@@ -493,7 +493,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[ignore = "helper process spawned by other tests through --exact --ignored, not a standalone test"]
     fn subprocess_mutates_token_store() {
         let action = std::env::var("TABLEPRO_TOKEN_TEST_ACTION").unwrap();
         let path = PathBuf::from(std::env::var_os("TABLEPRO_TOKEN_TEST_PATH").unwrap());

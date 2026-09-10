@@ -127,7 +127,9 @@ async fn required_intent_failure_prevents_driver_execution() {
         .await
         .expect_err("intent must fail");
 
-    assert!(error.to_string().contains("audit intent could not be persisted"));
+    assert!(
+        matches!(&error, DriverError::PolicyDenied(message) if message.contains("audit intent could not be persisted"))
+    );
     assert_eq!(executes.load(Ordering::SeqCst), 0);
 }
 
@@ -151,9 +153,7 @@ async fn commit_intent_failure_prevents_inner_commit() {
     let error = transaction.commit().await.expect_err("commit intent must fail");
 
     assert!(
-        error
-            .to_string()
-            .contains("commit denied because audit intent could not be persisted")
+        matches!(&error, DriverError::PolicyDenied(message) if message.contains("audit intent could not be persisted"))
     );
     assert_eq!(commits.load(Ordering::SeqCst), 0);
 }

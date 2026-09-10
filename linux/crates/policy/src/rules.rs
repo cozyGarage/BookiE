@@ -563,6 +563,23 @@ mod tests {
     }
 
     #[test]
+    fn human_scoped_dml_blast_radius_in_mixed_script_requires_approval() {
+        let facts = classify(
+            "UPDATE protected_data SET value = 'x' WHERE tenant_id = 42; INSERT INTO audit_log VALUES (1)",
+            "postgres",
+        );
+        let decision = evaluate(
+            &Principal::human_gui(),
+            Environment::Local,
+            &facts,
+            false,
+            &env_policy(Environment::Local),
+            None,
+        );
+        assert!(matches!(decision, Decision::RequireApproval { ref rule, .. } if rule == "blast_radius_unknown"));
+    }
+
+    #[test]
     fn agent_cannot_hide_unscoped_dml_in_mixed_script() {
         let facts = classify(
             "CREATE TABLE replacement(id integer); DELETE FROM protected_data",

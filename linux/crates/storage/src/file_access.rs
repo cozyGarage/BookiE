@@ -207,7 +207,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
+    #[ignore = "helper process spawned by other tests through --exact --ignored, not a standalone test"]
     async fn subprocess_holds_path_lock() {
         let path = PathBuf::from(std::env::var_os("TABLEPRO_LOCK_TEST_PATH").unwrap());
         let marker = PathBuf::from(std::env::var_os("TABLEPRO_LOCK_TEST_MARKER").unwrap());
