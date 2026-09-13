@@ -219,6 +219,7 @@ pub(super) fn build_column(
             }
             checkbox.set_opacity(if is_pending_delete { 0.5 } else { 1.0 });
             POSITION_SLOT.set(&checkbox, item.position());
+            ROW_KEY_SLOT.set(&checkbox, pk_values.clone());
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
             label.set_text(&text);
             apply_cell_tooltip(label.upcast_ref(), &text, is_null);
@@ -253,6 +254,7 @@ pub(super) fn build_column(
             SNAPSHOT_SLOT.take(&label);
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             POSITION_SLOT.take(&checkbox);
+            ROW_KEY_SLOT.take(&checkbox);
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
             POSITION_SLOT.take(&label);
         }

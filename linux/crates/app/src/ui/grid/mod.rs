@@ -2,6 +2,7 @@ mod column;
 mod context_menu;
 mod display;
 mod editing;
+mod export;
 mod types;
 
 use gtk4::prelude::*;
@@ -31,6 +32,8 @@ pub enum GridMsg {
     CopyRowAsInsert {
         row_position: u32,
     },
+    ShowRowAsJson(String),
+    ExportResults(QueryResult),
     SetCellNull {
         row_position: u32,
         col_index: usize,
@@ -65,6 +68,7 @@ pub fn build_column_view(
     schema_columns: &[ColumnInfo],
     table: &str,
     edit_sender: Option<relm4::Sender<GridMsg>>,
+    menu_sender: Option<relm4::Sender<GridMsg>>,
     sort: Option<(usize, bool)>,
     sort_sender: Option<relm4::Sender<GridMsg>>,
     connection_id: Option<uuid::Uuid>,
@@ -81,9 +85,9 @@ pub fn build_column_view(
         .show_column_separators(true)
         .build();
 
-    let grid_menus = edit_sender
+    let grid_menus = menu_sender
         .as_ref()
-        .map(|s| install_grid_context_menus(&column_view, s.clone()));
+        .map(|sender| install_grid_context_menus(&column_view, sender.clone(), result));
 
     let default_min_width = if result.columns.len() > WIDE_TABLE_THRESHOLD {
         Some(MIN_COLUMN_WIDTH_PX)

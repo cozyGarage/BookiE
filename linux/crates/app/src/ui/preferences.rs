@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 
-use crate::services::preferences::{self, Preferences};
+use crate::services::preferences;
 
 /// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
 /// in `workspace_state.rs`, the same way those two already duplicate each
@@ -201,12 +201,12 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
                 .get(page_size.selected() as usize)
                 .copied()
                 .unwrap_or(1_000);
-            preferences::save(&Preferences {
-                default_page_size,
-                confirm_destructive: confirm.is_active(),
-                editor_font_size: font.value() as u32,
-                history_retention_days: retention.value() as u32,
-                query_timeout_secs: timeout.value() as u32,
+            preferences::update(|prefs| {
+                prefs.default_page_size = default_page_size;
+                prefs.confirm_destructive = confirm.is_active();
+                prefs.editor_font_size = font.value() as u32;
+                prefs.history_retention_days = retention.value() as u32;
+                prefs.query_timeout_secs = timeout.value() as u32;
             });
         })
     };

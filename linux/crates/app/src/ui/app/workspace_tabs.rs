@@ -173,6 +173,12 @@ impl App {
                     SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
                     SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
                     SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
+                    SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
+                    SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
+                        title: crate::tr!("Row as JSON"),
+                        body,
+                    },
+                    SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
                 });
             let page = tab_view_for_create.append(editor.widget());
             let editor_count = workspace_tabs_for_create
@@ -359,6 +365,11 @@ impl App {
                 BrowseTabOutput::StateChanged => AppMsg::WorkspaceTabsChanged,
                 BrowseTabOutput::CopyRowAsInsert { row_position } => AppMsg::CopyRowAsInsert { tab_id, row_position },
                 BrowseTabOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
+                BrowseTabOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
+                    title: crate::tr!("Row as JSON"),
+                    body,
+                },
+                BrowseTabOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
                 BrowseTabOutput::SchemaWordsChanged(_words) => AppMsg::WorkspaceSchemaWordsChanged,
                 BrowseTabOutput::ShowSelectionAlert { title, body } => AppMsg::ShowAlert { title, body },
                 BrowseTabOutput::ShowToast(msg) => AppMsg::ShowToast(msg),
@@ -487,6 +498,12 @@ impl App {
                 SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
                 SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
                 SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
+                SqlEditorOutput::CopyToClipboard(text) => AppMsg::CopyToClipboard(text),
+                SqlEditorOutput::ShowRowAsJson(body) => AppMsg::ShowAlert {
+                    title: crate::tr!("Row as JSON"),
+                    body,
+                },
+                SqlEditorOutput::ExportResults { result, name } => AppMsg::ExportResults { result, name },
             });
         let page = tab_view.append(editor.widget());
         let label = match query.trim().is_empty() {

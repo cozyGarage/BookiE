@@ -285,6 +285,8 @@ pub enum BrowseTabInput {
         row_position: u32,
     },
     GridCopyToClipboard(String),
+    GridShowRowAsJson(String),
+    GridExportResults(QueryResult),
     /// Ctrl+Z on this tab. Pops one entry off the change tracker's
     /// undo stack AND mirrors the visual revert in the grid:
     /// CellEdit → reset the RowObject's cell + items_changed;
@@ -356,13 +358,23 @@ pub enum BrowseTabOutput {
     /// Display state changed in a way that should be persisted.
     StateChanged,
     /// Cell context-menu "Copy row as INSERT".
-    CopyRowAsInsert { row_position: u32 },
+    CopyRowAsInsert {
+        row_position: u32,
+    },
     /// Generic clipboard-copy request from grid.
     CopyToClipboard(String),
+    ShowRowAsJson(String),
+    ExportResults {
+        result: QueryResult,
+        name: String,
+    },
     /// Column-name vocabulary for editor autocomplete; App merges across tabs.
     SchemaWordsChanged(Vec<String>),
     /// Show a generic info dialog for "Cannot edit / select exactly one row".
-    ShowSelectionAlert { title: String, body: String },
+    ShowSelectionAlert {
+        title: String,
+        body: String,
+    },
     /// Show a transient toast — used for inline cell-input validation
     /// errors ("Invalid date format" etc.) where a modal alert is too
     /// heavy for the user's intent.
@@ -388,6 +400,8 @@ mod chrome;
 mod grid_render;
 mod row_ops;
 mod selection;
+#[cfg(test)]
+mod tests;
 mod value_parse;
 
 use chrome::*;
@@ -803,6 +817,8 @@ impl SimpleComponent for BrowseTab {
                 row_key,
             },
             GridMsg::CopyToClipboard(text) => BrowseTabInput::GridCopyToClipboard(text),
+            GridMsg::ShowRowAsJson(text) => BrowseTabInput::GridShowRowAsJson(text),
+            GridMsg::ExportResults(result) => BrowseTabInput::GridExportResults(result),
             GridMsg::CopyRowAsInsert { row_position } => BrowseTabInput::GridCopyRowAsInsert { row_position },
             GridMsg::SetCellNull {
                 row_position,
@@ -1138,6 +1154,15 @@ impl SimpleComponent for BrowseTab {
                 self.handle_grid_copy_row_as_insert(row_position, sender)
             }
             BrowseTabInput::GridCopyToClipboard(text) => self.handle_grid_copy_to_clipboard(text, sender),
+            BrowseTabInput::GridShowRowAsJson(text) => {
+                let _ = sender.output(BrowseTabOutput::ShowRowAsJson(text));
+            }
+            BrowseTabInput::GridExportResults(result) => {
+                let _ = sender.output(BrowseTabOutput::ExportResults {
+                    result,
+                    name: self.table_label(),
+                });
+            }
             BrowseTabInput::CopySelectedRowsAsTsv => self.handle_copy_selected_rows_as_tsv(sender),
             BrowseTabInput::PasteNotSupported => self.handle_paste_not_supported(sender),
             BrowseTabInput::SelectAllRows => self.handle_select_all_rows(),
@@ -1154,44 +1179,5 @@ impl SimpleComponent for BrowseTab {
             BrowseTabInput::Undo => self.handle_undo(),
             BrowseTabInput::Redo => self.handle_redo(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{BrowsePageRequest, PageRequestTracker, RowCountRequestTracker};
-    use uuid::Uuid;
-
-    #[test]
-    fn only_the_latest_browse_page_request_is_accepted() {
-        let tracker = PageRequestTracker::default();
-        let older = tracker.begin(0);
-        let newer = tracker.begin(0);
-
-        assert!(!tracker.accepts(older, 0));
-        assert!(tracker.accepts(newer, 0));
-    }
-
-    #[test]
-    fn only_the_latest_row_count_request_is_accepted() {
-        let tracker = RowCountRequestTracker::default();
-        let older = tracker.begin();
-        let newer = tracker.begin();
-
-        assert!(!tracker.accepts(older));
-        assert!(tracker.accepts(newer));
-    }
-
-    #[test]
-    fn browse_page_response_must_match_the_current_offset() {
-        let tracker = PageRequestTracker::default();
-        let request = tracker.begin(100);
-        let same_id_wrong_offset = BrowsePageRequest {
-            id: request.id,
-            offset: 100,
-        };
-
-        assert!(!tracker.accepts(same_id_wrong_offset, 200));
-        assert_ne!(request.id, Uuid::nil());
     }
 }

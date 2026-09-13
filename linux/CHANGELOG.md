@@ -72,6 +72,7 @@
 - Each window holds its own database connection, so several databases can be open at the same time in separate windows
 - A binary column holding valid UTF-8 text now displays as that text instead of a byte count
 - Browse marks a foreign-key column's header with 🔗
+- Result grids can copy selected rows as TSV, CSV, JSON, Markdown, or an IN clause, show a row as JSON, and export displayed table or query results as CSV or JSON
 
 ### Changed
 

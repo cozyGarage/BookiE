@@ -19,6 +19,8 @@ pub struct Preferences {
     /// shutdown.
     #[serde(default = "default_query_timeout_secs")]
     pub query_timeout_secs: u32,
+    #[serde(default = "default_csv_include_header")]
+    pub csv_include_header: bool,
 }
 
 fn default_history_retention_days() -> u32 {
@@ -29,6 +31,10 @@ fn default_query_timeout_secs() -> u32 {
     60
 }
 
+fn default_csv_include_header() -> bool {
+    true
+}
+
 impl Default for Preferences {
     fn default() -> Self {
         Self {
@@ -37,6 +43,7 @@ impl Default for Preferences {
             editor_font_size: 12,
             history_retention_days: default_history_retention_days(),
             query_timeout_secs: default_query_timeout_secs(),
+            csv_include_header: default_csv_include_header(),
         }
     }
 }
@@ -66,6 +73,12 @@ pub fn save(prefs: &Preferences) {
     if let Err(e) = atomic_write_json(&path, prefs) {
         tracing::warn!(path = %path.display(), error = %e, "preferences: write failed");
     }
+}
+
+pub fn update(mutate: impl FnOnce(&mut Preferences)) {
+    let mut prefs = load();
+    mutate(&mut prefs);
+    save(&prefs);
 }
 
 fn load_from_disk() -> Preferences {

@@ -245,6 +245,7 @@ impl BrowseTab {
             &self.current_columns,
             &self.table,
             edit_sender,
+            Some(self.grid_sender.clone()),
             self.current_sort,
             Some(self.grid_sender.clone()),
             self.connection_id,

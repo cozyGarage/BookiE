@@ -18,6 +18,7 @@ use tablepro_core::QueryResult;
 use tablepro_storage::query_history::{self, NewEntry, Outcome};
 
 use crate::services::database_service::{self, ConnectionMetadata};
+use crate::ui::grid::GridMsg;
 
 pub use completion::{SchemaIndex, SchemaRequest, candidate_words, referenced_tables, table_key};
 pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_schema_buffer};
@@ -34,6 +35,7 @@ pub struct SqlEditor {
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
     status: gtk::Label,
+    grid_sender: relm4::Sender<GridMsg>,
     cancel_token: Option<CancellationToken>,
     executions: std::collections::HashMap<u64, ExecutionContext>,
     connection_id: Option<Uuid>,
@@ -99,6 +101,7 @@ pub enum SqlEditorInput {
     RunAtCursor,
     ToggleLineComment,
     Explain,
+    Grid(GridMsg),
 }
 
 #[derive(Debug)]
@@ -106,6 +109,9 @@ pub enum SqlEditorOutput {
     RunStateChanged(bool),
     QueryChanged(String),
     NeedColumns(Vec<String>),
+    CopyToClipboard(String),
+    ShowRowAsJson(String),
+    ExportResults { result: QueryResult, name: String },
 }
 
 const MAX_DROPPED_SQL_BYTES: u64 = 8 * 1024 * 1024;
@@ -442,6 +448,10 @@ impl SimpleComponent for SqlEditor {
         });
         widgets.source_view.add_controller(drop_target);
 
+        let (grid_sender, grid_receiver) = relm4::channel::<GridMsg>();
+        let grid_input = sender.input_sender().clone();
+        relm4::spawn_local(grid_receiver.forward(grid_input, SqlEditorInput::Grid));
+
         let model = SqlEditor {
             source_view: widgets.source_view.clone(),
             run_button: widgets.run_button.clone(),
@@ -449,6 +459,7 @@ impl SimpleComponent for SqlEditor {
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
             status: widgets.status.clone(),
+            grid_sender,
             cancel_token: None,
             executions: std::collections::HashMap::new(),
             connection_id: init.connection_id,
@@ -467,6 +478,19 @@ impl SimpleComponent for SqlEditor {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
+            SqlEditorInput::Grid(GridMsg::CopyToClipboard(text)) => {
+                let _ = sender.output(SqlEditorOutput::CopyToClipboard(text));
+            }
+            SqlEditorInput::Grid(GridMsg::ShowRowAsJson(text)) => {
+                let _ = sender.output(SqlEditorOutput::ShowRowAsJson(text));
+            }
+            SqlEditorInput::Grid(GridMsg::ExportResults(result)) => {
+                let _ = sender.output(SqlEditorOutput::ExportResults {
+                    result,
+                    name: self.export_name(),
+                });
+            }
+            SqlEditorInput::Grid(_) => {}
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -562,7 +586,7 @@ impl SimpleComponent for SqlEditor {
                 self.status
                     .set_label(&summary_label(n_total, n_ok, total_ms, first_error.is_some()));
                 clear_box(&self.results_holder);
-                render_outcomes(&self.results_holder, &outcomes);
+                render_outcomes(&self.results_holder, &outcomes, &self.grid_sender);
             }
 
             SqlEditorInput::ShowCancelled(generation) => {
@@ -663,6 +687,28 @@ impl SimpleComponent for SqlEditor {
 }
 
 impl SqlEditor {
+    fn export_name(&self) -> String {
+        let buffer = self.source_view.buffer();
+        let (start, end) = buffer.bounds();
+        let label = derive_tab_label(&buffer.text(&start, &end, false));
+        let slug = label
+            .chars()
+            .map(|character| {
+                if character.is_alphanumeric() {
+                    character.to_ascii_lowercase()
+                } else {
+                    '-'
+                }
+            })
+            .collect::<String>();
+        let slug = slug.trim_matches('-');
+        if slug.is_empty() {
+            crate::tr!("query-results")
+        } else {
+            slug.to_string()
+        }
+    }
+
     fn connection(&self) -> Option<std::sync::Arc<dyn tablepro_core::Connection>> {
         database_service::instance().get(self.connection_id?)
     }

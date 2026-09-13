@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
 use super::{StatementOutcome, StatementOutcomeKind};
-use crate::ui::grid::{TabGridContext, build_column_view};
+use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
 use tablepro_core::{DriverError, OperationControl};
 
 pub(crate) fn clear_box(b: &gtk::Box) {
@@ -105,7 +105,7 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
     }
 }
 
-fn build_outcome_widget(o: &StatementOutcome, idx: usize) -> gtk::Widget {
+fn build_outcome_widget(o: &StatementOutcome, idx: usize, grid_sender: &relm4::Sender<GridMsg>) -> gtk::Widget {
     match &o.kind {
         StatementOutcomeKind::Rows(result) if !result.rows.is_empty() => {
             let (column_view, _selection) = build_column_view(
@@ -113,6 +113,7 @@ fn build_outcome_widget(o: &StatementOutcome, idx: usize) -> gtk::Widget {
                 &result.columns,
                 "",
                 None,
+                Some(grid_sender.clone()),
                 None,
                 None,
                 None,
@@ -165,7 +166,7 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
     }
 }
 
-pub(crate) fn render_outcomes(holder: &gtk::Box, outcomes: &[StatementOutcome]) {
+pub(crate) fn render_outcomes(holder: &gtk::Box, outcomes: &[StatementOutcome], grid_sender: &relm4::Sender<GridMsg>) {
     if outcomes.is_empty() {
         let placeholder = adw::StatusPage::builder()
             .title(crate::tr!("Empty query"))
@@ -177,13 +178,13 @@ pub(crate) fn render_outcomes(holder: &gtk::Box, outcomes: &[StatementOutcome]) 
         return;
     }
     if outcomes.len() == 1 {
-        let widget = build_outcome_widget(&outcomes[0], 0);
+        let widget = build_outcome_widget(&outcomes[0], 0, grid_sender);
         holder.append(&widget);
         return;
     }
     let stack = adw::ViewStack::new();
     for (idx, o) in outcomes.iter().enumerate() {
-        let widget = build_outcome_widget(o, idx);
+        let widget = build_outcome_widget(o, idx, grid_sender);
         let icon = match &o.kind {
             StatementOutcomeKind::Rows(_) => "view-grid-symbolic",
             StatementOutcomeKind::Error(_) => "dialog-error-symbolic",

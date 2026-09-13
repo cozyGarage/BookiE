@@ -69,6 +69,10 @@ pub enum AppMsg {
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
     ExportCsv,
     ExportJson,
+    ExportResults {
+        result: QueryResult,
+        name: String,
+    },
     CopyToClipboard(String),
     CopyRowAsInsert {
         tab_id: Uuid,
