@@ -1,7 +1,7 @@
 use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
-use tablepro_core::{QueryResult, Value};
+use tablepro_core::QueryResult;
 
 use crate::services::preferences;
 
@@ -201,47 +201,11 @@ fn write_csv(path: &std::path::Path, result: &QueryResult, include_header: bool)
 }
 
 fn write_json(path: &std::path::Path, result: &QueryResult) -> std::io::Result<()> {
-    let rows: Vec<serde_json::Value> = result
-        .rows
-        .iter()
-        .map(|row| {
-            let mut object = serde_json::Map::new();
-            for (index, column) in result.columns.iter().enumerate() {
-                let value = row.get(index).unwrap_or(&Value::Null);
-                object.insert(column.name.clone(), json_value(value));
-            }
-            serde_json::Value::Object(object)
-        })
-        .collect();
-    tablepro_core::export::write_atomically(path, |mut output| {
-        serde_json::to_writer_pretty(&mut output, &rows).map_err(std::io::Error::other)?;
-        std::io::Write::write_all(&mut output, b"\n")
+    let json = tablepro_core::export::render_json(&result.columns, &result.rows);
+    tablepro_core::export::write_atomically(path, |output| {
+        std::io::Write::write_all(output, json.as_bytes())?;
+        std::io::Write::write_all(output, b"\n")
     })
-}
-
-fn json_value(value: &Value) -> serde_json::Value {
-    match value {
-        Value::Null => serde_json::Value::Null,
-        Value::Bool(value) => serde_json::Value::Bool(*value),
-        Value::Int(value) => serde_json::Value::from(*value),
-        Value::Float(value) => serde_json::Value::from(*value),
-        Value::Text(value) => serde_json::Value::String(value.clone()),
-        Value::Bytes(value) => {
-            let mut text = String::from("\\x");
-            for byte in value {
-                use std::fmt::Write as _;
-                let _ = write!(text, "{byte:02x}");
-            }
-            serde_json::Value::String(text)
-        }
-        Value::Date(value) => serde_json::Value::String(value.to_string()),
-        Value::Time(value) => serde_json::Value::String(value.to_string()),
-        Value::DateTime(value) => serde_json::Value::String(value.to_string()),
-        Value::TimestampTz(value) => serde_json::Value::String(value.to_rfc3339()),
-        Value::Decimal(value) => serde_json::Value::String(value.to_string()),
-        Value::Uuid(value) => serde_json::Value::String(value.to_string()),
-        Value::Json(value) => value.clone(),
-    }
 }
 
 fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, error: &std::io::Error) {
@@ -277,10 +241,35 @@ mod tests {
     }
 
     #[test]
-    fn json_values_preserve_binary_data() {
+    fn json_export_keeps_duplicate_columns_and_binary_values() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("result.json");
+        let result = QueryResult {
+            columns: vec![column("id"), column("id")],
+            rows: vec![vec![
+                tablepro_core::Value::Bytes(vec![0, 0xff]),
+                tablepro_core::Value::Int(2),
+            ]],
+            truncated: false,
+        };
+
+        write_json(&path, &result).unwrap();
+
         assert_eq!(
-            json_value(&Value::Bytes(vec![0, 0xff, 0x41])),
-            serde_json::json!("\\x00ff41")
+            std::fs::read_to_string(path).unwrap(),
+            "[\n  {\n    \"id\": \"0x00ff\",\n    \"id_2\": 2\n  }\n]\n"
         );
+    }
+
+    fn column(name: &str) -> tablepro_core::ColumnInfo {
+        tablepro_core::ColumnInfo {
+            name: name.to_string(),
+            data_type: "text".to_string(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+        }
     }
 }

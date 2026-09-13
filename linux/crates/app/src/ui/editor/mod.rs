@@ -690,23 +690,7 @@ impl SqlEditor {
     fn export_name(&self) -> String {
         let buffer = self.source_view.buffer();
         let (start, end) = buffer.bounds();
-        let label = derive_tab_label(&buffer.text(&start, &end, false));
-        let slug = label
-            .chars()
-            .map(|character| {
-                if character.is_alphanumeric() {
-                    character.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect::<String>();
-        let slug = slug.trim_matches('-');
-        if slug.is_empty() {
-            crate::tr!("query-results")
-        } else {
-            slug.to_string()
-        }
+        export_name_for_query(&buffer.text(&start, &end, false))
     }
 
     fn connection(&self) -> Option<std::sync::Arc<dyn tablepro_core::Connection>> {
@@ -879,6 +863,27 @@ fn read_dropped_sql(path: &std::path::Path, max_bytes: u64) -> Result<String, St
     String::from_utf8(bytes).map_err(|_| crate::tr!("The dropped SQL file is not valid UTF-8"))
 }
 
+fn export_name_for_query(query: &str) -> String {
+    if query.trim().is_empty() {
+        return crate::tr!("query-results");
+    }
+    let label = derive_tab_label(query);
+    let mut slug = String::new();
+    for character in label.chars() {
+        if character.is_alphanumeric() {
+            slug.push(character.to_ascii_lowercase());
+        } else if !slug.ends_with('-') {
+            slug.push('-');
+        }
+    }
+    let slug = slug.trim_matches('-');
+    if slug.is_empty() {
+        crate::tr!("query-results")
+    } else {
+        slug.to_string()
+    }
+}
+
 fn build_completion_refresh(
     view: sourceview5::View,
     schema_buffer: gtk::TextBuffer,
@@ -909,7 +914,7 @@ fn build_completion_refresh(
 
 #[cfg(test)]
 mod tests {
-    use super::{DropGeneration, RunGeneration, read_dropped_sql};
+    use super::{DropGeneration, RunGeneration, export_name_for_query, read_dropped_sql};
     use std::io::Write;
 
     #[test]
@@ -943,6 +948,15 @@ mod tests {
         let first_terminal = generations.finish(first).unwrap();
         assert!(!first_terminal.replace_ui);
         assert!(first_terminal.became_idle);
+    }
+
+    #[test]
+    fn export_name_is_stable_and_safe_for_files() {
+        assert_eq!(
+            export_name_for_query("SELECT * FROM sales.order_items"),
+            "select-from-sales-order-item"
+        );
+        assert_eq!(export_name_for_query("  \n\t"), "query-results");
     }
 
     #[test]
