@@ -1,6 +1,6 @@
-# TablePro Linux development plan
+# BookiE Linux development plan
 
-Last audited: 2026-09-09
+Last updated: 2026-09-14
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -13,15 +13,23 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 
 ## Current baseline
 
-- Development starts from `linux` at `89979e51a3d70b52c2a4082d0fa44ac72528c8ea`. Verified implementation after this pass: `f8a0ba7055dfe609308aa5326fb10c82982c70b9`.
-- That commit passed hosted default, driver, TLS, PostgreSQL, GTK, and Flatpak checks; its optional DuckDB job failed at Git ownership validation before compilation.
-- The active findings and validation ledger are in [the bug and consistency audit](linux/docs/bug-consistency-2026-09.md). The [previous stabilization audit](linux/docs/stabilization-2026-09.md) is historical evidence for its recorded source tree.
+- Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
+- Next work is the [BookiE 0.1.1 review plan](linux/docs/bookie-0.1.1-plan.md): stabilization and bug fixes, one proposed macOS feature (Jump to Column), and a compatibility-first product rename. Implementation waits for review.
+- The [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) and [previous stabilization audit](linux/docs/stabilization-2026-09.md) are historical evidence for their recorded source trees, not approval of 0.1.1.
 - PostgreSQL has the broadest fixture evidence. Redis/MongoDB remain experimental and DuckDB is optional.
 - Package promotion remains separate: a frozen SHA, 30 consecutive retry-free GTK attempts across six runs, and installed Arch/Wayland install, upgrade, and rollback evidence are still required.
 
-## Active work: bugs and behavioral consistency only
+## Active work: review the BookiE 0.1.1 plan
 
-This pass supersedes the September feature-comparison sprint and takes precedence over the historical phases below. Feature adoption, redesign, broad refactoring, and package release approval are deferred.
+The [0.1.1 plan](linux/docs/bookie-0.1.1-plan.md) owns next-sprint scope,
+rename decisions, feature acceptance and release sequencing. No version bump,
+application/package rename or release publication is authorized by a checked
+historical phase below. Today ends after committing and pushing the plan.
+
+## Historical September 9 pass: bugs and behavioral consistency
+
+The following records the prior pass, now superseded for sequencing by the
+0.1.1 plan. It remains useful evidence of the review method, not active scope.
 
 1. Establish an exact baseline and distinguish confirmed defects, verification gaps, and existing limitations.
 2. Review data values and transaction boundaries, session/async ownership, policy/audit entry points, persistence, and browse/export behavior in that order.
@@ -36,7 +44,7 @@ Run `cargo deny check` from `linux/`; it does not accept `--manifest-path`. Rust
 
 ## Product contract
 
-TablePro Linux should provide:
+BookiE should provide:
 
 - Safe PostgreSQL operation during incidents
 - Fast native GTK workflows
@@ -49,7 +57,10 @@ TablePro Linux should provide:
 
 Every locally shipped Linux feature must work without an account, license key, receipt, subscription, or entitlement service.
 
-The product name remains **TablePro Linux** until repository ownership, package names, trademarks, and the final application ID are explicitly decided. “Bookie” is a possible future rename, not an assumption in implementation work.
+The chosen product name is **BookiE**. The running code is still named TablePro
+until the planned rename is implemented. Package/command transitions, durable
+application IDs and repository naming follow the explicit compatibility decisions
+in the 0.1.1 plan; do not globally replace persistence or credential identifiers.
 
 ## Status vocabulary
 
