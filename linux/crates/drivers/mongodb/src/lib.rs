@@ -512,6 +512,9 @@ fn parse_find_shell(input: &str) -> Option<FindQuery> {
             break;
         }
     }
+    if !remaining.trim().is_empty() {
+        return None;
+    }
     Some(FindQuery {
         collection,
         filter,
@@ -523,7 +526,10 @@ fn parse_find_shell(input: &str) -> Option<FindQuery> {
 fn parse_aggregate_shell(input: &str) -> Option<AggregateQuery> {
     let input = input.trim().trim_end_matches(';');
     let (collection, rest) = split_collection_call(input, "aggregate")?;
-    let (pipeline_src, _) = extract_balanced(rest.trim_start(), '(', ')')?;
+    let (pipeline_src, trailing) = extract_balanced(rest.trim_start(), '(', ')')?;
+    if !trailing.trim().is_empty() {
+        return None;
+    }
     let value: serde_json::Value = serde_json::from_str(pipeline_src).ok()?;
     let arr = value.as_array()?;
     let mut pipeline = Vec::new();
@@ -535,13 +541,19 @@ fn parse_aggregate_shell(input: &str) -> Option<AggregateQuery> {
 
 fn parse_insert_one(input: &str) -> Option<(String, Document)> {
     let (collection, rest) = split_collection_call(input.trim().trim_end_matches(';'), "insertOne")?;
-    let (doc_src, _) = extract_balanced(rest.trim_start(), '(', ')')?;
+    let (doc_src, trailing) = extract_balanced(rest.trim_start(), '(', ')')?;
+    if !trailing.trim().is_empty() {
+        return None;
+    }
     Some((collection, serde_json_to_document(doc_src).ok()?))
 }
 
 fn parse_delete_many(input: &str) -> Option<(String, Document)> {
     let (collection, rest) = split_collection_call(input.trim().trim_end_matches(';'), "deleteMany")?;
-    let (doc_src, _) = extract_balanced(rest.trim_start(), '(', ')')?;
+    let (doc_src, trailing) = extract_balanced(rest.trim_start(), '(', ')')?;
+    if !trailing.trim().is_empty() {
+        return None;
+    }
     Some((collection, serde_json_to_document(doc_src).ok()?))
 }
 
@@ -567,7 +579,7 @@ fn parse_drop_table_sql(input: &str) -> Option<String> {
             c => name.push(c),
         }
     }
-    Some(name)
+    chars.as_str().trim().is_empty().then_some(name)
 }
 
 fn split_collection_call<'a>(input: &'a str, method: &str) -> Option<(String, &'a str)> {
@@ -795,6 +807,16 @@ mod tests {
     fn parse_find_shell_bracket_name() {
         let q = parse_find_shell(r#"db["my-coll"].find({})"#).unwrap();
         assert_eq!(q.collection, "my-coll");
+    }
+
+    #[test]
+    fn shell_commands_reject_trailing_text_instead_of_executing_a_prefix() {
+        assert!(parse_find_shell(r#"db.users.find({}).limit(1) unexpected"#).is_none());
+        assert!(parse_find_shell(r#"db.users.find({}).unknown()"#).is_none());
+        assert!(parse_aggregate_shell(r#"db.users.aggregate([]) unexpected"#).is_none());
+        assert!(parse_insert_one(r#"db.users.insertOne({"name":"Ada"}) unexpected"#).is_none());
+        assert!(parse_delete_many(r#"db.users.deleteMany({}) unexpected"#).is_none());
+        assert!(parse_drop_table_sql(r#"DROP TABLE "users" unexpected"#).is_none());
     }
 
     #[test]

@@ -13,6 +13,7 @@
 - DDL completion and table/view refresh retain their originating connection and reject stale results
 - Redis browsing uses an isolated connection so interruption cannot change the normal command database
 - MongoDB filters and inserts preserve BSON numbers when arbitrary-precision JSON is enabled
+- MongoDB shell commands reject trailing text instead of executing only a valid prefix
 - Replaced the yanked transitive chacha20 0.10.1 release with 0.10.2
 
 ### Bug and consistency follow-up
