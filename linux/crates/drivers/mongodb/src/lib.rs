@@ -636,7 +636,49 @@ fn is_simple_ident(s: &str) -> bool {
 
 fn serde_json_to_document(src: &str) -> Result<Document, String> {
     let value: serde_json::Value = serde_json::from_str(src).map_err(|e| format!("JSON parse error: {e}"))?;
-    mongodb::bson::to_document(&value).map_err(|e| format!("BSON convert error: {e}"))
+    match json_to_bson(value)? {
+        Bson::Document(document) => Ok(document),
+        _ => Err("expected a JSON object".into()),
+    }
+}
+
+// Serializing serde_json::Value through BSON exposes serde_json's private
+// arbitrary-precision number representation as a document. Convert values
+// explicitly so numeric predicates and inserted numbers stay BSON numbers.
+fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
+    Ok(match value {
+        serde_json::Value::Null => Bson::Null,
+        serde_json::Value::Bool(value) => Bson::Boolean(value),
+        serde_json::Value::String(value) => Bson::String(value),
+        serde_json::Value::Number(value) => {
+            if let Some(integer) = value.as_i64() {
+                Bson::Int64(integer)
+            } else if value.as_u64().is_some() {
+                Bson::Decimal128(
+                    value
+                        .to_string()
+                        .parse()
+                        .map_err(|error| format!("BSON number: {error}"))?,
+                )
+            } else {
+                Bson::Double(
+                    value
+                        .as_f64()
+                        .filter(|value| value.is_finite())
+                        .ok_or("BSON number out of range")?,
+                )
+            }
+        }
+        serde_json::Value::Array(values) => {
+            Bson::Array(values.into_iter().map(json_to_bson).collect::<Result<_, _>>()?)
+        }
+        serde_json::Value::Object(values) => Bson::Document(
+            values
+                .into_iter()
+                .map(|(key, value)| Ok((key, json_to_bson(value)?)))
+                .collect::<Result<_, String>>()?,
+        ),
+    })
 }
 
 fn map_mongo_error(err: mongodb::error::Error) -> DriverError {
@@ -732,6 +774,21 @@ mod tests {
         assert_eq!(q.collection, "users");
         assert_eq!(q.limit, 10);
         assert_eq!(q.filter.get_document("age").unwrap().get_i64("$gt").unwrap(), 18);
+    }
+
+    #[test]
+    fn arbitrary_precision_json_numbers_remain_bson_numbers() {
+        let document = serde_json_to_document(
+            r#"{"nested":{"n":9223372036854775807},"values":[18,1.25],"wide":18446744073709551615}"#,
+        )
+        .unwrap();
+        assert_eq!(document.get_document("nested").unwrap().get_i64("n").unwrap(), i64::MAX);
+        assert_eq!(
+            document.get_array("values").unwrap(),
+            &vec![Bson::Int64(18), Bson::Double(1.25)]
+        );
+        assert!(matches!(document.get("wide"), Some(Bson::Decimal128(_))));
+        assert!(serde_json_to_document("[]").is_err());
     }
 
     #[test]

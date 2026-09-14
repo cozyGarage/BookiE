@@ -41,6 +41,26 @@ async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn copied_in_clause_keeps_backslash_payload_as_data() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    let payload = Value::Text("x\\' OR 1=1 -- ".into());
+    let clause = tablepro_core::export::render_in_clause("clickhouse", &[vec![payload.clone()]], 0);
+    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &payload);
+    let result = conn
+        .query(&format!("SELECT {literal} WHERE {literal} IN {}", clause.sql))
+        .await
+        .unwrap();
+    assert_eq!(result.rows, vec![vec![payload]]);
+    let unmatched = conn
+        .query(&format!("SELECT 'unrelated' WHERE 'unrelated' IN {}", clause.sql))
+        .await
+        .unwrap();
+    assert!(unmatched.rows.is_empty());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn connect_list_tables_and_pk_detection() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;

@@ -170,6 +170,11 @@ impl App {
                     initial_query: None,
                 })
                 .forward(sender_for_create.input_sender(), move |out| match out {
+                    SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
+                        origin,
+                        schema: None,
+                        table: None,
+                    },
                     SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
                     SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
                     SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),
@@ -495,6 +500,11 @@ impl App {
                 initial_query,
             })
             .forward(sender.input_sender(), move |out| match out {
+                SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
+                    origin,
+                    schema: None,
+                    table: None,
+                },
                 SqlEditorOutput::RunStateChanged(running) => AppMsg::EditorTabRunStateChanged(tab_id, running),
                 SqlEditorOutput::QueryChanged(text) => AppMsg::EditorTabQueryChanged(tab_id, text),
                 SqlEditorOutput::NeedColumns(tables) => AppMsg::EditorNeedsColumns(tables),

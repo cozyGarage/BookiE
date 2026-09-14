@@ -80,6 +80,28 @@ fn an_ordinary_read_stays_a_read_on_every_engine() {
 }
 
 #[test]
+fn corrected_lexer_keeps_reads_intact_and_following_mutations_denied() {
+    for (driver, read) in [
+        ("mysql", "SELECT 'a\\';b'"),
+        ("postgres", "SELECT 1 /* outer /* inner */ ; outer */"),
+    ] {
+        let sql = format!("{read}; DELETE FROM protected_items");
+        let statements = tablepro_core::sql_lex::split_statements(&sql, driver);
+        assert_eq!(statements, vec![read, "DELETE FROM protected_items"]);
+        assert_eq!(classify(&statements[0], driver).class, StatementClass::Select);
+        let decision = evaluate(
+            &Principal::human_gui(),
+            Environment::Local,
+            &classify(&statements[1], driver),
+            true,
+            &PolicyConfig::default().for_environment(Environment::Local),
+            None,
+        );
+        assert!(matches!(decision, Decision::Deny { .. }));
+    }
+}
+
+#[test]
 fn an_engine_procedure_name_inside_a_literal_is_not_administrative() {
     let facts = classify("SELECT 'xp_cmdshell is not called here' AS note", "mssql");
     assert_eq!(facts.class, StatementClass::Select);

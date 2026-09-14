@@ -1,4 +1,5 @@
 mod completion;
+mod diagnostics;
 mod outcomes;
 mod schema;
 mod sql_text;
@@ -29,6 +30,9 @@ use sql_text::toggle_line_comment;
 use tablepro_core::sql_lex::{split_statements, statement_at_cursor};
 
 pub struct SqlEditor {
+    catalog_changes: crate::services::catalog::CatalogChanges,
+    catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
+    diagnostics: diagnostics::Diagnostics,
     source_view: sourceview5::View,
     run_button: gtk::Button,
     cancel_button: gtk::Button,
@@ -72,6 +76,11 @@ pub enum StatementOutcomeKind {
 
 #[derive(Debug)]
 pub enum SqlEditorInput {
+    CatalogStatementSucceeded {
+        origin: crate::services::catalog::CatalogOrigin,
+        driver: String,
+        sql: String,
+    },
     Run,
     RunWithParameters {
         generation: u64,
@@ -106,6 +115,7 @@ pub enum SqlEditorInput {
 
 #[derive(Debug)]
 pub enum SqlEditorOutput {
+    CatalogChanged(crate::services::catalog::CatalogOrigin),
     RunStateChanged(bool),
     QueryChanged(String),
     NeedColumns(Vec<String>),
@@ -219,6 +229,13 @@ impl SimpleComponent for SqlEditor {
                     add_css_class: "dim-label",
                     add_css_class: "monospace",
                     set_margin_end: 8,
+                },
+
+                #[name = "warnings_button"]
+                gtk::MenuButton {
+                    set_label: &crate::tr!("SQL warnings"),
+                    set_tooltip_text: Some(crate::tr!("Character suggestions; SQL is not changed").as_str()),
+                    set_visible: false,
                 },
 
                 #[name = "running_spinner"]
@@ -453,6 +470,13 @@ impl SimpleComponent for SqlEditor {
         relm4::spawn_local(grid_receiver.forward(grid_input, SqlEditorInput::Grid));
 
         let model = SqlEditor {
+            catalog_changes: Default::default(),
+            catalog_origin: None,
+            diagnostics: diagnostics::Diagnostics::install(
+                &widgets.source_view,
+                &widgets.warnings_button,
+                init.connection_id,
+            ),
             source_view: widgets.source_view.clone(),
             run_button: widgets.run_button.clone(),
             cancel_button: widgets.cancel_button.clone(),
@@ -471,6 +495,7 @@ impl SimpleComponent for SqlEditor {
     }
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
+        self.diagnostics.stop();
         if let Some(handler) = self.dark_notify_handler.take() {
             adw::StyleManager::default().disconnect(handler);
         }
@@ -478,6 +503,18 @@ impl SimpleComponent for SqlEditor {
 
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
+            SqlEditorInput::CatalogStatementSucceeded { origin, driver, sql } => {
+                if !origin.owns_window(self.connection_id) {
+                    return;
+                }
+                if self.catalog_origin.as_ref() != Some(&origin) {
+                    self.catalog_changes = Default::default();
+                    self.catalog_origin = Some(origin.clone());
+                }
+                if self.catalog_changes.succeeded(&sql, &driver) {
+                    let _ = sender.output(SqlEditorOutput::CatalogChanged(origin));
+                }
+            }
             SqlEditorInput::Grid(GridMsg::CopyToClipboard(text)) => {
                 let _ = sender.output(SqlEditorOutput::CopyToClipboard(text));
             }
@@ -586,7 +623,7 @@ impl SimpleComponent for SqlEditor {
                 self.status
                     .set_label(&summary_label(n_total, n_ok, total_ms, first_error.is_some()));
                 clear_box(&self.results_holder);
-                render_outcomes(&self.results_holder, &outcomes, &self.grid_sender);
+                render_outcomes(&self.results_holder, &outcomes, &self.grid_sender, self.connection_id);
             }
 
             SqlEditorInput::ShowCancelled(generation) => {
@@ -693,10 +730,6 @@ impl SqlEditor {
         export_name_for_query(&buffer.text(&start, &end, false))
     }
 
-    fn connection(&self) -> Option<std::sync::Arc<dyn tablepro_core::Connection>> {
-        database_service::instance().get(self.connection_id?)
-    }
-
     fn metadata(&self) -> Option<ConnectionMetadata> {
         database_service::instance().metadata(self.connection_id?)
     }
@@ -740,7 +773,8 @@ impl SqlEditor {
         if !self.run_generation.accepts(generation) {
             return;
         }
-        let conn = match self.connection() {
+        let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id);
+        let conn = match origin.as_ref().and_then(|origin| origin.connection()) {
             Some(c) => c,
             None => {
                 self.status.set_label(&crate::tr!("no active connection"));
@@ -786,7 +820,18 @@ impl SqlEditor {
                 .register(async move {
                     let statements = split_statements(&trimmed, &driver_id);
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
-                    let msg = match run_statements(conn, statements, &driver_id, &parameter_values, &control).await {
+                    let succeeded = |sql: &str| {
+                        if let Some(origin) = &origin {
+                            sender_clone.input(SqlEditorInput::CatalogStatementSucceeded {
+                                origin: origin.clone(),
+                                driver: driver_id.clone(),
+                                sql: sql.into(),
+                            });
+                        }
+                    };
+                    let msg = match run_statements(conn, statements, &driver_id, &parameter_values, &control, succeeded)
+                        .await
+                    {
                         ScriptRunResult::Cancelled => SqlEditorInput::ShowCancelled(generation),
                         ScriptRunResult::TimedOut => SqlEditorInput::ShowTimedOut {
                             generation,

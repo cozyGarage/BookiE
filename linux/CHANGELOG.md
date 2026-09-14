@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### September 14 safety sprint
+
+- Copy as IN clause uses the result's SQL dialect and reports omitted values
+- SQL splitting preserves escaped quotes, nested PostgreSQL comments and escaped identifiers
+- SQL editor warnings identify full-width characters, curly quotes and unusual spaces without rewriting queries
+- Clipboard and file exports share exact value formatting, duplicate-column naming and `\x` binary encoding
+- CSV export defaults to spreadsheet-safe text; raw text remains an explicit option
+- File exports run off the GTK thread with progress, cancellation and atomic replacement
+- DDL completion and table/view refresh retain their originating connection and reject stale results
+- Redis browsing uses an isolated connection so interruption cannot change the normal command database
+- MongoDB filters and inserts preserve BSON numbers when arbitrary-precision JSON is enabled
+- Replaced the yanked transitive chacha20 0.10.1 release with 0.10.2
+
 ### Bug and consistency follow-up
 
 - SQLite preserves NULL in declared numeric, boolean, date/time, and blob columns, and preserves binary values on type mismatch

@@ -42,6 +42,14 @@ Add an entry only when a reference review causes a Linux code or product change.
 
 The entry should describe behavior, not file-by-file source movement. There should be no source-tree merge to record.
 
+## 2026-09-14: Linux safety and SQL character warnings
+
+- Reference reviewed: `TableProApp/TablePro` main through `035ffe8f771797345ad86032e3aead16f18181fe`, verified remotely on September 14; local Linux baseline `5dbf87a44`.
+- Manual behavior adoption: `a45fb4672` character warnings, `c180dbcac` cancellable/atomic export, and `558502f87` catalog refresh. Linux uses native Rust/GTK implementations, owning-connection identity, shared serializers and off-thread loaded-row export.
+- Additional Linux fixes: dialect-aware IN literals and lexical spans, Redis browse isolation, MongoDB JSON/BSON numbers, and structure-save notification without rename. Updated a yanked transitive dependency.
+- Not ported: Apple source/UI/services, plugin ABI, new engines or full database dump/restore. Existing Linux filters and reopen stack remain; further parity work is deferred.
+- Verification and remaining gates: [September 14 sprint ledger](sprint-2026-09-14.md). This is a source/behavior review, not a macOS runtime test or release approval.
+
 ## 2026-08-18: exact wide integers, export target, and unterminated SQL literals
 
 - Reference reviewed: `TableProApp/TablePro` `origin/main` at `f696b5f3`, commits `060e5ea4` (preserve wide integer values), `e055dcd0` (export from the database you picked), and `00885a7e` (Format Query on an unterminated SQL literal).

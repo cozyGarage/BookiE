@@ -1,5 +1,8 @@
 # Upstream adoption through macOS 0.72
 
+Historical matrix below. For later main-branch decisions and implemented fixes,
+see the [September 14 Linux sprint](sprint-2026-09-14.md).
+
 Reviewed: 2026-09-07. Linux baseline: `7d8288132` plus the stabilization changes described in the [historical sprint audit](stabilization-2026-09.md).
 
 Reference is pinned to [v0.72.0](https://github.com/TableProApp/TablePro/releases/tag/v0.72.0), commit `6e6396c590bc1cc37f5e71e6d98d563dfcf8a2d6`. The [pinned README](https://github.com/TableProApp/TablePro/blob/6e6396c590bc1cc37f5e71e6d98d563dfcf8a2d6/README.md), release notes, and the prior 0.62–0.71 review form the whole-product inventory. This is a source/behavior review, not a macOS runtime test. Later `main` changes are excluded. PLAN.md owns sequencing; this file owns parity decisions.

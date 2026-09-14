@@ -478,6 +478,12 @@ mod tests {
         let (second_guard, second) = service.get_with_identity(id).unwrap();
         assert!(!Arc::ptr_eq(&first_guard, &second_guard));
         assert_eq!(first, second);
+        let origin = crate::services::catalog::CatalogOrigin {
+            id,
+            identity: first.clone(),
+        };
+        assert!(origin.matches(Some(id), Some(&second)));
+        assert!(!origin.matches(Some(Uuid::new_v4()), Some(&second)));
         let mut index = crate::ui::SchemaIndex::default();
         assert!(index.sync_connection(&first));
         index.set_columns("items", vec!["id".into()]);
@@ -498,9 +504,11 @@ mod tests {
         }
         let current = service.identity(id).unwrap();
         assert_ne!(first, current);
+        assert!(!origin.matches(Some(id), Some(&current)));
         assert!(index.sync_connection(&current));
         assert!(!index.accepts(&request));
         service.close(id);
         assert!(service.identity(id).is_none());
+        assert!(!origin.matches(Some(id), None));
     }
 }

@@ -2,33 +2,40 @@ pub fn skip_span(rest: &str, driver_id: &str) -> Option<usize> {
     if rest.starts_with("--") {
         return Some(rest.find('\n').map_or(rest.len(), |offset| offset + 1));
     }
-    if let Some(body) = rest.strip_prefix("/*") {
-        return Some(body.find("*/").map_or(rest.len(), |offset| offset + 4));
+    if rest.starts_with("/*") {
+        return Some(block_comment_length(rest, matches!(driver_id, "postgres" | "mssql")));
     }
     if driver_id == "mysql" && rest.starts_with('#') {
         return Some(rest.find('\n').map_or(rest.len(), |offset| offset + 1));
     }
     if rest.starts_with('\'') {
-        return Some(quoted_length(rest, '\'', true));
+        return Some(quoted_length(rest, '\'', matches!(driver_id, "mysql" | "clickhouse")));
+    }
+    if driver_id == "postgres" && (rest.starts_with("E'") || rest.starts_with("e'")) {
+        return Some(1 + quoted_length(&rest[1..], '\'', true));
     }
     if let Some(tag_length) = dollar_quote_length(rest, driver_id) {
         return Some(tag_length);
     }
     match (driver_id, rest.as_bytes().first()) {
-        ("mysql" | "clickhouse", Some(b'`')) => Some(quoted_length(rest, '`', false)),
+        ("mysql" | "clickhouse", Some(b'`')) => Some(quoted_length(rest, '`', driver_id == "clickhouse")),
         ("mssql", Some(b'[')) => Some(bracket_length(rest)),
-        (_, Some(b'"')) => Some(quoted_length(rest, '"', true)),
+        (_, Some(b'"')) => Some(quoted_length(rest, '"', matches!(driver_id, "mysql" | "clickhouse"))),
         _ => None,
     }
 }
 
-fn quoted_length(rest: &str, quote: char, doubling_escapes: bool) -> usize {
+fn quoted_length(rest: &str, quote: char, backslash_escapes: bool) -> usize {
     let mut characters = rest.char_indices().skip(1);
     while let Some((offset, character)) = characters.next() {
+        if backslash_escapes && character == '\\' {
+            characters.next();
+            continue;
+        }
         if character != quote {
             continue;
         }
-        if doubling_escapes && rest[offset + character.len_utf8()..].starts_with(quote) {
+        if rest[offset + character.len_utf8()..].starts_with(quote) {
             characters.next();
             continue;
         }
@@ -38,10 +45,40 @@ fn quoted_length(rest: &str, quote: char, doubling_escapes: bool) -> usize {
 }
 
 fn bracket_length(rest: &str) -> usize {
-    match rest.find(']') {
-        Some(offset) => offset + 1,
-        None => rest.len(),
+    let mut characters = rest.char_indices().skip(1).peekable();
+    while let Some((offset, character)) = characters.next() {
+        if character == ']' {
+            if characters.peek().is_some_and(|(_, next)| *next == ']') {
+                characters.next();
+            } else {
+                return offset + 1;
+            }
+        }
     }
+    rest.len()
+}
+
+fn block_comment_length(rest: &str, nested: bool) -> usize {
+    let bytes = rest.as_bytes();
+    let mut depth = 1usize;
+    let mut index = 2;
+    while index + 1 < bytes.len() {
+        match &bytes[index..index + 2] {
+            b"/*" if nested => {
+                depth += 1;
+                index += 2;
+            }
+            b"*/" => {
+                depth -= 1;
+                index += 2;
+                if depth == 0 {
+                    return index;
+                }
+            }
+            _ => index += 1,
+        }
+    }
+    rest.len()
 }
 
 fn dollar_quote_length(rest: &str, driver_id: &str) -> Option<usize> {
@@ -117,6 +154,30 @@ pub fn statement_at_cursor(sql: &str, driver_id: &str, cursor_byte: usize) -> Op
 #[cfg(test)]
 mod tests {
     use super::{split_statements, statement_at_cursor};
+
+    #[test]
+    fn escaped_quotes_and_nested_comments_keep_statement_boundaries() {
+        let cases = [
+            ("mysql", "SELECT 'a\\';b'"),
+            ("clickhouse", "SELECT 'a\\';b'"),
+            ("postgres", "SELECT E'a\\';b'"),
+            ("postgres", "SELECT 1 /* outer /* inner */ ; still outer */"),
+            ("mssql", "SELECT [a]];b]"),
+            ("mysql", "SELECT `a``;b`"),
+        ];
+        for (driver, first) in cases {
+            let sql = format!("{first}; SELECT 2");
+            assert_eq!(split_statements(&sql, driver), vec![first, "SELECT 2"], "{driver}");
+            assert_eq!(
+                statement_at_cursor(&sql, driver, first.find(';').unwrap()),
+                Some(first.into())
+            );
+        }
+        assert_eq!(
+            split_statements("SELECT '\\'; SELECT 2", "postgres"),
+            vec!["SELECT '\\'", "SELECT 2"]
+        );
+    }
 
     #[test]
     fn a_postgres_dollar_quoted_body_stays_one_statement() {

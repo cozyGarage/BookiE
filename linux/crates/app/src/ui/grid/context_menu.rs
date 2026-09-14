@@ -29,6 +29,7 @@ pub(super) fn install_grid_context_menus(
     column_view: &gtk::ColumnView,
     sender: relm4::Sender<GridMsg>,
     result: &QueryResult,
+    driver_id: String,
 ) -> GridMenus {
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
     let columns = Rc::new(result.columns.clone());
@@ -121,6 +122,7 @@ pub(super) fn install_grid_context_menus(
         columns.clone(),
         export::render_markdown,
     );
+    let supports_sql = tablepro_core::export::supports_sql_literals(&driver_id);
     let copy_in_clause_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -130,7 +132,17 @@ pub(super) fn install_grid_context_menus(
                 let context = context.borrow();
                 let Some(slot) = context.as_ref() else { return };
                 let Some(view) = view.upgrade() else { return };
-                let clause = export::render_in_clause(&rows_for_menu(&view, position(slot)), slot.col_index);
+                let clause =
+                    export::render_in_clause(&driver_id, &rows_for_menu(&view, position(slot)), slot.col_index);
+                if clause.skipped > 0 {
+                    let message = crate::tr!("Skipped {n} NULL, binary or unsupported values.")
+                        .replace("{n}", &clause.skipped.to_string());
+                    let alert = libadwaita::AlertDialog::new(Some(&crate::tr!("Copy as IN clause")), Some(&message));
+                    use libadwaita::prelude::*;
+                    alert.add_response("close", &crate::tr!("Close"));
+                    alert.set_close_response("close");
+                    alert.present(Some(&view));
+                }
                 if !clause.sql.is_empty() {
                     sender.send(GridMsg::CopyToClipboard(clause.sql)).ok();
                 }
@@ -255,6 +267,12 @@ pub(super) fn install_grid_context_menus(
         duplicate_row_action,
     ]);
     column_view.insert_action_group("cell", Some(&group));
+    if let Some(action) = group
+        .lookup_action("copy-in-clause")
+        .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+    {
+        action.set_enabled(supports_sql);
+    }
     let edit_action = group
         .lookup_action("edit")
         .and_then(|action| action.downcast::<gio::SimpleAction>().ok())

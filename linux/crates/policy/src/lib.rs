@@ -4,7 +4,9 @@
 mod approval;
 mod audit;
 mod blast_radius;
+mod catalog_effect;
 mod classify;
+pub use catalog_effect::{CatalogEffect, catalog_effect};
 mod config;
 mod guard;
 mod mask;

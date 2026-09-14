@@ -885,9 +885,10 @@ def current_page_csv_export_is_pk_ordered(database, base):
     # full label keeps that from regressing.
     wait_for_node(name="Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-csv")
-    wait_for_node(name="Export current page as CSV", role=FILE_CHOOSER_ROLES)
+    invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Export Results", role=FILE_CHOOSER_ROLES)
     set_visible_editable_within(
-        "Export current page as CSV",
+        "Export Results",
         FILE_CHOOSER_ROLES,
         str(base / "home" / "current-page.csv"),
     )
@@ -930,8 +931,9 @@ def current_page_json_export_preserves_values(database, base):
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-json")
+    invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
     export = base / "home" / "current-page.json"
-    set_visible_editable_within("Export current page as JSON", FILE_CHOOSER_ROLES, str(export))
+    set_visible_editable_within("Export Results", FILE_CHOOSER_ROLES, str(export))
     invoke(wait_for_node(name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline and not export.exists():
@@ -1133,6 +1135,41 @@ def switching_one_window_leaves_the_other_windows_edits(database, base):
 switching_one_window_leaves_the_other_windows_edits.environment = "local"
 
 
+def sql_character_warnings_leave_query_unchanged(database, base):
+    sql = "SELECT '🙂；' AS value；"
+    editor = set_editor_text(sql)
+    invoke(wait_for_node(name="SQL warnings (1)", role=pyatspi.ROLE_TOGGLE_BUTTON))
+    warning = wait_for_node(name="； (U+FF1B): consider ; (U+003B)", role=pyatspi.ROLE_PUSH_BUTTON)
+    invoke(warning)
+    text = editor.queryText()
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and text.getNSelections() == 0:
+        time.sleep(0.05)
+    assert text.getNSelections() == 1, "warning did not select its source range"
+    assert text.getText(0, -1) == sql, "warning navigation changed SQL"
+    start, end = text.getSelection(0)
+    assert text.getText(start, end) == "；", "warning selected the wrong Unicode range"
+    run_sql("SELECT '🙂；' AS value;")
+    wait_for_node(name="SQL warnings (1)", present=False)
+    wait_for_node(name="🙂；")
+    assert_database_count_stable(database, 0, seconds=0.2)
+
+
+sql_character_warnings_leave_query_unchanged.environment = "local"
+
+
+def committed_editor_ddl_refreshes_sidebar(database, base):
+    run_sql("CREATE TABLE catalog_probe (id INTEGER PRIMARY KEY)")
+    wait_for_node(name="catalog_probe")
+    run_sql("DROP TABLE catalog_probe")
+    wait_for_node(name="catalog_probe", present=False)
+    with sqlite3.connect(database) as connection:
+        assert connection.execute("SELECT count(*) FROM sqlite_master WHERE name = 'catalog_probe'").fetchone()[0] == 0
+
+
+committed_editor_ddl_refreshes_sidebar.environment = "local"
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: gtk_safety.py /path/to/tablepro-app")
@@ -1140,6 +1177,8 @@ def main():
     if not binary.is_file():
         raise SystemExit(f"application binary not found: {binary}")
     scenarios = [
+        committed_editor_ddl_refreshes_sidebar,
+        sql_character_warnings_leave_query_unchanged,
         dismissed_approval_denies,
         approve_once_prompts_again,
         audit_failure_denies,

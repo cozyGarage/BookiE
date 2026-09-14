@@ -85,9 +85,13 @@ pub fn build_column_view(
         .show_column_separators(true)
         .build();
 
-    let grid_menus = menu_sender
-        .as_ref()
-        .map(|sender| install_grid_context_menus(&column_view, sender.clone(), result));
+    let grid_menus = menu_sender.as_ref().map(|sender| {
+        let driver_id = connection_id
+            .and_then(|id| crate::services::database_service::instance().metadata(id))
+            .map(|metadata| metadata.driver_id)
+            .unwrap_or_default();
+        install_grid_context_menus(&column_view, sender.clone(), result, driver_id)
+    });
 
     let default_min_width = if result.columns.len() > WIDE_TABLE_THRESHOLD {
         Some(MIN_COLUMN_WIDTH_PX)

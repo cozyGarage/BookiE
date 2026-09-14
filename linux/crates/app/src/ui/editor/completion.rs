@@ -26,6 +26,10 @@ pub struct SchemaRequest {
 }
 
 impl SchemaIndex {
+    pub fn invalidate_columns(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.columns.clear();
+    }
     pub fn sync_connection(&mut self, connection: &crate::services::database_service::ConnectionIdentity) -> bool {
         let unchanged = self.connection.as_ref() == Some(connection);
         if unchanged {

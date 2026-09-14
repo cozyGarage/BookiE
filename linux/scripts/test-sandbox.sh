@@ -35,3 +35,4 @@ done
 
 echo "==> sandbox tier: cargo test --tests"
 cargo test "${PKG_ARGS[@]}" --tests
+cargo test -p tablepro-driver-redis --test cancellation

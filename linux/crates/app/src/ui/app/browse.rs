@@ -1,6 +1,5 @@
 use relm4::adw::prelude::*;
-use relm4::gtk::gio;
-use relm4::{ComponentController, ComponentSender, adw, gtk};
+use relm4::{ComponentController, ComponentSender, adw};
 
 use tablepro_core::{ColumnInfo, QueryResult};
 use uuid::Uuid;
@@ -8,7 +7,7 @@ use uuid::Uuid;
 use crate::services::browse_query::{BrowseTarget, PageQuery};
 use crate::ui::browse_tab::{BrowseLoadFailure, BrowsePageRequest, BrowseRowCountRequest, BrowseTabInput};
 
-use super::{App, AppMsg, ExportFormat, OpenMode, render_json};
+use super::{App, AppMsg, ExportFormat, OpenMode};
 
 impl App {
     /// Sidebar click — routes via OpenMode (smart switch / new tab).
@@ -315,113 +314,17 @@ impl App {
             self.show_toast(&crate::tr!("Nothing to export"));
             return;
         };
-        if matches!(format, ExportFormat::Csv) {
-            self.on_export_csv_page(schema, table, result);
-            return;
-        }
         let table_label = match &schema {
-            Some(s) => format!("{s}.{table}"),
-            None => table.clone(),
+            Some(schema) => format!("{schema}.{table}"),
+            None => table,
         };
-        let suggested = format!("{table_label}.json");
-        let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&crate::tr!("JSON files")));
-        filter.add_mime_type("application/json");
-        filter.add_suffix("json");
-        let filters = gio::ListStore::new::<gtk::FileFilter>();
-        filters.append(&filter);
-        let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Export current page as JSON"))
-            .modal(true)
-            .initial_name(&suggested)
-            .default_filter(&filter)
-            .filters(&filters)
-            .build();
-        let parent = self.window.clone();
-        let parent_for_alert = parent.clone();
-        let toast_overlay = self.toast_overlay.clone();
-        dialog.save(Some(&parent), gtk::gio::Cancellable::NONE, move |outcome| {
-            let Ok(file) = outcome else { return };
-            let Some(path) = file.path() else { return };
-            let bytes = render_json(&result);
-            match tablepro_core::export::write_atomically(&path, |output| output.write_all(&bytes)) {
-                Ok(()) => toast_overlay.add_toast(relm4::adw::Toast::new(
-                    &crate::tr!("Exported the current page to {path}").replace("{path}", &path.display().to_string()),
-                )),
-                Err(e) => {
-                    let alert = adw::AlertDialog::new(
-                        Some(&crate::tr!("Couldn't export")),
-                        Some(
-                            &crate::tr!("Writing {path} failed: {error}")
-                                .replace("{path}", &path.display().to_string())
-                                .replace("{error}", &e.to_string()),
-                        ),
-                    );
-                    alert.add_response("close", &crate::tr!("Close"));
-                    alert.set_default_response(Some("close"));
-                    alert.set_close_response("close");
-                    alert.present(Some(&parent_for_alert));
-                }
-            }
-        });
-    }
-
-    fn on_export_csv_page(&self, schema: Option<String>, table: String, result: QueryResult) {
-        let table_label = match &schema {
-            Some(s) => format!("{s}.{table}"),
-            None => table.clone(),
-        };
-        let suggested = format!("{table_label}.csv");
-        let filter = gtk::FileFilter::new();
-        filter.set_name(Some(&crate::tr!("CSV files")));
-        filter.add_mime_type("text/csv");
-        filter.add_suffix("csv");
-        let filters = gio::ListStore::new::<gtk::FileFilter>();
-        filters.append(&filter);
-        let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Export current page as CSV"))
-            .modal(true)
-            .initial_name(&suggested)
-            .default_filter(&filter)
-            .filters(&filters)
-            .build();
-        let parent = self.window.clone();
-        let parent_for_alert = parent.clone();
-        let toast_overlay = self.toast_overlay.clone();
-        dialog.save(Some(&parent), gtk::gio::Cancellable::NONE, move |outcome| {
-            let Ok(file) = outcome else { return };
-            let Some(path) = file.path() else { return };
-            let write_result = tablepro_core::export::write_atomically(&path, |mut output| {
-                tablepro_core::export::write_csv_header(&mut output, &result.columns)?;
-                for row in &result.rows {
-                    tablepro_core::export::write_csv_row(&mut output, row)?;
-                }
-                Ok(())
-            })
-            .map(|()| result.rows.len())
-            .map_err(|error| error.to_string());
-            match write_result {
-                Ok(n) => toast_overlay.add_toast(relm4::adw::Toast::new(
-                    &crate::tr!("Exported {n} rows from the current page to {path}")
-                        .replace("{n}", &n.to_string())
-                        .replace("{path}", &path.display().to_string()),
-                )),
-                Err(error) => {
-                    let alert = adw::AlertDialog::new(
-                        Some(&crate::tr!("Couldn't export")),
-                        Some(
-                            &crate::tr!("Writing {path} failed: {error}")
-                                .replace("{path}", &path.display().to_string())
-                                .replace("{error}", &error),
-                        ),
-                    );
-                    alert.add_response("close", &crate::tr!("Close"));
-                    alert.set_default_response(Some("close"));
-                    alert.set_close_response("close");
-                    alert.present(Some(&parent_for_alert));
-                }
-            }
-        });
+        crate::ui::export_dialog::present_with_format(
+            &self.window,
+            &self.toast_overlay,
+            result,
+            table_label,
+            matches!(format, ExportFormat::Json),
+        );
     }
 
     /// Ctrl+F / Filter button — toggle the inline filter strip on

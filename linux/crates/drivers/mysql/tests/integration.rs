@@ -406,6 +406,12 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
         .expect("store the payload as data");
 
     let columns = connection.fetch_columns(None, "copy_probe").await.expect("columns");
+    let clause = tablepro_core::export::render_in_clause("mysql", &[vec![Value::Text(payload.into())]], 0);
+    let matching = connection
+        .query(&format!("SELECT note FROM copy_probe WHERE note IN {}", clause.sql))
+        .await
+        .unwrap();
+    assert_eq!(matching.rows, vec![vec![Value::Text(payload.into())]]);
     let loaded = connection
         .query("SELECT id, note FROM copy_probe WHERE id = 1")
         .await

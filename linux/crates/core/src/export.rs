@@ -15,6 +15,9 @@ use crate::error::DriverError;
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{build_order_and_pagination, quote_ident};
 
+mod file;
+pub use file::{ResultFormat, write_result_file};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CsvDelimiter {
     Comma,
@@ -111,7 +114,7 @@ pub fn value_to_text(value: &Value) -> Option<String> {
         Value::Int(value) => Some(value.to_string()),
         Value::Float(value) => Some(value.to_string()),
         Value::Text(value) => Some(value.clone()),
-        Value::Bytes(value) => Some(format!("0x{}", hex_encode(value))),
+        Value::Bytes(value) => Some(format!("\\x{}", hex_encode(value))),
         Value::Date(value) => Some(value.to_string()),
         Value::Time(value) => Some(value.to_string()),
         Value::DateTime(value) => Some(value.to_string()),
@@ -238,11 +241,11 @@ pub struct InClause {
     pub skipped: usize,
 }
 
-pub fn render_in_clause(rows: &[Vec<Value>], column_index: usize) -> InClause {
+pub fn render_in_clause(driver_id: &str, rows: &[Vec<Value>], column_index: usize) -> InClause {
     let values = rows.iter().filter_map(|row| row.get(column_index)).collect::<Vec<_>>();
     let literals = values
         .iter()
-        .filter_map(|value| in_clause_literal(value))
+        .filter_map(|value| in_clause_literal(driver_id, value))
         .collect::<Vec<_>>();
     InClause {
         skipped: values.len() - literals.len(),
@@ -300,6 +303,9 @@ fn escape_csv_field(value: &str, options: &CsvOptions, had_line_breaks: bool) ->
 }
 
 fn format_csv_cell(value: &Value, options: &CsvOptions) -> String {
+    let mut options = options.clone();
+    options.sanitize_formulas &= matches!(value, Value::Text(_));
+    let options = &options;
     let Some(mut text) = value_to_text(value) else {
         return escape_csv_field(if options.null_to_empty { "" } else { "NULL" }, options, false);
     };
@@ -365,17 +371,32 @@ fn markdown_value_cell(value: &Value) -> String {
     markdown_cell(&text)
 }
 
-fn in_clause_literal(value: &Value) -> Option<String> {
-    match value {
-        Value::Null | Value::Bytes(_) => None,
-        Value::Bool(value) => Some(if *value {
-            "TRUE".to_string()
-        } else {
-            "FALSE".to_string()
-        }),
-        Value::Int(_) | Value::Float(_) | Value::Decimal(_) => value_to_text(value),
-        _ => value_to_text(value).map(|value| format!("'{}'", value.replace('\'', "''"))),
+pub fn supports_sql_literals(driver_id: &str) -> bool {
+    matches!(
+        driver_id,
+        "postgres" | "mysql" | "sqlite" | "mssql" | "clickhouse" | "duckdb"
+    )
+}
+
+fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
+    if !supports_sql_literals(driver_id) || matches!(value, Value::Null | Value::Bytes(_)) {
+        return None;
     }
+    if matches!(value, Value::Float(number) if !number.is_finite()) {
+        return None;
+    }
+    if let Value::Bool(value) = value {
+        return Some(
+            match (driver_id, value) {
+                ("mssql", true) => "1",
+                ("mssql", false) => "0",
+                (_, true) => "TRUE",
+                (_, false) => "FALSE",
+            }
+            .into(),
+        );
+    }
+    Some(crate::sql_literal::render_sql_literal(driver_id, value))
 }
 
 /// Escape and write a CSV header line for `columns`.
@@ -491,6 +512,13 @@ pub fn write_atomically<F>(path: &Path, fill: F) -> io::Result<()>
 where
     F: FnOnce(&mut dyn Write) -> io::Result<()>,
 {
+    write_atomically_checked(path, fill, || Ok(()))
+}
+
+fn write_atomically_checked<F>(path: &Path, fill: F, before_publish: impl FnOnce() -> io::Result<()>) -> io::Result<()>
+where
+    F: FnOnce(&mut dyn Write) -> io::Result<()>,
+{
     let directory = match path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         Some(parent) => parent,
         None => Path::new("."),
@@ -504,6 +532,7 @@ where
         writer.flush()?;
     }
     temporary.as_file().sync_all()?;
+    before_publish()?;
     temporary.persist(path).map_err(|error| error.error)?;
     Ok(())
 }
@@ -813,18 +842,35 @@ mod tests {
         ];
 
         assert_eq!(
-            render_in_clause(&rows, 0),
+            render_in_clause("postgres", &rows, 0),
             InClause {
                 sql: "(1, 'O''Reilly', TRUE)".into(),
                 skipped: 2
             }
         );
-        assert_eq!(render_in_clause(&rows, 1), InClause::default());
+        assert_eq!(render_in_clause("postgres", &rows, 1), InClause::default());
+    }
+
+    #[test]
+    fn in_clause_uses_dialect_escaping_and_preserves_fractional_time() {
+        let rows = vec![vec![Value::Text("x\\' OR 1=1 -- ".into())]];
+        for driver in ["mysql", "clickhouse"] {
+            assert_eq!(render_in_clause(driver, &rows, 0).sql, "('x\\\\'' OR 1=1 -- ')");
+        }
+        assert_eq!(render_in_clause("postgres", &rows, 0).sql, "('x\\'' OR 1=1 -- ')");
+        assert!(render_in_clause("redis", &rows, 0).sql.is_empty());
+        assert_eq!(render_in_clause("redis", &rows, 0).skipped, 1);
+        let time = Value::Time("12:34:56.123456".parse().unwrap());
+        assert_eq!(value_to_text(&time).as_deref(), Some("12:34:56.123456"));
+        assert_eq!(
+            render_in_clause("postgres", &[vec![time]], 0).sql,
+            "('12:34:56.123456')"
+        );
     }
 
     #[test]
     fn value_to_text_preserves_non_json_value_representations() {
-        assert_eq!(value_to_text(&Value::Bytes(vec![0xde, 0xad])), Some("0xdead".into()));
+        assert_eq!(value_to_text(&Value::Bytes(vec![0xde, 0xad])), Some("\\xdead".into()));
         assert_eq!(value_to_text(&Value::Null), None);
         assert_eq!(
             value_to_text(&Value::Json(serde_json::json!({"a": 1}))),

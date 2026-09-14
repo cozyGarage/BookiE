@@ -23,6 +23,7 @@ pub(crate) async fn run_statements(
     driver_id: &str,
     parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
     control: &OperationControl,
+    succeeded: impl Fn(&str),
 ) -> ScriptRunResult {
     if statements.is_empty() {
         return ScriptRunResult::Completed(Vec::new());
@@ -53,7 +54,10 @@ pub(crate) async fn run_statements(
             }
         };
         let kind = match conn.query_params_controlled(&bound.sql, &bound.values, control).await {
-            Ok(qr) => StatementOutcomeKind::Rows(qr),
+            Ok(qr) => {
+                succeeded(&sql);
+                StatementOutcomeKind::Rows(qr)
+            }
             Err(DriverError::Cancelled) => return ScriptRunResult::Cancelled,
             Err(DriverError::TimedOut) => return ScriptRunResult::TimedOut,
 
@@ -105,7 +109,12 @@ pub(crate) fn summary_label(n_total: usize, n_ok: usize, total_ms: u128, has_err
     }
 }
 
-fn build_outcome_widget(o: &StatementOutcome, idx: usize, grid_sender: &relm4::Sender<GridMsg>) -> gtk::Widget {
+fn build_outcome_widget(
+    o: &StatementOutcome,
+    idx: usize,
+    grid_sender: &relm4::Sender<GridMsg>,
+    connection_id: Option<uuid::Uuid>,
+) -> gtk::Widget {
     match &o.kind {
         StatementOutcomeKind::Rows(result) if !result.rows.is_empty() => {
             let (column_view, _selection) = build_column_view(
@@ -116,7 +125,7 @@ fn build_outcome_widget(o: &StatementOutcome, idx: usize, grid_sender: &relm4::S
                 Some(grid_sender.clone()),
                 None,
                 None,
-                None,
+                connection_id,
                 TabGridContext::default(),
             );
             let scrolled = gtk::ScrolledWindow::builder()
@@ -166,7 +175,12 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
     }
 }
 
-pub(crate) fn render_outcomes(holder: &gtk::Box, outcomes: &[StatementOutcome], grid_sender: &relm4::Sender<GridMsg>) {
+pub(crate) fn render_outcomes(
+    holder: &gtk::Box,
+    outcomes: &[StatementOutcome],
+    grid_sender: &relm4::Sender<GridMsg>,
+    connection_id: Option<uuid::Uuid>,
+) {
     if outcomes.is_empty() {
         let placeholder = adw::StatusPage::builder()
             .title(crate::tr!("Empty query"))
@@ -178,13 +192,13 @@ pub(crate) fn render_outcomes(holder: &gtk::Box, outcomes: &[StatementOutcome], 
         return;
     }
     if outcomes.len() == 1 {
-        let widget = build_outcome_widget(&outcomes[0], 0, grid_sender);
+        let widget = build_outcome_widget(&outcomes[0], 0, grid_sender, connection_id);
         holder.append(&widget);
         return;
     }
     let stack = adw::ViewStack::new();
     for (idx, o) in outcomes.iter().enumerate() {
-        let widget = build_outcome_widget(o, idx, grid_sender);
+        let widget = build_outcome_widget(o, idx, grid_sender, connection_id);
         let icon = match &o.kind {
             StatementOutcomeKind::Rows(_) => "view-grid-symbolic",
             StatementOutcomeKind::Error(_) => "dialog-error-symbolic",

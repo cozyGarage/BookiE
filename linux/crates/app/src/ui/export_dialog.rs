@@ -1,3 +1,5 @@
+mod file;
+
 use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
@@ -58,15 +60,33 @@ pub(crate) fn present(
     result: QueryResult,
     suggested_name: String,
 ) {
+    present_with_format(parent, toast_overlay, result, suggested_name, false);
+}
+
+pub(crate) fn present_with_format(
+    parent: &adw::ApplicationWindow,
+    toast_overlay: &adw::ToastOverlay,
+    result: QueryResult,
+    suggested_name: String,
+    json: bool,
+) {
     let page = adw::PreferencesPage::new();
 
     let format_group = adw::PreferencesGroup::new();
     let labels: Vec<&str> = ExportFormat::ALL.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
         .title(crate::tr!("Format"))
-        .subtitle(crate::tr!("{n} rows").replace("{n}", &result.rows.len().to_string()))
+        .subtitle(
+            if result.truncated {
+                crate::tr!("{n} loaded rows (result truncated)")
+            } else {
+                crate::tr!("{n} loaded rows / current page")
+            }
+            .replace("{n}", &result.rows.len().to_string()),
+        )
         .model(&gtk::StringList::new(&labels))
         .build();
+    format_row.set_selected(u32::from(json));
     format_group.add(&format_row);
     page.add(&format_group);
 
@@ -79,6 +99,15 @@ pub(crate) fn present(
         .build();
     include_header.set_active(preferences::load().csv_include_header);
     csv_group.add(&include_header);
+    let safe_csv = adw::SwitchRow::builder()
+        .title(crate::tr!("Spreadsheet-safe text"))
+        .subtitle(crate::tr!(
+            "Prevent text and column names from being interpreted as formulas. Turn off for raw text."
+        ))
+        .active(true)
+        .build();
+    csv_group.add(&safe_csv);
+    csv_group.set_visible(!json);
     page.add(&csv_group);
 
     include_header.connect_active_notify(move |row| {
@@ -93,7 +122,11 @@ pub(crate) fn present(
     let reset_button = gtk::Button::builder().label(crate::tr!("Reset to Defaults")).build();
     reset_button.add_css_class("flat");
     let include_header_for_reset = include_header.clone();
-    reset_button.connect_clicked(move |_| include_header_for_reset.set_active(true));
+    let safe_csv_for_reset = safe_csv.clone();
+    reset_button.connect_clicked(move |_| {
+        include_header_for_reset.set_active(true);
+        safe_csv_for_reset.set_active(true);
+    });
 
     let export_button = gtk::Button::builder().label(crate::tr!("Export\u{2026}")).build();
     export_button.add_css_class("suggested-action");
@@ -136,6 +169,7 @@ pub(crate) fn present(
             &suggested_name,
             result.clone(),
             include_header,
+            safe_csv.is_active(),
         );
     });
 
@@ -149,6 +183,7 @@ fn save_with_file_dialog(
     suggested_name: &str,
     result: QueryResult,
     include_header: bool,
+    sanitize_formulas: bool,
 ) {
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&crate::tr!("{format} files").replace("{format}", format.label())));
@@ -173,39 +208,13 @@ fn save_with_file_dialog(
         let Some(path) = file.path() else {
             return;
         };
-        let write_result = match format {
-            ExportFormat::Csv => write_csv(&path, &result, include_header),
-            ExportFormat::Json => write_json(&path, &result),
+        let options = tablepro_core::export::CsvOptions {
+            header_row: include_header,
+            sanitize_formulas,
+            ..Default::default()
         };
-        match write_result {
-            Ok(()) => toast_overlay.add_toast(adw::Toast::new(
-                &crate::tr!("Exported {n} rows to {path}")
-                    .replace("{n}", &result.rows.len().to_string())
-                    .replace("{path}", &path.display().to_string()),
-            )),
-            Err(error) => show_export_error(&parent_for_alert, &path, &error),
-        }
+        file::start(&parent_for_alert, &toast_overlay, path, result, format, options);
     });
-}
-
-fn write_csv(path: &std::path::Path, result: &QueryResult, include_header: bool) -> std::io::Result<()> {
-    tablepro_core::export::write_atomically(path, |mut output| {
-        if include_header {
-            tablepro_core::export::write_csv_header(&mut output, &result.columns)?;
-        }
-        for row in &result.rows {
-            tablepro_core::export::write_csv_row(&mut output, row)?;
-        }
-        Ok(())
-    })
-}
-
-fn write_json(path: &std::path::Path, result: &QueryResult) -> std::io::Result<()> {
-    let json = tablepro_core::export::render_json(&result.columns, &result.rows);
-    tablepro_core::export::write_atomically(path, |output| {
-        std::io::Write::write_all(output, json.as_bytes())?;
-        std::io::Write::write_all(output, b"\n")
-    })
 }
 
 fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, error: &std::io::Error) {
@@ -238,38 +247,5 @@ mod tests {
             suggested_file_name("customers.json", ExportFormat::Csv),
             "customers.csv"
         );
-    }
-
-    #[test]
-    fn json_export_keeps_duplicate_columns_and_binary_values() {
-        let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("result.json");
-        let result = QueryResult {
-            columns: vec![column("id"), column("id")],
-            rows: vec![vec![
-                tablepro_core::Value::Bytes(vec![0, 0xff]),
-                tablepro_core::Value::Int(2),
-            ]],
-            truncated: false,
-        };
-
-        write_json(&path, &result).unwrap();
-
-        assert_eq!(
-            std::fs::read_to_string(path).unwrap(),
-            "[\n  {\n    \"id\": \"0x00ff\",\n    \"id_2\": 2\n  }\n]\n"
-        );
-    }
-
-    fn column(name: &str) -> tablepro_core::ColumnInfo {
-        tablepro_core::ColumnInfo {
-            name: name.to_string(),
-            data_type: "text".to_string(),
-            nullable: true,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-        }
     }
 }

@@ -41,7 +41,7 @@ use super::welcome_view::{WelcomeView, WelcomeViewInit, WelcomeViewOutput};
 use crate::services::database_service::ConnectionHealth;
 
 pub use msg::AppMsg;
-use render::{qualified_label, render_json};
+use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
 
@@ -75,6 +75,7 @@ pub struct App {
     sidebar_schemas: std::rc::Rc<std::cell::RefCell<Vec<Option<String>>>>,
     sidebar_kinds: std::rc::Rc<std::cell::RefCell<Vec<crate::ui::sidebar_row::SidebarObjectKind>>>,
     sidebar_views: Vec<tablepro_core::TableInfo>,
+    catalog_generation: std::cell::Cell<u64>,
     content_holder: adw::ToolbarView,
     toast_overlay: adw::ToastOverlay,
     /// Persistent "Connecting…" toast handle. Held so we can dismiss it
@@ -416,6 +417,7 @@ impl SimpleComponent for App {
             sidebar_schemas: sidebar.schemas,
             sidebar_kinds: sidebar.kinds,
             sidebar_views: Vec::new(),
+            catalog_generation: std::cell::Cell::new(0),
             content_holder: widgets.content_holder.clone(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
@@ -620,14 +622,22 @@ impl SimpleComponent for App {
             AppMsg::ShowCreateTableForExisting { schema, table } => self.on_show_create_table(schema, table, sender),
             AppMsg::ShowCreateTableLoaded { sql } => self.append_editor_tab(Some(sql), sender),
             AppMsg::DropTablePrompt { schema, table } => self.on_drop_table_prompt(schema, table, sender),
-            AppMsg::DropTableConfirmed { schema, table } => self.on_drop_table_confirmed(schema, table, sender),
-            AppMsg::DropTableSucceeded { schema, table } => self.on_drop_table_succeeded(schema, table, sender),
+            AppMsg::DropTableConfirmed { origin, schema, table } => {
+                self.on_drop_table_confirmed(origin, schema, table, sender)
+            }
+            AppMsg::DropTableSucceeded { origin, schema, table } => {
+                self.on_drop_table_succeeded(origin, schema, table, sender)
+            }
             AppMsg::ExecuteStructureTransaction { tab_id, statements } => {
                 self.on_execute_structure_transaction(tab_id, statements, sender)
             }
             AppMsg::SaveActiveStructureTabById(id) => self.save_structure_tab_by_id(id, sender),
-            AppMsg::StructureSaveCompleted { tab_id, new_table_name } => {
-                self.on_structure_save_completed(tab_id, new_table_name, sender.clone());
+            AppMsg::StructureSaveCompleted {
+                origin,
+                tab_id,
+                new_table_name,
+            } => {
+                self.on_structure_save_completed(origin, tab_id, new_table_name, sender.clone());
                 self.connection_switch_save_succeeded(tab_id, sender);
             }
             AppMsg::StructureSaveFailed(tab_id, message) => {
@@ -643,8 +653,12 @@ impl SimpleComponent for App {
             } => self.on_structure_data_loaded(tab_id, columns, indexes, fks),
             AppMsg::StructureLoadFailed { tab_id, message } => self.on_structure_load_failed(tab_id, message),
             AppMsg::StructureTabDirtyChanged(tab_id, dirty) => self.refresh_structure_tab_dirty(tab_id, dirty),
-            AppMsg::SchemaChanged { schema, table } => self.on_schema_changed(schema, table, sender),
-            AppMsg::TablesReloaded(id, identity, tables) => self.on_tables_reloaded(id, identity, tables),
+            AppMsg::SchemaChanged { origin, schema, table } => self.on_schema_changed(origin, schema, table, sender),
+            AppMsg::CatalogReloaded {
+                origin,
+                generation,
+                result,
+            } => self.on_catalog_reloaded(origin, generation, result),
             AppMsg::RowOpStarted => self.set_row_op_in_flight(true),
             AppMsg::ReloadConnections => self.on_reload_connections(sender),
             AppMsg::ConnectionsLoaded(connections) => {

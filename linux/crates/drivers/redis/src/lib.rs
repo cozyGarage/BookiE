@@ -63,14 +63,14 @@ impl DatabaseDriver for RedisDriver {
             .map_err(map_redis_error)?,
             None => Client::open(url).map_err(map_redis_error)?,
         };
-        let manager = match tokio::time::timeout(CONNECT_TIMEOUT, ConnectionManager::new(client)).await {
+        let manager = match tokio::time::timeout(CONNECT_TIMEOUT, ConnectionManager::new(client.clone())).await {
             Ok(result) => result.map_err(map_redis_error)?,
             Err(_) => return Err(DriverError::ConnectionRefused),
         };
         Ok(Box::new(RedisConnection {
             conn: Mutex::new(manager),
             db_count: 16,
-            db_index,
+            browse_client: client,
         }))
     }
 }
@@ -97,7 +97,8 @@ fn root_certificate(config: &tablepro_core::TlsConfig, verifies: bool) -> Result
 struct RedisConnection {
     conn: Mutex<ConnectionManager>,
     db_count: usize,
-    db_index: u8,
+    // Never clone the normal ConnectionManager for browsing: clones share SELECT state.
+    browse_client: Client,
 }
 
 fn redis_columns() -> Vec<ColumnInfo> {
@@ -177,23 +178,18 @@ impl Connection for RedisConnection {
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
         let db = parse_db_name(table)?;
-        let mut conn = self.conn.lock().await;
+        // A non-reconnecting, operation-local connection cannot leak SELECT state
+        // into commands, or reconnect mid-page onto the configured database.
+        let mut conn = tokio::time::timeout(CONNECT_TIMEOUT, self.browse_client.get_multiplexed_async_connection())
+            .await
+            .map_err(|_| DriverError::TimedOut)?
+            .map_err(map_redis_error)?;
         redis::cmd("SELECT")
             .arg(db)
-            .query_async::<()>(&mut *conn)
+            .query_async::<()>(&mut conn)
             .await
             .map_err(map_redis_error)?;
-        let outcome = fetch_page(&mut conn, offset, limit).await;
-        // conn is shared with every later query()/fetch_rows() call --
-        // restore the connection's own db before releasing the lock.
-        let restored = redis::cmd("SELECT")
-            .arg(self.db_index)
-            .query_async::<()>(&mut *conn)
-            .await
-            .map_err(map_redis_error);
-        let result = outcome?;
-        restored?;
-        Ok(result)
+        fetch_page(&mut conn, offset, limit).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
@@ -280,7 +276,11 @@ impl Connection for RedisConnection {
     }
 }
 
-async fn fetch_page(conn: &mut ConnectionManager, offset: u64, limit: u64) -> Result<QueryResult, DriverError> {
+async fn fetch_page(
+    conn: &mut redis::aio::MultiplexedConnection,
+    offset: u64,
+    limit: u64,
+) -> Result<QueryResult, DriverError> {
     let keys = scan_keys(conn, "*", (offset + limit) as usize).await?;
     let skip = offset as usize;
     let page: Vec<String> = keys.into_iter().skip(skip).take(limit as usize).collect();
@@ -295,7 +295,11 @@ async fn fetch_page(conn: &mut ConnectionManager, offset: u64, limit: u64) -> Re
     })
 }
 
-async fn scan_keys(conn: &mut ConnectionManager, pattern: &str, limit: usize) -> Result<Vec<String>, DriverError> {
+async fn scan_keys(
+    conn: &mut redis::aio::MultiplexedConnection,
+    pattern: &str,
+    limit: usize,
+) -> Result<Vec<String>, DriverError> {
     let mut cursor: u64 = 0;
     let mut keys = Vec::new();
     loop {
@@ -318,7 +322,7 @@ async fn scan_keys(conn: &mut ConnectionManager, pattern: &str, limit: usize) ->
     Ok(keys)
 }
 
-async fn key_row(conn: &mut ConnectionManager, key: &str) -> Result<Vec<Value>, DriverError> {
+async fn key_row(conn: &mut redis::aio::MultiplexedConnection, key: &str) -> Result<Vec<Value>, DriverError> {
     let key_type: String = conn.key_type(key).await.map_err(map_redis_error)?;
     let ttl: i64 = conn.ttl(key).await.map_err(map_redis_error)?;
     let preview = match key_type.as_str() {

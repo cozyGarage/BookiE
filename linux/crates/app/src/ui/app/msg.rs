@@ -1,4 +1,4 @@
-use tablepro_core::{ColumnInfo, ForeignKeyInfo, QueryResult, TableInfo, Value};
+use tablepro_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 use tablepro_storage::{ConnectionOrganization, ConnectionOrganizationIndex, SavedConnection};
 use uuid::Uuid;
 
@@ -123,10 +123,12 @@ pub enum AppMsg {
         table: String,
     },
     DropTableConfirmed {
+        origin: crate::services::catalog::CatalogOrigin,
         schema: Option<String>,
         table: String,
     },
     DropTableSucceeded {
+        origin: crate::services::catalog::CatalogOrigin,
         schema: Option<String>,
         table: String,
     },
@@ -136,6 +138,7 @@ pub enum AppMsg {
     },
     SaveActiveStructureTabById(Uuid),
     StructureSaveCompleted {
+        origin: Option<crate::services::catalog::CatalogOrigin>,
         tab_id: Uuid,
         new_table_name: Option<String>,
     },
@@ -155,14 +158,15 @@ pub enum AppMsg {
     },
     StructureTabDirtyChanged(Uuid, bool),
     SchemaChanged {
+        origin: crate::services::catalog::CatalogOrigin,
         schema: Option<String>,
         table: Option<String>,
     },
-    TablesReloaded(
-        Uuid,
-        crate::services::database_service::ConnectionIdentity,
-        Vec<TableInfo>,
-    ),
+    CatalogReloaded {
+        origin: crate::services::catalog::CatalogOrigin,
+        generation: u64,
+        result: Result<crate::services::catalog::Catalog, String>,
+    },
     ReopenClosedTab,
     ShowFilterDialog,
 }

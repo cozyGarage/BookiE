@@ -1,4 +1,5 @@
 pub mod approval_router;
+pub mod catalog;
 pub mod change_tracker;
 pub mod column_widths;
 pub mod config_io;

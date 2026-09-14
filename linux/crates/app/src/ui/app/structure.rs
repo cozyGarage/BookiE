@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use tablepro_core::{ColumnInfo, Value};
 
+use crate::services::catalog::CatalogOrigin;
 use crate::services::database_service;
 use crate::services::structure_tracker;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
@@ -70,6 +71,9 @@ impl App {
         table: String,
         sender: ComponentSender<Self>,
     ) {
+        let Some(origin) = CatalogOrigin::capture(self.connection_id) else {
+            return;
+        };
         let title = crate::tr!("Drop {table}?").replace("{table}", &table);
         let body =
             crate::tr!("All rows and the table definition will be removed. This can't be undone from inside TablePro.");
@@ -86,6 +90,7 @@ impl App {
             dlg.close();
             if response == "drop" {
                 sender_for_resp.input(AppMsg::DropTableConfirmed {
+                    origin: origin.clone(),
                     schema: schema_for_resp.clone(),
                     table: table_for_resp.clone(),
                 });
@@ -101,10 +106,14 @@ impl App {
     /// destructive action.
     pub(super) fn on_drop_table_confirmed(
         &mut self,
+        origin: CatalogOrigin,
         schema: Option<String>,
         table: String,
         sender: ComponentSender<Self>,
     ) {
+        if !origin.owns_window(self.connection_id) {
+            return;
+        }
         let Some(driver_id) = self.current_driver_id.clone() else {
             return;
         };
@@ -118,12 +127,12 @@ impl App {
         let schema_for_msg = schema.clone();
         let table_for_msg = table.clone();
         let sender_for_cmd = sender.clone();
-        let connection_id = self.connection_id;
+        let connection = origin.connection();
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let Some(conn) = connection_id.and_then(|id| database_service::instance().get(id)) else {
+                    let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::ShowAlert {
                             title: crate::tr!("Cannot drop table"),
                             body: crate::tr!("No active connection."),
@@ -134,6 +143,7 @@ impl App {
                     match conn.execute_controlled(&sql, &control).await {
                         Ok(_) => {
                             sender_for_cmd.input(AppMsg::DropTableSucceeded {
+                                origin: origin.clone(),
                                 schema: schema_for_msg.clone(),
                                 table: table_for_msg.clone(),
                             });
@@ -178,6 +188,7 @@ impl App {
                 // Nothing to save — short-circuit so close-after-save
                 // can proceed.
                 sender.input(AppMsg::StructureSaveCompleted {
+                    origin: CatalogOrigin::capture(self.connection_id),
                     tab_id,
                     new_table_name: None,
                 });
@@ -195,12 +206,17 @@ impl App {
     /// atomic to the user.
     pub(super) fn on_drop_table_succeeded(
         &mut self,
+        origin: CatalogOrigin,
         schema: Option<String>,
         table: String,
         sender: ComponentSender<Self>,
     ) {
+        if !origin.owns_window(self.connection_id) {
+            return;
+        }
         self.close_tabs_for_table(schema.as_deref(), &table);
         sender.input(AppMsg::SchemaChanged {
+            origin: origin.clone(),
             schema,
             table: Some(table),
         });
@@ -292,14 +308,19 @@ impl App {
             None
         };
 
+        let Some(origin) = CatalogOrigin::capture(self.connection_id) else {
+            self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
+            sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
+            return;
+        };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let connection_id = self.connection_id;
+        let connection = origin.connection();
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let Some(conn) = connection_id.and_then(|id| database_service::instance().get(id)) else {
+                    let Some(conn) = connection else {
                         sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
                         return;
                     };
@@ -321,6 +342,7 @@ impl App {
                         }
                     }
                     sender_for_cmd.input(AppMsg::StructureSaveCompleted {
+                        origin: Some(origin.clone()),
                         tab_id,
                         new_table_name: new_table_name.clone(),
                     });
@@ -341,6 +363,7 @@ impl App {
     ///    the tracker + refetches introspection.
     pub(super) fn on_structure_save_completed(
         &mut self,
+        origin: Option<CatalogOrigin>,
         tab_id: Uuid,
         new_table_name: Option<String>,
         sender: ComponentSender<Self>,
@@ -349,6 +372,10 @@ impl App {
             self.in_flight_saves.set(self.in_flight_saves.get() - 1);
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
+
+        let Some(origin) = origin.filter(|origin| origin.owns_window(self.connection_id)) else {
+            return;
+        };
 
         // Inspect slot kind first so we can branch — promote-and-close
         // vs. in-place clear — without borrowing across mutation.
@@ -364,7 +391,7 @@ impl App {
             match tabs.get(&tab_id) {
                 Some(WorkspaceTab::Structure(slot)) => match new_table_name.clone() {
                     Some(name) => SaveKind::PromoteNewToTable(slot.schema.clone(), name),
-                    None => SaveKind::Skip,
+                    None => SaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
                 },
                 Some(WorkspaceTab::Table(slot)) => SaveKind::UpdateInPlace(slot.schema.clone(), slot.table.clone()),
                 _ => SaveKind::Skip,
@@ -395,6 +422,7 @@ impl App {
                 sender.input(AppMsg::SchemaChanged {
                     schema,
                     table: Some(name),
+                    origin: origin.clone(),
                 });
             }
             SaveKind::UpdateInPlace(schema, table) => {
@@ -411,6 +439,7 @@ impl App {
                 sender.input(AppMsg::SchemaChanged {
                     schema,
                     table: Some(table),
+                    origin: origin.clone(),
                 });
             }
             SaveKind::Skip => {}
@@ -689,68 +718,84 @@ impl App {
         }
     }
 
-    /// Schema state changed somewhere — reload the table list, then
-    /// refetch any open Browse tab pointing at the affected table so
-    /// its grid reflects post-DDL schema (column adds / drops / type
-    /// changes / renames).
+    /// A workspace is rebuilt on connection switch: check its origin before
+    /// touching any tabs, then reject reordered catalog completions as well.
     pub(super) fn on_schema_changed(
         &self,
+        origin: CatalogOrigin,
         schema: Option<String>,
         table: Option<String>,
         sender: ComponentSender<Self>,
     ) {
-        // Refetch the affected Browse tab(s) immediately. Tab-id
-        // collection happens under a short-lived borrow; the sender
-        // dispatches happen after drop so the input handlers can
-        // re-borrow workspace_tabs without panic.
-        if let Some(table_name) = table.as_deref() {
-            let mut affected: Vec<Uuid> = Vec::new();
-            for (id, tab) in self.workspace_tabs.borrow().iter() {
-                if let WorkspaceTab::Table(slot) = tab
-                    && slot.schema.as_deref() == schema.as_deref()
-                    && slot.table == table_name
-                {
-                    affected.push(*id);
-                }
-            }
-            for id in affected {
-                // ColumnsLoaded schedules the page/count with fresh column types.
-                sender.input(AppMsg::FetchBrowseColumns(id));
-            }
+        if !origin.owns_window(self.connection_id) {
+            return;
         }
-        // Sidebar refresh: re-list tables and rebuild the factory.
-        let sender_for_cmd = sender.clone();
-        let Some(connection_id) = self.connection_id else {
+        let Some(conn) = origin.connection() else {
             return;
         };
-        let Some((conn, identity)) = database_service::instance().get_with_identity(connection_id) else {
-            return;
-        };
+        self.schema_index.borrow_mut().invalidate_columns();
+        self.requested_columns.borrow_mut().clear();
+        let affected: Vec<Uuid> = self
+            .workspace_tabs
+            .borrow()
+            .iter()
+            .filter_map(|(id, tab)| match tab {
+                WorkspaceTab::Table(slot)
+                    if table
+                        .as_ref()
+                        .is_none_or(|table| &slot.table == table && slot.schema == schema) =>
+                {
+                    Some(*id)
+                }
+                _ => None,
+            })
+            .collect();
+        for id in affected {
+            sender.input(AppMsg::FetchBrowseColumns(id));
+        }
+        let generation = self.catalog_generation.get().wrapping_add(1);
+        self.catalog_generation.set(generation);
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let sender_for_cmd = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    if let Ok(tables) = conn.list_tables_controlled(&control).await {
-                        sender_for_cmd.input(AppMsg::TablesReloaded(connection_id, identity, tables));
+                    let result = async {
+                        let tables = conn.list_tables_controlled(&control).await?;
+                        let views = conn.list_views_controlled(&control).await?;
+                        Ok::<_, tablepro_core::DriverError>((tables, views))
                     }
+                    .await
+                    .map_err(|error| error_text::driver_message(&error));
+                    sender_for_cmd.input(AppMsg::CatalogReloaded {
+                        origin,
+                        generation,
+                        result,
+                    });
                 })
                 .drop_on_shutdown()
         });
     }
 
-    pub(super) fn on_tables_reloaded(
+    pub(super) fn on_catalog_reloaded(
         &mut self,
-        connection_id: Uuid,
-        identity: database_service::ConnectionIdentity,
-        tables: Vec<tablepro_core::TableInfo>,
+        origin: CatalogOrigin,
+        generation: u64,
+        result: Result<crate::services::catalog::Catalog, String>,
     ) {
-        if self.connection_id != Some(connection_id)
-            || database_service::instance().identity(connection_id).as_ref() != Some(&identity)
-        {
+        if !origin.owns_window(self.connection_id) || self.catalog_generation.get() != generation {
             return;
         }
-        self.repopulate_sidebar(&tables);
+        match result {
+            Ok((tables, views)) => {
+                self.table_names = tables.iter().chain(&views).map(|table| table.name.clone()).collect();
+                self.sidebar_views = views;
+                self.repopulate_sidebar(&tables);
+                self.rebuild_schema_buffer();
+            }
+            Err(error) => self.show_error_alert(&crate::tr!("Catalog refresh failed"), &error),
+        }
     }
 
     pub(super) fn refresh_structure_tab_dirty(&self, tab_id: Uuid, dirty: bool) {
