@@ -31,6 +31,20 @@ async fn a_plaintext_mode_is_refused_by_a_tls_only_server() {
 
 #[tokio::test]
 #[ignore = "requires the driver tls fixture"]
+async fn verifying_modes_reject_an_ip_endpoint_absent_from_the_certificate() {
+    let fixture = DriverTlsFixture::from_env();
+    for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
+        let mut options = fixture.mongo(mode, Some(fixture.ca_cert.clone()));
+        options.host = "127.0.0.1".into();
+        assert!(
+            MongodbDriver.connect(options).await.is_err(),
+            "{mode:?} must not accept an endpoint absent from the certificate"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires the driver tls fixture"]
 async fn a_verifying_mode_without_an_authority_is_refused() {
     let fixture = DriverTlsFixture::from_env();
     let result = MongodbDriver.connect(fixture.mongo(TlsMode::VerifyFull, None)).await;

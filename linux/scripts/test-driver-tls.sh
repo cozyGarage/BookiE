@@ -30,7 +30,7 @@ teardown() {
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
 }
 
-bash "$FIXTURE/generate-materials.sh"
+bash "$FIXTURE/generate-materials.sh" --force
 
 trap teardown EXIT
 compose down --volumes --remove-orphans >/dev/null 2>&1 || true

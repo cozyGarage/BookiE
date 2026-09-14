@@ -16,6 +16,18 @@ async fn a_verifying_mode_connects_with_the_fixture_authority() {
 
 #[tokio::test]
 #[ignore = "requires the driver tls fixture"]
+async fn verify_full_rejects_an_ip_endpoint_absent_from_the_certificate() {
+    let fixture = DriverTlsFixture::from_env();
+    let mut options = fixture.clickhouse(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
+    options.host = "127.0.0.1".into();
+    assert!(
+        ClickhouseDriver.connect(options).await.is_err(),
+        "verify full must not accept an endpoint absent from the certificate"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the driver tls fixture"]
 async fn a_verifying_mode_without_an_authority_is_refused() {
     let fixture = DriverTlsFixture::from_env();
     let result = ClickhouseDriver
