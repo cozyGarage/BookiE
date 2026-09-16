@@ -280,6 +280,12 @@ mod tests {
     }
 
     #[test]
+    fn the_truncation_limits_are_forty_thousand_bytes_and_ten_thousand_chars() {
+        assert_eq!(DISPLAY_TEXT_MAX_CHARS, 10_000);
+        assert_eq!(DISPLAY_TEXT_BYTES_THRESHOLD, 40_000);
+    }
+
+    #[test]
     fn truncate_passes_through_text_one_byte_under_the_threshold() {
         let s = "a".repeat(DISPLAY_TEXT_BYTES_THRESHOLD - 1);
         assert_eq!(truncate_for_display(&s), s);

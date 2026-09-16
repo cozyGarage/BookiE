@@ -363,16 +363,20 @@ async fn bind_local(bind: LocalBind) -> Result<(LocalListener, u16, Option<Local
         LocalBind::Socket { name } => {
             let directory = LocalSocketDir::create()?;
             let path = directory.path.join(&name);
-            if path.as_os_str().len() > MAX_SOCKET_PATH_LEN {
-                return Err(SshError::Bind(std::io::Error::other(format!(
-                    "forwarded socket path is too long: {} bytes",
-                    path.as_os_str().len()
-                ))));
-            }
+            check_socket_path_length(path.as_os_str().len())?;
             let listener = UnixListener::bind(&path).map_err(SshError::Bind)?;
             Ok((LocalListener::Socket(listener), 0, Some(directory)))
         }
     }
+}
+
+fn check_socket_path_length(len: usize) -> Result<(), SshError> {
+    if len > MAX_SOCKET_PATH_LEN {
+        return Err(SshError::Bind(std::io::Error::other(format!(
+            "forwarded socket path is too long: {len} bytes"
+        ))));
+    }
+    Ok(())
 }
 
 enum LocalListener {
@@ -738,6 +742,23 @@ mod tests {
         let outcome = Arc::new(Mutex::new(None));
         let err = map_connect_error(russh::Error::Disconnect, "db.example.com", 5432, &known_hosts, &outcome);
         assert!(matches!(err, SshError::Connect(_)), "expected Connect, got {err:?}");
+    }
+
+    #[test]
+    fn check_socket_path_length_accepts_exactly_the_limit() {
+        assert!(check_socket_path_length(MAX_SOCKET_PATH_LEN).is_ok());
+    }
+
+    #[test]
+    fn check_socket_path_length_rejects_one_byte_over_the_limit() {
+        let error = check_socket_path_length(MAX_SOCKET_PATH_LEN + 1).unwrap_err();
+        let SshError::Bind(error) = error else {
+            panic!("expected Bind, got {error}");
+        };
+        assert!(
+            error.to_string().contains("forwarded socket path is too long"),
+            "expected the length guard's own message, got: {error}"
+        );
     }
 
     #[test]

@@ -615,6 +615,11 @@ mod tests {
     }
 
     #[test]
+    fn split_redis_cli_keeps_a_backslash_literal_outside_quotes() {
+        assert_eq!(split_redis_cli(r"SET k a\b"), vec!["SET", "k", r"a\b"]);
+    }
+
+    #[test]
     fn parse_db_name_accepts_db_n() {
         assert_eq!(parse_db_name("db0").unwrap(), 0);
         assert_eq!(parse_db_name("db15").unwrap(), 15);
