@@ -1,14 +1,15 @@
-# TablePro Linux roadmap
+# BookiE roadmap
 
-Current bug-fix scope and validation: [bug and consistency audit](docs/bug-consistency-2026-09.md). It supersedes older candidate-status statements below; package release approval remains separate.
+Active delivery plan: [BookiE 0.1.1 → 0.2 sprint](docs/bookie-0.2-sprint.md),
+approved September 16. It supersedes older sequencing below.
 
-The current source and verification record is the [bug and consistency audit](docs/bug-consistency-2026-09.md); dated audits linked below are historical evidence only.
+Current scope and verification are recorded in the [approved sprint ledger](docs/bookie-0.2-sprint.md). Prior audits retain evidence for their own source trees.
 
 The repository-level [`PLAN.md`](../PLAN.md) is the source of truth for sequencing, detailed acceptance criteria, and the Linux capability backlog. This file is the concise status view.
 
 ## Current state
 
-TablePro Linux is a substantial GTK4/libadwaita database client, not a prototype. Its core daily-driver workflows are implemented. Production approval, fail-closed audit, PostgreSQL cancellation, and PostgreSQL TLS, SSH, lock, and reconnect behavior are release-verified locally. Exclusive connection switching, deterministic PostgreSQL ordering, direct local sockets, the internal Arch recipe, and a required GTK job are implemented. A release candidate must be frozen before its hosted, soak, and installed-package evidence can be attributed to it.
+BookiE is a GTK4/libadwaita database client. Its core daily-driver workflows are implemented. Production approval, fail-closed audit, PostgreSQL cancellation, and PostgreSQL TLS, SSH, lock, and reconnect behavior are release-verified locally. Exclusive connection switching, deterministic PostgreSQL ordering, direct local sockets, the internal Arch recipe, and a required GTK job are implemented. A release candidate must be frozen before its hosted, soak, and installed-package evidence can be attributed to it.
 
 Every claim below states whether it is implemented, integrated, or release-verified. A feature with unit tests only is never described as verified.
 
@@ -164,8 +165,11 @@ Phase 10 is in progress. Slice 10.2 added connection organisation: groups, tags,
 
 ## Next implementation target
 
-The active target is the bug-and-consistency scope in [PLAN.md](../PLAN.md). Its [current audit](docs/bug-consistency-2026-09.md) records corrections, checks, and unresolved release gates; the September stabilization audit is historical evidence for its own source tree.
-
-Feature work follows the [whole-app adoption review through pinned macOS 0.72](docs/upstream-adoption.md): finish session/activity gaps, then small grid workflows, PostgreSQL catalog/types, timing, and export/transfer foundations. Connection organization and DuckDB flat-file opening already exist and must not be recreated from older backlog entries.
+Deliver 0.1.1 correctness, complete drafts, safe formatting, Jump to Column and
+BookiE identity first. Then converge the platform/runtime/driver/transport contracts
+and deliver editor file workflows plus read-only PostgreSQL catalog/types for 0.2.
+See the [approved sprint](docs/bookie-0.2-sprint.md) for package order and acceptance.
+Existing formatting, run-at-cursor, connection organization and DuckDB flat-file
+opening must not be recreated from historical backlog entries.
 
 RC release remains separate: freeze a candidate, collect 30 consecutive retry-free GTK attempts at that commit, and verify Arch install/upgrade/rollback under Wayland. The passing base-commit smoke job does not supply that ledger.

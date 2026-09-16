@@ -1,5 +1,22 @@
 # Optional upstream reference review
 
+The approved [BookiE convergence sprint](bookie-0.2-sprint.md) now includes shared
+Rust/Linux foundations as well as behavior review. Apple source trees remain excluded.
+
+## 2026-09-16: script planner and safe formatting
+
+- Reference: `TableProApp/TablePro` Linux `5730238f5c72b4924669efbb7c0e79372de50a36`,
+  changes `f483e4169` and `50a515a36`.
+- Imported the standalone `sql_syntax/script` modules and grammar enumeration,
+  and the editor `format_plan`/`significant_tokens` modules with their tests.
+- Connected formatting to the owning connection's dialect. Unsupported/non-SQL
+  connections do not silently format as PostgreSQL. Existing execution/policy
+  splitting remains unchanged until its contract migration is verified.
+- Storage changes follow the upstream complete-draft and ordered-writer behavior,
+  integrated with this fork's existing workspace queue and close-time failure UI.
+- Verification is recorded in the sprint implementation ledger; imports alone
+  do not complete the planned session or driver contract switch.
+
 TablePro Linux is an independent Rust and GTK codebase. Other TablePro implementations may be reviewed as references for security fixes, product behavior, SQL semantics, and user expectations. This review is optional and is not a source synchronization process.
 
 ## Rules
@@ -85,3 +102,11 @@ The entry should describe behavior, not file-by-file source movement. There shou
 - Manual port: PostgreSQL text-pattern conversion; ordinary/controlled view forwarding; stale-sidebar rejection; bundled JSON/Parquet. Invalid count fallback and redundant post-DDL browse reads were additional Linux findings. Structure/editor transactions use separate pooled handles; a real-engine regression confirms isolation.
 - Not ported: Apple UI, plugins, licensing, bulk dump/restore behavior without a Linux counterpart. Timing remains a specified follow-up, not fabricated engine time.
 - Historical verification: [stabilization ledger](stabilization-2026-09.md); [performance evidence](performance-2026-09.md). No Apple source tree was merged.
+
+The editor now uses the imported planner for execution and run-at-cursor as well
+as formatting, following upstream `statement_cursor.rs`. Fork differences: retain
+policy/audit dispatch, parameter prompts and run-generation ownership; stop the
+whole script on errors; reject `GO n` rather than silently ignoring repetition;
+keep the existing scanner for the additional non-upstream drivers. Run-at-cursor
+passes the already planned statement directly, so MySQL custom delimiters are
+not lost by planning the isolated procedure again.

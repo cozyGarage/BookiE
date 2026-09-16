@@ -39,6 +39,12 @@
 
 ### Added
 
+- Jump to Column searches browse/result metadata, distinguishes duplicate names by ordinal, and supports Ctrl+Shift+J.
+- BookiE display name and original book icon; new package commands retain legacy aliases.
+- Arch candidates can be built from an explicit local commit SHA and version before publishing a tag.
+
+- SQL drafts are stored as complete private files instead of being truncated at 256 KiB; the first migration preserves the legacy workspace as a backup
+
 - PostgreSQL views appear in the sidebar as read-only objects, listed through the same policy and timeout path as tables
 - Saved connections can name a certificate authority, so a server whose certificate is issued privately can be verified with Verify Ca or Verify Full
 - Policy crate with AST SQL classification, PolicyGuard, blast-radius rewrite, column masking, and policy.toml. Statements that read host files, run a program, or send SQL to another server are treated as administrative, so an agent is refused and a read-only connection denies them
@@ -118,6 +124,13 @@
 - Public package metadata names only drivers that are actually shipped
 
 ### Fixed
+
+- Updated Rustls to 0.23.45 for RUSTSEC-2026-0285, including its required crypto dependencies.
+
+- PostgreSQL reports non-NULL decoding failures instead of displaying or exporting false NULL values, and out-of-range dates and timestamps no longer panic during decoding
+- SQL formatting preserves dialect-specific executable tokens and leaves statements unchanged when the formatter cannot safely reflow them
+- SSH password and key-passphrase storage failures are reported instead of silently appearing to save successfully
+- Column widths and filters persist in order with coalesced writes, preserve unreadable settings files, and flush on application exit
 
 - A denied statement or dismissed approval is refused if that denial cannot be written to the audit journal
 - The last open connection is reopened when the app starts. If it cannot connect, its tabs stay with that connection instead of attaching to another database

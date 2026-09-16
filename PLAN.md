@@ -1,6 +1,10 @@
 # BookiE Linux development plan
 
-Last updated: 2026-09-14
+Active delivery sequencing and acceptance are now in the approved
+[BookiE 0.1.1 → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
+The capability backlog and historical evidence below remain reference material.
+
+Last updated: 2026-09-16
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -14,17 +18,16 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 ## Current baseline
 
 - Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
-- Next work is the [BookiE 0.1.1 review plan](linux/docs/bookie-0.1.1-plan.md): stabilization and bug fixes, one proposed macOS feature (Jump to Column), and a compatibility-first product rename. Implementation waits for review.
+- Active work follows the approved [BookiE 0.1.1 → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.
 - The [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) and [previous stabilization audit](linux/docs/stabilization-2026-09.md) are historical evidence for their recorded source trees, not approval of 0.1.1.
 - PostgreSQL has the broadest fixture evidence. Redis/MongoDB remain experimental and DuckDB is optional.
 - Package promotion remains separate: a frozen SHA, 30 consecutive retry-free GTK attempts across six runs, and installed Arch/Wayland install, upgrade, and rollback evidence are still required.
 
-## Active work: review the BookiE 0.1.1 plan
+## Active work: BookiE 0.1.1 → 0.2
 
-The [0.1.1 plan](linux/docs/bookie-0.1.1-plan.md) owns next-sprint scope,
-rename decisions, feature acceptance and release sequencing. No version bump,
-application/package rename or release publication is authorized by a checked
-historical phase below. Today ends after committing and pushing the plan.
+The [approved sprint](linux/docs/bookie-0.2-sprint.md) owns scope, migration,
+acceptance and release sequencing. Implementation is authorized; publication
+remains a separate decision. Check its implementation ledger for current evidence.
 
 ## Historical September 9 pass: bugs and behavioral consistency
 
@@ -57,10 +60,9 @@ BookiE should provide:
 
 Every locally shipped Linux feature must work without an account, license key, receipt, subscription, or entitlement service.
 
-The chosen product name is **BookiE**. The running code is still named TablePro
-until the planned rename is implemented. Package/command transitions, durable
+The chosen product name is **BookiE**. The working tree now uses BookiE for the visible application name. Package/command transitions, durable
 application IDs and repository naming follow the explicit compatibility decisions
-in the 0.1.1 plan; do not globally replace persistence or credential identifiers.
+in the approved sprint; do not globally replace persistence or credential identifiers.
 
 ## Status vocabulary
 

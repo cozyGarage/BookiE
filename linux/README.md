@@ -1,14 +1,14 @@
-# TablePro Linux
+# BookiE
 
 Current bug-fix scope and validation: [bug and consistency audit](docs/bug-consistency-2026-09.md). It supersedes older candidate-status statements below; package release approval remains separate.
 
-TablePro is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. The Rust workspace is rooted in this `linux/` directory.
+BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. It is a fork of [TablePro](https://github.com/TableProApp/TablePro). The Rust workspace is rooted in this `linux/` directory.
 
 ## Status
 
 The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse. Redis and MongoDB are experimental, and DuckDB is an optional build feature.
 
-Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `tablepro-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
+Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
 
 The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Hosted checks at `89979e51a` passed except for DuckDB's Git ownership setup; its correction still needs hosted confirmation. Package release approval requires the separate frozen-candidate soak and installed-package evidence.
 
@@ -40,7 +40,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 | Storage | XDG JSON files, SQLite FTS5, JSONL audit journal, Secret Service through `oo7` |
 | Packaging | Internal Arch RC first; no public AUR or Flathub release yet |
 
-Drivers are linked at build time. TablePro does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
+Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
 
 ## Build requirements
 
@@ -139,4 +139,4 @@ The helper pins the tag's commit archive and verifies a real checksum. It does n
 
 ## License
 
-TablePro Linux is licensed under AGPL-3.0-or-later. See [LICENSE.md](LICENSE.md).
+BookiE is licensed under AGPL-3.0-or-later. See [LICENSE.md](LICENSE.md).

@@ -1,5 +1,8 @@
 # BookiE 0.1.1 — next sprint and release plan
 
+Superseded for sequencing by Milestone A of the approved
+[BookiE 0.1.1 → 0.2 sprint](bookie-0.2-sprint.md). Evidence below is historical.
+
 Status: proposed implementation plan for user review; no rename, version bump,
 new feature, release tag or publication has been performed by this document.
 Prepared: 2026-09-14. Delivery branch: `linux`; Linux remains the priority.
