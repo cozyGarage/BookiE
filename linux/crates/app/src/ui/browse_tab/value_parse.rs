@@ -201,8 +201,30 @@ pub(super) fn parse_time_value(text: &str) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{TypeKind, classify_type, parse_input_for_column};
+    use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column};
     use tablepro_core::{ColumnInfo, Value};
+
+    #[test]
+    fn normalize_single_line_leaves_plain_text_untouched() {
+        assert_eq!(normalize_single_line_input("hello world"), "hello world");
+    }
+
+    #[test]
+    fn normalize_single_line_collapses_a_multiline_paste_into_one_line() {
+        assert_eq!(
+            normalize_single_line_input("first\nsecond\r\nthird"),
+            "first second third"
+        );
+    }
+
+    #[test]
+    fn normalize_single_line_squashes_runs_of_whitespace_left_by_the_collapse() {
+        assert_eq!(normalize_single_line_input("a\n\n\nb"), "a b");
+        assert_eq!(
+            normalize_single_line_input("  leading and trailing  "),
+            "leading and trailing"
+        );
+    }
 
     fn col(data_type: &str, nullable: bool) -> ColumnInfo {
         ColumnInfo {
