@@ -202,9 +202,34 @@ pub(super) fn selected_positions(selection: &gtk::MultiSelection) -> Vec<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::build_persisted_row_key;
+    use super::{build_persisted_row_key, escape_tsv_cell};
     use crate::services::change_tracker::RowKey;
     use tablepro_core::Value;
+
+    #[test]
+    fn escape_tsv_cell_passes_through_plain_text() {
+        assert_eq!(escape_tsv_cell("hello world"), "hello world");
+    }
+
+    #[test]
+    fn escape_tsv_cell_replaces_a_tab_so_it_cannot_split_into_another_column() {
+        assert_eq!(escape_tsv_cell("a\tb"), "a b");
+    }
+
+    #[test]
+    fn escape_tsv_cell_replaces_a_newline_so_it_cannot_split_into_another_row() {
+        assert_eq!(escape_tsv_cell("a\nb"), "a b");
+    }
+
+    #[test]
+    fn escape_tsv_cell_replaces_each_character_of_a_crlf_pair() {
+        assert_eq!(escape_tsv_cell("a\r\nb"), "a  b");
+    }
+
+    #[test]
+    fn escape_tsv_cell_keeps_unicode_content_intact() {
+        assert_eq!(escape_tsv_cell("caf\u{e9} \u{1f980}"), "caf\u{e9} \u{1f980}");
+    }
 
     #[test]
     pub(super) fn build_pk_single_column() {

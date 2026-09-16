@@ -577,6 +577,66 @@ mod tests {
         assert_eq!(csv_field("line\n"), "\"line\n\"");
     }
 
+    fn sample_entry() -> Entry {
+        Entry {
+            id: 1,
+            query: "SELECT 1".into(),
+            driver_id: "sqlite".into(),
+            connection_id: Uuid::nil(),
+            connection_name: "test".into(),
+            executed_at: SystemTime::now(),
+            duration_ms: None,
+            rows_affected: None,
+            success: true,
+            cancelled: false,
+            pinned: false,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn outcome_summary_reports_cancelled_before_checking_success() {
+        let mut entry = sample_entry();
+        entry.cancelled = true;
+        entry.success = false;
+        assert_eq!(outcome_summary(&entry), "cancelled");
+    }
+
+    #[test]
+    fn outcome_summary_reports_an_error_outcome() {
+        let mut entry = sample_entry();
+        entry.success = false;
+        assert_eq!(outcome_summary(&entry), "error");
+    }
+
+    #[test]
+    fn outcome_summary_reports_rows_and_duration_when_both_are_known() {
+        let mut entry = sample_entry();
+        entry.rows_affected = Some(3);
+        entry.duration_ms = Some(12);
+        assert_eq!(outcome_summary(&entry), "ok · 3 row(s) · 12 ms");
+    }
+
+    #[test]
+    fn outcome_summary_reports_rows_only_when_duration_is_unknown() {
+        let mut entry = sample_entry();
+        entry.rows_affected = Some(3);
+        assert_eq!(outcome_summary(&entry), "ok · 3 row(s)");
+    }
+
+    #[test]
+    fn outcome_summary_reports_duration_only_when_rows_are_unknown() {
+        let mut entry = sample_entry();
+        entry.duration_ms = Some(12);
+        assert_eq!(outcome_summary(&entry), "ok · 12 ms");
+    }
+
+    #[test]
+    fn outcome_summary_reports_plain_ok_when_neither_is_known() {
+        let entry = sample_entry();
+        assert_eq!(outcome_summary(&entry), "ok");
+    }
+
     #[test]
     fn a_fresh_history_db_is_created_private() {
         use std::os::unix::fs::PermissionsExt;
