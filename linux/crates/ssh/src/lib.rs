@@ -683,4 +683,84 @@ mod tests {
             other => panic!("expected Changed, got {other:?}"),
         }
     }
+
+    #[test]
+    fn verify_or_learn_reports_io_error_when_known_hosts_path_is_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("known_hosts_dir");
+        std::fs::create_dir(&path).unwrap();
+        let key = parse_key(KEY_A_BASE64);
+        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp");
+        assert!(
+            matches!(outcome, HostKeyOutcome::KnownHostsIo(_)),
+            "expected KnownHostsIo, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn ssh_auth_private_key_redacts_passphrase_in_debug() {
+        let auth = SshAuth::PrivateKey {
+            path: PathBuf::from("/home/user/.ssh/id_ed25519"),
+            passphrase: Some(SecretString::new("topsecret".to_string().into())),
+        };
+        let dbg = format!("{auth:?}");
+        assert!(!dbg.contains("topsecret"), "passphrase leaked in Debug: {dbg}");
+    }
+
+    #[test]
+    fn map_connect_error_prefers_a_recorded_host_key_mismatch_over_the_raw_connect_error() {
+        let known_hosts = PathBuf::from("/nonexistent/known_hosts");
+        let outcome = Arc::new(Mutex::new(Some(HostKeyOutcome::Changed {
+            fingerprint: "new-fp".to_string(),
+            line: 3,
+        })));
+        let err = map_connect_error(russh::Error::Disconnect, "db.example.com", 5432, &known_hosts, &outcome);
+        match err {
+            SshError::HostKeyMismatch {
+                host,
+                port,
+                new_fingerprint,
+                line,
+                ..
+            } => {
+                assert_eq!(host, "db.example.com");
+                assert_eq!(port, 5432);
+                assert_eq!(new_fingerprint, "new-fp");
+                assert_eq!(line, 3);
+            }
+            other => panic!("expected HostKeyMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn map_connect_error_falls_back_to_a_generic_connect_error_without_a_recorded_outcome() {
+        let known_hosts = PathBuf::from("/nonexistent/known_hosts");
+        let outcome = Arc::new(Mutex::new(None));
+        let err = map_connect_error(russh::Error::Disconnect, "db.example.com", 5432, &known_hosts, &outcome);
+        assert!(matches!(err, SshError::Connect(_)), "expected Connect, got {err:?}");
+    }
+
+    #[test]
+    fn bind_local_rejects_a_socket_name_that_makes_the_path_too_long() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(bind_local(LocalBind::Socket {
+            name: "x".repeat(MAX_SOCKET_PATH_LEN + 1),
+        }));
+        assert!(matches!(result, Err(SshError::Bind(_))));
+    }
+
+    #[test]
+    fn bind_local_accepts_a_socket_name_within_the_path_limit() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime.block_on(bind_local(LocalBind::Socket {
+            name: "pg.sock".to_string(),
+        }));
+        assert!(result.is_ok());
+    }
 }
