@@ -458,3 +458,37 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
         assert_eq!(conn.query("SELECT 42::int").await.unwrap().rows[0][0], Value::Int(42));
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn activity_duration_types_decode_as_text() {
+    let (_container, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query(
+            "SELECT INTERVAL '1 hour 2 minutes 3 seconds', \
+                    INTERVAL '3 days', \
+                    NULL::interval, \
+                    '192.0.2.1'::inet, \
+                    '192.0.2.0/24'::cidr, \
+                    '2001:db8::1'::inet, \
+                    '0/16B3748'::pg_lsn, \
+                    now() - query_start \
+             FROM pg_stat_activity \
+             WHERE pid = pg_backend_pid()",
+        )
+        .await
+        .expect("activity types must decode");
+    assert_eq!(result.rows[0][0], Value::Text("01:02:03".into()));
+    assert_eq!(result.rows[0][1], Value::Text("3 days".into()));
+    assert_eq!(result.rows[0][2], Value::Null);
+    assert_eq!(result.rows[0][3], Value::Text("192.0.2.1".into()));
+    assert_eq!(result.rows[0][4], Value::Text("192.0.2.0/24".into()));
+    assert_eq!(result.rows[0][5], Value::Text("2001:db8::1".into()));
+    assert_eq!(result.rows[0][6], Value::Text("0/16B3748".into()));
+    assert!(
+        matches!(&result.rows[0][7], Value::Text(value) if !value.is_empty()),
+        "session duration must remain a readable interval, got {:?}",
+        result.rows[0][7]
+    );
+}

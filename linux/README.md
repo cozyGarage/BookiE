@@ -106,13 +106,13 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 
 ## Packaging
 
-The first package is an internal Arch RC. After the exact clean commit passes every gate and is tagged `linux-v0.1.0-rc1`:
+The first package is an internal Arch RC for BookiE 0.1.1. After the exact clean commit passes every gate:
 
 ```bash
-./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.1 ./scripts/build-arch-rc.sh
 ```
 
-The helper pins the tag's commit archive and verifies a real checksum. It does not publish to AUR. Debian and Flatpak files remain development scaffolds; see [packaging/README.md](packaging/README.md).
+The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only after a tag exists. Debian and Flatpak files remain development scaffolds; see [packaging/README.md](packaging/README.md).
 
 ## Documentation
 

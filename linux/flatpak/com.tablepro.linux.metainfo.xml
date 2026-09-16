@@ -48,12 +48,13 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.0rc1" date="2026-08-20">
+    <release version="0.1.1" date="2026-09-16">
       <description>
         <p>
-          Internal Linux release candidate with governed writes, PostgreSQL
-          connection hardening, local Unix sockets, agent access, and GTK
-          installed-flow verification.
+          BookiE 0.1.1: Jump to Column, complete SQL drafts, dialect-safe
+          formatting, and PostgreSQL values that no longer appear as false
+          NULLs. Server Activity still shows session duration. Legacy
+          tablepro commands remain available.
         </p>
       </description>
     </release>

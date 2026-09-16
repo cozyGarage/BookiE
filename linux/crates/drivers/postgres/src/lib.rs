@@ -14,6 +14,8 @@ use tablepro_core::{
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
+mod decode;
+
 pub struct PgDriver;
 
 #[async_trait]
@@ -788,14 +790,21 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     if raw.is_null() {
         return Ok(Value::Null);
     }
-    if raw.format() == sqlx::postgres::PgValueFormat::Binary
-        && matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ")
-    {
-        return raw
+    if raw.format() == sqlx::postgres::PgValueFormat::Binary {
+        if matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ") {
+            return raw
+                .as_bytes()
+                .ok()
+                .and_then(|bytes| decode_temporal(bytes, type_name))
+                .ok_or_else(|| decode_error(idx, type_name));
+        }
+        if let Some(text) = raw
             .as_bytes()
             .ok()
-            .and_then(|bytes| decode_temporal(bytes, type_name))
-            .ok_or_else(|| decode_error(idx, type_name));
+            .and_then(|bytes| decode::decode_pg_binary_text(type_name, bytes))
+        {
+            return Ok(Value::Text(text));
+        }
     }
     let decoded = match type_name {
         "BOOL" => row.try_get::<bool, _>(idx).map(Value::Bool),

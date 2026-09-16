@@ -127,7 +127,7 @@
 
 - Updated Rustls to 0.23.45 for RUSTSEC-2026-0285, including its required crypto dependencies.
 
-- PostgreSQL reports non-NULL decoding failures instead of displaying or exporting false NULL values, and out-of-range dates and timestamps no longer panic during decoding
+- PostgreSQL decode failures stay errors, not false NULLs; INTERVAL, INET, CIDR, and LSN still render as text
 - SQL formatting preserves dialect-specific executable tokens and leaves statements unchanged when the formatter cannot safely reflow them
 - SSH password and key-passphrase storage failures are reported instead of silently appearing to save successfully
 - Column widths and filters persist in order with coalesced writes, preserve unreadable settings files, and flush on application exit
