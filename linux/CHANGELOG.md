@@ -96,6 +96,7 @@
 
 ### Changed
 
+- BookiE app icon: open ledger with a grid page on a teal squircle.
 - Preferences no longer offers an Admin MCP token. That option did not grant extra tools or bypass policy, and a stored Admin token still authenticates as read and write.
 - Saving several row edits at once writes them in primary-key order, so two windows saving overlapping rows cannot deadlock against each other and a failed save reports the same row every time
 - Stop is offered for the engines that can actually abort a statement, because the policy layer no longer hides a driver's cancellation support
@@ -187,6 +188,7 @@
 
 ### Security
 
+- Unused rkyv 0.7 via rust_decimal (RUSTSEC-2026-0235)
 - The headless agent daemon opens a saved connection through its configured SSH chain and verifies the certificate against the real database hostname, instead of dialling the database directly
 - MongoDB connections honour the selected TLS mode and certificate authority instead of always connecting without encryption
 - MySQL Verify Ca connections no longer crash the application
