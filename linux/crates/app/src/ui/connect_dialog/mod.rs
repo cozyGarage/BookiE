@@ -857,10 +857,14 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
     if let Some(s) = &ssh {
         match &s.secret_to_store {
             SshSecretToStore::Password(p) => {
-                let _ = store_ssh_password(saved.id, p.expose_secret(), &label).await;
+                store_ssh_password(saved.id, p.expose_secret(), &label).await.map_err(|error| {
+                    format!("Connection settings were saved, but the SSH password was not saved: {error}. Re-enter the SSH password and connect again.")
+                })?;
             }
             SshSecretToStore::Passphrase(p) => {
-                let _ = store_ssh_passphrase(saved.id, p.expose_secret(), &label).await;
+                store_ssh_passphrase(saved.id, p.expose_secret(), &label).await.map_err(|error| {
+                    format!("Connection settings were saved, but the SSH key passphrase was not saved: {error}. Re-enter the passphrase and connect again.")
+                })?;
             }
             SshSecretToStore::None => {}
         }

@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::config_io::{atomic_write_json, xdg_config_path};
+use super::config_io::xdg_config_path;
+use super::workspace_disk;
 
 /// Serialises every read-modify-write of `workspace_state.json`. Each
 /// `save_connection` call loads the current state, mutates one entry,
@@ -107,7 +108,6 @@ impl WorkspaceQueue {
 const MAX_TABS_PER_CONNECTION: usize = 32;
 const MAX_TABLE_NAME_BYTES: usize = 256;
 const MAX_SCHEMA_NAME_BYTES: usize = 256;
-const MAX_QUERY_BYTES: usize = 256 * 1024;
 const FILE_NAME: &str = "workspace_state.json";
 
 const PAGE_SIZE_OPTIONS: &[u64] = &[100, 500, 1_000, 5_000, 10_000];
@@ -149,8 +149,10 @@ pub enum WorkspaceTabRecord {
         sort_asc: Option<bool>,
     },
     Editor {
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "String::is_empty")]
         query: String,
+        #[serde(default)]
+        draft_id: Option<Uuid>,
     },
     /// Persisted Structure tab (Edit mode only — `New` mode tabs are
     /// drafts for tables that don't exist yet, so they don't survive
@@ -199,6 +201,7 @@ pub enum PersistedTableMode {
 pub(crate) enum RestoredWorkspaceTab {
     Editor {
         query: String,
+        draft_id: Option<Uuid>,
     },
     Table {
         schema: Option<String>,
@@ -215,7 +218,10 @@ pub(crate) enum RestoredWorkspaceTab {
 
 pub(crate) fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<RestoredWorkspaceTab> {
     match record {
-        WorkspaceTabRecord::Editor { query } => Some(RestoredWorkspaceTab::Editor { query: query.clone() }),
+        WorkspaceTabRecord::Editor { query, draft_id } => Some(RestoredWorkspaceTab::Editor {
+            query: query.clone(),
+            draft_id: *draft_id,
+        }),
         WorkspaceTabRecord::Table {
             schema,
             table,
@@ -254,32 +260,31 @@ pub(crate) fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<Rest
     }
 }
 
-fn load_locked() -> WorkspaceState {
-    let Some(path) = xdg_config_path(FILE_NAME) else {
-        return WorkspaceState::default();
-    };
-    let mut state: WorkspaceState = std::fs::read(path)
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default();
+fn drafts_path() -> std::path::PathBuf {
+    glib::user_data_dir().join("tablepro").join("drafts")
+}
+
+fn load_locked() -> Result<WorkspaceState, WorkspaceFlushError> {
+    let path = xdg_config_path(FILE_NAME).ok_or(WorkspaceFlushError::WriteFailed)?;
+    let mut state = workspace_disk::load(&path, &drafts_path()).map_err(|error| {
+        tracing::warn!(%error, "workspace could not be read; existing files will be preserved");
+        WorkspaceFlushError::WriteFailed
+    })?;
     clamp(&mut state);
-    state
+    Ok(state)
 }
 
 fn save_locked(state: &WorkspaceState) -> Result<(), WorkspaceFlushError> {
-    let Some(path) = xdg_config_path(FILE_NAME) else {
-        tracing::warn!("workspace_state: no config path; skipping save");
-        return Err(WorkspaceFlushError::WriteFailed);
-    };
+    let path = xdg_config_path(FILE_NAME).ok_or(WorkspaceFlushError::WriteFailed)?;
     let mut snapshot = state.clone();
     clamp(&mut snapshot);
-    atomic_write_json(&path, &snapshot).map_err(|error| {
-        tracing::warn!(path = %path.display(), error = %error, "workspace_state: write failed");
+    workspace_disk::save(&path, &drafts_path(), &snapshot).map_err(|error| {
+        tracing::warn!(%error, "workspace could not be saved");
         WorkspaceFlushError::WriteFailed
     })
 }
 
-pub fn prefetch_connections(ids: &[Uuid]) {
+pub fn prefetch_connections(ids: &[Uuid]) -> Result<(), WorkspaceFlushError> {
     prefetch_connections_coordinated(
         &MEMORY_LOCK,
         cache(),
@@ -294,7 +299,7 @@ pub fn prefetch_connections(ids: &[Uuid]) {
             let _guard = FILE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
             load_locked()
         },
-    );
+    )
 }
 
 pub fn load_connection(id: Uuid) -> Option<ConnectionWorkspaceState> {
@@ -318,15 +323,16 @@ fn prefetch_connections_coordinated(
     cache: &Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>,
     ids: &[Uuid],
     flush: impl FnOnce(),
-    load: impl FnOnce() -> WorkspaceState,
-) {
+    load: impl FnOnce() -> Result<WorkspaceState, WorkspaceFlushError>,
+) -> Result<(), WorkspaceFlushError> {
     let _memory_guard = memory_lock.lock().unwrap_or_else(|error| error.into_inner());
     flush();
-    let state = load();
+    let state = load()?;
     let mut cache = cache.lock().unwrap_or_else(|error| error.into_inner());
     for id in ids {
         cache.insert(*id, state.connections.get(&id.to_string()).cloned());
     }
+    Ok(())
 }
 
 fn save_connection_coordinated(
@@ -393,11 +399,12 @@ fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>) {
         let attempted_sequence = pending.iter().map(|(_, entry)| entry.sequence).max().unwrap_or(0);
         let result = {
             let _guard = FILE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
-            let mut state = load_locked();
-            for (id, entry) in &pending {
-                state.connections.insert(id.to_string(), entry.state.clone());
-            }
-            save_locked(&state)
+            load_locked().and_then(|mut state| {
+                for (id, entry) in &pending {
+                    state.connections.insert(id.to_string(), entry.state.clone());
+                }
+                save_locked(&state)
+            })
         };
         let mut queue = queue.lock().unwrap_or_else(|error| error.into_inner());
         if result.is_err() {
@@ -471,12 +478,7 @@ fn clamp_connection(conn: &mut ConnectionWorkspaceState) {
     }
     for tab in &mut conn.tabs {
         match tab {
-            WorkspaceTabRecord::Editor { query } => {
-                if query.len() > MAX_QUERY_BYTES {
-                    let boundary = floor_char_boundary(query, MAX_QUERY_BYTES);
-                    query.truncate(boundary);
-                }
-            }
+            WorkspaceTabRecord::Editor { .. } => {}
             WorkspaceTabRecord::Table {
                 schema,
                 table,
@@ -510,11 +512,6 @@ fn clamp_connection(conn: &mut ConnectionWorkspaceState) {
     }
 }
 
-pub fn bounded_query(query: &str) -> String {
-    let boundary = floor_char_boundary(query, MAX_QUERY_BYTES);
-    query[..boundary].to_owned()
-}
-
 fn floor_char_boundary(s: &str, idx: usize) -> usize {
     if idx >= s.len() {
         return s.len();
@@ -538,7 +535,7 @@ mod tests {
         };
         clamp_connection(&mut state);
         assert!(
-            matches!(&state.tabs[state.active_idx as usize], WorkspaceTabRecord::Editor { query } if query == "selected")
+            matches!(&state.tabs[state.active_idx as usize], WorkspaceTabRecord::Editor { query, .. } if query == "selected")
         );
     }
 
@@ -564,7 +561,10 @@ mod tests {
     }
 
     fn editor(query: &str) -> WorkspaceTabRecord {
-        WorkspaceTabRecord::Editor { query: query.into() }
+        WorkspaceTabRecord::Editor {
+            query: query.into(),
+            draft_id: None,
+        }
     }
 
     fn connection(query: &str) -> ConnectionWorkspaceState {
@@ -587,7 +587,9 @@ mod tests {
         assert_eq!(pending.len(), 2);
         let first_state = pending.iter().find(|(id, _)| *id == first).unwrap();
         assert_eq!(first_state.1.sequence, 3);
-        assert!(matches!(&first_state.1.state.tabs[0], WorkspaceTabRecord::Editor { query } if query == "SELECT 3"));
+        assert!(
+            matches!(&first_state.1.state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 3")
+        );
     }
 
     #[test]
@@ -684,7 +686,7 @@ mod tests {
         let pending = queue.take_pending();
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].1.sequence, 2);
-        assert!(matches!(&pending[0].1.state.tabs[0], WorkspaceTabRecord::Editor { query } if query == "SELECT 2"));
+        assert!(matches!(&pending[0].1.state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 2"));
     }
 
     #[test]
@@ -709,9 +711,10 @@ mod tests {
                 || {
                     load_started_sender.send(()).unwrap();
                     continue_load_receiver.recv().unwrap();
-                    disk_state
+                    Ok(disk_state)
                 },
-            );
+            )
+            .unwrap();
         });
         load_started_receiver.recv().unwrap();
 
@@ -733,22 +736,12 @@ mod tests {
         save.join().unwrap();
 
         let cached = cache.lock().unwrap().get(&id).cloned().flatten().unwrap();
-        assert!(matches!(&cached.tabs[0], WorkspaceTabRecord::Editor { query } if query == "SELECT new"));
+        assert!(matches!(&cached.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new"));
         let pending = queue.lock().unwrap().take_pending();
         assert_eq!(pending.len(), 1);
-        assert!(matches!(&pending[0].1.state.tabs[0], WorkspaceTabRecord::Editor { query } if query == "SELECT new"));
-    }
-
-    #[test]
-    fn bounded_query_copies_only_the_utf8_safe_limit() {
-        let mut query = "a".repeat(MAX_QUERY_BYTES - 1);
-        query.push('é');
-        query.push_str(&"b".repeat(MAX_QUERY_BYTES));
-
-        let bounded = bounded_query(&query);
-
-        assert_eq!(bounded.len(), MAX_QUERY_BYTES - 1);
-        assert!(bounded.is_char_boundary(bounded.len()));
+        assert!(
+            matches!(&pending[0].1.state.tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT new")
+        );
     }
 
     #[test]
@@ -800,8 +793,8 @@ mod tests {
     }
 
     #[test]
-    fn clamp_truncates_long_query_at_char_boundary() {
-        let mut q = "a".repeat(MAX_QUERY_BYTES - 1);
+    fn clamp_preserves_the_complete_query() {
+        let mut q = "a".repeat(512 * 1024);
         q.push('é');
         let mut conn = ConnectionWorkspaceState {
             tabs: vec![editor(&q)],
@@ -809,9 +802,9 @@ mod tests {
         };
         clamp_connection(&mut conn);
         match &conn.tabs[0] {
-            WorkspaceTabRecord::Editor { query } => {
+            WorkspaceTabRecord::Editor { query, .. } => {
                 assert!(query.is_char_boundary(query.len()));
-                assert!(query.len() <= MAX_QUERY_BYTES);
+                assert_eq!(query, &q);
             }
             _ => panic!("expected Editor"),
         }
@@ -934,7 +927,7 @@ mod tests {
             _ => panic!("expected Browse"),
         }
         match &tabs[1] {
-            WorkspaceTabRecord::Editor { query } => assert_eq!(query, ""),
+            WorkspaceTabRecord::Editor { query, .. } => assert_eq!(query, ""),
             _ => panic!("expected Editor"),
         }
     }

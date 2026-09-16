@@ -233,8 +233,8 @@ impl App {
         }
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
-                Some(workspace_state::RestoredWorkspaceTab::Editor { query }) => {
-                    self.append_editor_tab(Some(query), sender.clone());
+                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id }) => {
+                    self.append_editor_draft(Some(query), draft_id, sender.clone());
                 }
                 Some(workspace_state::RestoredWorkspaceTab::Table {
                     schema,
@@ -486,11 +486,20 @@ impl App {
 
     /// Public entry: append an Editor tab with optional initial query.
     pub(super) fn append_editor_tab(&mut self, initial_query: Option<String>, sender: ComponentSender<Self>) {
+        self.append_editor_draft(initial_query, None, sender);
+    }
+
+    fn append_editor_draft(
+        &mut self,
+        initial_query: Option<String>,
+        draft_id: Option<Uuid>,
+        sender: ComponentSender<Self>,
+    ) {
         self.ensure_workspace_root(sender.clone());
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
         };
-        let tab_id = Uuid::new_v4();
+        let tab_id = draft_id.unwrap_or_else(Uuid::new_v4);
         let query = initial_query.clone().unwrap_or_default();
         let editor = SqlEditor::builder()
             .launch(SqlEditorInit {

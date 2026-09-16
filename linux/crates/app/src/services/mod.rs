@@ -15,9 +15,11 @@ pub mod query_parameters;
 pub mod quick_switcher;
 pub mod request_generation;
 pub mod single_instance;
+mod state_file;
 pub mod structure_tracker;
 pub mod window_registry;
 pub mod window_state;
+mod workspace_disk;
 pub mod workspace_state;
 
 pub(crate) mod browse_query;

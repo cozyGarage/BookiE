@@ -1,20 +1,11 @@
-//! Per-table filter persistence. Mirrors `column_widths.rs` but the
-//! key includes the schema (so `public.users` and `audit.users` don't
-//! collide on a multi-schema Postgres database) and the value is a
-//! `FilterSet` rather than a single integer.
-//!
-//! Save path is debounced via `relm4::spawn`; rapid Apply clicks land
-//! one disk write each, but they don't block the GTK main loop. An
-//! empty `FilterSet` removes the entry from the file so it shrinks
-//! back when the user clears their filter.
-
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use tablepro_core::FilterSet;
 use uuid::Uuid;
 
-use super::config_io::{atomic_write_json, xdg_config_path};
+use super::config_io::xdg_config_path;
+use super::state_file::StateFile;
 
 const FILE: &str = "filter_settings.json";
 
@@ -23,7 +14,21 @@ type Tables = HashMap<String, FilterSet>;
 type Schemas = HashMap<String, Tables>;
 type Connections = HashMap<String, Schemas>;
 
-static CACHE: Mutex<Option<Connections>> = Mutex::new(None);
+static STORE: OnceLock<Option<StateFile<Connections>>> = OnceLock::new();
+
+fn store() -> Option<&'static StateFile<Connections>> {
+    STORE
+        .get_or_init(|| xdg_config_path(FILE).map(StateFile::load))
+        .as_ref()
+}
+
+pub fn flush() {
+    if let Some(Some(store)) = STORE.get()
+        && let Err(error) = store.flush()
+    {
+        tracing::warn!(%error, "filter settings flush failed");
+    }
+}
 
 /// `None` schema is stored as the empty string so JSON keys are
 /// always concrete. This is the only callsite-facing translation.
@@ -32,67 +37,47 @@ fn schema_key(schema: Option<&str>) -> String {
 }
 
 pub fn load(connection_id: Uuid, schema: Option<&str>, table: &str) -> FilterSet {
-    let mut guard = match CACHE.lock() {
-        Ok(g) => g,
-        Err(_) => return FilterSet::default(),
-    };
-    let map = guard.get_or_insert_with(load_from_disk);
-    map.get(&connection_id.to_string())
-        .and_then(|s| s.get(&schema_key(schema)))
-        .and_then(|t| t.get(table))
-        .cloned()
+    store()
+        .and_then(|store| {
+            store.read(|map| {
+                map.get(&connection_id.to_string())
+                    .and_then(|schemas| schemas.get(&schema_key(schema)))
+                    .and_then(|tables| tables.get(table))
+                    .cloned()
+                    .unwrap_or_default()
+            })
+        })
         .unwrap_or_default()
 }
 
-pub fn save(connection_id: Uuid, schema: Option<&str>, table: &str, set: FilterSet) {
-    let mut guard = match CACHE.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
-    let map = guard.get_or_insert_with(load_from_disk);
-    if set.is_empty() {
-        // Empty FilterSet → remove the entry (and any now-empty
-        // ancestor maps) so the file shrinks back to its previous
-        // shape. Without this, "clear filter" would leave a
-        // `{"rules":[]}` blob behind on disk, which loads as an
-        // empty FilterSet anyway but bloats the file over time.
-        if let Some(schemas) = map.get_mut(&connection_id.to_string()) {
-            if let Some(tables) = schemas.get_mut(&schema_key(schema)) {
-                tables.remove(table);
-                if tables.is_empty() {
-                    schemas.remove(&schema_key(schema));
+pub fn save(connection_id: Uuid, schema: Option<&str>, table: &str, set: FilterSet) -> Result<(), String> {
+    let store = store().ok_or("Settings directory is unavailable")?;
+    store.update(|map| {
+        if set.is_empty() {
+            // Empty FilterSet → remove the entry (and any now-empty
+            // ancestor maps) so the file shrinks back to its previous
+            // shape. Without this, "clear filter" would leave a
+            // `{"rules":[]}` blob behind on disk, which loads as an
+            // empty FilterSet anyway but bloats the file over time.
+            if let Some(schemas) = map.get_mut(&connection_id.to_string()) {
+                if let Some(tables) = schemas.get_mut(&schema_key(schema)) {
+                    tables.remove(table);
+                    if tables.is_empty() {
+                        schemas.remove(&schema_key(schema));
+                    }
+                }
+                if schemas.is_empty() {
+                    map.remove(&connection_id.to_string());
                 }
             }
-            if schemas.is_empty() {
-                map.remove(&connection_id.to_string());
-            }
+        } else {
+            map.entry(connection_id.to_string())
+                .or_default()
+                .entry(schema_key(schema))
+                .or_default()
+                .insert(table.to_string(), set);
         }
-    } else {
-        map.entry(connection_id.to_string())
-            .or_default()
-            .entry(schema_key(schema))
-            .or_default()
-            .insert(table.to_string(), set);
-    }
-    let snapshot = map.clone();
-    drop(guard);
-    relm4::spawn(async move {
-        if let Some(path) = xdg_config_path(FILE)
-            && let Err(e) = atomic_write_json(&path, &snapshot)
-        {
-            tracing::warn!(error = %e, "filter_settings: persist failed");
-        }
-    });
-}
-
-fn load_from_disk() -> Connections {
-    let Some(path) = xdg_config_path(FILE) else {
-        return HashMap::new();
-    };
-    let Ok(bytes) = std::fs::read(path) else {
-        return HashMap::new();
-    };
-    serde_json::from_slice(&bytes).unwrap_or_default()
+    })
 }
 
 #[cfg(test)]

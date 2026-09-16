@@ -86,10 +86,11 @@ fn do_persist_workspace_state(
             active_raw_index = Some(i as usize);
         }
         let record = read_workspace_tab_id(&page)
-            .and_then(|id| tabs.get(&id))
-            .and_then(|slot| match slot {
+            .and_then(|id| tabs.get(&id).map(|slot| (id, slot)))
+            .and_then(|(id, slot)| match slot {
                 WorkspaceTab::Editor(s) => Some(WorkspaceTabRecord::Editor {
-                    query: workspace_state::bounded_query(&s.query),
+                    query: s.query.clone(),
+                    draft_id: Some(id),
                 }),
                 WorkspaceTab::Structure(_) => None,
                 WorkspaceTab::Table(s) if s.table.is_empty() => None,

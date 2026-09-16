@@ -1,53 +1,45 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::OnceLock;
 
 use uuid::Uuid;
 
-use super::config_io::{atomic_write_json, xdg_config_path};
+use super::config_io::xdg_config_path;
+use super::state_file::StateFile;
 
-type Widths = HashMap<String, i32>;
-type Tables = HashMap<String, Widths>;
-type Connections = HashMap<String, Tables>;
+type Connections = HashMap<String, HashMap<String, HashMap<String, i32>>>;
+static STORE: OnceLock<Option<StateFile<Connections>>> = OnceLock::new();
 
-static CACHE: Mutex<Option<Connections>> = Mutex::new(None);
+fn store() -> Option<&'static StateFile<Connections>> {
+    STORE
+        .get_or_init(|| xdg_config_path("column_widths.json").map(StateFile::load))
+        .as_ref()
+}
 
 pub fn load(connection_id: Uuid, table: &str, column: &str) -> Option<i32> {
-    let mut guard = CACHE.lock().ok()?;
-    let map = guard.get_or_insert_with(load_from_disk);
-    map.get(&connection_id.to_string())?.get(table)?.get(column).copied()
+    store()?
+        .read(|map| map.get(&connection_id.to_string())?.get(table)?.get(column).copied())
+        .flatten()
 }
 
 pub fn save(connection_id: Uuid, table: &str, column: &str, width: i32) {
-    let mut guard = match CACHE.lock() {
-        Ok(g) => g,
-        Err(_) => return,
+    let Some(store) = store() else {
+        return;
     };
-    let map = guard.get_or_insert_with(load_from_disk);
-    map.entry(connection_id.to_string())
-        .or_default()
-        .entry(table.to_string())
-        .or_default()
-        .insert(column.to_string(), width);
-    let snapshot = map.clone();
-    drop(guard);
-    // Column resize fires this rapidly during a drag; using `relm4::spawn`
-    // shares the existing tokio runtime instead of creating a fresh OS
-    // thread per width change.
-    relm4::spawn(async move {
-        if let Some(path) = xdg_config_path("column_widths.json")
-            && let Err(e) = atomic_write_json(&path, &snapshot)
-        {
-            tracing::warn!(error = %e, "column_widths: persist failed");
-        }
-    });
+    if let Err(error) = store.update(|map| {
+        map.entry(connection_id.to_string())
+            .or_default()
+            .entry(table.to_string())
+            .or_default()
+            .insert(column.to_string(), width);
+    }) {
+        tracing::warn!(%error, "column width was not saved");
+    }
 }
 
-fn load_from_disk() -> Connections {
-    let Some(path) = xdg_config_path("column_widths.json") else {
-        return HashMap::new();
-    };
-    let Ok(bytes) = std::fs::read(path) else {
-        return HashMap::new();
-    };
-    serde_json::from_slice(&bytes).unwrap_or_default()
+pub fn flush() {
+    if let Some(Some(store)) = STORE.get()
+        && let Err(error) = store.flush()
+    {
+        tracing::warn!(%error, "column width flush failed");
+    }
 }

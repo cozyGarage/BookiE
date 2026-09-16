@@ -195,7 +195,11 @@ impl App {
                 .register(async move {
                     if let Ok(connections) = tablepro_storage::load_connections().await {
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
-                        crate::services::workspace_state::prefetch_connections(&ids);
+                        if crate::services::workspace_state::prefetch_connections(&ids).is_err() {
+                            sender_clone.input(AppMsg::ShowToast(crate::tr!(
+                                "Could not restore the workspace. Existing files have been preserved."
+                            )));
+                        }
                         sender_clone.input(AppMsg::ConnectionsLoaded(connections));
                     }
                 })
@@ -385,7 +389,7 @@ impl App {
             let dialog = adw::AlertDialog::new(
                 Some(&crate::tr!("Cancel running queries and switch?")),
                 Some(&crate::tr!(
-                    "TablePro will wait for every running query to report cancellation before changing connections."
+                    "BookiE will wait for every running query to report cancellation before changing connections."
                 )),
             );
             dialog.add_response("stay", &crate::tr!("Stay"));

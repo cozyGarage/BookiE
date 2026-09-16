@@ -34,7 +34,7 @@ pub enum LockError {
 impl std::fmt::Display for LockError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LockError::AlreadyRunning => write!(f, "another TablePro instance is already running"),
+            LockError::AlreadyRunning => write!(f, "another BookiE instance is already running"),
             LockError::Io(e) => write!(f, "single-instance lock io error: {e}"),
         }
     }

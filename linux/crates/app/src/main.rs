@@ -27,7 +27,7 @@ fn main() {
     let _instance_lock = match services::single_instance::acquire() {
         Ok(lock) => Some(lock),
         Err(services::single_instance::LockError::AlreadyRunning) => {
-            tracing::info!("another TablePro instance is running; exiting");
+            tracing::info!("another BookiE instance is running; exiting");
             return;
         }
         Err(e) => {
@@ -74,6 +74,9 @@ fn main() {
 
     let app = RelmApp::new(APP_ID);
     app.run::<ui::App>(registry);
+
+    services::column_widths::flush();
+    services::filter_settings::flush();
 
     // Explicit ordered shutdown: `app.run` returned (window closed),
     // so let the tokio runtime's worker threads finish in-flight

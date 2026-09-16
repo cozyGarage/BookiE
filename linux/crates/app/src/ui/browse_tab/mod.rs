@@ -1048,8 +1048,15 @@ impl SimpleComponent for BrowseTab {
                     return;
                 }
                 self.current_filter = set.clone();
-                if let Some(conn_id) = self.connection_id {
-                    crate::services::filter_settings::save(conn_id, self.schema.as_deref(), &self.table, set.clone());
+                if let Some(conn_id) = self.connection_id
+                    && let Err(error) = crate::services::filter_settings::save(
+                        conn_id,
+                        self.schema.as_deref(),
+                        &self.table,
+                        set.clone(),
+                    )
+                {
+                    let _ = sender.output(BrowseTabOutput::ShowToast(error));
                 }
                 // Filtered counts shift; jump back to page 1 so the
                 // user isn't stranded on offset N where N might be
