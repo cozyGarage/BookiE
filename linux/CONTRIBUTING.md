@@ -4,7 +4,7 @@ This repository is a Linux-only Rust and GTK project. The Cargo workspace starts
 
 ## Development environment
 
-Install the native packages listed in [README.md](README.md). Rust 1.93 is the minimum supported version and is pinned in `rust-toolchain.toml`. Arch may also provide a newer `/usr/bin/cargo`; see [docs/toolchains.md](docs/toolchains.md) when comparing toolchain results.
+Install the native packages listed in [README.md](README.md). Rust 1.98 is the minimum supported version and is pinned in `rust-toolchain.toml`. Arch may also provide a newer `/usr/bin/cargo`; see [docs/toolchains.md](docs/toolchains.md) when comparing toolchain results.
 
 Use the fast checks while iterating:
 
@@ -25,7 +25,7 @@ cargo run -p tablepro-app
 | `rustfmt` | `rustfmt.toml` | Run before each pull request |
 | `clippy` | `clippy.toml` | Workspace targets pass with `-D warnings` |
 | Rust edition | Workspace manifest | Edition 2024 |
-| MSRV | `rust-toolchain.toml` | Rust 1.93 |
+| MSRV | `rust-toolchain.toml` | Rust 1.98 |
 
 Keep code focused and readable:
 

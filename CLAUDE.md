@@ -4,7 +4,7 @@ This file defines the repository rules for coding agents and contributors.
 
 ## Project scope
 
-TablePro is a Linux-only native database client. Current development stays on the `linux` branch. The source is a Rust 1.93 Cargo workspace under `linux/`.
+TablePro is a Linux-only native database client. Current development stays on the `linux` branch. The source is a Rust 1.98 Cargo workspace under `linux/`.
 
 The UI uses GTK4, libadwaita, GtkSourceView, and Relm4. Database drivers are static workspace crates linked into the app. Keep driver registration at compile time. Do not add cross-platform UI layers, web views, or source for another operating system.
 
@@ -70,7 +70,7 @@ These rules apply to the GUI, MCP server, and `tablepro-agentd`.
 
 `linux/rustfmt.toml`, `linux/clippy.toml`, and the workspace lints are authoritative.
 
-- Use Rust edition 2024 and Rust 1.93.
+- Use Rust edition 2024 and Rust 1.98.
 - Format with `rustfmt`; the line width is 120 characters.
 - Do not add comments, including documentation comments. Prefer clear module, type, function, and test names.
 - Use early returns to keep control flow flat.

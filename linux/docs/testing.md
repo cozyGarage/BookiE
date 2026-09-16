@@ -177,7 +177,7 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 `.github/workflows/build-linux.yml` has these jobs:
 
-1. Preflight on Rust 1.93 without the GTK application.
+1. Preflight on Rust 1.98 without the GTK application.
 2. GTK formatting, Clippy, and `cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins` in Ubuntu 25.10.
 3. Required installed GTK safety smoke under Xvfb and PyAT-SPI, including a real Secret Service round-trip.
 4. PostgreSQL, MySQL, SQL Server, ClickHouse, and Redis integration tests on Docker.

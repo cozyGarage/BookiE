@@ -32,7 +32,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 
 | Layer | Technology |
 |---|---|
-| Language | Rust 1.93+ |
+| Language | Rust 1.98+ |
 | GUI | GTK4 4.14+, libadwaita 1.6+, GtkSourceView 5.12+ |
 | Components | Relm4 |
 | Async work | Tokio for database and service work, GLib main context for GTK |
