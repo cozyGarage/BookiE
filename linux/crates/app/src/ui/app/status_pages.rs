@@ -84,20 +84,23 @@ impl App {
 
     pub(super) fn on_show_about(&self) {
         let dialog = adw::AboutDialog::builder()
-            .application_name(crate::tr!("TablePro"))
+            .application_name(crate::tr!("BookiE"))
             .application_icon("com.tablepro.linux")
-            .developer_name(crate::tr!("TablePro Authors"))
+            .developer_name(crate::tr!("BookiE contributors"))
             .version(env!("CARGO_PKG_VERSION"))
-            .website("https://github.com/TableProApp/TablePro")
-            .issue_url("https://github.com/TableProApp/TablePro/issues")
-            .support_url("https://github.com/TableProApp/TablePro/discussions")
+            .website("https://github.com/cozyGarage/TablePro")
+            .issue_url("https://github.com/cozyGarage/TablePro/issues")
+            .support_url("https://github.com/cozyGarage/TablePro/discussions")
             .copyright(crate::tr!("© 2025–2026 TablePro Authors"))
             .license_type(gtk::License::Agpl30)
             .comments(crate::tr!(
                 "A native Linux database client built with GTK4 + libadwaita."
             ))
             .build();
-        dialog.set_developers(&["TablePro Authors https://github.com/TableProApp/TablePro"]);
+        dialog.set_developers(&[
+            "BookiE contributors https://github.com/cozyGarage/TablePro",
+            "TablePro Authors https://github.com/TableProApp/TablePro",
+        ]);
         dialog.set_translator_credits(&crate::tr!("translator-credits"));
         dialog.present(Some(&self.window));
     }

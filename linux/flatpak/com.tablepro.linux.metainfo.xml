@@ -3,11 +3,11 @@
   <id>com.tablepro.linux</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>AGPL-3.0-or-later</project_license>
-  <name>TablePro</name>
+  <name>BookiE</name>
   <summary>Native Linux database client</summary>
   <description>
     <p>
-      TablePro is a fast, native database client for Linux. It connects to
+      BookiE is a fast, native database client for Linux. It connects to
       PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse, with experimental
       Redis and MongoDB support. It lets you browse tables, edit data in place,
       run SQL, and tunnel through SSH bastions, all from a clean GTK4 /
@@ -25,10 +25,10 @@
     </ul>
   </description>
   <launchable type="desktop-id">com.tablepro.linux.desktop</launchable>
-  <url type="homepage">https://github.com/TableProApp/TablePro</url>
-  <url type="bugtracker">https://github.com/TableProApp/TablePro/issues</url>
+  <url type="homepage">https://github.com/cozyGarage/TablePro</url>
+  <url type="bugtracker">https://github.com/cozyGarage/TablePro/issues</url>
   <developer id="com.tablepro">
-    <name>TablePro Authors</name>
+    <name>BookiE contributors</name>
   </developer>
   <categories>
     <category>Development</category>
@@ -59,6 +59,7 @@
     </release>
   </releases>
   <provides>
+    <binary>bookie</binary>
     <binary>tablepro</binary>
   </provides>
   <recommends>

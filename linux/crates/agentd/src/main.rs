@@ -24,7 +24,7 @@ use tablepro_storage::{AuditJournal, SavedConnection, load_connections};
 use uuid::Uuid;
 
 #[derive(Parser, Debug)]
-#[command(name = "tablepro-agentd", about = "Headless TablePro MCP agent daemon")]
+#[command(name = "bookie-agentd", about = "Headless BookiE MCP agent daemon")]
 struct Args {
     /// Path to policy.toml (required).
     #[arg(long)]
@@ -88,7 +88,7 @@ const APPROVAL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120
 impl ApprovalSink for TtyApprovalSink {
     async fn request(&self, req: ApprovalRequest) -> ApprovalOutcome {
         let prompt = format!(
-            "\n[tablepro-agentd] approval required\n  connection: {}\n  rule: {}\n  reason: {}\n  sql: {}\nApprove? [y/N] ",
+            "\n[bookie-agentd] approval required\n  connection: {}\n  rule: {}\n  reason: {}\n  sql: {}\nApprove? [y/N] ",
             sanitize_for_terminal(&req.connection_name),
             sanitize_for_terminal(&req.rule),
             sanitize_for_terminal(&req.reason),

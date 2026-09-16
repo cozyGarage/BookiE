@@ -28,16 +28,16 @@ impl App {
             (Some(name), Some(driver), Some((schema, table))) => {
                 let label = qualified_label(schema, table);
                 (
-                    format!("{label} · {name} — TablePro"),
+                    format!("{label} · {name} — BookiE"),
                     format_connection_subtitle(name, driver, metadata.as_ref()),
                 )
             }
             (Some(name), Some(driver), None) => (
-                format!("{name} — TablePro"),
+                format!("{name} — BookiE"),
                 format_connection_subtitle(name, driver, metadata.as_ref()),
             ),
-            (None, Some(driver), _) => (format!("{driver} — TablePro"), driver.clone()),
-            _ => ("TablePro".to_string(), String::new()),
+            (None, Some(driver), _) => (format!("{driver} — BookiE"), driver.clone()),
+            _ => ("BookiE".to_string(), String::new()),
         };
         // GNOME Text Editor convention: prefix the OS-level window
         // title with "• " when any open document has unsaved changes,

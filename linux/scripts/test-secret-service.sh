@@ -17,8 +17,10 @@ if [[ "${TABLEPRO_SECRET_DBUS_ACTIVE:-0}" != "1" ]]; then
   chmod 0700 "$secret_root/runtime"
   trap 'rm -rf -- "$secret_root"' EXIT
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+  rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
   TABLEPRO_SECRET_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
+    RUSTUP_HOME="$rustup_home" \
     HOME="$secret_root/home" \
     XDG_CONFIG_HOME="$secret_root/config" \
     XDG_DATA_HOME="$secret_root/data" \

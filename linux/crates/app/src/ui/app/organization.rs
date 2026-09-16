@@ -152,7 +152,7 @@ impl App {
             Err(error) => {
                 tracing::warn!(error = %error, "rejected imported connection URL");
                 self.show_toast(&crate::tr!(
-                    "That is not a connection URL TablePro can read. Use a form like postgres://user@host:5432/database."
+                    "That is not a connection URL BookiE can read. Use a form like postgres://user@host:5432/database."
                 ));
                 return;
             }

@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=TablePro
+Name=BookiE
 GenericName=Database Client
 Comment=Native Linux database client
-Exec=tablepro
+Exec=bookie
 Icon=com.tablepro.linux
 Terminal=false
 Type=Application

@@ -3,11 +3,14 @@
 # commit and supplies the verified archive checksum.
 # shellcheck shell=bash disable=SC2034,SC2154,SC2164
 
-pkgname=tablepro
-pkgver=0.1.0rc1
+pkgname=bookie
+pkgver="${TABLEPRO_RC_VERSION:-0.1.1}"
 pkgrel=1
 pkgdesc="Native Linux database client (internal release candidate)"
 arch=('x86_64')
+provides=("tablepro=$pkgver")
+conflicts=('tablepro')
+replaces=('tablepro')
 url="https://github.com/cozygarage/TablePro"
 license=('AGPL-3.0-or-later')
 depends=('gtk4' 'libadwaita' 'gtksourceview5' 'libsecret' 'openssl' 'krb5')
@@ -15,9 +18,9 @@ makedepends=('rust>=1:1.93' 'pkgconf' 'clang' 'gettext')
 checkdepends=('desktop-file-utils' 'appstream')
 options=('!lto')
 
-_commit="${TABLEPRO_RC_COMMIT:?Use scripts/build-arch-rc.sh to resolve the immutable RC tag}"
+_commit="${TABLEPRO_RC_COMMIT:?Use scripts/build-arch-rc.sh to resolve the immutable candidate commit}"
 _archive_sha256="${TABLEPRO_RC_SHA256:?Use scripts/build-arch-rc.sh to calculate the source checksum}"
-source=("$pkgname-$pkgver.tar.gz::https://github.com/cozygarage/TablePro/archive/${_commit}.tar.gz")
+source=("${TABLEPRO_RC_ARCHIVE:?Use scripts/build-arch-rc.sh to prepare the candidate archive}")
 sha256sums=("$_archive_sha256")
 
 prepare() {
@@ -41,8 +44,10 @@ check() {
 
 package() {
   cd "$srcdir/TablePro-${_commit}/linux"
-  install -Dm755 "$srcdir/target/release/tablepro-app" "$pkgdir/usr/bin/tablepro"
-  install -Dm755 "$srcdir/target/release/tablepro-agentd" "$pkgdir/usr/bin/tablepro-agentd"
+  install -Dm755 "$srcdir/target/release/tablepro-app" "$pkgdir/usr/bin/bookie"
+  install -Dm755 "$srcdir/target/release/tablepro-agentd" "$pkgdir/usr/bin/bookie-agentd"
+  ln -s bookie "$pkgdir/usr/bin/tablepro"
+  ln -s bookie-agentd "$pkgdir/usr/bin/tablepro-agentd"
   install -Dm644 flatpak/com.tablepro.linux.desktop \
     "$pkgdir/usr/share/applications/com.tablepro.linux.desktop"
   install -Dm644 flatpak/com.tablepro.linux.metainfo.xml \

@@ -13,13 +13,15 @@ fi
 
 contents="$(bsdtar -tf "$package")"
 for required in \
+  usr/bin/bookie \
+  usr/bin/bookie-agentd \
   usr/bin/tablepro \
   usr/bin/tablepro-agentd \
   usr/share/applications/com.tablepro.linux.desktop \
   usr/share/metainfo/com.tablepro.linux.metainfo.xml \
   usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
-  usr/share/licenses/tablepro/LICENSE.md \
-  usr/share/doc/tablepro/policy.example.toml; do
+  usr/share/licenses/bookie/LICENSE.md \
+  usr/share/doc/bookie/policy.example.toml; do
   if ! grep -Fxq "$required" <<<"$contents"; then
     echo "package is missing $required" >&2
     exit 1

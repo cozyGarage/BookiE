@@ -1,6 +1,6 @@
 # Translations
 
-TablePro Linux uses [GNU gettext](https://www.gnu.org/software/gettext/) for
+BookiE uses [GNU gettext](https://www.gnu.org/software/gettext/) for
 localisation. Source strings are wrapped at the call site with the `tr!`
 macro defined in `crates/app/src/i18n.rs`; at runtime
 `bindtextdomain("tablepro", …)` points gettext at the locale directory
@@ -29,12 +29,12 @@ ad-hoc testing).
 
 ## Regenerating tablepro.pot
 
-`tablepro.pot` is the master template. Regenerate it with
-[`xtr`](https://crates.io/crates/xtr):
+`tablepro.pot` is the master template. Regenerate it using GNU gettext
+with Rust support (the helper normalizes namespaced macro calls in temporary
+copies so `xgettext` can extract them):
 
 ```sh
-cargo install xtr
-xtr --keyword=tr --output=po/tablepro.pot $(cat po/POTFILES.in)
+python3 scripts/update-translations.py
 ```
 
 Use `msgmerge` to fold new strings into existing translations:

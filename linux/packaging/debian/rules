@@ -19,9 +19,11 @@ override_dh_auto_test:
 
 override_dh_auto_install:
 	install -Dm755 $(TABLEPRO_LINUX)/target/release/tablepro-app \
-		$(CURDIR)/debian/tablepro/usr/bin/tablepro
+		$(CURDIR)/debian/tablepro/usr/bin/bookie
 	install -Dm755 $(TABLEPRO_LINUX)/target/release/tablepro-agentd \
-		$(CURDIR)/debian/tablepro/usr/bin/tablepro-agentd
+		$(CURDIR)/debian/tablepro/usr/bin/bookie-agentd
+	ln -s bookie $(CURDIR)/debian/tablepro/usr/bin/tablepro
+	ln -s bookie-agentd $(CURDIR)/debian/tablepro/usr/bin/tablepro-agentd
 	install -Dm644 $(TABLEPRO_LINUX)/flatpak/com.tablepro.linux.desktop \
 		$(CURDIR)/debian/tablepro/usr/share/applications/com.tablepro.linux.desktop
 	install -Dm644 $(TABLEPRO_LINUX)/flatpak/com.tablepro.linux.metainfo.xml \

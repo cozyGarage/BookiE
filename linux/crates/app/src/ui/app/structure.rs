@@ -76,7 +76,7 @@ impl App {
         };
         let title = crate::tr!("Drop {table}?").replace("{table}", &table);
         let body =
-            crate::tr!("All rows and the table definition will be removed. This can't be undone from inside TablePro.");
+            crate::tr!("All rows and the table definition will be removed. This can't be undone from inside BookiE.");
         let dialog = adw::AlertDialog::new(Some(&title), Some(&body));
         dialog.add_response("cancel", &crate::tr!("Cancel"));
         dialog.add_response("drop", &crate::tr!("Drop"));
