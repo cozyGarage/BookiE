@@ -308,10 +308,18 @@ own change with a regression test that fails against the current code first:
    one real gap found: `outcome_summary` in `query_history.rs` (formats a
    history entry's outcome for SQL/CSV export) had zero tests. Added 6
    covering all branches.
-5. **Redis correctness.** `Core/Redis/*` covers reply parsing, argument
-   encoding, binary values, and key-tree commands.
-   `tablepro-driver-redis` has 7 tests; the whole-app matrix already flags
-   Redis maturity as partial. Not started.
+5. **Redis correctness.** Done. `redis_value_to_result` and `redis_scalar`
+   (reply-to-`QueryResult`/`Value` mapping) had zero tests despite handling
+   every reply shape, including lossy UTF-8 decoding of binary values and
+   the `MAX_QUERY_ROWS` truncation path. `urlencoding_lite` and
+   `map_redis_error` (connection-refusal vs. auth-failure vs. generic query
+   error classification) were also untested. 7 → 19 tests in
+   `crates/drivers/redis/src/lib.rs`.
+
+All five items landed in the `test/ssh-hardening` branch: 34 new tests, 5
+commits, full workspace suite 879 → 911 passing. Continue the upstream
+review from here as new upstream releases land, rather than treating this
+pass as exhaustive.
 
 ## File-size guard
 
