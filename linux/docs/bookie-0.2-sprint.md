@@ -63,9 +63,10 @@ cancellation, verified TLS, atomic exports, Redis, MongoDB, and optional DuckDB.
 | `83545baab`, `d47514b4a` | Owned cancellation/write outcomes/session capabilities: integrate; durable audit remains authoritative |
 
 Lossless decoding is integrated upstream; several session/OpenSSH pieces remain
-preparatory. Importing types alone is not completion. Our russh/cryptovec 0.60.3
-already satisfy [0153](https://rustsec.org/advisories/RUSTSEC-2026-0153.html) and
-[0154](https://rustsec.org/advisories/RUSTSEC-2026-0154.html); upgrading is alignment.
+preparatory. Importing types alone is not completion. russh 0.62.7 is the current
+floor: 0.60.3 covered [0153](https://rustsec.org/advisories/RUSTSEC-2026-0153.html)
+and [0154](https://rustsec.org/advisories/RUSTSEC-2026-0154.html) only. Later GHSA
+client panics and parser DoS need 0.62.4 or newer.
 
 ### macOS lessons
 
