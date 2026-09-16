@@ -250,6 +250,26 @@ backup bytes, but an installed-package rollback is still a release gate.
   `linux`. Also added `libsqlite3-dev` to every CI job that builds the sqlite
   driver or the app crate — missing before, and a certain CI failure once system
   SQLite linking landed, independent of the GNOME 50 question.
+- 2026-09-16/17: reviewed the macOS `main` branch's Swift test suite (~1,300
+  files) for adoptable test cases against `linux`'s own logic, tracked in
+  [docs/testing.md](testing.md)'s "Upstream test-suite parity" section.
+  Ported 5 items — SSH (host-key/socket-path/connect-error edge cases),
+  cell/value display (binary edge cases; surfaced but did not fix an
+  `is_cell_editable` type-affinity gap needing GTK visual verification), row
+  copy/paste (TSV escaping, paste normalization), storage (found already
+  ahead of main's equivalent suite; one real gap in query-history export
+  formatting), and Redis (reply-to-value mapping, error classification) — 34
+  new tests, workspace suite 879 → 911. A follow-on mutation-testing pass
+  (`cargo mutants` against the newly touched files, not yet wired into CI at
+  the time) found 3 tests that passed without actually pinning the behavior
+  they claimed to: a boundary check whose test couldn't reach the exact edge
+  (fixed by extracting the check into its own pure function), a CLI-escape
+  guard tested on only one side of its condition, and a constant referenced
+  only symbolically so a change to its own definition couldn't be caught.
+  All three fixed and reverified; `linux-quality.yml`'s scheduled mutation
+  job now also covers `ssh` and `driver-redis` going forward. Bumped MSRV
+  and CI to Rust 1.98 in the same pass, validated against the real toolchain
+  locally (fmt/clippy/929 tests/`cargo deny` clean) before landing.
 
 ### Local implementation commits
 
