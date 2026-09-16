@@ -67,6 +67,7 @@ pub enum AppMsg {
     ExtraWindowClosed(usize),
     RowCountLoaded(Uuid, crate::ui::browse_tab::BrowseRowCountRequest, u64),
     RowCountFailed(Uuid, crate::ui::browse_tab::BrowseRowCountRequest),
+    JumpToColumn,
     ExportCsv,
     ExportJson,
     ExportResults {

@@ -232,7 +232,7 @@ impl SimpleComponent for App {
     view! {
         #[name = "window"]
         adw::ApplicationWindow {
-            set_title: Some("TablePro"),
+            set_title: Some("BookiE"),
             set_default_width: 1200,
             set_default_height: 760,
 
@@ -242,7 +242,7 @@ impl SimpleComponent for App {
                     #[name = "window_title"]
                     #[wrap(Some)]
                     set_title_widget = &adw::WindowTitle {
-                        set_title: "TablePro",
+                        set_title: "BookiE",
                     },
 
                     // Two distinct affordances → two distinct buttons.
@@ -729,6 +729,16 @@ impl SimpleComponent for App {
             }
             AppMsg::ExtraWindowClosed(key) => {
                 self.extra_windows.retain(|(k, _)| *k != key);
+            }
+            AppMsg::JumpToColumn => {
+                let opened = self
+                    .workspace_tab_view
+                    .as_ref()
+                    .and_then(|view| view.selected_page())
+                    .is_some_and(|page| crate::ui::grid::jump_to_column(&page.child()));
+                if !opened {
+                    self.show_toast(&crate::tr!("Open a result grid to jump to a column."));
+                }
             }
             AppMsg::ExportCsv => self.on_export(ExportFormat::Csv),
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),

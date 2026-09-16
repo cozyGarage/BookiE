@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pyatspi
 
-APP_NAME = "TablePro"
+APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
 CONNECTION_B_NAME = "Safety SQLite B"
 BROKEN_CONNECTION_NAME = "Broken SQLite"
@@ -440,17 +440,21 @@ def set_text_by_name(name, text, timeout=WAIT_SECONDS):
 
 
 def set_visible_editable_within(anchor_name, anchor_role, text):
-    anchor = wait_for_node(name=anchor_name, role=anchor_role)
-    for node in descendants(anchor):
-        try:
-            extents = node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
-            if extents.width <= 1 or extents.height <= 1:
-                continue
-            editable = node.queryEditableText()
-            editable.setTextContents(text)
-            return
-        except Exception:
-            continue
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        anchor = find_node(name=anchor_name, role=anchor_role)
+        if anchor is not None and find_within(anchor, name="Save", role=pyatspi.ROLE_PUSH_BUTTON):
+            for node in descendants(anchor):
+                try:
+                    extents = node.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+                    if extents.width <= 1 or extents.height <= 1:
+                        continue
+                    editable = node.queryEditableText()
+                    editable.setTextContents(text)
+                    return
+                except Exception:
+                    continue
+        time.sleep(POLL_SECONDS)
     raise AssertionError(f"no visible editable control within {anchor_name!r}:\n{accessible_snapshot()}")
 
 
@@ -582,7 +586,7 @@ def start_application(binary, environment, restored=False):
     )
     try:
         if restored:
-            wait_for_frame_containing(" — TablePro")
+            wait_for_frame_containing(" — BookiE")
         else:
             wait_for_node(name=CONNECTION_NAME)
         return process
@@ -641,7 +645,7 @@ def run_scenario(binary, scenario):
             process.wait(timeout=WAIT_SECONDS)
             assert process.returncode == 0, "graceful quit failed"
             stderr += stop_application(process)
-            wait_for_frame_containing(" — TablePro", present=False)
+            wait_for_frame_containing(" — BookiE", present=False)
             process = start_application(binary, environment, restored=True)
 
         if getattr(scenario, "needs_restart", False):
@@ -807,7 +811,7 @@ def successful_switch_keeps_database_ownership(database, base):
     wait_for_database_count(database, 1)
 
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_node(name=f"{CONNECTION_B_NAME} — TablePro", role=pyatspi.ROLE_FRAME)
+    wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
     invoke(wait_for_node(name="Open SQL editor"))
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("CREATE TABLE ownership_new (id INTEGER PRIMARY KEY); INSERT INTO safety_items(id) VALUES (22)")
@@ -850,7 +854,7 @@ def running_query_is_cancelled_before_switch(database, base):
     open_saved_connection(CONNECTION_B_NAME)
     invoke(wait_for_node(name="Cancel queries and switch", role=pyatspi.ROLE_PUSH_BUTTON))
 
-    wait_for_node(name=f"{CONNECTION_B_NAME} — TablePro", role=pyatspi.ROLE_FRAME)
+    wait_for_node(name=f"{CONNECTION_B_NAME} — BookiE", role=pyatspi.ROLE_FRAME)
     invoke(wait_for_node(name="Open SQL editor"))
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     run_sql("INSERT INTO safety_items(id) VALUES (44)")
@@ -954,16 +958,16 @@ def restart_restores_active_editor_and_connection(database, base, restart):
     with sqlite3.connect(database_b) as connection:
         connection.executemany("INSERT INTO safety_items(id) VALUES (?)", [(1,), (2,), (3,)])
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     invoke_named_action_within("safety_items", "Open safety_items")
     wait_for_node(name="Rows 1 – 3 of 3")
     invoke_accessible_action("win.open-editor")
     wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
-    query = "INSERT INTO safety_items(id, note) VALUES (901, 'restored editor')"
+    query = "/*" + "Grüße 東京🙂 " * 30000 + "*/\nINSERT INTO safety_items(id, note) VALUES (901, 'restored editor')"
     set_editor_text(query)
     # Close immediately: the normal close path must flush pending workspace saves.
     restart()
-    window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_within(window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
     texts = []
     for node in descendants(window):
@@ -996,15 +1000,15 @@ def pending_edits_gate_a_connection_switch(database, base):
     wait_for_node(name="Save changes before switching?")
     invoke(wait_for_node(name="Stay", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Save changes before switching?", present=False)
-    wait_for_frame_containing(f"{CONNECTION_NAME} — TablePro")
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro", present=False)
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE", present=False)
     wait_for_node(name="1 unsaved change")
     assert_database_count_stable(database, 0)
 
     open_saved_connection(CONNECTION_B_NAME)
     wait_for_node(name="Save changes before switching?")
     invoke(wait_for_node(name="Discard and switch", role=pyatspi.ROLE_PUSH_BUTTON))
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_for_node(name="1 unsaved change", present=False)
     assert database_ids(database) == [], (
         f"a discarded pending row reached the old database: {database_ids(database)}"
@@ -1039,7 +1043,7 @@ def a_browse_tab_reads_the_new_connection_after_a_switch(database, base):
     wait_for_node_containing("Rows 1 – 7")
 
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     wait_for_node_containing("Rows 1 – 7", present=False)
 
     invoke_named_action_within("safety_items", "Open safety_items")
@@ -1055,13 +1059,13 @@ def two_windows_hold_two_connections(database, base):
     database_b = base / "safety-b.sqlite"
 
     invoke_accessible_action("win.new-window")
-    second_window = wait_for_node(name="TablePro", role=pyatspi.ROLE_FRAME)
+    second_window = wait_for_node(name="BookiE", role=pyatspi.ROLE_FRAME)
     invoke_named_action_within_node(second_window, CONNECTION_B_NAME, "Open connection")
-    second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     invoke(wait_within(second_window, name="Open SQL editor"))
     wait_within(second_window, name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
 
-    first_window = find_frame_containing(f"{CONNECTION_NAME} — TablePro")
+    first_window = find_frame_containing(f"{CONNECTION_NAME} — BookiE")
     assert first_window is not None, (
         f"the first window lost its connection when the second one connected:\n{accessible_snapshot()}"
     )
@@ -1091,11 +1095,11 @@ def switched_connection_keeps_workspace_tabs_after_debounce(database, _base):
     wait_for_node_containing("Rows 1 – 5")
 
     open_saved_connection(CONNECTION_B_NAME)
-    wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
     time.sleep(0.7)
 
     open_saved_connection(CONNECTION_NAME)
-    wait_for_frame_containing(f"{CONNECTION_NAME} — TablePro")
+    wait_for_frame_containing(f"{CONNECTION_NAME} — BookiE")
     wait_for_node_containing("Rows 1 – 5")
 
 
@@ -1106,16 +1110,16 @@ def switching_one_window_leaves_the_other_windows_edits(database, base):
     database_b = base / "safety-b.sqlite"
 
     invoke_accessible_action("win.new-window")
-    second_window = wait_for_node(name="TablePro", role=pyatspi.ROLE_FRAME)
+    second_window = wait_for_node(name="BookiE", role=pyatspi.ROLE_FRAME)
     invoke_named_action_within_node(second_window, CONNECTION_B_NAME, "Open connection")
-    second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — TablePro")
+    second_window = wait_for_frame_containing(f"{CONNECTION_B_NAME} — BookiE")
 
     invoke_named_action_within_node(second_window, "safety_items", "Open safety_items")
     wait_within(second_window, name="No rows on this page")
     invoke(wait_within(second_window, name="Insert row", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_within(second_window, name="1 unsaved change")
 
-    first_window = find_frame_containing(f"{CONNECTION_NAME} — TablePro")
+    first_window = find_frame_containing(f"{CONNECTION_NAME} — BookiE")
     assert first_window is not None, f"the first window disappeared:\n{accessible_snapshot()}"
     open_saved_connection_within(first_window, CONNECTION_B_NAME)
     time.sleep(SETTLE_SECONDS / 3)
@@ -1158,6 +1162,31 @@ def sql_character_warnings_leave_query_unchanged(database, base):
 sql_character_warnings_leave_query_unchanged.environment = "local"
 
 
+def jump_to_column_keyboard_search(database, base):
+    run_sql('SELECT 1 AS duplicate, 2 AS duplicate, 3 AS "Grüße 東京"')
+    wait_for_node(name="3")
+    press_x11_key("j", ("Control_L", "Shift_L"))
+    search = wait_for_node(name="Search columns")
+    wait_for_node(name="1 · duplicate")
+    wait_for_node(name="2 · duplicate")
+    search.queryEditableText().setTextContents("東京")
+    time.sleep(0.3)
+    press_x11_key("Return")
+    wait_for_node(name="Search columns", present=False)
+    press_x11_key("j", ("Control_L", "Shift_L"))
+    search = wait_for_node(name="Search columns")
+    search.queryEditableText().setTextContents("not-a-column")
+    wait_for_node(name="No matching columns")
+    press_x11_key("Return")
+    wait_for_node(name="Search columns")
+    press_x11_key("Escape")
+    wait_for_node(name="Search columns", present=False)
+    assert_database_count_stable(database, 0, seconds=0.2)
+
+
+jump_to_column_keyboard_search.environment = "local"
+
+
 def committed_editor_ddl_refreshes_sidebar(database, base):
     run_sql("CREATE TABLE catalog_probe (id INTEGER PRIMARY KEY)")
     wait_for_node(name="catalog_probe")
@@ -1177,6 +1206,7 @@ def main():
     if not binary.is_file():
         raise SystemExit(f"application binary not found: {binary}")
     scenarios = [
+        jump_to_column_keyboard_search,
         committed_editor_ddl_refreshes_sidebar,
         sql_character_warnings_leave_query_unchanged,
         dismissed_approval_denies,

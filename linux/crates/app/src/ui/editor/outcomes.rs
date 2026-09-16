@@ -116,7 +116,7 @@ fn build_outcome_widget(
     connection_id: Option<uuid::Uuid>,
 ) -> gtk::Widget {
     match &o.kind {
-        StatementOutcomeKind::Rows(result) if !result.rows.is_empty() => {
+        StatementOutcomeKind::Rows(result) if !result.columns.is_empty() => {
             let (column_view, _selection) = build_column_view(
                 result,
                 &result.columns,

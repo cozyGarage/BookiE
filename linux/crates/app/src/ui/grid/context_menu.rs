@@ -38,6 +38,7 @@ pub(super) fn install_grid_context_menus(
     let readonly_menu = build_menu(false, false, true);
     let empty_menu = gio::Menu::new();
     empty_menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
+    empty_menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
 
     let group = gio::SimpleActionGroup::new();
     let edit_action = {
@@ -347,6 +348,7 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool) -> gio::M
     menu.append_section(None, &display);
     let actions = gio::Menu::new();
     actions.append(Some(&crate::tr!("Export Results…")), Some("cell.export"));
+    actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
     if row_operations {
         actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
         actions.append(Some(&crate::tr!("Duplicate row")), Some("cell.duplicate-row"));

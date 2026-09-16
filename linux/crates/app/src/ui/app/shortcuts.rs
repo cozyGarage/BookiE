@@ -13,6 +13,7 @@ pub(super) fn primary_menu_model() -> gio::Menu {
     menu.append_section(None, &connection_section);
     let query_section = gio::Menu::new();
     query_section.append(Some(&crate::tr!("Open Quickly")), Some("win.open-quickly"));
+    query_section.append(Some(&crate::tr!("Jump to Column…")), Some("win.jump-column"));
     query_section.append(Some(&crate::tr!("Save Query as Favorite")), Some("win.save-favorite"));
     menu.append_section(None, &query_section);
     let history_section = gio::Menu::new();
@@ -26,7 +27,7 @@ pub(super) fn primary_menu_model() -> gio::Menu {
     menu.append_section(None, &prefs_section);
     let app_section = gio::Menu::new();
     app_section.append(Some(&crate::tr!("Keyboard Shortcuts")), Some("win.shortcuts"));
-    app_section.append(Some(&crate::tr!("About TablePro")), Some("win.about"));
+    app_section.append(Some(&crate::tr!("About BookiE")), Some("win.about"));
     app_section.append(Some(&crate::tr!("Quit")), Some("win.quit"));
     menu.append_section(None, &app_section);
     menu
@@ -62,6 +63,7 @@ pub(super) fn install_window_actions(
         input_action!("show-activity", AppMsg::ShowActivity),
         input_action!("explain-query", AppMsg::ExplainActiveQuery),
         input_action!("refresh-page", AppMsg::RefreshPage),
+        input_action!("jump-column", AppMsg::JumpToColumn),
         input_action!("export-csv", AppMsg::ExportCsv),
         input_action!("export-json", AppMsg::ExportJson),
         input_action!("save-changes", AppMsg::SaveActiveBrowseTab),
@@ -97,6 +99,7 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         ("<Primary>comma", "win.preferences"),
         ("<Primary>h", "win.show-history"),
         ("<Primary>p", "win.open-quickly"),
+        ("<Primary><Shift>j", "win.jump-column"),
         ("<Primary>d", "win.save-favorite"),
         ("<Primary>s", "win.save-changes"),
         ("<Primary>z", "win.undo-change"),
@@ -153,6 +156,7 @@ pub(super) fn build_shortcuts_window(parent: &adw::ApplicationWindow) -> gtk::Sh
         ("Delete", crate::tr!("Delete selected row")),
         ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
         ("<Primary>f", crate::tr!("Filter rows")),
+        ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
         ("<Primary>a", crate::tr!("Select all rows")),
         (
             "<Shift>Pointer_Button1",

@@ -1,4 +1,5 @@
 mod column;
+mod column_jump;
 mod context_menu;
 mod display;
 mod editing;
@@ -118,6 +119,13 @@ pub fn build_column_view(
         columns.push(col);
     }
 
+    column_jump::install(
+        &column_view,
+        &columns,
+        result.columns.iter().map(|column| column.name.clone()).collect(),
+        connection_id,
+    );
+
     if let Some((col_idx, ascending)) = sort
         && let Some(col) = columns.get(col_idx)
     {
@@ -158,4 +166,8 @@ pub fn build_column_view(
     }
 
     (column_view, selection)
+}
+
+pub(crate) fn jump_to_column(widget: &gtk4::Widget) -> bool {
+    column_jump::open_in(widget)
 }
