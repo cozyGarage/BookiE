@@ -6,6 +6,8 @@ This file defines the repository rules for coding agents and contributors.
 
 TablePro is a Linux-only native database client. Current development stays on the `linux` branch. The source is a Rust 1.98 Cargo workspace under `linux/`.
 
+The Linux app is being renamed to **BookiE** (`linux/README.md`, `linux/ROADMAP.md`). The active plan is [`linux/docs/bookie-0.2-sprint.md`](linux/docs/bookie-0.2-sprint.md): ship BookiE 0.1.1 first, then 0.2.0. The rename covers display name, binary names (`bookie`, `bookie-agentd`), and branding assets only — app ID, config/data paths, keyring schema, UUIDs, audit format, and protocol contracts stay `tablepro`/`com.tablepro.linux` for compatibility. Do not rename those identifiers without checking that plan first.
+
 The UI uses GTK4, libadwaita, GtkSourceView, and Relm4. Database drivers are static workspace crates linked into the app. Keep driver registration at compile time. Do not add cross-platform UI layers, web views, or source for another operating system.
 
 Every shipped feature must be available without an account, license key, subscription, paid tier, or remote entitlement check.

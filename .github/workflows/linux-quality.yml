@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   mutation:
-    name: Mutation testing (core, policy)
+    name: Mutation testing (core, policy, ssh, driver-redis)
     timeout-minutes: 120
     runs-on: ubuntu-24.04
     defaults:
@@ -69,6 +69,24 @@ jobs:
         run: |
           cargo mutants --package tablepro-policy --test-tool cargo \
             --output mutants-policy --timeout 60 --no-shuffle -- --lib
+      # ssh and driver-redis are the two crates a live audit (mutation
+      # testing run by hand, not this job) most recently found real gaps
+      # in: a boundary check whose test couldn't reach the exact edge, and
+      # a parser guard only exercised on one side of its condition. Both
+      # are pure logic with no Docker/GTK dependency, so they belong here
+      # alongside core/policy rather than in the driver-integration tier.
+      - name: Mutate tablepro-ssh
+        id: mutate-ssh
+        continue-on-error: true
+        run: |
+          cargo mutants --package tablepro-ssh --test-tool cargo \
+            --output mutants-ssh --timeout 60 --no-shuffle -- --lib
+      - name: Mutate tablepro-driver-redis
+        id: mutate-driver-redis
+        continue-on-error: true
+        run: |
+          cargo mutants --package tablepro-driver-redis --test-tool cargo \
+            --output mutants-driver-redis --timeout 60 --no-shuffle -- --lib
       - name: Summarise surviving mutants
         if: always()
         run: |
@@ -80,8 +98,10 @@ jobs:
             echo "rest are behaviour with no test behind it."
             echo "Core step outcome: ${{ steps.mutate-core.outcome }}"
             echo "Policy step outcome: ${{ steps.mutate-policy.outcome }}"
+            echo "SSH step outcome: ${{ steps.mutate-ssh.outcome }}"
+            echo "Redis driver step outcome: ${{ steps.mutate-driver-redis.outcome }}"
             echo "A failed measurement can mean surviving mutants, timeouts, or infrastructure failure; inspect its logs."
-            for crate in core policy; do
+            for crate in core policy ssh driver-redis; do
               report="mutants-$crate/mutants.out"
               caught="$report/caught.txt"
               missed="$report/missed.txt"
@@ -113,6 +133,8 @@ jobs:
           path: |
             linux/mutants-core
             linux/mutants-policy
+            linux/mutants-ssh
+            linux/mutants-driver-redis
           if-no-files-found: warn
 
   coverage:
