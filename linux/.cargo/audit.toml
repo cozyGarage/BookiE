@@ -3,6 +3,6 @@
 
 [advisories]
 ignore = [
-    # No fixed release. Pulled by russh (SSH) and sqlx-mysql (auth plugins).
+    # No fixed release. rsa 0.9.10 via sqlx-mysql; rsa 0.10 rc via russh.
     "RUSTSEC-2023-0071",
 ]
