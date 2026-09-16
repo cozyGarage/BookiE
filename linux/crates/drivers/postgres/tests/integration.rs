@@ -432,3 +432,29 @@ async fn bad_sql_returns_query_error() {
         "expected error to mention missing relation, got: {msg}"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn non_null_decode_failures_are_not_returned_as_null() {
+    let (_container, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query("SELECT NULL::numeric, NULL::int[], NULL::date, 42::int")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows[0],
+        vec![Value::Null, Value::Null, Value::Null, Value::Int(42)]
+    );
+    for sql in [
+        "SELECT 1234567890123456789012345678901234567890::numeric",
+        "SELECT ARRAY[1, 2]::int[]",
+        "SELECT 'infinity'::date",
+        "SELECT '-infinity'::timestamp",
+        "SELECT 'infinity'::timestamptz",
+        "SELECT '280000-01-01'::timestamp",
+    ] {
+        assert!(matches!(conn.query(sql).await, Err(DriverError::Query { .. })), "{sql}");
+        assert_eq!(conn.query("SELECT 42::int").await.unwrap().rows[0][0], Value::Int(42));
+    }
+}

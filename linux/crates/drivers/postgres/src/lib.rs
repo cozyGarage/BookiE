@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
-use sqlx::{Column, Connection as SqlxConnection, Pool, Postgres, Row, TypeInfo};
+use sqlx::{Column, Connection as SqlxConnection, Pool, Postgres, Row, TypeInfo, ValueRef};
 
 use futures::stream::StreamExt;
 
@@ -773,7 +773,7 @@ where
                 .iter()
                 .enumerate()
                 .map(|(index, type_name)| extract_value(&row, index, type_name))
-                .collect(),
+                .collect::<Result<Vec<_>, _>>()?,
         );
     }
     Ok(QueryResult {
@@ -783,54 +783,69 @@ where
     })
 }
 
-fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Value {
-    match type_name {
-        "BOOL" => row.try_get::<bool, _>(idx).map(Value::Bool).unwrap_or(Value::Null),
-        "INT2" => row
-            .try_get::<i16, _>(idx)
-            .map(|v| Value::Int(v as i64))
-            .unwrap_or(Value::Null),
-        "INT4" => row
-            .try_get::<i32, _>(idx)
-            .map(|v| Value::Int(v as i64))
-            .unwrap_or(Value::Null),
-        "INT8" => row.try_get::<i64, _>(idx).map(Value::Int).unwrap_or(Value::Null),
-        "FLOAT4" => row
-            .try_get::<f32, _>(idx)
-            .map(|v| Value::Float(v as f64))
-            .unwrap_or(Value::Null),
-        "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float).unwrap_or(Value::Null),
-        "NUMERIC" => row
-            .try_get::<rust_decimal::Decimal, _>(idx)
-            .map(Value::Decimal)
-            .unwrap_or(Value::Null),
-        "DATE" => row
-            .try_get::<chrono::NaiveDate, _>(idx)
-            .map(Value::Date)
-            .unwrap_or(Value::Null),
-        "TIME" => row
-            .try_get::<chrono::NaiveTime, _>(idx)
-            .map(Value::Time)
-            .unwrap_or(Value::Null),
-        "TIMESTAMP" => row
-            .try_get::<chrono::NaiveDateTime, _>(idx)
-            .map(Value::DateTime)
-            .unwrap_or(Value::Null),
+fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, DriverError> {
+    let raw = row.try_get_raw(idx).map_err(map_sqlx_error)?;
+    if raw.is_null() {
+        return Ok(Value::Null);
+    }
+    if raw.format() == sqlx::postgres::PgValueFormat::Binary
+        && matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ")
+    {
+        return raw
+            .as_bytes()
+            .ok()
+            .and_then(|bytes| decode_temporal(bytes, type_name))
+            .ok_or_else(|| decode_error(idx, type_name));
+    }
+    let decoded = match type_name {
+        "BOOL" => row.try_get::<bool, _>(idx).map(Value::Bool),
+        "INT2" => row.try_get::<i16, _>(idx).map(|v| Value::Int(v as i64)),
+        "INT4" => row.try_get::<i32, _>(idx).map(|v| Value::Int(v as i64)),
+        "INT8" => row.try_get::<i64, _>(idx).map(Value::Int),
+        "FLOAT4" => row.try_get::<f32, _>(idx).map(|v| Value::Float(v as f64)),
+        "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float),
+        "NUMERIC" => row.try_get::<rust_decimal::Decimal, _>(idx).map(Value::Decimal),
+        "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date),
+        "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time),
+        "TIMESTAMP" => row.try_get::<chrono::NaiveDateTime, _>(idx).map(Value::DateTime),
         "TIMESTAMPTZ" => row
             .try_get::<chrono::DateTime<chrono::Utc>, _>(idx)
-            .map(Value::TimestampTz)
-            .unwrap_or(Value::Null),
-        "UUID" => row
-            .try_get::<uuid::Uuid, _>(idx)
-            .map(Value::Uuid)
-            .unwrap_or(Value::Null),
-        "JSON" | "JSONB" => row
-            .try_get::<serde_json::Value, _>(idx)
-            .map(Value::Json)
-            .unwrap_or(Value::Null),
-        "BYTEA" => row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes).unwrap_or(Value::Null),
-        _ => row.try_get::<String, _>(idx).map(Value::Text).unwrap_or(Value::Null),
+            .map(Value::TimestampTz),
+        "UUID" => row.try_get::<uuid::Uuid, _>(idx).map(Value::Uuid),
+        "JSON" | "JSONB" => row.try_get::<serde_json::Value, _>(idx).map(Value::Json),
+        "BYTEA" => row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes),
+        _ => row.try_get::<String, _>(idx).map(Value::Text),
+    };
+    decoded.map_err(|_| decode_error(idx, type_name))
+}
+
+fn decode_error(index: usize, type_name: &str) -> DriverError {
+    DriverError::Query {
+        message: format!(
+            "Cannot decode PostgreSQL column {} ({type_name}); its non-NULL value was not returned",
+            index + 1
+        ),
+        sqlstate: None,
     }
+}
+
+fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
+    let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)?;
+    if type_name == "DATE" {
+        let days = i32::from_be_bytes(bytes.try_into().ok()?);
+        return epoch
+            .checked_add_signed(chrono::TimeDelta::try_days(i64::from(days))?)
+            .map(Value::Date);
+    }
+    let micros = i64::from_be_bytes(bytes.try_into().ok()?);
+    let time = epoch
+        .and_hms_opt(0, 0, 0)?
+        .checked_add_signed(chrono::TimeDelta::microseconds(micros))?;
+    Some(if type_name == "TIMESTAMPTZ" {
+        Value::TimestampTz(time.and_utc())
+    } else {
+        Value::DateTime(time)
+    })
 }
 
 /// Bind a positional parameter list to a sqlx Postgres query in the
