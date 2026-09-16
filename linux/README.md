@@ -123,6 +123,7 @@ The helper archives that commit, verifies a real checksum, and does not publish 
 | Production audit | [docs/production-audit.md](docs/production-audit.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Rust toolchains on Arch and Omarchy | [docs/toolchains.md](docs/toolchains.md) |
+| Arch / Omarchy internal package | [docs/omarchy.md](docs/omarchy.md) |
 | Historical September stabilization evidence | [docs/stabilization-2026-09.md](docs/stabilization-2026-09.md) |
 | Ignored-test inventory | [docs/ignored-tests.md](docs/ignored-tests.md) |
 | Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/upstream-adoption.md) |
