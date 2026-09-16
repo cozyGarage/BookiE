@@ -99,7 +99,7 @@ impl Connection for SqliteConnection {
         // table_info on older SQLite (< 3.37) — both have the same
         // first 6 columns: cid, name, type, notnull, dflt_value, pk.
         let pragma_sql = format!("PRAGMA table_xinfo({})", quote_ident(table));
-        let rows = sqlx::query(&pragma_sql)
+        let rows = sqlx::query(sqlx::AssertSqlSafe(pragma_sql.as_str()))
             .fetch_all(&self.pool)
             .await
             .map_err(map_sqlx_error)?;
@@ -207,14 +207,17 @@ impl Connection for SqliteConnection {
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let res = sqlx::query(sql).execute(&self.pool).await.map_err(map_sqlx_error)?;
+        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
         })
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let q = bind_sqlite_params(sqlx::query(sql), params);
+        let q = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
         let res = q.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
@@ -252,7 +255,8 @@ impl Connection for SqliteConnection {
         let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
-            let q = bind_sqlite_params(sqlx::query(sql), params);
+            let sql = sql.as_str();
+            let q = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -275,10 +279,13 @@ impl Connection for SqliteConnection {
         // ordering. PK index doesn't always show up in index_list (a
         // bare INTEGER PRIMARY KEY uses the rowid alias, no real
         // index), so we synthesise one from table_info if missing.
-        let list = sqlx::query(&format!("PRAGMA index_list({})", quote_ident(table)))
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
+        let list = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "PRAGMA index_list({})",
+            quote_ident(table)
+        )))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
         let mut out: Vec<IndexInfo> = Vec::with_capacity(list.len());
         let mut saw_primary = false;
         for r in list {
@@ -289,10 +296,13 @@ impl Connection for SqliteConnection {
             if primary {
                 saw_primary = true;
             }
-            let info_rows = sqlx::query(&format!("PRAGMA index_info({})", quote_ident(&name)))
-                .fetch_all(&self.pool)
-                .await
-                .map_err(map_sqlx_error)?;
+            let info_rows = sqlx::query(sqlx::AssertSqlSafe(format!(
+                "PRAGMA index_info({})",
+                quote_ident(&name)
+            )))
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
             let columns: Vec<String> = info_rows
                 .into_iter()
                 .map(|c| c.try_get::<String, _>(2).unwrap_or_default())
@@ -308,10 +318,13 @@ impl Connection for SqliteConnection {
             // Synthesise the implicit PK index from PRAGMA table_info
             // so the UI can render PK columns even when SQLite chose
             // the rowid-alias path.
-            let table_info = sqlx::query(&format!("PRAGMA table_info({})", quote_ident(table)))
-                .fetch_all(&self.pool)
-                .await
-                .map_err(map_sqlx_error)?;
+            let table_info = sqlx::query(sqlx::AssertSqlSafe(format!(
+                "PRAGMA table_info({})",
+                quote_ident(table)
+            )))
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
             let pk_cols: Vec<String> = table_info
                 .into_iter()
                 .filter(|r| r.try_get::<i64, _>(5).unwrap_or(0) > 0)
@@ -335,10 +348,13 @@ impl Connection for SqliteConnection {
         // stored by SQLite, so we synthesise "fk_{table}_{id}" — stable
         // across re-runs of the same schema. Group by id and build
         // ForeignKeyInfo.
-        let rows = sqlx::query(&format!("PRAGMA foreign_key_list({})", quote_ident(table)))
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
+        let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
+            "PRAGMA foreign_key_list({})",
+            quote_ident(table)
+        )))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
         let mut by_id: std::collections::BTreeMap<i64, ForeignKeyInfo> = std::collections::BTreeMap::new();
         for r in rows {
             let id: i64 = r.try_get(0).unwrap_or(0);
@@ -401,7 +417,10 @@ impl tablepro_core::Transaction for SqliteTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let rows = sqlx::query(sql).fetch_all(&mut **tx).await.map_err(map_sqlx_error)?;
+        let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(map_sqlx_error)?;
         if rows.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -438,7 +457,10 @@ impl tablepro_core::Transaction for SqliteTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let res = sqlx::query(sql).execute(&mut **tx).await.map_err(map_sqlx_error)?;
+        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&mut **tx)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
         })
@@ -465,7 +487,7 @@ async fn stream_into_result<'e, E>(executor: E, sql: &str, limit: usize) -> Resu
 where
     E: sqlx::Executor<'e, Database = Sqlite>,
 {
-    let mut stream = sqlx::query(sql).fetch(executor);
+    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(executor);
     let mut collected: Vec<SqliteRow> = Vec::new();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -585,9 +607,9 @@ fn decode_fallback(row: &SqliteRow, idx: usize) -> Value {
 }
 
 fn bind_sqlite_params<'q>(
-    mut q: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments<'q>>,
+    mut q: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments>,
     params: &'q [Value],
-) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
+) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments> {
     for p in params {
         q = match p {
             Value::Null => q.bind(Option::<&str>::None),
@@ -641,7 +663,7 @@ where
     if params.is_empty() {
         return stream_into_result(executor, sql, limit).await;
     }
-    let query = bind_sqlite_params(sqlx::query(sql), params);
+    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let mut stream = query.fetch(executor);
     let mut collected: Vec<SqliteRow> = Vec::new();
     let mut truncated = false;
@@ -660,7 +682,7 @@ async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<E
 where
     E: sqlx::Executor<'e, Database = Sqlite>,
 {
-    let query = bind_sqlite_params(sqlx::query(sql), params);
+    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let result = query.execute(executor).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),

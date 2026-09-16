@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/tablepro/linux">
+    <file>style.css</file>
+    <file>icons/scalable/apps/com.tablepro.linux.svg</file>
+  </gresource>
+</gresources>

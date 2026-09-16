@@ -316,7 +316,7 @@ pub async fn search(filter: SearchFilter) -> Result<Vec<Entry>, StorageError> {
     }
     sql.push_str("ORDER BY h.pinned DESC, h.executed_at DESC LIMIT ?");
 
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
     if let Some(needle) = &filter.needle {
         q = q.bind(needle);
     }
@@ -381,7 +381,7 @@ pub async fn delete_many(ids: &[i64]) -> Result<usize, StorageError> {
     let pool = pool()?;
     let placeholders = vec!["?"; ids.len()].join(",");
     let sql = format!("DELETE FROM history WHERE id IN ({placeholders})");
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
     for id in ids {
         q = q.bind(id);
     }
@@ -439,7 +439,7 @@ pub async fn fetch_by_ids(ids: &[i64]) -> Result<Vec<Entry>, StorageError> {
          duration_ms, rows_affected, success, cancelled, pinned, error \
          FROM history WHERE id IN ({placeholders}) ORDER BY pinned DESC, executed_at DESC"
     );
-    let mut q = sqlx::query(&sql);
+    let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
     for id in ids {
         q = q.bind(id);
     }

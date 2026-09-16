@@ -15,7 +15,8 @@ name = "tablepro-agentd"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["kerberos"]
+kerberos = ["tablepro-driver-mssql/kerberos"]
 duckdb = ["dep:tablepro-driver-duckdb"]
 
 [dependencies]
