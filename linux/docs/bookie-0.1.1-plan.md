@@ -134,7 +134,7 @@ clearance or repository/domain ownership.
 
 - [ ] Clean stale active docs/dead code only with evidence; preserve historical
   ledgers and upstream attribution. Update driver maturity claims honestly.
-- [ ] Freeze one candidate SHA and rerun full CI, Rust 1.93 MSRV/current stable,
+- [ ] Freeze one candidate SHA and rerun full CI, Rust 1.98 MSRV/current stable,
   driver integrations, PostgreSQL release, TLS, isolated Secret Service,
   installed GTK, optional DuckDB and dependency audit/deny gates as applicable.
 - [ ] Record hosted results for that SHA. A failed, skipped or unavailable gate
