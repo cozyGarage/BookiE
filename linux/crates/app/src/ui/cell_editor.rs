@@ -10,7 +10,7 @@
 //! mirrors the stack's `visible-child-name` notify so callers can
 //! snapshot the original text on entry and emit a commit on exit.
 
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
@@ -24,6 +24,7 @@ mod imp {
         pub stack: OnceCell<gtk4::Stack>,
         pub label: OnceCell<gtk4::Label>,
         pub entry: OnceCell<gtk4::Text>,
+        pub inline_editable: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -160,6 +161,17 @@ impl CellEditor {
         self.entry_widget().set_text(s);
     }
 
+    pub fn set_inline_editable(&self, editable: bool) {
+        self.imp().inline_editable.set(editable);
+        if !editable && self.is_editing() {
+            self.stop_editing(false);
+        }
+    }
+
+    pub fn is_inline_editable(&self) -> bool {
+        self.imp().inline_editable.get()
+    }
+
     /// Apply or clear a Pango strikethrough attribute on the display
     /// Label. Edit-mode `GtkText` is intentionally unaffected — a row
     /// marked for deletion is read-only by definition.
@@ -182,6 +194,9 @@ impl CellEditor {
     }
 
     pub fn start_editing(&self) {
+        if !self.is_inline_editable() {
+            return;
+        }
         let stack = self.stack_widget();
         let entry = self.entry_widget();
         // Mirror the label's text into the entry before showing it

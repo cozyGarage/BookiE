@@ -415,7 +415,7 @@ pub(super) fn attach_cell_gesture(
             col_index: idx,
             column_name: gesture_name.clone(),
         });
-        edit_action.set_enabled(is_text_editable);
+        edit_action.set_enabled(edit_enabled_for(&gesture_widget, is_text_editable));
         let local = gtk::graphene::Point::new(x as f32, y as f32);
         let (x, y) = gesture_widget
             .compute_point(&view, &local)
@@ -438,7 +438,7 @@ pub(super) fn attach_cell_gesture(
                 col_index: idx,
                 column_name: column_name.clone(),
             });
-            key_action.set_enabled(is_text_editable);
+            key_action.set_enabled(edit_enabled_for(&key_widget, is_text_editable));
             popover.set_pointing_to(
                 key_widget
                     .compute_bounds(&key_view)
@@ -459,6 +459,13 @@ pub(super) fn attach_cell_gesture(
     let controller = gtk::ShortcutController::new();
     controller.add_shortcut(shortcut);
     widget.add_controller(controller);
+}
+
+fn edit_enabled_for(widget: &gtk::Widget, fallback: bool) -> bool {
+    widget
+        .downcast_ref::<crate::ui::cell_editor::CellEditor>()
+        .map(|editor| editor.is_inline_editable())
+        .unwrap_or(fallback)
 }
 
 fn position(slot: &CellContext) -> u32 {
