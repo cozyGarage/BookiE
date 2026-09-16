@@ -1,9 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect x="12" y="8" width="104" height="112" rx="24" fill="#24554e"/>
-  <path d="M32 28h28q10 0 10 10v62q-5-8-16-8H32z" fill="#f6ecd4"/>
-  <path d="M70 38q0-10 10-10h16v64H84q-9 0-14 8z" fill="#d5dec5"/>
-  <path d="M70 38v60" fill="none" stroke="#24554e" stroke-width="4"/>
-  <g fill="none" stroke="#24554e" stroke-width="4" stroke-linecap="round">
-    <path d="M42 44h15M42 57h15M42 70h15M80 44h6M80 57h6M80 70h6"/>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="#1f4f48"/>
+  <rect x="24" y="32" width="38" height="64" rx="12" fill="#f3ead6"/>
+  <rect x="66" y="32" width="38" height="64" rx="12" fill="#9eae9a"/>
+  <rect x="60" y="30" width="8" height="68" rx="4" fill="#163d38"/>
+  <g fill="none" stroke="#6f8478" stroke-width="3.5" stroke-linecap="round">
+    <path d="M33 48h20"/>
+    <path d="M33 58h20"/>
+    <path d="M33 68h20"/>
+  </g>
+  <g fill="#c5d0c2">
+    <rect x="74" y="44" width="7" height="7" rx="1.5"/>
+    <rect x="83" y="44" width="7" height="7" rx="1.5"/>
+    <rect x="92" y="44" width="7" height="7" rx="1.5"/>
+    <rect x="74" y="53" width="7" height="7" rx="1.5"/>
+    <rect x="83" y="53" width="7" height="7" rx="1.5"/>
+    <rect x="92" y="53" width="7" height="7" rx="1.5"/>
+    <rect x="74" y="62" width="7" height="7" rx="1.5"/>
+    <rect x="83" y="62" width="7" height="7" rx="1.5"/>
+    <rect x="92" y="62" width="7" height="7" rx="1.5"/>
   </g>
 </svg>

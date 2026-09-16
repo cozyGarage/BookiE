@@ -4,7 +4,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154,SC2164
 
 pkgname=bookie
-pkgver="${TABLEPRO_RC_VERSION:-0.1.2}"
+pkgver="${TABLEPRO_RC_VERSION:-0.1.3}"
 pkgrel=1
 pkgdesc="Native Linux database client (internal release candidate)"
 arch=('x86_64')

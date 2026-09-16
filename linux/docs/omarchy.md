@@ -1,4 +1,4 @@
-# BookiE 0.1.2 on Arch Linux Omarchy
+# BookiE 0.1.3 on Arch Linux Omarchy
 
 Install from the `linux` branch. Do not mix this with 0.2.0. Do not package from a dirty tree.
 
@@ -9,6 +9,7 @@ The package is an internal Arch candidate, not an AUR or Flathub release. Visibl
 - PostgreSQL INTERVAL, INET, CIDR, and LSN render as text. Decode failures stay errors, not fake NULLs.
 - A SQLite TEXT column that holds a blob stays display-only. Committing no longer overwrites it with `<N bytes>`.
 - Jump to Column (Ctrl+Shift+J), complete SQL drafts, dialect-safe formatting, BookiE name and icon, `bookie` package commands.
+- App icon is an open ledger with a grid page. rust_decimal 1.43 so unused rkyv 0.7 is gone.
 - Toolchain is Rust 1.98 (`rust-toolchain.toml`).
 
 Stay off 0.2.0: lossless typed values, GNOME 50, SQLx 0.9, Meson/GResource.
@@ -57,17 +58,17 @@ git rev-parse HEAD
 From `linux/`:
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.2 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.3 ./scripts/build-arch-rc.sh
 ```
 
-Do not set `TABLEPRO_RC_TAG` until a `linux-v…` tag exists. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.2-1-x86_64.pkg.tar.zst`.
+Do not set `TABLEPRO_RC_TAG` until a `linux-v…` tag exists. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.3-1-x86_64.pkg.tar.zst`.
 
 `makepkg --cleanbuild` builds from the commit archive. It does not reuse a dirty `target/` directory.
 
 ## Install
 
 ```bash
-sudo pacman -U packaging/arch/bookie-0.1.2-1-x86_64.pkg.tar.zst
+sudo pacman -U packaging/arch/bookie-0.1.3-1-x86_64.pkg.tar.zst
 ```
 
 Launch with `bookie` or the BookiE desktop entry. `tablepro` still works.
@@ -84,7 +85,7 @@ bookie-agentd --help
 - Stop BookiE before upgrading or rolling back the package. Do not delete those directories or keyring records.
 - If you ever migrated drafts, `workspace_state.before-drafts.json` is the backup of the pre-migration workspace.
 - The package replaces and conflicts with `tablepro`. Test install, upgrade, and removal. User XDG data must remain.
-- Tagging `linux-v0.1.2` and publishing remain a separate decision.
+- Tagging `linux-v0.1.3` and publishing remain a separate decision.
 
 ## Run from source without packaging
 
