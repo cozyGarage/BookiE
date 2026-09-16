@@ -96,6 +96,8 @@ To smoke-test a PostgreSQL server you already run:
 ./scripts/smoke-postgres.sh
 ```
 
+For manual connection checks across every network driver, use the local-only [manual connection fixture](tests/manual-connections/README.md).
+
 To run the disposable real Unix-socket fixture:
 
 ```bash

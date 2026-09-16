@@ -1,0 +1,121 @@
+name: tablepro-manual-connections
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: tablepro_lab
+      POSTGRES_USER: tablepro_admin
+      POSTGRES_PASSWORD: tablepro_admin_password
+    volumes:
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tablepro_admin -d tablepro_lab"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: tablepro_lab
+      MYSQL_USER: tablepro_rw
+      MYSQL_PASSWORD: tablepro_rw_password
+      MYSQL_ROOT_PASSWORD: tablepro_root_password
+    volumes:
+      - ./init/mysql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:13306:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -ptablepro_root_password"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: Y
+      MSSQL_SA_PASSWORD: TablePro_sa_password1
+    ports:
+      - "127.0.0.1:11433:1433"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P TablePro_sa_password1 -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  mssql-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      mssql:
+        condition: service_healthy
+    volumes:
+      - ./init/mssql.sql:/init/mssql.sql:ro
+    entrypoint:
+      [
+        "/opt/mssql-tools18/bin/sqlcmd",
+        "-C",
+        "-S",
+        "mssql",
+        "-U",
+        "sa",
+        "-P",
+        "TablePro_sa_password1",
+        "-b",
+        "-i",
+        "/init/mssql.sql",
+      ]
+    restart: "no"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    environment:
+      CLICKHOUSE_DB: tablepro_lab
+      CLICKHOUSE_USER: tablepro_rw
+      CLICKHOUSE_PASSWORD: tablepro_rw_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ./init/clickhouse:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:18123:8123"
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user tablepro_rw --password tablepro_rw_password --query 'SELECT 1'"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  mongo:
+    image: mongo:8.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: tablepro_admin
+      MONGO_INITDB_ROOT_PASSWORD: tablepro_admin_password
+    volumes:
+      - ./init/mongo:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:27017:27017"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok' | grep 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./redis.acl:/usr/local/etc/redis/users.acl:ro
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --user tablepro_rw --pass tablepro_rw_password ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
