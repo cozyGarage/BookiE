@@ -620,4 +620,119 @@ mod tests {
         assert_eq!(parse_db_name("db15").unwrap(), 15);
         assert!(parse_db_name("users").is_err());
     }
+
+    #[test]
+    fn urlencoding_lite_keeps_unreserved_characters_and_encodes_everything_else() {
+        assert_eq!(urlencoding_lite("Az09-_.~"), "Az09-_.~");
+        assert_eq!(urlencoding_lite("a b"), "a%20b");
+        assert_eq!(urlencoding_lite("p@ss/w:rd"), "p%40ss%2Fw%3Ard");
+    }
+
+    #[test]
+    fn map_redis_error_recognizes_a_connection_refusal() {
+        let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
+        assert!(matches!(map_redis_error(err), DriverError::ConnectionRefused));
+    }
+
+    #[test]
+    fn map_redis_error_recognizes_noauth_and_wrongpass_as_auth_failures() {
+        let noauth = RedisError::from((
+            redis::ErrorKind::AuthenticationFailed,
+            "authentication required",
+            "NOAUTH Authentication required.".to_string(),
+        ));
+        assert!(matches!(map_redis_error(noauth), DriverError::AuthFailed));
+
+        let wrongpass = RedisError::from((
+            redis::ErrorKind::AuthenticationFailed,
+            "authentication failed",
+            "WRONGPASS invalid username-password pair".to_string(),
+        ));
+        assert!(matches!(map_redis_error(wrongpass), DriverError::AuthFailed));
+    }
+
+    #[test]
+    fn map_redis_error_falls_back_to_a_query_error() {
+        let err = RedisError::from((redis::ErrorKind::UnexpectedReturnType, "unexpected type"));
+        assert!(matches!(map_redis_error(err), DriverError::Query { .. }));
+    }
+
+    #[test]
+    fn redis_value_to_result_maps_nil_okay_and_scalars() {
+        assert_eq!(redis_value_to_result(RedisValue::Nil).rows, vec![vec![Value::Null]]);
+        assert_eq!(
+            redis_value_to_result(RedisValue::Okay).rows,
+            vec![vec![Value::Text("OK".into())]]
+        );
+        assert_eq!(
+            redis_value_to_result(RedisValue::Int(42)).rows,
+            vec![vec![Value::Int(42)]]
+        );
+        assert_eq!(
+            redis_value_to_result(RedisValue::Boolean(true)).rows,
+            vec![vec![Value::Bool(true)]]
+        );
+    }
+
+    #[test]
+    fn redis_value_to_result_decodes_valid_utf8_binary_as_text() {
+        let result = redis_value_to_result(RedisValue::BulkString(b"hello".to_vec()));
+        assert_eq!(result.rows, vec![vec![Value::Text("hello".into())]]);
+    }
+
+    #[test]
+    fn redis_value_to_result_replaces_invalid_utf8_binary_instead_of_failing() {
+        let result = redis_value_to_result(RedisValue::BulkString(vec![0xFF, 0xFE]));
+        let Value::Text(text) = &result.rows[0][0] else {
+            panic!("expected a text value");
+        };
+        assert!(text.contains('\u{FFFD}'));
+    }
+
+    #[test]
+    fn redis_value_to_result_maps_an_array_to_one_row_per_item() {
+        let result = redis_value_to_result(RedisValue::Array(vec![
+            RedisValue::Int(1),
+            RedisValue::SimpleString("two".into()),
+        ]));
+        assert_eq!(result.rows, vec![vec![Value::Int(1)], vec![Value::Text("two".into())]]);
+        assert!(!result.truncated);
+    }
+
+    #[test]
+    fn redis_value_to_result_truncates_an_array_past_the_row_cap() {
+        let items = (0..MAX_QUERY_ROWS + 1).map(|i| RedisValue::Int(i as i64)).collect();
+        let result = redis_value_to_result(RedisValue::Array(items));
+        assert_eq!(result.rows.len(), MAX_QUERY_ROWS);
+        assert!(result.truncated);
+    }
+
+    #[test]
+    fn redis_value_to_result_maps_a_map_to_key_value_rows() {
+        let result = redis_value_to_result(RedisValue::Map(vec![(
+            RedisValue::SimpleString("field".into()),
+            RedisValue::Int(7),
+        )]));
+        assert_eq!(result.rows, vec![vec![Value::Text("field".into()), Value::Int(7)]]);
+    }
+
+    #[test]
+    fn redis_scalar_maps_nil_and_primitives() {
+        assert_eq!(redis_scalar(RedisValue::Nil), Value::Null);
+        assert_eq!(redis_scalar(RedisValue::Int(9)), Value::Int(9));
+        assert_eq!(redis_scalar(RedisValue::Boolean(false)), Value::Bool(false));
+        assert_eq!(redis_scalar(RedisValue::Okay), Value::Text("OK".into()));
+    }
+
+    #[test]
+    fn redis_scalar_decodes_binary_as_lossy_text() {
+        assert_eq!(
+            redis_scalar(RedisValue::BulkString(b"abc".to_vec())),
+            Value::Text("abc".into())
+        );
+        assert_eq!(
+            redis_scalar(RedisValue::BulkString(vec![0xFF])),
+            Value::Text("\u{FFFD}".into())
+        );
+    }
 }
