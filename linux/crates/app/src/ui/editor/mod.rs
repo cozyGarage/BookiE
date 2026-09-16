@@ -1,8 +1,11 @@
 mod completion;
 mod diagnostics;
+mod format_plan;
 mod outcomes;
 mod schema;
+mod significant_tokens;
 mod sql_text;
+mod statement_cursor;
 
 use std::io::Read;
 use std::time::SystemTime;
@@ -27,7 +30,7 @@ pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_sch
 use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements, summary_label};
 use schema::{apply_editor_font_size, apply_editor_scheme};
 use sql_text::toggle_line_comment;
-use tablepro_core::sql_lex::{split_statements, statement_at_cursor};
+use statement_cursor::{script_statements, statement_at_cursor};
 
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
@@ -85,6 +88,7 @@ pub enum SqlEditorInput {
     RunWithParameters {
         generation: u64,
         sql: String,
+        statements: Vec<String>,
         values: std::collections::HashMap<String, tablepro_core::Value>,
     },
     Cancel,
@@ -537,15 +541,16 @@ impl SimpleComponent for SqlEditor {
                     self.status.set_label(&crate::tr!("empty query"));
                     return;
                 }
-                self.begin_run(trimmed, sender);
+                self.begin_run(trimmed, false, sender);
             }
 
             SqlEditorInput::RunWithParameters {
                 generation,
                 sql,
+                statements,
                 values,
             } => {
-                self.execute_sql(generation, sql, values, sender);
+                self.execute_sql(generation, sql, statements, values, sender);
             }
 
             SqlEditorInput::ToggleLineComment => {
@@ -576,7 +581,7 @@ impl SimpleComponent for SqlEditor {
                     self.status.set_label(&crate::tr!("No statement at cursor"));
                     return;
                 };
-                self.begin_run(statement, sender);
+                self.begin_run(statement, true, sender);
             }
 
             SqlEditorInput::Cancel => {
@@ -707,13 +712,16 @@ impl SimpleComponent for SqlEditor {
                 if text.trim().is_empty() {
                     return;
                 }
-                let opts = sqlformat::FormatOptions {
-                    indent: sqlformat::Indent::Spaces(4),
-                    uppercase: Some(true),
-                    lines_between_queries: 2,
-                    ..sqlformat::FormatOptions::default()
+                let Some(grammar) = self
+                    .metadata()
+                    .and_then(|metadata| statement_cursor::grammar_for(&metadata.driver_id))
+                else {
+                    self.status
+                        .set_label(&crate::tr!("Formatting is unavailable for this connection"));
+                    return;
                 };
-                let formatted = sqlformat::format(&text, &sqlformat::QueryParams::None, &opts);
+                let settings = tablepro_core::sql_syntax::script::LexicalSettings::default_for(grammar);
+                let formatted = format_plan::format_script(&text, grammar, settings);
                 if formatted == text {
                     return;
                 }
@@ -734,15 +742,26 @@ impl SqlEditor {
         database_service::instance().metadata(self.connection_id?)
     }
 
-    fn begin_run(&mut self, sql: String, sender: ComponentSender<Self>) {
+    fn begin_run(&mut self, sql: String, single_statement: bool, sender: ComponentSender<Self>) {
         if let Some(token) = self.cancel_token.take() {
             token.cancel();
         }
         let generation = self.run_generation.begin();
         let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+        let statements = if single_statement {
+            vec![sql.clone()]
+        } else {
+            match script_statements(&sql, &driver_id) {
+                Ok(statements) => statements,
+                Err(message) => {
+                    self.status.set_label(&message);
+                    return;
+                }
+            }
+        };
         let names = crate::services::query_parameters::statement_names(&sql, &driver_id);
         if names.is_empty() {
-            self.execute_sql(generation, sql, std::collections::HashMap::new(), sender);
+            self.execute_sql(generation, sql, statements, std::collections::HashMap::new(), sender);
             return;
         }
         let Some(window) = self
@@ -758,6 +777,7 @@ impl SqlEditor {
             sender.input(SqlEditorInput::RunWithParameters {
                 generation,
                 sql: sql.clone(),
+                statements: statements.clone(),
                 values,
             });
         });
@@ -767,6 +787,7 @@ impl SqlEditor {
         &mut self,
         generation: u64,
         trimmed: String,
+        statements: Vec<String>,
         parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
         sender: ComponentSender<Self>,
     ) {
@@ -818,7 +839,6 @@ impl SqlEditor {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let statements = split_statements(&trimmed, &driver_id);
                     let control = crate::services::operation_control::bounded_with(timeout_secs, token);
                     let succeeded = |sql: &str| {
                         if let Some(origin) = &origin {
