@@ -4,8 +4,8 @@ use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
 use super::display::{
-    POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, auto_filled_sentinel,
-    editable_null_sentinel, value_to_display_text, value_to_edit_text,
+    POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind,
+    value_is_inline_editable,
 };
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 use super::types::{classify_editor_kind, is_bool_type, is_bytes_type};
@@ -124,17 +124,8 @@ pub(super) fn build_column(
             raw_value
         };
         let is_null = matches!(value, Value::Null);
-        let text = if is_null && column_auto_filled {
-            auto_filled_sentinel()
-        } else if editable_for_bind {
-            if is_null {
-                editable_null_sentinel()
-            } else {
-                value_to_edit_text(&value)
-            }
-        } else {
-            value_to_display_text(&value)
-        };
+        let inline_editable = editable_for_bind && value_is_inline_editable(&value);
+        let text = cell_text_for_bind(&value, editable_for_bind, column_auto_filled);
 
         let pending_classes: Vec<&'static str> = if let Some(_tab_id) = tab_ctx_for_bind.tab_id {
             if row.draft_id().is_some() {
@@ -173,6 +164,7 @@ pub(super) fn build_column(
         let is_pending_delete = pending_classes.contains(&"tp-row-pending-delete");
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
+            label.set_inline_editable(inline_editable);
             label.set_text(&text);
             apply_cell_tooltip(label.upcast_ref(), &text, is_null);
             if is_null && !editable_for_bind {
@@ -243,6 +235,7 @@ pub(super) fn build_column(
         };
         let Some(child) = item.child() else { return };
         if let Ok(label) = child.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
+            label.set_inline_editable(false);
             if label.is_editing() {
                 label.stop_editing(false);
             }
@@ -317,8 +310,9 @@ fn set_label_strikethrough(label: &gtk4::Label, on: bool) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::display::{POSITION_SLOT, value_is_inline_editable};
     use super::*;
-    use tablepro_core::ColumnInfo;
+    use tablepro_core::{ColumnInfo, Value};
 
     fn col(data_type: &str, primary_key: bool) -> ColumnInfo {
         ColumnInfo {
@@ -374,5 +368,173 @@ mod tests {
         assert!(!is_cell_editable(&col("longblob", false)));
         assert!(!is_cell_editable(&col("BINARY", false)));
         assert!(!is_cell_editable(&col("varbinary", false)));
+    }
+
+    #[test]
+    fn text_column_stays_column_editable_when_a_cell_holds_bytes() {
+        assert!(is_cell_editable(&col("text", false)));
+        assert!(!value_is_inline_editable(&Value::Bytes(vec![0xFF, 0xFE])));
+    }
+
+    fn collect_cell_editors(widget: &gtk4::Widget) -> Vec<crate::ui::cell_editor::CellEditor> {
+        use gtk4::prelude::*;
+        let mut found = Vec::new();
+        if let Ok(editor) = widget.clone().downcast::<crate::ui::cell_editor::CellEditor>() {
+            found.push(editor);
+            return found;
+        }
+        let mut child = widget.first_child();
+        while let Some(node) = child {
+            found.extend(collect_cell_editors(&node));
+            child = node.next_sibling();
+        }
+        found
+    }
+
+    fn wait_for_editors(view: &gtk4::Widget, n: usize) -> Vec<crate::ui::cell_editor::CellEditor> {
+        let ctx = gtk4::glib::MainContext::default();
+        for _ in 0..200 {
+            let mut pumped = 0;
+            while ctx.iteration(false) && pumped < 64 {
+                pumped += 1;
+            }
+            let found = collect_cell_editors(view);
+            if found.len() >= n {
+                return found;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        collect_cell_editors(view)
+    }
+
+    fn editor_at(editors: &[crate::ui::cell_editor::CellEditor], position: u32) -> &crate::ui::cell_editor::CellEditor {
+        editors
+            .iter()
+            .find(|editor| POSITION_SLOT.get(*editor) == Some(position))
+            .unwrap_or_else(|| panic!("no cell editor bound at position {position}"))
+    }
+
+    fn capture_bind_visual(
+        editors: &[crate::ui::cell_editor::CellEditor],
+        artifact_dir: &std::path::Path,
+    ) -> std::path::PathBuf {
+        let log = artifact_dir.join("text-column-binary-bind.txt");
+        let mut lines = String::from("position\ttext\tinline_editable\tediting\n");
+        for position in 0..3 {
+            let editor = editor_at(editors, position);
+            lines.push_str(&format!(
+                "{position}\t{}\t{}\t{}\n",
+                editor.text(),
+                editor.is_inline_editable(),
+                editor.is_editing()
+            ));
+        }
+        std::fs::write(&log, lines).expect("write bind visual log");
+        let png = artifact_dir.join("text-column-binary-bind.png");
+        let _ = std::process::Command::new("scrot").arg(&png).status();
+        png
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn bind_does_not_open_binary_bytes_in_a_text_column_for_editing() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let columns = vec![col("TEXT", false)];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![
+                vec![Value::Text("hello".into())],
+                vec![Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01])],
+                vec![Value::Bytes(b"utf8 blob".to_vec())],
+            ],
+            truncated: false,
+        };
+        let (sender, _receiver) = relm4::channel::<GridMsg>();
+        let (view, selection) = crate::ui::grid::build_column_view(
+            &result,
+            &columns,
+            "notes",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+        );
+        let window = gtk4::Window::builder()
+            .title("TEXT cells with binary values")
+            .default_width(520)
+            .default_height(220)
+            .child(&view)
+            .build();
+        window.present();
+        let editors = wait_for_editors(view.upcast_ref(), 3);
+        assert_eq!(editors.len(), 3, "column factory should bind a cell editor per row");
+
+        let text_cell = editor_at(&editors, 0);
+        assert_eq!(text_cell.text().as_str(), "hello");
+        assert!(text_cell.is_inline_editable());
+        text_cell.start_editing();
+        assert!(text_cell.is_editing());
+        text_cell.stop_editing(false);
+        assert!(!text_cell.is_editing());
+
+        let binary_cell = editor_at(&editors, 1);
+        assert_eq!(binary_cell.text().as_str(), "<4 bytes>");
+        assert!(!binary_cell.is_inline_editable());
+        binary_cell.start_editing();
+        assert!(!binary_cell.is_editing());
+        assert_eq!(binary_cell.text().as_str(), "<4 bytes>");
+
+        let utf8_bytes_cell = editor_at(&editors, 2);
+        assert_eq!(utf8_bytes_cell.text().as_str(), "utf8 blob");
+        assert!(!utf8_bytes_cell.is_inline_editable());
+        utf8_bytes_cell.start_editing();
+        assert!(!utf8_bytes_cell.is_editing());
+
+        let artifact_dir = std::env::var_os("TABLEPRO_GTK_ARTIFACT_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(std::env::temp_dir);
+        let _ = std::fs::create_dir_all(&artifact_dir);
+        let png = capture_bind_visual(&editors, &artifact_dir);
+        if std::env::var_os("TABLEPRO_GTK_REQUIRE_SCREENSHOT").is_some() {
+            assert!(
+                png.is_file(),
+                "scrot should capture the bound TEXT/binary grid to {png:?}"
+            );
+        }
+
+        let store = selection
+            .model()
+            .expect("selection model")
+            .downcast::<gtk4::gio::ListStore>()
+            .expect("row store");
+        store.remove(0);
+        store.insert(
+            0,
+            &crate::ui::row_object::RowObject::new(vec![Value::Bytes(vec![0xAA, 0xBB, 0xCC])]),
+        );
+        let rebound = wait_for_editors(view.upcast_ref(), 3);
+        let recycled = editor_at(&rebound, 0);
+        assert_eq!(recycled.text().as_str(), "<3 bytes>");
+        assert!(!recycled.is_inline_editable());
+        recycled.start_editing();
+        assert!(!recycled.is_editing());
+
+        store.remove(0);
+        store.insert(
+            0,
+            &crate::ui::row_object::RowObject::new(vec![Value::Text("hello".into())]),
+        );
+        let restored = wait_for_editors(view.upcast_ref(), 3);
+        let restored_cell = editor_at(&restored, 0);
+        assert_eq!(restored_cell.text().as_str(), "hello");
+        assert!(restored_cell.is_inline_editable());
+        restored_cell.start_editing();
+        assert!(restored_cell.is_editing());
+        restored_cell.stop_editing(false);
+
+        window.close();
     }
 }

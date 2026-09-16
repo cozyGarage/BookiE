@@ -58,7 +58,7 @@
                 }
             },
             "build-commands": [
-                "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.93.0 --profile minimal",
+                "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.98.0 --profile minimal",
                 "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; rustc --version; cargo --version",
                 "export PATH=\"${CARGO_HOME}/bin:${PATH}\"; cargo build --release -p tablepro-app --locked",
                 "install -Dm755 target/release/tablepro-app /app/bin/bookie",

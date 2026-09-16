@@ -13,6 +13,9 @@ use super::types::CellEditorKind;
 use crate::ui::cell_editor::CellEditor;
 
 pub(super) fn enter_edit_mode(label: &CellEditor) {
+    if !label.is_inline_editable() {
+        return;
+    }
     if label.text().as_str() == editable_null_sentinel() {
         label.set_text("");
     }
@@ -135,6 +138,14 @@ fn install_edit_triggers(
             let sender = sender.clone();
             std::rc::Rc::new(move |l| show_json_popover(l, col_index, &sender))
         }
+    };
+    let trigger: std::rc::Rc<dyn Fn(&CellEditor)> = {
+        let inner = trigger;
+        std::rc::Rc::new(move |label: &CellEditor| {
+            if label.is_inline_editable() {
+                inner(label);
+            }
+        })
     };
 
     let gesture = gtk::GestureClick::builder().button(gtk::gdk::BUTTON_PRIMARY).build();

@@ -128,6 +128,7 @@
 - Updated Rustls to 0.23.45 for RUSTSEC-2026-0285, including its required crypto dependencies.
 
 - PostgreSQL decode failures stay errors, not false NULLs; INTERVAL, INET, CIDR, and LSN still render as text
+- Binary values in a TEXT column opening as editable text
 - SQL formatting preserves dialect-specific executable tokens and leaves statements unchanged when the formatter cannot safely reflow them
 - SSH password and key-passphrase storage failures are reported instead of silently appearing to save successfully
 - Column widths and filters persist in order with coalesced writes, preserve unreadable settings files, and flush on application exit

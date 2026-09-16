@@ -49,6 +49,25 @@ pub fn value_to_edit_text(value: &Value) -> String {
     }
 }
 
+pub(super) fn value_is_inline_editable(value: &Value) -> bool {
+    !matches!(value, Value::Bytes(_))
+}
+
+pub(super) fn cell_text_for_bind(value: &Value, column_editable: bool, column_auto_filled: bool) -> String {
+    let is_null = matches!(value, Value::Null);
+    if is_null && column_auto_filled {
+        auto_filled_sentinel()
+    } else if column_editable && value_is_inline_editable(value) {
+        if is_null {
+            editable_null_sentinel()
+        } else {
+            value_to_edit_text(value)
+        }
+    } else {
+        value_to_display_text(value)
+    }
+}
+
 pub(super) fn truncate_for_display(s: &str) -> String {
     if s.len() < DISPLAY_TEXT_BYTES_THRESHOLD {
         return s.to_string();
@@ -171,15 +190,25 @@ mod tests {
     }
 
     #[test]
-    fn edit_text_for_valid_utf8_bytes_matches_display_text() {
-        let value = Value::Bytes(b"hello world".to_vec());
-        assert_eq!(value_to_edit_text(&value), value_to_display_text(&value));
+    fn binary_bytes_are_not_inline_editable() {
+        assert!(!value_is_inline_editable(&Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01])));
+        assert!(!value_is_inline_editable(&Value::Bytes(b"hello world".to_vec())));
+        assert!(!value_is_inline_editable(&Value::Bytes(Vec::new())));
+        assert!(value_is_inline_editable(&Value::Text("hello".into())));
+        assert!(value_is_inline_editable(&Value::Null));
+        assert!(value_is_inline_editable(&Value::Int(1)));
     }
 
     #[test]
-    fn edit_text_for_binary_bytes_is_the_byte_count_placeholder() {
-        let value = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
-        assert_eq!(value_to_edit_text(&value), "<4 bytes>");
+    fn bind_text_for_bytes_in_an_editable_column_stays_display_text() {
+        let binary = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
+        assert_eq!(cell_text_for_bind(&binary, true, false), "<4 bytes>");
+        let utf8 = Value::Bytes(b"hello world".to_vec());
+        assert_eq!(cell_text_for_bind(&utf8, true, false), "hello world");
+        assert_eq!(cell_text_for_bind(&Value::Text("hello".into()), true, false), "hello");
+        assert_eq!(cell_text_for_bind(&Value::Null, true, false), editable_null_sentinel());
+        assert_eq!(cell_text_for_bind(&Value::Null, false, false), "NULL");
+        assert_eq!(cell_text_for_bind(&Value::Null, true, true), auto_filled_sentinel());
     }
 
     #[test]
