@@ -161,6 +161,28 @@ mod tests {
     }
 
     #[test]
+    fn display_text_keeps_bytes_with_an_embedded_nul_as_a_byte_count() {
+        assert_eq!(value_to_display_text(&Value::Bytes(b"ab\0cd".to_vec())), "<5 bytes>");
+    }
+
+    #[test]
+    fn display_text_shows_empty_bytes_as_empty_text() {
+        assert_eq!(value_to_display_text(&Value::Bytes(Vec::new())), "");
+    }
+
+    #[test]
+    fn edit_text_for_valid_utf8_bytes_matches_display_text() {
+        let value = Value::Bytes(b"hello world".to_vec());
+        assert_eq!(value_to_edit_text(&value), value_to_display_text(&value));
+    }
+
+    #[test]
+    fn edit_text_for_binary_bytes_is_the_byte_count_placeholder() {
+        let value = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
+        assert_eq!(value_to_edit_text(&value), "<4 bytes>");
+    }
+
+    #[test]
     fn display_text_temporal_variants() {
         let date = chrono::NaiveDate::from_ymd_opt(2026, 4, 26).unwrap();
         assert_eq!(value_to_display_text(&Value::Date(date)), "2026-04-26");
@@ -226,6 +248,26 @@ mod tests {
         assert!(out.starts_with(&"a".repeat(10_000)));
         assert!(out.contains("more chars"));
         assert!(out.len() < 10_500);
+    }
+
+    #[test]
+    fn truncate_passes_through_text_one_byte_under_the_threshold() {
+        let s = "a".repeat(DISPLAY_TEXT_BYTES_THRESHOLD - 1);
+        assert_eq!(truncate_for_display(&s), s);
+    }
+
+    #[test]
+    fn truncate_cuts_text_exactly_at_the_byte_threshold() {
+        let s = "a".repeat(DISPLAY_TEXT_BYTES_THRESHOLD);
+        let out = truncate_for_display(&s);
+        let expected_remaining = DISPLAY_TEXT_BYTES_THRESHOLD - DISPLAY_TEXT_MAX_CHARS;
+        assert_eq!(
+            out,
+            format!(
+                "{}… (+{expected_remaining} more chars)",
+                "a".repeat(DISPLAY_TEXT_MAX_CHARS)
+            )
+        );
     }
 
     #[test]
