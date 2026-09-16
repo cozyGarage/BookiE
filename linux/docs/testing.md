@@ -258,6 +258,46 @@ Treat coverage as a map of untested regions, not a score. A well-covered
 line proves a test executed it, never that a test checked its result -
 which is exactly the gap mutation testing measures.
 
+## Upstream test-suite parity
+
+The macOS `main` branch's Swift test suite (roughly 1,300 files, mostly under
+`Packages/TableProCore/Tests` and `TableProTests`) is a source of test *cases*
+Linux can adopt even though the two apps share no code. Most of it does not
+transfer: it exercises Apple-only surfaces (Keychain, `NSView` focus, CloudKit
+sync, license tiers, the Vim engine, TeamLibrary) or plugins for engines
+Linux does not ship (Snowflake, BigQuery, DynamoDB, Elasticsearch, Etcd,
+CockroachDB, Cassandra, SurrealDB, Teradata, Trino, Beancount). Foreign-app
+connection import (DBeaver, DataGrip, Navicat, TablePlus, KeePass) is a
+missing *feature*, not a test gap, and is a product decision, not a QA task.
+
+Reviewed 2026-09-16. Adoption targets, ranked by value, each ported as its
+own change with a regression test that fails against the current code first:
+
+1. **SSH.** Main has roughly 35 files under `Core/SSH/`: config parsing,
+   jump-host chain resolution, host-key store, TOTP, composite and
+   keyboard-interactive auth, forward-failure recording. `crates/ssh/src/lib.rs`
+   is one file with 7 tests. This is the highest-priority gap: the security
+   audit already found a real hop-password-reuse bug here (fixed) and a
+   dead-end attempt at TCP peer-UID checks, both signs the surface is
+   under-tested relative to its risk. In progress in the `ssh-hardening`
+   worktree (branch `test/ssh-hardening`).
+2. **Cell/value formatting.** `BlobFormattingServiceTests`,
+   `PhpSerializeParserTests`, `JsonReindenterTests`, `HexEditorTests`,
+   `CellValueContentDetectorTests` suggest display edge cases beyond the
+   binary-as-UTF8-text fix already shipped in
+   [grid rendering](../crates/app/src/ui/grid/display.rs).
+3. **Row copy/paste.** `RowOperationsManagerCopyTests`,
+   `RowOperationsManagerPasteTests`, `RowOperationsManagerBinaryCopyTests`,
+   `CellPasteRoutingTests` probe binary-value and multi-cell copy/paste, an
+   area the whole-app matrix already flags for stable row identity.
+4. **Storage migration/corruption.** Main's `Core/Storage/*` has many
+   migration and malformed-file decode tests. `crates/storage` covers audit
+   journal recovery but not saved-connection-file corruption or migration.
+5. **Redis correctness.** `Core/Redis/*` covers reply parsing, argument
+   encoding, binary values, and key-tree commands.
+   `tablepro-driver-redis` has 7 tests; the whole-app matrix already flags
+   Redis maturity as partial.
+
 ## File-size guard
 
 `scripts/check-file-size.sh` enforces the Rust source limits recorded in `file-size-baselines.txt`:
