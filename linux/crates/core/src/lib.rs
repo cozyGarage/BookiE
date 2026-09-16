@@ -14,6 +14,7 @@ pub mod sql_diagnostics;
 pub mod sql_dialect;
 pub mod sql_lex;
 pub mod sql_literal;
+pub mod sql_syntax;
 mod tls;
 mod transaction;
 
