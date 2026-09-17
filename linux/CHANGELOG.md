@@ -188,6 +188,9 @@
 
 ### Security
 
+- Cached agent session reuse after Secret Service or key/certificate file rotation
+- Unbounded PostgreSQL SCRAM iteration counts in sqlx-postgres
+- Unbounded MongoDB SCRAM iteration counts
 - SSH tunnel crashes or over-allocates against a hostile host (CVE-2026-73429, CVE-2026-48107, CVE-2026-46702)
 - Unused rkyv 0.7 via rust_decimal (RUSTSEC-2026-0235)
 - The headless agent daemon opens a saved connection through its configured SSH chain and verifies the certificate against the real database hostname, instead of dialling the database directly

@@ -105,7 +105,8 @@ Flatpak files exist, but Flatpak publication is later and is not the first relea
 - Accessibility work needs full keyboard and screen-reader validation.
 - Stable driver labels cover common connection, browse, query, and write paths. They do not mean every TLS, reconnect, transaction, large-result, and packaging case has passed a release fixture.
 - MCP driver operations, authorization, and controlled rollback are deadline-bound, but durable audit filesystem work can outlive the request deadline. It is not externally cancelled because abandoning an audit append could leave an unconfirmed terminal state. Policy remains fail closed while the request waits.
-- A healthy cached agent session is invalidated when saved endpoint, TLS, authentication mode, or SSH metadata changes. Rotating a Secret Service value or replacing key or certificate contents at the same path does not invalidate that session until it fails a health check or another keyed setting changes.
+- A healthy cached agent session is invalidated when saved endpoint, TLS, authentication mode, SSH metadata, Secret Service secret values, or SSH key / TLS CA file contents change. Issued handles keep the session they already hold until released. Secret Service or material-file failures refuse a new open instead of serving the cache.
+- rsa Marvin (RUSTSEC-2023-0071) remains ignored: no crate fix exists. The lockfile carries rsa 0.10.0-rc.18 via russh, ssh-key, and sqlx-mysql.
 - SQL Server now accepts a saved custom certificate authority, but real-server verification remains outstanding. MongoDB and Redis treat Verify Ca as the stricter Verify Full behavior because their current Rust TLS backends do not expose CA-only verification.
 
 ## Current decision

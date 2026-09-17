@@ -1,0 +1,262 @@
+use std::path::Path;
+
+use secrecy::{ExposeSecret, SecretString};
+use sha2::{Digest, Sha256};
+use tablepro_storage::{SavedConnection, SavedSshAuth, load_password, load_ssh_passphrase, load_ssh_password};
+
+use crate::{TransportError, jump_hop_password_refused, loads_database_password};
+
+const MAX_MATERIAL_FILE_BYTES: u64 = 1024 * 1024;
+
+pub async fn session_material_digest(saved: &SavedConnection) -> Result<[u8; 32], TransportError> {
+    let mut hasher = MaterialHasher::new();
+    append_db_password(&mut hasher, saved).await?;
+    append_ssh_material(&mut hasher, saved).await?;
+    append_tls_ca(&mut hasher, saved)?;
+    Ok(hasher.finish())
+}
+
+struct MaterialHasher(Sha256);
+
+impl MaterialHasher {
+    fn new() -> Self {
+        Self(Sha256::new())
+    }
+
+    fn tag(&mut self, tag: &[u8], bytes: &[u8]) {
+        self.0.update((tag.len() as u64).to_le_bytes());
+        self.0.update(tag);
+        self.0.update((bytes.len() as u64).to_le_bytes());
+        self.0.update(bytes);
+    }
+
+    fn finish(self) -> [u8; 32] {
+        self.0.finalize().into()
+    }
+}
+
+async fn append_db_password(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result<(), TransportError> {
+    let password = if loads_database_password(saved) {
+        load_password(saved.id)
+            .await
+            .map_err(|error| TransportError::Secret(format!("load database password: {error}")))?
+            .unwrap_or_else(|| SecretString::new(String::new().into()))
+    } else {
+        SecretString::new(String::new().into())
+    };
+    hasher.tag(b"db_password", password.expose_secret().as_bytes());
+    Ok(())
+}
+
+async fn append_ssh_material(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result<(), TransportError> {
+    let Some(ssh) = &saved.ssh else {
+        return Ok(());
+    };
+    for (index, hop) in ssh.flatten_hops().into_iter().enumerate() {
+        match &hop.auth {
+            SavedSshAuth::Password if index > 0 => return Err(jump_hop_password_refused(index)),
+            SavedSshAuth::Password => {
+                let password = load_ssh_password(saved.id)
+                    .await
+                    .map_err(|error| TransportError::Secret(format!("load ssh password: {error}")))?
+                    .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))?;
+                hasher.tag(b"ssh_password", password.expose_secret().as_bytes());
+            }
+            SavedSshAuth::PrivateKey { path, has_passphrase } => {
+                hasher.tag(b"ssh_key", &read_material_file(path)?);
+                if *has_passphrase {
+                    match load_ssh_passphrase(saved.id)
+                        .await
+                        .map_err(|error| TransportError::Secret(format!("load ssh passphrase: {error}")))?
+                    {
+                        Some(passphrase) => hasher.tag(b"ssh_passphrase", passphrase.expose_secret().as_bytes()),
+                        None => hasher.tag(b"ssh_passphrase", &[]),
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn append_tls_ca(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result<(), TransportError> {
+    let Some(path) = saved.tls_root_cert.as_deref() else {
+        return Ok(());
+    };
+    hasher.tag(b"tls_ca", &read_material_file(path)?);
+    Ok(())
+}
+
+fn read_material_file(path: &Path) -> Result<Vec<u8>, TransportError> {
+    let metadata = std::fs::metadata(path)
+        .map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))?;
+    if !metadata.is_file() {
+        return Err(TransportError::Secret(format!(
+            "{} is not a regular file",
+            path.display()
+        )));
+    }
+    if metadata.len() > MAX_MATERIAL_FILE_BYTES {
+        return Err(TransportError::Secret(format!(
+            "{} exceeds the {}-byte material limit",
+            path.display(),
+            MAX_MATERIAL_FILE_BYTES
+        )));
+    }
+    std::fs::read(path).map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    use tablepro_core::{AuthMode, Environment, TlsMode};
+    use tablepro_storage::{SavedSshAuth, SavedSshConfig};
+    use uuid::Uuid;
+
+    fn sqlite_saved() -> SavedConnection {
+        SavedConnection {
+            id: Uuid::new_v4(),
+            name: "Local".into(),
+            driver_id: "sqlite".into(),
+            host: String::new(),
+            port: 0,
+            socket_dir: None,
+            database: ":memory:".into(),
+            username: String::new(),
+            use_tls: false,
+            tls_mode: Some(TlsMode::Disabled),
+            tls_root_cert: None,
+            read_only: true,
+            auth_mode: AuthMode::Password,
+            environment: Environment::Local,
+            ssh: None,
+            last_opened_at: None,
+        }
+    }
+
+    fn key_hop(path: PathBuf) -> SavedSshConfig {
+        SavedSshConfig {
+            host: "bastion.example".into(),
+            port: 22,
+            username: "jump".into(),
+            auth: SavedSshAuth::PrivateKey {
+                path,
+                has_passphrase: false,
+            },
+            jump: None,
+        }
+    }
+
+    #[test]
+    fn length_prefix_avoids_tag_ambiguity() {
+        let mut left = MaterialHasher::new();
+        left.tag(b"ab", b"c");
+        left.tag(b"d", b"e");
+        let mut right = MaterialHasher::new();
+        right.tag(b"a", b"bc");
+        right.tag(b"d", b"e");
+        assert_ne!(left.finish(), right.finish());
+    }
+
+    #[test]
+    fn password_bytes_change_the_digest() {
+        let mut old = MaterialHasher::new();
+        old.tag(b"db_password", b"old");
+        let mut new = MaterialHasher::new();
+        new.tag(b"db_password", b"new");
+        assert_ne!(old.finish(), new.finish());
+    }
+
+    #[tokio::test]
+    async fn sqlite_digest_is_stable_without_secret_service() {
+        let saved = sqlite_saved();
+        let first = session_material_digest(&saved).await.expect("sqlite digest");
+        let second = session_material_digest(&saved).await.expect("sqlite digest");
+        assert_eq!(first, second);
+    }
+
+    #[tokio::test]
+    async fn rotating_tls_ca_bytes_changes_the_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let ca = directory.path().join("ca.pem");
+        std::fs::write(&ca, b"old-ca").unwrap();
+        let mut saved = sqlite_saved();
+        saved.tls_root_cert = Some(ca.clone());
+
+        let first = session_material_digest(&saved).await.expect("digest with old ca");
+        std::fs::write(&ca, b"new-ca").unwrap();
+        let second = session_material_digest(&saved).await.expect("digest with new ca");
+        assert_ne!(first, second);
+    }
+
+    #[tokio::test]
+    async fn rotating_ssh_key_bytes_changes_the_digest() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("id_ed25519");
+        std::fs::write(&key, b"old-key").unwrap();
+        let mut saved = sqlite_saved();
+        saved.ssh = Some(key_hop(key.clone()));
+
+        let first = session_material_digest(&saved).await.expect("digest with old key");
+        std::fs::write(&key, b"new-key").unwrap();
+        let second = session_material_digest(&saved).await.expect("digest with new key");
+        assert_ne!(first, second);
+    }
+
+    #[tokio::test]
+    async fn missing_tls_ca_file_fails_closed() {
+        let mut saved = sqlite_saved();
+        saved.tls_root_cert = Some(PathBuf::from("/no/such/tablepro-ca.pem"));
+        let error = session_material_digest(&saved).await.expect_err("missing ca must fail");
+        assert!(matches!(error, TransportError::Secret(_)));
+    }
+
+    #[tokio::test]
+    async fn missing_ssh_key_file_fails_closed() {
+        let mut saved = sqlite_saved();
+        saved.ssh = Some(key_hop(PathBuf::from("/no/such/id_ed25519")));
+        let error = session_material_digest(&saved)
+            .await
+            .expect_err("missing ssh key must fail");
+        assert!(matches!(error, TransportError::Secret(_)));
+    }
+
+    #[tokio::test]
+    async fn oversized_material_file_fails_closed() {
+        let directory = tempfile::tempdir().unwrap();
+        let ca = directory.path().join("ca.pem");
+        std::fs::write(&ca, vec![b'x'; (MAX_MATERIAL_FILE_BYTES as usize) + 1]).unwrap();
+        let mut saved = sqlite_saved();
+        saved.tls_root_cert = Some(ca);
+        let error = session_material_digest(&saved)
+            .await
+            .expect_err("oversized ca must fail");
+        assert!(error.to_string().contains("material limit"));
+    }
+
+    #[tokio::test]
+    async fn jump_hop_password_auth_fails_closed() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("id_ed25519");
+        std::fs::write(&key, b"hop0").unwrap();
+        let mut saved = sqlite_saved();
+        saved.ssh = Some(SavedSshConfig {
+            jump: Some(Box::new(SavedSshConfig {
+                auth: SavedSshAuth::Password,
+                ..key_hop(key.clone())
+            })),
+            ..key_hop(key)
+        });
+        let error = session_material_digest(&saved)
+            .await
+            .expect_err("jump password must fail");
+        let message = error.to_string();
+        assert!(message.contains("hop 1"), "unexpected error: {message}");
+        assert!(
+            !message.contains("not in keyring"),
+            "must fail before the keyring: {message}"
+        );
+    }
+}

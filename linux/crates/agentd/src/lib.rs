@@ -198,10 +198,11 @@ struct SessionKey {
     tls_root_cert: Option<PathBuf>,
     auth_mode: AuthMode,
     ssh: Option<SavedSshConfig>,
+    material: [u8; 32],
 }
 
-impl From<&SavedConnection> for SessionKey {
-    fn from(saved: &SavedConnection) -> Self {
+impl SessionKey {
+    fn from_saved(saved: &SavedConnection, material: [u8; 32]) -> Self {
         Self {
             driver_id: saved.driver_id.clone(),
             host: saved.host.clone(),
@@ -213,6 +214,7 @@ impl From<&SavedConnection> for SessionKey {
             tls_root_cert: saved.tls_root_cert.clone(),
             auth_mode: saved.auth_mode,
             ssh: saved.ssh.clone(),
+            material,
         }
     }
 }
@@ -280,7 +282,10 @@ impl DaemonProvider {
     async fn open_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
         let session_lock = self.session_lock(saved.id)?;
         let _open = session_lock.lock_owned().await;
-        let key = SessionKey::from(saved);
+        let material = tablepro_transport::session_material_digest(saved)
+            .await
+            .map_err(|error| error.to_string())?;
+        let key = SessionKey::from_saved(saved, material);
         let cached = self.cached_connection(saved.id, &key)?;
         if let Some(connection) = cached {
             let healthy = ping_is_healthy(connection.ping(), SESSION_PING_TIMEOUT).await;
@@ -412,27 +417,35 @@ mod tests {
     #[test]
     fn session_key_changes_when_saved_transport_changes() {
         let original = saved_connection();
-        let original_key = SessionKey::from(&original);
+        let original_key = SessionKey::from_saved(&original, [0; 32]);
         let mut changed = original.clone();
         changed.host = "replacement.example".into();
 
-        assert!(original_key != SessionKey::from(&changed));
+        assert!(original_key != SessionKey::from_saved(&changed, [0; 32]));
 
         changed = original.clone();
         changed.socket_dir = Some(PathBuf::from("/run/postgresql"));
 
-        assert!(original_key != SessionKey::from(&changed));
+        assert!(original_key != SessionKey::from_saved(&changed, [0; 32]));
     }
 
     #[test]
     fn session_key_ignores_policy_only_changes() {
         let original = saved_connection();
-        let original_key = SessionKey::from(&original);
+        let original_key = SessionKey::from_saved(&original, [0; 32]);
         let mut changed = original.clone();
         changed.read_only = false;
         changed.environment = Environment::Dev;
 
-        assert!(original_key == SessionKey::from(&changed));
+        assert!(original_key == SessionKey::from_saved(&changed, [0; 32]));
+    }
+
+    #[test]
+    fn session_key_changes_when_material_changes() {
+        let saved = saved_connection();
+        let original_key = SessionKey::from_saved(&saved, [1; 32]);
+
+        assert!(original_key != SessionKey::from_saved(&saved, [2; 32]));
     }
 
     #[tokio::test]
@@ -445,7 +458,7 @@ mod tests {
     #[tokio::test]
     async fn retired_session_drops_after_final_issued_reference() {
         let saved = saved_connection();
-        let key = SessionKey::from(&saved);
+        let key = SessionKey::from_saved(&saved, [0; 32]);
         let mut opts = ConnectOptions {
             database: ":memory:".into(),
             ..Default::default()
@@ -483,6 +496,39 @@ mod tests {
         drop(issued);
 
         assert!(raw_lifetime.upgrade().is_none());
+    }
+
+    #[tokio::test]
+    async fn cached_session_is_dropped_when_material_changes() {
+        let saved = saved_connection();
+        let old_key = SessionKey::from_saved(&saved, [1; 32]);
+        let new_key = SessionKey::from_saved(&saved, [2; 32]);
+        let mut opts = ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        };
+        opts.tls.mode = TlsMode::Disabled;
+        let connection: Arc<dyn Connection> = Arc::from(SqliteDriver.connect(opts).await.expect("open test database"));
+        let provider = DaemonProvider::new(
+            Arc::new(DriverRegistry::new()),
+            Arc::new(PolicyConfig::default()),
+            Arc::new(NullAuditSink),
+            Arc::new(AuditState::new()),
+            Arc::new(DenyApprovalSink),
+        );
+        provider.sessions.lock().expect("sessions").insert(
+            saved.id,
+            OpenSession {
+                key: old_key,
+                connection: connection.clone(),
+            },
+        );
+
+        let cached = provider
+            .cached_connection(saved.id, &new_key)
+            .expect("inspect cache after material rotation");
+        assert!(cached.is_none());
+        assert!(provider.sessions.lock().expect("sessions").get(&saved.id).is_none());
     }
 }
 

@@ -8,6 +8,10 @@ use tablepro_storage::{
 };
 use uuid::Uuid;
 
+mod session_material;
+
+pub use session_material::session_material_digest;
+
 const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Debug, thiserror::Error)]
@@ -52,12 +56,13 @@ pub fn tls_config(mode: TlsMode) -> TlsConfig {
 }
 
 pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptions, TransportError> {
-    let password = match saved.auth_mode {
-        AuthMode::Password if !matches!(saved.driver_id.as_str(), "sqlite" | "duckdb") => load_password(saved.id)
+    let password = if loads_database_password(saved) {
+        load_password(saved.id)
             .await
             .map_err(|error| TransportError::Secret(format!("load database password: {error}")))?
-            .unwrap_or_else(|| SecretString::new(String::new().into())),
-        AuthMode::Password | AuthMode::Kerberos => SecretString::new(String::new().into()),
+            .unwrap_or_else(|| SecretString::new(String::new().into()))
+    } else {
+        SecretString::new(String::new().into())
     };
     Ok(ConnectOptions {
         host: saved.host.clone(),
@@ -218,6 +223,17 @@ fn check_auth_mode(mode: AuthMode, supports_integrated_auth: bool, driver_name: 
     Ok(())
 }
 
+fn jump_hop_password_refused(hop_index: usize) -> TransportError {
+    TransportError::Secret(format!(
+        "jump hop {hop_index} uses password auth, but only hop 0 can \
+         (edit connections.json jump auth to use a private key for this hop)"
+    ))
+}
+
+fn loads_database_password(saved: &SavedConnection) -> bool {
+    saved.auth_mode == AuthMode::Password && !matches!(saved.driver_id.as_str(), "sqlite" | "duckdb")
+}
+
 async fn resolve_saved_ssh_chain(id: Uuid, saved: &SavedSshConfig) -> Result<Vec<SshConfig>, TransportError> {
     let hops = saved.flatten_hops();
     let mut out = Vec::with_capacity(hops.len());
@@ -239,10 +255,7 @@ async fn resolve_saved_ssh_hop(
             // so a jump hop cannot have its own password. Reusing hop 0's
             // password here would send it to a different host silently; fail
             // closed instead.
-            return Err(TransportError::Secret(format!(
-                "jump hop {hop_index} uses password auth, but only hop 0 can \
-                 (edit connections.json jump auth to use a private key for this hop)"
-            )));
+            return Err(jump_hop_password_refused(hop_index));
         }
         SavedSshAuth::Password => {
             let pw = load_ssh_password(id)

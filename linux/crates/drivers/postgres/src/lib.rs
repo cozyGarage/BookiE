@@ -1015,6 +1015,16 @@ mod tests {
     }
 
     #[test]
+    fn patched_sqlx_postgres_caps_scram_iterations() {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../vendor/sqlx-postgres/src/connection/sasl.rs"
+        ));
+        assert!(source.contains("const MAX_SASL_ITERATIONS: u32 = 100_000"));
+        assert!(source.contains("iter_count > MAX_SASL_ITERATIONS"));
+    }
+
+    #[test]
     fn driver_metadata() {
         let d = PgDriver;
         assert_eq!(d.id(), "postgres");

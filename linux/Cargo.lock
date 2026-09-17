@@ -3743,8 +3743,6 @@ checksum = "851fac73f7fe22f6a3ab87f720ce509cae7c9fd08e7dd27866cc232dee07ccf4"
 [[package]]
 name = "mongodb"
 version = "3.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af84443ae9878f59a6818686f339064479f42cdf293c4c637d8fc9c0a8c5eed6"
 dependencies = [
  "base64 0.22.1",
  "bitflags 2.13.2",
@@ -5754,8 +5752,6 @@ dependencies = [
 [[package]]
 name = "sqlx-postgres"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87a2bdd6e83f6b3ea525ca9fee568030508b58355a43d0b2c1674d5f79dcd65e"
 dependencies = [
  "atoi",
  "base64 0.22.1",
@@ -6402,6 +6398,7 @@ dependencies = [
  "async-trait",
  "rustls",
  "secrecy",
+ "sha2 0.10.9",
  "tablepro-core",
  "tablepro-ssh",
  "tablepro-storage",
