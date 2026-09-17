@@ -22,6 +22,7 @@ pub(super) struct WindowLifecycleHandles {
 pub(super) fn install_window_lifecycle(
     window: &adw::ApplicationWindow,
     split_view: &adw::OverlaySplitView,
+    workspace: &crate::services::workspace_state::WorkspaceStore,
     sender: &ComponentSender<App>,
 ) -> WindowLifecycleHandles {
     let restored = crate::services::window_state::load();
@@ -50,6 +51,7 @@ pub(super) fn install_window_lifecycle(
     };
     let in_flight_saves_for_close = in_flight_saves.clone();
     let close_request_input_sender = sender.input_sender().clone();
+    let workspace_for_close = workspace.clone();
     window.connect_close_request(move |w| {
         // If a Save is mid-flight (async transaction running), block
         // the close until it resolves. Without this, the completion
@@ -179,12 +181,13 @@ pub(super) fn install_window_lifecycle(
             w.set_sensitive(false);
             let _ = close_request_input_sender.send(AppMsg::WorkspaceTabsChanged);
             let window_for_flush = w.clone();
+            let workspace_for_flush = workspace_for_close.clone();
             let workspace_flushed_for_poll = workspace_flushed_for_close.clone();
             let workspace_flush_in_progress_for_poll = workspace_flush_in_progress_for_close.clone();
             glib::timeout_add_local_once(
                 super::workspace_persist::PERSIST_DELAY + std::time::Duration::from_millis(10),
                 move || {
-                    let receiver = crate::services::workspace_state::flush();
+                    let receiver = workspace_for_flush.flush();
                     glib::timeout_add_local(std::time::Duration::from_millis(10), move || {
                         match receiver.try_recv() {
                             Ok(Ok(())) => {

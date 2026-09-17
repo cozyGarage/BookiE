@@ -190,12 +190,13 @@ impl App {
 
     pub(super) fn on_reload_connections(&self, sender: ComponentSender<Self>) {
         let sender_clone = sender.clone();
+        let workspace = self.workspace.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     if let Ok(connections) = tablepro_storage::load_connections().await {
                         let ids = connections.iter().map(|connection| connection.id).collect::<Vec<_>>();
-                        if crate::services::workspace_state::prefetch_connections(&ids).is_err() {
+                        if workspace.prefetch_connections(&ids).is_err() {
                             sender_clone.input(AppMsg::ShowToast(crate::tr!(
                                 "Could not restore the workspace. Existing files have been preserved."
                             )));

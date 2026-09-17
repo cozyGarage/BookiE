@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -15,10 +15,17 @@ use super::workspace_disk;
 /// the duration of the load + serialise + atomic-rename sequence —
 /// short enough that contention is negligible, long enough to make
 /// the sequence atomic from any other thread's perspective.
-static FILE_LOCK: Mutex<()> = Mutex::new(());
-static MEMORY_LOCK: Mutex<()> = Mutex::new(());
-static CACHE: OnceLock<Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>> = OnceLock::new();
-static WRITER: OnceLock<WorkspaceWriter> = OnceLock::new();
+#[derive(Clone)]
+pub struct WorkspaceStore {
+    inner: Arc<WorkspaceStoreInner>,
+}
+
+struct WorkspaceStoreInner {
+    file_lock: Arc<Mutex<()>>,
+    memory_lock: Mutex<()>,
+    cache: Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>>,
+    writer: WorkspaceWriter,
+}
 
 struct WorkspaceWriter {
     wake: mpsc::SyncSender<()>,
@@ -286,38 +293,88 @@ fn save_locked(state: &WorkspaceState) -> Result<(), WorkspaceFlushError> {
     })
 }
 
-pub fn prefetch_connections(ids: &[Uuid]) -> Result<(), WorkspaceFlushError> {
-    prefetch_connections_coordinated(
-        &MEMORY_LOCK,
-        cache(),
-        ids,
-        || {
-            let receiver = flush();
-            if !matches!(receiver.recv(), Ok(Ok(()))) {
-                tracing::warn!("workspace_state: preload flush failed");
-            }
-        },
-        || {
-            let _guard = FILE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
-            load_locked()
-        },
-    )
+impl WorkspaceStore {
+    pub fn new() -> Self {
+        let file_lock = Arc::new(Mutex::new(()));
+        let (wake, receiver) = mpsc::sync_channel(1);
+        let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
+        let writer_queue = Arc::clone(&queue);
+        let writer_file_lock = Arc::clone(&file_lock);
+        let _writer = std::thread::spawn(move || run_writer(receiver, writer_queue, writer_file_lock));
+        Self {
+            inner: Arc::new(WorkspaceStoreInner {
+                file_lock,
+                memory_lock: Mutex::new(()),
+                cache: Mutex::new(HashMap::new()),
+                writer: WorkspaceWriter { wake, queue },
+            }),
+        }
+    }
+
+    pub fn prefetch_connections(&self, ids: &[Uuid]) -> Result<(), WorkspaceFlushError> {
+        prefetch_connections_coordinated(
+            &self.inner.memory_lock,
+            &self.inner.cache,
+            ids,
+            || {
+                let receiver = self.flush();
+                if !matches!(receiver.recv(), Ok(Ok(()))) {
+                    tracing::warn!("workspace_state: preload flush failed");
+                }
+            },
+            || {
+                let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+                load_locked()
+            },
+        )
+    }
+
+    pub fn load_connection(&self, id: Uuid) -> Option<ConnectionWorkspaceState> {
+        self.inner
+            .cache
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .get(&id)
+            .cloned()
+            .flatten()
+    }
+
+    pub fn save_connection(&self, id: Uuid, mut conn_state: ConnectionWorkspaceState) {
+        clamp_connection(&mut conn_state);
+        save_connection_coordinated(
+            &self.inner.memory_lock,
+            &self.inner.cache,
+            &self.inner.writer.queue,
+            id,
+            conn_state,
+        );
+        wake_writer(&self.inner.writer);
+    }
+
+    pub fn flush(&self) -> mpsc::Receiver<Result<(), WorkspaceFlushError>> {
+        let (sender, receiver) = mpsc::channel();
+        self.inner
+            .writer
+            .queue
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .flush(sender);
+        if !wake_writer(&self.inner.writer) {
+            self.inner
+                .writer
+                .queue
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .fail_flushes(WorkspaceFlushError::WriterUnavailable);
+        }
+        receiver
+    }
 }
 
-pub fn load_connection(id: Uuid) -> Option<ConnectionWorkspaceState> {
-    cache()
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .get(&id)
-        .cloned()
-        .flatten()
-}
-
-pub fn save_connection(id: Uuid, mut conn_state: ConnectionWorkspaceState) {
-    clamp_connection(&mut conn_state);
-    let writer = writer();
-    save_connection_coordinated(&MEMORY_LOCK, cache(), &writer.queue, id, conn_state);
-    wake_writer(writer);
+impl Default for WorkspaceStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn prefetch_connections_coordinated(
@@ -352,38 +409,6 @@ fn save_connection_coordinated(
     queue.lock().unwrap_or_else(|error| error.into_inner()).save(id, state);
 }
 
-pub fn flush() -> mpsc::Receiver<Result<(), WorkspaceFlushError>> {
-    let (sender, receiver) = mpsc::channel();
-    let writer = writer();
-    writer
-        .queue
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .flush(sender);
-    if !wake_writer(writer) {
-        writer
-            .queue
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .fail_flushes(WorkspaceFlushError::WriterUnavailable);
-    }
-    receiver
-}
-
-fn cache() -> &'static Mutex<HashMap<Uuid, Option<ConnectionWorkspaceState>>> {
-    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
-fn writer() -> &'static WorkspaceWriter {
-    WRITER.get_or_init(|| {
-        let (wake, receiver) = mpsc::sync_channel(1);
-        let queue = Arc::new(Mutex::new(WorkspaceQueue::default()));
-        let writer_queue = Arc::clone(&queue);
-        let _writer = std::thread::spawn(move || run_writer(receiver, writer_queue));
-        WorkspaceWriter { wake, queue }
-    })
-}
-
 fn wake_writer(writer: &WorkspaceWriter) -> bool {
     if let Err(mpsc::TrySendError::Disconnected(())) = writer.wake.try_send(()) {
         tracing::warn!("workspace_state: writer unavailable");
@@ -392,7 +417,7 @@ fn wake_writer(writer: &WorkspaceWriter) -> bool {
     true
 }
 
-fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>) {
+fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>, file_lock: Arc<Mutex<()>>) {
     while receiver.recv().is_ok() {
         let pending = queue.lock().unwrap_or_else(|error| error.into_inner()).take_pending();
         if pending.is_empty() {
@@ -400,7 +425,7 @@ fn run_writer(receiver: mpsc::Receiver<()>, queue: Arc<Mutex<WorkspaceQueue>>) {
         }
         let attempted_sequence = pending.iter().map(|(_, entry)| entry.sequence).max().unwrap_or(0);
         let result = {
-            let _guard = FILE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+            let _guard = file_lock.lock().unwrap_or_else(|error| error.into_inner());
             load_locked().and_then(|mut state| {
                 for (id, entry) in &pending {
                     state.connections.insert(id.to_string(), entry.state.clone());
@@ -574,6 +599,23 @@ mod tests {
             tabs: vec![editor(query)],
             active_idx: 0,
         }
+    }
+
+    #[test]
+    fn workspace_store_state_is_shared_only_with_its_clones() {
+        let first = WorkspaceStore::new();
+        let clone = first.clone();
+        let separate = WorkspaceStore::new();
+        let id = Uuid::new_v4();
+        first
+            .inner
+            .cache
+            .lock()
+            .unwrap()
+            .insert(id, Some(connection("SELECT 1")));
+
+        assert!(clone.load_connection(id).is_some());
+        assert!(separate.load_connection(id).is_none());
     }
 
     #[test]

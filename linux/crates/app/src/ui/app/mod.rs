@@ -49,6 +49,7 @@ pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, 
 pub struct AppInit {
     pub registry: Arc<DriverRegistry>,
     pub persistence: crate::services::persistence_stores::PersistenceStores,
+    pub workspace: crate::services::workspace_state::WorkspaceStore,
     pub history: Option<tablepro_storage::query_history::HistoryStore>,
 }
 
@@ -74,6 +75,7 @@ pub(super) fn dec_close_after_save(map: &mut std::collections::HashMap<Uuid, u32
 pub struct App {
     registry: Arc<DriverRegistry>,
     persistence: crate::services::persistence_stores::PersistenceStores,
+    workspace: crate::services::workspace_state::WorkspaceStore,
     history: Option<tablepro_storage::query_history::HistoryStore>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
@@ -390,13 +392,15 @@ impl SimpleComponent for App {
         let AppInit {
             registry,
             persistence,
+            workspace,
             history,
         } = init;
         let widgets = view_output!();
 
         init_css::install_pending_change_css();
 
-        let window_handles = init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &sender);
+        let window_handles =
+            init_window::install_window_lifecycle(&widgets.window, &widgets.split_view, &workspace, &sender);
 
         let sidebar = init_sidebar::build_sidebar(&widgets, &sender);
 
@@ -423,6 +427,7 @@ impl SimpleComponent for App {
         let mut model = App {
             registry,
             persistence,
+            workspace,
             history,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
@@ -729,6 +734,7 @@ impl SimpleComponent for App {
                     .launch(AppInit {
                         registry: self.registry.clone(),
                         persistence: self.persistence.clone(),
+                        workspace: self.workspace.clone(),
                         history: self.history.clone(),
                     })
                     .detach();

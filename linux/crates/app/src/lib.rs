@@ -73,6 +73,7 @@ pub fn run() {
 
     let registry = Arc::new(build_registry());
     let persistence = services::persistence_stores::PersistenceStores::open();
+    let workspace = services::workspace_state::WorkspaceStore::new();
     tracing::info!(drivers = registry.len(), "starting tablepro-app");
 
     let approval_router = services::approval_router::ApprovalRouter::new(
@@ -87,6 +88,7 @@ pub fn run() {
     app.run::<ui::App>(ui::AppInit {
         registry,
         persistence: persistence.clone(),
+        workspace,
         history,
     });
 
@@ -97,9 +99,8 @@ pub fn run() {
     // tasks rather than getting cancelled mid-flight by an abrupt
     // mem::forget-style leak. The previous `mem::forget(runtime)`
     // was a workaround for an sqlx-pool reaper concern that no
-    // longer applies — the history pool sits in a global OnceLock
-    // and stays usable from relm4's runtime; this runtime here is
-    // only used for the startup init / prune block_on above.
+    // longer applies. This runtime is only used for startup history
+    // initialization and pruning.
     if let Some(runtime) = runtime {
         runtime.shutdown_timeout(std::time::Duration::from_secs(2));
     }
