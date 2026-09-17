@@ -8,6 +8,7 @@
 - Development builds isolate connections, history, audit, drafts, settings, locks, and keyring items from installed builds.
 - Column-width and filter persistence is owned by the application and shared explicitly with its windows and tabs.
 - Query history is owned by the application and passed explicitly to editors, dialogs, preferences, and retention work.
+- Workspace cache, coalesced writer, and close-time flush are owned by the application and shared explicitly across windows.
 
 ### Fixed
 

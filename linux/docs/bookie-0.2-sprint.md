@@ -376,3 +376,11 @@ isolated-test inventory passed. Debian package fixture could not run because
   existing database path and format remain unchanged. Preflight, app and storage
   tests, Clippy, and all 19 GTK safety scenarios passed. Workspace and
   database-service globals remain for later B2 slices.
+
+- 2026-09-17 B2 workspace slice: `bc701a3` replaces the global workspace
+  cache, locks, and writer with one application-owned `WorkspaceStore` shared
+  by every window. Existing draft/workspace formats, coalescing, retry, and
+  close-time flush behavior remain unchanged. The app suite (260 passed, 3
+  isolated-GTK tests ignored), a focused ownership test, Clippy, and all 19 GTK
+  safety scenarios passed. Database-service and preference globals remain for
+  later B2 slices.
