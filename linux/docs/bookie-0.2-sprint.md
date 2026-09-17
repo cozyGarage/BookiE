@@ -369,3 +369,10 @@ isolated-test inventory passed. Debian package fixture could not run because
   Unreadable-file preservation and production file formats remain unchanged. App
   check, 263 library tests, Clippy and all 19 GTK safety scenarios passed. History,
   workspace and database-service globals remain for later B2 slices.
+
+- 2026-09-17 B2 history slice: `2c80851` replaces the process-global query-history
+  pool with an application-owned `HistoryStore`. The same explicit store is passed
+  to editors, the history dialog, preferences, and scheduled retention work; the
+  existing database path and format remain unchanged. Preflight, app and storage
+  tests, Clippy, and all 19 GTK safety scenarios passed. Workspace and
+  database-service globals remain for later B2 slices.
