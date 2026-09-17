@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -12,12 +12,6 @@ use tablepro_ssh::{SshConfig, SshTunnel};
 use tablepro_storage::AuditJournal;
 
 use super::connection_monitor;
-
-static SERVICE: OnceLock<DatabaseService> = OnceLock::new();
-
-pub fn instance() -> &'static DatabaseService {
-    SERVICE.get_or_init(DatabaseService::new)
-}
 
 /// Opaque identity of the underlying session, independent of the fresh
 /// PolicyGuard allocated for each request. It grants no database access.
@@ -123,7 +117,7 @@ pub struct DatabaseService {
 }
 
 impl DatabaseService {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let audit = AuditRuntime::open_default();
         let (policy, policy_available) = match load_policy() {
             Ok(policy) => (Arc::new(policy), true),
@@ -313,10 +307,12 @@ mod tests {
     use tablepro_core::DatabaseDriver;
 
     #[test]
-    fn instance_is_singleton() {
-        let a = instance() as *const _;
-        let b = instance() as *const _;
-        assert_eq!(a, b);
+    fn separate_instances_do_not_share_connections() {
+        let a = DatabaseService::new();
+        let b = DatabaseService::new();
+        let id = Uuid::new_v4();
+        assert!(!a.is_active(id));
+        assert!(!b.is_active(id));
     }
 
     #[test]

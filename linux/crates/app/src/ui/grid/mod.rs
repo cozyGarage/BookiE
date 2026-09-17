@@ -12,6 +12,7 @@ use gtk4::prelude::*;
 
 use tablepro_core::{ColumnInfo, QueryResult};
 
+use crate::services::database_service::DatabaseService;
 use crate::ui::row_object::RowObject;
 
 use column::{build_column, is_cell_editable};
@@ -77,6 +78,7 @@ pub fn build_column_view(
     connection_id: Option<uuid::Uuid>,
     tab_ctx: TabGridContext,
     column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
+    database: std::sync::Arc<DatabaseService>,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
     let store = gtk4::gio::ListStore::new::<RowObject>();
     for row in &result.rows {
@@ -91,7 +93,7 @@ pub fn build_column_view(
 
     let grid_menus = menu_sender.as_ref().map(|sender| {
         let driver_id = connection_id
-            .and_then(|id| crate::services::database_service::instance().metadata(id))
+            .and_then(|id| database.metadata(id))
             .map(|metadata| metadata.driver_id)
             .unwrap_or_default();
         install_grid_context_menus(&column_view, sender.clone(), result, driver_id)
@@ -128,6 +130,7 @@ pub fn build_column_view(
         &columns,
         result.columns.iter().map(|column| column.name.clone()).collect(),
         connection_id,
+        database,
     );
 
     if let Some((col_idx, ascending)) = sort

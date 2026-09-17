@@ -14,7 +14,12 @@ pub(super) struct Diagnostics {
 }
 
 impl Diagnostics {
-    pub fn install(view: &sourceview5::View, button: &gtk::MenuButton, connection_id: Option<uuid::Uuid>) -> Self {
+    pub fn install(
+        view: &sourceview5::View,
+        button: &gtk::MenuButton,
+        connection_id: Option<uuid::Uuid>,
+        database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    ) -> Self {
         let buffer = view.buffer();
         let timer: Rc<RefCell<Option<glib::SourceId>>> = Rc::default();
         let generation = Rc::new(Cell::new(0u64));
@@ -35,9 +40,7 @@ impl Diagnostics {
                 }
                 let (start, end) = buffer.bounds();
                 let sql = buffer.text(&start, &end, false).to_string();
-                let Some(metadata) =
-                    connection_id.and_then(|id| crate::services::database_service::instance().metadata(id))
-                else {
+                let Some(metadata) = connection_id.and_then(|id| database.metadata(id)) else {
                     return;
                 };
                 let driver = metadata.driver_id;

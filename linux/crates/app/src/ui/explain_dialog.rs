@@ -6,10 +6,15 @@ use gtk::prelude::IsA;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use crate::services::database_service;
+use crate::services::database_service::DatabaseService;
 use crate::tr;
 
-pub fn present(parent: &impl IsA<gtk::Window>, connection_id: Option<uuid::Uuid>, sql: &str) {
+pub fn present(
+    parent: &impl IsA<gtk::Window>,
+    connection_id: Option<uuid::Uuid>,
+    sql: &str,
+    database: &DatabaseService,
+) {
     let trimmed = sql.trim();
     if trimmed.is_empty() {
         let toast_parent = parent.clone().upcast::<gtk::Window>();
@@ -26,11 +31,11 @@ pub fn present(parent: &impl IsA<gtk::Window>, connection_id: Option<uuid::Uuid>
     let Some(connection_id) = connection_id else {
         return;
     };
-    let Some(conn) = database_service::instance().get(connection_id) else {
+    let Some(conn) = database.get(connection_id) else {
         return;
     };
 
-    let driver_id = database_service::instance()
+    let driver_id = database
         .metadata(connection_id)
         .map(|metadata| metadata.driver_id)
         .unwrap_or_default();

@@ -6,7 +6,7 @@ use tablepro_storage::SavedConnection;
 use tablepro_transport::TransportError;
 use uuid::Uuid;
 
-use super::database_service::{self, ConnectionMetadata, ReconnectParams};
+use super::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
 
 /// A connection that has authenticated and completed its initial metadata
 /// query, but has not replaced the active application connection yet.
@@ -44,7 +44,7 @@ pub struct ActivatedConnection {
 
 impl PreparedConnection {
     /// The saved connection this would activate, so a caller can check
-    /// `database_service::instance().is_active(id)` before committing to
+    /// `DatabaseService::is_active(id)` before committing to
     /// the switch -- tearing down whatever it currently owns only after
     /// confirming the target isn't already open in another window.
     pub fn id(&self) -> Uuid {
@@ -77,12 +77,12 @@ impl PreparedConnection {
     /// in another window; the caller should show that error and leave
     /// whatever it currently owns untouched. Callers that must guarantee
     /// success should check [`Self::id`] against
-    /// `database_service::instance().is_active` before committing to the
+    /// `DatabaseService::is_active` before committing to the
     /// switch (tearing down a previous connection, clearing tabs) so a
     /// refusal here never needs to be rolled back.
-    pub fn activate(self) -> Option<ActivatedConnection> {
+    pub fn activate(self, database: &DatabaseService) -> Option<ActivatedConnection> {
         let id = self.id;
-        let activated = database_service::instance().activate(
+        let activated = database.activate(
             id,
             self.metadata,
             self.connection,

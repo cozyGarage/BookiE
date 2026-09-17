@@ -10,11 +10,13 @@ use tablepro_policy::Principal;
 use tablepro_storage::{SavedConnection, load_connections, store_mcp_token};
 use uuid::Uuid;
 
-use super::database_service;
+use super::database_service::DatabaseService;
 
 static BRIDGE: OnceLock<Arc<McpBridge>> = OnceLock::new();
 
-struct AppConnectionProvider;
+struct AppConnectionProvider {
+    database: Arc<DatabaseService>,
+}
 
 #[async_trait]
 impl ConnectionProvider for AppConnectionProvider {
@@ -23,7 +25,7 @@ impl ConnectionProvider for AppConnectionProvider {
     }
 
     async fn connection(&self, connection_id: Uuid, principal: Principal) -> Result<Arc<dyn Connection>, String> {
-        let svc = database_service::instance();
+        let svc = &self.database;
         let conn = match &principal {
             Principal::Human { .. } => svc.get(connection_id),
             _ => svc.handle(connection_id, principal),
@@ -33,12 +35,12 @@ impl ConnectionProvider for AppConnectionProvider {
 }
 
 /// Start the loopback MCP HTTP server.
-pub fn start_background() -> Option<Arc<McpBridge>> {
-    if !database_service::instance().audit_available() {
+pub fn start_background(database: Arc<DatabaseService>) -> Option<Arc<McpBridge>> {
+    if !database.audit_available() {
         tracing::error!("MCP server disabled because the required audit journal is unavailable");
         return None;
     }
-    if !database_service::instance().policy_available() {
+    if !database.policy_available() {
         tracing::error!("MCP server disabled because the policy file could not be loaded");
         return None;
     }
@@ -49,7 +51,7 @@ pub fn start_background() -> Option<Arc<McpBridge>> {
             return None;
         }
     };
-    let bridge = Arc::new(McpBridge::new(Arc::new(AppConnectionProvider), tokens));
+    let bridge = Arc::new(McpBridge::new(Arc::new(AppConnectionProvider { database }), tokens));
     let _ = BRIDGE.set(bridge.clone());
     let bridge_http = bridge.clone();
     let config = tablepro_mcp::McpServerConfig::default();

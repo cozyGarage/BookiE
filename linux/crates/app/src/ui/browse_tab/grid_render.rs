@@ -251,6 +251,7 @@ impl BrowseTab {
             self.connection_id,
             tab_ctx,
             self.persistence.column_widths.clone(),
+            self.database.clone(),
         );
         self.current_selection = Some(selection);
         self.current_column_view = Some(column_view.clone());

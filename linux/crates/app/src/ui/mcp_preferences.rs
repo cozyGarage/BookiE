@@ -8,8 +8,8 @@ use tablepro_mcp::TokenPermissions;
 use crate::services::mcp_service;
 use crate::tr;
 
-pub fn build_page() -> adw::PreferencesPage {
-    let policy_reload = crate::services::database_service::instance().reload_policy();
+pub fn build_page(database: &crate::services::database_service::DatabaseService) -> adw::PreferencesPage {
+    let policy_reload = database.reload_policy();
 
     let page = adw::PreferencesPage::builder()
         .title(tr!("MCP"))

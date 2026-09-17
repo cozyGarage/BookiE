@@ -15,7 +15,6 @@ use uuid::Uuid;
 use tablepro_core::{ColumnInfo, Value};
 
 use crate::services::catalog::CatalogOrigin;
-use crate::services::database_service;
 use crate::services::structure_tracker;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
 use crate::ui::error_text;
@@ -71,7 +70,7 @@ impl App {
         table: String,
         sender: ComponentSender<Self>,
     ) {
-        let Some(origin) = CatalogOrigin::capture(self.connection_id) else {
+        let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             return;
         };
         let title = crate::tr!("Drop {table}?").replace("{table}", &table);
@@ -111,7 +110,7 @@ impl App {
         table: String,
         sender: ComponentSender<Self>,
     ) {
-        if !origin.owns_window(self.connection_id) {
+        if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
         let Some(driver_id) = self.current_driver_id.clone() else {
@@ -127,7 +126,7 @@ impl App {
         let schema_for_msg = schema.clone();
         let table_for_msg = table.clone();
         let sender_for_cmd = sender.clone();
-        let connection = origin.connection();
+        let connection = origin.connection(&self.database);
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
@@ -188,7 +187,7 @@ impl App {
                 // Nothing to save — short-circuit so close-after-save
                 // can proceed.
                 sender.input(AppMsg::StructureSaveCompleted {
-                    origin: CatalogOrigin::capture(self.connection_id),
+                    origin: CatalogOrigin::capture(self.connection_id, &self.database),
                     tab_id,
                     new_table_name: None,
                 });
@@ -211,7 +210,7 @@ impl App {
         table: String,
         sender: ComponentSender<Self>,
     ) {
-        if !origin.owns_window(self.connection_id) {
+        if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
         self.close_tabs_for_table(schema.as_deref(), &table);
@@ -308,14 +307,14 @@ impl App {
             None
         };
 
-        let Some(origin) = CatalogOrigin::capture(self.connection_id) else {
+        let Some(origin) = CatalogOrigin::capture(self.connection_id, &self.database) else {
             self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
             sender.input(AppMsg::StructureSaveFailed(tab_id, crate::tr!("No active connection.")));
             return;
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let connection = origin.connection();
+        let connection = origin.connection(&self.database);
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
@@ -373,7 +372,7 @@ impl App {
         }
         self.structure_saves_in_flight.borrow_mut().remove(&tab_id);
 
-        let Some(origin) = origin.filter(|origin| origin.owns_window(self.connection_id)) else {
+        let Some(origin) = origin.filter(|origin| origin.owns_window(self.connection_id, &self.database)) else {
             return;
         };
 
@@ -499,11 +498,12 @@ impl App {
         let table_for_cmd = table.clone();
         let schema_for_cmd = schema.clone();
         let connection_id = self.connection_id;
+        let database = self.database.clone();
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let Some(conn) = connection_id.and_then(|id| database_service::instance().get(id)) else {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
                         sender_for_cmd.input(AppMsg::ShowToast(crate::tr!("No active connection.")));
                         return;
                     };
@@ -618,11 +618,12 @@ impl App {
         };
         let sender_for_cmd = sender.clone();
         let connection_id = self.connection_id;
+        let database = self.database.clone();
         let timeout_secs = crate::services::operation_control::configured_timeout_secs();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let Some(conn) = connection_id.and_then(|id| database_service::instance().get(id)) else {
+                    let Some(conn) = connection_id.and_then(|id| database.get(id)) else {
                         sender_for_cmd.input(AppMsg::StructureLoadFailed {
                             tab_id,
                             message: crate::tr!("No active connection."),
@@ -727,10 +728,10 @@ impl App {
         table: Option<String>,
         sender: ComponentSender<Self>,
     ) {
-        if !origin.owns_window(self.connection_id) {
+        if !origin.owns_window(self.connection_id, &self.database) {
             return;
         }
-        let Some(conn) = origin.connection() else {
+        let Some(conn) = origin.connection(&self.database) else {
             return;
         };
         self.schema_index.borrow_mut().invalidate_columns();
@@ -784,7 +785,7 @@ impl App {
         generation: u64,
         result: Result<crate::services::catalog::Catalog, String>,
     ) {
-        if !origin.owns_window(self.connection_id) || self.catalog_generation.get() != generation {
+        if !origin.owns_window(self.connection_id, &self.database) || self.catalog_generation.get() != generation {
             return;
         }
         match result {

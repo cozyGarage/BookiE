@@ -477,6 +477,7 @@ mod tests {
             None,
             TabGridContext::default(),
             None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
@@ -541,6 +542,7 @@ mod tests {
             None,
             TabGridContext::default(),
             None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
         );
         let window = gtk4::Window::builder()
             .title("TEXT cells with binary values")

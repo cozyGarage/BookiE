@@ -1,4 +1,4 @@
-use super::database_service::{self, ConnectionIdentity};
+use super::database_service::{ConnectionIdentity, DatabaseService};
 use std::sync::Arc;
 use tablepro_core::{Connection, TableInfo};
 use uuid::Uuid;
@@ -49,21 +49,21 @@ impl CatalogChanges {
 }
 
 impl CatalogOrigin {
-    pub fn capture(id: Option<Uuid>) -> Option<Self> {
+    pub fn capture(id: Option<Uuid>, database: &DatabaseService) -> Option<Self> {
         let id = id?;
         Some(Self {
             id,
-            identity: database_service::instance().identity(id)?,
+            identity: database.identity(id)?,
         })
     }
-    pub fn owns_window(&self, id: Option<Uuid>) -> bool {
-        self.matches(id, database_service::instance().identity(self.id).as_ref())
+    pub fn owns_window(&self, id: Option<Uuid>, database: &DatabaseService) -> bool {
+        self.matches(id, database.identity(self.id).as_ref())
     }
     pub(crate) fn matches(&self, id: Option<Uuid>, identity: Option<&ConnectionIdentity>) -> bool {
         id == Some(self.id) && identity == Some(&self.identity)
     }
-    pub fn connection(&self) -> Option<Arc<dyn Connection>> {
-        let (connection, identity) = database_service::instance().get_with_identity(self.id)?;
+    pub fn connection(&self, database: &DatabaseService) -> Option<Arc<dyn Connection>> {
+        let (connection, identity) = database.get_with_identity(self.id)?;
         (identity == self.identity).then_some(connection)
     }
 }

@@ -4,10 +4,7 @@ use super::{App, AppMsg};
 
 impl App {
     pub(super) fn on_editor_needs_columns(&self, tables: Vec<String>, sender: ComponentSender<Self>) {
-        let Some((conn, identity)) = self
-            .connection_id
-            .and_then(|id| crate::services::database_service::instance().get_with_identity(id))
-        else {
+        let Some((conn, identity)) = self.connection_id.and_then(|id| self.database.get_with_identity(id)) else {
             return;
         };
         let pending: Vec<crate::ui::editor::SchemaRequest> = {
@@ -51,10 +48,7 @@ impl App {
         request: crate::ui::editor::SchemaRequest,
         columns: Result<Vec<String>, ()>,
     ) {
-        let Some(identity) = self
-            .connection_id
-            .and_then(|id| crate::services::database_service::instance().identity(id))
-        else {
+        let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id)) else {
             return;
         };
         let key = crate::ui::editor::table_key(&request.table);
@@ -74,9 +68,7 @@ impl App {
     }
 
     pub(super) fn rebuild_schema_buffer(&self) {
-        if let Some(identity) = self
-            .connection_id
-            .and_then(|id| crate::services::database_service::instance().identity(id))
+        if let Some(identity) = self.connection_id.and_then(|id| self.database.identity(id))
             && self.schema_index.borrow_mut().sync_connection(&identity)
         {
             self.requested_columns.borrow_mut().clear();

@@ -20,7 +20,7 @@ use uuid::Uuid;
 use tablepro_core::QueryResult;
 use tablepro_storage::query_history::{HistoryStore, NewEntry, Outcome};
 
-use crate::services::database_service::{self, ConnectionMetadata};
+use crate::services::database_service::ConnectionMetadata;
 use crate::ui::grid::GridMsg;
 
 pub use completion::{SchemaIndex, SchemaRequest, candidate_words, referenced_tables, table_key};
@@ -46,6 +46,7 @@ pub struct SqlEditor {
     executions: std::collections::HashMap<u64, ExecutionContext>,
     connection_id: Option<Uuid>,
     history: Option<HistoryStore>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
     run_generation: RunGeneration,
     drop_generation: std::rc::Rc<DropGeneration>,
     /// Disconnected in `shutdown`. Without this, every tab's
@@ -62,6 +63,7 @@ pub struct SqlEditorInit {
     pub initial_query: Option<String>,
     pub connection_id: Option<Uuid>,
     pub history: Option<HistoryStore>,
+    pub database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 }
 
 #[derive(Debug, Clone)]
@@ -478,10 +480,12 @@ impl SimpleComponent for SqlEditor {
         let model = SqlEditor {
             catalog_changes: Default::default(),
             catalog_origin: None,
+            database: init.database.clone(),
             diagnostics: diagnostics::Diagnostics::install(
                 &widgets.source_view,
                 &widgets.warnings_button,
                 init.connection_id,
+                init.database.clone(),
             ),
             source_view: widgets.source_view.clone(),
             run_button: widgets.run_button.clone(),
@@ -511,7 +515,7 @@ impl SimpleComponent for SqlEditor {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>) {
         match msg {
             SqlEditorInput::CatalogStatementSucceeded { origin, driver, sql } => {
-                if !origin.owns_window(self.connection_id) {
+                if !origin.owns_window(self.connection_id, &self.database) {
                     return;
                 }
                 if self.catalog_origin.as_ref() != Some(&origin) {
@@ -570,7 +574,7 @@ impl SimpleComponent for SqlEditor {
                     buffer.text(&start, &end, true).to_string()
                 };
                 if let Some(window) = self.source_view.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
-                    crate::ui::explain_dialog::present(&window, self.connection_id, &text);
+                    crate::ui::explain_dialog::present(&window, self.connection_id, &text, &self.database);
                 }
             }
 
@@ -632,7 +636,13 @@ impl SimpleComponent for SqlEditor {
                 self.status
                     .set_label(&summary_label(n_total, n_ok, total_ms, first_error.is_some()));
                 clear_box(&self.results_holder);
-                render_outcomes(&self.results_holder, &outcomes, &self.grid_sender, self.connection_id);
+                render_outcomes(
+                    &self.results_holder,
+                    &outcomes,
+                    &self.grid_sender,
+                    self.connection_id,
+                    self.database.clone(),
+                );
             }
 
             SqlEditorInput::ShowCancelled(generation) => {
@@ -743,7 +753,7 @@ impl SqlEditor {
     }
 
     fn metadata(&self) -> Option<ConnectionMetadata> {
-        database_service::instance().metadata(self.connection_id?)
+        self.database.metadata(self.connection_id?)
     }
 
     fn begin_run(&mut self, sql: String, single_statement: bool, sender: ComponentSender<Self>) {
@@ -810,8 +820,8 @@ impl SqlEditor {
         if !self.run_generation.accepts(generation) {
             return;
         }
-        let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id);
-        let conn = match origin.as_ref().and_then(|origin| origin.connection()) {
+        let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);
+        let conn = match origin.as_ref().and_then(|origin| origin.connection(&self.database)) {
             Some(c) => c,
             None => {
                 self.status.set_label(&crate::tr!("no active connection"));

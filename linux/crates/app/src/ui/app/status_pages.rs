@@ -71,13 +71,15 @@ impl App {
             self.show_toast(&crate::tr!("Query history is unavailable"));
             return;
         };
-        let dialog =
-            HistoryDialog::builder()
-                .launch(HistoryDialogInit { history })
-                .forward(sender.input_sender(), |out| match out {
-                    HistoryDialogOutput::OpenInNewTab(text) => AppMsg::OpenHistoryQuery(text),
-                    HistoryDialogOutput::ReplaceCurrentTabQuery(text) => AppMsg::ReplaceActiveTabQuery(text),
-                });
+        let dialog = HistoryDialog::builder()
+            .launch(HistoryDialogInit {
+                history,
+                database: self.database.clone(),
+            })
+            .forward(sender.input_sender(), |out| match out {
+                HistoryDialogOutput::OpenInNewTab(text) => AppMsg::OpenHistoryQuery(text),
+                HistoryDialogOutput::ReplaceCurrentTabQuery(text) => AppMsg::ReplaceActiveTabQuery(text),
+            });
         dialog.model().dialog().present(Some(&self.window));
         self.history_dialog = Some(dialog);
     }
@@ -121,6 +123,6 @@ impl App {
         };
         let sql = slot.query.clone();
         drop(tabs);
-        crate::ui::explain_dialog::present(&self.window, self.connection_id, &sql);
+        crate::ui::explain_dialog::present(&self.window, self.connection_id, &sql, &self.database);
     }
 }

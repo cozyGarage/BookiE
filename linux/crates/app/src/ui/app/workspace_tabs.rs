@@ -157,6 +157,7 @@ impl App {
         let schema_buffer_for_create = self.schema_buffer.clone();
         let schema_index_for_create = self.schema_index.clone();
         let history_for_create = self.history.clone();
+        let database_for_create = self.database.clone();
         let sender_for_create = sender.clone();
         // The workspace root is rebuilt on every connect, so the identifier
         // captured here always belongs to the connection this window owns.
@@ -170,6 +171,7 @@ impl App {
                     schema_index: schema_index_for_create.clone(),
                     initial_query: None,
                     history: history_for_create.clone(),
+                    database: database_for_create.clone(),
                 })
                 .forward(sender_for_create.input_sender(), move |out| match out {
                     SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
@@ -363,6 +365,7 @@ impl App {
             initial_offset: offset,
             initial_sort: sort,
             persistence: self.persistence.clone(),
+            database: self.database.clone(),
         };
         let browse = BrowseTab::builder()
             .launch(browse_init)
@@ -511,6 +514,7 @@ impl App {
                 schema_index: self.schema_index.clone(),
                 initial_query,
                 history: self.history.clone(),
+                database: self.database.clone(),
             })
             .forward(sender.input_sender(), move |out| match out {
                 SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {

@@ -25,7 +25,11 @@ fn format_thousands(n: u64) -> String {
     out
 }
 
-pub fn present(parent: &impl IsA<gtk::Widget>, history: Option<tablepro_storage::query_history::HistoryStore>) {
+pub fn present(
+    parent: &impl IsA<gtk::Widget>,
+    history: Option<tablepro_storage::query_history::HistoryStore>,
+    database: &crate::services::database_service::DatabaseService,
+) {
     let window = adw::PreferencesDialog::builder()
         .title(crate::tr!("Preferences"))
         .build();
@@ -191,7 +195,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>, history: Option<tablepro_storage:
 
     window.add(&general);
     window.add(&editor);
-    window.add(&super::mcp_preferences::build_page());
+    window.add(&super::mcp_preferences::build_page(database));
 
     // Live save — write on every value change instead of batching to
     // window.connect_closed. GNOME Settings applies its preferences

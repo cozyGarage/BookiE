@@ -5,8 +5,8 @@ use tablepro_core::TableInfo;
 use tablepro_storage::SavedConnection;
 use uuid::Uuid;
 
+use crate::services::connection_service;
 use crate::services::database_service::{ConnectionHealth, ConnectionMetadata};
-use crate::services::{connection_service, database_service};
 use crate::ui::connect_dialog::{ConnectDialog, ConnectDialogInit, ConnectDialogOutput};
 
 use super::{App, AppMsg, ConnectionTransition, SwitchDecision};
@@ -17,12 +17,12 @@ impl App {
     /// so another window's connection can never answer for this one.
     pub(super) fn window_connection(&self) -> Option<std::sync::Arc<dyn tablepro_core::Connection>> {
         let id = self.connection_id?;
-        database_service::instance().get(id)
+        self.database.get(id)
     }
 
     pub(super) fn window_metadata(&self) -> Option<ConnectionMetadata> {
         let id = self.connection_id?;
-        database_service::instance().metadata(id)
+        self.database.metadata(id)
     }
 
     pub(super) fn on_open_connect(&mut self, sender: ComponentSender<Self>) {
@@ -168,7 +168,7 @@ impl App {
             if crate::services::window_state::load().last_connection_id == Some(id) {
                 crate::services::window_state::set_last_connection_id(None);
             }
-            database_service::instance().close(id);
+            self.database.close(id);
             crate::services::window_registry::unregister(id);
         }
         self.schema_buffer.set_text(crate::ui::editor::SQL_KEYWORDS);
@@ -248,9 +248,7 @@ impl App {
     }
 
     pub(super) fn on_poll_health(&mut self) {
-        let current = self
-            .connection_id
-            .and_then(|id| database_service::instance().health(id));
+        let current = self.connection_id.and_then(|id| self.database.health(id));
         if current != self.health_state {
             self.refresh_health_banner(current.clone());
             self.health_state = current;
@@ -375,7 +373,7 @@ impl App {
 
         if self.connection_transition == ConnectionTransition::WaitingForRuns {
             let was_disabled = self.switch_cancel_audit_was_disabled.take().unwrap_or(false);
-            if !was_disabled && database_service::instance().governed_writes_disabled() {
+            if !was_disabled && self.database.governed_writes_disabled() {
                 self.prepared_connection = None;
                 self.switch_saves_pending.clear();
                 self.connection_transition = ConnectionTransition::Idle;
@@ -455,7 +453,7 @@ impl App {
                 self.show_toast(&crate::tr!("Connection switch cancelled."));
             }
             SwitchDecision::CancelRuns => {
-                self.switch_cancel_audit_was_disabled = Some(database_service::instance().governed_writes_disabled());
+                self.switch_cancel_audit_was_disabled = Some(self.database.governed_writes_disabled());
                 self.connection_transition = ConnectionTransition::WaitingForRuns;
                 self.cancel_all_editor_runs();
                 self.continue_connection_switch(sender);
@@ -501,7 +499,7 @@ impl App {
         // owns is refused outright rather than stealing it, so a refusal
         // never needs to roll back a half-finished switch.
         let target_id = prepared.id();
-        if self.connection_id != Some(target_id) && database_service::instance().is_active(target_id) {
+        if self.connection_id != Some(target_id) && self.database.is_active(target_id) {
             self.connection_transition = ConnectionTransition::Idle;
             self.switch_saves_pending.clear();
             self.switch_cancel_audit_was_disabled = None;
@@ -518,9 +516,9 @@ impl App {
         // replacing. Closing before activation keeps reconnecting to the same
         // saved connection correct: the identifier is reused, not cancelled.
         if let Some(previous) = self.connection_id.take() {
-            database_service::instance().close(previous);
+            self.database.close(previous);
         }
-        let Some(activated) = prepared.activate() else {
+        let Some(activated) = prepared.activate(&self.database) else {
             // Only reachable if another window raced this one between the
             // check above and here; the GTK main loop makes that
             // effectively impossible, but stay fail-closed rather than

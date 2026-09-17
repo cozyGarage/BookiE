@@ -11,10 +11,10 @@ use tokio_util::sync::CancellationToken;
 
 use tablepro_core::{ActivityQuery, ActivityUnsupported, Value, activity_kinds, activity_sql, parse_session_id};
 
-use crate::services::database_service;
+use crate::services::database_service::DatabaseService;
 use crate::tr;
 
-pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
+pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database: &std::sync::Arc<DatabaseService>) {
     let Some(connection) = connection_id else {
         let alert = adw::AlertDialog::new(
             Some(&tr!("No active connection")),
@@ -24,7 +24,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
         alert.present(Some(parent));
         return;
     };
-    let Some(meta) = database_service::instance().metadata(connection) else {
+    let Some(meta) = database.metadata(connection) else {
         let alert = adw::AlertDialog::new(
             Some(&tr!("No active connection")),
             Some(&tr!("Open a connection before viewing server activity.")),
@@ -88,6 +88,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
             btn.set_tooltip_text(Some(&unsupported_text(&driver_id)));
         }
         let in_flight_for_query = in_flight.clone();
+        let database_for_query = database.clone();
         btn.connect_clicked(move |_| {
             let sql = match activity_sql(&driver, kind, None) {
                 Ok(sql) => sql,
@@ -96,7 +97,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
                     return;
                 }
             };
-            let Some(conn) = database_service::instance().get(connection) else {
+            let Some(conn) = database_for_query.get(connection) else {
                 status_l.set_text(&tr!("Connection closed."));
                 return;
             };
@@ -147,6 +148,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
     let driver = driver_id.clone();
     let kill_entry_c = kill_entry.clone();
     let in_flight_for_kill = in_flight.clone();
+    let database_for_kill = database.clone();
     kill_btn.connect_clicked(move |_| {
         let id = match parse_session_id(&kill_entry_c.text()) {
             Some(id) => id,
@@ -162,7 +164,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>) {
                 return;
             }
         };
-        let Some(conn) = database_service::instance().get(connection) else {
+        let Some(conn) = database_for_kill.get(connection) else {
             return;
         };
         let text_buf = text_buf.clone();

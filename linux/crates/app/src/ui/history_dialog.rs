@@ -8,7 +8,7 @@ use relm4::{adw, gtk};
 
 use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter};
 
-use crate::services::database_service::{self, ConnectionMetadata};
+use crate::services::database_service::ConnectionMetadata;
 
 pub struct HistoryDialog {
     history: HistoryStore,
@@ -44,6 +44,7 @@ pub struct HistoryDialog {
 
 pub struct HistoryDialogInit {
     pub history: HistoryStore,
+    pub database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 }
 
 #[derive(Debug)]
@@ -113,7 +114,7 @@ impl Component for HistoryDialog {
             .popover(&filter_popover)
             .build();
 
-        let connections = database_service::instance().all_connections();
+        let connections = init.database.all_connections();
 
         let conn_strings: Vec<String> = std::iter::once(crate::tr!("All connections"))
             .chain(connections.iter().map(|m| m.name.clone()))

@@ -117,6 +117,7 @@ fn build_outcome_widget(
     idx: usize,
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 ) -> gtk::Widget {
     match &o.kind {
         StatementOutcomeKind::Rows(result) if !result.columns.is_empty() => {
@@ -131,6 +132,7 @@ fn build_outcome_widget(
                 connection_id,
                 TabGridContext::default(),
                 None,
+                database,
             );
             let scrolled = gtk::ScrolledWindow::builder()
                 .child(&column_view)
@@ -184,6 +186,7 @@ pub(crate) fn render_outcomes(
     outcomes: &[StatementOutcome],
     grid_sender: &relm4::Sender<GridMsg>,
     connection_id: Option<uuid::Uuid>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 ) {
     if outcomes.is_empty() {
         let placeholder = adw::StatusPage::builder()
@@ -196,13 +199,13 @@ pub(crate) fn render_outcomes(
         return;
     }
     if outcomes.len() == 1 {
-        let widget = build_outcome_widget(&outcomes[0], 0, grid_sender, connection_id);
+        let widget = build_outcome_widget(&outcomes[0], 0, grid_sender, connection_id, database);
         holder.append(&widget);
         return;
     }
     let stack = adw::ViewStack::new();
     for (idx, o) in outcomes.iter().enumerate() {
-        let widget = build_outcome_widget(o, idx, grid_sender, connection_id);
+        let widget = build_outcome_widget(o, idx, grid_sender, connection_id, database.clone());
         let icon = match &o.kind {
             StatementOutcomeKind::Rows(_) => "view-grid-symbolic",
             StatementOutcomeKind::Error(_) => "dialog-error-symbolic",

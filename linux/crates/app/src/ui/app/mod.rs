@@ -51,6 +51,7 @@ pub struct AppInit {
     pub persistence: crate::services::persistence_stores::PersistenceStores,
     pub workspace: crate::services::workspace_state::WorkspaceStore,
     pub history: Option<tablepro_storage::query_history::HistoryStore>,
+    pub database: Arc<crate::services::database_service::DatabaseService>,
 }
 
 /// Decrement a tab's pending-save counter in the close-after-save map.
@@ -77,6 +78,7 @@ pub struct App {
     persistence: crate::services::persistence_stores::PersistenceStores,
     workspace: crate::services::workspace_state::WorkspaceStore,
     history: Option<tablepro_storage::query_history::HistoryStore>,
+    database: Arc<crate::services::database_service::DatabaseService>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     window_title: adw::WindowTitle,
@@ -394,6 +396,7 @@ impl SimpleComponent for App {
             persistence,
             workspace,
             history,
+            database,
         } = init;
         let widgets = view_output!();
 
@@ -429,6 +432,7 @@ impl SimpleComponent for App {
             persistence,
             workspace,
             history,
+            database,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
             window_title: widgets.window_title.clone(),
@@ -725,10 +729,14 @@ impl SimpleComponent for App {
             AppMsg::ShowShortcuts => self.on_show_shortcuts(),
             AppMsg::ShowAbout => self.on_show_about(),
             AppMsg::ShowActivity => {
-                crate::ui::activity_dialog::present(self.window.upcast_ref::<gtk::Window>(), self.connection_id);
+                crate::ui::activity_dialog::present(
+                    self.window.upcast_ref::<gtk::Window>(),
+                    self.connection_id,
+                    &self.database,
+                );
             }
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
-            AppMsg::ShowPreferences => super::preferences::present(&self.window, self.history.clone()),
+            AppMsg::ShowPreferences => super::preferences::present(&self.window, self.history.clone(), &self.database),
             AppMsg::NewWindow => {
                 let ctrl = App::builder()
                     .launch(AppInit {
@@ -736,6 +744,7 @@ impl SimpleComponent for App {
                         persistence: self.persistence.clone(),
                         workspace: self.workspace.clone(),
                         history: self.history.clone(),
+                        database: self.database.clone(),
                     })
                     .detach();
                 // Only the window relm4 starts the application with is
@@ -803,7 +812,7 @@ impl SimpleComponent for App {
     /// context, until this runs (H12).
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         if let Some(id) = self.connection_id.take() {
-            crate::services::database_service::instance().close(id);
+            self.database.close(id);
             crate::services::window_registry::unregister(id);
         }
         if let Some(source) = self.poll_health_source.take() {

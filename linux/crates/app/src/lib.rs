@@ -74,15 +74,16 @@ pub fn run() {
     let registry = Arc::new(build_registry());
     let persistence = services::persistence_stores::PersistenceStores::open();
     let workspace = services::workspace_state::WorkspaceStore::new();
+    let database = Arc::new(services::database_service::DatabaseService::new());
     tracing::info!(drivers = registry.len(), "starting tablepro-app");
 
     let approval_router = services::approval_router::ApprovalRouter::new(
         Arc::new(services::gtk_approval::GtkApprovalSink),
         Arc::new(services::gtk_approval::GtkApprovalSink),
     );
-    services::database_service::instance().set_approval_sink(Arc::new(approval_router));
+    database.set_approval_sink(Arc::new(approval_router));
 
-    let _mcp = services::mcp_service::start_background();
+    let _mcp = services::mcp_service::start_background(database.clone());
 
     let app = RelmApp::new(config::APP_ID);
     app.run::<ui::App>(ui::AppInit {
@@ -90,6 +91,7 @@ pub fn run() {
         persistence: persistence.clone(),
         workspace,
         history,
+        database,
     });
 
     persistence.flush();

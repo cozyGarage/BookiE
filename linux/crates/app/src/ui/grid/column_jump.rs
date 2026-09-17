@@ -1,29 +1,31 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gtk4::{self as gtk, gio, glib};
 use libadwaita::{self as adw, prelude::*};
+
+use crate::services::database_service::DatabaseService;
 
 pub(super) fn install(
     view: &gtk::ColumnView,
     columns: &[gtk::ColumnViewColumn],
     names: Vec<String>,
     connection: Option<uuid::Uuid>,
+    database: Arc<DatabaseService>,
 ) {
     let columns = Rc::new(columns.iter().map(|column| column.downgrade()).collect::<Vec<_>>());
     let action = gio::SimpleAction::new("jump-column", None);
     action.set_enabled(!columns.is_empty() && connection.is_some());
     let weak_view = view.downgrade();
+    let install_database = database.clone();
     action.connect_activate(move |_, _| {
         let Some(view) = weak_view.upgrade().filter(|view| view.is_mapped()) else {
             return;
         };
-        if connection
-            .and_then(|id| crate::services::database_service::instance().get(id))
-            .is_none()
-        {
+        if connection.and_then(|id| install_database.get(id)).is_none() {
             return;
         }
-        present(&view, columns.clone(), &names, connection);
+        present(&view, columns.clone(), &names, connection, install_database.clone());
     });
     let actions = gio::SimpleActionGroup::new();
     actions.add_action(&action);
@@ -44,6 +46,7 @@ fn present(
     columns: Rc<Vec<glib::WeakRef<gtk::ColumnViewColumn>>>,
     names: &[String],
     connection: Option<uuid::Uuid>,
+    database: Arc<DatabaseService>,
 ) {
     let dialog = adw::Dialog::builder()
         .title(crate::tr!("Jump to Column"))
@@ -160,9 +163,7 @@ fn present(
                 return;
             };
             if let Some(view) = view.upgrade().filter(|view| view.is_mapped()) {
-                let live = connection
-                    .and_then(|id| crate::services::database_service::instance().get(id))
-                    .is_some();
+                let live = connection.and_then(|id| database.get(id)).is_some();
                 let column = usize::try_from(row.index())
                     .ok()
                     .and_then(|index| columns.get(index))

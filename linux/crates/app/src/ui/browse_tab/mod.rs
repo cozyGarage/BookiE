@@ -83,6 +83,7 @@ pub struct BrowseTabInit {
     pub initial_offset: u64,
     pub initial_sort: Option<(usize, bool)>,
     pub persistence: crate::services::persistence_stores::PersistenceStores,
+    pub database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 }
 
 pub struct BrowseTab {
@@ -93,6 +94,7 @@ pub struct BrowseTab {
     connection_id: Option<Uuid>,
     read_only: bool,
     persistence: crate::services::persistence_stores::PersistenceStores,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 
     current_offset: u64,
     page_size: u64,
@@ -849,6 +851,7 @@ impl SimpleComponent for BrowseTab {
             connection_id: init.connection_id,
             read_only: init.read_only,
             persistence: init.persistence,
+            database: init.database,
             current_offset: init.initial_offset,
             page_size: init.page_size,
             current_sort: init.initial_sort,
