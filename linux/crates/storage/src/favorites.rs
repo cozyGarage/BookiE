@@ -287,17 +287,7 @@ fn carry_unknown_fields(document: &mut serde_json::Value, stored: &serde_json::M
 }
 
 fn favorites_path() -> Result<PathBuf, StorageError> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| {
-                let mut path = PathBuf::from(home);
-                path.push(".config");
-                path
-            })
-        })
-        .ok_or_else(|| StorageError::Schema("neither XDG_CONFIG_HOME nor HOME is set".into()))?;
-    Ok(base.join("tablepro").join("favorites.json"))
+    crate::config_path("favorites.json")
 }
 
 #[cfg(test)]

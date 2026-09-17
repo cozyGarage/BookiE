@@ -1,0 +1,52 @@
+{
+    "app-id": "com.tablepro.linux.Devel",
+    "runtime": "org.gnome.Platform",
+    "runtime-version": "50",
+    "sdk": "org.gnome.Sdk",
+    "sdk-extensions": [
+        "org.freedesktop.Sdk.Extension.rust-stable",
+        "org.freedesktop.Sdk.Extension.llvm22"
+    ],
+    "command": "bookie",
+    "finish-args": [
+        "--share=ipc",
+        "--share=network",
+        "--socket=fallback-x11",
+        "--socket=wayland",
+        "--device=dri",
+        "--filesystem=home",
+        "--filesystem=host-etc:ro",
+        "--filesystem=/run/.heim_org.h5l.kcm-socket",
+        "--env=KRB5_CONFIG=/run/host/etc/krb5.conf",
+        "--talk-name=org.freedesktop.secrets"
+    ],
+    "build-options": {
+        "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm22/bin",
+        "prepend-ld-library-path": "/usr/lib/sdk/llvm22/lib",
+        "build-args": [
+            "--share=network"
+        ],
+        "env": {
+            "CARGO_HOME": "/run/build/tablepro-app/cargo",
+            "LIBCLANG_PATH": "/usr/lib/sdk/llvm22/lib"
+        }
+    },
+    "modules": [
+        {
+            "name": "tablepro-app",
+            "buildsystem": "meson",
+            "config-opts": [
+                "-Dprofile=development"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "../",
+                    "skip": [
+                        "target"
+                    ]
+                }
+            ]
+        }
+    ]
+}

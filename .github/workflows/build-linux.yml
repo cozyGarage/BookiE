@@ -75,13 +75,12 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     needs: preflight
-    # ubuntu-24.04 ships glib 2.80, but libadwaita 1.6 (workspace pin)
-    # transitively requires gio-2.0 >= 2.82. Building inside ubuntu:25.10
-    # gives us glib 2.84, which satisfies the system-deps check. The
+    # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
+    # Debian testing provides that native stack. The
     # integration job stays on the host runner — driver crates depend
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
-      image: ubuntu:25.10
+      image: debian:testing
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -149,7 +148,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: fast
     container:
-      image: ubuntu:25.10
+      image: debian:testing
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -204,7 +203,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs: preflight
     container:
-      image: ubuntu:25.10
+      image: debian:testing
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -384,7 +383,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-24.04
     container:
-      image: ubuntu:25.10
+      image: debian:testing
       env:
         DEBIAN_FRONTEND: noninteractive
     env:

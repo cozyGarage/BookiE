@@ -644,18 +644,7 @@ fn join_error(error: tokio::task::JoinError) -> StorageError {
 }
 
 fn journal_path() -> Result<PathBuf, StorageError> {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| {
-                let mut path = PathBuf::from(home);
-                path.push(".local");
-                path.push("share");
-                path
-            })
-        })
-        .ok_or_else(|| StorageError::Schema("neither XDG_DATA_HOME nor HOME is set".into()))?;
-    Ok(base.join("tablepro").join("audit.jsonl"))
+    crate::data_path("audit.jsonl")
 }
 
 #[async_trait]

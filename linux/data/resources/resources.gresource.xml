@@ -2,6 +2,7 @@
 <gresources>
   <gresource prefix="/com/tablepro/linux">
     <file>style.css</file>
-    <file>icons/scalable/apps/com.tablepro.linux.svg</file>
+    <file alias="icons/scalable/apps/com.tablepro.linux.svg">../../flatpak/icons/scalable/com.tablepro.linux.svg</file>
+    <file alias="icons/scalable/apps/com.tablepro.linux.Devel.svg">../../flatpak/icons/scalable/com.tablepro.linux.svg</file>
   </gresource>
 </gresources>

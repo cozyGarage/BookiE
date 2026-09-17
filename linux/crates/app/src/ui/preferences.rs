@@ -130,7 +130,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     storage_button.add_css_class("flat");
     let storage_subtitle = tablepro_storage::query_history::db_path()
         .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "$XDG_CONFIG_HOME/tablepro/history.db".to_string());
+        .unwrap_or_else(|| format!("$XDG_CONFIG_HOME/{}/history.db", crate::config::storage_dir_name()));
     let storage_row = adw::ActionRow::builder()
         .title(crate::tr!("Storage location"))
         .subtitle(&storage_subtitle)

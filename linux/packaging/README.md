@@ -41,7 +41,8 @@ the user's XDG configuration, data, state, and keyring records untouched.
 ## Debian / Ubuntu package
 
 The amd64 `.deb` on the `linux-v0.1.4` GitHub Release is built on Ubuntu 25.10.
-GTK and libadwaita need GLib 2.82, so Ubuntu 24.04 cannot run it.
+The GNOME 50 baseline needs GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceView 5.18.
+Use `flatpak/com.tablepro.linux.Devel.json` for an isolated development Flatpak.
 
 ```bash
 DEB_VERSION=0.1.4-1 ./scripts/build-deb.sh

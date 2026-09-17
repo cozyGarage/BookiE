@@ -24,6 +24,10 @@ FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
 SETTLE_SECONDS = 3.0
 
 
+def storage_dir_name():
+    return os.environ.get("TABLEPRO_GTK_STORAGE_DIR", "tablepro")
+
+
 def descendants(node):
     yield node
     try:
@@ -498,7 +502,7 @@ def write_fixture(base, audit_available=True, environment="prod"):
     with sqlite3.connect(database_b) as connection:
         connection.execute("CREATE TABLE safety_items (id INTEGER PRIMARY KEY, note TEXT)")
 
-    tablepro_config = config / "tablepro"
+    tablepro_config = config / storage_dir_name()
     tablepro_config.mkdir(parents=True)
     connections = {
         "version": 1,
@@ -730,7 +734,7 @@ def press_x11_text(text):
 
 
 def favorites_path(base):
-    return base / "config" / "tablepro" / "favorites.json"
+    return base / "config" / storage_dir_name() / "favorites.json"
 
 
 def wait_for_favorites(base, predicate, description, timeout=WAIT_SECONDS):

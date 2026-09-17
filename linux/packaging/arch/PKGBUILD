@@ -13,7 +13,7 @@ conflicts=('tablepro')
 replaces=('tablepro')
 url="https://github.com/cozygarage/TablePro"
 license=('AGPL-3.0-or-later')
-depends=('gtk4' 'libadwaita' 'gtksourceview5' 'libsecret' 'openssl' 'krb5' 'sqlite')
+depends=('gtk4>=1:4.22' 'glib2>=2.88' 'libadwaita>=1:1.9' 'gtksourceview5>=5.18' 'libsecret' 'openssl' 'krb5' 'sqlite')
 makedepends=('rust>=1:1.98' 'pkgconf' 'clang' 'gettext')
 checkdepends=('desktop-file-utils' 'appstream')
 options=('!lto')

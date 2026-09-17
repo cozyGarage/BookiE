@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -68,6 +69,9 @@ def _listing_last_fields(package: Path) -> set[str]:
 
 
 def main() -> None:
+    if shutil.which("dpkg-deb") is None:
+        print("Debian package validation skipped: dpkg-deb is unavailable")
+        return
     source = Path(__file__).resolve().parents[2]
     validator = source / "scripts/validate-deb-package.sh"
     with tempfile.TemporaryDirectory(prefix="bookie-deb-test-") as temporary:

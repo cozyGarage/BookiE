@@ -5,6 +5,7 @@ mod connections;
 mod error;
 mod favorites;
 mod file_access;
+mod paths;
 pub mod query_history;
 mod secrets;
 
@@ -22,6 +23,7 @@ pub use error::StorageError;
 pub use favorites::{
     SavedQuery, delete_favorite, load_favorites, matches_filter, rank_favorites, save_favorite, touch_favorite,
 };
+pub use paths::{config_path, data_path, secret_schema, storage_dir_name};
 pub use secrets::{
     delete_mcp_token, delete_password, delete_ssh_passphrase, delete_ssh_password, load_mcp_token, load_password,
     load_ssh_passphrase, load_ssh_password, store_mcp_token, store_password, store_ssh_passphrase, store_ssh_password,

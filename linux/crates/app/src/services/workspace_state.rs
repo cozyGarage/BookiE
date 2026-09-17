@@ -261,7 +261,9 @@ pub(crate) fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<Rest
 }
 
 fn drafts_path() -> std::path::PathBuf {
-    glib::user_data_dir().join("tablepro").join("drafts")
+    glib::user_data_dir()
+        .join(crate::config::storage_dir_name())
+        .join("drafts")
 }
 
 fn load_locked() -> Result<WorkspaceState, WorkspaceFlushError> {

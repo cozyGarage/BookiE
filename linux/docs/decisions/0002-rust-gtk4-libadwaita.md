@@ -2,6 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-04-26
+- **Updated**: 2026-09-17
 
 ## Context
 
@@ -18,7 +19,9 @@ Changing the GUI stack after product development starts would require a large re
 
 ## Decision
 
-TablePro uses Rust, GTK4 4.14 or later, libadwaita 1.6 or later, and GtkSourceView 5.12 or later. Rust bindings come from the gtk-rs project. The application supports Linux only.
+BookiE uses Rust 1.98 or later, GTK4 4.22 or later, GLib 2.88 or later,
+libadwaita 1.9 or later, and GtkSourceView 5.18 or later. Rust bindings come
+from the gtk-rs project. The application supports Linux only.
 
 ## Rationale
 

@@ -6,8 +6,6 @@ use uuid::Uuid;
 
 use crate::error::StorageError;
 
-const SCHEMA: &str = "com.tablepro.linux.Password";
-
 const KIND_DB_PASSWORD: &str = "db_password";
 const KIND_SSH_PASSWORD: &str = "ssh_password";
 const KIND_SSH_PASSPHRASE: &str = "ssh_passphrase";
@@ -99,7 +97,7 @@ fn map_err(e: oo7::Error) -> StorageError {
 
 fn attrs_for(id: Uuid, kind: &str) -> HashMap<&'static str, String> {
     let mut m = HashMap::new();
-    m.insert("xdg:schema", SCHEMA.to_string());
+    m.insert("xdg:schema", crate::secret_schema().to_string());
     m.insert("connection-id", id.to_string());
     m.insert("kind", kind.to_string());
     m
@@ -113,7 +111,7 @@ mod tests {
     fn attrs_include_schema_connection_id_and_kind() {
         let id = Uuid::new_v4();
         let a = attrs_for(id, KIND_DB_PASSWORD);
-        assert_eq!(a.get("xdg:schema").map(String::as_str), Some(SCHEMA));
+        assert_eq!(a.get("xdg:schema").map(String::as_str), Some(crate::secret_schema()));
         assert_eq!(
             a.get("connection-id").map(String::as_str),
             Some(id.to_string().as_str())
@@ -143,8 +141,8 @@ mod tests {
 
     #[test]
     fn schema_constant_uses_reverse_dns() {
-        assert!(SCHEMA.starts_with("com."));
-        assert!(SCHEMA.contains("tablepro"));
+        assert!(crate::secret_schema().starts_with("com."));
+        assert!(crate::secret_schema().contains("tablepro"));
     }
 
     #[test]

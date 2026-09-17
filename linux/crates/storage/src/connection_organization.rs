@@ -295,17 +295,7 @@ pub(crate) async fn save_to(path: &Path, index: &ConnectionOrganizationIndex) ->
 }
 
 fn organization_path() -> Result<PathBuf, StorageError> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| {
-                let mut path = PathBuf::from(home);
-                path.push(".config");
-                path
-            })
-        })
-        .ok_or_else(|| StorageError::Schema("neither XDG_CONFIG_HOME nor HOME is set".into()))?;
-    Ok(base.join("tablepro").join("connection-organization.json"))
+    crate::config_path("connection-organization.json")
 }
 
 /// Fold labels that differ only in case into one entry and order the

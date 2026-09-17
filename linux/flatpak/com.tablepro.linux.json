@@ -1,11 +1,11 @@
 {
     "app-id": "com.tablepro.linux",
     "runtime": "org.gnome.Platform",
-    "runtime-version": "47",
+    "runtime-version": "50",
     "sdk": "org.gnome.Sdk",
     "sdk-extensions": [
         "org.freedesktop.Sdk.Extension.rust-stable",
-        "org.freedesktop.Sdk.Extension.llvm19"
+        "org.freedesktop.Sdk.Extension.llvm22"
     ],
     "command": "bookie",
     "finish-args": [
@@ -21,30 +21,14 @@
         "--talk-name=org.freedesktop.secrets"
     ],
     "build-options": {
-        "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm19/bin",
-        "prepend-ld-library-path": "/usr/lib/sdk/llvm19/lib",
+        "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm22/bin",
+        "prepend-ld-library-path": "/usr/lib/sdk/llvm22/lib",
         "env": {
             "CARGO_HOME": "/run/build/tablepro-app/cargo",
-            "LIBCLANG_PATH": "/usr/lib/sdk/llvm19/lib"
+            "LIBCLANG_PATH": "/usr/lib/sdk/llvm22/lib"
         }
     },
     "modules": [
-        {
-            "name": "gtksourceview5",
-            "buildsystem": "meson",
-            "config-opts": [
-                "-Ddocumentation=false",
-                "-Dvapi=false",
-                "-Dintrospection=enabled"
-            ],
-            "sources": [
-                {
-                    "type": "archive",
-                    "url": "https://download.gnome.org/sources/gtksourceview/5.14/gtksourceview-5.14.2.tar.xz",
-                    "sha256": "1a6d387a68075f8aefd4e752cf487177c4a6823b14ff8a434986858aeaef6264"
-                }
-            ]
-        },
         {
             "name": "tablepro-app",
             "buildsystem": "simple",

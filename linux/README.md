@@ -19,14 +19,14 @@ BookiE 0.1.4 (tag `linux-v0.1.4`) targets:
 | Distro | Arch | Artifact | Package name | Launch |
 |---|---|---|---|---|
 | Ubuntu 25.10+ | amd64 | `tablepro_0.1.4-1_amd64.deb` | `tablepro` | `bookie` |
-| Debian with GLib 2.82+ | amd64 | same `.deb` | `tablepro` | `bookie` |
+| Debian testing with GNOME 50 libraries | amd64 | same `.deb` | `tablepro` | `bookie` |
 | Arch Linux / Omarchy | x86_64 | `bookie-0.1.4-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
 
 `tablepro` and `tablepro-agentd` remain aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
 
-**Ubuntu 24.04 cannot run this line.** libadwaita 1.6 needs GLib 2.82; 24.04 ships GLib 2.80. GTK CI builds in `ubuntu:25.10` for that reason.
+**Ubuntu 24.04 and 25.10 cannot run this line.** GTK CI builds in Debian testing for the GNOME 50 library baseline.
 
-Runtime baseline: GTK4 4.14+, libadwaita 1.6+, GtkSourceView 5.12+. Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
+Runtime baseline: GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+. Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
 
 ## Named query parameters
 
@@ -49,7 +49,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 | Layer | Technology |
 |---|---|
 | Language | Rust 1.98+ |
-| GUI | GTK4 4.14+, libadwaita 1.6+, GtkSourceView 5.12+ |
+| GUI | GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+ |
 | Components | Relm4 |
 | Async work | Tokio for database and service work, GLib main context for GTK |
 | Drivers | sqlx, tiberius, clickhouse, and engine-specific Rust crates |

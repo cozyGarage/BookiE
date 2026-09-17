@@ -8,8 +8,6 @@ pub const GETTEXT_PACKAGE: &str = "tablepro";
 pub const SCHEMA_ID: &str = "com.tablepro.linux";
 pub const RESOURCE_BASE_PATH: &str = "/com/tablepro/linux";
 
-const DEVELOPMENT_SUFFIX: &str = ".Devel";
-
 const fn default_env(value: Option<&'static str>, fallback: &'static str) -> &'static str {
     match value {
         Some(value) => value,
@@ -24,7 +22,7 @@ pub enum Profile {
 }
 
 pub fn profile() -> Profile {
-    if APP_ID.ends_with(DEVELOPMENT_SUFFIX) {
+    if PROFILE == "development" {
         Profile::Development
     } else {
         Profile::Default
@@ -35,16 +33,13 @@ pub fn profile() -> Profile {
 /// development build keeps its own so `cargo run` never writes over an
 /// installed build's connections, history or workspace state.
 pub fn storage_dir_name() -> &'static str {
-    match profile() {
-        Profile::Default => "tablepro",
-        Profile::Development => "tablepro-devel",
-    }
+    tablepro_storage::storage_dir_name()
 }
 
 /// `xdg:schema` attribute for keyring items. It follows the app ID, so
 /// a development build never reads an installed build's secrets.
 pub fn secret_schema() -> String {
-    format!("{APP_ID}.Password")
+    tablepro_storage::secret_schema().to_string()
 }
 
 #[cfg(test)]
@@ -69,7 +64,7 @@ mod tests {
 
     #[test]
     fn profile_is_development_exactly_when_the_app_id_is_a_devel_id() {
-        assert_eq!(profile() == Profile::Development, APP_ID.ends_with(DEVELOPMENT_SUFFIX));
+        assert_eq!(profile() == Profile::Development, APP_ID.ends_with(".Devel"));
     }
 
     #[test]

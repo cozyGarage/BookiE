@@ -17,8 +17,6 @@ use std::fs::{File, OpenOptions};
 use std::os::fd::AsRawFd;
 use std::path::PathBuf;
 
-const LOCK_FILE: &str = "tablepro.lock";
-
 pub struct Lock {
     // Held only for its drop-side effect (closing the fd, which the
     // kernel turns into a flock release).
@@ -43,15 +41,16 @@ impl std::fmt::Display for LockError {
 impl std::error::Error for LockError {}
 
 fn lock_path() -> Option<PathBuf> {
+    let lock_file = format!("{}.lock", crate::config::storage_dir_name());
     if let Some(dir) = std::env::var_os("XDG_RUNTIME_DIR") {
-        return Some(PathBuf::from(dir).join(LOCK_FILE));
+        return Some(PathBuf::from(dir).join(lock_file));
     }
     let cache = std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))?;
-    let dir = cache.join("tablepro");
+    let dir = cache.join(crate::config::storage_dir_name());
     let _ = std::fs::create_dir_all(&dir);
-    Some(dir.join(LOCK_FILE))
+    Some(dir.join(lock_file))
 }
 
 /// Try to acquire the process-wide single-instance lock. Returns

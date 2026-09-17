@@ -58,10 +58,7 @@ pub struct SearchFilter {
 }
 
 pub fn db_path() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))?;
-    Some(base.join("tablepro").join("history.db"))
+    crate::config_path("history.db").ok()
 }
 
 pub async fn init() -> Result<(), StorageError> {

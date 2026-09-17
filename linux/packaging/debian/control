@@ -7,14 +7,14 @@ Build-Depends:
  cargo,
  rustc (>= 1.98),
  pkg-config,
- libgtk-4-dev,
- libadwaita-1-dev,
- libgtksourceview-5-dev,
+ libgtk-4-dev (>= 4.22),
+ libadwaita-1-dev (>= 1.9),
+ libgtksourceview-5-dev (>= 5.18),
  libssl-dev,
  libsecret-1-dev,
  libkrb5-dev,
  libsqlite3-dev,
- libglib2.0-dev,
+ libglib2.0-dev (>= 2.88),
  clang,
  gettext
 Standards-Version: 4.7.0

@@ -15,10 +15,19 @@ on:
 
 jobs:
   flatpak:
-    name: flatpak-builder
+    name: flatpak-builder (${{ matrix.profile }})
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - profile: default
+            bundle: bookie.flatpak
+            manifest: linux/flatpak/com.tablepro.linux.json
+          - profile: development
+            bundle: bookie-devel.flatpak
+            manifest: linux/flatpak/com.tablepro.linux.Devel.json
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-47
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -27,7 +36,7 @@ jobs:
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb
         with:
-          bundle: tablepro.flatpak
-          manifest-path: linux/flatpak/com.tablepro.linux.json
-          cache-key: flatpak-builder-${{ github.sha }}
+          bundle: ${{ matrix.bundle }}
+          manifest-path: ${{ matrix.manifest }}
+          cache-key: flatpak-builder-${{ matrix.profile }}-${{ github.sha }}
           upload-artifact: true
