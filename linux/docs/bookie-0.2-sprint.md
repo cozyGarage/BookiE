@@ -437,3 +437,25 @@ isolated-test inventory passed. Debian package fixture could not run because
   parser-level policy value in `statement_cursor.rs`. Full workspace fmt,
   Clippy, `--lib --bins` tests, the two named `tablepro-mcp` integration
   tests, the sandbox tier, and `cargo deny check` all passed.
+
+- 2026-09-17 follow-up: closed the Postgres undecodable-cell item the review
+  above left open. `extract_value`/`collect_query_rows` no longer aborts an
+  entire result on one undecodable cell: added
+  `tablepro_core::Value::Undecodable`, carrying the column's type name,
+  threaded through every consumer that matches on `Value` (core
+  export/SQL-literal rendering, every driver's write bind path, MCP JSON
+  serialization, the change tracker's row-identity key, the activity dialog,
+  and the grid). The grid marks a cell holding this variant read-only, the
+  same as `Bytes`; CSV/JSON/SQL-literal export show it as an explicit
+  `<undecodable TYPE>` marker instead of silently rendering NULL or empty.
+  Write-path binds treat it as unreachable from real user input (the grid
+  never lets it be edited) and fall back to writing NULL, except
+  ClickHouse's already-fallible literal renderer, which now returns a real
+  error instead. Updated the Docker-gated Postgres integration test that
+  previously asserted the old "whole query fails" behavior to assert the new
+  per-cell degradation instead. Full workspace fmt, Clippy (including the
+  optional `tablepro-driver-duckdb` crate, which needed the same write-path
+  match arm), `--lib --bins` tests, the two named `tablepro-mcp` integration
+  tests, the sandbox tier, and `cargo deny check` all passed; Docker-gated
+  driver integration tests were not run (no container runtime available in
+  this session).

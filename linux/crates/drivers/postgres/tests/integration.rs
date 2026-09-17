@@ -469,6 +469,9 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
         result.rows[0],
         vec![Value::Null, Value::Null, Value::Null, Value::Int(42)]
     );
+    // A single undecodable cell degrades to `Value::Undecodable` instead of
+    // aborting the whole result set (or silently becoming NULL): the rest
+    // of the row, and other rows in the same result, still come back.
     for sql in [
         "SELECT 1234567890123456789012345678901234567890::numeric",
         "SELECT ARRAY[1, 2]::int[]",
@@ -477,9 +480,19 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
         "SELECT 'infinity'::timestamptz",
         "SELECT '280000-01-01'::timestamp",
     ] {
-        assert!(matches!(conn.query(sql).await, Err(DriverError::Query { .. })), "{sql}");
-        assert_eq!(conn.query("SELECT 42::int").await.unwrap().rows[0][0], Value::Int(42));
+        let result = conn.query(sql).await.unwrap_or_else(|e| panic!("{sql}: {e}"));
+        assert!(
+            matches!(result.rows[0][0], Value::Undecodable(_)),
+            "{sql}: expected an undecodable cell, got {:?}",
+            result.rows[0][0]
+        );
     }
+    for sql in ["SELECT 1234567890123456789012345678901234567890::numeric, 42::int"] {
+        let result = conn.query(sql).await.unwrap();
+        assert!(matches!(result.rows[0][0], Value::Undecodable(_)));
+        assert_eq!(result.rows[0][1], Value::Int(42));
+    }
+    assert_eq!(conn.query("SELECT 42::int").await.unwrap().rows[0][0], Value::Int(42));
 }
 
 #[tokio::test]

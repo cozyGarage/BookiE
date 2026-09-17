@@ -433,6 +433,11 @@ fn values_to_duck_params(params: &[Value]) -> Vec<duckdb::types::Value> {
             Value::Decimal(d) => duckdb::types::Value::Text(d.to_string()),
             Value::Uuid(u) => duckdb::types::Value::Text(u.to_string()),
             Value::Json(j) => duckdb::types::Value::Text(j.to_string()),
+            // Never produced from user input: the grid marks a cell holding
+            // this variant read-only, so it can only reach here through a
+            // handcrafted MCP write, which the caller's policy layer already
+            // treats as suspect.
+            Value::Undecodable(_) => duckdb::types::Value::Null,
         })
         .collect()
 }

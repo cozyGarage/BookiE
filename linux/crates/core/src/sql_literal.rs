@@ -27,6 +27,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> String {
         Value::TimestampTz(stamp) => quote_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => quote_literal(driver_id, &id.to_string()),
         Value::Json(json) => quote_literal(driver_id, &json.to_string()),
+        Value::Undecodable(type_name) => format!("/* undecodable {type_name} value omitted */ NULL"),
     }
 }
 
@@ -104,6 +105,13 @@ mod tests {
             is_generated: true,
             ..column(name)
         }
+    }
+
+    #[test]
+    fn an_undecodable_value_is_never_written_back_as_null() {
+        let rendered = render_sql_literal("postgres", &Value::Undecodable("NUMERIC".into()));
+        assert!(rendered.contains("NUMERIC"));
+        assert!(rendered.trim_start().starts_with("/*"));
     }
 
     /// The exact shape that escaped a MySQL literal: the trailing

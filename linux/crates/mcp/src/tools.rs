@@ -271,6 +271,7 @@ fn value_to_json(v: &tablepro_core::Value) -> JsonValue {
         tablepro_core::Value::Decimal(d) => json!(d.to_string()),
         tablepro_core::Value::Uuid(u) => json!(u.to_string()),
         tablepro_core::Value::Json(j) => j.clone(),
+        tablepro_core::Value::Undecodable(type_name) => json!({ "undecodable": type_name }),
     }
 }
 

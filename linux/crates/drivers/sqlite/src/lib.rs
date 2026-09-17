@@ -625,6 +625,11 @@ fn bind_sqlite_params<'q>(
             Value::Decimal(d) => q.bind(d.to_string()),
             Value::Uuid(u) => q.bind(u.to_string()),
             Value::Json(j) => q.bind(j.to_string()),
+            // Never produced from user input: the grid marks a cell holding
+            // this variant read-only, so it can only reach here through a
+            // handcrafted MCP write, which the caller's policy layer already
+            // treats as suspect.
+            Value::Undecodable(_) => q.bind(Option::<&str>::None),
         };
     }
     q

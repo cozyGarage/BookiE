@@ -84,6 +84,7 @@ pub enum KeyValue {
     Decimal(String),
     Uuid(uuid::Uuid),
     Json(String),
+    Undecodable(String),
 }
 
 impl From<&Value> for KeyValue {
@@ -102,6 +103,7 @@ impl From<&Value> for KeyValue {
             Value::Decimal(d) => KeyValue::Decimal(d.to_string()),
             Value::Uuid(u) => KeyValue::Uuid(*u),
             Value::Json(j) => KeyValue::Json(j.to_string()),
+            Value::Undecodable(type_name) => KeyValue::Undecodable(type_name.clone()),
         }
     }
 }
@@ -762,6 +764,7 @@ fn keyvalue_to_value(kv: &KeyValue) -> Value {
         KeyValue::Json(s) => serde_json::from_str(s)
             .map(Value::Json)
             .unwrap_or(Value::Text(s.clone())),
+        KeyValue::Undecodable(type_name) => Value::Undecodable(type_name.clone()),
     }
 }
 

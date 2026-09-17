@@ -562,6 +562,11 @@ fn boxed_params(params: &[Value]) -> Vec<Box<dyn ToSql>> {
                 Value::Uuid(u) => Box::new(*u),
                 // TDS has no JSON type; SQL Server stores JSON as nvarchar.
                 Value::Json(j) => Box::new(serde_json::to_string(j).unwrap_or_default()),
+                // Never produced from user input: the grid marks a cell holding
+                // this variant read-only, so it can only reach here through a
+                // handcrafted MCP write, which the caller's policy layer already
+                // treats as suspect.
+                Value::Undecodable(_) => Box::new(Option::<String>::None),
             }
         })
         .collect()

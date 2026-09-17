@@ -19,6 +19,7 @@
 - ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 - A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
+- A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable and keeps the rest of the row and result instead of failing the whole query.
 
 ## [0.1.4] - 2026-09-17
 

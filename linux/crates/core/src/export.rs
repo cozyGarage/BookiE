@@ -122,7 +122,12 @@ pub fn value_to_text(value: &Value) -> Option<String> {
         Value::Decimal(value) => Some(value.to_string()),
         Value::Uuid(value) => Some(value.to_string()),
         Value::Json(value) => Some(value.to_string()),
+        Value::Undecodable(type_name) => Some(undecodable_marker(type_name)),
     }
+}
+
+fn undecodable_marker(type_name: &str) -> String {
+    format!("<undecodable {type_name}>")
 }
 
 pub fn render_csv(columns: &[ColumnInfo], rows: &[Vec<Value>], options: &CsvOptions) -> String {
@@ -583,6 +588,7 @@ fn value_to_csv_text(value: &Value) -> String {
         Value::Decimal(d) => d.to_string(),
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => j.to_string(),
+        Value::Undecodable(type_name) => undecodable_marker(type_name),
     }
 }
 
@@ -730,6 +736,13 @@ mod atomic_write_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_undecodable_value_renders_as_a_visible_marker_not_an_empty_null() {
+        let value = Value::Undecodable("NUMERIC".into());
+        assert_eq!(value_to_text(&value), Some("<undecodable NUMERIC>".into()));
+        assert_eq!(value_to_csv_text(&value), "<undecodable NUMERIC>");
+    }
 
     #[test]
     fn csv_header_and_row() {

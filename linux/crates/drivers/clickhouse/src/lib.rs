@@ -845,6 +845,11 @@ fn literal(value: &Value) -> Result<String, DriverError> {
         Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
         Value::Uuid(u) => format!("toUUID('{u}')"),
         Value::Json(j) => format!("'{}'", escape_str(&j.to_string())),
+        Value::Undecodable(type_name) => {
+            return Err(DriverError::Internal(format!(
+                "cannot write back an undecodable {type_name} value"
+            )));
+        }
     };
     Ok(rendered)
 }

@@ -39,6 +39,7 @@ pub fn value_to_display_text(value: &Value) -> String {
         Value::Decimal(d) => d.to_string(),
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => truncate_for_display(&j.to_string()),
+        Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
 }
 
@@ -50,7 +51,7 @@ pub fn value_to_edit_text(value: &Value) -> String {
 }
 
 pub(super) fn value_is_inline_editable(value: &Value) -> bool {
-    !matches!(value, Value::Bytes(_))
+    !matches!(value, Value::Bytes(_) | Value::Undecodable(_))
 }
 
 pub(super) fn cell_text_for_bind(value: &Value, column_editable: bool, column_auto_filled: bool) -> String {
@@ -197,6 +198,14 @@ mod tests {
         assert!(value_is_inline_editable(&Value::Text("hello".into())));
         assert!(value_is_inline_editable(&Value::Null));
         assert!(value_is_inline_editable(&Value::Int(1)));
+    }
+
+    #[test]
+    fn an_undecodable_cell_is_shown_distinctly_from_null_and_is_not_editable() {
+        let value = Value::Undecodable("NUMERIC".into());
+        assert_eq!(value_to_display_text(&value), "<undecodable NUMERIC>");
+        assert_ne!(value_to_display_text(&value), value_to_display_text(&Value::Null));
+        assert!(!value_is_inline_editable(&value));
     }
 
     #[test]

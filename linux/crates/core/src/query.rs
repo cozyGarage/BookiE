@@ -77,6 +77,10 @@ pub enum Value {
     Decimal(Decimal),
     Uuid(Uuid),
     Json(serde_json::Value),
+    /// A non-NULL cell the driver could not decode (e.g. a wide NUMERIC
+    /// sqlx cannot represent). Carries the driver's column type name so the
+    /// UI can explain the gap instead of showing it as an editable NULL.
+    Undecodable(String),
 }
 
 /// Soft upper bound on rows materialized by an arbitrary SQL `query` call.

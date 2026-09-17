@@ -796,11 +796,11 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     }
     if raw.format() == sqlx::postgres::PgValueFormat::Binary {
         if matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ") {
-            return raw
+            return Ok(raw
                 .as_bytes()
                 .ok()
                 .and_then(|bytes| decode_temporal(bytes, type_name))
-                .ok_or_else(|| decode_error(idx, type_name));
+                .unwrap_or_else(|| undecodable(type_name)));
         }
         if let Some(text) = raw
             .as_bytes()
@@ -829,17 +829,11 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
         "BYTEA" => row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes),
         _ => row.try_get::<String, _>(idx).map(Value::Text),
     };
-    decoded.map_err(|_| decode_error(idx, type_name))
+    Ok(decoded.unwrap_or_else(|_| undecodable(type_name)))
 }
 
-fn decode_error(index: usize, type_name: &str) -> DriverError {
-    DriverError::Query {
-        message: format!(
-            "Cannot decode PostgreSQL column {} ({type_name}); its non-NULL value was not returned",
-            index + 1
-        ),
-        sqlstate: None,
-    }
+fn undecodable(type_name: &str) -> Value {
+    Value::Undecodable(type_name.to_string())
 }
 
 fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
@@ -884,6 +878,11 @@ fn bind_pg_params<'q>(
             Value::Decimal(d) => q.bind(*d),
             Value::Uuid(u) => q.bind(*u),
             Value::Json(j) => q.bind(j.clone()),
+            // Never produced from user input: the grid marks a cell holding
+            // this variant read-only, so it can only reach here through a
+            // handcrafted MCP write, which the caller's policy layer already
+            // treats as suspect.
+            Value::Undecodable(_) => q.bind(Option::<&str>::None),
         };
     }
     q
