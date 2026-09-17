@@ -2,11 +2,11 @@ use crate::error::Error;
 use crate::io::StatementId;
 use crate::query_as::query_as;
 use crate::statement::PgStatementMetadata;
-use crate::types::Json;
 use crate::PgConnection;
 use smallvec::SmallVec;
 use sqlx_core::query_builder::QueryBuilder;
 use sqlx_core::sql_str::AssertSqlSafe;
+use sqlx_core::types::Json;
 
 impl PgConnection {
     /// Check whether EXPLAIN statements are supported by the current connection

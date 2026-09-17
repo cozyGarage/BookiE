@@ -211,8 +211,6 @@
 use crate::type_info::PgTypeKind;
 use crate::{PgTypeInfo, Postgres};
 
-#[cfg(feature = "json")]
-pub(crate) use sqlx_core::types::Json;
 pub(crate) use sqlx_core::types::Type;
 
 mod array;

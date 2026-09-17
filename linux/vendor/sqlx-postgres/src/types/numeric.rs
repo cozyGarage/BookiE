@@ -88,6 +88,7 @@ impl PgNumeric {
         (0..10_000).contains(&digit)
     }
 
+    #[cfg_attr(not(feature = "bigdecimal"), expect(dead_code))]
     pub(crate) fn size_hint(decimal_digits: u64) -> usize {
         let mut size_hint = Saturating(decimal_digits);
 
