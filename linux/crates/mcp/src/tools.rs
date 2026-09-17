@@ -299,4 +299,11 @@ mod tests {
         assert!(parse_u64(&json!({"offset": "3"}), "offset", 0).is_err());
         assert!(parse_u64(&json!({"offset": 1.5}), "offset", 0).is_err());
     }
+
+    #[test]
+    fn an_undecodable_value_is_reported_to_mcp_clients_not_hidden_as_null() {
+        let json = value_to_json(&tablepro_core::Value::Undecodable("NUMERIC".into()));
+        assert_ne!(json, JsonValue::Null);
+        assert_eq!(json, json!({ "undecodable": "NUMERIC" }));
+    }
 }

@@ -1178,4 +1178,19 @@ mod tests {
         assert!(matches!(t.row_state(&k1), RowState::PendingDelete));
         assert!(matches!(t.row_state(&k2), RowState::PendingDelete));
     }
+
+    #[test]
+    fn an_undecodable_pk_value_round_trips_through_key_value() {
+        let original = Value::Undecodable("NUMERIC".into());
+        let key = KeyValue::from(&original);
+        assert_eq!(key, KeyValue::Undecodable("NUMERIC".into()));
+        assert_eq!(keyvalue_to_value(&key), original);
+    }
+
+    #[test]
+    fn undecodable_key_values_with_different_types_are_distinct_rows() {
+        let a = rk(&[Value::Undecodable("NUMERIC".into())]);
+        let b = rk(&[Value::Undecodable("INTERVAL".into())]);
+        assert_ne!(a, b);
+    }
 }

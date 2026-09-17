@@ -459,3 +459,17 @@ isolated-test inventory passed. Debian package fixture could not run because
   tests, the sandbox tier, and `cargo deny check` all passed; Docker-gated
   driver integration tests were not run (no container runtime available in
   this session).
+
+- 2026-09-17 test hardening: strengthened the two follow-up fixes' unit
+  coverage. `BatchErrorPolicy`: `script_statements` is now checked against
+  every grammar (not just Postgres/MSSQL) so a future grammar addition
+  defaults to `StopScript` unless explicitly opted in, plus the unrecognised-
+  driver fallback path; `run_statements` gained cases for more than one error
+  in a row and for a parameter-bind error (not just a driver error) under
+  `ContinueNextBatch`. `Value::Undecodable`: added a `KeyValue` round-trip
+  test and a distinct-row-identity test (two undecodable PK values with
+  different type names must not collide) in the change tracker, an MCP
+  `value_to_json` test asserting the JSON shape is never `null`, and a grid
+  `cell_text_for_bind` test confirming an editable column still shows the
+  undecodable marker rather than the empty-editable-NULL text. Full workspace
+  fmt, Clippy, and `--lib --bins` tests (23/23 binaries, 0 failed) passed.

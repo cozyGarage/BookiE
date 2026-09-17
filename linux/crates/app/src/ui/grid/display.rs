@@ -209,6 +209,13 @@ mod tests {
     }
 
     #[test]
+    fn bind_text_for_an_undecodable_cell_in_an_editable_column_stays_display_text() {
+        let value = Value::Undecodable("NUMERIC".into());
+        assert_eq!(cell_text_for_bind(&value, true, false), "<undecodable NUMERIC>");
+        assert_ne!(cell_text_for_bind(&value, true, false), editable_null_sentinel());
+    }
+
+    #[test]
     fn bind_text_for_bytes_in_an_editable_column_stays_display_text() {
         let binary = Value::Bytes(vec![0xFF, 0xFE, 0x00, 0x01]);
         assert_eq!(cell_text_for_bind(&binary, true, false), "<4 bytes>");

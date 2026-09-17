@@ -276,6 +276,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn continue_next_batch_policy_recovers_after_more_than_one_error() {
+        let conn = sqlite_connection().await;
+        let statements = vec![
+            "CREATE TABLE t (id int)".into(),
+            "not sql".into(),
+            "also not sql".into(),
+            "SELECT 1".into(),
+        ];
+        let control = crate::services::operation_control::bounded(0);
+        let result = run_statements(
+            conn,
+            statements,
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::ContinueNextBatch,
+            |_| {},
+        )
+        .await;
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        assert!(!outcomes.iter().any(|o| matches!(o.kind, StatementOutcomeKind::NotRun)));
+        assert!(matches!(outcomes[1].kind, StatementOutcomeKind::Error(_)));
+        assert!(matches!(outcomes[2].kind, StatementOutcomeKind::Error(_)));
+        assert!(matches!(outcomes[3].kind, StatementOutcomeKind::Rows(_)));
+    }
+
+    #[tokio::test]
+    async fn continue_next_batch_policy_also_recovers_from_a_parameter_bind_error() {
+        let conn = sqlite_connection().await;
+        let statements = vec!["SELECT :missing".into(), "SELECT 1".into()];
+        let control = crate::services::operation_control::bounded(0);
+        let result = run_statements(
+            conn,
+            statements,
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::ContinueNextBatch,
+            |_| {},
+        )
+        .await;
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        assert!(matches!(outcomes[0].kind, StatementOutcomeKind::Error(_)));
+        assert!(
+            matches!(outcomes[1].kind, StatementOutcomeKind::Rows(_)),
+            "a bind error must not stop later batches under ContinueNextBatch"
+        );
+    }
+
+    #[tokio::test]
     async fn continue_next_batch_policy_still_runs_statements_after_an_error() {
         let conn = sqlite_connection().await;
         let statements = vec!["CREATE TABLE t (id int)".into(), "not sql".into(), "SELECT 1".into()];

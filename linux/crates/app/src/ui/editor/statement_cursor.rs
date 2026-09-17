@@ -97,6 +97,25 @@ mod tests {
     }
 
     #[test]
+    fn only_mssql_go_batches_continue_after_an_error() {
+        for driver in ["postgres", "mysql", "sqlite", "clickhouse"] {
+            assert_eq!(
+                script_statements("SELECT 1", driver).unwrap().error_policy,
+                BatchErrorPolicy::StopScript,
+                "{driver}"
+            );
+        }
+        assert_eq!(
+            script_statements("SELECT 1", "mssql").unwrap().error_policy,
+            BatchErrorPolicy::ContinueNextBatch
+        );
+        assert_eq!(
+            script_statements("SELECT 1", "an-unknown-driver").unwrap().error_policy,
+            BatchErrorPolicy::StopScript
+        );
+    }
+
+    #[test]
     fn an_unterminated_construct_elsewhere_does_not_block_a_clean_statement_at_the_cursor() {
         let sql = "SELECT 1; SELECT 'unfinished";
         assert_eq!(
