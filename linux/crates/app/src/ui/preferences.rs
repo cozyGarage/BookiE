@@ -25,7 +25,7 @@ fn format_thousands(n: u64) -> String {
     out
 }
 
-pub fn present(parent: &impl IsA<gtk::Widget>) {
+pub fn present(parent: &impl IsA<gtk::Widget>, history: Option<tablepro_storage::query_history::HistoryStore>) {
     let window = adw::PreferencesDialog::builder()
         .title(crate::tr!("Preferences"))
         .build();
@@ -97,6 +97,7 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         .build();
     clear_row.add_suffix(&clear_button);
     let dialog_root = window.clone();
+    let history_for_clear = history.clone();
     clear_button.connect_clicked(move |_| {
         let alert = adw::AlertDialog::new(
             Some(&crate::tr!("Clear all query history?")),
@@ -109,11 +110,15 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         alert.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
         alert.set_default_response(Some("cancel"));
         alert.set_close_response("cancel");
+        let history = history_for_clear.clone();
         alert.connect_response(None, move |dlg, response| {
             dlg.close();
             if response == "clear" {
+                let history = history.clone();
                 relm4::spawn(async move {
-                    if let Err(e) = tablepro_storage::query_history::clear_all().await {
+                    if let Some(history) = history
+                        && let Err(e) = history.clear_all().await
+                    {
                         tracing::warn!(error = %e, "history clear_all failed");
                     }
                 });
@@ -128,8 +133,9 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
         .valign(gtk::Align::Center)
         .build();
     storage_button.add_css_class("flat");
-    let storage_subtitle = tablepro_storage::query_history::db_path()
-        .map(|p| p.display().to_string())
+    let storage_subtitle = history
+        .as_ref()
+        .map(|store| store.path().display().to_string())
         .unwrap_or_else(|| format!("$XDG_CONFIG_HOME/{}/history.db", crate::config::storage_dir_name()));
     let storage_row = adw::ActionRow::builder()
         .title(crate::tr!("Storage location"))
@@ -141,8 +147,9 @@ pub fn present(parent: &impl IsA<gtk::Widget>) {
     storage_row.set_tooltip_text(Some(&storage_subtitle));
     storage_row.add_suffix(&storage_button);
     let parent_for_launcher = window.clone();
+    let history_for_launcher = history;
     storage_button.connect_clicked(move |_| {
-        let Some(path) = tablepro_storage::query_history::db_path() else {
+        let Some(path) = history_for_launcher.as_ref().map(|store| store.path().to_path_buf()) else {
             return;
         };
         let parent = path.parent().map(|p| p.to_path_buf()).unwrap_or(path);

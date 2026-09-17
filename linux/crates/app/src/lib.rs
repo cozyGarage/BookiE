@@ -54,16 +54,22 @@ pub fn run() {
             None
         }
     };
-    if let Some(runtime) = runtime.as_ref() {
+    let history = runtime.as_ref().and_then(|runtime| {
         runtime.block_on(async {
-            if let Err(e) = tablepro_storage::query_history::init().await {
-                tracing::warn!(error = %e, "history init failed; feature disabled");
-            } else if let Err(e) = tablepro_storage::query_history::prune_older_than(prefs.history_retention_days).await
-            {
-                tracing::warn!(error = %e, "history prune failed");
+            match tablepro_storage::query_history::HistoryStore::open_default().await {
+                Ok(store) => {
+                    if let Err(e) = store.prune_older_than(prefs.history_retention_days).await {
+                        tracing::warn!(error = %e, "history prune failed");
+                    }
+                    Some(store)
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "history init failed; feature disabled");
+                    None
+                }
             }
-        });
-    }
+        })
+    });
 
     let registry = Arc::new(build_registry());
     let persistence = services::persistence_stores::PersistenceStores::open();
@@ -81,6 +87,7 @@ pub fn run() {
     app.run::<ui::App>(ui::AppInit {
         registry,
         persistence: persistence.clone(),
+        history,
     });
 
     persistence.flush();

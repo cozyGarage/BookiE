@@ -49,6 +49,7 @@ pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, 
 pub struct AppInit {
     pub registry: Arc<DriverRegistry>,
     pub persistence: crate::services::persistence_stores::PersistenceStores,
+    pub history: Option<tablepro_storage::query_history::HistoryStore>,
 }
 
 /// Decrement a tab's pending-save counter in the close-after-save map.
@@ -73,6 +74,7 @@ pub(super) fn dec_close_after_save(map: &mut std::collections::HashMap<Uuid, u32
 pub struct App {
     registry: Arc<DriverRegistry>,
     persistence: crate::services::persistence_stores::PersistenceStores,
+    history: Option<tablepro_storage::query_history::HistoryStore>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     window_title: adw::WindowTitle,
@@ -385,7 +387,11 @@ impl SimpleComponent for App {
     }
 
     fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        let AppInit { registry, persistence } = init;
+        let AppInit {
+            registry,
+            persistence,
+            history,
+        } = init;
         let widgets = view_output!();
 
         init_css::install_pending_change_css();
@@ -417,6 +423,7 @@ impl SimpleComponent for App {
         let mut model = App {
             registry,
             persistence,
+            history,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
             window_title: widgets.window_title.clone(),
@@ -499,10 +506,14 @@ impl SimpleComponent for App {
             glib::ControlFlow::Continue
         }));
 
-        model.history_prune_source = Some(glib::timeout_add_seconds_local(3600, || {
+        let history = model.history.clone();
+        model.history_prune_source = Some(glib::timeout_add_seconds_local(3600, move || {
             let retention = crate::services::preferences::load().history_retention_days;
+            let history = history.clone();
             relm4::spawn(async move {
-                if let Err(e) = tablepro_storage::query_history::prune_older_than(retention).await {
+                if let Some(history) = history
+                    && let Err(e) = history.prune_older_than(retention).await
+                {
                     tracing::warn!(error = %e, "history prune failed");
                 }
             });
@@ -712,12 +723,13 @@ impl SimpleComponent for App {
                 crate::ui::activity_dialog::present(self.window.upcast_ref::<gtk::Window>(), self.connection_id);
             }
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
-            AppMsg::ShowPreferences => super::preferences::present(&self.window),
+            AppMsg::ShowPreferences => super::preferences::present(&self.window, self.history.clone()),
             AppMsg::NewWindow => {
                 let ctrl = App::builder()
                     .launch(AppInit {
                         registry: self.registry.clone(),
                         persistence: self.persistence.clone(),
+                        history: self.history.clone(),
                     })
                     .detach();
                 // Only the window relm4 starts the application with is

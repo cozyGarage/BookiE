@@ -156,6 +156,7 @@ impl App {
         let tab_view_for_create = tab_view.clone();
         let schema_buffer_for_create = self.schema_buffer.clone();
         let schema_index_for_create = self.schema_index.clone();
+        let history_for_create = self.history.clone();
         let sender_for_create = sender.clone();
         // The workspace root is rebuilt on every connect, so the identifier
         // captured here always belongs to the connection this window owns.
@@ -168,6 +169,7 @@ impl App {
                     schema_buffer: schema_buffer_for_create.clone(),
                     schema_index: schema_index_for_create.clone(),
                     initial_query: None,
+                    history: history_for_create.clone(),
                 })
                 .forward(sender_for_create.input_sender(), move |out| match out {
                     SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {
@@ -508,6 +510,7 @@ impl App {
                 schema_buffer: self.schema_buffer.clone(),
                 schema_index: self.schema_index.clone(),
                 initial_query,
+                history: self.history.clone(),
             })
             .forward(sender.input_sender(), move |out| match out {
                 SqlEditorOutput::CatalogChanged(origin) => AppMsg::SchemaChanged {

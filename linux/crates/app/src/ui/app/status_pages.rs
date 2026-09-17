@@ -67,9 +67,13 @@ impl App {
     }
 
     pub(super) fn on_show_history(&mut self, sender: ComponentSender<Self>) {
+        let Some(history) = self.history.clone() else {
+            self.show_toast(&crate::tr!("Query history is unavailable"));
+            return;
+        };
         let dialog =
             HistoryDialog::builder()
-                .launch(HistoryDialogInit)
+                .launch(HistoryDialogInit { history })
                 .forward(sender.input_sender(), |out| match out {
                     HistoryDialogOutput::OpenInNewTab(text) => AppMsg::OpenHistoryQuery(text),
                     HistoryDialogOutput::ReplaceCurrentTabQuery(text) => AppMsg::ReplaceActiveTabQuery(text),

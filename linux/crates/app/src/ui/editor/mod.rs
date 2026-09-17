@@ -18,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use tablepro_core::QueryResult;
-use tablepro_storage::query_history::{self, NewEntry, Outcome};
+use tablepro_storage::query_history::{HistoryStore, NewEntry, Outcome};
 
 use crate::services::database_service::{self, ConnectionMetadata};
 use crate::ui::grid::GridMsg;
@@ -45,6 +45,7 @@ pub struct SqlEditor {
     cancel_token: Option<CancellationToken>,
     executions: std::collections::HashMap<u64, ExecutionContext>,
     connection_id: Option<Uuid>,
+    history: Option<HistoryStore>,
     run_generation: RunGeneration,
     drop_generation: std::rc::Rc<DropGeneration>,
     /// Disconnected in `shutdown`. Without this, every tab's
@@ -60,6 +61,7 @@ pub struct SqlEditorInit {
     pub schema_index: std::rc::Rc<std::cell::RefCell<SchemaIndex>>,
     pub initial_query: Option<String>,
     pub connection_id: Option<Uuid>,
+    pub history: Option<HistoryStore>,
 }
 
 #[derive(Debug, Clone)]
@@ -490,6 +492,7 @@ impl SimpleComponent for SqlEditor {
             cancel_token: None,
             executions: std::collections::HashMap::new(),
             connection_id: init.connection_id,
+            history: init.history,
             run_generation: RunGeneration::default(),
             drop_generation,
             dark_notify_handler: Some(dark_notify_handler),
@@ -619,7 +622,7 @@ impl SimpleComponent for SqlEditor {
                     None => Outcome::Success,
                 };
                 let rows_for_history = if total_rows > 0 { Some(total_rows) } else { None };
-                Self::record_history(context, total_ms as i64, rows_for_history, history_outcome);
+                self.record_history(context, total_ms as i64, rows_for_history, history_outcome);
                 if !terminal.replace_ui {
                     return;
                 }
@@ -638,7 +641,7 @@ impl SimpleComponent for SqlEditor {
                     .duration_since(context.started_at)
                     .map(|duration| duration.as_millis() as i64)
                     .unwrap_or(0);
-                Self::record_history(context, elapsed, None, Outcome::Cancelled);
+                self.record_history(context, elapsed, None, Outcome::Cancelled);
                 if !terminal.replace_ui {
                     return;
                 }
@@ -665,7 +668,7 @@ impl SimpleComponent for SqlEditor {
                 let secs_str = secs.to_string();
                 let reason =
                     crate::tr!("Query exceeded the {n}s timeout configured in Preferences.").replace("{n}", &secs_str);
-                Self::record_history(context, elapsed, None, Outcome::Error(reason.clone()));
+                self.record_history(context, elapsed, None, Outcome::Error(reason.clone()));
                 if !terminal.replace_ui {
                     return;
                 }
@@ -896,7 +899,16 @@ impl SqlEditor {
         Some((terminal, context))
     }
 
-    fn record_history(context: ExecutionContext, duration_ms: i64, rows_affected: Option<i64>, outcome: Outcome) {
+    fn record_history(
+        &self,
+        context: ExecutionContext,
+        duration_ms: i64,
+        rows_affected: Option<i64>,
+        outcome: Outcome,
+    ) {
+        let Some(history) = self.history.clone() else {
+            return;
+        };
         let entry = NewEntry {
             query: context.sql,
             driver_id: context.metadata.driver_id,
@@ -908,7 +920,7 @@ impl SqlEditor {
             outcome,
         };
         relm4::spawn(async move {
-            if let Err(e) = query_history::record(entry).await {
+            if let Err(e) = history.record(entry).await {
                 tracing::warn!(error = %e, "history record failed");
             }
         });
