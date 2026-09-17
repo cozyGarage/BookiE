@@ -362,3 +362,10 @@ isolated-test inventory passed. Debian package fixture could not run because
   passed. The staged Meson development install passed all 19 GTK safety scenarios;
   the harness now selects `tablepro-devel` explicitly for development builds.
   A real Flatpak build, installed package upgrade/rollback and candidate soak remain.
+
+- 2026-09-17 B2 persistence slice: `b7719b4` removes the process-global column-width
+  and filter stores. The application opens them once, passes them to every window
+  and browse tab, and flushes the shared ordered/coalescing writers at shutdown.
+  Unreadable-file preservation and production file formats remain unchanged. App
+  check, 263 library tests, Clippy and all 19 GTK safety scenarios passed. History,
+  workspace and database-service globals remain for later B2 slices.

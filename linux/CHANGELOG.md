@@ -6,6 +6,7 @@
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
 - Development builds isolate connections, history, audit, drafts, settings, locks, and keyring items from installed builds.
+- Column-width and filter persistence is owned by the application and shared explicitly with its windows and tabs.
 
 ### Fixed
 
