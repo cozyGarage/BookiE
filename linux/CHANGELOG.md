@@ -18,6 +18,7 @@
 - Debian fallback package installing `tablepro` while the desktop file launched `bookie`.
 - ClickHouse VerifyFull reporting a hostname mismatch as a dropped connection.
 - MongoDB VerifyFull reporting an IP-endpoint identity mismatch as connection refused.
+- Redis VerifyFull reporting an IP-endpoint identity mismatch as connection refused.
 
 ### Security
 

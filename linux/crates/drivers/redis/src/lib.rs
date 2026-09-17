@@ -60,11 +60,11 @@ impl DatabaseDriver for RedisDriver {
                     root_cert: Some(root_cert),
                 },
             )
-            .map_err(map_redis_error)?,
-            None => Client::open(url).map_err(map_redis_error)?,
+            .map_err(|err| map_redis_connect_error(err, verifies))?,
+            None => Client::open(url).map_err(|err| map_redis_connect_error(err, verifies))?,
         };
-        let manager = match tokio::time::timeout(CONNECT_TIMEOUT, ConnectionManager::new(client.clone())).await {
-            Ok(result) => result.map_err(map_redis_error)?,
+        let manager = match tokio::time::timeout(CONNECT_TIMEOUT, establish_connection_manager(client.clone())).await {
+            Ok(result) => result.map_err(|err| map_redis_connect_error(err, verifies))?,
             Err(_) => return Err(DriverError::ConnectionRefused),
         };
         Ok(Box::new(RedisConnection {
@@ -547,12 +547,56 @@ fn urlencoding_lite(s: &str) -> String {
     out
 }
 
+async fn establish_connection_manager(client: Client) -> Result<ConnectionManager, RedisError> {
+    client.get_multiplexed_async_connection().await?;
+    ConnectionManager::new(client).await
+}
+
+fn error_chain_text(err: &RedisError) -> String {
+    let mut parts = Vec::new();
+    let mut current: Option<&dyn std::error::Error> = Some(err);
+    while let Some(error) = current {
+        parts.push(error.to_string());
+        current = error.source();
+    }
+    parts.join(" ")
+}
+
+fn looks_like_tls_failure(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("certificate")
+        || lower.contains("notvalidforname")
+        || lower.contains("not valid for name")
+        || lower.contains("hostname")
+        || lower.contains("invaliddnsname")
+        || lower.contains("tls handshake")
+        || lower.contains("unknown issuer")
+        || lower.contains("unknown ca")
+}
+
+fn redis_error_can_hide_tls(err: &RedisError) -> bool {
+    matches!(err.kind(), redis::ErrorKind::Io | redis::ErrorKind::Client)
+        || err.is_connection_refusal()
+        || err.is_connection_dropped()
+        || err.is_timeout()
+}
+
 fn map_redis_error(err: RedisError) -> DriverError {
+    map_redis_connect_error(err, false)
+}
+
+fn map_redis_connect_error(err: RedisError, verifies_cert: bool) -> DriverError {
+    let chain = error_chain_text(&err);
+    if redis_error_can_hide_tls(&err) && looks_like_tls_failure(&chain) {
+        return DriverError::Tls(chain);
+    }
     let msg = err.to_string();
     if msg.contains("Connection refused") || err.is_connection_refusal() {
         DriverError::ConnectionRefused
     } else if msg.contains("NOAUTH") || msg.contains("WRONGPASS") || msg.contains("invalid password") {
         DriverError::AuthFailed
+    } else if verifies_cert && err.is_connection_dropped() {
+        DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
     } else {
         DriverError::Query {
             message: msg,
@@ -637,6 +681,80 @@ mod tests {
     fn map_redis_error_recognizes_a_connection_refusal() {
         let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
         assert!(matches!(map_redis_error(err), DriverError::ConnectionRefused));
+    }
+
+    #[test]
+    fn a_plain_connection_refused_stays_connection_refused_when_verifying() {
+        let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
+        assert!(matches!(
+            map_redis_connect_error(err, true),
+            DriverError::ConnectionRefused
+        ));
+    }
+
+    #[test]
+    fn a_certificate_name_mismatch_io_error_maps_to_tls() {
+        let err = RedisError::from(std::io::Error::other(
+            "invalid peer certificate: certificate not valid for name \"127.0.0.1\"",
+        ));
+        assert!(matches!(map_redis_error(err), DriverError::Tls(detail) if detail.contains("certificate")));
+    }
+
+    #[test]
+    fn a_connection_refused_carrying_a_name_mismatch_maps_to_tls() {
+        let err = RedisError::from(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "invalid peer certificate: certificate not valid for name \"127.0.0.1\"",
+        ));
+        let mapped = map_redis_connect_error(err, true);
+        assert!(matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate")));
+    }
+
+    #[test]
+    fn verifying_connect_does_not_report_a_hostname_mismatch_as_a_refusal() {
+        let err = RedisError::from(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "invalid peer certificate: NotValidForName",
+        ));
+        let mapped = map_redis_connect_error(err, true);
+        assert!(matches!(
+            mapped,
+            DriverError::Tls(detail)
+                if detail.to_ascii_lowercase().contains("certificate")
+                    || detail.to_ascii_lowercase().contains("notvalidforname")
+        ));
+    }
+
+    #[test]
+    fn rustls_invalid_data_name_mismatch_maps_to_tls() {
+        let err = RedisError::from(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid peer certificate: NotValidForName",
+        ));
+        let mapped = map_redis_connect_error(err, true);
+        assert!(matches!(
+            mapped,
+            DriverError::Tls(detail) if detail.to_ascii_lowercase().contains("notvalidforname")
+        ));
+    }
+
+    #[test]
+    fn verifying_connect_maps_a_dropped_handshake_without_tls_text() {
+        let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+        assert!(matches!(map_redis_error(err.clone()), DriverError::Query { .. }));
+        let mapped = map_redis_connect_error(err, true);
+        assert!(
+            matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate") && detail.contains("hostname"))
+        );
+    }
+
+    #[test]
+    fn looks_like_tls_failure_reads_rustls_identity_text() {
+        assert!(looks_like_tls_failure(
+            "invalid peer certificate: certificate not valid for name \"127.0.0.1\""
+        ));
+        assert!(looks_like_tls_failure("invalid peer certificate: NotValidForName"));
+        assert!(!looks_like_tls_failure("Connection refused"));
     }
 
     #[test]
