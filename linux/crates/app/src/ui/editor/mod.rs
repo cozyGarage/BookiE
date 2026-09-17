@@ -90,6 +90,7 @@ pub enum SqlEditorInput {
         generation: u64,
         sql: String,
         statements: Vec<String>,
+        error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
         values: std::collections::HashMap<String, tablepro_core::Value>,
     },
     Cancel,
@@ -550,9 +551,10 @@ impl SimpleComponent for SqlEditor {
                 generation,
                 sql,
                 statements,
+                error_policy,
                 values,
             } => {
-                self.execute_sql(generation, sql, statements, values, sender);
+                self.execute_sql(generation, sql, statements, error_policy, values, sender);
             }
 
             SqlEditorInput::ToggleLineComment => {
@@ -750,11 +752,14 @@ impl SqlEditor {
         }
         let generation = self.run_generation.begin();
         let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
-        let statements = if single_statement {
-            vec![sql.clone()]
+        let (statements, error_policy) = if single_statement {
+            (
+                vec![sql.clone()],
+                tablepro_core::sql_syntax::script::BatchErrorPolicy::StopScript,
+            )
         } else {
             match script_statements(&sql, &driver_id) {
-                Ok(statements) => statements,
+                Ok(planned) => (planned.statements, planned.error_policy),
                 Err(message) => {
                     self.status.set_label(&message);
                     return;
@@ -763,7 +768,14 @@ impl SqlEditor {
         };
         let names = crate::services::query_parameters::statement_names(&sql, &driver_id);
         if names.is_empty() {
-            self.execute_sql(generation, sql, statements, std::collections::HashMap::new(), sender);
+            self.execute_sql(
+                generation,
+                sql,
+                statements,
+                error_policy,
+                std::collections::HashMap::new(),
+                sender,
+            );
             return;
         }
         let Some(window) = self
@@ -780,6 +792,7 @@ impl SqlEditor {
                 generation,
                 sql: sql.clone(),
                 statements: statements.clone(),
+                error_policy,
                 values,
             });
         });
@@ -790,6 +803,7 @@ impl SqlEditor {
         generation: u64,
         trimmed: String,
         statements: Vec<String>,
+        error_policy: tablepro_core::sql_syntax::script::BatchErrorPolicy,
         parameter_values: std::collections::HashMap<String, tablepro_core::Value>,
         sender: ComponentSender<Self>,
     ) {
@@ -851,8 +865,16 @@ impl SqlEditor {
                             });
                         }
                     };
-                    let msg = match run_statements(conn, statements, &driver_id, &parameter_values, &control, succeeded)
-                        .await
+                    let msg = match run_statements(
+                        conn,
+                        statements,
+                        &driver_id,
+                        &parameter_values,
+                        &control,
+                        error_policy,
+                        succeeded,
+                    )
+                    .await
                     {
                         ScriptRunResult::Cancelled => SqlEditorInput::ShowCancelled(generation),
                         ScriptRunResult::TimedOut => SqlEditorInput::ShowTimedOut {

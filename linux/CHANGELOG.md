@@ -18,6 +18,7 @@
 - SSH socket forwarding falls back to a short private path when the runtime directory would exceed Unix limits.
 - ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
+- A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
 
 ## [0.1.4] - 2026-09-17
 

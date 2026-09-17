@@ -3,6 +3,7 @@ use relm4::{adw, gtk};
 
 use super::{StatementOutcome, StatementOutcomeKind};
 use crate::ui::grid::{GridMsg, TabGridContext, build_column_view};
+use tablepro_core::sql_syntax::script::BatchErrorPolicy;
 use tablepro_core::{DriverError, OperationControl};
 
 pub(crate) fn clear_box(b: &gtk::Box) {
@@ -23,11 +24,13 @@ pub(crate) async fn run_statements(
     driver_id: &str,
     parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
     control: &OperationControl,
+    error_policy: BatchErrorPolicy,
     succeeded: impl Fn(&str),
 ) -> ScriptRunResult {
     if statements.is_empty() {
         return ScriptRunResult::Completed(Vec::new());
     }
+    let stops_on_error = error_policy == BatchErrorPolicy::StopScript;
     let mut out = Vec::with_capacity(statements.len());
     let mut aborted = false;
     for sql in statements.into_iter() {
@@ -49,7 +52,7 @@ pub(crate) async fn run_statements(
                     elapsed_ms: 0,
                     kind: StatementOutcomeKind::Error(reason),
                 });
-                aborted = true;
+                aborted = stops_on_error;
                 continue;
             }
         };
@@ -62,7 +65,7 @@ pub(crate) async fn run_statements(
             Err(DriverError::TimedOut) => return ScriptRunResult::TimedOut,
 
             Err(e) => {
-                aborted = true;
+                aborted = stops_on_error;
                 StatementOutcomeKind::Error(crate::ui::error_text::driver_message(&e))
             }
         };
@@ -234,7 +237,69 @@ pub(crate) fn render_outcomes(
 
 #[cfg(test)]
 mod tests {
-    use super::{sql_preview, summary_label};
+    use super::{BatchErrorPolicy, ScriptRunResult, StatementOutcomeKind, run_statements, sql_preview, summary_label};
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    async fn sqlite_connection() -> std::sync::Arc<dyn tablepro_core::Connection> {
+        let driver = drivers_sqlite::SqliteDriver;
+        let connection = driver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .expect("in-memory sqlite connection");
+        std::sync::Arc::from(connection)
+    }
+
+    #[tokio::test]
+    async fn stop_script_policy_skips_statements_after_the_first_error() {
+        let conn = sqlite_connection().await;
+        let statements = vec!["CREATE TABLE t (id int)".into(), "not sql".into(), "SELECT 1".into()];
+        let control = crate::services::operation_control::bounded(0);
+        let result = run_statements(
+            conn,
+            statements,
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::StopScript,
+            |_| {},
+        )
+        .await;
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        assert!(matches!(outcomes[0].kind, StatementOutcomeKind::Rows(_)));
+        assert!(matches!(outcomes[1].kind, StatementOutcomeKind::Error(_)));
+        assert!(matches!(outcomes[2].kind, StatementOutcomeKind::NotRun));
+    }
+
+    #[tokio::test]
+    async fn continue_next_batch_policy_still_runs_statements_after_an_error() {
+        let conn = sqlite_connection().await;
+        let statements = vec!["CREATE TABLE t (id int)".into(), "not sql".into(), "SELECT 1".into()];
+        let control = crate::services::operation_control::bounded(0);
+        let result = run_statements(
+            conn,
+            statements,
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::ContinueNextBatch,
+            |_| {},
+        )
+        .await;
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        assert!(matches!(outcomes[0].kind, StatementOutcomeKind::Rows(_)));
+        assert!(matches!(outcomes[1].kind, StatementOutcomeKind::Error(_)));
+        assert!(
+            matches!(outcomes[2].kind, StatementOutcomeKind::Rows(_)),
+            "a later batch must still run after an earlier batch's error under ContinueNextBatch"
+        );
+    }
 
     #[test]
     fn sql_preview_collapses_whitespace_and_truncates() {

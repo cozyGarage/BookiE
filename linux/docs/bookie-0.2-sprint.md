@@ -424,3 +424,16 @@ isolated-test inventory passed. Debian package fixture could not run because
   `sql_format/mod.rs`, and `storage/query_history.rs` that violate the
   repository's no-comments rule. No release was tagged or built in this pass;
   A5 and B3–B7 remain open as tracked above.
+
+- 2026-09-17 follow-up: closed the batch-error-policy item the review above
+  left open. `ScriptPlan::batch_error_policy()` is SQL Server's `GO`-batch
+  setting, not MySQL's (this document's own note above mislabeled it); each
+  `GO`-delimited batch was already one planner "statement," so no
+  batch-boundary plumbing was actually needed. `script_statements` now
+  returns the policy alongside the statement list, and `run_statements` only
+  stops the script on the first error when the policy is `StopScript`; under
+  `ContinueNextBatch` a failed batch no longer prevents later batches from
+  running. Regression tests cover both policies in `outcomes.rs` and the
+  parser-level policy value in `statement_cursor.rs`. Full workspace fmt,
+  Clippy, `--lib --bins` tests, the two named `tablepro-mcp` integration
+  tests, the sandbox tier, and `cargo deny check` all passed.
