@@ -124,13 +124,10 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-fast-gtk
-      - name: Format check
-        run: cargo fmt --all -- --check
-      - name: Clippy
-        # DuckDB is an optional heavy crate; keep it out of the default GTK gate.
-        run: cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
       - name: Unit tests (build via test)
-        run: cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
+        run: ./scripts/ci-local.sh full
+      - name: Isolated GTK widget regressions
+        run: bash ./scripts/test-gtk-widgets.sh
       - name: Install cargo-deny and cargo-audit
         run: |
           cargo install cargo-deny --locked

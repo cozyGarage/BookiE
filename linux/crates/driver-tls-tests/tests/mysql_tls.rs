@@ -40,12 +40,8 @@ async fn a_plaintext_mode_is_refused_by_a_tls_only_server() {
 #[ignore = "requires the driver tls fixture"]
 async fn verify_full_rejects_an_ip_endpoint_absent_from_the_certificate() {
     let fixture = DriverTlsFixture::from_env();
-    let mut options = fixture.mysql(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
-    options.host = "127.0.0.1".into();
-    assert!(
-        MysqlDriver.connect(options).await.is_err(),
-        "verify full must not accept an endpoint absent from the certificate"
-    );
+    let options = fixture.mysql(TlsMode::VerifyFull, Some(fixture.ca_cert.clone()));
+    tablepro_driver_tls_tests::assert_endpoint_identity_rejected(&MysqlDriver, options).await;
 }
 
 #[tokio::test]

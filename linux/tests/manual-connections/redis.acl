@@ -1,3 +1,3 @@
 user default off
 user tablepro_rw on >tablepro_rw_password ~* &* +@all
-user tablepro_ro on >tablepro_ro_password ~* &* +@read +ping +info -@write -@admin -@dangerous
+user tablepro_ro on >tablepro_ro_password ~* &* +@read +ping +info +select -@write -@admin -@dangerous

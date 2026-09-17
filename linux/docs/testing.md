@@ -1,5 +1,21 @@
 # Testing
 
+## 0.1.4 executable gates
+
+`scripts/ci-local.sh full` is shared by local development and hosted fast CI.
+It also checks the ignored-test inventory and candidate packaging contracts.
+`scripts/ci-local.sh widgets` executes the registered Rust GTK regressions in
+separate isolated processes. `scripts/test-secret-service.sh` executes all three
+registered keyring/transport tests. Registrations live in
+`scripts/isolated-tests.json`; zero selected tests is a failure.
+
+Every `ci-local.sh` run saves exact-tree evidence in `target/quality/` (commit,
+dirty status, compiler, mode/features, per-binary counts, output and exit status).
+The `release` mode now includes fast, widget, driver, TLS, keyring, PostgreSQL
+release, installed GTK, optional DuckDB and supply-chain checks. It does not
+certify package installation, Wayland, upgrade/rollback or retry-free candidate soak.
+See [0.1.4 review actions and evidence](release-0.1.4.md).
+
 Run test commands from the `linux/` workspace root. Current results and limits are in [the bug and consistency audit](bug-consistency-2026-09.md); [the earlier September audit](stabilization-2026-09.md) records historical evidence.
 
 ## Current local checks

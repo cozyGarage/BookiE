@@ -6,13 +6,17 @@
 #   ./scripts/ci-local.sh quick     # alias for ./scripts/preflight.sh (no GTK app)
 #   ./scripts/ci-local.sh full      # fmt + clippy + build + unit tests (GTK)
 #   ./scripts/ci-local.sh integration  # driver docker integration tests
-#   ./scripts/ci-local.sh release      # integration plus the postgres release fixture
+#   ./scripts/ci-local.sh release      # automated gates; manual package/soak approval remains separate
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 MODE="${1:-full}"
+if [[ "${BOOKIE_CI_REPORT_ACTIVE:-0}" != 1 ]]; then
+  export BOOKIE_CI_REPORT_ACTIVE=1
+  exec python3 "$ROOT/scripts/ci-report.py" "$MODE" bash "$0" "$MODE"
+fi
 
 if [[ -f "$ROOT/scripts/dev-env.sh" ]]; then
   # shellcheck source=/dev/null
@@ -25,6 +29,8 @@ case "$CARGO_TARGET_DIR" in
 esac
 
 run_full() {
+  python3 scripts/inventory-ignored-tests.py --check
+  python3 scripts/tests/test_arch_candidate.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 
@@ -70,12 +76,20 @@ run_integration() {
 }
 
 run_release() {
+  run_full
+  bash "$ROOT/scripts/test-gtk-widgets.sh"
   run_integration
+  "$ROOT/scripts/test-driver-tls.sh"
+  "$ROOT/scripts/test-secret-service.sh"
   echo "==> PostgreSQL release fixture"
   "$ROOT/scripts/test-postgres-release.sh"
   echo "==> Installed GTK safety flows"
   "$ROOT/scripts/test-gtk-safety.sh"
-  echo "Release checks passed."
+  cargo test --locked -p tablepro-driver-duckdb
+  cargo build --locked -p tablepro-app --features duckdb
+  cargo deny check
+  cargo audit
+  echo "Automated release gates passed. Package install/upgrade/rollback, Wayland and candidate soak remain separate."
 }
 
 case "$MODE" in
@@ -88,11 +102,14 @@ case "$MODE" in
   integration)
     run_integration
     ;;
+  widgets)
+    bash "$ROOT/scripts/test-gtk-widgets.sh"
+    ;;
   release)
     run_release
     ;;
   *)
-    echo "usage: $0 [quick|full|integration|release]" >&2
+    echo "usage: $0 [quick|full|widgets|integration|release]" >&2
     exit 2
     ;;
 esac

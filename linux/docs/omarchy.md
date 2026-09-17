@@ -1,6 +1,6 @@
-# BookiE 0.1.3 on Arch Linux Omarchy
+# BookiE 0.1.4 on Arch Linux Omarchy
 
-Install from the `linux` branch. Do not mix this with 0.2.0. Do not package from a dirty tree.
+Install from the pinned 0.1.4 commit/tag on `linux`. Do not package from a dirty tree. Read [release evidence](release-0.1.4.md) before installation.
 
 The package is an internal Arch candidate, not an AUR or Flathub release. Visible name is BookiE. Commands `bookie` and `bookie-agentd` are installed, with `tablepro` and `tablepro-agentd` aliases. Application ID, D-Bus, XDG paths, and keyring schema stay `com.tablepro.linux` / `tablepro`.
 
@@ -12,7 +12,7 @@ The package is an internal Arch candidate, not an AUR or Flathub release. Visibl
 - App icon is an open ledger with a grid page. rust_decimal 1.43 so unused rkyv 0.7 is gone.
 - Toolchain is Rust 1.98 (`rust-toolchain.toml`).
 
-Stay off 0.2.0: lossless typed values, GNOME 50, SQLx 0.9, Meson/GResource.
+The merged Linux baseline already contains SQLx 0.9/system SQLite, GResource and an app-library split. The full GNOME 50 migration, lossless value contracts and Meson release packaging remain 0.2 work. This package uses the existing Cargo/Arch build, not Meson.
 
 ## Toolchain
 
@@ -20,7 +20,7 @@ Arch's `rust` package ignores `rust-toolchain.toml`. Use `rustup`. The two packa
 
 ```bash
 sudo pacman -S --needed base-devel pkg-config gtk4 libadwaita \
-  gtksourceview5 openssl libsecret krb5 clang rustup \
+  gtksourceview5 openssl libsecret krb5 sqlite clang rustup \
   desktop-file-utils appstream namcap gettext
 
 rustup toolchain install 1.98.0 --profile minimal --component rustfmt,clippy
@@ -39,7 +39,7 @@ cargo --version
 
 ## Checkout
 
-Use a clean clone or a clean worktree. Do not use a tree that has 0.2.0 work or uncommitted files.
+Use a clean clone or a clean worktree at the recorded release commit, not a later moving branch tip.
 
 ```bash
 git clone https://github.com/cozyGarage/TablePro.git
@@ -58,17 +58,17 @@ git rev-parse HEAD
 From `linux/`:
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.3 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
 ```
 
-Do not set `TABLEPRO_RC_TAG` until a `linux-v…` tag exists. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.3-1-x86_64.pkg.tar.zst`.
+Do not set `TABLEPRO_RC_TAG` until a `linux-v…` tag exists. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.4-1-x86_64.pkg.tar.zst`.
 
 `makepkg --cleanbuild` builds from the commit archive. It does not reuse a dirty `target/` directory.
 
 ## Install
 
 ```bash
-sudo pacman -U packaging/arch/bookie-0.1.3-1-x86_64.pkg.tar.zst
+sudo pacman -U packaging/arch/bookie-0.1.4-1-x86_64.pkg.tar.zst
 ```
 
 Launch with `bookie` or the BookiE desktop entry. `tablepro` still works.
@@ -85,7 +85,7 @@ bookie-agentd --help
 - Stop BookiE before upgrading or rolling back the package. Do not delete those directories or keyring records.
 - If you ever migrated drafts, `workspace_state.before-drafts.json` is the backup of the pre-migration workspace.
 - The package replaces and conflicts with `tablepro`. Test install, upgrade, and removal. User XDG data must remain.
-- Tagging `linux-v0.1.3` and publishing remain a separate decision.
+- The 0.1.4 tag does not certify your local Wayland installation or rollback; record those checks after installing.
 
 ## Run from source without packaging
 

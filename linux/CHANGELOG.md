@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-09-17
+
+- Preserve significant whitespace and literal prefixes during SQL formatting; move the guard into core and verify against PostgreSQL.
+- Block BOOLEAN affinity mismatches at widget binding and edit acceptance; preserve normal NULL/boolean editing.
+- Reject malformed network prefixes and avoid interval arithmetic panics in PostgreSQL decoding.
+- Run isolated GTK and all registered keyring tests through shared local/CI runners, rejecting empty selections.
+- Record exact-tree local pipeline evidence; expand automated release gates and keep manual package/Wayland/soak checks explicit.
+- Retain merged session-rotation/SCRAM security fixes and TLS endpoint-identity regressions.
+- Correct manual DuckDB quoting, Redis read-only database selection and Arch system-SQLite dependencies.
+
+## Historical 0.1.x implementation ledger
+
 ### September 14 safety sprint
 
 - Copy as IN clause uses the result's SQL dialect and reports omitted values

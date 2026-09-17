@@ -27,12 +27,12 @@ def main():
         (commands / "makepkg").write_text("""#!/bin/bash
 set -eu
 if [[ "$1" == --packagelist ]]; then
-  printf '%s\n' "$BOOKIE_TEST_PACKAGE"
+  printf '%s\n' "$BOOKIE_TEST_PACKAGE" "$BOOKIE_TEST_DEBUG_PACKAGE"
 else
   test "$TABLEPRO_RC_VERSION" = 0.1.1
   test "$(sha256sum "$TABLEPRO_RC_ARCHIVE" | cut -d' ' -f1)" = "$TABLEPRO_RC_SHA256"
   test "$(tar -xOf "$TABLEPRO_RC_ARCHIVE" "TablePro-$TABLEPRO_RC_COMMIT/linux/probe")" = 'candidate bytes'
-  touch "$BOOKIE_TEST_PACKAGE"
+  touch "$BOOKIE_TEST_PACKAGE" "$BOOKIE_TEST_DEBUG_PACKAGE"
 fi
 """)
         (commands / "namcap").write_text("#!/bin/sh\nexit 0\n")
@@ -40,8 +40,9 @@ fi
             command.chmod(0o755)
         environment = dict(os.environ, PATH=str(commands) + os.pathsep + os.environ["PATH"],
                            TABLEPRO_RC_COMMIT=sha, TABLEPRO_RC_VERSION="0.1.1",
-                           BOOKIE_TEST_PACKAGE=str(root / "candidate.pkg.tar.zst"))
-        (root / ".git/info/exclude").write_text("commands/\ncandidate.pkg.tar.zst\n")
+                           BOOKIE_TEST_PACKAGE=str(root / "bookie-0.1.1-1-x86_64.pkg.tar.zst"),
+                           BOOKIE_TEST_DEBUG_PACKAGE=str(root / "bookie-debug-0.1.1-1-x86_64.pkg.tar.zst"))
+        (root / ".git/info/exclude").write_text("commands/\n*.pkg.tar.zst\n")
         runner = ["bash", str(scripts / "build-arch-rc.sh")]
         subprocess.run(runner, env=environment, check=True)
         for overrides, expected in [

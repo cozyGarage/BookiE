@@ -50,6 +50,19 @@ export TABLEPRO_RC_SHA256="$checksum"
 export TABLEPRO_RC_VERSION="$version"
 export TABLEPRO_RC_ARCHIVE="$archive"
 makepkg --cleanbuild --clean --syncdeps --noconfirm
-package_file="$(makepkg --packagelist)"
-namcap PKGBUILD "$package_file"
-"$root/scripts/validate-arch-package.sh" "$package_file"
+mapfile -t package_files < <(makepkg --packagelist)
+namcap PKGBUILD "${package_files[@]}"
+validated=0
+for package_file in "${package_files[@]}"; do
+  # Arch may emit a separate debug package; only the application package
+  # contains desktop metadata and executables required by our validator.
+  if [[ "$(basename "$package_file")" == bookie-"$version"-* ]]; then
+    "$root/scripts/validate-arch-package.sh" "$package_file"
+    sha256sum "$package_file"
+    validated=$((validated + 1))
+  fi
+done
+if [[ "$validated" != 1 ]]; then
+  echo "expected exactly one BookiE application package, found $validated" >&2
+  exit 1
+fi

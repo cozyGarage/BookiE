@@ -43,6 +43,8 @@ for c in "${CRATES[@]}"; do
 done
 
 echo "==> file size guardrail"
+python3 scripts/inventory-ignored-tests.py --check
+python3 scripts/tests/test_arch_candidate.py
 "$ROOT/scripts/check-file-size.sh"
 
 echo "==> bounded database operations in the GUI"

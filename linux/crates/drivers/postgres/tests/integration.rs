@@ -42,6 +42,29 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     PgDriver.connect(opts).await.expect("connect")
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn formatting_preserves_server_results_for_significant_whitespace() {
+    use tablepro_core::sql_syntax::{SqlGrammar, script::LexicalSettings};
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    for source in [
+        "SELECT 'a'\n'b'",
+        r"SELECT U&'d\0061t'",
+        "SELECT 1 + 2 AS total",
+        "SELECT E'a\\nb'",
+    ] {
+        let formatted = tablepro_core::sql_format::format_script(
+            source,
+            SqlGrammar::PostgreSql,
+            LexicalSettings::default_for(SqlGrammar::PostgreSql),
+        );
+        let original = connection.query(source).await.expect("original expression");
+        let result = connection.query(&formatted).await.expect("formatted expression");
+        assert_eq!(original.rows, result.rows, "{source:?} became {formatted:?}");
+    }
+}
+
 async fn tagged_query_is_active(connection: &dyn Connection, tag: &str) -> bool {
     let sql = format!(
         "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"

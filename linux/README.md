@@ -108,10 +108,10 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 
 ## Packaging
 
-The current package candidate is BookiE 0.1.3. After the exact clean commit passes every gate:
+The current package candidate is BookiE 0.1.4. See [the release evidence](docs/release-0.1.4.md) for passed and pending gates. Build from the exact clean commit:
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.3 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
 ```
 
 The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only after a tag exists. Debian and Flatpak files remain development scaffolds; see [packaging/README.md](packaging/README.md).

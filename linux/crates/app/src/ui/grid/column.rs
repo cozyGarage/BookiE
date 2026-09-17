@@ -3,12 +3,11 @@ use gtk4::prelude::*;
 use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
-use super::display::{
-    POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind,
-    value_is_inline_editable,
-};
+use super::display::{POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind};
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
-use super::types::{classify_editor_kind, is_bool_type, is_bytes_type};
+use super::presentation::cell_allows_inline_edit;
+pub(super) use super::presentation::column_is_editable as is_cell_editable;
+use super::types::{classify_editor_kind, is_bool_type};
 use super::{GridMsg, TabGridContext};
 
 const PENDING_CSS_CLASSES: &[&str] = &[
@@ -19,10 +18,6 @@ const PENDING_CSS_CLASSES: &[&str] = &[
 ];
 
 const TOOLTIP_MIN_CHARS: usize = 40;
-
-pub(super) fn is_cell_editable(col: &ColumnInfo) -> bool {
-    !col.primary_key && !col.is_generated && !col.is_auto_increment && !is_bytes_type(&col.data_type)
-}
 
 /// Marks a foreign-key column's header before the cell value picker
 /// (a later slice) exists to act on it.
@@ -96,6 +91,7 @@ pub(super) fn build_column(
     });
 
     let editable_for_bind = editable && sender.is_some();
+    let column_info = info.clone();
     let column_auto_filled = info.is_auto_increment || info.is_generated;
     let tab_ctx_for_bind = tab_ctx.clone();
     factory.connect_bind(move |_, item| {
@@ -124,7 +120,7 @@ pub(super) fn build_column(
             raw_value
         };
         let is_null = matches!(value, Value::Null);
-        let inline_editable = editable_for_bind && value_is_inline_editable(&value);
+        let inline_editable = editable_for_bind && cell_allows_inline_edit(&column_info, &value);
         let text = cell_text_for_bind(&value, editable_for_bind, column_auto_filled);
 
         let pending_classes: Vec<&'static str> = if let Some(_tab_id) = tab_ctx_for_bind.tab_id {
@@ -185,6 +181,7 @@ pub(super) fn build_column(
             POSITION_SLOT.set(&label, item.position());
             ROW_KEY_SLOT.set(&label, pk_values.clone());
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
+            checkbox.set_sensitive(inline_editable);
             SUPPRESS_SLOT.set(&checkbox, true);
             match value {
                 Value::Bool(true) => {
@@ -246,6 +243,7 @@ pub(super) fn build_column(
             ROW_KEY_SLOT.take(&label);
             SNAPSHOT_SLOT.take(&label);
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
+            checkbox.set_sensitive(false);
             POSITION_SLOT.take(&checkbox);
             ROW_KEY_SLOT.take(&checkbox);
         } else if let Ok(label) = child.downcast::<gtk4::Label>() {
@@ -433,6 +431,78 @@ mod tests {
         let png = artifact_dir.join("text-column-binary-bind.png");
         let _ = std::process::Command::new("scrot").arg(&png).status();
         png
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn boolean_affinity_mismatch_cannot_emit_an_edit() {
+        use futures::FutureExt;
+        fn checkbox(widget: &gtk4::Widget) -> Option<gtk4::CheckButton> {
+            if let Ok(button) = widget.clone().downcast::<gtk4::CheckButton>() {
+                return Some(button);
+            }
+            let mut child = widget.first_child();
+            while let Some(current) = child {
+                if let Some(button) = checkbox(&current) {
+                    return Some(button);
+                }
+                child = current.next_sibling();
+            }
+            None
+        }
+        gtk4::init().unwrap();
+        let columns = vec![col("BOOLEAN", false)];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![vec![Value::Bool(false)]],
+            truncated: false,
+        };
+        let (sender, receiver) = relm4::channel::<GridMsg>();
+        let (view, selection) = crate::ui::grid::build_column_view(
+            &result,
+            &columns,
+            "flags",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let store = selection.model().unwrap().downcast::<gtk4::gio::ListStore>().unwrap();
+        for (value, allowed) in [
+            (Value::Bytes(vec![1]), false),
+            (Value::Text("true".into()), false),
+            (Value::Null, true),
+            (Value::Bool(false), true),
+            (Value::Bytes(vec![]), false),
+        ] {
+            store.splice(0, 1, &[crate::ui::row_object::RowObject::new(vec![value])]);
+            let context = gtk4::glib::MainContext::default();
+            for _ in 0..50 {
+                for _ in 0..64 {
+                    if !context.iteration(false) {
+                        break;
+                    }
+                }
+                if checkbox(view.upcast_ref()).is_some() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            let button = checkbox(view.upcast_ref()).expect("bound checkbox");
+            assert_eq!(button.is_sensitive(), allowed);
+            button.set_active(!button.is_active());
+            let event = receiver.recv().now_or_never().flatten();
+            assert_eq!(
+                matches!(event, Some(GridMsg::CellEdited { .. })),
+                allowed,
+                "blocked values must emit no pending edit"
+            );
+        }
+        window.close();
     }
 
     #[test]

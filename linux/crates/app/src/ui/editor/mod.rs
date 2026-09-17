@@ -1,9 +1,8 @@
 mod completion;
 mod diagnostics;
-mod format_plan;
+use tablepro_core::sql_format as format_plan;
 mod outcomes;
 mod schema;
-mod significant_tokens;
 mod sql_text;
 mod statement_cursor;
 

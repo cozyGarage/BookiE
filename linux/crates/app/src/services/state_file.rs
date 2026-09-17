@@ -13,7 +13,9 @@ pub struct StateFile<T> {
 struct State<T> {
     value: T,
     revision: u64,
-    completed: u64,
+    // Last attempted revision, not last successful persistence. A failed write
+    // settles waiters with write_error; it must not cause an unbounded retry loop.
+    attempted: u64,
     read_error: Option<String>,
     write_error: Option<String>,
     closed: bool,
@@ -45,7 +47,7 @@ impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFi
             Mutex::new(State {
                 value,
                 revision: 0,
-                completed: 0,
+                attempted: 0,
                 read_error,
                 write_error: None,
                 closed: false,
@@ -63,11 +65,11 @@ impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFi
                             return;
                         };
                         let Ok(state) =
-                            wake.wait_while(state, |state| state.revision == state.completed && !state.closed)
+                            wake.wait_while(state, |state| state.revision == state.attempted && !state.closed)
                         else {
                             return;
                         };
-                        if state.revision == state.completed && state.closed {
+                        if state.revision == state.attempted && state.closed {
                             return;
                         }
                         (state.value.clone(), state.revision)
@@ -80,7 +82,7 @@ impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFi
                     let Ok(mut state) = lock.lock() else {
                         return;
                     };
-                    state.completed = revision;
+                    state.attempted = revision;
                     state.write_error = error;
                     wake.notify_all();
                 }
@@ -115,7 +117,7 @@ impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFi
         let deadline = Instant::now() + Duration::from_secs(5);
         let mut state = lock.lock().map_err(|_| "settings lock unavailable")?;
         let target = state.revision;
-        while state.completed < target {
+        while state.attempted < target {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
                 return Err("settings flush timed out".into());

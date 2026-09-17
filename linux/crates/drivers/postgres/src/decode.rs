@@ -35,7 +35,7 @@ fn push_counted(parts: &mut Vec<String>, count: i32, singular: &str, plural: &st
     if count == 0 {
         return;
     }
-    let label = if count.abs() == 1 { singular } else { plural };
+    let label = if count.unsigned_abs() == 1 { singular } else { plural };
     parts.push(format!("{count} {label}"));
 }
 
@@ -82,6 +82,9 @@ fn decode_inet(bytes: &[u8], force_prefix: bool) -> Option<String> {
         }
         _ => return None,
     };
+    if u16::from(bits) > max_bits || bytes[2] > 1 {
+        return None;
+    }
     if force_prefix || u16::from(bits) != max_bits {
         Some(format!("{host}/{bits}"))
     } else {
@@ -97,6 +100,25 @@ fn decode_pg_lsn(bytes: &[u8]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extreme_intervals_and_malformed_network_values_do_not_panic() {
+        for days in [i32::MIN, -1, 0, 1, i32::MAX] {
+            for micros in [i64::MIN, -1, 0, 1, i64::MAX] {
+                assert!(decode_interval(&interval_bytes(i32::MIN, days, micros)).is_some());
+            }
+        }
+        for prefix in 33..=255 {
+            assert_eq!(decode_inet(&[2, prefix, 0, 4, 192, 0, 2, 1], false), None);
+        }
+        for length in 0..64 {
+            for byte in 0..=255 {
+                for kind in ["INTERVAL", "INET", "CIDR", "PG_LSN"] {
+                    let _ = decode_pg_binary_text(kind, &vec![byte; length]);
+                }
+            }
+        }
+    }
 
     fn interval_bytes(months: i32, days: i32, microseconds: i64) -> [u8; 16] {
         let mut bytes = [0_u8; 16];

@@ -4,7 +4,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154,SC2164
 
 pkgname=bookie
-pkgver="${TABLEPRO_RC_VERSION:-0.1.3}"
+pkgver="${TABLEPRO_RC_VERSION:-0.1.4}"
 pkgrel=1
 pkgdesc="Native Linux database client (internal release candidate)"
 arch=('x86_64')
@@ -13,8 +13,8 @@ conflicts=('tablepro')
 replaces=('tablepro')
 url="https://github.com/cozygarage/TablePro"
 license=('AGPL-3.0-or-later')
-depends=('gtk4' 'libadwaita' 'gtksourceview5' 'libsecret' 'openssl' 'krb5')
-makedepends=('rust>=1:1.93' 'pkgconf' 'clang' 'gettext')
+depends=('gtk4' 'libadwaita' 'gtksourceview5' 'libsecret' 'openssl' 'krb5' 'sqlite')
+makedepends=('rust>=1:1.98' 'pkgconf' 'clang' 'gettext')
 checkdepends=('desktop-file-utils' 'appstream')
 options=('!lto')
 

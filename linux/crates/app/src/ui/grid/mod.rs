@@ -4,7 +4,9 @@ mod context_menu;
 mod display;
 mod editing;
 mod export;
+mod presentation;
 mod types;
+pub(crate) use presentation::cell_allows_inline_edit;
 
 use gtk4::prelude::*;
 

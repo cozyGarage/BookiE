@@ -7,6 +7,29 @@ use std::path::PathBuf;
 use secrecy::SecretString;
 use tablepro_core::{ConnectOptions, TlsConfig, TlsMode};
 
+/// A negative identity test must fail for certificate verification, not because
+/// the fixture is down or credentials are wrong. Exercise a verified control first.
+pub async fn assert_endpoint_identity_rejected(
+    driver: &dyn tablepro_core::DatabaseDriver,
+    mut options: ConnectOptions,
+) {
+    let connection = driver
+        .connect(options.clone())
+        .await
+        .expect("verified control connection");
+    connection.ping().await.expect("control ping");
+    connection.close().await.expect("close control");
+    options.host = "127.0.0.1".into();
+    let error = match driver.connect(options).await {
+        Ok(_) => panic!("endpoint absent from certificate was accepted"),
+        Err(error) => error.to_string().to_ascii_lowercase(),
+    };
+    assert!(
+        error.contains("cert") || error.contains("hostname") || error.contains("notvalidforname"),
+        "expected certificate identity failure, not unrelated failure: {error}"
+    );
+}
+
 pub const DRIVER_TLS_ENV: &str = "TABLEPRO_FIXTURE_DRIVER_TLS";
 
 pub fn driver_tls_enabled() -> bool {

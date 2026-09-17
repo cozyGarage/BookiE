@@ -15,7 +15,7 @@ systemd unit: stdio agentd is launched on demand by its MCP client.
 After committing and validating the candidate (no published tag required):
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.3 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
 ```
 
 The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives

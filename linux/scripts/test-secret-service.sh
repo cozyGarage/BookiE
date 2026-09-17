@@ -34,4 +34,4 @@ fi
 eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
 printf 'probe' | secret-tool store --label='TablePro CI probe' application tablepro-ci
 secret-tool clear application tablepro-ci
-cargo test -p tablepro-storage secrets::tests::round_trip_via_secret_service -- --ignored --exact
+python3 "$ROOT/scripts/run-isolated-tests.py" keyring

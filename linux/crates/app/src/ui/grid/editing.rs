@@ -67,7 +67,7 @@ pub(super) fn setup_bool_cell(
         attach_cell_gesture(checkbox.upcast_ref(), column_view, idx, column_name, true, false, menus);
     }
     checkbox.connect_toggled(move |cb| {
-        if SUPPRESS_SLOT.get(cb).unwrap_or(false) {
+        if !cb.is_sensitive() || SUPPRESS_SLOT.get(cb).unwrap_or(false) {
             return;
         }
         let position = POSITION_SLOT.get(cb).unwrap_or(0);

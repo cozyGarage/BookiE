@@ -12,6 +12,7 @@ mod registry;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
 pub mod sql_dialect;
+pub mod sql_format;
 pub mod sql_lex;
 pub mod sql_literal;
 pub mod sql_syntax;

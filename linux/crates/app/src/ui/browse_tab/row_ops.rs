@@ -224,6 +224,17 @@ impl BrowseTab {
         if self.reject_stale_row_edit(row_position, &row_key, &sender) {
             return;
         }
+        // Defense in depth: synthetic/queued widget events must obey the same
+        // runtime-value gate as rendering, even after a row has been rebound.
+        let allowed = self
+            .current_columns
+            .get(col_index)
+            .zip(self.row_object_at(row_position))
+            .is_some_and(|(column, row)| crate::ui::grid::cell_allows_inline_edit(column, &row.cell_value(col_index)));
+        if !allowed {
+            self.refresh_row(row_position);
+            return;
+        }
         // Cell edits route through the per-tab change tracker
         // so the user can review / Save / Discard a batch.
         //

@@ -56,7 +56,7 @@ mkdir -p "$HOME/.local/share/tablepro/manual-fixtures"
 sqlite3 "$HOME/.local/share/tablepro/manual-fixtures/tablepro-lab.sqlite" \
   'CREATE TABLE IF NOT EXISTS people (id INTEGER PRIMARY KEY, name TEXT NOT NULL, active BOOLEAN NOT NULL); INSERT OR IGNORE INTO people VALUES (1, "Ada Lovelace", 1), (2, "Grace Hopper", 0);'
 duckdb "$HOME/.local/share/tablepro/manual-fixtures/tablepro-lab.duckdb" \
-  'CREATE TABLE IF NOT EXISTS people (id BIGINT PRIMARY KEY, name VARCHAR NOT NULL, active BOOLEAN NOT NULL); INSERT OR IGNORE INTO people VALUES (1, ''Ada Lovelace'', true), (2, ''Grace Hopper'', false);'
+  "CREATE TABLE IF NOT EXISTS people (id BIGINT PRIMARY KEY, name VARCHAR NOT NULL, active BOOLEAN NOT NULL); INSERT OR IGNORE INTO people VALUES (1, 'Ada Lovelace', true), (2, 'Grace Hopper', false);"
 ```
 
 Use the file path as the connection endpoint. DuckDB requires an app build with the `duckdb` Cargo feature.

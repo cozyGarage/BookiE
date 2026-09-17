@@ -6047,7 +6047,7 @@ dependencies = [
 
 [[package]]
 name = "tablepro-agentd"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "async-trait",
  "chrono",
@@ -6076,12 +6076,13 @@ dependencies = [
 
 [[package]]
 name = "tablepro-app"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "async-channel",
  "async-trait",
  "chrono",
+ "futures",
  "gettext-rs",
  "glib",
  "glib-build-tools",
@@ -6094,7 +6095,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sourceview5",
- "sqlformat",
  "tablepro-core",
  "tablepro-driver-clickhouse",
  "tablepro-driver-duckdb",
@@ -6129,6 +6129,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sqlformat",
  "tempfile",
  "thiserror 2.0.20",
  "tokio",

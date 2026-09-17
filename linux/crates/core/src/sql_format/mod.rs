@@ -1,7 +1,8 @@
-use tablepro_core::sql_syntax::SqlGrammar;
-use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
+use crate::sql_syntax::SqlGrammar;
+use crate::sql_syntax::script::{LexicalSettings, ScriptPlan};
 
-use super::significant_tokens::significant_tokens;
+mod significant_tokens;
+use significant_tokens::significant_tokens;
 
 /// Reformat every statement the formatter can read, and leave the rest
 /// exactly as it was.
@@ -165,5 +166,40 @@ mod tests {
     fn an_empty_script_stays_empty() {
         assert_eq!(format("", SqlGrammar::PostgreSql), "");
         assert_eq!(format("   \n\n", SqlGrammar::PostgreSql), "   \n\n");
+    }
+
+    #[test]
+    fn significant_whitespace_and_literal_prefixes_survive() {
+        for source in ["SELECT 'a'\n'b'", r"SELECT U&'d\0061t'"] {
+            assert_eq!(format(source, SqlGrammar::PostgreSql), source);
+        }
+        for literal in ["B'101'", "X'ff'"] {
+            assert!(format(&format!("SELECT {literal}"), SqlGrammar::PostgreSql).contains(literal));
+        }
+    }
+
+    #[test]
+    fn bounded_unicode_corpus_is_safe_and_idempotent() {
+        for grammar in SqlGrammar::ALL {
+            for literal in [
+                "'é'",
+                "'東京'",
+                "'a''b'",
+                "'unfinished",
+                "/* nested /* x */ y */",
+                "-- x\n",
+            ] {
+                for suffix in ["", "; SELECT 2", "\n", " AS value"] {
+                    let source = format!("SELECT {literal}{suffix}");
+                    let settings = LexicalSettings::default_for(grammar);
+                    let result = format_script(&source, grammar, settings);
+                    assert_eq!(
+                        significant_tokens(&source, grammar, settings),
+                        significant_tokens(&result, grammar, settings)
+                    );
+                    assert_eq!(format_script(&result, grammar, settings), result);
+                }
+            }
+        }
     }
 }
