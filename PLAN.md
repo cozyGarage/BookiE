@@ -1,10 +1,10 @@
 # BookiE Linux development plan
 
 Active delivery sequencing and acceptance are now in the approved
-[BookiE 0.1.1 → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
+[BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
 The capability backlog and historical evidence below remain reference material.
 
-Last updated: 2026-09-16
+Last updated: 2026-09-17
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -17,13 +17,15 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 
 ## Current baseline
 
+- Current fork baseline: `e9bba1f5b`, BookiE 0.1.4. The [30-commit review](linux/docs/baseline-review-2026-09-17.md) governs continuation toward 0.2; older baseline entries below are historical.
+
 - Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
-- Active work follows the approved [BookiE 0.1.1 → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.
+- Active work follows the approved [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.
 - The [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) and [previous stabilization audit](linux/docs/stabilization-2026-09.md) are historical evidence for their recorded source trees, not approval of 0.1.1.
 - PostgreSQL has the broadest fixture evidence. Redis/MongoDB remain experimental and DuckDB is optional.
 - Package promotion remains separate: a frozen SHA, 30 consecutive retry-free GTK attempts across six runs, and installed Arch/Wayland install, upgrade, and rollback evidence are still required.
 
-## Active work: BookiE 0.1.1 → 0.2
+## Active work: BookiE 0.1.x → 0.2
 
 The [approved sprint](linux/docs/bookie-0.2-sprint.md) owns scope, migration,
 acceptance and release sequencing. Implementation is authorized; publication
@@ -43,7 +45,7 @@ The following records the prior pass, now superseded for sequencing by the
 
 The pass preserves saved-state formats, MCP interfaces, intentional permission differences, and supported-driver limitations. The GUI JSON export correction encodes binary values as `\x`-prefixed hexadecimal, matching existing CSV and MCP behavior. Export temporary files are unique and private; concurrent complete exports use last-completed replacement semantics.
 
-Run `cargo deny check` from `linux/`; it does not accept `--manifest-path`. Rust 1.93 remains the supported toolchain; current-stable CI is separate.
+Run `cargo deny check` from `linux/`; it does not accept `--manifest-path`. Rust 1.98 is the supported toolchain; current-stable CI is separate.
 
 ## Product contract
 

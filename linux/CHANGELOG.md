@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
+- Development builds isolate connections, history, audit, drafts, settings, locks, and keyring items from installed builds.
+
+### Fixed
+
+- Embedded application icons now use the same BookiE artwork as installed packages.
+- Malformed MongoDB SCRAM nonces are rejected instead of crashing authentication.
+- SSH key and TLS certificate reads remain bounded if a file changes while it is read.
+- SSH socket forwarding falls back to a short private path when the runtime directory would exceed Unix limits.
+
 ## [0.1.4] - 2026-09-17
 
 ### Changed

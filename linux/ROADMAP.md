@@ -1,7 +1,8 @@
 # BookiE roadmap
 
-Active delivery plan: [BookiE 0.1.1 → 0.2 sprint](docs/bookie-0.2-sprint.md),
-approved September 16. It supersedes older sequencing below.
+Active delivery plan: [BookiE 0.1.x → 0.2 sprint](docs/bookie-0.2-sprint.md),
+approved September 16, refreshed against 0.1.4 on September 17. It supersedes older sequencing below.
+See the [30-commit baseline review](docs/baseline-review-2026-09-17.md) before further convergence work.
 
 Current scope and verification are recorded in the [approved sprint ledger](docs/bookie-0.2-sprint.md). Prior audits retain evidence for their own source trees.
 

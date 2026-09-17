@@ -1,4 +1,4 @@
-# BookiE 0.1.1 → 0.2: upstream convergence and daily workflows
+# BookiE 0.1.x → 0.2: upstream convergence and daily workflows
 
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, `origin/linux` in `cozyGarage/TablePro` (called `fork`
@@ -6,9 +6,12 @@ in older documents). This document supersedes the 0.1.1 plan for sequencing.
 
 ## Goal and baseline
 
-Deliver BookiE 0.1.1 first, then 0.2.0 with the full upstream Linux foundation,
+Continue from the integrated BookiE 0.1.4 baseline toward 0.2.0 with the full upstream Linux foundation,
 daily editor/grid workflows, and read-only PostgreSQL catalog/type browsing.
-Keep a two-week checkpoint; extend the sprint until both releases pass their gates.
+Keep the original two-week checkpoint; extend the sprint until release gates pass.
+The original Milestone A numbering below is historical scope, not a request to
+downgrade or release 0.1.1. See the [September 17 baseline review](baseline-review-2026-09-17.md)
+for the 30-commit review, remaining risks, and revised handoff order.
 
 | Source | Pin | Review |
 | --- | --- | --- |
@@ -108,12 +111,11 @@ references, tests, and differences. Implementation and release verification diff
 - [ ] **B1 platform/build**: Rust 1.98, GNOME 50, SQLx 0.9/system SQLite, crypto/
   dependencies, Meson/GResource, library entrypoint, gettext/logging, isolated dev
   profiles, Arch/development Flatpak. Keep internal crate names when renaming adds
-  no compatibility benefit. GNOME 50 itself (`gtk4` `gnome_50`, `libadwaita` `v1_9`,
-  `sourceview5` `v5_18`, `glib`/`gio` `v2_88`) is blocked on a GTK4 Shortcuts API
-  migration — see the 2026-09-17 ledger entry below. The feature flags are reverted
-  to their pre-bump values (`v4_14`/`v1_6`+`gtk_v4_6`/`v5_12`, no `v2_88`) until that
-  lands; Rust 1.98, SQLx 0.9/system SQLite, and the other B1 items are unaffected
-  and already in `linux`.
+  no compatibility benefit. GNOME 50 (`gtk4` `gnome_50`, `libadwaita` `v1_9`,
+  `sourceview5` `v5_18`, `glib`/`gio` `v2_88`) is enabled after migrating the
+  shortcuts dialog and calendar API. Cargo compile and Clippy pass on the host;
+  the development Meson build/install path also passes. Flatpak execution and
+  installed-package qualification remain.
 - [ ] **B2 runtime/storage**: owned Tasks, explicit stores, private durable writes,
   history migrations, GSettings, coalesced writers. Remove replaced globals/runtime
   calls; flush persistence and settle governed operations at shutdown.
@@ -283,3 +285,80 @@ backup bytes, but an installed-package rollback is still a release gate.
 
 The above checks used the evolving working tree. They are implementation evidence,
 not the exact-candidate soak ledger. No public release or upstream contact occurred.
+
+### 2026-09-17 refreshed fork baseline
+
+Fetched `origin` and fast-forwarded cleanly from `32ce81f9c` to
+`e9bba1f5b24575b4eb959b492421ff50c9117063` (nine incoming commits). Reviewed
+the latest 30 commit subjects/change inventories and inspected the safety-critical
+diffs and current callers. The [review ledger](baseline-review-2026-09-17.md)
+records coverage and unresolved findings.
+
+A1–A4 implementation is present and strengthened by the 0.1.2–0.1.4 work. A5
+qualification remains separate from implementation and package/version labels.
+B1 is partially integrated; do not redo SQLx/Rust/library/resource imports. The
+GNOME 50 API migration, development-profile isolation and Meson development build
+are now present, while Flatpak/package qualification remains. B2–B4 must retain runtime
+cell validation, formatter adjacency checks, material-sensitive session retirement,
+SCRAM caps, service-host TLS identity, and the executable isolated-test inventory.
+
+This pass removed stale duplicate embedded artwork, reusing the packaged SVG
+through a GResource alias. Resource compilation and byte-for-byte extraction
+passed. Core formatter tests: 16 passed on Rust 1.98. Arch candidate tests and
+isolated-test inventory passed. Debian package fixture could not run because
+  `dpkg-deb` is absent. The later verification below supersedes this pass's limited
+  evidence. Candidate soak, package installation and publication remain open.
+
+- 2026-09-17 continuation: re-enabled the GNOME 50 feature floor after replacing
+  deprecated GTK shortcut widgets with `AdwShortcutsDialog` and `Calendar::select_day`
+  with `Calendar::set_date`. App all-target check and Clippy passed on GTK 4.22.4,
+  libadwaita 1.9.3, GtkSourceView 5.20.0 and GLib 2.88.3. Temporary Meson/Ninja tools
+  built and installed the development profile; generated `.Devel` desktop/AppStream
+  metadata and command aliases validated. Storage paths and Secret Service schemas
+  now derive from the build profile; production retains its legacy identity and
+  development uses `tablepro-devel`/`com.tablepro.linux.Devel.Password`. Storage
+  tests passed (95, two ignored), plus the focused development-profile identity test.
+  CI images and the production/development Flatpak manifests now target GNOME 50;
+  a real Flatpak build remains required.
+
+- 2026-09-17 second-review pass: independently re-verified the working tree above
+  (not just the review doc's claims) against the actual diffs, then closed part of
+  the "verification gap" it flagged. The MongoDB SCRAM patch guard
+  (`patched_mongodb_caps_scram_iterations`) only checked source text, not behavior;
+  added 3 direct tests against the vendored `ServerFirst::validate` (prefix match,
+  mismatch, and a client nonce longer than the server's echoed nonce — the exact
+  shape that would have panicked under the old unchecked slice index). Could not
+  execute these locally: the vendored crate's dev-dependencies require its original
+  upstream workspace, which isn't present here; verified correct by tracing the
+  logic instead. The equivalent `sqlx-postgres` SASL iteration-count guard
+  (`patched_sqlx_postgres_caps_scram_iterations`) has the same weakness but was left
+  alone after confirming isolation is a bigger job there — `sqlx-postgres` depends
+  on `sqlx-core` throughout the crate, and `sqlx-core` is itself workspace-versioned,
+  so testing it standalone would mean reconstructing much of the upstream sqlx
+  workspace, not a small change.
+  Ran `cargo mutants` against the two newest security-relevant files (redirecting
+  its scratch build directory off `/tmp`, which was full from the development
+  Meson build above). `transport::session_material`: 16/27 → 23/27 caught. Added a
+  hardcoded value test for `MAX_MATERIAL_FILE_BYTES` (was only referenced
+  symbolically), a test proving the size limit is `>` not `>=`, and a test proving
+  hop-0 password SSH auth is not wrongly refused by the jump-hop guard (only hop 1+
+  refusal was tested). Left 2 mutants open: one needs a mocked Secret Service, one
+  needs a real TOCTOU race — both match this document's B4 note above, not new gaps.
+  `ssh::lib`: 10/65 → 16/65 caught. The GNOME-50-adjacent socket-path fallback
+  (try `XDG_RUNTIME_DIR`, then `/tmp`) had only a happy-path test; extracted the
+  boundary arithmetic into a pure `socket_dir_path_fits` function and tested it at
+  the exact limit. Remaining misses all need a live SSH server/socket
+  (multi-hop chain indexing, `Drop` impls, `connect_and_auth`) — integration-tier,
+  consistent with earlier assessment of this file.
+  Full workspace: fmt clean, Clippy 0 errors (2 pre-existing informational warnings
+  inside `vendor/sqlx-postgres`, outside workspace-member lint scope), 952 tests
+  passing (up from 947), `cargo deny check` clean. These security changes landed as
+  `2a3b8c7` (`fix(linux): harden authentication and session material`).
+
+- 2026-09-17 B1 checkpoint: GNOME 50 APIs, isolated development storage/keyring,
+  Meson/GResource metadata, development Flatpak manifest and CI floors landed as
+  `399fb5b` (`build(linux): complete GNOME 50 development baseline`). On the exact
+  combined tree, preflight, `scripts/ci-local.sh full`, and `cargo deny check`
+  passed. The staged Meson development install passed all 19 GTK safety scenarios;
+  the harness now selects `tablepro-devel` explicitly for development builds.
+  A real Flatpak build, installed package upgrade/rollback and candidate soak remain.
