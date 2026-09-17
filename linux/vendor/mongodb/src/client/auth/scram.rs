@@ -519,7 +519,7 @@ impl ServerFirst {
                 "SCRAM",
                 "handshake terminated early",
             ))
-        } else if &self.nonce[0..nonce.len()] != nonce {
+        } else if !self.nonce.starts_with(nonce) {
             Err(Error::authentication_error("SCRAM", "mismatched nonce"))
         } else if self.i < MIN_ITERATION_COUNT {
             Err(Error::authentication_error(
@@ -727,5 +727,34 @@ mod tests {
             ..max_allowed_iteration_count
         };
         assert!(too_high_iteration_count.validate(nonce).is_err());
+    }
+
+    fn server_first_with_nonce(nonce: &str) -> ServerFirst {
+        ServerFirst {
+            conversation_id: Bson::Null,
+            done: false,
+            message: "mocked".to_string(),
+            nonce: nonce.to_string(),
+            salt: Vec::new(),
+            i: 4096,
+        }
+    }
+
+    #[test]
+    fn test_nonce_prefix_matches() {
+        let server_first = server_first_with_nonce("client-nonceserver-suffix");
+        assert!(server_first.validate("client-nonce").is_ok());
+    }
+
+    #[test]
+    fn test_nonce_mismatch_is_rejected() {
+        let server_first = server_first_with_nonce("server-nonce");
+        assert!(server_first.validate("client-nonce").is_err());
+    }
+
+    #[test]
+    fn test_client_nonce_longer_than_server_nonce_is_rejected_not_a_panic() {
+        let server_first = server_first_with_nonce("short");
+        assert!(server_first.validate("this-nonce-is-longer-than-the-server-echoed-back").is_err());
     }
 }

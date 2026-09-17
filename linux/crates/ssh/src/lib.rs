@@ -117,27 +117,39 @@ struct LocalSocketDir {
 }
 
 impl LocalSocketDir {
-    fn create() -> Result<Self, SshError> {
-        let base = std::env::var_os("XDG_RUNTIME_DIR")
+    fn create(socket_name_len: usize) -> Result<Self, SshError> {
+        let preferred = std::env::var_os("XDG_RUNTIME_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
         let mut last_error = None;
-        for _ in 0..8 {
-            let unique = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|elapsed| elapsed.as_nanos())
-                .unwrap_or_default();
-            let path = base.join(format!("tablepro-ssh-{}-{unique}", std::process::id()));
-            match std::fs::DirBuilder::new().recursive(false).mode(0o700).create(&path) {
-                Ok(()) => return Ok(Self { path }),
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => last_error = Some(error),
-                Err(error) => return Err(SshError::Bind(error)),
+        for base in [preferred, PathBuf::from("/tmp")] {
+            for _ in 0..8 {
+                let unique = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|elapsed| elapsed.as_nanos())
+                    .unwrap_or_default();
+                let path = base.join(format!("tablepro-ssh-{}-{unique}", std::process::id()));
+                if !socket_dir_path_fits(path.as_os_str().len(), socket_name_len) {
+                    break;
+                }
+                match std::fs::DirBuilder::new().recursive(false).mode(0o700).create(&path) {
+                    Ok(()) => return Ok(Self { path }),
+                    Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => last_error = Some(error),
+                    Err(error) => {
+                        last_error = Some(error);
+                        break;
+                    }
+                }
             }
         }
         Err(SshError::Bind(last_error.unwrap_or_else(|| {
-            std::io::Error::other("could not create a private socket directory")
+            std::io::Error::other("no private runtime directory can fit the forwarded socket path")
         })))
     }
+}
+
+fn socket_dir_path_fits(candidate_path_len: usize, socket_name_len: usize) -> bool {
+    candidate_path_len + 1 + socket_name_len <= MAX_SOCKET_PATH_LEN
 }
 
 impl Drop for LocalSocketDir {
@@ -369,10 +381,15 @@ async fn bind_local(bind: LocalBind) -> Result<(LocalListener, u16, Option<Local
             Ok((LocalListener::Tcp(listener), local_port, None))
         }
         LocalBind::Socket { name } => {
-            let directory = LocalSocketDir::create()?;
+            let directory = LocalSocketDir::create(name.len())?;
             let path = directory.path.join(&name);
             check_socket_path_length(path.as_os_str().len())?;
-            let listener = UnixListener::bind(&path).map_err(SshError::Bind)?;
+            let listener = UnixListener::bind(&path).map_err(|error| {
+                SshError::Bind(std::io::Error::new(
+                    error.kind(),
+                    format!("bind {}: {error}", path.display()),
+                ))
+            })?;
             Ok((LocalListener::Socket(listener), 0, Some(directory)))
         }
     }
@@ -782,14 +799,20 @@ mod tests {
     }
 
     #[test]
-    fn bind_local_accepts_a_socket_name_within_the_path_limit() {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-        let result = runtime.block_on(bind_local(LocalBind::Socket {
-            name: "pg.sock".to_string(),
-        }));
-        assert!(result.is_ok());
+    fn local_socket_directory_fits_a_short_socket_name() {
+        let name = "pg.sock";
+        let directory = LocalSocketDir::create(name.len()).unwrap();
+        let path = directory.path.join(name);
+        assert!(path.as_os_str().len() <= MAX_SOCKET_PATH_LEN);
+    }
+
+    #[test]
+    fn socket_dir_path_fits_exactly_at_the_limit() {
+        assert!(socket_dir_path_fits(MAX_SOCKET_PATH_LEN - 1 - 7, 7));
+    }
+
+    #[test]
+    fn socket_dir_path_fits_rejects_one_byte_over_the_limit() {
+        assert!(!socket_dir_path_fits(MAX_SOCKET_PATH_LEN - 7, 7));
     }
 }

@@ -788,6 +788,7 @@ mod tests {
         ));
         assert!(source.contains("const MAX_ITERATION_COUNT: u32 = 100_000"));
         assert!(source.contains("self.i > MAX_ITERATION_COUNT"));
+        assert!(source.contains("self.nonce.starts_with(nonce)"));
     }
 
     #[test]

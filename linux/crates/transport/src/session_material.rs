@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 
 use secrecy::{ExposeSecret, SecretString};
@@ -88,8 +90,11 @@ fn append_tls_ca(hasher: &mut MaterialHasher, saved: &SavedConnection) -> Result
 }
 
 fn read_material_file(path: &Path) -> Result<Vec<u8>, TransportError> {
-    let metadata = std::fs::metadata(path)
-        .map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))?;
+    let file =
+        File::open(path).map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| TransportError::Secret(format!("cannot inspect {}: {error}", path.display())))?;
     if !metadata.is_file() {
         return Err(TransportError::Secret(format!(
             "{} is not a regular file",
@@ -103,7 +108,18 @@ fn read_material_file(path: &Path) -> Result<Vec<u8>, TransportError> {
             MAX_MATERIAL_FILE_BYTES
         )));
     }
-    std::fs::read(path).map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(MAX_MATERIAL_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| TransportError::Secret(format!("cannot read {}: {error}", path.display())))?;
+    if bytes.len() as u64 > MAX_MATERIAL_FILE_BYTES {
+        return Err(TransportError::Secret(format!(
+            "{} exceeds the {}-byte material limit",
+            path.display(),
+            MAX_MATERIAL_FILE_BYTES
+        )));
+    }
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -234,6 +250,39 @@ mod tests {
             .await
             .expect_err("oversized ca must fail");
         assert!(error.to_string().contains("material limit"));
+    }
+
+    #[test]
+    fn the_material_file_limit_is_one_mebibyte() {
+        assert_eq!(MAX_MATERIAL_FILE_BYTES, 1_048_576);
+    }
+
+    #[tokio::test]
+    async fn material_file_exactly_at_the_limit_is_accepted() {
+        let directory = tempfile::tempdir().unwrap();
+        let ca = directory.path().join("ca.pem");
+        std::fs::write(&ca, vec![b'x'; MAX_MATERIAL_FILE_BYTES as usize]).unwrap();
+        let mut saved = sqlite_saved();
+        saved.tls_root_cert = Some(ca);
+        session_material_digest(&saved)
+            .await
+            .expect("a file exactly at the limit must be accepted");
+    }
+
+    #[tokio::test]
+    async fn hop_zero_password_auth_is_not_refused_by_the_jump_guard() {
+        let mut saved = sqlite_saved();
+        saved.ssh = Some(SavedSshConfig {
+            auth: SavedSshAuth::Password,
+            ..key_hop(PathBuf::from("/unused"))
+        });
+        if let Err(error) = session_material_digest(&saved).await {
+            let message = error.to_string();
+            assert!(
+                !message.contains("uses password auth"),
+                "hop 0 must not be refused by the jump-hop guard: {message}"
+            );
+        }
     }
 
     #[tokio::test]
