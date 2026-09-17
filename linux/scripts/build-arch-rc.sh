@@ -49,6 +49,7 @@ export TABLEPRO_RC_COMMIT="$commit"
 export TABLEPRO_RC_SHA256="$checksum"
 export TABLEPRO_RC_VERSION="$version"
 export TABLEPRO_RC_ARCHIVE="$archive"
+export SRCDEST="$archive_dir"
 makepkg --cleanbuild --clean --syncdeps --noconfirm
 mapfile -t package_files < <(makepkg --packagelist)
 namcap PKGBUILD "${package_files[@]}"

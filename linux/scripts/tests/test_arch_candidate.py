@@ -30,6 +30,9 @@ if [[ "$1" == --packagelist ]]; then
   printf '%s\n' "$BOOKIE_TEST_PACKAGE" "$BOOKIE_TEST_DEBUG_PACKAGE"
 else
   test "$TABLEPRO_RC_VERSION" = 0.1.1
+  test -n "${SRCDEST:-}"
+  test "$(basename "$TABLEPRO_RC_ARCHIVE")" = bookie-0.1.1.tar.gz
+  test -f "$SRCDEST/$(basename "$TABLEPRO_RC_ARCHIVE")"
   test "$(sha256sum "$TABLEPRO_RC_ARCHIVE" | cut -d' ' -f1)" = "$TABLEPRO_RC_SHA256"
   test "$(tar -xOf "$TABLEPRO_RC_ARCHIVE" "TablePro-$TABLEPRO_RC_COMMIT/linux/probe")" = 'candidate bytes'
   touch "$BOOKIE_TEST_PACKAGE" "$BOOKIE_TEST_DEBUG_PACKAGE"
