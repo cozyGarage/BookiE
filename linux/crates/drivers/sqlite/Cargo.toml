@@ -12,13 +12,13 @@ path = "src/lib.rs"
 
 [dependencies]
 tablepro-core = { path = "../../core" }
-libsqlite3-sys = "0.30"
+libsqlite3-sys.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 futures.workspace = true
 rust_decimal.workspace = true
 serde_json.workspace = true
-sqlx = { workspace = true, features = ["sqlite"] }
+sqlx = { workspace = true, features = ["sqlite-unbundled"] }
 tokio.workspace = true
 uuid.workspace = true
 

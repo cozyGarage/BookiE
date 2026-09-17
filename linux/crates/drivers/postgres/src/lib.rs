@@ -258,7 +258,7 @@ impl Connection for PgConnection {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sql), params);
+        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
         let mut stream = query.fetch(&self.pool);
         collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
     }
@@ -278,7 +278,10 @@ impl Connection for PgConnection {
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let res = sqlx::query(sql).execute(&self.pool).await.map_err(map_sqlx_error)?;
+        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
         })
@@ -294,7 +297,7 @@ impl Connection for PgConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sql), params);
+        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
         let result = query.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: result.rows_affected(),
@@ -319,7 +322,8 @@ impl Connection for PgConnection {
         let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
-            let q = bind_pg_params(sqlx::query(sql), params);
+            let sql = sql.as_str();
+            let q = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -712,7 +716,7 @@ async fn query_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sql), params);
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let mut stream = query.fetch(&mut **connection);
     collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
 }
@@ -722,7 +726,7 @@ async fn execute_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sql), params);
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let result = query.execute(&mut **connection).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
@@ -730,7 +734,7 @@ async fn execute_connection(
 }
 
 async fn stream_into_result(pool: &Pool<Postgres>, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
-    let mut stream = sqlx::query(sql).fetch(pool);
+    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(pool);
     collect_query_rows(&mut stream, limit).await
 }
 
@@ -1008,6 +1012,16 @@ mod tests {
     fn map_io_refused_returns_connection_refused() {
         let err = sqlx::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
         assert!(matches!(map_sqlx_error(err), DriverError::ConnectionRefused));
+    }
+
+    #[test]
+    fn patched_sqlx_postgres_caps_scram_iterations() {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../vendor/sqlx-postgres/src/connection/sasl.rs"
+        ));
+        assert!(source.contains("const MAX_SASL_ITERATIONS: u32 = 100_000"));
+        assert!(source.contains("iter_count > MAX_SASL_ITERATIONS"));
     }
 
     #[test]

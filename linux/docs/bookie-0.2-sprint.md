@@ -108,7 +108,12 @@ references, tests, and differences. Implementation and release verification diff
 - [ ] **B1 platform/build**: Rust 1.98, GNOME 50, SQLx 0.9/system SQLite, crypto/
   dependencies, Meson/GResource, library entrypoint, gettext/logging, isolated dev
   profiles, Arch/development Flatpak. Keep internal crate names when renaming adds
-  no compatibility benefit.
+  no compatibility benefit. GNOME 50 itself (`gtk4` `gnome_50`, `libadwaita` `v1_9`,
+  `sourceview5` `v5_18`, `glib`/`gio` `v2_88`) is blocked on a GTK4 Shortcuts API
+  migration — see the 2026-09-17 ledger entry below. The feature flags are reverted
+  to their pre-bump values (`v4_14`/`v1_6`+`gtk_v4_6`/`v5_12`, no `v2_88`) until that
+  lands; Rust 1.98, SQLx 0.9/system SQLite, and the other B1 items are unaffected
+  and already in `linux`.
 - [ ] **B2 runtime/storage**: owned Tasks, explicit stores, private durable writes,
   history migrations, GSettings, coalesced writers. Remove replaced globals/runtime
   calls; flush persistence and settle governed operations at shutdown.
@@ -224,6 +229,47 @@ backup bytes, but an installed-package rollback is still a release gate.
 - Refreshed dependency checks found [RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html)
   in Rustls 0.23.43. The patch update to 0.23.45 is part of 0.1.1; transport and
   advisory checks must be rerun. Rust 1.98.1 is installed for the later B1 work.
+- 2026-09-17: the GNOME 50 platform bump (`gtk4` `gnome_50`, `libadwaita` `v1_9`,
+  `sourceview5` `v5_18`, `glib`/`gio` `v2_88`) was built and Clippy-checked inside a
+  `debian:testing` container (the only readily available Linux environment with
+  glib >= 2.88 and libadwaita >= 1.9; `ubuntu:25.10`, the CI GTK image, ships glib
+  2.86 and libadwaita 1.8 and cannot satisfy the bump at all). The build itself
+  succeeds, but `cargo clippy -- -D warnings` fails with 40 errors: GTK4's
+  `ShortcutsWindow`/`ShortcutsSection`/`ShortcutsGroup`/`ShortcutsShortcut` builder
+  API is deprecated wholesale as of 4.18 (`crates/app/src/ui/app/shortcuts.rs`,
+  ~15 call sites), and `Calendar::select_day` is deprecated as of 4.20
+  (`crates/app/src/ui/grid/editing.rs:220`). Reverted just the four feature-flag
+  lines in the workspace `Cargo.toml` back to their pre-bump values (crate
+  *versions* did not change, only which deprecated API surface compiles in), so
+  `linux` builds and lints clean again. The underlying GNOME 50 migration is real,
+  wanted B1 work — it needs the Shortcuts window rebuilt against its replacement
+  API (own GTK release notes have not been checked yet) and the one Calendar call
+  site updated, verified visually before re-enabling the feature flags. Everything
+  else from this pass (Rust 1.98, SQLx 0.9/system SQLite, tiberius fork switch,
+  russh 0.63, BookiE identity/Meson scaffolding) is unaffected and already in
+  `linux`. Also added `libsqlite3-dev` to every CI job that builds the sqlite
+  driver or the app crate — missing before, and a certain CI failure once system
+  SQLite linking landed, independent of the GNOME 50 question.
+- 2026-09-16/17: reviewed the macOS `main` branch's Swift test suite (~1,300
+  files) for adoptable test cases against `linux`'s own logic, tracked in
+  [docs/testing.md](testing.md)'s "Upstream test-suite parity" section.
+  Ported 5 items — SSH (host-key/socket-path/connect-error edge cases),
+  cell/value display (binary edge cases; surfaced but did not fix an
+  `is_cell_editable` type-affinity gap needing GTK visual verification), row
+  copy/paste (TSV escaping, paste normalization), storage (found already
+  ahead of main's equivalent suite; one real gap in query-history export
+  formatting), and Redis (reply-to-value mapping, error classification) — 34
+  new tests, workspace suite 879 → 911. A follow-on mutation-testing pass
+  (`cargo mutants` against the newly touched files, not yet wired into CI at
+  the time) found 3 tests that passed without actually pinning the behavior
+  they claimed to: a boundary check whose test couldn't reach the exact edge
+  (fixed by extracting the check into its own pure function), a CLI-escape
+  guard tested on only one side of its condition, and a constant referenced
+  only symbolically so a change to its own definition couldn't be caught.
+  All three fixed and reverified; `linux-quality.yml`'s scheduled mutation
+  job now also covers `ssh` and `driver-redis` going forward. Bumped MSRV
+  and CI to Rust 1.98 in the same pass, validated against the real toolchain
+  locally (fmt/clippy/929 tests/`cargo deny` clean) before landing.
 
 ### Local implementation commits
 

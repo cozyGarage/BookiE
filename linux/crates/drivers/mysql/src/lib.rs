@@ -206,14 +206,17 @@ impl Connection for MysqlConnection {
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let res = sqlx::query(sql).execute(&self.pool).await.map_err(map_sqlx_error)?;
+        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
         })
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let q = bind_mysql_params(sqlx::query(sql), params);
+        let q = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
         let res = q.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
@@ -251,7 +254,8 @@ impl Connection for MysqlConnection {
         let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
-            let q = bind_mysql_params(sqlx::query(sql), params);
+            let sql = sql.as_str();
+            let q = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -394,7 +398,10 @@ impl tablepro_core::Transaction for MysqlTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let rows = sqlx::query(sql).fetch_all(&mut **tx).await.map_err(map_sqlx_error)?;
+        let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .fetch_all(&mut **tx)
+            .await
+            .map_err(map_sqlx_error)?;
         if rows.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -431,7 +438,10 @@ impl tablepro_core::Transaction for MysqlTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let res = sqlx::query(sql).execute(&mut **tx).await.map_err(map_sqlx_error)?;
+        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
+            .execute(&mut **tx)
+            .await
+            .map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
         })
@@ -458,7 +468,7 @@ async fn stream_into_result<'e, E>(executor: E, sql: &str, limit: usize) -> Resu
 where
     E: sqlx::Executor<'e, Database = MySql>,
 {
-    let mut stream = sqlx::query(sql).fetch(executor);
+    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(executor);
     let mut collected: Vec<MySqlRow> = Vec::new();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
@@ -584,7 +594,7 @@ where
     if params.is_empty() {
         return stream_into_result(executor, sql, limit).await;
     }
-    let query = bind_mysql_params(sqlx::query(sql), params);
+    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let mut stream = query.fetch(executor);
     let mut collected: Vec<MySqlRow> = Vec::new();
     let mut truncated = false;
@@ -603,7 +613,7 @@ async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<E
 where
     E: sqlx::Executor<'e, Database = MySql>,
 {
-    let query = bind_mysql_params(sqlx::query(sql), params);
+    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
     let result = query.execute(executor).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
@@ -650,7 +660,7 @@ async fn request_cancellation(pool: &Pool<MySql>, connection_id: u64) -> Result<
     let pool = pool.clone();
     let task = tokio::spawn(async move {
         let mut conn = pool.acquire().await.map_err(map_sqlx_error)?;
-        let outcome = sqlx::query(&format!("KILL QUERY {connection_id}"))
+        let outcome = sqlx::query(sqlx::AssertSqlSafe(format!("KILL QUERY {connection_id}")))
             .execute(&mut *conn)
             .await
             .map_err(map_sqlx_error);

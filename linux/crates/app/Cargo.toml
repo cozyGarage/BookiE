@@ -6,12 +6,17 @@ license.workspace = true
 rust-version.workspace = true
 publish = false
 
+[lib]
+name = "tablepro_app"
+path = "src/lib.rs"
+
 [[bin]]
 name = "tablepro-app"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["kerberos"]
+kerberos = ["tablepro-driver-mssql/kerberos"]
 # Bundled DuckDB compiles a large C++ tree; enable explicitly when needed.
 duckdb = ["dep:tablepro-driver-duckdb"]
 
@@ -56,3 +61,6 @@ async-trait.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+[build-dependencies]
+glib-build-tools.workspace = true

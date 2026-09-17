@@ -40,4 +40,5 @@
 *.flatpak binary
 
 linux/po/*.po linguist-generated=true
+linux/vendor/** linguist-vendored
 .github/workflows/*.lock.yml linguist-generated=true merge=ours

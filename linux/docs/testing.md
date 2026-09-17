@@ -216,6 +216,17 @@ and the two crates whose defects reach SQL text and authorization
 decisions. Mutating the app crate mostly reports widget construction no
 unit test can reach.
 
+CI's scheduled `mutation` job (`linux-quality.yml`) also covers `ssh` and
+`driver-redis` — both pure logic with no Docker/GTK dependency, and the two
+crates a 2026-09-17 manual run found real gaps in: a socket-path length
+check whose test could not reach the exact boundary (the boundary depended
+on a nondeterministic temp-directory name; fixed by extracting the check
+into its own pure function), and a CLI-argument escape guard only tested on
+one side of its condition (backslash inside quotes, not outside). Add a
+crate here once it accumulates unit-testable logic worth pinning this way;
+a driver crate whose logic is mostly "call the real client library" is not
+a good target until it grows some.
+
 Read the output carefully. Many surviving mutants are *equivalent* - a
 different program with identical behaviour - and can never be caught. In
 `sql_lex::skip_span`, replacing `offset + 1` with `offset - 1` shortens a

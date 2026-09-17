@@ -165,11 +165,20 @@ async fn a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly() {
     let _environment = ENV_LOCK.lock().await;
     let config = tempfile::TempDir::new().expect("temporary config directory");
     let journal = tempfile::TempDir::new().expect("temporary journal directory");
+    let keys = tempfile::TempDir::new().expect("temporary key directory");
     // SAFETY: the storage crate resolves saved connections from this variable
     // and the test process owns it for the duration of this test binary.
     unsafe { std::env::set_var("XDG_CONFIG_HOME", config.path()) };
 
-    let saved = saved_with_bastion("127.0.0.1", 1);
+    let key_path = keys.path().join("id_ed25519");
+    std::fs::write(&key_path, b"not-a-real-ssh-key").expect("write a dummy private key for material hashing");
+    let mut saved = saved_with_bastion("127.0.0.1", 1);
+    if let Some(ssh) = saved.ssh.as_mut() {
+        ssh.auth = SavedSshAuth::PrivateKey {
+            path: key_path,
+            has_passphrase: false,
+        };
+    }
     let connection_id = saved.id;
     save_connections(&[saved]).await.expect("save the fixture connection");
 

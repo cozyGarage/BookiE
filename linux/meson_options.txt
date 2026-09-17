@@ -1,0 +1,2 @@
+option('profile', type: 'combo', choices: ['default', 'development'], value: 'default')
+option('kerberos', type: 'boolean', value: true)

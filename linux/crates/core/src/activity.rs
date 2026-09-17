@@ -79,7 +79,7 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
     match (driver_id, kind) {
         ("postgres", ActivityQuery::Sessions) => Some(
             "SELECT pid, usename, datname, state, wait_event_type, wait_event, \
-             now() - query_start AS duration, left(query, 200) AS query \
+             (now() - query_start)::text AS duration, left(query, 200) AS query \
              FROM pg_stat_activity \
              WHERE backend_type = 'client backend' \
              ORDER BY query_start NULLS LAST"
@@ -108,7 +108,7 @@ fn activity_template(driver_id: &str, kind: ActivityQuery, session_id: Option<u6
                 .into(),
         ),
         ("postgres", ActivityQuery::LongRunning) => Some(
-            "SELECT pid, usename, datname, now() - query_start AS duration, \
+            "SELECT pid, usename, datname, (now() - query_start)::text AS duration, \
              left(query, 200) AS query \
              FROM pg_stat_activity \
              WHERE state = 'active' AND query_start < now() - interval '30 seconds' \

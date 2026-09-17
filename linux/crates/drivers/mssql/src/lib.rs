@@ -72,11 +72,11 @@ impl DatabaseDriver for MssqlDriver {
     }
 
     fn supports_integrated_auth(&self) -> bool {
-        true
+        cfg!(feature = "kerberos")
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        let target = build_target(&opts);
+        let target = build_target(&opts)?;
         let client = match opts.auth_mode {
             AuthMode::Password => tokio::time::timeout(CONNECT_TIMEOUT, open_client(target))
                 .await
@@ -94,13 +94,13 @@ struct MssqlTarget {
     dial_port: u16,
 }
 
-fn build_target(opts: &ConnectOptions) -> MssqlTarget {
+fn build_target(opts: &ConnectOptions) -> Result<MssqlTarget, DriverError> {
     let (service_host, service_port) = opts.service_address();
     let mut config = Config::new();
     config.host(service_host);
     config.port(service_port);
     config.database(&opts.database);
-    config.authentication(auth_method(opts));
+    config.authentication(auth_method(opts)?);
     use tablepro_core::TlsMode;
     match opts.tls.mode {
         TlsMode::Disabled => {
@@ -119,17 +119,22 @@ fn build_target(opts: &ConnectOptions) -> MssqlTarget {
         }
     }
 
-    MssqlTarget {
+    Ok(MssqlTarget {
         config,
         dial_host: dial_host(&opts.host).to_string(),
         dial_port: opts.port,
-    }
+    })
 }
 
-fn auth_method(opts: &ConnectOptions) -> AuthMethod {
+fn auth_method(opts: &ConnectOptions) -> Result<AuthMethod, DriverError> {
     match opts.auth_mode {
-        AuthMode::Password => AuthMethod::sql_server(&opts.username, opts.password.expose_secret()),
-        AuthMode::Kerberos => AuthMethod::Integrated,
+        AuthMode::Password => Ok(AuthMethod::sql_server(&opts.username, opts.password.expose_secret())),
+        #[cfg(feature = "kerberos")]
+        AuthMode::Kerberos => Ok(AuthMethod::Integrated),
+        #[cfg(not(feature = "kerberos"))]
+        AuthMode::Kerberos => Err(DriverError::IntegratedAuth(
+            "Kerberos support is not enabled in this build".into(),
+        )),
     }
 }
 
@@ -844,6 +849,7 @@ fn map_tiberius_error(err: tiberius::error::Error) -> DriverError {
                 }
             }
         }
+        #[cfg(feature = "kerberos")]
         E::Gssapi(detail) => DriverError::IntegratedAuth(detail),
         E::Routing { host, port } => DriverError::Internal(format!("server requested routing to {host}:{port}")),
         other => DriverError::Internal(other.to_string()),
@@ -911,7 +917,7 @@ mod tests {
 
     #[test]
     fn direct_connection_uses_service_identity_as_dial_endpoint() {
-        let target = build_target(&direct_options());
+        let target = build_target(&direct_options()).unwrap();
 
         assert_eq!(target.config.get_addr(), "sql.corp.example:1433");
         assert_eq!(
@@ -928,7 +934,7 @@ mod tests {
             service_endpoint: Some(("sql.corp.example".into(), 1433)),
             ..direct_options()
         };
-        let target = build_target(&options);
+        let target = build_target(&options).unwrap();
 
         assert_eq!(target.config.get_addr(), "sql.corp.example:1433");
         assert_eq!((target.dial_host.as_str(), target.dial_port), ("127.0.0.1", 54321));
@@ -940,7 +946,7 @@ mod tests {
             host: ".".into(),
             ..direct_options()
         };
-        let target = build_target(&options);
+        let target = build_target(&options).unwrap();
 
         assert_eq!(target.config.get_addr(), "localhost:1433");
         assert_eq!(target.dial_host, "localhost");
@@ -960,7 +966,7 @@ mod tests {
             },
             ..direct_options()
         };
-        let _ = build_target(&options);
+        let _ = build_target(&options).unwrap();
     }
 
     #[test]
@@ -972,7 +978,7 @@ mod tests {
             },
             ..direct_options()
         };
-        let _ = build_target(&options);
+        let _ = build_target(&options).unwrap();
     }
 
     #[test]
@@ -984,6 +990,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "kerberos")]
     fn kerberos_uses_integrated_authentication() {
         let options = ConnectOptions {
             auth_mode: AuthMode::Kerberos,
@@ -991,15 +998,27 @@ mod tests {
             ..direct_options()
         };
 
-        assert_eq!(auth_method(&options), AuthMethod::Integrated);
-        assert_eq!(auth_method(&direct_options()), AuthMethod::sql_server("", ""));
+        assert_eq!(auth_method(&options).unwrap(), AuthMethod::Integrated);
+        assert_eq!(auth_method(&direct_options()).unwrap(), AuthMethod::sql_server("", ""));
     }
 
     #[test]
+    #[cfg(feature = "kerberos")]
     fn gssapi_errors_are_classified_as_integrated_authentication_failures() {
         let error = map_tiberius_error(tiberius::error::Error::Gssapi("ticket expired".into()));
 
         assert!(matches!(error, DriverError::IntegratedAuth(detail) if detail == "ticket expired"));
+    }
+
+    #[test]
+    #[cfg(not(feature = "kerberos"))]
+    fn disabled_kerberos_is_rejected_before_connecting() {
+        let options = ConnectOptions {
+            auth_mode: AuthMode::Kerberos,
+            ..direct_options()
+        };
+        assert!(!MssqlDriver.supports_integrated_auth());
+        assert!(matches!(build_target(&options), Err(DriverError::IntegratedAuth(_))));
     }
 
     #[test]

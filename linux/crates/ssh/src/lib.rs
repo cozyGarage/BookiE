@@ -257,7 +257,15 @@ struct ClientHandler {
 impl client::Handler for ClientHandler {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, key: &PublicKey) -> Result<bool, Self::Error> {
+    async fn check_server_key(&mut self, presented: &russh::keys::PublicKeyOrCertificate) -> Result<bool, Self::Error> {
+        let russh::keys::PublicKeyOrCertificate::PublicKey { key, .. } = presented else {
+            if let Ok(mut slot) = self.outcome.lock() {
+                *slot = Some(HostKeyOutcome::KnownHostsIo(
+                    "SSH host certificates require the OpenSSH transport".into(),
+                ));
+            }
+            return Ok(false);
+        };
         let fingerprint = key.fingerprint(HashAlg::Sha256).to_string();
         let outcome = verify_or_learn(
             &self.target_host,

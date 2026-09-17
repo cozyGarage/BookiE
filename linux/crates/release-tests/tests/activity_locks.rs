@@ -3,7 +3,22 @@ use tablepro_release_tests::Fixture;
 
 async fn activity_rows(connection: &dyn Connection, kind: ActivityQuery) -> usize {
     let sql = activity_sql("postgres", kind, None).expect("postgres activity template");
-    connection.query(&sql).await.expect("activity query").rows.len()
+    let result = connection.query(&sql).await.expect("activity query");
+    if kind == ActivityQuery::Sessions {
+        let duration = result
+            .columns
+            .iter()
+            .position(|column| column.name == "duration")
+            .expect("duration column");
+        assert!(
+            result
+                .rows
+                .iter()
+                .any(|row| matches!(row.get(duration), Some(Value::Text(_)))),
+            "activity must return a readable duration rather than silently decoding it as NULL"
+        );
+    }
+    result.rows.len()
 }
 
 #[tokio::test]

@@ -730,6 +730,16 @@ mod tests {
     }
 
     #[test]
+    fn patched_mongodb_caps_scram_iterations() {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../vendor/mongodb/src/client/auth/scram.rs"
+        ));
+        assert!(source.contains("const MAX_ITERATION_COUNT: u32 = 100_000"));
+        assert!(source.contains("self.i > MAX_ITERATION_COUNT"));
+    }
+
+    #[test]
     fn drop_table_sql_extracts_the_collection_name() {
         assert_eq!(
             parse_drop_table_sql(r#"DROP TABLE IF EXISTS "widgets""#),

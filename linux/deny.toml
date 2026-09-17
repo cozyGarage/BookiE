@@ -13,9 +13,9 @@ yanked = "warn"
 # paste and similar are transitive only.
 unmaintained = "workspace"
 ignore = [
-    # No fixed release. rsa 0.9.10 via sqlx-mysql; rsa 0.10 rc via russh.
+    # No fixed release. rsa 0.10.0-rc.18 via russh, ssh-key, and sqlx-mysql.
     # Local desktop use; remote timing against our RSA private-key path is limited.
-    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack: no fixed upgrade; transitive via russh and sqlx-mysql" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack: no fixed upgrade; transitive via russh, ssh-key, and sqlx-mysql" },
 ]
 
 [licenses]
@@ -49,4 +49,4 @@ highlight = "all"
 unknown-registry = "deny"
 unknown-git = "warn"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/prisma/tiberius"]
+allow-git = ["https://github.com/tiberius-rs/tiberius"]
