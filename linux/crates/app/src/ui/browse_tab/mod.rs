@@ -82,6 +82,7 @@ pub struct BrowseTabInit {
     pub page_size: u64,
     pub initial_offset: u64,
     pub initial_sort: Option<(usize, bool)>,
+    pub persistence: crate::services::persistence_stores::PersistenceStores,
 }
 
 pub struct BrowseTab {
@@ -91,6 +92,7 @@ pub struct BrowseTab {
     driver_id: String,
     connection_id: Option<Uuid>,
     read_only: bool,
+    persistence: crate::services::persistence_stores::PersistenceStores,
 
     current_offset: u64,
     page_size: u64,
@@ -519,7 +521,12 @@ impl SimpleComponent for BrowseTab {
         // strip start with the same FilterSet.
         let initial_filter = init
             .connection_id
-            .map(|id| crate::services::filter_settings::load(id, init.schema.as_deref(), &init.table))
+            .and_then(|id| {
+                init.persistence
+                    .filter_settings
+                    .as_ref()
+                    .map(|store| store.load(id, init.schema.as_deref(), &init.table))
+            })
             .unwrap_or_default();
 
         let suppress_combo_emit = Rc::new(std::cell::Cell::new(true));
@@ -841,6 +848,7 @@ impl SimpleComponent for BrowseTab {
             driver_id: init.driver_id,
             connection_id: init.connection_id,
             read_only: init.read_only,
+            persistence: init.persistence,
             current_offset: init.initial_offset,
             page_size: init.page_size,
             current_sort: init.initial_sort,
@@ -1048,13 +1056,8 @@ impl SimpleComponent for BrowseTab {
                     return;
                 }
                 self.current_filter = set.clone();
-                if let Some(conn_id) = self.connection_id
-                    && let Err(error) = crate::services::filter_settings::save(
-                        conn_id,
-                        self.schema.as_deref(),
-                        &self.table,
-                        set.clone(),
-                    )
+                if let (Some(conn_id), Some(store)) = (self.connection_id, &self.persistence.filter_settings)
+                    && let Err(error) = store.save(conn_id, self.schema.as_deref(), &self.table, set.clone())
                 {
                     let _ = sender.output(BrowseTabOutput::ShowToast(error));
                 }

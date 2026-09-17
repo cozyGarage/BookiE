@@ -66,6 +66,7 @@ pub fn run() {
     }
 
     let registry = Arc::new(build_registry());
+    let persistence = services::persistence_stores::PersistenceStores::open();
     tracing::info!(drivers = registry.len(), "starting tablepro-app");
 
     let approval_router = services::approval_router::ApprovalRouter::new(
@@ -77,10 +78,12 @@ pub fn run() {
     let _mcp = services::mcp_service::start_background();
 
     let app = RelmApp::new(config::APP_ID);
-    app.run::<ui::App>(registry);
+    app.run::<ui::App>(ui::AppInit {
+        registry,
+        persistence: persistence.clone(),
+    });
 
-    services::column_widths::flush();
-    services::filter_settings::flush();
+    persistence.flush();
 
     // Explicit ordered shutdown: `app.run` returned (window closed),
     // so let the tokio runtime's worker threads finish in-flight

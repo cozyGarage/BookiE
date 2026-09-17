@@ -127,6 +127,7 @@ fn build_outcome_widget(
                 None,
                 connection_id,
                 TabGridContext::default(),
+                None,
             );
             let scrolled = gtk::ScrolledWindow::builder()
                 .child(&column_view)

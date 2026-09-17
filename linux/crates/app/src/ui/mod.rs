@@ -23,7 +23,7 @@ mod structure_tab;
 mod structure_tab_dialogs;
 mod welcome_view;
 
-pub use app::App;
+pub use app::{App, AppInit};
 
 #[cfg(test)]
 pub(crate) use editor::SchemaIndex;

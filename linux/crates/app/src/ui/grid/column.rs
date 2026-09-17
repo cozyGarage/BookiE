@@ -42,6 +42,7 @@ pub(super) fn build_column(
     default_min_width: Option<i32>,
     column_view: gtk4::ColumnView,
     grid_menus: Option<GridMenus>,
+    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
 ) -> gtk4::ColumnViewColumn {
     let factory = gtk4::SignalListItemFactory::new();
     let edit_sender = if editable { sender.clone() } else { None };
@@ -263,17 +264,24 @@ pub(super) fn build_column(
         column.set_sorter(Some(&dummy));
     }
     if let Some(id) = connection_id {
-        if let Some(saved) = crate::services::column_widths::load(id, &table_for_persist, &info.name) {
+        if let Some(saved) = column_widths
+            .as_ref()
+            .and_then(|store| store.load(id, &table_for_persist, &info.name))
+        {
             column.set_fixed_width(saved);
         } else if let Some(min) = default_min_width {
             column.set_fixed_width(min);
         }
         let column_for_save = column.clone();
         let column_name = info.name.clone();
+        let column_widths = column_widths.clone();
         column.connect_fixed_width_notify(move |_| {
             let width = column_for_save.fixed_width();
-            if width > 0 {
-                crate::services::column_widths::save(id, &table_for_persist, &column_name, width);
+            if width > 0
+                && let Some(store) = &column_widths
+                && let Err(error) = store.save(id, &table_for_persist, &column_name, width)
+            {
+                tracing::warn!(%error, "column width was not saved");
             }
         });
     } else if let Some(min) = default_min_width {
@@ -468,6 +476,7 @@ mod tests {
             None,
             None,
             TabGridContext::default(),
+            None,
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
@@ -531,6 +540,7 @@ mod tests {
             None,
             None,
             TabGridContext::default(),
+            None,
         );
         let window = gtk4::Window::builder()
             .title("TEXT cells with binary values")

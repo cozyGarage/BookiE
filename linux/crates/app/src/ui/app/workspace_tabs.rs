@@ -360,6 +360,7 @@ impl App {
             page_size,
             initial_offset: offset,
             initial_sort: sort,
+            persistence: self.persistence.clone(),
         };
         let browse = BrowseTab::builder()
             .launch(browse_init)

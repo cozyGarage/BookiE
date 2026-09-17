@@ -45,6 +45,12 @@ use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
 
+#[derive(Clone)]
+pub struct AppInit {
+    pub registry: Arc<DriverRegistry>,
+    pub persistence: crate::services::persistence_stores::PersistenceStores,
+}
+
 /// Decrement a tab's pending-save counter in the close-after-save map.
 /// Returns `true` if the entry just dropped to zero (the caller should
 /// fire `WorkspaceTabClosed`); returns `false` if there's still another
@@ -66,6 +72,7 @@ pub(super) fn dec_close_after_save(map: &mut std::collections::HashMap<Uuid, u32
 
 pub struct App {
     registry: Arc<DriverRegistry>,
+    persistence: crate::services::persistence_stores::PersistenceStores,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     window_title: adw::WindowTitle,
@@ -225,7 +232,7 @@ impl App {
 
 #[relm4::component(pub)]
 impl SimpleComponent for App {
-    type Init = Arc<DriverRegistry>;
+    type Init = AppInit;
     type Input = AppMsg;
     type Output = ();
 
@@ -377,7 +384,8 @@ impl SimpleComponent for App {
         }
     }
 
-    fn init(registry: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+        let AppInit { registry, persistence } = init;
         let widgets = view_output!();
 
         init_css::install_pending_change_css();
@@ -408,6 +416,7 @@ impl SimpleComponent for App {
 
         let mut model = App {
             registry,
+            persistence,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
             window_title: widgets.window_title.clone(),
@@ -705,7 +714,12 @@ impl SimpleComponent for App {
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(&self.window),
             AppMsg::NewWindow => {
-                let ctrl = App::builder().launch(self.registry.clone()).detach();
+                let ctrl = App::builder()
+                    .launch(AppInit {
+                        registry: self.registry.clone(),
+                        persistence: self.persistence.clone(),
+                    })
+                    .detach();
                 // Only the window relm4 starts the application with is
                 // presented for us. A window spawned here stays unmapped
                 // unless it joins the application and is presented.

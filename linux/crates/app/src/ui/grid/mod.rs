@@ -76,6 +76,7 @@ pub fn build_column_view(
     sort_sender: Option<relm4::Sender<GridMsg>>,
     connection_id: Option<uuid::Uuid>,
     tab_ctx: TabGridContext,
+    column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
     let store = gtk4::gio::ListStore::new::<RowObject>();
     for row in &result.rows {
@@ -116,6 +117,7 @@ pub fn build_column_view(
             default_min_width,
             column_view.clone(),
             grid_menus.clone(),
+            column_widths.clone(),
         );
         column_view.append_column(&col);
         columns.push(col);
