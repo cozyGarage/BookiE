@@ -36,8 +36,9 @@ impl DatabaseDriver for MongodbDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+        let verifies_cert = opts.tls.mode.verifies_cert();
         let client_opts = build_client_options(&opts).await?;
-        let client = Client::with_options(client_opts).map_err(map_mongo_error)?;
+        let client = Client::with_options(client_opts).map_err(|err| map_mongo_connect_error(err, verifies_cert))?;
         let database_name = if opts.database.is_empty() {
             "test".into()
         } else {
@@ -47,7 +48,7 @@ impl DatabaseDriver for MongodbDriver {
             .database("admin")
             .run_command(doc! { "ping": 1 })
             .await
-            .map_err(map_mongo_error)?;
+            .map_err(|err| map_mongo_connect_error(err, verifies_cert))?;
         Ok(Box::new(MongodbConnection { client, database_name }))
     }
 }
@@ -693,15 +694,65 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
     })
 }
 
-fn map_mongo_error(err: mongodb::error::Error) -> DriverError {
+fn error_chain_text(err: &mongodb::error::Error) -> String {
+    let mut parts = Vec::new();
+    let mut current: Option<&dyn std::error::Error> = Some(err);
+    while let Some(error) = current {
+        parts.push(error.to_string());
+        current = error.source();
+    }
+    if let mongodb::error::ErrorKind::Io(io) = &*err.kind {
+        let mut nested: Option<&dyn std::error::Error> = Some(io.as_ref());
+        while let Some(error) = nested {
+            parts.push(error.to_string());
+            nested = error.source();
+        }
+    }
+    parts.join(" ")
+}
+
+fn looks_like_tls_failure(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("certificate")
+        || lower.contains("notvalidforname")
+        || lower.contains("not valid for name")
+        || lower.contains("hostname")
+        || lower.contains("invaliddnsname")
+        || lower.contains("tls handshake")
+        || lower.contains("unknown issuer")
+        || lower.contains("unknown ca")
+}
+
+fn mongo_error_can_hide_tls(kind: &mongodb::error::ErrorKind) -> bool {
     use mongodb::error::ErrorKind;
-    let message = err.to_string();
+    matches!(
+        kind,
+        ErrorKind::Io(_)
+            | ErrorKind::ServerSelection { .. }
+            | ErrorKind::DnsResolve { .. }
+            | ErrorKind::ConnectionPoolCleared { .. }
+    )
+}
+
+fn map_mongo_error(err: mongodb::error::Error) -> DriverError {
+    map_mongo_connect_error(err, false)
+}
+
+fn map_mongo_connect_error(err: mongodb::error::Error, verifies_cert: bool) -> DriverError {
+    use mongodb::error::ErrorKind;
+    let chain = error_chain_text(&err);
+    if mongo_error_can_hide_tls(&err.kind) && looks_like_tls_failure(&chain) {
+        return DriverError::Tls(chain);
+    }
     match &*err.kind {
         ErrorKind::Authentication { .. } => DriverError::AuthFailed,
         ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
+        ErrorKind::ServerSelection { .. } if verifies_cert => {
+            DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
+        }
         ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } => DriverError::ConnectionRefused,
         _ => DriverError::Query {
-            message,
+            message: err.to_string(),
             sqlstate: None,
         },
     }
@@ -788,6 +839,56 @@ mod tests {
         let io = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
         let error = mongodb::error::Error::from(io);
         assert!(matches!(map_mongo_error(error), DriverError::Query { .. }));
+    }
+
+    #[test]
+    fn a_certificate_name_mismatch_io_error_maps_to_tls() {
+        let io = std::io::Error::other("invalid peer certificate: certificate not valid for name \"127.0.0.1\"");
+        let mapped = map_mongo_error(mongodb::error::Error::from(io));
+        assert!(matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate")));
+    }
+
+    #[test]
+    fn a_connection_refused_carrying_a_name_mismatch_maps_to_tls() {
+        let io = std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "invalid peer certificate: certificate not valid for name \"127.0.0.1\"",
+        );
+        let mapped = map_mongo_error(mongodb::error::Error::from(io));
+        assert!(matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate")));
+    }
+
+    #[test]
+    fn a_plain_connection_refused_stays_connection_refused_when_verifying() {
+        let io = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        let mapped = map_mongo_connect_error(mongodb::error::Error::from(io), true);
+        assert!(matches!(mapped, DriverError::ConnectionRefused));
+    }
+
+    #[test]
+    fn verifying_connect_does_not_report_a_hostname_mismatch_as_a_refusal() {
+        let io = std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "invalid peer certificate: NotValidForName",
+        );
+        let mapped = map_mongo_connect_error(mongodb::error::Error::from(io), true);
+        assert!(matches!(
+            mapped,
+            DriverError::Tls(detail)
+                if detail.to_ascii_lowercase().contains("certificate")
+                    || detail.to_ascii_lowercase().contains("notvalidforname")
+        ));
+    }
+
+    #[test]
+    fn a_server_selection_timeout_embedding_a_name_mismatch_is_tls() {
+        let text = "Server selection timeout: No available servers. Topology: { Type: Unknown, \
+                    Servers: [ { Address: 127.0.0.1:27018, Type: Unknown, Error: Kind: I/O error: \
+                    invalid peer certificate: certificate not valid for name \"127.0.0.1\" } ] }";
+        assert!(looks_like_tls_failure(text));
+        assert!(!looks_like_tls_failure(
+            "Server selection timeout: No available servers. Topology: { Type: Unknown }"
+        ));
     }
 
     #[test]
