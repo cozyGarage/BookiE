@@ -18,7 +18,7 @@ linux/
 │   ├── release-tests/       deterministic release checks against the PostgreSQL fixture
 │   └── drivers/             one crate per database engine
 ├── tests/fixtures/          container fixtures for release checks
-├── packaging/               internal Arch RC and development Debian files
+├── packaging/               Arch and Debian GitHub Release files
 ├── flatpak/                 later Flatpak packaging work
 └── scripts/                 local checks, integration tests, and package helpers
 ```
