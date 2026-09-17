@@ -53,11 +53,11 @@ Include before and after screenshots for visible changes. Test both light and da
 
 ## Packaging
 
-The internal Arch RC is the first packaging target. Test
-`packaging/arch/PKGBUILD` and `scripts/validate-arch-package.sh` when a change
-affects installed files, native dependencies, desktop integration, or launch
-behavior. Public AUR/Omarchy and Flatpak publication are deferred and must not
-define the current RC requirements.
+GitHub Release packages are Arch x86_64 and Ubuntu 25.10 amd64. Test
+`packaging/arch/PKGBUILD`, `scripts/validate-arch-package.sh`, and
+`scripts/validate-deb-package.sh` when a change affects installed files,
+native dependencies, desktop integration, or launch behavior. Public AUR
+and Flathub publication are deferred and must not define current requirements.
 
 ## Commits and pull requests
 

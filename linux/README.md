@@ -10,7 +10,23 @@ The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHou
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
 
-The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Installable 0.1.4 packages for Ubuntu 25.10+ / Debian (amd64) and Arch / Omarchy (x86_64) are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/TablePro/releases/tag/linux-v0.1.4). Ubuntu 24.04 is below the GLib 2.82 / libadwaita 1.6 baseline. Wayland soak remains an operator check after install.
+The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/TablePro/releases/tag/linux-v0.1.4). Wayland soak remains an operator check after install.
+
+## Linux versions
+
+BookiE 0.1.4 (tag `linux-v0.1.4`) targets:
+
+| Distro | Arch | Artifact | Package name | Launch |
+|---|---|---|---|---|
+| Ubuntu 25.10+ | amd64 | `tablepro_0.1.4-1_amd64.deb` | `tablepro` | `bookie` |
+| Debian with GLib 2.82+ | amd64 | same `.deb` | `tablepro` | `bookie` |
+| Arch Linux / Omarchy | x86_64 | `bookie-0.1.4-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
+
+`tablepro` and `tablepro-agentd` remain aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
+
+**Ubuntu 24.04 cannot run this line.** libadwaita 1.6 needs GLib 2.82; 24.04 ships GLib 2.80. GTK CI builds in `ubuntu:25.10` for that reason.
+
+Runtime baseline: GTK4 4.14+, libadwaita 1.6+, GtkSourceView 5.12+. Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
 
 ## Named query parameters
 
@@ -38,7 +54,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 | Async work | Tokio for database and service work, GLib main context for GTK |
 | Drivers | sqlx, tiberius, clickhouse, and engine-specific Rust crates |
 | Storage | XDG JSON files, SQLite FTS5, JSONL audit journal, Secret Service through `oo7` |
-| Packaging | Internal Arch RC first; no public AUR or Flathub release yet |
+| Packaging | GitHub Release `.deb` (Ubuntu 25.10+) and Arch `.pkg`; no AUR or Flathub yet |
 
 Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
 
@@ -49,7 +65,7 @@ Drivers are linked at build time. BookiE does not load database drivers as runti
 sudo apt install -y build-essential pkg-config libgtk-4-dev libadwaita-1-dev \
   libgtksourceview-5-dev libssl-dev libsecret-1-dev libkrb5-dev libsqlite3-dev clang
 
-# Fedora
+# Fedora (build from source only; no 0.1.4 package)
 sudo dnf install -y gcc pkg-config gtk4-devel libadwaita-devel \
   gtksourceview5-devel openssl-devel libsecret-devel krb5-devel clang
 

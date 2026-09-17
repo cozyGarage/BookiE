@@ -10,7 +10,7 @@ The package is an internal Arch candidate, not an AUR or Flathub release. Visibl
 sudo pacman -U bookie-0.1.4-1-x86_64.pkg.tar.zst
 ```
 
-Ubuntu 25.10+ / Debian 13+ (amd64) can install the same release's `.deb`:
+Ubuntu 25.10+ (amd64), and Debian amd64 where system GLib is 2.82 or newer, can install the same release's `.deb`:
 
 ```bash
 sudo apt install ./tablepro_0.1.4-1_amd64.deb

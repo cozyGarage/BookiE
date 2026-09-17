@@ -130,7 +130,7 @@ CI runs GTK checks in an Ubuntu 25.10 container because the selected libadwaita 
 - Drivers are statically linked.
 - There is no embedded browser UI.
 - There is no in-process user scripting runtime.
-- An internal Arch package is the first release target. Public AUR/Omarchy and Flatpak publication come later.
+- GitHub Release packages are Arch x86_64 and Ubuntu 25.10 amd64. Public AUR and Flathub publication come later.
 
 ## Browse query planning and asynchronous identity
 

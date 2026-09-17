@@ -1,8 +1,8 @@
 # Packaging
 
-The first release target is an internal Arch Linux release candidate. Nothing
-in this directory is ready for AUR or Flathub publication; BookiE retains the existing repository and application ID. Portal permissions
-and the public update channel still need release review.
+GitHub Release `linux-v0.1.4` ships an Arch/Omarchy `.pkg.tar.zst` and an Ubuntu 25.10 `.deb`.
+Nothing here is ready for AUR or Flathub. BookiE keeps the existing repository and
+application ID. Portal permissions and the public update channel still need release review.
 
 ## Internal Arch RC
 
@@ -31,8 +31,8 @@ Also validate the installed artifact in a clean Arch VM or container:
 ```bash
 desktop-file-validate /usr/share/applications/com.tablepro.linux.desktop
 appstreamcli validate --no-net /usr/share/metainfo/com.tablepro.linux.metainfo.xml
-dbus-run-session -- tablepro
-tablepro-agentd --help
+dbus-run-session -- bookie
+bookie-agentd --help
 ```
 
 Test install, upgrade, downgrade, and removal. Package operations must leave

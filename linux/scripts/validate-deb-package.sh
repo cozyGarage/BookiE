@@ -11,27 +11,6 @@ if [[ ! -f "$package" ]]; then
   exit 2
 fi
 
-contents="$(dpkg-deb -c "$package" | awk '{print $NF}')"
-for required in \
-  ./usr/bin/bookie \
-  ./usr/bin/bookie-agentd \
-  ./usr/bin/tablepro \
-  ./usr/bin/tablepro-agentd \
-  ./usr/share/applications/com.tablepro.linux.desktop \
-  ./usr/share/metainfo/com.tablepro.linux.metainfo.xml \
-  ./usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
-  ./usr/share/doc/tablepro/LICENSE.md \
-  ./usr/share/doc/tablepro/policy.example.toml; do
-  if ! grep -Fxq "$required" <<<"$contents"; then
-    echo "package is missing $required" >&2
-    exit 1
-  fi
-done
-if grep -Fq 'tablepro-agentd.service' <<<"$contents"; then
-  echo "the Debian package must not ship the obsolete agentd systemd unit" >&2
-  exit 1
-fi
-
 control="$(dpkg-deb -I "$package")"
 if ! grep -Eq '^[[:space:]]*Package: tablepro$' <<<"$control"; then
   echo "Debian package name must remain tablepro" >&2
@@ -42,9 +21,29 @@ if ! grep -Eq '^[[:space:]]*Version: 0\.1\.4-1$' <<<"$control"; then
   exit 1
 fi
 
+if dpkg-deb -c "$package" | grep -Fq 'tablepro-agentd.service'; then
+  echo "the Debian package must not ship the obsolete agentd systemd unit" >&2
+  exit 1
+fi
+
 stage="$(mktemp -d)"
 trap 'rm -rf -- "$stage"' EXIT
 dpkg-deb -x "$package" "$stage"
+for required in \
+  usr/bin/bookie \
+  usr/bin/bookie-agentd \
+  usr/bin/tablepro \
+  usr/bin/tablepro-agentd \
+  usr/share/applications/com.tablepro.linux.desktop \
+  usr/share/metainfo/com.tablepro.linux.metainfo.xml \
+  usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
+  usr/share/doc/tablepro/LICENSE.md \
+  usr/share/doc/tablepro/policy.example.toml; do
+  if [[ ! -e "$stage/$required" ]]; then
+    echo "package is missing /$required" >&2
+    exit 1
+  fi
+done
 if command -v desktop-file-validate >/dev/null 2>&1; then
   desktop-file-validate "$stage/usr/share/applications/com.tablepro.linux.desktop"
 fi

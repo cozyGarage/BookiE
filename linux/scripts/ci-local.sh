@@ -31,6 +31,7 @@ esac
 run_full() {
   python3 scripts/inventory-ignored-tests.py --check
   python3 scripts/tests/test_arch_candidate.py
+  python3 scripts/tests/test_deb_package.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 
