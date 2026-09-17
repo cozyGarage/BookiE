@@ -351,6 +351,38 @@ impl WorkspaceStore {
         wake_writer(&self.inner.writer);
     }
 
+    pub fn forget_connection(&self, id: Uuid) {
+        {
+            let _memory_guard = self.inner.memory_lock.lock().unwrap_or_else(|error| error.into_inner());
+            self.inner
+                .cache
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .remove(&id);
+        }
+        {
+            let _guard = self.inner.file_lock.lock().unwrap_or_else(|error| error.into_inner());
+            match load_locked() {
+                Ok(mut state) => {
+                    if state.connections.remove(&id.to_string()).is_some()
+                        && let Err(error) = save_locked(&state)
+                    {
+                        tracing::warn!(%id, ?error, "could not remove deleted connection from workspace state");
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%id, ?error, "could not load workspace state to remove a deleted connection");
+                }
+            }
+        }
+        let path = drafts_path().join(id.to_string());
+        if let Err(error) = std::fs::remove_dir_all(&path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!(%id, %error, "could not remove drafts for a deleted connection");
+        }
+    }
+
     pub fn flush(&self) -> mpsc::Receiver<Result<(), WorkspaceFlushError>> {
         let (sender, receiver) = mpsc::channel();
         self.inner

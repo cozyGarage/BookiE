@@ -384,3 +384,43 @@ isolated-test inventory passed. Debian package fixture could not run because
   isolated-GTK tests ignored), a focused ownership test, Clippy, and all 19 GTK
   safety scenarios passed. Database-service and preference globals remain for
   later B2 slices.
+
+- 2026-09-17 pre-release code review: reviewed the diff against this sprint's
+  `143a389ae` baseline (96 files, `crates/`) for correctness, robustness, and
+  compliance with the repository rules. Fixed 8 confirmed bugs, each with a
+  regression test: the ClickHouse heredoc lexer arm silently dropped its
+  unterminated-quote diagnostic; `ScriptPlan::statement_at` mapped "cursor is
+  before any statement" to statement 0 instead of `None`; "Run at cursor"
+  refused to run a clean statement if an unrelated unterminated construct
+  existed anywhere else in the buffer; one connection's unreadable editor
+  draft aborted workspace restoration for every connection at startup instead
+  of only its own tab; deleting a saved connection left its on-disk editor
+  drafts behind indefinitely; ClickHouse connection timeouts and MongoDB
+  server-selection failures (the most common outcome for an unreachable host)
+  were misreported as certificate hostname mismatches; and `agentd`'s
+  `open_session` fetched fresh session material (Secret Service plus file
+  reads) before checking the connection cache, so a transient lookup failure
+  hard-failed calls even with a healthy cached connection available. Full
+  workspace fmt, Clippy, `--lib --bins` tests, the two named `tablepro-mcp`
+  integration tests, the sandbox tier, and `cargo deny check` all passed;
+  Docker-gated driver integration tests were not run (no container runtime
+  available in that session).
+
+  Two items were reviewed and deliberately left open for later, scoped work
+  rather than a rushed fix: `ScriptPlan::batch_error_policy()` (and MySQL's
+  `ContinueNextBatch`) is computed but has no caller — `run_statements` in
+  `crates/app/src/ui/editor/outcomes.rs` always stops a script on its first
+  statement error regardless of driver, so continue-after-batch-error is
+  currently inert and needs batch-boundary-aware plumbing from the editor's
+  run path. And Postgres `collect_query_rows` aborts an entire result set if
+  any single cell fails to decode; the previous silent-NULL behavior was
+  itself a deliberately fixed bug (masking bad data as absent data), so the
+  real fix is a new "undecodable cell" value representation threaded through
+  `tablepro-core` and the grid UI, not a quick patch. Lower-severity cleanup
+  also noted: duplicated TLS-detection/error-chain code across the
+  clickhouse/mongodb/redis driver crates, a second hand-rolled background
+  writer in `workspace_state.rs` duplicating `StateFile<T>`, dead functions in
+  `text_offsets.rs`, and a few comments in `app/src/lib.rs`, `logging.rs`,
+  `sql_format/mod.rs`, and `storage/query_history.rs` that violate the
+  repository's no-comments rule. No release was tagged or built in this pass;
+  A5 and B3–B7 remain open as tracked above.

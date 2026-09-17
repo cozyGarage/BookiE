@@ -282,9 +282,22 @@ impl DaemonProvider {
     async fn open_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
         let session_lock = self.session_lock(saved.id)?;
         let _open = session_lock.lock_owned().await;
-        let material = tablepro_transport::session_material_digest(saved)
-            .await
-            .map_err(|error| error.to_string())?;
+        let material = match tablepro_transport::session_material_digest(saved).await {
+            Ok(material) => material,
+            Err(error) => {
+                if let Some(connection) = self.any_cached_connection(saved.id)?
+                    && ping_is_healthy(connection.ping(), SESSION_PING_TIMEOUT).await
+                {
+                    tracing::warn!(
+                        id = %saved.id,
+                        %error,
+                        "session material could not be verified; reusing the existing connection"
+                    );
+                    return Ok(connection);
+                }
+                return Err(error.to_string());
+            }
+        };
         let key = SessionKey::from_saved(saved, material);
         let cached = self.cached_connection(saved.id, &key)?;
         if let Some(connection) = cached {
@@ -341,6 +354,14 @@ impl DaemonProvider {
         Ok(connection)
     }
 
+    fn any_cached_connection(&self, id: Uuid) -> Result<Option<Arc<dyn Connection>>, String> {
+        let sessions = self
+            .sessions
+            .lock()
+            .map_err(|_| "session cache unavailable".to_string())?;
+        Ok(sessions.get(&id).map(|session| session.connection.clone()))
+    }
+
     fn session_is_current(&self, id: Uuid, key: &SessionKey, connection: &Arc<dyn Connection>) -> Result<bool, String> {
         let sessions = self
             .sessions
@@ -392,6 +413,7 @@ mod tests {
     use drivers_sqlite::SqliteDriver;
     use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Environment};
     use tablepro_policy::{DenyApprovalSink, NullAuditSink};
+    use tablepro_storage::SavedSshAuth;
 
     fn saved_connection() -> SavedConnection {
         SavedConnection {
@@ -529,6 +551,49 @@ mod tests {
             .expect("inspect cache after material rotation");
         assert!(cached.is_none());
         assert!(provider.sessions.lock().expect("sessions").get(&saved.id).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_transient_material_lookup_failure_reuses_a_healthy_cached_connection() {
+        let mut saved = saved_connection();
+        saved.driver_id = "sqlite".into();
+        saved.ssh = Some(SavedSshConfig {
+            host: "bastion".into(),
+            port: 22,
+            username: "tunnel".into(),
+            auth: SavedSshAuth::PrivateKey {
+                path: "/nonexistent/tablepro-test-key".into(),
+                has_passphrase: false,
+            },
+            jump: None,
+        });
+        let key = SessionKey::from_saved(&saved, [0; 32]);
+        let mut opts = ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        };
+        opts.tls.mode = TlsMode::Disabled;
+        let connection: Arc<dyn Connection> = Arc::from(SqliteDriver.connect(opts).await.expect("open test database"));
+        let provider = DaemonProvider::new(
+            Arc::new(DriverRegistry::new()),
+            Arc::new(PolicyConfig::default()),
+            Arc::new(NullAuditSink),
+            Arc::new(AuditState::new()),
+            Arc::new(DenyApprovalSink),
+        );
+        provider.sessions.lock().expect("sessions").insert(
+            saved.id,
+            OpenSession {
+                key,
+                connection: connection.clone(),
+            },
+        );
+
+        let reused = provider
+            .open_session(&saved)
+            .await
+            .expect("a healthy cached connection is reused despite the material lookup failure");
+        assert!(Arc::ptr_eq(&reused, &connection));
     }
 }
 

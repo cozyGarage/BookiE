@@ -20,7 +20,21 @@ pub fn load(path: &Path, drafts: &Path) -> std::io::Result<WorkspaceState> {
                 draft_id: Some(id),
             } = tab
             {
-                *query = std::fs::read_to_string(drafts.join(connection.to_string()).join(format!("{id}.sql")))?;
+                match std::fs::read_to_string(drafts.join(connection.to_string()).join(format!("{id}.sql"))) {
+                    Ok(text) => *query = text,
+                    Err(error) => {
+                        tracing::warn!(
+                            %connection,
+                            %id,
+                            %error,
+                            "workspace draft could not be read; the tab will restore with an empty query"
+                        );
+                        *tab = WorkspaceTabRecord::Editor {
+                            query: String::new(),
+                            draft_id: None,
+                        };
+                    }
+                }
             }
         }
     }
@@ -108,7 +122,53 @@ mod tests {
     }
 
     #[test]
-    fn missing_draft_or_failed_write_does_not_replace_the_workspace() {
+    fn a_missing_draft_only_drops_its_own_tab_and_leaves_other_connections_intact() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("workspace.json");
+        let drafts = dir.path().join("drafts");
+        let broken_id = Uuid::new_v4().to_string();
+        let healthy_id = Uuid::new_v4().to_string();
+        let healthy_draft = Uuid::new_v4();
+        let mut state = WorkspaceState::default();
+        state.connections.insert(
+            broken_id.clone(),
+            ConnectionWorkspaceState {
+                tabs: vec![WorkspaceTabRecord::Editor {
+                    query: "SELECT 1".into(),
+                    draft_id: Some(Uuid::new_v4()),
+                }],
+                active_idx: 0,
+            },
+        );
+        state.connections.insert(
+            healthy_id.clone(),
+            ConnectionWorkspaceState {
+                tabs: vec![WorkspaceTabRecord::Editor {
+                    query: "SELECT 2".into(),
+                    draft_id: Some(healthy_draft),
+                }],
+                active_idx: 0,
+            },
+        );
+        atomic_write_json(&path, &state).unwrap();
+        std::fs::create_dir_all(drafts.join(&healthy_id)).unwrap();
+        std::fs::write(
+            drafts.join(&healthy_id).join(format!("{healthy_draft}.sql")),
+            "SELECT 2",
+        )
+        .unwrap();
+
+        let loaded = load(&path, &drafts).unwrap();
+        assert!(
+            matches!(&loaded.connections[&broken_id].tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None } if query.is_empty())
+        );
+        assert!(
+            matches!(&loaded.connections[&healthy_id].tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 2")
+        );
+    }
+
+    #[test]
+    fn failed_write_does_not_replace_the_workspace() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("workspace.json");
         let drafts = dir.path().join("drafts");
@@ -126,7 +186,6 @@ mod tests {
         );
         atomic_write_json(&path, &state).unwrap();
         let original = std::fs::read(&path).unwrap();
-        assert!(load(&path, &drafts).is_err());
         std::fs::write(&drafts, "not a directory").unwrap();
         assert!(save(&path, &drafts, &state).is_err());
         assert_eq!(std::fs::read(&path).unwrap(), original);

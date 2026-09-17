@@ -901,8 +901,9 @@ fn looks_like_tls_failure(text: &str) -> bool {
 }
 
 fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bool) -> DriverError {
+    let is_ambiguous_network_disconnect = matches!(&err, clickhouse::error::Error::Network(_));
     match map_clickhouse_error(err) {
-        DriverError::Disconnected if verifies_cert => {
+        DriverError::Disconnected if verifies_cert && is_ambiguous_network_disconnect => {
             DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
         }
         other => other,
@@ -1172,5 +1173,12 @@ mod tests {
         assert!(
             matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate") && detail.contains("hostname"))
         );
+    }
+
+    #[test]
+    fn a_verifying_connect_timeout_stays_disconnected_instead_of_a_fabricated_tls_mismatch() {
+        let err = clickhouse::error::Error::TimedOut;
+        let mapped = map_clickhouse_connect_error(err, true);
+        assert!(matches!(mapped, DriverError::Disconnected));
     }
 }

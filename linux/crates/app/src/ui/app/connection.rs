@@ -283,12 +283,13 @@ impl App {
         dialog.set_close_response("cancel");
 
         let sender_for_response = sender;
+        let workspace = self.workspace.clone();
         dialog.connect_response(None, move |dialog, response| {
             dialog.close();
             if response != "delete" {
                 return;
             }
-            execute_delete_connection(id, sender_for_response.clone());
+            execute_delete_connection(id, workspace.clone(), sender_for_response.clone());
         });
         dialog.present(Some(&self.window));
     }
@@ -624,7 +625,11 @@ impl App {
 /// Performs the actual disk + keyring teardown for a saved connection.
 /// Extracted from `on_delete_connection` so the confirm-yes branch and
 /// the prefs-disabled branch share one implementation.
-fn execute_delete_connection(id: Uuid, sender: ComponentSender<App>) {
+fn execute_delete_connection(
+    id: Uuid,
+    workspace: crate::services::workspace_state::WorkspaceStore,
+    sender: ComponentSender<App>,
+) {
     let sender_clone = sender.clone();
     sender.command(move |_, shutdown| {
         shutdown
@@ -635,6 +640,7 @@ fn execute_delete_connection(id: Uuid, sender: ComponentSender<App>) {
                     sender_clone.input(AppMsg::ShowToast(crate::tr!("The connection could not be deleted.")));
                     return;
                 }
+                workspace.forget_connection(id);
 
                 let password = tablepro_storage::delete_password(id).await;
                 let ssh_password = tablepro_storage::delete_ssh_password(id).await;

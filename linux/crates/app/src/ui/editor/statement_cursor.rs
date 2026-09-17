@@ -42,11 +42,15 @@ pub fn statement_at_cursor(text: &str, driver: &str, byte: usize) -> Option<Stri
         return tablepro_core::sql_lex::statement_at_cursor(text, driver, byte);
     };
     let plan = plan_for(text, grammar);
-    if !plan.diagnostics().is_empty() {
+    let statement = plan.statement_at(byte)?;
+    let affected = plan.diagnostics().iter().any(|diagnostic| {
+        let tablepro_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
+        statement.range.contains(start)
+    });
+    if affected {
         return None;
     }
-    plan.statement_at(byte)
-        .map(|statement| statement.text(text).trim().to_owned())
+    Some(statement.text(text).trim().to_owned())
 }
 
 #[cfg(test)]
@@ -76,5 +80,18 @@ mod tests {
         );
         assert!(script_statements("SELECT 1\nGO 2", "mssql").is_err());
         assert!(script_statements("SELECT 'unfinished", "postgres").is_err());
+    }
+
+    #[test]
+    fn an_unterminated_construct_elsewhere_does_not_block_a_clean_statement_at_the_cursor() {
+        let sql = "SELECT 1; SELECT 'unfinished";
+        assert_eq!(
+            statement_at_cursor(sql, "postgres", sql.find("SELECT 1").unwrap()),
+            Some("SELECT 1".into())
+        );
+        assert_eq!(
+            statement_at_cursor(sql, "postgres", sql.find("'unfinished").unwrap()),
+            None
+        );
     }
 }

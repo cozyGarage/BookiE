@@ -738,7 +738,7 @@ fn map_mongo_error(err: mongodb::error::Error) -> DriverError {
     map_mongo_connect_error(err, false)
 }
 
-fn map_mongo_connect_error(err: mongodb::error::Error, verifies_cert: bool) -> DriverError {
+fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert: bool) -> DriverError {
     use mongodb::error::ErrorKind;
     let chain = error_chain_text(&err);
     if mongo_error_can_hide_tls(&err.kind) && looks_like_tls_failure(&chain) {
@@ -747,9 +747,6 @@ fn map_mongo_connect_error(err: mongodb::error::Error, verifies_cert: bool) -> D
     match &*err.kind {
         ErrorKind::Authentication { .. } => DriverError::AuthFailed,
         ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
-        ErrorKind::ServerSelection { .. } if verifies_cert => {
-            DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
-        }
         ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } => DriverError::ConnectionRefused,
         _ => DriverError::Query {
             message: err.to_string(),

@@ -227,8 +227,11 @@ impl<'a> Lexer<'a> {
                 }
             }
             DollarQuote::Heredoc => {
-                if let Some(end) = self.heredoc_end(start) {
-                    return self.plain(ScriptTokenKind::DollarQuoted, end);
+                if let Some(close) = find_byte(self.bytes, start + 1, b'$') {
+                    return match self.heredoc_close(start, close) {
+                        Some(end) => self.plain(ScriptTokenKind::DollarQuoted, end),
+                        None => self.unterminated(start, OpenConstruct::DollarQuoted),
+                    };
                 }
             }
             DollarQuote::None => {}
@@ -260,8 +263,7 @@ impl<'a> Lexer<'a> {
         Some(index + 1)
     }
 
-    fn heredoc_end(&mut self, start: usize) -> Option<usize> {
-        let close = find_byte(self.bytes, start + 1, b'$')?;
+    fn heredoc_close(&mut self, start: usize, close: usize) -> Option<usize> {
         let opener = &self.text[start..=close];
         if self.missing_heredoc_closers.contains(opener) {
             return None;

@@ -8,7 +8,7 @@
 - Development builds isolate connections, history, audit, drafts, settings, locks, and keyring items from installed builds.
 - Column-width and filter persistence is owned by the application and shared explicitly with its windows and tabs.
 - Query history is owned by the application and passed explicitly to editors, dialogs, preferences, and retention work.
-- Workspace cache, coalesced writer, and close-time flush are owned by the application and shared explicitly across windows.
+- Workspace cache, coalesced writer, and close-time flush are owned by the application and shared explicitly across windows. A connection whose editor draft cannot be read no longer blocks restoring every other open connection's tabs, and deleting a saved connection now removes its drafts from disk instead of leaving them behind.
 
 ### Fixed
 
@@ -16,6 +16,8 @@
 - Malformed MongoDB SCRAM nonces are rejected instead of crashing authentication.
 - SSH key and TLS certificate reads remain bounded if a file changes while it is read.
 - SSH socket forwarding falls back to a short private path when the runtime directory would exceed Unix limits.
+- ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
+- MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 
 ## [0.1.4] - 2026-09-17
 

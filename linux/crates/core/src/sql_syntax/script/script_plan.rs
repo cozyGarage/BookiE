@@ -36,7 +36,7 @@ impl ScriptPlan {
         let following = self
             .statements
             .partition_point(|statement| statement.range.start <= byte);
-        self.statements.get(following.saturating_sub(1))
+        following.checked_sub(1).and_then(|index| self.statements.get(index))
     }
 
     pub fn diagnostics(&self) -> &[ScriptDiagnostic] {
@@ -210,5 +210,35 @@ impl<'a> Builder<'a> {
             }
             statement.extent.end = end;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_cursor_before_the_first_statement_finds_no_statement() {
+        let plan = ScriptPlan::build(
+            "   SELECT 1;",
+            SqlGrammar::PostgreSql,
+            LexicalSettings::default_for(SqlGrammar::PostgreSql),
+        );
+        assert!(plan.statement_at(0).is_none());
+        assert!(plan.statement_at(plan.statements()[0].range.start).is_some());
+    }
+
+    #[test]
+    fn an_unterminated_clickhouse_heredoc_is_reported_as_a_diagnostic() {
+        let plan = ScriptPlan::build(
+            "SELECT $$abc",
+            SqlGrammar::ClickHouse,
+            LexicalSettings::default_for(SqlGrammar::ClickHouse),
+        );
+        assert!(
+            plan.diagnostics()
+                .iter()
+                .any(|diagnostic| matches!(diagnostic, ScriptDiagnostic::Unterminated { .. }))
+        );
     }
 }
