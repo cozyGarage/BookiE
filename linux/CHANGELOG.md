@@ -16,6 +16,7 @@
 - PostgreSQL INTERVAL overflow and malformed INET/CIDR prefixes treated as NULL.
 - DuckDB identifier quoting and Redis read-only SELECT in the manual connection lab.
 - Debian fallback package installing `tablepro` while the desktop file launched `bookie`.
+- ClickHouse VerifyFull reporting a hostname mismatch as a dropped connection.
 
 ### Security
 

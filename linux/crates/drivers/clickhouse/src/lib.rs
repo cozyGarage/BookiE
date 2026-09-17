@@ -79,7 +79,7 @@ impl DatabaseDriver for ClickhouseDriver {
 
         let probe = client.query("SELECT 1").execute();
         match tokio::time::timeout(PROBE_TIMEOUT, probe).await {
-            Ok(result) => result.map_err(map_clickhouse_error)?,
+            Ok(result) => result.map_err(|err| map_clickhouse_connect_error(err, opts.tls.mode.verifies_cert()))?,
             Err(_) => return Err(DriverError::ConnectionRefused),
         }
 
@@ -878,16 +878,44 @@ fn hex_encode(bytes: &[u8]) -> String {
 /// 497 ACCESS_DENIED, 516 AUTHENTICATION_FAILED.
 const AUTH_CODES: [&str; 5] = ["code: 192", "code: 193", "code: 194", "code: 497", "code: 516"];
 
+fn error_chain_text(err: &dyn std::error::Error) -> String {
+    let mut parts = Vec::new();
+    let mut current = Some(err);
+    while let Some(error) = current {
+        parts.push(error.to_string());
+        current = error.source();
+    }
+    parts.join(" ")
+}
+
+fn looks_like_tls_failure(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("certificate")
+        || lower.contains("notvalidforname")
+        || lower.contains("not valid for name")
+        || lower.contains("hostname")
+        || lower.contains("invaliddnsname")
+        || lower.contains("tls handshake")
+        || lower.contains("unknown issuer")
+        || lower.contains("unknown ca")
+}
+
+fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bool) -> DriverError {
+    match map_clickhouse_error(err) {
+        DriverError::Disconnected if verifies_cert => {
+            DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
+        }
+        other => other,
+    }
+}
+
 fn map_clickhouse_error(err: clickhouse::error::Error) -> DriverError {
-    let msg = err.to_string();
-    let lower = msg.to_lowercase();
+    let chain = error_chain_text(&err);
+    let lower = chain.to_ascii_lowercase();
     match &err {
-        // Transport failures are the only place a TLS or refused-connect
-        // diagnosis can come from. Matching those words against a server
-        // response would misclassify a query that merely mentions them.
         clickhouse::error::Error::Network(_) => {
-            if lower.contains("certificate") || lower.contains("tls") || lower.contains("handshake") {
-                DriverError::Tls(msg)
+            if looks_like_tls_failure(&lower) {
+                DriverError::Tls(chain)
             } else if lower.contains("connection refused") || lower.contains("connect error") {
                 DriverError::ConnectionRefused
             } else {
@@ -900,7 +928,7 @@ fn map_clickhouse_error(err: clickhouse::error::Error) -> DriverError {
                 DriverError::AuthFailed
             } else {
                 DriverError::Query {
-                    message: msg,
+                    message: err.to_string(),
                     sqlstate: None,
                 }
             }
@@ -1124,5 +1152,25 @@ mod tests {
             "Code: 47. Unknown identifier: certificate".into(),
         ));
         assert!(matches!(err, DriverError::Query { .. }));
+    }
+
+    #[test]
+    fn nested_certificate_name_mismatch_is_tls() {
+        let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other(
+            "invalid peer certificate: certificate not valid for name \"127.0.0.1\"",
+        )));
+        let mapped = map_clickhouse_error(err);
+        assert!(matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate")));
+    }
+
+    #[test]
+    fn verifying_connect_does_not_report_a_hostname_mismatch_as_a_drop() {
+        let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other("connection closed unexpectedly")));
+        assert!(matches!(map_clickhouse_error(err), DriverError::Disconnected));
+        let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other("connection closed unexpectedly")));
+        let mapped = map_clickhouse_connect_error(err, true);
+        assert!(
+            matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate") && detail.contains("hostname"))
+        );
     }
 }
