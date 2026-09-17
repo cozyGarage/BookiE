@@ -4,13 +4,23 @@
 
 ## [0.1.4] - 2026-09-17
 
-- Preserve significant whitespace and literal prefixes during SQL formatting; move the guard into core and verify against PostgreSQL.
-- Block BOOLEAN affinity mismatches at widget binding and edit acceptance; preserve normal NULL/boolean editing.
-- Reject malformed network prefixes and avoid interval arithmetic panics in PostgreSQL decoding.
-- Run isolated GTK and all registered keyring tests through shared local/CI runners, rejecting empty selections.
-- Record exact-tree local pipeline evidence; expand automated release gates and keep manual package/Wayland/soak checks explicit.
-- Retain merged session-rotation/SCRAM security fixes and TLS endpoint-identity regressions.
-- Correct manual DuckDB quoting, Redis read-only database selection and Arch system-SQLite dependencies.
+### Changed
+
+- Isolated GTK and Secret Service tests through shared local/CI runners.
+- Arch and Debian packages: system SQLite, Rust 1.98, and `bookie` launchers with `tablepro` aliases.
+
+### Fixed
+
+- SQL formatting dropping significant whitespace and literal prefixes.
+- BOOLEAN cells with mismatched bytes/text entering the inline editor.
+- PostgreSQL INTERVAL overflow and malformed INET/CIDR prefixes treated as NULL.
+- DuckDB identifier quoting and Redis read-only SELECT in the manual connection lab.
+- Debian fallback package installing `tablepro` while the desktop file launched `bookie`.
+
+### Security
+
+- Agentd session reuse after Secret Service or SSH/CA file rotation.
+- Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
 ## Historical 0.1.x implementation ledger
 

@@ -1,8 +1,24 @@
 # BookiE 0.1.4 on Arch Linux Omarchy
 
-Install from the pinned 0.1.4 commit/tag on `linux`. Do not package from a dirty tree. Read [release evidence](release-0.1.4.md) before installation.
+Install from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/TablePro/releases/tag/linux-v0.1.4). Do not package from a dirty tree. Read [release evidence](release-0.1.4.md) before installation.
 
 The package is an internal Arch candidate, not an AUR or Flathub release. Visible name is BookiE. Commands `bookie` and `bookie-agentd` are installed, with `tablepro` and `tablepro-agentd` aliases. Application ID, D-Bus, XDG paths, and keyring schema stay `com.tablepro.linux` / `tablepro`.
+
+## Download
+
+```bash
+sudo pacman -U bookie-0.1.4-1-x86_64.pkg.tar.zst
+```
+
+Ubuntu 25.10+ / Debian 13+ (amd64) can install the same release's `.deb`:
+
+```bash
+sudo apt install ./tablepro_0.1.4-1_amd64.deb
+```
+
+Ubuntu 24.04 cannot run this build: libadwaita 1.6 needs GLib 2.82.
+
+Launch with `bookie` or the BookiE desktop entry. `tablepro` still works.
 
 ## What this line includes
 
@@ -39,7 +55,7 @@ cargo --version
 
 ## Checkout
 
-Use a clean clone or a clean worktree at the recorded release commit, not a later moving branch tip.
+Building from source is optional when the GitHub Release package is enough. Use a clean clone or a clean worktree at the recorded release commit, not a later moving branch tip.
 
 ```bash
 git clone https://github.com/cozyGarage/TablePro.git
@@ -61,7 +77,7 @@ From `linux/`:
 TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
 ```
 
-Do not set `TABLEPRO_RC_TAG` until a `linux-v…` tag exists. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.4-1-x86_64.pkg.tar.zst`.
+Do not set `TABLEPRO_RC_TAG` unless you are verifying an already published `linux-v…` tag. The helper runs `makepkg --cleanbuild`, `namcap`, and package-content checks. The package is `packaging/arch/bookie-0.1.4-1-x86_64.pkg.tar.zst`.
 
 `makepkg --cleanbuild` builds from the commit archive. It does not reuse a dirty `target/` directory.
 

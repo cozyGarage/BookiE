@@ -38,19 +38,19 @@ tablepro-agentd --help
 Test install, upgrade, downgrade, and removal. Package operations must leave
 the user's XDG configuration, data, state, and keyring records untouched.
 
-## Debian / Ubuntu development package
+## Debian / Ubuntu package
 
-The Debian files are a secondary development scaffold, not a release target.
-For a local binary package:
+The amd64 `.deb` on the `linux-v0.1.4` GitHub Release is built on Ubuntu 25.10.
+GTK and libadwaita need GLib 2.82, so Ubuntu 24.04 cannot run it.
 
 ```bash
-./scripts/preflight.sh
-./scripts/build-deb.sh
-sudo apt install ./packaging/out/tablepro_*.deb
+DEB_VERSION=0.1.4-1 ./scripts/build-deb.sh
+sudo apt install ./packaging/out/tablepro_0.1.4-1_amd64.deb
 ```
 
-The package installs the GUI as `/usr/bin/bookie` and agentd as an on-demand
-`/usr/bin/bookie-agentd` CLI, with both legacy command aliases. It does not install or enable a user service.
+The package name stays `tablepro`. It installs `/usr/bin/bookie` and
+`/usr/bin/bookie-agentd`, with both legacy command aliases. It does not
+install or enable a user service.
 
 ## Flatpak development build
 

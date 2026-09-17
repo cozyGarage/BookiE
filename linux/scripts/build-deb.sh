@@ -5,14 +5,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${DEB_OUT:-$ROOT/packaging/out}"
-VERSION="${DEB_VERSION:-0.1.0-2}"
+VERSION="${DEB_VERSION:-0.1.4-1}"
 ARCH="${DEB_ARCH:-amd64}"
 PKG_NAME="tablepro_${VERSION}_${ARCH}"
 mkdir -p "$OUT"
 
 # Force on-disk target dir: agent environments may point CARGO_TARGET_DIR
 # at a small tmpfs that cannot hold a release build.
-export CARGO_TARGET_DIR="$ROOT/target"
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 cd "$ROOT"
 
 if [[ -f "$ROOT/scripts/dev-env.sh" ]]; then
@@ -36,8 +36,10 @@ done
 
 STAGE="$OUT/$PKG_NAME"
 rm -rf "$STAGE"
-install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$STAGE/usr/bin/tablepro"
-install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-agentd" "$STAGE/usr/bin/tablepro-agentd"
+install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$STAGE/usr/bin/bookie"
+install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-agentd" "$STAGE/usr/bin/bookie-agentd"
+ln -s bookie "$STAGE/usr/bin/tablepro"
+ln -s bookie-agentd "$STAGE/usr/bin/tablepro-agentd"
 install -Dm644 flatpak/com.tablepro.linux.desktop "$STAGE/usr/share/applications/com.tablepro.linux.desktop"
 install -Dm644 flatpak/com.tablepro.linux.metainfo.xml "$STAGE/usr/share/metainfo/com.tablepro.linux.metainfo.xml"
 install -Dm644 flatpak/icons/scalable/com.tablepro.linux.svg \
@@ -53,12 +55,13 @@ Section: database
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: TablePro Contributors <noreply@tablepro.app>
-Depends: libgtk-4-1, libadwaita-1-0, libgtksourceview-5-0, libsecret-1-0, libgssapi-krb5-2, libkrb5-3
+Depends: libgtk-4-1, libadwaita-1-0, libgtksourceview-5-0, libsecret-1-0, libgssapi-krb5-2, libkrb5-3, libsqlite3-0
 Description: Native Linux database client
- TablePro is a fast, native GTK4 / libadwaita database client with
- policy-gated agent access (MCP) and a headless agentd binary.
+ BookiE is a native GTK4 / libadwaita database client. It installs
+ bookie and bookie-agentd, with tablepro aliases.
 EOF
 
 dpkg-deb --root-owner-group --build "$STAGE" "$OUT/${PKG_NAME}.deb"
 echo "Wrote $OUT/${PKG_NAME}.deb"
 dpkg-deb -I "$OUT/${PKG_NAME}.deb"
+"$ROOT/scripts/validate-deb-package.sh" "$OUT/${PKG_NAME}.deb"

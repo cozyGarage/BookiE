@@ -33,8 +33,11 @@ release, not completion of the broader [0.2 sprint](bookie-0.2-sprint.md).
 
 ## Verification ledger
 
-Implementation in progress. No completed release qualification is claimed here.
-Final checks and artifact identity will be recorded before handoff.
+Packaging on this tree installs `bookie` and `bookie-agentd`, with `tablepro` aliases.
+Debian `rules` and `scripts/build-deb.sh` agree at `tablepro` 0.1.4-1, with system SQLite and Rust 1.98.
+The GitHub Release tag is `linux-v0.1.4`. Ubuntu 24.04 is below the GLib 2.82 / libadwaita 1.6 baseline; GTK CI uses Ubuntu 25.10.
+
+Wayland install, rollback, and soak remain operator checks after downloading the artifacts. They are not implied by the tag.
 
 ## Install and verify on Omarchy
 

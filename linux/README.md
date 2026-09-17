@@ -10,7 +10,7 @@ The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHou
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
 
-The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Hosted checks at `89979e51a` passed except for DuckDB's Git ownership setup; its correction still needs hosted confirmation. Package release approval requires the separate frozen-candidate soak and installed-package evidence.
+The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Installable 0.1.4 packages for Ubuntu 25.10+ / Debian (amd64) and Arch / Omarchy (x86_64) are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/TablePro/releases/tag/linux-v0.1.4). Ubuntu 24.04 is below the GLib 2.82 / libadwaita 1.6 baseline. Wayland soak remains an operator check after install.
 
 ## Named query parameters
 
@@ -47,7 +47,7 @@ Drivers are linked at build time. BookiE does not load database drivers as runti
 ```bash
 # Ubuntu / Debian
 sudo apt install -y build-essential pkg-config libgtk-4-dev libadwaita-1-dev \
-  libgtksourceview-5-dev libssl-dev libsecret-1-dev libkrb5-dev clang
+  libgtksourceview-5-dev libssl-dev libsecret-1-dev libkrb5-dev libsqlite3-dev clang
 
 # Fedora
 sudo dnf install -y gcc pkg-config gtk4-devel libadwaita-devel \
@@ -55,7 +55,7 @@ sudo dnf install -y gcc pkg-config gtk4-devel libadwaita-devel \
 
 # Arch
 sudo pacman -S --needed base-devel pkg-config gtk4 libadwaita \
-  gtksourceview5 openssl libsecret krb5 clang
+  gtksourceview5 openssl libsecret krb5 sqlite clang
 ```
 
 Check the native libraries and Rust toolchain:
@@ -108,13 +108,13 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 
 ## Packaging
 
-The current package candidate is BookiE 0.1.4. See [the release evidence](docs/release-0.1.4.md) for passed and pending gates. Build from the exact clean commit:
+The current package is BookiE 0.1.4. Download it from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/TablePro/releases/tag/linux-v0.1.4), or see [the release evidence](docs/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
 
 ```bash
 TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
 ```
 
-The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only after a tag exists. Debian and Flatpak files remain development scaffolds; see [packaging/README.md](packaging/README.md).
+The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only to verify an already published tag.
 
 ## Documentation
 

@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: TablePro
-Upstream-Contact: https://github.com/TableProApp/TablePro/issues
-Source: https://github.com/TableProApp/TablePro
+Upstream-Name: BookiE
+Upstream-Contact: https://github.com/cozyGarage/TablePro/issues
+Source: https://github.com/cozyGarage/TablePro
 
 Files: *
 Copyright: TablePro Authors

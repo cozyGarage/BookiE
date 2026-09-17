@@ -4,6 +4,7 @@ export DH_VERBOSE = 1
 export CARGO_HOME = $(CURDIR)/debian/cargo-home
 # Build from the linux/ workspace root (this debian/ lives under packaging/).
 export TABLEPRO_LINUX = $(CURDIR)/../..
+export CARGO_TARGET_DIR ?= $(TABLEPRO_LINUX)/target
 
 %:
 	dh $@
@@ -18,9 +19,9 @@ override_dh_auto_test:
 	cd $(TABLEPRO_LINUX) && cargo test --workspace --lib
 
 override_dh_auto_install:
-	install -Dm755 $(TABLEPRO_LINUX)/target/release/tablepro-app \
+	install -Dm755 $(CARGO_TARGET_DIR)/release/tablepro-app \
 		$(CURDIR)/debian/tablepro/usr/bin/bookie
-	install -Dm755 $(TABLEPRO_LINUX)/target/release/tablepro-agentd \
+	install -Dm755 $(CARGO_TARGET_DIR)/release/tablepro-agentd \
 		$(CURDIR)/debian/tablepro/usr/bin/bookie-agentd
 	ln -s bookie $(CURDIR)/debian/tablepro/usr/bin/tablepro
 	ln -s bookie-agentd $(CURDIR)/debian/tablepro/usr/bin/tablepro-agentd
