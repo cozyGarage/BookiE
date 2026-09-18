@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -59,7 +60,29 @@ struct Entry {
     read_only: bool,
     environment: Environment,
     cancel: CancellationToken,
+    fault: Arc<Notify>,
     _monitor: tokio::task::JoinHandle<()>,
+}
+
+/// A driver that panicked left the connection's protocol state
+/// unverified, so the next statement on it cannot be trusted. Waking the
+/// monitor replaces it instead of waiting for the ping interval to
+/// notice, which it may not: a desynchronised connection can still
+/// answer a ping.
+struct EntryFaultSink {
+    connection_id: Uuid,
+    fault: Arc<Notify>,
+}
+
+impl tablepro_policy::ConnectionFaultSink for EntryFaultSink {
+    fn connection_became_unusable(&self, operation: &str) {
+        tracing::warn!(
+            connection_id = %self.connection_id,
+            operation,
+            "driver stopped mid-operation; replacing the connection"
+        );
+        self.fault.notify_one();
+    }
 }
 
 struct AuditRuntime {
@@ -211,13 +234,20 @@ impl DatabaseService {
             health: ConnectionHealth::Healthy,
         }));
         let cancel = CancellationToken::new();
-        let monitor = tokio::spawn(connection_monitor::run(inner.clone(), params, cancel.clone()));
+        let fault = Arc::new(Notify::new());
+        let monitor = tokio::spawn(connection_monitor::run(
+            inner.clone(),
+            params,
+            cancel.clone(),
+            fault.clone(),
+        ));
         let entry = Entry {
             inner,
             metadata,
             read_only,
             environment,
             cancel,
+            fault,
             _monitor: monitor,
         };
         connections.insert(id, entry);
@@ -264,8 +294,12 @@ impl DatabaseService {
             audit: self.audit.clone(),
             audit_state: self.audit_state.clone(),
         };
+        let fault = Arc::new(EntryFaultSink {
+            connection_id: entry.metadata.id,
+            fault: entry.fault.clone(),
+        });
         Some((
-            Arc::new(PolicyGuard::new(inner.connection.clone(), ctx)) as Arc<dyn Connection>,
+            Arc::new(PolicyGuard::new(inner.connection.clone(), ctx).with_fault_sink(fault)) as Arc<dyn Connection>,
             ConnectionIdentity(Arc::downgrade(&inner.connection)),
         ))
     }

@@ -38,10 +38,18 @@ pub struct GuardContext {
     pub audit_state: Arc<AuditState>,
 }
 
+/// Reports that a driver stopped mid-operation, which leaves the
+/// connection's protocol state unverified. The owner decides whether to
+/// replace it; the guard only reports.
+pub trait ConnectionFaultSink: Send + Sync {
+    fn connection_became_unusable(&self, operation: &str);
+}
+
 #[derive(Clone)]
 pub struct PolicyGuard {
     inner: Arc<dyn Connection>,
     ctx: GuardContext,
+    fault: Option<Arc<dyn ConnectionFaultSink>>,
 }
 
 struct PolicyTransaction {
@@ -78,7 +86,17 @@ struct AuditOutcome {
 
 impl PolicyGuard {
     pub fn new(inner: Arc<dyn Connection>, ctx: GuardContext) -> Self {
-        Self { inner, ctx }
+        Self {
+            inner,
+            ctx,
+            fault: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_fault_sink(mut self, fault: Arc<dyn ConnectionFaultSink>) -> Self {
+        self.fault = Some(fault);
+        self
     }
 
     pub fn context(&self) -> &GuardContext {

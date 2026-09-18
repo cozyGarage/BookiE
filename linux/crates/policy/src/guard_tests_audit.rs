@@ -561,3 +561,62 @@ async fn a_panicking_driver_read_records_a_failed_terminal_outcome() {
     let outcome = events.last().expect("outcome event");
     assert_ne!(outcome.terminal_status, AuditTerminalStatus::Succeeded);
 }
+
+struct CountingFaultSink {
+    reports: Arc<AtomicUsize>,
+}
+
+impl crate::ConnectionFaultSink for CountingFaultSink {
+    fn connection_became_unusable(&self, _operation: &str) {
+        self.reports.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+fn panicking_guard(reports: Arc<AtomicUsize>) -> PolicyGuard {
+    PolicyGuard::new(
+        Arc::new(PanickingConn),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    )
+    .with_fault_sink(Arc::new(CountingFaultSink { reports }))
+}
+
+#[tokio::test]
+async fn a_panicking_read_reports_the_connection_as_unusable() {
+    let reports = Arc::new(AtomicUsize::new(0));
+    let guard = panicking_guard(reports.clone());
+
+    let error = guard.list_tables().await.expect_err("the panic must surface");
+
+    assert!(matches!(error, DriverError::Internal(_)));
+    assert_eq!(reports.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn a_panicking_write_reports_the_connection_as_unusable() {
+    let reports = Arc::new(AtomicUsize::new(0));
+    let guard = panicking_guard(reports.clone());
+
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("the panic must surface");
+
+    assert_eq!(reports.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test]
+async fn an_operation_that_does_not_panic_reports_no_fault() {
+    let reports = Arc::new(AtomicUsize::new(0));
+    let guard = panicking_guard(reports.clone());
+
+    guard.ping().await.expect("ping does not panic");
+
+    assert_eq!(reports.load(Ordering::SeqCst), 0);
+}

@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use tablepro_core::Connection;
@@ -13,11 +14,27 @@ const PING_INTERVAL: Duration = Duration::from_secs(30);
 const BACKOFF_INITIAL: Duration = Duration::from_secs(5);
 const BACKOFF_MAX: Duration = Duration::from_secs(60);
 
-pub(super) async fn run(inner: Arc<Mutex<EntryInner>>, params: ReconnectParams, cancel: CancellationToken) {
+pub(super) async fn run(
+    inner: Arc<Mutex<EntryInner>>,
+    params: ReconnectParams,
+    cancel: CancellationToken,
+    fault: Arc<Notify>,
+) {
     loop {
-        tokio::select! {
+        // A reported fault skips the ping: the driver stopped
+        // mid-protocol, so a successful ping would not prove the
+        // connection is usable.
+        let faulted = tokio::select! {
             _ = cancel.cancelled() => return,
-            _ = tokio::time::sleep(PING_INTERVAL) => {}
+            _ = tokio::time::sleep(PING_INTERVAL) => false,
+            _ = fault.notified() => true,
+        };
+
+        if faulted {
+            if reconnect_loop(&inner, &params, &cancel).await.is_err() {
+                return;
+            }
+            continue;
         }
 
         let conn = match snapshot_connection(&inner) {
@@ -93,7 +110,116 @@ fn set_health(inner: &Arc<Mutex<EntryInner>>, health: ConnectionHealth) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use async_trait::async_trait;
+    use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, ExecResult, QueryResult, TableInfo};
+
     use super::*;
+
+    struct CountingDriver {
+        attempts: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for CountingDriver {
+        fn id(&self) -> &'static str {
+            "counting"
+        }
+
+        fn display_name(&self) -> &'static str {
+            "Counting"
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            Err(DriverError::ConnectionRefused)
+        }
+    }
+
+    struct IdleConn;
+
+    #[async_trait]
+    impl Connection for IdleConn {
+        async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+            Ok(vec![])
+        }
+
+        async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<tablepro_core::ColumnInfo>, DriverError> {
+            Ok(vec![])
+        }
+
+        async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+            Err(DriverError::ConnectionRefused)
+        }
+
+        async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+            Err(DriverError::ConnectionRefused)
+        }
+
+        async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+            Err(DriverError::ConnectionRefused)
+        }
+
+        async fn execute_params(&self, _: &str, _: &[tablepro_core::Value]) -> Result<ExecResult, DriverError> {
+            Err(DriverError::ConnectionRefused)
+        }
+
+        async fn execute_in_transaction(
+            &self,
+            _: &[(String, Vec<tablepro_core::Value>)],
+        ) -> Result<Vec<u64>, DriverError> {
+            Err(DriverError::ConnectionRefused)
+        }
+
+        async fn ping(&self) -> Result<(), DriverError> {
+            Ok(())
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            Ok(())
+        }
+    }
+
+    /// A reported fault must not wait for the ping interval, and must
+    /// not be dismissed by a connection that still answers a ping.
+    #[tokio::test(start_paused = true)]
+    async fn a_reported_fault_starts_a_reconnect_before_the_next_ping() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let inner = Arc::new(Mutex::new(EntryInner {
+            connection: Arc::new(IdleConn) as Arc<dyn Connection>,
+            tunnel: None,
+            health: ConnectionHealth::Healthy,
+        }));
+        let params = ReconnectParams {
+            driver: Arc::new(CountingDriver {
+                attempts: attempts.clone(),
+            }),
+            opts: ConnectOptions::default(),
+            ssh: None,
+        };
+        let cancel = CancellationToken::new();
+        let fault = Arc::new(Notify::new());
+        let monitor = tokio::spawn(run(inner.clone(), params, cancel.clone(), fault.clone()));
+
+        fault.notify_one();
+        tokio::time::sleep(BACKOFF_INITIAL + Duration::from_secs(1)).await;
+
+        assert!(
+            attempts.load(Ordering::SeqCst) >= 1,
+            "the fault must trigger a reconnect"
+        );
+        assert!(matches!(
+            inner.lock().expect("entry lock").health,
+            ConnectionHealth::Reconnecting { .. }
+        ));
+        cancel.cancel();
+        let _ = monitor.await;
+    }
 
     #[test]
     fn backoff_doubles_until_capped() {

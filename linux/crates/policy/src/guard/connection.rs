@@ -1,4 +1,3 @@
-use super::panic_boundary::{caught_read, caught_write};
 use super::*;
 
 #[async_trait]
@@ -16,7 +15,7 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("LIST TABLES", Vec::new());
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("LIST TABLES", self.inner.list_tables()).await;
+        let result = self.caught_read("LIST TABLES", self.inner.list_tables()).await;
         let rows = result.as_ref().ok().map(|tables| tables.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
         result
@@ -27,7 +26,9 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("LIST TABLES", Vec::new());
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("LIST TABLES", self.inner.list_tables_controlled(control)).await;
+        let result = self
+            .caught_read("LIST TABLES", self.inner.list_tables_controlled(control))
+            .await;
         let rows = result.as_ref().ok().map(|tables| tables.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
@@ -38,7 +39,7 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("LIST VIEWS", Vec::new());
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("LIST VIEWS", self.inner.list_views()).await;
+        let result = self.caught_read("LIST VIEWS", self.inner.list_views()).await;
         let rows = result.as_ref().ok().map(|views| views.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
         result
@@ -49,7 +50,9 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("LIST VIEWS", Vec::new());
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("LIST VIEWS", self.inner.list_views_controlled(control)).await;
+        let result = self
+            .caught_read("LIST VIEWS", self.inner.list_views_controlled(control))
+            .await;
         let rows = result.as_ref().ok().map(|views| views.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
@@ -61,7 +64,9 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("FETCH COLUMNS", self.inner.fetch_columns(schema, table)).await;
+        let result = self
+            .caught_read("FETCH COLUMNS", self.inner.fetch_columns(schema, table))
+            .await;
         let rows = result.as_ref().ok().map(|columns| columns.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
         result
@@ -78,11 +83,12 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read(
-            "FETCH COLUMNS",
-            self.inner.fetch_columns_controlled(schema, table, control),
-        )
-        .await;
+        let result = self
+            .caught_read(
+                "FETCH COLUMNS",
+                self.inner.fetch_columns_controlled(schema, table, control),
+            )
+            .await;
         let rows = result.as_ref().ok().map(|columns| columns.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
@@ -100,7 +106,8 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH ROWS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("FETCH ROWS", self.inner.fetch_rows(schema, table, offset, limit))
+        let result = self
+            .caught_read("FETCH ROWS", self.inner.fetch_rows(schema, table, offset, limit))
             .await
             .map(|rows| self.mask_result(rows));
         let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
@@ -121,12 +128,13 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH ROWS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read(
-            "FETCH ROWS",
-            self.inner.fetch_rows_controlled(schema, table, offset, limit, control),
-        )
-        .await
-        .map(|rows| self.mask_result(rows));
+        let result = self
+            .caught_read(
+                "FETCH ROWS",
+                self.inner.fetch_rows_controlled(schema, table, offset, limit, control),
+            )
+            .await
+            .map(|rows| self.mask_result(rows));
         let row_count = result.as_ref().ok().map(|rows| rows.rows.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, row_count)
             .await?;
@@ -150,7 +158,8 @@ impl Connection for PolicyGuard {
         );
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY", self.inner.query(sql))
+        let result = self
+            .caught_read("QUERY", self.inner.query(sql))
             .await
             .map(|value| self.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -175,7 +184,8 @@ impl Connection for PolicyGuard {
         );
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY", self.inner.query_controlled(sql, control))
+        let result = self
+            .caught_read("QUERY", self.inner.query_controlled(sql, control))
             .await
             .map(|value| self.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -201,7 +211,8 @@ impl Connection for PolicyGuard {
         );
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY PARAMS", self.inner.query_params(sql, params))
+        let result = self
+            .caught_read("QUERY PARAMS", self.inner.query_params(sql, params))
             .await
             .map(|value| self.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -233,7 +244,8 @@ impl Connection for PolicyGuard {
         );
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
+        let result = self
+            .caught_read("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
             .await
             .map(|value| self.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -293,7 +305,9 @@ impl Connection for PolicyGuard {
         self.handle_intent_failure(self.record_intent(&operation).await)?;
         let mut pending_write = self.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("EXECUTE IN TRANSACTION", self.inner.execute_in_transaction(statements)).await;
+        let result = self
+            .caught_write("EXECUTE IN TRANSACTION", self.inner.execute_in_transaction(statements))
+            .await;
         let rows = result.as_ref().ok().map(|values| values.iter().sum());
         self.audit_transaction_result(&operation, start, &result, rows).await?;
         pending_write.disarm();
@@ -305,7 +319,9 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("FETCH INDEXES", self.inner.fetch_indexes(schema, table)).await;
+        let result = self
+            .caught_read("FETCH INDEXES", self.inner.fetch_indexes(schema, table))
+            .await;
         let rows = result.as_ref().ok().map(|indexes| indexes.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
         result
@@ -322,11 +338,12 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH INDEXES", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read(
-            "FETCH INDEXES",
-            self.inner.fetch_indexes_controlled(schema, table, control),
-        )
-        .await;
+        let result = self
+            .caught_read(
+                "FETCH INDEXES",
+                self.inner.fetch_indexes_controlled(schema, table, control),
+            )
+            .await;
         let rows = result.as_ref().ok().map(|indexes| indexes.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
@@ -338,7 +355,9 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("FETCH FOREIGN KEYS", self.inner.fetch_foreign_keys(schema, table)).await;
+        let result = self
+            .caught_read("FETCH FOREIGN KEYS", self.inner.fetch_foreign_keys(schema, table))
+            .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_read_result(&operation, start, &result, rows).await?;
         result
@@ -355,11 +374,12 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("FETCH FOREIGN KEYS", vec![target]);
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read(
-            "FETCH FOREIGN KEYS",
-            self.inner.fetch_foreign_keys_controlled(schema, table, control),
-        )
-        .await;
+        let result = self
+            .caught_read(
+                "FETCH FOREIGN KEYS",
+                self.inner.fetch_foreign_keys_controlled(schema, table, control),
+            )
+            .await;
         let rows = result.as_ref().ok().map(|keys| keys.len() as u64);
         self.audit_controlled_read_result(&operation, start, &result, rows)
             .await?;
@@ -367,7 +387,7 @@ impl Connection for PolicyGuard {
     }
 
     async fn begin(&self) -> Result<Box<dyn Transaction>, DriverError> {
-        let inner = caught_write("BEGIN", self.inner.begin()).await?;
+        let inner = self.caught_write("BEGIN", self.inner.begin()).await?;
         Ok(Box::new(PolicyTransaction {
             guard: self.clone(),
             inner,
@@ -379,13 +399,13 @@ impl Connection for PolicyGuard {
         let operation = self.metadata_operation("SERVER VERSION", Vec::new());
         self.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("SERVER VERSION", self.inner.server_version()).await;
+        let result = self.caught_read("SERVER VERSION", self.inner.server_version()).await;
         self.audit_read_result(&operation, start, &result, None).await?;
         result
     }
 
     async fn ping(&self) -> Result<(), DriverError> {
-        caught_read("PING", self.inner.ping()).await
+        self.caught_read("PING", self.inner.ping()).await
     }
 
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
@@ -417,7 +437,7 @@ impl PolicyGuard {
         self.handle_intent_failure(self.record_intent(&operation).await)?;
         let mut pending_write = self.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("a write statement", execute(&self.inner)).await;
+        let result = self.caught_write("a write statement", execute(&self.inner)).await;
         let rows = result.as_ref().ok().map(|value| value.rows_affected);
         self.audit_write_result(&operation, start, &result, rows).await?;
         pending_write.disarm();
@@ -447,7 +467,8 @@ impl PolicyGuard {
         self.handle_intent_failure(self.record_intent(&operation).await)?;
         let mut pending_write = self.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("a write statement", execute(&self.inner))
+        let result = self
+            .caught_write("a write statement", execute(&self.inner))
             .await
             .map(|value| self.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -475,7 +496,9 @@ impl Transaction for PolicyTransaction {
                 .handle_intent_failure(self.guard.record_intent(&operation).await)?;
             let mut pending_write = self.guard.ctx.audit_state.pending_write();
             let start = Instant::now();
-            let result = caught_write("QUERY", self.inner.query(sql))
+            let result = self
+                .guard
+                .caught_write("QUERY", self.inner.query(sql))
                 .await
                 .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
             let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -495,7 +518,9 @@ impl Transaction for PolicyTransaction {
         );
         self.guard.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY", self.inner.query(sql))
+        let result = self
+            .guard
+            .caught_read("QUERY", self.inner.query(sql))
             .await
             .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -521,7 +546,9 @@ impl Transaction for PolicyTransaction {
                 .handle_intent_failure(self.guard.record_intent(&operation).await)?;
             let mut pending_write = self.guard.ctx.audit_state.pending_write();
             let start = Instant::now();
-            let result = caught_write("QUERY", self.inner.query_controlled(sql, control))
+            let result = self
+                .guard
+                .caught_write("QUERY", self.inner.query_controlled(sql, control))
                 .await
                 .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
             let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -541,7 +568,9 @@ impl Transaction for PolicyTransaction {
         );
         self.guard.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY", self.inner.query_controlled(sql, control))
+        let result = self
+            .guard
+            .caught_read("QUERY", self.inner.query_controlled(sql, control))
             .await
             .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -567,7 +596,9 @@ impl Transaction for PolicyTransaction {
                 .handle_intent_failure(self.guard.record_intent(&operation).await)?;
             let mut pending_write = self.guard.ctx.audit_state.pending_write();
             let start = Instant::now();
-            let result = caught_write("QUERY PARAMS", self.inner.query_params(sql, params))
+            let result = self
+                .guard
+                .caught_write("QUERY PARAMS", self.inner.query_params(sql, params))
                 .await
                 .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
             let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -587,7 +618,9 @@ impl Transaction for PolicyTransaction {
         );
         self.guard.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY PARAMS", self.inner.query_params(sql, params))
+        let result = self
+            .guard
+            .caught_read("QUERY PARAMS", self.inner.query_params(sql, params))
             .await
             .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -618,7 +651,9 @@ impl Transaction for PolicyTransaction {
                 .handle_intent_failure(self.guard.record_intent(&operation).await)?;
             let mut pending_write = self.guard.ctx.audit_state.pending_write();
             let start = Instant::now();
-            let result = caught_write("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
+            let result = self
+                .guard
+                .caught_write("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
                 .await
                 .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
             let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -638,7 +673,9 @@ impl Transaction for PolicyTransaction {
         );
         self.guard.prepare_governed_read(&operation).await?;
         let start = Instant::now();
-        let result = caught_read("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
+        let result = self
+            .guard
+            .caught_read("QUERY PARAMS", self.inner.query_params_controlled(sql, params, control))
             .await
             .map(|value| self.guard.mask_result_for_sql(Some(sql), value));
         let rows = result.as_ref().ok().map(|value| value.rows.len() as u64);
@@ -663,7 +700,7 @@ impl Transaction for PolicyTransaction {
             .handle_intent_failure(self.guard.record_intent(&operation).await)?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("EXECUTE", self.inner.execute(sql)).await;
+        let result = self.guard.caught_write("EXECUTE", self.inner.execute(sql)).await;
         let rows = result.as_ref().ok().map(|value| value.rows_affected);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows)
@@ -687,7 +724,10 @@ impl Transaction for PolicyTransaction {
             .handle_intent_failure(self.guard.record_intent(&operation).await)?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("EXECUTE", self.inner.execute_controlled(sql, control)).await;
+        let result = self
+            .guard
+            .caught_write("EXECUTE", self.inner.execute_controlled(sql, control))
+            .await;
         let rows = result.as_ref().ok().map(|value| value.rows_affected);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows)
@@ -711,7 +751,10 @@ impl Transaction for PolicyTransaction {
             .handle_intent_failure(self.guard.record_intent(&operation).await)?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("EXECUTE PARAMS", self.inner.execute_params(sql, params)).await;
+        let result = self
+            .guard
+            .caught_write("EXECUTE PARAMS", self.inner.execute_params(sql, params))
+            .await;
         let rows = result.as_ref().ok().map(|value| value.rows_affected);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows)
@@ -740,11 +783,13 @@ impl Transaction for PolicyTransaction {
             .handle_intent_failure(self.guard.record_intent(&operation).await)?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write(
-            "EXECUTE PARAMS",
-            self.inner.execute_params_controlled(sql, params, control),
-        )
-        .await;
+        let result = self
+            .guard
+            .caught_write(
+                "EXECUTE PARAMS",
+                self.inner.execute_params_controlled(sql, params, control),
+            )
+            .await;
         let rows = result.as_ref().ok().map(|value| value.rows_affected);
         self.guard
             .audit_transaction_result(&operation, start, &result, rows)
@@ -763,7 +808,7 @@ impl Transaction for PolicyTransaction {
         })?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("COMMIT", self.inner.commit()).await;
+        let result = self.guard.caught_write("COMMIT", self.inner.commit()).await;
         let (status, transaction_outcome, category) = match &result {
             Ok(()) => (AuditTerminalStatus::Succeeded, AuditTransactionOutcome::Committed, None),
             Err(error) if is_ambiguous_post_dispatch(error) => {
@@ -816,7 +861,7 @@ impl Transaction for PolicyTransaction {
         })?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("ROLLBACK", self.inner.rollback()).await;
+        let result = self.guard.caught_write("ROLLBACK", self.inner.rollback()).await;
         let (status, transaction_outcome, category) = match &result {
             Ok(()) => (
                 AuditTerminalStatus::Succeeded,
@@ -873,7 +918,10 @@ impl Transaction for PolicyTransaction {
         })?;
         let mut pending_write = self.guard.ctx.audit_state.pending_write();
         let start = Instant::now();
-        let result = caught_write("ROLLBACK", self.inner.rollback_controlled(control)).await;
+        let result = self
+            .guard
+            .caught_write("ROLLBACK", self.inner.rollback_controlled(control))
+            .await;
         let (status, transaction_outcome, category) = match &result {
             Ok(()) => (
                 AuditTerminalStatus::Succeeded,
