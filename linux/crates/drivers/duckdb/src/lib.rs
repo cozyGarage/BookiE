@@ -159,27 +159,25 @@ impl Connection for DuckdbConnection {
             let guard = conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
-            let sql = if let Some(schema) = schema.as_deref() {
-                format!(
+            let (sql, binds) = match schema {
+                Some(schema) => (
                     "SELECT column_name, data_type, is_nullable, column_default \
                      FROM information_schema.columns \
-                     WHERE table_schema = '{}' AND table_name = '{}' \
+                     WHERE table_schema = ? AND table_name = ? \
                      ORDER BY ordinal_position",
-                    escape_literal(schema),
-                    escape_literal(&table)
-                )
-            } else {
-                format!(
+                    vec![schema, table],
+                ),
+                None => (
                     "SELECT column_name, data_type, is_nullable, column_default \
                      FROM information_schema.columns \
-                     WHERE table_name = '{}' \
+                     WHERE table_name = ? \
                      ORDER BY ordinal_position",
-                    escape_literal(&table)
-                )
+                    vec![table],
+                ),
             };
-            let mut stmt = guard.prepare(&sql).map_err(map_duck_error)?;
+            let mut stmt = guard.prepare(sql).map_err(map_duck_error)?;
             let rows = stmt
-                .query_map([], |row| {
+                .query_map(params_from_iter(binds.iter()), |row| {
                     let nullable: String = row.get(2)?;
                     Ok(ColumnInfo {
                         name: row.get(0)?,
@@ -453,10 +451,6 @@ fn qualified(schema: Option<&str>, table: &str) -> String {
     }
 }
 
-fn escape_literal(s: &str) -> String {
-    s.replace('\'', "''")
-}
-
 async fn blocking<T: Send + 'static>(
     f: impl FnOnce() -> Result<T, DriverError> + Send + 'static,
 ) -> Result<T, DriverError> {
@@ -525,6 +519,23 @@ mod tests {
         let rows = conn.fetch_rows(None, "foo", 0, 10).await.unwrap();
         assert_eq!(rows.rows.len(), 2);
     }
+    #[tokio::test]
+    async fn columns_are_read_for_a_table_whose_name_needs_quoting() {
+        let driver = DuckdbDriver;
+        let conn = driver.connect(ConnectOptions::default()).await.unwrap();
+        conn.execute("CREATE TABLE \"O'Brien\" (id INTEGER, note VARCHAR)")
+            .await
+            .unwrap();
+
+        let columns = conn.fetch_columns(None, "O'Brien").await.unwrap();
+
+        assert_eq!(
+            columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+            vec!["id", "note"],
+            "the table name reaches the catalog query as a bound value"
+        );
+    }
+
     #[test]
     fn flat_files_open_with_quoted_paths_and_expected_rows() {
         let dir = TempDir::new().unwrap();
@@ -557,7 +568,7 @@ mod tests {
         assert_eq!(count, 2);
         conn.execute_batch(&format!(
             "COPY (SELECT 1 AS id) TO '{}' (FORMAT PARQUET)",
-            escape_literal(path.to_str().unwrap())
+            escape_duckdb_literal(path.to_str().unwrap())
         ))
         .unwrap();
         let reopened = open_path(path.to_str().unwrap()).unwrap();

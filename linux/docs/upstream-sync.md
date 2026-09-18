@@ -29,10 +29,10 @@ SHAs of commits the sprint plan already dispositioned. The 19 are:
 
 | Kind | Commits |
 | --- | --- |
-| Features we do not have | CSV import, Excel export, INSERT-statement export, Markdown/HTML/XML export, connection groups, connection import/export, connection colour tags, duplicate a connection, named saved queries, column comments, open a SQL file, JSON log format |
-| Fixes in code we share | `3bcd8df75` column rename, `92aea7112` export precision |
-| Fixes in code we do not have | `55528b854` OpenSSH 9 askpass fingerprint parsing |
-| Housekeeping | roadmap, i18n extraction, two test-stability fixes |
+| Features we do not have (13) | CSV import, Excel export, INSERT-statement export, Markdown/HTML/XML export, connection groups, connection import/export, connection colour tags, duplicate a connection, named saved queries, column comments, open a SQL file, JSON log format, recording the statements the app itself runs in history |
+| Fixes in code we share (1) | `3bcd8df75` column rename |
+| Fixes in code we do not have (1) | `55528b854` OpenSSH 9 askpass fingerprint parsing |
+| Housekeeping (4) | roadmap, i18n extraction, two test-stability fixes |
 
 ### What the shared fixes cost us
 
@@ -46,6 +46,12 @@ or comment. Fixed with a cross-dialect regression test.
 
 `55528b854` does not apply: we have no askpass bridge. Carry it forward if the
 system OpenSSH transport is ever adopted in B4.
+
+One older commit deserves a separate check rather than a claim.
+`92aea7112 fix(core): export values at the precision their column declares` sits
+below the boundary, inside the 60 the sprint plan already dispositioned, under
+"converge serializers". That row records an intention, not a verification, so
+whether our exporter matches the declared precision is still unconfirmed.
 
 ### What the excluded trees still taught us
 
