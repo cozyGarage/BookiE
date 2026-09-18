@@ -419,8 +419,8 @@ isolated-test inventory passed. Debian package fixture could not run because
   `tablepro-core` and the grid UI, not a quick patch. Lower-severity cleanup
   also noted: duplicated TLS-detection/error-chain code across the
   clickhouse/mongodb/redis driver crates, a second hand-rolled background
-  writer in `workspace_state.rs` duplicating `StateFile<T>`, dead functions in
-  `text_offsets.rs`, and a few comments in `app/src/lib.rs`, `logging.rs`,
+  writer in `workspace_state.rs` duplicating `StateFile<T>`, and a few
+  comments in `app/src/lib.rs`, `logging.rs`,
   `sql_format/mod.rs`, and `storage/query_history.rs` that violate the
   repository's no-comments rule. No release was tagged or built in this pass;
   A5 and B3–B7 remain open as tracked above.

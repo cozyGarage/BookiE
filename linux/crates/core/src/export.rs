@@ -1,6 +1,5 @@
 //! Streaming export helpers. CSV writes row-by-row without holding the
-//! full result set; Parquet is stubbed until arrow/parquet deps are
-//! justified by compile-time cost.
+//! full result set.
 
 use std::collections::HashSet;
 #[cfg(test)]
@@ -13,7 +12,7 @@ use std::path::Path;
 use crate::connection::Connection;
 use crate::error::DriverError;
 use crate::query::{ColumnInfo, Value};
-use crate::sql_dialect::{build_order_and_pagination, quote_ident};
+use crate::sql_dialect::build_order_and_pagination;
 
 mod file;
 pub use file::{ResultFormat, write_result_file};
@@ -107,7 +106,7 @@ impl Default for CsvOptions {
     }
 }
 
-pub fn value_to_text(value: &Value) -> Option<String> {
+pub(crate) fn value_to_text(value: &Value) -> Option<String> {
     match value {
         Value::Null => None,
         Value::Bool(value) => Some(value.to_string()),
@@ -542,21 +541,6 @@ where
     Ok(())
 }
 
-/// Parquet export is not wired yet (arrow/parquet inflate compile time).
-pub fn export_parquet_unsupported(_path: &str) -> Result<(), DriverError> {
-    Err(DriverError::Unsupported(
-        "Parquet export is not implemented yet; use CSV streaming export".into(),
-    ))
-}
-
-/// Qualified table name for logging / filenames.
-pub fn qualified_table_name(driver_id: &str, schema: Option<&str>, table: &str) -> String {
-    match schema {
-        Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
-        None => quote_ident(driver_id, table),
-    }
-}
-
 fn csv_escape(s: &str) -> String {
     if s.contains(',') || s.contains('"') || s.contains('\n') || s.contains('\r') {
         format!("\"{}\"", s.replace('"', "\"\""))
@@ -760,12 +744,6 @@ mod tests {
         write_csv_row(&mut buf, &[Value::Text("hello".into())]).unwrap();
         let s = String::from_utf8(buf).unwrap();
         assert_eq!(s, "\"a,b\"\nhello\n");
-    }
-
-    #[test]
-    fn parquet_stub_errors() {
-        let err = export_parquet_unsupported("/tmp/x.parquet").unwrap_err();
-        assert!(matches!(err, DriverError::Unsupported(_)));
     }
 
     fn column(name: &str) -> ColumnInfo {

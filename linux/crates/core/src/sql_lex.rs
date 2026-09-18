@@ -103,7 +103,7 @@ fn dollar_quote_length(rest: &str, driver_id: &str) -> Option<usize> {
     }
 }
 
-pub fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
+fn statement_spans(sql: &str, driver_id: &str) -> Vec<(usize, usize)> {
     let mut spans: Vec<(usize, usize)> = Vec::new();
     let bytes = sql.as_bytes();
     let mut start = 0usize;

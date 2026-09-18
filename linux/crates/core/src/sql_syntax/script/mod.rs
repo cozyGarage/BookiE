@@ -11,7 +11,6 @@ mod script_rules;
 mod script_statement;
 mod script_token;
 mod script_token_kind;
-pub mod text_offsets;
 
 pub use batch_error_policy::BatchErrorPolicy;
 pub use lexical_settings::LexicalSettings;
