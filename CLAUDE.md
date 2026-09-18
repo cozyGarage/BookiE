@@ -20,7 +20,7 @@ The root [LICENSE](LICENSE) applies to the repository. User-facing changes are r
 2. Fix root causes. Reproduce or trace a defect before changing code.
 3. Keep dependencies one-directional and preserve crate boundaries.
 4. Use clear names, small functions, early returns, and explicit error paths.
-5. Do not add comments. Code, types, tests, and module boundaries must express intent.
+5. Do not add comments. Code, types, tests, and module boundaries must express intent. Record only what an external system forces on us and cannot be named.
 6. Every testable behavior change needs a regression test.
 7. Keep changes focused. Do not mix unrelated cleanup into a fix.
 8. Do not add feature gates based on accounts, licenses, subscriptions, payment, or remote access checks.
@@ -74,7 +74,7 @@ These rules apply to the GUI, MCP server, and `tablepro-agentd`.
 
 - Use Rust edition 2024 and Rust 1.98.
 - Format with `rustfmt`; the line width is 120 characters.
-- Do not add comments, including documentation comments. Prefer clear module, type, function, and test names.
+- Do not add comments, including documentation comments. Prefer clear module, type, function, and test names. The single exception is behaviour of something outside this repository that no name can express: a dependency's parser, an engine's SQL quirk, a platform or protocol contract. Such a comment states the external rule and what breaks without it, never what the code does. A comment explaining our own code is still a signal to rename or restructure it.
 - Use early returns to keep control flow flat.
 - Keep public APIs small. Default to private visibility.
 - Do not use `unwrap`, `expect`, `panic!`, `todo!`, or `unimplemented!` in production paths. The workspace lints deny these, so a violation fails Clippy rather than review. Unit tests in a `#[cfg(test)]` module are exempt through `linux/clippy.toml`; a new integration test file under a crate's `tests/` directory must start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because those settings do not reach separate test crates.

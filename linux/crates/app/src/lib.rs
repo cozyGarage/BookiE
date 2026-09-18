@@ -99,13 +99,8 @@ pub fn run() {
 
     persistence.flush();
 
-    // Explicit ordered shutdown: `app.run` returned (window closed),
-    // so let the tokio runtime's worker threads finish in-flight
-    // tasks rather than getting cancelled mid-flight by an abrupt
-    // mem::forget-style leak. The previous `mem::forget(runtime)`
-    // was a workaround for an sqlx-pool reaper concern that no
-    // longer applies. This runtime is only used for startup history
-    // initialization and pruning.
+    // Dropping a tokio runtime cancels its in-flight tasks at once;
+    // shutdown_timeout lets the worker threads finish first.
     if let Some(runtime) = runtime {
         runtime.shutdown_timeout(std::time::Duration::from_secs(2));
     }

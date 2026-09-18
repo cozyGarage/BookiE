@@ -417,11 +417,15 @@ isolated-test inventory passed. Debian package fixture could not run because
   itself a deliberately fixed bug (masking bad data as absent data), so the
   real fix is a new "undecodable cell" value representation threaded through
   `tablepro-core` and the grid UI, not a quick patch. Lower-severity cleanup
-  also noted: a second hand-rolled background
-  writer in `workspace_state.rs` duplicating `StateFile<T>`, and a few
-  comments in `app/src/lib.rs`, `logging.rs`,
-  `sql_format/mod.rs`, and `storage/query_history.rs` that violate the
-  repository's no-comments rule. No release was tagged or built in this pass;
+  also noted: a second hand-rolled background writer in
+  `workspace_state.rs` and comments in `app/src/lib.rs`, `logging.rs`,
+  `sql_format/mod.rs`, and `storage/query_history.rs`. Both were reviewed
+  on 2026-09-18 and closed without the changes the note assumed: the
+  workspace writer merges per-connection entries under a file lock and is
+  not a `StateFile<T>` duplicate (see
+  [state management](state-management.md)), and the comments record
+  external parser and engine behaviour, which the repository rule now
+  allows explicitly. No release was tagged or built in this pass;
   A5 and B3–B7 remain open as tracked above.
 
 - 2026-09-17 follow-up: closed the batch-error-policy item the review above

@@ -132,6 +132,20 @@ Some state outlives any single component: open connections, user preferences, qu
 
 Per-tab editing state is the deliberate exception. `change_tracker`, `structure_tracker` and `window_registry` keep a `thread_local!` registry keyed by tab or window id. That is sound because each is confined to the GTK main thread by the Relm4 contract, which is also why they use `RefCell` rather than `Mutex`. Threading a registry handle through every grid cell binding would cost more in the hot `connect_bind` path than it buys. Tests construct a fresh registry rather than sharing the thread-local one.
 
+## Two persistence primitives, deliberately not one
+
+`services::state_file::StateFile<T>` and `services::workspace_state::WorkspaceStore` both own a background writer thread, which makes them look like duplicates. They are not, and merging them would lose a guarantee.
+
+| | `StateFile<T>` | `WorkspaceStore` |
+|---|---|---|
+| Unit of write | the whole `T` | per-connection entries |
+| Write shape | serialize the owned value | reload from disk, merge the pending entries, save |
+| Concurrency | one owner, revision coalescing | file lock across processes and windows, sequence-ordered |
+| On failure | settles waiters with a write error | restores the pending entries for the next attempt |
+| Errors | `String` | typed `WorkspaceFlushError` |
+
+The read-modify-write under a file lock is the point: two windows save different connections at the same time, and a whole-value write would drop whichever landed first. `StateFile` is correct for a single owned document such as preferences; `WorkspaceStore` is correct for a map many windows write into. Use `StateFile` for new whole-document state, and do not port `WorkspaceStore` onto it.
+
 ## Anti-patterns to flag in review
 
 - `gtk::glib::clone!` capturing `&mut` references to model fields. Use `ComponentSender` and route via `Input`.

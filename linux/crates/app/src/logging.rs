@@ -11,8 +11,6 @@ pub enum LoggingError {
     Install(Box<dyn Error + Send + Sync>),
 }
 
-/// A development build is noisy on purpose; an installed one keeps the
-/// journal readable.
 pub fn default_level(profile: Profile) -> &'static str {
     match profile {
         Profile::Development => "debug",
