@@ -184,6 +184,13 @@ fn validate_token_connections(requested: &[Uuid], saved: &[SavedConnection]) -> 
     Ok(())
 }
 
+fn emit_token(plain: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let mut out = std::io::stdout().lock();
+    writeln!(out, "{plain}")?;
+    out.flush()
+}
+
 fn build_registry() -> DriverRegistry {
     let mut r = DriverRegistry::new();
     r.register(Arc::new(ClickhouseDriver));
@@ -228,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let (_meta, plain) = tokens.issue(name, args.permissions.into(), args.connection, expires_at)?;
         match args.token_file {
             Some(path) => write_token_file(&path, &plain)?,
-            None => println!("{plain}"),
+            None => emit_token(&plain)?,
         }
         return Ok(());
     }
