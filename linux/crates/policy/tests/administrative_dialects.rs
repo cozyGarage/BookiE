@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::Environment;
 use tablepro_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
 

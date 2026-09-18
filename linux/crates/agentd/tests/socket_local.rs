@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Real agent-provider coverage for saved PostgreSQL Unix sockets.
 //!
 //! Run through `scripts/test-postgres-socket.sh`.

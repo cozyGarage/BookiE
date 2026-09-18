@@ -21,3 +21,6 @@ tokio.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["redis"] }
+
+[lints]
+workspace = true

@@ -27,3 +27,11 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tablepro-mcp = { path = "../mcp" }
 async-trait.workspace = true
 serde_json.workspace = true
+
+
+[lints.clippy]
+unwrap_used = "allow"
+expect_used = "allow"
+panic = "allow"
+todo = "deny"
+unimplemented = "deny"

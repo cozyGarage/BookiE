@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! A refused port fails instantly and proves nothing about timeouts. These
 //! tests use a listener that completes the TCP handshake and then never sends
 //! the SSH banner, which is what a black-holed host or a hung bastion looks

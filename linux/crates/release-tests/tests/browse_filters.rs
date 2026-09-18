@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::{
     ColumnInfo, Combinator, Connection, FilterOp, FilterRule, FilterSet, FilterValue, Value, build_filter_where,
     keyset_order_by, keyset_where_clause,

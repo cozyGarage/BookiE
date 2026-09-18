@@ -21,3 +21,11 @@ tablepro-driver-mongodb = { path = "../drivers/mongodb" }
 tablepro-driver-mysql = { path = "../drivers/mysql" }
 tablepro-driver-redis = { path = "../drivers/redis" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+
+[lints.clippy]
+unwrap_used = "allow"
+expect_used = "allow"
+panic = "allow"
+todo = "deny"
+unimplemented = "deny"

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::{ActivityQuery, Connection, Value, activity_sql};
 use tablepro_release_tests::Fixture;
 

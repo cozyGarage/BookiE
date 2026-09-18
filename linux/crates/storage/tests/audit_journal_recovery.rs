@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::os::unix::fs::PermissionsExt;
 
 use sha2::{Digest, Sha256};

@@ -64,3 +64,6 @@ tempfile.workspace = true
 
 [build-dependencies]
 glib-build-tools.workspace = true
+
+[lints]
+workspace = true

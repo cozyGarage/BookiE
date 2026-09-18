@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! The guard adds policy, not a driver. Properties that belong to the
 //! connection underneath have to survive being wrapped, because the
 //! interface only ever holds guarded connections: anything the guard

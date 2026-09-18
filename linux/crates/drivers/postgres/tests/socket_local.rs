@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! PostgreSQL Unix-socket integration smoke.
 //!
 //! Run through `scripts/test-postgres-socket.sh`; the harness exposes a

@@ -70,3 +70,13 @@ libc = "0.2"
 tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "c1d2e741ee6fe0935091826d91fb5886b6a4082a" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"

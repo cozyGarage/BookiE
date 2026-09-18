@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::{DatabaseDriver, TlsMode};
 use tablepro_driver_tls_tests::DriverTlsFixture;
 

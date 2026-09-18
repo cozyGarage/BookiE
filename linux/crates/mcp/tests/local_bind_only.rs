@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! The MCP HTTP endpoint is loopback-only. A non-local bind host must be
 //! refused before a socket is opened, so no routable interface is ever
 //! exposed.

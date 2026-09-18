@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Consumer-level tests for the pipelines the application composes out
 //! of `tablepro-core`. Each helper has unit tests of its own; these
 //! cover the seams between them, where a mismatch produces SQL whose

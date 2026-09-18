@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Local smoke against an already-running Postgres (no Docker required).
 //!
 //! Ignored by default so a plain `cargo test` stays green without a database.

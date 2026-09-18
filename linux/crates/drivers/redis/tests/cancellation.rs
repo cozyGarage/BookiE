@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Protocol fixture pauses SCAN after SELECT has succeeded. No timing guess is
 //! used to establish that cancellation occurs inside the temporary database.
 use drivers_redis::RedisDriver;

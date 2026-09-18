@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! `establish` refuses several combinations before it ever dials. Each
 //! one exists because the alternative silently weakens a guarantee the
 //! user asked for, so the refusals are as much a part of the contract

@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::sql_lex::split_statements;
 use tablepro_core::{Value, extract_named_parameters};
 use tablepro_release_tests::Fixture;

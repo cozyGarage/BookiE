@@ -33,3 +33,6 @@ secrecy.workspace = true
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util.workspace = true
+
+[lints]
+workspace = true

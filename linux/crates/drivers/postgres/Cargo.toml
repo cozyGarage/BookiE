@@ -30,3 +30,6 @@ testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres"] }
 tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[lints]
+workspace = true

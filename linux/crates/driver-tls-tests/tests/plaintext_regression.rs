@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! Enabling TLS on a driver must not cost it the ability to speak plaintext.
 //! These run against servers that offer no encryption at all.
 
