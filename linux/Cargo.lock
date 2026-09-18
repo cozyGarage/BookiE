@@ -6181,6 +6181,8 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tablepro-core",
+ "testcontainers",
+ "testcontainers-modules",
  "tokio",
 ]
 

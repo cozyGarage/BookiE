@@ -12,7 +12,7 @@ users are not surprised by missing write or transaction paths. These are driver 
 | SQL Server | Stable | yes | yes | SQL | yes | yes | no interactive begin | Tiberius; custom CA implemented; Verify Ca and Verify Full are identical; server cancellation unsupported |
 | ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Async mutations; no row counts; TLS release-verified |
 | Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | no | no | TLS release-verified; Verify Ca behaves as Verify Full |
-| MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop | no | no | TLS release-verified; Verify Ca behaves as Verify Full |
+| MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop | no | no | TLS release-verified; Verify Ca behaves as Verify Full; CI integration coverage for browse, find, aggregate, delete and drop |
 | DuckDB | Experimental | yes | yes | SQL | yes | yes | no | Cargo feature `duckdb`; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; explicit optional CI |
 
 ## Rules

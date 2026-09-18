@@ -105,9 +105,13 @@ Every test belongs to exactly one tier, and every tier has one script and one ga
 | driver | `crates/drivers/*/tests/integration.rs` against a container | none | CI `integration` |
 | driver-tls | `crates/driver-tls-tests` against network servers holding a privately issued certificate | `linux/scripts/test-driver-tls.sh` | CI `driver-tls` |
 | release | `crates/release-tests` against the PostgreSQL fixture | `linux/scripts/test-postgres-release.sh` | CI `postgres-release` |
-| gtk | `crates/app/tests/gtk_safety.py` on an installed build | `linux/scripts/test-gtk-safety.sh` | CI `fast` |
+| gtk-widgets | `#[ignore]` widget tests needing an isolated display, listed in `linux/scripts/isolated-tests.json` under `gtk` | `linux/scripts/test-gtk-widgets.sh` | CI `fast` |
+| keyring | `#[ignore]` tests needing a live Secret Service, listed in `linux/scripts/isolated-tests.json` under `keyring` | `linux/scripts/test-secret-service.sh` | CI `gtk-safety` |
+| gtk | `crates/app/tests/gtk_safety.py` on an installed build | `linux/scripts/test-gtk-safety.sh` | CI `gtk-safety` |
 
 The sandbox script selects targets with `--tests` rather than by name, so a new integration file is gated as soon as it is added. Adding a crate to the workspace means adding it to the crate lists in `preflight.sh` and `test-sandbox.sh`.
+
+The gtk-widgets and keyring tiers are selected by name, not by pattern, so a test added to either must also be added to `isolated-tests.json` or nothing runs it. Their runner asserts that each named test executed exactly once, so a renamed or deleted entry fails the tier instead of silently passing.
 
 Every fixed defect gets a regression test in the lowest tier that can reproduce it, and the fix and its test land in the same commit. Before relying on a new regression test, confirm it fails against the unfixed code.
 
@@ -164,6 +168,7 @@ cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test i
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration -- --include-ignored --test-threads=1
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration -- --include-ignored --test-threads=1
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration -- --include-ignored --test-threads=1
+cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
 ```
 
 `linux/scripts/preflight.sh` runs the file-size, panic-site and bounded-operation guards, formatting, Clippy, the unit tier and the sandbox tier in one pass, and is the quicker way to cover most of the above.

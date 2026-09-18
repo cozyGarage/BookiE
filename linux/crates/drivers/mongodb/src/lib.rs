@@ -568,7 +568,10 @@ fn parse_drop_table_sql(input: &str) -> Option<String> {
     let trimmed = input.trim().trim_end_matches(';').trim();
     let rest = trimmed.strip_prefix("DROP TABLE")?.trim_start();
     let rest = rest.strip_prefix("IF EXISTS").unwrap_or(rest).trim_start();
-    let mut chars = rest.strip_prefix('"')?.chars();
+    let Some(quoted) = rest.strip_prefix('"') else {
+        return is_simple_ident(rest).then(|| rest.to_owned());
+    };
+    let mut chars = quoted.chars();
     let mut name = String::new();
     loop {
         match chars.next()? {
@@ -811,6 +814,14 @@ mod tests {
     #[test]
     fn drop_table_sql_ignores_an_unrelated_statement() {
         assert_eq!(parse_drop_table_sql("SELECT 1"), None);
+        assert_eq!(parse_drop_table_sql("DROP TABLE widgets"), Some("widgets".into()));
+        assert_eq!(
+            parse_drop_table_sql("DROP TABLE IF EXISTS widgets"),
+            Some("widgets".into())
+        );
+        assert_eq!(parse_drop_table_sql("DROP TABLE widgets extra"), None);
+        assert_eq!(parse_drop_table_sql("DROP TABLE wid-gets"), None);
+        assert_eq!(parse_drop_table_sql("DROP TABLE "), None);
         assert_eq!(parse_drop_table_sql(r#"db.widgets.deleteMany({})"#), None);
     }
 
