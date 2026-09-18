@@ -65,11 +65,15 @@ MCP authorization and SQL policy answer different questions:
 | Boundary | Responsibility |
 |---|---|
 | MCP token scopes and connection allowlists | Decide which saved connections and MCP tools a caller may access. MCP may ask policy whether a statement needs write capability for that scope check; it does not evaluate rules or write audit records. |
-| `PolicyGuard` | Classify SQL, apply environment rules, request approval, mask results, and record audit events |
+| `PolicyGuard` | Classify SQL, apply environment rules, request approval, mask results, record audit events, and contain a driver that stops mid-operation |
 
 A token scope never bypasses `PolicyGuard`. Policy approval never bypasses a token's connection allowlist. The GTK app and `tablepro-agentd` build guarded connection handles before governed operations run.
 
 Writes record an audit intent before driver execution and a terminal outcome afterward. Required audit failures deny governed writes. Recovered unresolved outcomes also keep governed writes disabled until they are handled.
+
+A driver that panics is contained at the guard rather than lost with its task. The guard catches the unwind at every forwarded call and turns it into a `DriverError`: reads become `Internal`, and writes become `OperationOutcomeUnknown`, because a driver that stopped mid-statement cannot tell us whether the server applied it. The surrounding audit path then sees an ordinary error and records the required terminal state, so containment does not create a gap in the journal. The panic payload reaches `tracing` only; it never enters the returned error, the audit fields, or the interface.
+
+Because a panic leaves the connection's protocol state unverified, the guard also reports the fault through the optional `ConnectionFaultSink` its owner installs. `app::services::database_service` implements that sink and wakes the connection monitor, which replaces the connection instead of waiting for the next ping. A desynchronised connection can still answer a ping, so the fault path deliberately skips the ping and reconnects. `tablepro-mcp` and `tablepro-agentd` install no sink and keep the error conversion alone.
 
 ## Async and GTK ownership
 

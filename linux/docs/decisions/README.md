@@ -40,6 +40,7 @@ Other options and why they were rejected.
 | [0003](0003-relm4-architecture.md) | Relm4 for application architecture | Accepted | Typed component state and async message flow. |
 | [0004](0004-libsecret-secret-storage.md) | Secret Service through oo7 | Accepted | Credentials stay in the desktop keyring. |
 | [0005](0005-server-side-cancellation.md) | Cancellation must reach the database | Accepted | Stop and timeouts abort the statement server-side, and only the engine's own abort error is terminal. |
+| [0006](0006-driver-panic-containment.md) | A driver panic is contained, not trusted away | Accepted | The guard turns a driver panic into a failed operation and the connection is replaced. |
 
 ## Adding a decision
 

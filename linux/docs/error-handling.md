@@ -95,7 +95,7 @@ Do not display raw `Debug` or `Display` output for domain errors. Always go thro
 
 ## Logging
 
-Use the `tracing` crate, with a `tracing-journald` subscriber installed in `app::main`. Levels:
+Use the `tracing` crate. `app::logging::init` installs a `tracing_subscriber` formatter that writes to stderr; the GNOME session journals that for both Flatpak and system installs, so panics and logs interleave in order without a journald writer. `RUST_LOG` overrides the per-profile default level. Levels:
 
 - `error!`: something the user must see, or a contract was violated.
 - `warn!`: recoverable but suspicious.
@@ -103,17 +103,20 @@ Use the `tracing` crate, with a `tracing-journald` subscriber installed in `app:
 - `debug!`: verbose internal flow.
 - `trace!`: query bodies and network frames. Off by default.
 
-Never log passwords, secret tokens, or full query parameters at any level above `trace!`. The lint enforces this in CI by grepping for known sensitive identifiers.
+Never log passwords, secret tokens, connection strings, or query parameters at any level. Nothing enforces this automatically: no lint or CI step greps for sensitive identifiers, so it is a review obligation. `print!`, `println!`, `eprint!`, `eprintln!` and `dbg!` are denied by the workspace lints, which keeps application logging on `tracing`; protocol output that must reach stdout writes through an explicit `std::io::stdout` handle instead.
 
 ## `unwrap` and `expect`
 
-Banned in production paths. The only legitimate uses:
+Denied in production paths by the workspace lints in `linux/Cargo.toml`, together with `panic!`, `todo!` and `unimplemented!`. This is a compiler error under `-D warnings`, not a review convention, so there is no list of tolerated exceptions to argue about.
 
-- `OnceLock::get_or_init` initialisers that genuinely cannot fail.
-- Test code.
-- Single-call type conversions on values whose validity is locally provable (e.g. `"5432".parse::<u16>().expect("constant literal")`).
+Test code is exempt in two different ways, because Clippy treats the two kinds of test differently:
 
-In every other case, propagate the error. If a function "cannot fail", make it `infallible` by typing.
+- Unit tests in a `#[cfg(test)]` module are covered by `allow-unwrap-in-tests`, `allow-expect-in-tests` and `allow-panic-in-tests` in `linux/clippy.toml`.
+- Integration tests under a crate's `tests/` directory are separate crates that those settings do not reach, so each file carries `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]` on its first line. A new integration test file needs that header or the build fails.
+
+Crates that exist only to support tests (`tablepro-driver-tls-tests`, `tablepro-release-tests`) set the allowances in their own manifests, since their `src/` is test scaffolding.
+
+When a value's validity is locally provable, express that in the types or restructure so the impossible case cannot be written, rather than asserting it at runtime. Making a construction infallible is usually a smaller change than it looks: a widget handle that must exist by construction belongs in the struct as a plain field, not behind a cell that has to be unwrapped at every use.
 
 ## Anti-patterns flagged in review
 

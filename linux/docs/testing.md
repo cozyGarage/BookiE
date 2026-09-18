@@ -43,6 +43,14 @@ cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 
 Keep both `--lib` and `--bins`. `tablepro-app` is a binary crate, so `--lib` alone skips its tests. DuckDB is excluded from the default gate because its optional native build is large.
 
+The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, the `print!` family and `dbg!`, and Clippy runs with `-D warnings`, so a violation fails the gate. Unit tests inside a `#[cfg(test)]` module are exempt through `linux/clippy.toml`. Integration tests under `tests/` are separate crates that those settings do not reach, so **a new file in a `tests/` directory must start with**:
+
+```rust
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+```
+
+Without it the file compiles locally but fails Clippy. See [error-handling.md](error-handling.md) for the production-path rules.
+
 To run the same unit-test shape without the helper script:
 
 ```bash

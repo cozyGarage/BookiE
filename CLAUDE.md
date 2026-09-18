@@ -77,11 +77,11 @@ These rules apply to the GUI, MCP server, and `tablepro-agentd`.
 - Do not add comments, including documentation comments. Prefer clear module, type, function, and test names.
 - Use early returns to keep control flow flat.
 - Keep public APIs small. Default to private visibility.
-- Do not use `unwrap`, `expect`, `panic!`, `todo!`, or `unimplemented!` in production paths.
+- Do not use `unwrap`, `expect`, `panic!`, `todo!`, or `unimplemented!` in production paths. The workspace lints deny these, so a violation fails Clippy rather than review. Unit tests in a `#[cfg(test)]` module are exempt through `linux/clippy.toml`; a new integration test file under a crate's `tests/` directory must start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because those settings do not reach separate test crates.
 - Use typed `thiserror` errors across crate boundaries. Add context to internal failures without exposing secrets.
 - Avoid `unsafe`. If a native API makes it unavoidable, isolate it behind the smallest safe interface and require focused tests and review.
 - Do not suppress Clippy lints to avoid fixing code unless the lint is wrong for a documented repository-wide reason.
-- Use `tracing` fields for application logs. Do not use `print!`, `println!`, `eprint!`, or `eprintln!` for app logging. Protocol output on stdout must remain separate from logs.
+- Use `tracing` fields for application logs. The workspace lints deny `print!`, `println!`, `eprint!`, `eprintln!` and `dbg!`. Protocol output on stdout must remain separate from logs and writes through an explicit `std::io::stdout` handle so a failed write is reported rather than swallowed.
 - Do not log SQL parameters, credentials, tokens, connection strings, or unmasked query results.
 
 ## Tests
