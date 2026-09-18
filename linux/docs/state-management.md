@@ -10,9 +10,9 @@ The `app` crate uses [Relm4](https://relm4.org) on top of gtk4-rs. The choice is
 | `AsyncComponent` | Loading data on init or in update is the core of the component. Connection list, table content viewer. |
 | `SimpleComponent` | A leaf widget with no `Output` to its parent. Avoid; very few cases. |
 | `Factory` (`FactoryComponent`) | A homogeneous list of children driven by a model. Connection sidebar entries, tab strip items. |
-| `Worker` | Background unit that does not own widgets. Use for the driver registry interaction; receives requests, returns results. |
+| `Worker` | Background unit that does not own widgets. Unused today: services are `Arc`-shared structs and async work runs through component commands. |
 
-If you find yourself reaching for a static `Mutex<AppState>`, you are not using the framework. Stop and re-read the model.
+If you find yourself adding a global singleton for application state, you are not using the framework. Stop and re-read the model.
 
 ## Component skeleton
 
@@ -97,35 +97,46 @@ sender.command(|out, shutdown| {
 })
 ```
 
-The command runs on the runtime owned by `app::runtime`. It is automatically cancelled when the component is destroyed. **Always use `drop_on_shutdown`** unless the work is critical to complete (rare; saving user data is the main case).
+The command runs on the Tokio runtime Relm4 owns, and is cancelled when the component is destroyed. **Always use `drop_on_shutdown`** unless the work is critical to complete (rare; saving user data is the main case).
 
 ## Talking to drivers
 
-Driver interaction is centralised in `app::services::DatabaseService`. Components never call `core::DriverRegistry` directly. They send a request to the service worker and receive a typed reply.
+Driver interaction is centralised in `app::services::database_service::DatabaseService`. Components never call `core::DriverRegistry` directly.
+
+The service is not a Relm4 `Worker` and has no request/reply enums. It is a plain struct the application owns as an `Arc` and passes explicitly into the windows and dialogs that need it. It owns the connection map, health, the reconnect monitor, the audit runtime and the policy configuration, and it hands out a guarded connection handle:
 
 ```rust
-let req = DatabaseRequest::FetchRows {
-    connection_id,
-    table: "users".into(),
-    offset: 0,
-    limit: 1000,
+let Some(conn) = self.window_connection() else {
+    return;
 };
-db_service.send(req);
-// In update_cmd:
-DatabaseReply::Rows { rows, .. } => { /* update model */ }
+sender.command(move |_, shutdown| {
+    shutdown
+        .register(async move {
+            let control = operation_control::bounded(timeout_secs);
+            let result = conn
+                .fetch_rows_controlled(schema.as_deref(), &table, offset, limit, &control)
+                .await;
+            // route the outcome back through an Input message
+        })
+        .drop_on_shutdown()
+});
 ```
 
-Why centralise: connection lifecycles, retries, health pings, cancellation, logging are concerns the UI must not see.
+`DatabaseService::get` and `handle` wrap the live connection in a `PolicyGuard` before returning it, so a component cannot reach a raw driver connection even by accident. Classification, approval, masking, audit and driver-panic containment all happen inside that handle.
+
+Why centralise: connection lifecycles, retries, health pings, cancellation and policy are concerns the interface must not reimplement.
 
 ## State that does not belong in a component
 
-Some state is genuinely global: open connections, the driver registry, app settings. We model these as `Worker` components or as `Arc<RwLock<T>>` owned by `app::main` and passed to component `init` payloads. Never reach for global statics other than the tokio runtime handle and the application identifier.
+Some state outlives any single component: open connections, user preferences, query history, the workspace cache and the MCP bridge. The application owns these as `Arc`s and passes them explicitly into each window, tab and dialog that needs them. They were global singletons until the 0.2 sprint, and that is exactly what the `Arc` handles replaced.
+
+Per-tab editing state is the deliberate exception. `change_tracker`, `structure_tracker` and `window_registry` keep a `thread_local!` registry keyed by tab or window id. That is sound because each is confined to the GTK main thread by the Relm4 contract, which is also why they use `RefCell` rather than `Mutex`. Threading a registry handle through every grid cell binding would cost more in the hot `connect_bind` path than it buys. Tests construct a fresh registry rather than sharing the thread-local one.
 
 ## Anti-patterns to flag in review
 
 - `gtk::glib::clone!` capturing `&mut` references to model fields. Use `ComponentSender` and route via `Input`.
 - Async work spawned with raw `tokio::spawn` from inside a component. Use `sender.command`.
-- Components reading from a `Mutex<AppState>`. Pass state in via `Init` or via parent → child `Input`.
+- A new global singleton for state the application could own and pass in. Pass it via `Init` or parent to child `Input`. The main-thread `thread_local!` tab registries are the documented exception, not a precedent to extend.
 - A `Component` doing async work in its `init`. Promote to `AsyncComponent`.
 - One enormous `Input` enum with 30 variants. Split the component.
 
