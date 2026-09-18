@@ -888,7 +888,7 @@ mod tests {
         assert_eq!(d.display_name(), "SQL Server");
         assert_eq!(d.default_port(), 1433);
         assert!(!d.is_file_based());
-        assert!(d.supports_integrated_auth());
+        assert_eq!(d.supports_integrated_auth(), cfg!(feature = "kerberos"));
     }
 
     fn direct_options() -> ConnectOptions {
