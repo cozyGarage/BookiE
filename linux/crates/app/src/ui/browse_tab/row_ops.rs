@@ -17,23 +17,7 @@ impl BrowseTab {
             return;
         };
         let source_cells = source.cells_clone();
-        // Clone source values; blank columns whose value is
-        // owned by the database (PK, identity / serial,
-        // generated). The duplicate is meant to be a *new*
-        // row — inheriting the source's identity would either
-        // collide on save or pre-fill nonsense.
-        let values: Vec<Value> = self
-            .current_columns
-            .iter()
-            .enumerate()
-            .map(|(i, col)| {
-                if col.primary_key || col.is_auto_increment || col.is_generated {
-                    Value::Null
-                } else {
-                    source_cells.get(i).cloned().unwrap_or(Value::Null)
-                }
-            })
-            .collect();
+        let values = duplicate_row_values(&self.current_columns, &source_cells);
         let key_opt = crate::services::change_tracker::with_tab(self.tab_id, |t| t.track_insert(values.clone()));
         let Some(key) = key_opt else {
             return;
@@ -643,6 +627,27 @@ impl BrowseTab {
     }
 }
 
+/// Build the draft values for a duplicated row. Columns whose value is
+/// owned by the database (primary key, identity / serial, generated) are
+/// blanked, and so is any cell the driver could not decode: carrying an
+/// undecodable value into an INSERT binds it as NULL without the user
+/// ever being able to see or correct it.
+fn duplicate_row_values(columns: &[ColumnInfo], source_cells: &[Value]) -> Vec<Value> {
+    columns
+        .iter()
+        .enumerate()
+        .map(|(i, col)| {
+            if col.primary_key || col.is_auto_increment || col.is_generated {
+                return Value::Null;
+            }
+            match source_cells.get(i) {
+                Some(Value::Undecodable(_)) | None => Value::Null,
+                Some(value) => value.clone(),
+            }
+        })
+        .collect()
+}
+
 /// Compare the primary-key values a row carries now with the ones read
 /// when its editor opened.
 fn row_key_matches(columns: &[ColumnInfo], cells: &[Value], expected: &[Value]) -> bool {
@@ -666,7 +671,7 @@ fn row_key_matches(columns: &[ColumnInfo], cells: &[Value], expected: &[Value]) 
 
 #[cfg(test)]
 mod row_identity_tests {
-    use super::row_key_matches;
+    use super::{duplicate_row_values, row_key_matches};
     use tablepro_core::{ColumnInfo, Value};
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
@@ -748,6 +753,29 @@ mod row_identity_tests {
     fn a_table_without_a_primary_key_has_nothing_to_compare() {
         let columns = [column("a", false)];
         assert!(row_key_matches(&columns, &[Value::Int(1)], &[]));
+    }
+
+    #[test]
+    fn duplicating_a_row_blanks_database_owned_and_undecodable_cells() {
+        let columns = [column("id", true), column("amount", false), column("note", false)];
+        let source = [
+            Value::Int(7),
+            Value::Undecodable("NUMERIC".into()),
+            Value::Text("keep me".into()),
+        ];
+        assert_eq!(
+            duplicate_row_values(&columns, &source),
+            vec![Value::Null, Value::Null, Value::Text("keep me".into())]
+        );
+    }
+
+    #[test]
+    fn duplicating_a_row_pads_missing_source_cells_with_null() {
+        let columns = [column("id", true), column("note", false)];
+        assert_eq!(
+            duplicate_row_values(&columns, &[Value::Int(1)]),
+            vec![Value::Null, Value::Null]
+        );
     }
 
     #[test]
