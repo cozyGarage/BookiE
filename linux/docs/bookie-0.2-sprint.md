@@ -473,3 +473,39 @@ isolated-test inventory passed. Debian package fixture could not run because
   `cell_text_for_bind` test confirming an editable column still shows the
   undecodable marker rather than the empty-editable-NULL text. Full workspace
   fmt, Clippy, and `--lib --bins` tests (23/23 binaries, 0 failed) passed.
+
+- 2026-09-18 mutation testing: ran `cargo mutants --in-diff` (scoped to the
+  two follow-up fixes' changed lines) against the workspace, redirecting its
+  scratch build off `/tmp` (a 6.8 GB tmpfs here, too small for a full
+  from-scratch workspace rebuild) to a disk-backed `TMPDIR`. Every mutant on
+  lines the follow-up fixes actually added or changed was caught: the
+  `stops_on_error` comparison in `run_statements`, the parser guard in
+  `script_statements`, and every `Value::Undecodable`-handling function
+  across `export.rs`, `sql_literal.rs`, `grid/display.rs`, ClickHouse's
+  `literal`, MSSQL's `boxed_params`, and MCP's `value_to_json`. The diff also
+  swept in the unrelated `DatabaseService` ownership refactor (same commit
+  range), which produced many additional "missed" mutants in GTK
+  `update`/`init` methods that merely gained a new parameter; those are
+  pre-existing structural gaps in GTK-only code this project already
+  verifies manually, not new holes.
+
+- 2026-09-18 B2 close-out: converted the last two process-global singletons.
+  `crates/app/src/services/database_service.rs`'s `static SERVICE: OnceLock`
+  is now built once in `lib.rs::run()` as `Arc<DatabaseService>` and threaded
+  explicitly through every GTK component and free function that used
+  `database_service::instance()` (34 original call sites, plus the cascade
+  through `CatalogOrigin`/`CatalogChanges`, `PreparedConnection::activate`,
+  and the `BrowseTab`/`SqlEditor`/`HistoryDialog` component `Init` structs —
+  24 files total). `services/preferences.rs`'s `static CACHE` became a
+  `PreferencesStore` handle, threaded the same way through 17 files,
+  including `operation_control::configured_timeout_secs`'s own 19 call
+  sites. `services/mcp_service.rs`'s `static BRIDGE: OnceLock<Arc<McpBridge>>`
+  is now the `Option<Arc<McpBridge>>` `start_background` already returned,
+  threaded through `AppInit`/`App` into the MCP preferences page instead of
+  being reached globally. No behavior changed in any of the three; each
+  landed as its own commit with full workspace fmt, Clippy, `--lib --bins`
+  tests (23/23 binaries), the two named `tablepro-mcp` integration tests, and
+  the file-size guard passing. B2's "remove replaced globals" goal is now
+  complete; GSettings migration and history-format migration (also named
+  under B2) were out of scope for this pass and remain open, so the
+  checklist item stays unmarked until qualified. B3–B7 and A5 remain open.
