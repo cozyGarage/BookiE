@@ -223,7 +223,9 @@ pub(super) fn build_column_expander_row(
     });
     let (suggestions_button, suggestions_popover) = build_type_suggestions_button(driver_id, &type_row);
     type_row.add_suffix(&suggestions_button);
-    popover_registry.borrow_mut().push(suggestions_popover);
+    if let Some(suggestions_popover) = suggestions_popover {
+        popover_registry.borrow_mut().push(suggestions_popover);
+    }
     row.add_row(&type_row);
 
     // Nullable (AdwSwitchRow).
@@ -341,7 +343,7 @@ pub(super) fn build_column_expander_row(
 /// can register it for popdown on rebuild — otherwise an open menu
 /// would keep its captured target alive and dispatch a click into a
 /// detached AdwEntryRow.
-fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gtk::MenuButton, gtk::Popover) {
+fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gtk::MenuButton, Option<gtk::Popover>) {
     // Per-button action group: one action `apply` keyed by `String`
     // parameter. Each menu item activates `types.apply::<typename>`.
     let action_group = gio::SimpleActionGroup::new();
@@ -377,8 +379,6 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
     // The PopoverMenu is auto-created by MenuButton from the menu
     // model. Hand it back so the caller can `popdown` it before the
     // owning column row is torn down on Refresh.
-    let popover = button
-        .popover()
-        .expect("MenuButton creates a PopoverMenu when a menu model is set");
+    let popover = button.popover();
     (button, popover)
 }

@@ -41,18 +41,17 @@ pub(super) fn install_grid_context_menus(
     empty_menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
 
     let group = gio::SimpleActionGroup::new();
-    let edit_action = {
+    let edit_action = gio::SimpleAction::new("edit", None);
+    {
         let context = context.clone();
-        gio::ActionEntry::builder("edit")
-            .activate(move |_, _, _| {
-                if let Some(slot) = context.borrow().as_ref()
-                    && let Ok(label) = slot.widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
-                {
-                    enter_edit_mode(&label);
-                }
-            })
-            .build()
-    };
+        edit_action.connect_activate(move |_, _| {
+            if let Some(slot) = context.borrow().as_ref()
+                && let Ok(label) = slot.widget.clone().downcast::<crate::ui::cell_editor::CellEditor>()
+            {
+                enter_edit_mode(&label);
+            }
+        });
+    }
     let copy_value_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -248,8 +247,8 @@ pub(super) fn install_grid_context_menus(
             })
             .build()
     };
+    group.add_action(&edit_action);
     group.add_action_entries([
-        edit_action,
         copy_value_action,
         copy_column_name_action,
         copy_rows_entry,
@@ -274,10 +273,6 @@ pub(super) fn install_grid_context_menus(
     {
         action.set_enabled(supports_sql);
     }
-    let edit_action = group
-        .lookup_action("edit")
-        .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
-        .expect("registered edit action");
 
     let editable_popover = gtk::PopoverMenu::from_model_full(&editable_menu, gtk::PopoverMenuFlags::NESTED);
     editable_popover.set_has_arrow(true);

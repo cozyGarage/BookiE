@@ -55,7 +55,6 @@ pub(super) fn install_window_actions(
         input_action!("about", AppMsg::ShowAbout),
         quit,
         input_action!("open-editor", AppMsg::NewEditorTab),
-        input_action!("disconnect", AppMsg::Disconnect),
         input_action!("close-current", AppMsg::CloseActiveWorkspaceTab),
         input_action!("preferences", AppMsg::ShowPreferences),
         input_action!("new-window", AppMsg::NewWindow),
@@ -74,11 +73,11 @@ pub(super) fn install_window_actions(
         input_action!("open-quickly", AppMsg::ShowQuickSwitcher),
         input_action!("save-favorite", AppMsg::SaveQueryAsFavorite),
     ]);
+    let disconnect_action = gio::SimpleAction::new("disconnect", None);
+    let disconnect_sender = sender.clone();
+    disconnect_action.connect_activate(move |_, _| disconnect_sender.input(AppMsg::Disconnect));
+    group.add_action(&disconnect_action);
     window.insert_action_group("win", Some(&group));
-    let disconnect_action = group
-        .lookup_action("disconnect")
-        .and_then(|a| a.downcast::<gio::SimpleAction>().ok())
-        .expect("disconnect action must be a SimpleAction");
     disconnect_action.set_enabled(false);
     tracing::info!(enabled = disconnect_action.is_enabled(), "registered win.disconnect");
     disconnect_action

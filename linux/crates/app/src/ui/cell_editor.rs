@@ -10,7 +10,7 @@
 //! mirrors the stack's `visible-child-name` notify so callers can
 //! snapshot the original text on entry and emit a commit on exit.
 
-use std::cell::{Cell, OnceCell};
+use std::cell::Cell;
 
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
@@ -19,12 +19,30 @@ use gtk4::{glib, pango};
 mod imp {
     use super::*;
 
-    #[derive(Default)]
     pub struct CellEditor {
-        pub stack: OnceCell<gtk4::Stack>,
-        pub label: OnceCell<gtk4::Label>,
-        pub entry: OnceCell<gtk4::Text>,
+        pub stack: gtk4::Stack,
+        pub label: gtk4::Label,
+        pub entry: gtk4::Text,
         pub inline_editable: Cell<bool>,
+    }
+
+    impl Default for CellEditor {
+        fn default() -> Self {
+            Self {
+                stack: gtk4::Stack::builder()
+                    .transition_type(gtk4::StackTransitionType::None)
+                    .hhomogeneous(true)
+                    .vhomogeneous(true)
+                    .build(),
+                label: gtk4::Label::builder()
+                    .xalign(0.0)
+                    .hexpand(true)
+                    .ellipsize(pango::EllipsizeMode::End)
+                    .build(),
+                entry: gtk4::Text::builder().hexpand(true).build(),
+                inline_editable: Cell::default(),
+            }
+        }
     }
 
     #[glib::object_subclass]
@@ -47,17 +65,9 @@ mod imp {
             // Stable CSS class so app-level selectors can target this
             // widget without depending on the type-name node default.
             self.obj().add_css_class("tp-cell-editor");
-            let stack = gtk4::Stack::builder()
-                .transition_type(gtk4::StackTransitionType::None)
-                .hhomogeneous(true)
-                .vhomogeneous(true)
-                .build();
-            let label = gtk4::Label::builder()
-                .xalign(0.0)
-                .hexpand(true)
-                .ellipsize(pango::EllipsizeMode::End)
-                .build();
-            let entry = gtk4::Text::builder().hexpand(true).build();
+            let stack = self.stack.clone();
+            let label = self.label.clone();
+            let entry = self.entry.clone();
             stack.add_named(&label, Some("display"));
             stack.add_named(&entry, Some("edit"));
             stack.set_visible_child_name("display");
@@ -109,19 +119,13 @@ mod imp {
                 }
             });
             entry.add_controller(focus_ctrl);
-
-            self.stack.set(stack).expect("constructed once");
-            self.label.set(label).expect("constructed once");
-            self.entry.set(entry).expect("constructed once");
         }
 
         fn dispose(&self) {
             // BinLayout-managed child must be unparented before our
             // destructor runs or GTK warns about a finalised widget
             // with leftover children.
-            if let Some(stack) = self.stack.get() {
-                stack.unparent();
-            }
+            self.stack.unparent();
         }
     }
 
@@ -241,14 +245,14 @@ impl CellEditor {
     }
 
     fn stack_widget(&self) -> gtk4::Stack {
-        self.imp().stack.get().expect("constructed").clone()
+        self.imp().stack.clone()
     }
 
     fn label_widget(&self) -> gtk4::Label {
-        self.imp().label.get().expect("constructed").clone()
+        self.imp().label.clone()
     }
 
     fn entry_widget(&self) -> gtk4::Text {
-        self.imp().entry.get().expect("constructed").clone()
+        self.imp().entry.clone()
     }
 }
