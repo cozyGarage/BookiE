@@ -116,6 +116,8 @@ Test code is exempt in two different ways, because Clippy treats the two kinds o
 
 Crates that exist only to support tests (`tablepro-driver-tls-tests`, `tablepro-release-tests`) set the allowances in their own manifests, since their `src/` is test scaffolding.
 
+Two mechanisms enforce this, and both must pass. The workspace lints are semantic and run with Clippy. `linux/scripts/check-panic-sites.sh`, run by `preflight.sh` and `ci-local.sh`, is a text scan with the same exclusion model: not inside a `#[cfg(test)]` item, not under a `tests/` directory, not in a `*-tests` support crate. Keep the two lists aligned when either changes; `unreachable!` is covered by both.
+
 When a value's validity is locally provable, express that in the types or restructure so the impossible case cannot be written, rather than asserting it at runtime. Making a construction infallible is usually a smaller change than it looks: a widget handle that must exist by construction belongs in the struct as a plain field, not behind a cell that has to be unwrapped at every use.
 
 ## Anti-patterns flagged in review

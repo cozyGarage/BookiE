@@ -147,6 +147,8 @@ Run commands from the repository root. Start with the narrow test for the change
 
 ```bash
 bash linux/scripts/check-file-size.sh
+bash linux/scripts/check-panic-sites.sh
+bash linux/scripts/check-bounded-operations.sh
 cargo fmt --manifest-path linux/Cargo.toml --all -- --check
 cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 cargo test --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --lib --bins
@@ -163,6 +165,8 @@ cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test inte
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration -- --include-ignored --test-threads=1
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration -- --include-ignored --test-threads=1
 ```
+
+`linux/scripts/preflight.sh` runs the file-size, panic-site and bounded-operation guards, formatting, Clippy, the unit tier and the sandbox tier in one pass, and is the quicker way to cover most of the above.
 
 If required GTK development packages, database services, containers, or `cargo-deny` are unavailable, report which validation could not run and why.
 
