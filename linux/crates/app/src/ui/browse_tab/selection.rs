@@ -165,12 +165,23 @@ pub(super) fn build_persisted_row_key(
     cells: Vec<Value>,
     pk_indices: &[usize],
 ) -> Option<(crate::services::change_tracker::RowKey, Vec<Value>)> {
-    let pk_values: Vec<Value> = pk_indices
-        .iter()
-        .map(|&i| cells.get(i).cloned())
-        .collect::<Option<_>>()?;
+    let pk_values = pk_values_of(&cells, pk_indices)?;
     let key = crate::services::change_tracker::RowKey::from_pk_values(&pk_values)?;
     Some((key, cells))
+}
+
+/// Pull the primary-key components out of a row's cells, or `None` when
+/// an index runs past the row (a column dropped since the page loaded).
+pub(super) fn pk_values_of(cells: &[Value], pk_indices: &[usize]) -> Option<Vec<Value>> {
+    pk_indices.iter().map(|&i| cells.get(i).cloned()).collect()
+}
+
+/// True when the row at `pk_indices` carries a key the driver could not
+/// decode, so it cannot be identified or written back.
+pub(super) fn row_key_is_unreadable(cells: &[Value], pk_indices: &[usize]) -> bool {
+    pk_values_of(cells, pk_indices)
+        .as_deref()
+        .is_some_and(crate::services::change_tracker::pk_values_are_unreadable)
 }
 
 /// Update the selection-count badge in response to a
@@ -202,7 +213,7 @@ pub(super) fn selected_positions(selection: &gtk::MultiSelection) -> Vec<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_persisted_row_key, escape_tsv_cell};
+    use super::{build_persisted_row_key, escape_tsv_cell, row_key_is_unreadable};
     use crate::services::change_tracker::RowKey;
     use tablepro_core::Value;
 
@@ -297,5 +308,21 @@ mod tests {
         let cells = vec![Value::Null, Value::Text("x".into())];
         let (key, _) = build_persisted_row_key(cells, &[0]).expect("Null PK is valid");
         assert!(matches!(key, RowKey::Persisted(_)));
+    }
+
+    #[test]
+    fn a_row_whose_key_could_not_be_decoded_yields_no_key() {
+        let cells = vec![Value::Undecodable("NUMERIC".into()), Value::Text("alice".into())];
+        assert!(build_persisted_row_key(cells.clone(), &[0]).is_none());
+        assert!(row_key_is_unreadable(&cells, &[0]));
+        assert!(!row_key_is_unreadable(&cells, &[1]));
+    }
+
+    #[test]
+    fn two_rows_with_the_same_undecodable_key_type_do_not_collide() {
+        let first = vec![Value::Undecodable("NUMERIC".into()), Value::Text("alice".into())];
+        let second = vec![Value::Undecodable("NUMERIC".into()), Value::Text("bob".into())];
+        assert!(build_persisted_row_key(first, &[0]).is_none());
+        assert!(build_persisted_row_key(second, &[0]).is_none());
     }
 }

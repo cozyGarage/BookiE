@@ -35,78 +35,13 @@ use tablepro_core::{
     sql_dialect::{BuildSqlError, build_insert_from_draft, build_update, placeholder_for, quote_ident},
 };
 
+#[path = "change_tracker_row_identity.rs"]
+mod row_identity;
+
+use row_identity::keyvalue_to_value;
+pub use row_identity::{KeyValue, MaterializeError, RowKey, pk_values_are_unreadable};
+
 const UNDO_LIMIT: usize = 50;
-
-/// Stable identity for a row across sort / filter / page navigation.
-/// Persisted rows are keyed by their primary key tuple; draft rows
-/// (not yet committed) are keyed by a monotonic local id assigned by
-/// the tracker.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum RowKey {
-    Persisted(Vec<KeyValue>),
-    Draft(u64),
-}
-
-impl RowKey {
-    /// Build a `Persisted` key from an existing row's PK column
-    /// values, or `None` if the slice is empty (table has no PK,
-    /// editing is blocked at the UI level).
-    pub fn from_pk_values(pk_values: &[Value]) -> Option<Self> {
-        if pk_values.is_empty() {
-            return None;
-        }
-        Some(RowKey::Persisted(pk_values.iter().map(KeyValue::from).collect()))
-    }
-}
-
-/// Hash- and Eq-friendly mirror of `Value`. Floats are stored as
-/// IEEE-754 bits (so NaN equals NaN for identity purposes — pathological
-/// PK case but defined behaviour). `Decimal` and `Json` are stored as
-/// their canonical string forms because neither type derives `Hash`.
-///
-/// `Ord` exists to give a batch of statements one canonical order, not
-/// to express a meaningful ranking: `FloatBits` compares raw bits, so
-/// negative floats do not sort numerically. Consistency is all the
-/// ordering needs, because it only decides the sequence rows are locked
-/// and written in.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum KeyValue {
-    Null,
-    Bool(bool),
-    Int(i64),
-    FloatBits(u64),
-    Text(String),
-    Bytes(Vec<u8>),
-    Date(chrono::NaiveDate),
-    Time(chrono::NaiveTime),
-    DateTime(chrono::NaiveDateTime),
-    TimestampTz(chrono::DateTime<chrono::Utc>),
-    Decimal(String),
-    Uuid(uuid::Uuid),
-    Json(String),
-    Undecodable(String),
-}
-
-impl From<&Value> for KeyValue {
-    fn from(v: &Value) -> Self {
-        match v {
-            Value::Null => KeyValue::Null,
-            Value::Bool(b) => KeyValue::Bool(*b),
-            Value::Int(i) => KeyValue::Int(*i),
-            Value::Float(f) => KeyValue::FloatBits(f.to_bits()),
-            Value::Text(s) => KeyValue::Text(s.clone()),
-            Value::Bytes(b) => KeyValue::Bytes(b.clone()),
-            Value::Date(d) => KeyValue::Date(*d),
-            Value::Time(t) => KeyValue::Time(*t),
-            Value::DateTime(dt) => KeyValue::DateTime(*dt),
-            Value::TimestampTz(ts) => KeyValue::TimestampTz(*ts),
-            Value::Decimal(d) => KeyValue::Decimal(d.to_string()),
-            Value::Uuid(u) => KeyValue::Uuid(*u),
-            Value::Json(j) => KeyValue::Json(j.to_string()),
-            Value::Undecodable(type_name) => KeyValue::Undecodable(type_name.clone()),
-        }
-    }
-}
 
 /// A draft row collected by the tracker. `values` is the full column
 /// vector (length = `columns.len()` at the time of creation). Empty
@@ -564,7 +499,7 @@ impl TabChangeTracker {
         schema: Option<&str>,
         table: &str,
         columns: &[ColumnInfo],
-    ) -> Result<(Vec<(String, Vec<Value>)>, Vec<StatementSource>), BuildSqlError> {
+    ) -> Result<(Vec<(String, Vec<Value>)>, Vec<StatementSource>), MaterializeError> {
         let mut out: Vec<(String, Vec<Value>)> = Vec::new();
         let mut sources: Vec<StatementSource> = Vec::new();
         for draft in &self.inserts {
@@ -612,12 +547,18 @@ impl TabChangeTracker {
                 .map(|(i, _)| i)
                 .collect();
             if pk_indices.is_empty() {
-                return Err(BuildSqlError::NoPrimaryKey);
+                return Err(BuildSqlError::NoPrimaryKey.into());
             }
             // Reconstruct PK values (KeyValue → Value is lossy but
             // acceptable: PK values were captured from the original
             // row at edit time and are still equality-correct).
             let pk_values: Vec<Value> = pk_keyvalues.iter().map(keyvalue_to_value).collect();
+            // An undecodable key component binds as NULL, so the WHERE
+            // clause would match no row while the tracker cleared the
+            // edit and the UI reported a successful save.
+            if pk_values_are_unreadable(&pk_values) {
+                return Err(MaterializeError::UnreadableRowKey);
+            }
             // Both col_idx (per edit) and pk_indices (derived from the
             // current `columns`) were computed against whatever schema
             // was current when the edit was tracked. If a Structure tab
@@ -625,7 +566,7 @@ impl TabChangeTracker {
             // past the current columns/pk_values -- indexing them
             // directly would panic and abort the app mid-save.
             if edits.iter().any(|(col_idx, ..)| *col_idx >= columns.len()) || pk_values.len() != pk_indices.len() {
-                return Err(BuildSqlError::StaleColumns);
+                return Err(BuildSqlError::StaleColumns.into());
             }
             let mut params: Vec<Value> = Vec::new();
             let mut placeholder_idx = 0;
@@ -691,14 +632,18 @@ impl TabChangeTracker {
                 .map(|(i, _)| i)
                 .collect();
             if pk_indices.is_empty() {
-                return Err(BuildSqlError::NoPrimaryKey);
+                return Err(BuildSqlError::NoPrimaryKey.into());
             }
             let pk_values: Vec<Value> = pk_keyvalues.iter().map(keyvalue_to_value).collect();
+            // Same unreadable-key guard as the UPDATE path above.
+            if pk_values_are_unreadable(&pk_values) {
+                return Err(MaterializeError::UnreadableRowKey);
+            }
             // Same staleness guard as the UPDATE path above: the PK
             // shape recorded when this delete was tracked may no longer
             // match the table's current primary key.
             if pk_values.len() != pk_indices.len() {
-                return Err(BuildSqlError::StaleColumns);
+                return Err(BuildSqlError::StaleColumns.into());
             }
             let mut params: Vec<Value> = Vec::new();
             // Same NULL-safe rewrite as the UPDATE path above.
@@ -742,29 +687,6 @@ fn undo_op_matches_draft(op: &UndoOp, draft_id: u64) -> bool {
             ..
         } => *id == draft_id,
         _ => false,
-    }
-}
-
-/// Lossy KeyValue → Value mapping. Used only by `materialize` to feed
-/// PK values back into SQL params; equality-correctness preserved.
-fn keyvalue_to_value(kv: &KeyValue) -> Value {
-    match kv {
-        KeyValue::Null => Value::Null,
-        KeyValue::Bool(b) => Value::Bool(*b),
-        KeyValue::Int(i) => Value::Int(*i),
-        KeyValue::FloatBits(bits) => Value::Float(f64::from_bits(*bits)),
-        KeyValue::Text(s) => Value::Text(s.clone()),
-        KeyValue::Bytes(b) => Value::Bytes(b.clone()),
-        KeyValue::Date(d) => Value::Date(*d),
-        KeyValue::Time(t) => Value::Time(*t),
-        KeyValue::DateTime(dt) => Value::DateTime(*dt),
-        KeyValue::TimestampTz(ts) => Value::TimestampTz(*ts),
-        KeyValue::Decimal(s) => s.parse().map(Value::Decimal).unwrap_or(Value::Text(s.clone())),
-        KeyValue::Uuid(u) => Value::Uuid(*u),
-        KeyValue::Json(s) => serde_json::from_str(s)
-            .map(Value::Json)
-            .unwrap_or(Value::Text(s.clone())),
-        KeyValue::Undecodable(type_name) => Value::Undecodable(type_name.clone()),
     }
 }
 
@@ -856,6 +778,7 @@ pub fn pending_tabs_for(tab_ids: &std::collections::HashSet<Uuid>) -> Vec<Uuid> 
     REGISTRY.with(|reg| reg.borrow().pending_tabs_for(tab_ids))
 }
 
+#[cfg(test)]
 #[cfg(test)]
 #[path = "change_tracker_materialize_tests.rs"]
 mod materialize_tests;
@@ -1188,9 +1111,49 @@ mod tests {
     }
 
     #[test]
-    fn undecodable_key_values_with_different_types_are_distinct_rows() {
-        let a = rk(&[Value::Undecodable("NUMERIC".into())]);
-        let b = rk(&[Value::Undecodable("INTERVAL".into())]);
-        assert_ne!(a, b);
+    fn an_undecodable_pk_component_yields_no_persisted_row_key() {
+        assert!(RowKey::from_pk_values(&[Value::Undecodable("NUMERIC".into())]).is_none());
+        assert!(RowKey::from_pk_values(&[Value::Int(1), Value::Undecodable("INTERVAL".into())]).is_none());
+        assert!(RowKey::from_pk_values(&[Value::Int(1)]).is_some());
+        assert!(RowKey::from_pk_values(&[]).is_none());
+    }
+
+    #[test]
+    fn two_rows_with_the_same_undecodable_key_type_never_share_a_row_key() {
+        let first = RowKey::from_pk_values(&[Value::Undecodable("NUMERIC".into())]);
+        let second = RowKey::from_pk_values(&[Value::Undecodable("NUMERIC".into())]);
+        assert!(first.is_none());
+        assert!(second.is_none());
+    }
+
+    #[test]
+    fn a_pending_delete_on_an_undecodable_key_cannot_be_attributed_to_another_row() {
+        let mut t = TabChangeTracker::new();
+        let readable = rk(&[Value::Int(1)]);
+        t.track_delete(readable.clone(), vec![Value::Int(1), Value::Text("doomed".into())]);
+        let unreadable = RowKey::from_pk_values(&[Value::Undecodable("NUMERIC".into())]);
+        assert!(unreadable.is_none());
+        assert!(matches!(t.row_state(&readable), RowState::PendingDelete));
+        assert_eq!(t.pending_count(), 1);
+    }
+
+    #[test]
+    fn materialize_refuses_an_update_whose_key_could_not_be_read() {
+        let mut t = TabChangeTracker::new();
+        let columns = vec![pk_col("id"), data_col("name")];
+        let key = RowKey::Persisted(vec![KeyValue::Undecodable("NUMERIC".into())]);
+        t.track_cell_edit(key, 1, Value::Text("old".into()), Value::Text("new".into()));
+        let err = t.materialize("postgres", None, "t", &columns).unwrap_err();
+        assert!(matches!(err, MaterializeError::UnreadableRowKey));
+    }
+
+    #[test]
+    fn materialize_refuses_a_delete_whose_key_could_not_be_read() {
+        let mut t = TabChangeTracker::new();
+        let columns = vec![pk_col("id"), data_col("name")];
+        let key = RowKey::Persisted(vec![KeyValue::Undecodable("NUMERIC".into())]);
+        t.track_delete(key, vec![Value::Undecodable("NUMERIC".into()), Value::Text("x".into())]);
+        let err = t.materialize("postgres", None, "t", &columns).unwrap_err();
+        assert!(matches!(err, MaterializeError::UnreadableRowKey));
     }
 }
