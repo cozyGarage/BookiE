@@ -21,10 +21,12 @@ serde_json.workspace = true
 sqlx = { workspace = true, features = ["postgres", "tls-rustls-aws-lc-rs"] }
 tokio.workspace = true
 tokio-util.workspace = true
+tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
 secrecy.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres"] }
+tracing-subscriber.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
