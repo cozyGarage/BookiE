@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -52,33 +52,41 @@ impl Default for Preferences {
 /// it, every caller -- including `operation_control::configured_timeout_secs`,
 /// read on the GTK thread before each query dispatch -- did a synchronous
 /// file read on the main thread for a value that only ever changes from the
-/// Preferences dialog.
-static CACHE: Mutex<Option<Preferences>> = Mutex::new(None);
+/// Preferences dialog. App-owned and shared explicitly rather than a global,
+/// so tests and multiple windows never fight over one process-wide cache.
+#[derive(Debug, Clone, Default)]
+pub struct PreferencesStore(Arc<Mutex<Option<Preferences>>>);
 
-pub fn load() -> Preferences {
-    let mut guard = match CACHE.lock() {
-        Ok(g) => g,
-        Err(_) => return load_from_disk(),
-    };
-    guard.get_or_insert_with(load_from_disk).clone()
-}
-
-pub fn save(prefs: &Preferences) {
-    if let Ok(mut guard) = CACHE.lock() {
-        *guard = Some(prefs.clone());
+impl PreferencesStore {
+    pub fn new() -> Self {
+        Self::default()
     }
-    let Some(path) = xdg_config_path("preferences.json") else {
-        return;
-    };
-    if let Err(e) = atomic_write_json(&path, prefs) {
-        tracing::warn!(path = %path.display(), error = %e, "preferences: write failed");
-    }
-}
 
-pub fn update(mutate: impl FnOnce(&mut Preferences)) {
-    let mut prefs = load();
-    mutate(&mut prefs);
-    save(&prefs);
+    pub fn load(&self) -> Preferences {
+        let mut guard = match self.0.lock() {
+            Ok(g) => g,
+            Err(_) => return load_from_disk(),
+        };
+        guard.get_or_insert_with(load_from_disk).clone()
+    }
+
+    pub fn save(&self, prefs: &Preferences) {
+        if let Ok(mut guard) = self.0.lock() {
+            *guard = Some(prefs.clone());
+        }
+        let Some(path) = xdg_config_path("preferences.json") else {
+            return;
+        };
+        if let Err(e) = atomic_write_json(&path, prefs) {
+            tracing::warn!(path = %path.display(), error = %e, "preferences: write failed");
+        }
+    }
+
+    pub fn update(&self, mutate: impl FnOnce(&mut Preferences)) {
+        let mut prefs = self.load();
+        mutate(&mut prefs);
+        self.save(&prefs);
+    }
 }
 
 fn load_from_disk() -> Preferences {
@@ -105,7 +113,8 @@ mod tests {
             default_page_size: 424_242,
             ..Preferences::default()
         };
-        *CACHE.lock().unwrap() = Some(sentinel.clone());
-        assert_eq!(load().default_page_size, sentinel.default_page_size);
+        let store = PreferencesStore::new();
+        *store.0.lock().unwrap() = Some(sentinel.clone());
+        assert_eq!(store.load().default_page_size, sentinel.default_page_size);
     }
 }

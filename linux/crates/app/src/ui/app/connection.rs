@@ -34,6 +34,7 @@ impl App {
         let dialog = ConnectDialog::builder()
             .launch(ConnectDialogInit {
                 registry: self.registry.clone(),
+                preferences: self.preferences.clone(),
             })
             .forward(sender.input_sender(), |out| match out {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
@@ -304,7 +305,7 @@ impl App {
             &crate::tr!("Opening {name}").replace("{name}", &saved.name),
         );
         let registry = self.registry.clone();
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown

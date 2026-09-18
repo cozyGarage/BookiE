@@ -52,6 +52,7 @@ pub struct AppInit {
     pub workspace: crate::services::workspace_state::WorkspaceStore,
     pub history: Option<tablepro_storage::query_history::HistoryStore>,
     pub database: Arc<crate::services::database_service::DatabaseService>,
+    pub preferences: crate::services::preferences::PreferencesStore,
 }
 
 /// Decrement a tab's pending-save counter in the close-after-save map.
@@ -79,6 +80,7 @@ pub struct App {
     workspace: crate::services::workspace_state::WorkspaceStore,
     history: Option<tablepro_storage::query_history::HistoryStore>,
     database: Arc<crate::services::database_service::DatabaseService>,
+    preferences: crate::services::preferences::PreferencesStore,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     window_title: adw::WindowTitle,
@@ -397,6 +399,7 @@ impl SimpleComponent for App {
             workspace,
             history,
             database,
+            preferences,
         } = init;
         let widgets = view_output!();
 
@@ -427,12 +430,14 @@ impl SimpleComponent for App {
                     WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
                 });
 
+        let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             registry,
             persistence,
             workspace,
             history,
             database,
+            preferences,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
             window_title: widgets.window_title.clone(),
@@ -468,7 +473,7 @@ impl SimpleComponent for App {
             current_driver_id: None,
             table_names: Vec::new(),
             read_only: false,
-            default_page_size: crate::services::preferences::load().default_page_size,
+            default_page_size,
             saved_connections: Vec::new(),
             connection_organization: ConnectionOrganizationIndex::default(),
             connected: false,
@@ -516,8 +521,9 @@ impl SimpleComponent for App {
         }));
 
         let history = model.history.clone();
+        let preferences_for_prune = model.preferences.clone();
         model.history_prune_source = Some(glib::timeout_add_seconds_local(3600, move || {
-            let retention = crate::services::preferences::load().history_retention_days;
+            let retention = preferences_for_prune.load().history_retention_days;
             let history = history.clone();
             relm4::spawn(async move {
                 if let Some(history) = history
@@ -642,7 +648,7 @@ impl SimpleComponent for App {
             AppMsg::CloseActiveWorkspaceTab => self.close_active_workspace_tab(sender),
             AppMsg::ShowAlert { title, body } => self.show_error_alert(&title, &body),
             AppMsg::ExportResults { result, name } => {
-                super::export_dialog::present(&self.window, &self.toast_overlay, result, name)
+                super::export_dialog::present(&self.window, &self.toast_overlay, result, name, &self.preferences)
             }
             AppMsg::ShowToast(msg) => self.show_toast(&msg),
             AppMsg::BrowseTabDirtyChanged(tab_id, dirty) => self.refresh_browse_tab_dirty(tab_id, dirty),
@@ -733,10 +739,13 @@ impl SimpleComponent for App {
                     self.window.upcast_ref::<gtk::Window>(),
                     self.connection_id,
                     &self.database,
+                    &self.preferences,
                 );
             }
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
-            AppMsg::ShowPreferences => super::preferences::present(&self.window, self.history.clone(), &self.database),
+            AppMsg::ShowPreferences => {
+                super::preferences::present(&self.window, self.history.clone(), &self.database, &self.preferences)
+            }
             AppMsg::NewWindow => {
                 let ctrl = App::builder()
                     .launch(AppInit {
@@ -745,6 +754,7 @@ impl SimpleComponent for App {
                         workspace: self.workspace.clone(),
                         history: self.history.clone(),
                         database: self.database.clone(),
+                        preferences: self.preferences.clone(),
                     })
                     .detach();
                 // Only the window relm4 starts the application with is

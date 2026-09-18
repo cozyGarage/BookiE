@@ -7,6 +7,7 @@ use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
 use crate::services::database_service::DatabaseService;
+use crate::services::preferences::PreferencesStore;
 use crate::tr;
 
 pub fn present(
@@ -14,6 +15,7 @@ pub fn present(
     connection_id: Option<uuid::Uuid>,
     sql: &str,
     database: &DatabaseService,
+    preferences: &PreferencesStore,
 ) {
     let trimmed = sql.trim();
     if trimmed.is_empty() {
@@ -87,7 +89,7 @@ pub fn present(
     window.present();
 
     let buffer = view.buffer();
-    let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+    let timeout_secs = crate::services::operation_control::configured_timeout_secs(preferences);
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded(timeout_secs);
         let text = match conn.query_controlled(&explain_sql, &control).await {

@@ -5,7 +5,7 @@ use relm4::gtk::gio;
 use relm4::{adw, gtk};
 use tablepro_core::QueryResult;
 
-use crate::services::preferences;
+use crate::services::preferences::PreferencesStore;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ExportFormat {
@@ -59,8 +59,9 @@ pub(crate) fn present(
     toast_overlay: &adw::ToastOverlay,
     result: QueryResult,
     suggested_name: String,
+    preferences: &PreferencesStore,
 ) {
-    present_with_format(parent, toast_overlay, result, suggested_name, false);
+    present_with_format(parent, toast_overlay, result, suggested_name, false, preferences);
 }
 
 pub(crate) fn present_with_format(
@@ -69,6 +70,7 @@ pub(crate) fn present_with_format(
     result: QueryResult,
     suggested_name: String,
     json: bool,
+    preferences: &PreferencesStore,
 ) {
     let page = adw::PreferencesPage::new();
 
@@ -97,7 +99,7 @@ pub(crate) fn present_with_format(
         .title(crate::tr!("Include column names"))
         .subtitle(crate::tr!("Write column names in the first row"))
         .build();
-    include_header.set_active(preferences::load().csv_include_header);
+    include_header.set_active(preferences.load().csv_include_header);
     csv_group.add(&include_header);
     let safe_csv = adw::SwitchRow::builder()
         .title(crate::tr!("Spreadsheet-safe text"))
@@ -110,8 +112,9 @@ pub(crate) fn present_with_format(
     csv_group.set_visible(!json);
     page.add(&csv_group);
 
+    let preferences_for_toggle = preferences.clone();
     include_header.connect_active_notify(move |row| {
-        preferences::update(|prefs| prefs.csv_include_header = row.is_active());
+        preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active());
     });
 
     let csv_group_for_format = csv_group.clone();

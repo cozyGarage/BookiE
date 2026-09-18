@@ -42,7 +42,8 @@ pub fn run() {
         }
     };
 
-    let prefs = services::preferences::load();
+    let preferences = services::preferences::PreferencesStore::new();
+    let prefs = preferences.load();
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
@@ -92,6 +93,7 @@ pub fn run() {
         workspace,
         history,
         database,
+        preferences,
     });
 
     persistence.flush();

@@ -47,6 +47,7 @@ pub struct SqlEditor {
     connection_id: Option<Uuid>,
     history: Option<HistoryStore>,
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    preferences: crate::services::preferences::PreferencesStore,
     run_generation: RunGeneration,
     drop_generation: std::rc::Rc<DropGeneration>,
     /// Disconnected in `shutdown`. Without this, every tab's
@@ -64,6 +65,7 @@ pub struct SqlEditorInit {
     pub connection_id: Option<Uuid>,
     pub history: Option<HistoryStore>,
     pub database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+    pub preferences: crate::services::preferences::PreferencesStore,
 }
 
 #[derive(Debug, Clone)]
@@ -338,7 +340,7 @@ impl SimpleComponent for SqlEditor {
             apply_editor_scheme(&view_for_theme);
         });
 
-        let font_size = crate::services::preferences::load().editor_font_size;
+        let font_size = init.preferences.load().editor_font_size;
         apply_editor_font_size(&widgets.source_view, font_size);
 
         let provider = sourceview5::CompletionWords::new(Some("SQL"));
@@ -481,6 +483,7 @@ impl SimpleComponent for SqlEditor {
             catalog_changes: Default::default(),
             catalog_origin: None,
             database: init.database.clone(),
+            preferences: init.preferences.clone(),
             diagnostics: diagnostics::Diagnostics::install(
                 &widgets.source_view,
                 &widgets.warnings_button,
@@ -574,7 +577,13 @@ impl SimpleComponent for SqlEditor {
                     buffer.text(&start, &end, true).to_string()
                 };
                 if let Some(window) = self.source_view.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
-                    crate::ui::explain_dialog::present(&window, self.connection_id, &text, &self.database);
+                    crate::ui::explain_dialog::present(
+                        &window,
+                        self.connection_id,
+                        &text,
+                        &self.database,
+                        &self.preferences,
+                    );
                 }
             }
 
@@ -855,7 +864,7 @@ impl SqlEditor {
             },
         );
 
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         let driver_id = self
             .executions
             .get(&generation)

@@ -23,7 +23,7 @@ impl App {
         if pending.is_empty() {
             return;
         };
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown

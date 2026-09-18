@@ -12,9 +12,15 @@ use tokio_util::sync::CancellationToken;
 use tablepro_core::{ActivityQuery, ActivityUnsupported, Value, activity_kinds, activity_sql, parse_session_id};
 
 use crate::services::database_service::DatabaseService;
+use crate::services::preferences::PreferencesStore;
 use crate::tr;
 
-pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database: &std::sync::Arc<DatabaseService>) {
+pub fn present(
+    parent: &gtk::Window,
+    connection_id: Option<uuid::Uuid>,
+    database: &std::sync::Arc<DatabaseService>,
+    preferences: &PreferencesStore,
+) {
     let Some(connection) = connection_id else {
         let alert = adw::AlertDialog::new(
             Some(&tr!("No active connection")),
@@ -89,6 +95,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database
         }
         let in_flight_for_query = in_flight.clone();
         let database_for_query = database.clone();
+        let preferences_for_query = preferences.clone();
         btn.connect_clicked(move |_| {
             let sql = match activity_sql(&driver, kind, None) {
                 Ok(sql) => sql,
@@ -105,7 +112,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database
             let text_buf = text_buf.clone();
             let status_l = status_l.clone();
             let token = replace_in_flight(&in_flight_for_query);
-            let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+            let timeout_secs = crate::services::operation_control::configured_timeout_secs(&preferences_for_query);
             glib::spawn_future_local(async move {
                 let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
                 match conn.query_controlled(&sql, &control).await {
@@ -149,6 +156,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database
     let kill_entry_c = kill_entry.clone();
     let in_flight_for_kill = in_flight.clone();
     let database_for_kill = database.clone();
+    let preferences_for_kill = preferences.clone();
     kill_btn.connect_clicked(move |_| {
         let id = match parse_session_id(&kill_entry_c.text()) {
             Some(id) => id,
@@ -170,7 +178,7 @@ pub fn present(parent: &gtk::Window, connection_id: Option<uuid::Uuid>, database
         let text_buf = text_buf.clone();
         let status_l = status_l.clone();
         let token = replace_in_flight(&in_flight_for_kill);
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&preferences_for_kill);
         glib::spawn_future_local(async move {
             let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
             match conn.execute_controlled(&sql, &control).await {

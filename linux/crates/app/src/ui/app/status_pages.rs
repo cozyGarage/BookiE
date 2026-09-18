@@ -123,6 +123,12 @@ impl App {
         };
         let sql = slot.query.clone();
         drop(tabs);
-        crate::ui::explain_dialog::present(&self.window, self.connection_id, &sql, &self.database);
+        crate::ui::explain_dialog::present(
+            &self.window,
+            self.connection_id,
+            &sql,
+            &self.database,
+            &self.preferences,
+        );
     }
 }

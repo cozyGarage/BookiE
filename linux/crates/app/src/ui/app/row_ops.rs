@@ -45,7 +45,7 @@ impl App {
         // outcome.
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {

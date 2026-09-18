@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 
-use crate::services::preferences;
+use crate::services::preferences::PreferencesStore;
 
 /// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
 /// in `workspace_state.rs`, the same way those two already duplicate each
@@ -29,6 +29,7 @@ pub fn present(
     parent: &impl IsA<gtk::Widget>,
     history: Option<tablepro_storage::query_history::HistoryStore>,
     database: &crate::services::database_service::DatabaseService,
+    preferences: &PreferencesStore,
 ) {
     let window = adw::PreferencesDialog::builder()
         .title(crate::tr!("Preferences"))
@@ -46,7 +47,7 @@ pub fn present(
         ))
         .build();
 
-    let current = preferences::load();
+    let current = preferences.load();
 
     let page_size_row = adw::ComboRow::new();
     page_size_row.set_title(&crate::tr!("Default page size"));
@@ -207,12 +208,13 @@ pub fn present(
         let font = font_size_row.clone();
         let retention = retention_row.clone();
         let timeout = timeout_row.clone();
+        let preferences = preferences.clone();
         std::rc::Rc::new(move || {
             let default_page_size = PAGE_SIZE_OPTIONS
                 .get(page_size.selected() as usize)
                 .copied()
                 .unwrap_or(1_000);
-            preferences::update(|prefs| {
+            preferences.update(|prefs| {
                 prefs.default_page_size = default_page_size;
                 prefs.confirm_destructive = confirm.is_active();
                 prefs.editor_font_size = font.value() as u32;

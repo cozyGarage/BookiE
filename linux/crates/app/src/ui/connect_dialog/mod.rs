@@ -39,6 +39,7 @@ pub struct ConnectDialog {
     submit: gtk::Button,
     toast_overlay: adw::ToastOverlay,
     form: AuthFormState,
+    preferences: crate::services::preferences::PreferencesStore,
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +68,7 @@ use form::{AuthFormState, EndpointFormState, resolved_socket_path, socket_direct
 
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
+    pub preferences: crate::services::preferences::PreferencesStore,
 }
 
 #[derive(Debug)]
@@ -323,6 +325,7 @@ impl Component for ConnectDialog {
             submit,
             toast_overlay,
             form: AuthFormState::default(),
+            preferences: init.preferences,
         };
         let widgets = view_output!();
 
@@ -432,7 +435,7 @@ impl Component for ConnectDialog {
                 };
                 let read_only = self.read_only.is_active();
                 let environment = self.selected_environment();
-                let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+                let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
 
                 sender.command(move |out, shutdown| {
                     shutdown
@@ -482,7 +485,7 @@ impl Component for ConnectDialog {
                     None
                 };
 
-                let timeout_secs = crate::services::operation_control::configured_timeout_secs();
+                let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {

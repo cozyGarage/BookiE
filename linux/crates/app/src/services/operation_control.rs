@@ -3,12 +3,14 @@ use std::time::Duration;
 use tablepro_core::OperationControl;
 use tokio_util::sync::CancellationToken;
 
+use crate::services::preferences::PreferencesStore;
+
 /// The query timeout the user configured, read on the GTK thread so the
 /// deadline itself can be built inside the async command where the tokio
 /// clock lives. A configured `0` means no timeout, which is how the SQL
 /// editor has always read the same preference.
-pub fn configured_timeout_secs() -> u32 {
-    crate::services::preferences::load().query_timeout_secs
+pub fn configured_timeout_secs(preferences: &PreferencesStore) -> u32 {
+    preferences.load().query_timeout_secs
 }
 
 pub fn deadline_for(timeout_secs: u32) -> Option<tokio::time::Instant> {
