@@ -54,6 +54,9 @@ echo "==> bounded database operations in the GUI"
 echo "==> panic sites in production code"
 "$ROOT/scripts/check-panic-sites.sh"
 
+echo "==> function sizes"
+python3 scripts/check-function-size.py
+
 echo "==> cargo fmt --check (workspace)"
 cargo fmt --all -- --check
 

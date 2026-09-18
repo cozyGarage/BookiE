@@ -71,11 +71,15 @@ These rules apply to the GUI, MCP server, and `tablepro-agentd`.
 ## Rust code style
 
 `linux/rustfmt.toml`, `linux/clippy.toml`, and the workspace lints are authoritative.
+[`linux/docs/code-conventions.md`](linux/docs/code-conventions.md) settles the recurring shape
+questions this file does not: function length, parameter count, naming, when to extract shared
+code, and the decisions that must not be reversed in passing.
 
 - Use Rust edition 2024 and Rust 1.98.
 - Format with `rustfmt`; the line width is 120 characters.
 - Do not add comments, including documentation comments. Prefer clear module, type, function, and test names. The single exception is behaviour of something outside this repository that no name can express: a dependency's parser, an engine's SQL quirk, a platform or protocol contract. Such a comment states the external rule and what breaks without it, never what the code does. A comment explaining our own code is still a signal to rename or restructure it.
-- Use early returns to keep control flow flat.
+- Use early returns to keep control flow flat. Three levels of indentation inside a function body is the limit before extracting.
+- Keep a function body at or below 60 lines. `linux/scripts/check-function-size.py` enforces this and freezes existing longer functions per file in `linux/function-size-baselines.txt`. Lower a count when you split a function; never raise one.
 - Keep public APIs small. Default to private visibility.
 - Do not use `unwrap`, `expect`, `panic!`, `todo!`, or `unimplemented!` in production paths. The workspace lints deny these, so a violation fails Clippy rather than review. Unit tests in a `#[cfg(test)]` module are exempt through `linux/clippy.toml`; a new integration test file under a crate's `tests/` directory must start with `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`, because those settings do not reach separate test crates.
 - Use typed `thiserror` errors across crate boundaries. Add context to internal failures without exposing secrets.
@@ -115,6 +119,16 @@ The gtk-widgets and keyring tiers are selected by name, not by pattern, so a tes
 
 Every fixed defect gets a regression test in the lowest tier that can reproduce it, and the fix and its test land in the same commit. Before relying on a new regression test, confirm it fails against the unfixed code.
 
+## Function-size guard
+
+Run `python3 linux/scripts/check-function-size.py` for every Rust change.
+
+- A function body may be at most 60 lines, counted between its braces.
+- `linux/function-size-baselines.txt` records how many over-limit functions each existing file may still contain. A listed file may not gain another.
+- Lower a count in the same commit that splits a function. Do not raise one.
+- `#[cfg(test)]` modules and files under a crate's `tests/` are excluded.
+- GTK widget construction and Relm4 message dispatch are the known exception, already baselined. Logic inside them still moves to a testable free function.
+
 ## File-size guard
 
 Run `linux/scripts/check-file-size.sh` for every Rust change.
@@ -152,6 +166,7 @@ Run commands from the repository root. Start with the narrow test for the change
 ```bash
 bash linux/scripts/check-file-size.sh
 bash linux/scripts/check-panic-sites.sh
+python3 linux/scripts/check-function-size.py
 bash linux/scripts/check-bounded-operations.sh
 cargo fmt --manifest-path linux/Cargo.toml --all -- --check
 cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
@@ -171,7 +186,7 @@ cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
 ```
 
-`linux/scripts/preflight.sh` runs the file-size, panic-site and bounded-operation guards, formatting, Clippy, the unit tier and the sandbox tier in one pass, and is the quicker way to cover most of the above.
+`linux/scripts/preflight.sh` runs the file-size, function-size, panic-site and bounded-operation guards, formatting, Clippy, the unit tier and the sandbox tier in one pass, and is the quicker way to cover most of the above.
 
 If required GTK development packages, database services, containers, or `cargo-deny` are unavailable, report which validation could not run and why.
 
