@@ -42,6 +42,7 @@ struct BlockingWriteConn {
     release: Arc<Notify>,
 }
 struct AmbiguousWriteConn;
+struct PanickingConn;
 struct ControlledWriteConn {
     outcome_unknown: bool,
 }
@@ -498,6 +499,45 @@ fn context(
         approval,
         audit,
         audit_state,
+    }
+}
+
+#[async_trait]
+impl Connection for PanickingConn {
+    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+        panic!("codec read past the end of the buffer")
+    }
+
+    async fn fetch_columns(&self, _: Option<&str>, _: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+        Ok(vec![])
+    }
+
+    async fn fetch_rows(&self, _: Option<&str>, _: &str, _: u64, _: u64) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn query(&self, _: &str) -> Result<QueryResult, DriverError> {
+        Ok(empty_result())
+    }
+
+    async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
+        panic!("codec read past the end of the buffer")
+    }
+
+    async fn execute_params(&self, sql: &str, _: &[Value]) -> Result<ExecResult, DriverError> {
+        self.execute(sql).await
+    }
+
+    async fn execute_in_transaction(&self, _: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        panic!("codec read past the end of the buffer")
+    }
+
+    async fn ping(&self) -> Result<(), DriverError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) -> Result<(), DriverError> {
+        Ok(())
     }
 }
 

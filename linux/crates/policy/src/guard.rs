@@ -789,6 +789,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
 }
 
 mod connection;
+mod panic_boundary;
 
 #[cfg(test)]
 #[path = "guard_tests.rs"]

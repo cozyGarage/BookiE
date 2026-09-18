@@ -13,6 +13,7 @@
 
 ### Fixed
 
+- A database driver that stops unexpectedly is reported as a failed operation, with writes marked as having an unknown result, instead of leaving the request waiting forever.
 - Embedded application icons now use the same BookiE artwork as installed packages.
 - Malformed MongoDB SCRAM nonces are rejected instead of crashing authentication.
 - SSH key and TLS certificate reads remain bounded if a file changes while it is read.

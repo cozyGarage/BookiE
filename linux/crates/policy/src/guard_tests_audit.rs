@@ -505,3 +505,59 @@ async fn human_policy_deny_keeps_the_policy_message_when_audit_succeeds() {
     assert!(!error.to_string().contains("audit recording failed"));
     assert_eq!(executes.load(Ordering::SeqCst), 0);
 }
+
+#[tokio::test]
+async fn a_panicking_driver_write_records_an_unknown_terminal_outcome() {
+    let state = Arc::new(AuditState::new());
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        Arc::new(PanickingConn),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            state.clone(),
+        ),
+    );
+
+    let error = guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("a panicking driver must surface as an error");
+    assert!(matches!(error, DriverError::OperationOutcomeUnknown { .. }));
+    assert!(!format!("{error}").contains("codec read past the end"));
+
+    assert!(state.governed_writes_disabled());
+    let events = audit.events.lock().expect("event lock");
+    let outcome = events.last().expect("outcome event");
+    assert_eq!(outcome.terminal_status, AuditTerminalStatus::Unknown);
+}
+
+#[tokio::test]
+async fn a_panicking_driver_read_records_a_failed_terminal_outcome() {
+    let state = Arc::new(AuditState::new());
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        Arc::new(PanickingConn),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            state.clone(),
+        ),
+    );
+
+    let error = guard
+        .list_tables()
+        .await
+        .expect_err("a panicking driver must surface as an error");
+    assert!(matches!(error, DriverError::Internal(_)));
+
+    let events = audit.events.lock().expect("event lock");
+    let outcome = events.last().expect("outcome event");
+    assert_ne!(outcome.terminal_status, AuditTerminalStatus::Succeeded);
+}
