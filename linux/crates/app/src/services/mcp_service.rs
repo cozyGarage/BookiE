@@ -1,7 +1,7 @@
 //! In-process MCP server for the GTK app. Agents talk to the same
 //! policy-gated connections the UI uses.
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use tablepro_core::Connection;
@@ -11,8 +11,6 @@ use tablepro_storage::{SavedConnection, load_connections, store_mcp_token};
 use uuid::Uuid;
 
 use super::database_service::DatabaseService;
-
-static BRIDGE: OnceLock<Arc<McpBridge>> = OnceLock::new();
 
 struct AppConnectionProvider {
     database: Arc<DatabaseService>,
@@ -52,7 +50,6 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<Arc<McpBridge>
         }
     };
     let bridge = Arc::new(McpBridge::new(Arc::new(AppConnectionProvider { database }), tokens));
-    let _ = BRIDGE.set(bridge.clone());
     let bridge_http = bridge.clone();
     let config = tablepro_mcp::McpServerConfig::default();
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
@@ -76,17 +73,14 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<Arc<McpBridge>
     Some(bridge)
 }
 
-pub fn bridge() -> Option<Arc<McpBridge>> {
-    BRIDGE.get().cloned()
-}
-
 /// Issue a token, store plaintext in libsecret, return plaintext once.
 pub async fn issue_token(
+    bridge: Option<&Arc<McpBridge>>,
     name: String,
     permissions: TokenPermissions,
     connection_allowlist: Vec<Uuid>,
 ) -> Result<(Uuid, String), String> {
-    let bridge = bridge().ok_or_else(|| "MCP server is not running".to_string())?;
+    let bridge = bridge.ok_or_else(|| "MCP server is not running".to_string())?;
     let (meta, plaintext) = bridge
         .tokens()
         .issue(name.clone(), permissions, connection_allowlist, None)?;
@@ -96,8 +90,8 @@ pub async fn issue_token(
     Ok((meta.id, plaintext))
 }
 
-pub fn revoke_token(id: Uuid) -> Result<(), String> {
-    let bridge = bridge().ok_or_else(|| "MCP server is not running".to_string())?;
+pub fn revoke_token(bridge: Option<&Arc<McpBridge>>, id: Uuid) -> Result<(), String> {
+    let bridge = bridge.ok_or_else(|| "MCP server is not running".to_string())?;
     bridge.tokens().revoke(id)?;
     relm4::spawn(async move {
         if let Err(e) = tablepro_storage::delete_mcp_token(id).await {
@@ -107,6 +101,6 @@ pub fn revoke_token(id: Uuid) -> Result<(), String> {
     Ok(())
 }
 
-pub fn list_tokens() -> Vec<tablepro_mcp::McpToken> {
-    bridge().map(|b| b.tokens().list()).unwrap_or_default()
+pub fn list_tokens(bridge: Option<&Arc<McpBridge>>) -> Vec<tablepro_mcp::McpToken> {
+    bridge.map(|b| b.tokens().list()).unwrap_or_default()
 }

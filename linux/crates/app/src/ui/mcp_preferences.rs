@@ -3,12 +3,17 @@
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_mcp::TokenPermissions;
+use std::sync::Arc;
+
+use tablepro_mcp::{McpBridge, TokenPermissions};
 
 use crate::services::mcp_service;
 use crate::tr;
 
-pub fn build_page(database: &crate::services::database_service::DatabaseService) -> adw::PreferencesPage {
+pub fn build_page(
+    database: &crate::services::database_service::DatabaseService,
+    mcp_bridge: Option<Arc<McpBridge>>,
+) -> adw::PreferencesPage {
     let policy_reload = database.reload_policy();
 
     let page = adw::PreferencesPage::builder()
@@ -68,12 +73,13 @@ pub fn build_page(database: &crate::services::database_service::DatabaseService)
     issue_group.add(&issue_row);
 
     let tokens_group = adw::PreferencesGroup::builder().title(tr!("Active tokens")).build();
-    refresh_token_list(&tokens_group);
+    refresh_token_list(&tokens_group, mcp_bridge.clone());
 
     let name_for_issue = name_row.clone();
     let scope_for_issue = scope_combo.clone();
     let tokens_for_issue = tokens_group.clone();
     let page_for_dialog = page.clone();
+    let bridge_for_issue = mcp_bridge.clone();
     issue_button.connect_clicked(move |_| {
         let name = name_for_issue.text().to_string();
         if name.trim().is_empty() {
@@ -85,6 +91,7 @@ pub fn build_page(database: &crate::services::database_service::DatabaseService)
         };
         let tokens_group = tokens_for_issue.clone();
         let parent = page_for_dialog.clone();
+        let bridge = bridge_for_issue.clone();
         glib::spawn_future_local(async move {
             let allowlist = match tablepro_storage::load_connections().await {
                 Ok(list) => list.into_iter().map(|c| c.id).collect::<Vec<_>>(),
@@ -112,10 +119,10 @@ pub fn build_page(database: &crate::services::database_service::DatabaseService)
                 alert.present(Some(&parent));
                 return;
             }
-            match mcp_service::issue_token(name, permissions, allowlist).await {
+            match mcp_service::issue_token(bridge.as_ref(), name, permissions, allowlist).await {
                 Ok((_id, plaintext)) => {
                     show_issued_token(&parent, &plaintext);
-                    clear_and_refresh(&tokens_group);
+                    clear_and_refresh(&tokens_group, bridge.clone());
                 }
                 Err(e) => {
                     tracing::warn!(error = %e, "MCP token issue failed");
@@ -137,15 +144,15 @@ pub fn build_page(database: &crate::services::database_service::DatabaseService)
     page
 }
 
-fn clear_and_refresh(group: &adw::PreferencesGroup) {
+fn clear_and_refresh(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpBridge>>) {
     while let Some(child) = group.first_child() {
         group.remove(&child);
     }
-    refresh_token_list(group);
+    refresh_token_list(group, mcp_bridge);
 }
 
-fn refresh_token_list(group: &adw::PreferencesGroup) {
-    let tokens = mcp_service::list_tokens();
+fn refresh_token_list(group: &adw::PreferencesGroup, mcp_bridge: Option<Arc<McpBridge>>) {
+    let tokens = mcp_service::list_tokens(mcp_bridge.as_ref());
     if tokens.is_empty() {
         let empty = adw::ActionRow::builder()
             .title(tr!("No tokens yet"))
@@ -174,11 +181,12 @@ fn refresh_token_list(group: &adw::PreferencesGroup) {
         revoke.add_css_class("flat");
         let id = token.id;
         let group_c = group.clone();
+        let bridge_for_revoke = mcp_bridge.clone();
         revoke.connect_clicked(move |_| {
-            if let Err(e) = mcp_service::revoke_token(id) {
+            if let Err(e) = mcp_service::revoke_token(bridge_for_revoke.as_ref(), id) {
                 tracing::warn!(error = %e, "revoke failed");
             }
-            clear_and_refresh(&group_c);
+            clear_and_refresh(&group_c, bridge_for_revoke.clone());
         });
         row.add_suffix(&revoke);
         group.add(&row);

@@ -84,7 +84,7 @@ pub fn run() {
     );
     database.set_approval_sink(Arc::new(approval_router));
 
-    let _mcp = services::mcp_service::start_background(database.clone());
+    let mcp_bridge = services::mcp_service::start_background(database.clone());
 
     let app = RelmApp::new(config::APP_ID);
     app.run::<ui::App>(ui::AppInit {
@@ -94,6 +94,7 @@ pub fn run() {
         history,
         database,
         preferences,
+        mcp_bridge,
     });
 
     persistence.flush();

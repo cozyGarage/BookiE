@@ -53,6 +53,7 @@ pub struct AppInit {
     pub history: Option<tablepro_storage::query_history::HistoryStore>,
     pub database: Arc<crate::services::database_service::DatabaseService>,
     pub preferences: crate::services::preferences::PreferencesStore,
+    pub mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
 }
 
 /// Decrement a tab's pending-save counter in the close-after-save map.
@@ -81,6 +82,7 @@ pub struct App {
     history: Option<tablepro_storage::query_history::HistoryStore>,
     database: Arc<crate::services::database_service::DatabaseService>,
     preferences: crate::services::preferences::PreferencesStore,
+    mcp_bridge: Option<Arc<tablepro_mcp::McpBridge>>,
     window: adw::ApplicationWindow,
     split_view: adw::OverlaySplitView,
     window_title: adw::WindowTitle,
@@ -400,6 +402,7 @@ impl SimpleComponent for App {
             history,
             database,
             preferences,
+            mcp_bridge,
         } = init;
         let widgets = view_output!();
 
@@ -438,6 +441,7 @@ impl SimpleComponent for App {
             history,
             database,
             preferences,
+            mcp_bridge,
             window: root.clone(),
             split_view: widgets.split_view.clone(),
             window_title: widgets.window_title.clone(),
@@ -743,9 +747,13 @@ impl SimpleComponent for App {
                 );
             }
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
-            AppMsg::ShowPreferences => {
-                super::preferences::present(&self.window, self.history.clone(), &self.database, &self.preferences)
-            }
+            AppMsg::ShowPreferences => super::preferences::present(
+                &self.window,
+                self.history.clone(),
+                &self.database,
+                &self.preferences,
+                self.mcp_bridge.clone(),
+            ),
             AppMsg::NewWindow => {
                 let ctrl = App::builder()
                     .launch(AppInit {
@@ -755,6 +763,7 @@ impl SimpleComponent for App {
                         history: self.history.clone(),
                         database: self.database.clone(),
                         preferences: self.preferences.clone(),
+                        mcp_bridge: self.mcp_bridge.clone(),
                     })
                     .detach();
                 // Only the window relm4 starts the application with is

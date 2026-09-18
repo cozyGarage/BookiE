@@ -30,6 +30,7 @@ pub fn present(
     history: Option<tablepro_storage::query_history::HistoryStore>,
     database: &crate::services::database_service::DatabaseService,
     preferences: &PreferencesStore,
+    mcp_bridge: Option<std::sync::Arc<tablepro_mcp::McpBridge>>,
 ) {
     let window = adw::PreferencesDialog::builder()
         .title(crate::tr!("Preferences"))
@@ -196,7 +197,7 @@ pub fn present(
 
     window.add(&general);
     window.add(&editor);
-    window.add(&super::mcp_preferences::build_page(database));
+    window.add(&super::mcp_preferences::build_page(database, mcp_bridge));
 
     // Live save — write on every value change instead of batching to
     // window.connect_closed. GNOME Settings applies its preferences
