@@ -6238,6 +6238,8 @@ dependencies = [
  "testcontainers-modules",
  "tokio",
  "tokio-util",
+ "tracing",
+ "tracing-subscriber",
  "uuid",
 ]
 

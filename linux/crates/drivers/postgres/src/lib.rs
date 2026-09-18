@@ -800,7 +800,7 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
                 .as_bytes()
                 .ok()
                 .and_then(|bytes| decode_temporal(bytes, type_name))
-                .unwrap_or_else(|| undecodable(type_name)));
+                .unwrap_or_else(|| undecodable(idx, type_name)));
         }
         if let Some(text) = raw
             .as_bytes()
@@ -829,10 +829,15 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
         "BYTEA" => row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes),
         _ => row.try_get::<String, _>(idx).map(Value::Text),
     };
-    Ok(decoded.unwrap_or_else(|_| undecodable(type_name)))
+    Ok(decoded.unwrap_or_else(|_| undecodable(idx, type_name)))
 }
 
-fn undecodable(type_name: &str) -> Value {
+fn undecodable(idx: usize, type_name: &str) -> Value {
+    tracing::warn!(
+        column_index = idx + 1,
+        type_name,
+        "postgres column value could not be decoded; showing it as undecodable"
+    );
     Value::Undecodable(type_name.to_string())
 }
 
@@ -979,6 +984,58 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Arc, Mutex};
+
+    #[derive(Clone, Default)]
+    struct CapturedLogs(Arc<Mutex<Vec<u8>>>);
+
+    impl CapturedLogs {
+        fn text(&self) -> String {
+            match self.0.lock() {
+                Ok(buffer) => String::from_utf8_lossy(&buffer).into_owned(),
+                Err(poisoned) => String::from_utf8_lossy(&poisoned.into_inner()).into_owned(),
+            }
+        }
+    }
+
+    impl std::io::Write for CapturedLogs {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            match self.0.lock() {
+                Ok(mut buffer) => {
+                    buffer.extend_from_slice(buf);
+                    Ok(buf.len())
+                }
+                Err(_) => Ok(buf.len()),
+            }
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CapturedLogs {
+        type Writer = Self;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            self.clone()
+        }
+    }
+
+    #[test]
+    fn an_undecodable_column_is_reported_to_the_logs_with_its_index_and_type() {
+        let logs = CapturedLogs::default();
+        let subscriber = tracing_subscriber::fmt()
+            .with_writer(logs.clone())
+            .with_ansi(false)
+            .finish();
+        let value = tracing::subscriber::with_default(subscriber, || undecodable(3, "MYDOMAIN"));
+        assert!(matches!(&value, Value::Undecodable(name) if name == "MYDOMAIN"));
+        let text = logs.text();
+        assert!(text.contains("WARN"), "{text}");
+        assert!(text.contains("column_index=4"), "{text}");
+        assert!(text.contains("type_name=\"MYDOMAIN\""), "{text}");
+    }
 
     #[test]
     fn structure_metadata_declarations_match_the_connection_impl() {

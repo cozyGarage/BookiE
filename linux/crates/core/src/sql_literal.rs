@@ -27,7 +27,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> String {
         Value::TimestampTz(stamp) => quote_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => quote_literal(driver_id, &id.to_string()),
         Value::Json(json) => quote_literal(driver_id, &json.to_string()),
-        Value::Undecodable(type_name) => format!("/* undecodable {type_name} value omitted */ NULL"),
+        Value::Undecodable(_) => "/* undecodable value omitted */ NULL".into(),
     }
 }
 
@@ -108,10 +108,48 @@ mod tests {
     }
 
     #[test]
-    fn an_undecodable_value_is_never_written_back_as_null() {
+    fn an_undecodable_value_is_never_written_back_as_a_bare_null() {
         let rendered = render_sql_literal("postgres", &Value::Undecodable("NUMERIC".into()));
-        assert!(rendered.contains("NUMERIC"));
-        assert!(rendered.trim_start().starts_with("/*"));
+        assert!(rendered.starts_with("/*"), "{rendered}");
+        assert!(rendered.ends_with("NULL"), "{rendered}");
+    }
+
+    #[test]
+    fn a_catalog_type_name_cannot_break_out_of_the_undecodable_marker() {
+        let hostile = [
+            "x */, (SELECT 1) --",
+            "*/",
+            "*/; DROP TABLE users; --",
+            "a' OR 1=1 --",
+            "line\nbreak */ UNION ALL SELECT 1",
+            "NUMERIC",
+        ];
+        for driver_id in ["postgres", "mysql", "sqlite", "mssql", "clickhouse"] {
+            for type_name in hostile {
+                let rendered = render_sql_literal(driver_id, &Value::Undecodable(type_name.into()));
+                assert!(rendered.starts_with("/*"), "{driver_id}: {rendered}");
+                let Some((comment, tail)) = rendered.split_once("*/") else {
+                    panic!("{driver_id} produced an unterminated comment: {rendered}");
+                };
+                assert!(
+                    !comment[2..].contains("/*"),
+                    "{driver_id} nested a comment opener: {rendered}"
+                );
+                assert_eq!(
+                    tail, " NULL",
+                    "{driver_id} let {type_name:?} place SQL after the marker: {rendered}"
+                );
+                assert!(
+                    !rendered.contains(';'),
+                    "{driver_id} let {type_name:?} start a second statement: {rendered}"
+                );
+                assert_eq!(
+                    rendered,
+                    render_sql_literal(driver_id, &Value::Undecodable("plain".into())),
+                    "{driver_id} still renders catalog text into SQL"
+                );
+            }
+        }
     }
 
     /// The exact shape that escaped a MySQL literal: the trailing
