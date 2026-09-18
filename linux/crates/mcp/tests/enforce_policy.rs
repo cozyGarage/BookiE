@@ -511,6 +511,7 @@ fn column(name: &str) -> ColumnInfo {
         is_auto_increment: false,
         default_value: None,
         is_generated: false,
+        comment: None,
     }
 }
 

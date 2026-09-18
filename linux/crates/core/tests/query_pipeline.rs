@@ -23,6 +23,7 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
         is_auto_increment: false,
         default_value: None,
         is_generated: false,
+        comment: None,
     }
 }
 
@@ -211,6 +212,7 @@ fn a_copied_row_and_a_drafted_row_agree_on_which_columns_are_writable() {
     let mut columns = schema();
     columns.push(ColumnInfo {
         is_generated: true,
+        comment: None,
         ..column("computed", "integer", false)
     });
     let row = vec![

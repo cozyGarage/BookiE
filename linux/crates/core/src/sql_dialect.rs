@@ -323,6 +323,7 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         }
     }
 
@@ -568,6 +569,7 @@ mod tests {
             is_auto_increment: true,
             default_value: None,
             is_generated: false,
+            comment: None,
         }
     }
 
@@ -580,6 +582,7 @@ mod tests {
             is_auto_increment: false,
             default_value: Some(default.into()),
             is_generated: false,
+            comment: None,
         }
     }
 
@@ -592,6 +595,7 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: true,
+            comment: None,
         }
     }
 

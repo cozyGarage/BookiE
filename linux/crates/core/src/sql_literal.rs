@@ -97,12 +97,14 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         }
     }
 
     fn generated(name: &str) -> ColumnInfo {
         ColumnInfo {
             is_generated: true,
+            comment: None,
             ..column(name)
         }
     }

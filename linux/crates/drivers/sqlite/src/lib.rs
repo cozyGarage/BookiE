@@ -159,6 +159,7 @@ impl Connection for SqliteConnection {
                     is_auto_increment,
                     default_value,
                     is_generated,
+                    comment: None,
                 }
             })
             .collect())
@@ -439,6 +440,7 @@ impl tablepro_core::Transaction for SqliteTransaction {
                 is_auto_increment: false,
                 default_value: None,
                 is_generated: false,
+                comment: None,
             })
             .collect();
         let data: Vec<Vec<Value>> = rows
@@ -520,6 +522,7 @@ fn rows_into_result(collected: &[SqliteRow], truncated: bool) -> QueryResult {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         })
         .collect();
     let rows: Vec<Vec<Value>> = collected

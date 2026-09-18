@@ -220,6 +220,7 @@ impl Connection for ClickhouseConnection {
                     is_auto_increment: false,
                     default_value,
                     is_generated,
+                    comment: None,
                 }
             })
             .collect())
@@ -515,6 +516,7 @@ async fn fetch_result(
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         })
         .collect();
 

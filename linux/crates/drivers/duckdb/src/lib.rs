@@ -187,6 +187,7 @@ impl Connection for DuckdbConnection {
                         is_auto_increment: false,
                         default_value: row.get(3)?,
                         is_generated: false,
+                        comment: None,
                     })
                 })
                 .map_err(map_duck_error)?;
@@ -358,6 +359,7 @@ fn run_query(
                 is_auto_increment: false,
                 default_value: None,
                 is_generated: false,
+                comment: None,
             })
             .collect()
     } else {
@@ -370,6 +372,7 @@ fn run_query(
                 is_auto_increment: false,
                 default_value: None,
                 is_generated: false,
+                comment: None,
             })
             .collect()
     };

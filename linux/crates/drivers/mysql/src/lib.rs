@@ -155,6 +155,7 @@ impl Connection for MysqlConnection {
                     is_generated: generation_expr.as_deref().is_some_and(|s| !s.is_empty())
                         || extra.contains("virtual generated")
                         || extra.contains("stored generated"),
+                    comment: None,
                 }
             })
             .collect())
@@ -420,6 +421,7 @@ impl tablepro_core::Transaction for MysqlTransaction {
                 is_auto_increment: false,
                 default_value: None,
                 is_generated: false,
+                comment: None,
             })
             .collect();
         let data: Vec<Vec<Value>> = rows
@@ -501,6 +503,7 @@ fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         })
         .collect();
     let rows: Vec<Vec<Value>> = collected

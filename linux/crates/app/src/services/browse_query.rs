@@ -128,6 +128,7 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         }
     }
 

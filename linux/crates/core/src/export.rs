@@ -738,6 +738,7 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         }];
         let mut buf = Vec::new();
         write_csv_header(&mut buf, &cols).unwrap();
@@ -755,6 +756,7 @@ mod tests {
             is_auto_increment: false,
             default_value: None,
             is_generated: false,
+            comment: None,
         }
     }
 

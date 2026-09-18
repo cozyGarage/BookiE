@@ -225,6 +225,7 @@ impl Connection for PgConnection {
                     is_auto_increment: is_identity || is_serial,
                     default_value,
                     is_generated,
+                    comment: None,
                 }
             })
             .collect())
@@ -769,6 +770,7 @@ where
                     is_auto_increment: false,
                     default_value: None,
                     is_generated: false,
+                    comment: None,
                 })
                 .collect();
         }

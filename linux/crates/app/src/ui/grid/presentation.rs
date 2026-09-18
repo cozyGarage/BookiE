@@ -28,6 +28,7 @@ mod tests {
             primary_key: false,
             is_auto_increment: false,
             is_generated: false,
+            comment: None,
             default_value: None,
         };
         for value in [Value::Bytes(vec![1]), Value::Text("true".into()), Value::Int(2)] {
@@ -49,6 +50,7 @@ mod tests {
             primary_key: false,
             is_auto_increment: false,
             is_generated: false,
+            comment: None,
             default_value: None,
         };
         assert!(cell_allows_inline_edit(&column, &Value::Null));
@@ -64,6 +66,7 @@ mod tests {
             primary_key: false,
             is_auto_increment: false,
             is_generated: false,
+            comment: None,
             default_value: None,
         };
         for value in [

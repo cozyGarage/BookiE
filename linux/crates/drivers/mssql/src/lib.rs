@@ -581,6 +581,7 @@ fn col_to_info(c: &Column) -> ColumnInfo {
         is_auto_increment: false,
         default_value: None,
         is_generated: false,
+        comment: None,
     }
 }
 
@@ -706,6 +707,7 @@ fn row_to_column_info(row: &[Value]) -> ColumnInfo {
             default_raw.map(|d| normalize_mssql_default(&d))
         },
         is_generated: as_bool(row.get(7)).unwrap_or(false),
+        comment: None,
     }
 }
 
