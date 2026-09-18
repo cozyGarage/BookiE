@@ -1037,3 +1037,31 @@ fn an_unrenamed_column_emits_no_rename() {
     let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
     assert!(!ops.iter().any(|op| matches!(op, StructureOp::RenameColumn { .. })));
 }
+
+#[test]
+fn a_pure_column_rename_needs_no_alter_on_any_dialect() {
+    let original = vec![existing("label", "text")];
+    let mut draft = DraftColumn::from_info(original[0].clone());
+    draft.name = "title".into();
+    let ops = diff_to_ops(None, "t", "t", &original, &[draft], &[], &[], &[], &[]);
+
+    assert!(
+        !ops.iter().any(|op| matches!(op, StructureOp::AlterColumn { .. })),
+        "a name-only change has nothing for an alter to do: {ops:?}"
+    );
+
+    assert_eq!(
+        materialize_ops(&ops, "sqlite").unwrap(),
+        vec!["ALTER TABLE \"t\" RENAME COLUMN \"label\" TO \"title\"".to_string()],
+        "SQLite supports RENAME COLUMN even though it refuses every other alter"
+    );
+    assert_eq!(
+        materialize_ops(&ops, "mysql").unwrap(),
+        vec!["ALTER TABLE `t` RENAME COLUMN `label` TO `title`".to_string()],
+        "a redundant MODIFY COLUMN would restate the definition without collation or comment"
+    );
+    assert_eq!(
+        materialize_ops(&ops, "mssql").unwrap(),
+        vec!["EXEC sp_rename '[t].[label]', 'title', 'COLUMN'".to_string()]
+    );
+}

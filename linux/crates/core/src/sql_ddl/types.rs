@@ -166,16 +166,25 @@ impl DraftColumn {
         }
     }
 
-    /// True when any of the user-editable attributes differ from the
-    /// loaded original. New columns (`original = None`) always count
-    /// as different. Used by the diff path to decide whether the
-    /// column needs an `AlterColumn` op.
-    pub fn differs_from_original(&self) -> bool {
+    /// True when the column kept its identity and changed its name.
+    pub fn renamed(&self) -> bool {
+        match &self.original {
+            None => false,
+            Some(orig) => orig.name != self.name && !self.name.trim().is_empty(),
+        }
+    }
+
+    /// True when something other than the name differs, which is what
+    /// decides whether an `AlterColumn` has any work to do. A rename is
+    /// its own op, so a column that only changed name must not raise an
+    /// alter: SQLite refuses every alter and would fail the whole save,
+    /// and MySQL would restate the column definition from a model that
+    /// does not carry collation, character set or comment.
+    pub fn differs_beyond_name(&self) -> bool {
         match &self.original {
             None => true,
             Some(orig) => {
-                orig.name != self.name
-                    || orig.data_type != self.data_type
+                orig.data_type != self.data_type
                     || orig.nullable != self.nullable
                     || orig.primary_key != self.primary_key
                     || orig.is_auto_increment != self.auto_increment

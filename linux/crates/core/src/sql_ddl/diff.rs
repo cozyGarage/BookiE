@@ -94,10 +94,7 @@ pub fn diff_to_ops(
     // Rename columns before altering them: the alter builders address
     // the column by its drafted name, so the rename has to land first.
     for col in current_columns {
-        if let Some(orig) = &col.original
-            && orig.name != col.name
-            && !col.name.trim().is_empty()
-        {
+        if let Some(orig) = col.original.as_ref().filter(|_| col.renamed()) {
             ops.push(StructureOp::RenameColumn {
                 schema: schema_owned.clone(),
                 table: table.clone(),
@@ -107,10 +104,11 @@ pub fn diff_to_ops(
         }
     }
 
-    // Alter columns: drafts whose original is Some and attributes
-    // differ.
+    // Alter columns: drafts whose original is Some and something other
+    // than the name differs. A column that only changed name has
+    // nothing left for an alter to do.
     for col in current_columns {
-        if col.original.is_some() && col.differs_from_original() {
+        if col.original.is_some() && col.differs_beyond_name() {
             ops.push(StructureOp::AlterColumn {
                 schema: schema_owned.clone(),
                 table: table.clone(),
