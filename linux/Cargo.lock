@@ -6202,6 +6202,7 @@ dependencies = [
  "tiberius",
  "tokio",
  "tokio-util",
+ "tracing",
  "uuid",
 ]
 
@@ -6221,6 +6222,7 @@ dependencies = [
  "testcontainers-modules",
  "tokio",
  "tokio-util",
+ "tracing",
  "uuid",
 ]
 

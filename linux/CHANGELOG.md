@@ -22,6 +22,7 @@
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 - A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
 - MongoDB accepts `DROP TABLE people` as well as the quoted form, instead of reporting the statement as unsupported.
+- MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
 - A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, a row whose key could not be read is refused with an explanation instead of being changed or deleted silently, and SQL exports write a fixed placeholder comment for such a cell.
 
 ## [0.1.4] - 2026-09-17

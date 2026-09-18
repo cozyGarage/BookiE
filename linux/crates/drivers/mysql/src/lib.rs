@@ -516,10 +516,16 @@ fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
 
 fn extract_value(row: &MySqlRow, idx: usize) -> Value {
     let type_name = row.columns()[idx].type_info().name().to_ascii_uppercase();
-    match type_name.as_str() {
-        "TINYINT" | "SMALLINT" | "INT" | "MEDIUMINT" | "BIGINT" => {
-            row.try_get::<i64, _>(idx).map(Value::Int).unwrap_or(Value::Null)
-        }
+    match row.try_get_raw(idx) {
+        Ok(raw) if raw.is_null() => Value::Null,
+        Ok(_) => decode_by_type(row, idx, &type_name).unwrap_or_else(|| undecodable(idx, &type_name)),
+        Err(_) => undecodable(idx, &type_name),
+    }
+}
+
+fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> {
+    match type_name {
+        "TINYINT" | "SMALLINT" | "INT" | "MEDIUMINT" | "BIGINT" => row.try_get::<i64, _>(idx).map(Value::Int).ok(),
         // sqlx's i64 decoder refuses an UNSIGNED-flagged column
         // outright (a distinct type-compatibility class, not just the
         // same decode with a wider range), so every one of these
@@ -529,8 +535,8 @@ fn extract_value(row: &MySqlRow, idx: usize) -> Value {
         "TINYINT UNSIGNED" | "SMALLINT UNSIGNED" | "INT UNSIGNED" | "MEDIUMINT UNSIGNED" | "BIGINT UNSIGNED" => row
             .try_get::<u64, _>(idx)
             .map(|v| i64::try_from(v).map_or_else(|_| Value::Text(v.to_string()), Value::Int))
-            .unwrap_or(Value::Null),
-        "FLOAT" | "DOUBLE" => row.try_get::<f64, _>(idx).map(Value::Float).unwrap_or(Value::Null),
+            .ok(),
+        "FLOAT" | "DOUBLE" => row.try_get::<f64, _>(idx).map(Value::Float).ok(),
         // DECIMAL/NUMERIC arrive over the wire as text, but sqlx only
         // decodes that text into rust_decimal::Decimal, which caps out
         // at ~28-29 significant digits -- well inside what MySQL
@@ -540,46 +546,45 @@ fn extract_value(row: &MySqlRow, idx: usize) -> Value {
         "DECIMAL" | "NUMERIC" => row
             .try_get::<rust_decimal::Decimal, _>(idx)
             .map(Value::Decimal)
-            .unwrap_or_else(|_| decimal_text_fallback(row, idx)),
-        "BOOLEAN" => row.try_get::<bool, _>(idx).map(Value::Bool).unwrap_or(Value::Null),
-        "DATE" => row
-            .try_get::<chrono::NaiveDate, _>(idx)
-            .map(Value::Date)
-            .unwrap_or(Value::Null),
-        "TIME" => row
-            .try_get::<chrono::NaiveTime, _>(idx)
-            .map(Value::Time)
-            .unwrap_or(Value::Null),
-        "DATETIME" => row
-            .try_get::<chrono::NaiveDateTime, _>(idx)
-            .map(Value::DateTime)
-            .unwrap_or(Value::Null),
+            .ok()
+            .or_else(|| decimal_text_fallback(row, idx)),
+        "BOOLEAN" => row.try_get::<bool, _>(idx).map(Value::Bool).ok(),
+        "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date).ok(),
+        "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time).ok(),
+        "DATETIME" => row.try_get::<chrono::NaiveDateTime, _>(idx).map(Value::DateTime).ok(),
         "TIMESTAMP" => row
             .try_get::<chrono::DateTime<chrono::Utc>, _>(idx)
             .map(Value::TimestampTz)
-            .unwrap_or(Value::Null),
-        "JSON" => row
-            .try_get::<serde_json::Value, _>(idx)
-            .map(Value::Json)
-            .unwrap_or(Value::Null),
+            .ok(),
+        "JSON" => row.try_get::<serde_json::Value, _>(idx).map(Value::Json).ok(),
         "BLOB" | "TINYBLOB" | "MEDIUMBLOB" | "LONGBLOB" | "VARBINARY" | "BINARY" => {
-            row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes).unwrap_or(Value::Null)
+            row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes).ok()
         }
-        _ => row.try_get::<String, _>(idx).map(Value::Text).unwrap_or(Value::Null),
+        _ => row.try_get::<String, _>(idx).map(Value::Text).ok(),
     }
+}
+
+fn undecodable(idx: usize, type_name: &str) -> Value {
+    tracing::warn!(
+        column_index = idx + 1,
+        type_name,
+        "mysql column value could not be decoded; showing it as undecodable"
+    );
+    Value::Undecodable(type_name.to_string())
 }
 
 /// `String`'s `Type<MySql>` compatibility check refuses a DECIMAL
 /// column outright, even though its wire representation is already
 /// text -- decoding through the raw value ref bypasses that check
 /// instead of going through `Row::try_get`.
-fn decimal_text_fallback(row: &MySqlRow, idx: usize) -> Value {
-    match row.try_get_raw(idx) {
-        Ok(raw) if !raw.is_null() => <&str as sqlx::Decode<sqlx::MySql>>::decode(raw)
-            .map(|s| Value::Text(s.to_string()))
-            .unwrap_or(Value::Null),
-        _ => Value::Null,
+fn decimal_text_fallback(row: &MySqlRow, idx: usize) -> Option<Value> {
+    let raw = row.try_get_raw(idx).ok()?;
+    if raw.is_null() {
+        return None;
     }
+    <&str as sqlx::Decode<sqlx::MySql>>::decode(raw)
+        .map(|s| Value::Text(s.to_string()))
+        .ok()
 }
 
 async fn params_into_result<'e, E>(

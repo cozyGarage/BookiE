@@ -23,6 +23,7 @@ rust_decimal.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
 tiberius.workspace = true
+tracing.workspace = true
 tokio.workspace = true
 tokio-util = { workspace = true, features = ["compat"] }
 uuid.workspace = true

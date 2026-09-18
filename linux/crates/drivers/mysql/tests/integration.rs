@@ -449,3 +449,31 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
         "the insert must add exactly one row"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE undecodable (shape GEOMETRY, flags BIT(8), absent INT)")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO undecodable VALUES (ST_GeomFromText('POINT(1 1)'), b'10101010', NULL)")
+        .await
+        .unwrap();
+
+    let result = conn
+        .query("SELECT shape, flags, absent FROM undecodable")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Undecodable("GEOMETRY".into()),
+            Value::Undecodable("BIT".into()),
+            Value::Null,
+        ]],
+        "a value that failed to decode must not be indistinguishable from a stored NULL"
+    );
+}

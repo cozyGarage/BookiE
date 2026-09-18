@@ -621,30 +621,36 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
             }
             None => Value::Null,
         },
-        ColumnData::Date(_) => NaiveDate::from_sql(cd)
-            .ok()
-            .flatten()
-            .map(Value::Date)
-            .unwrap_or(Value::Null),
-        ColumnData::Time(_) => NaiveTime::from_sql(cd)
-            .ok()
-            .flatten()
-            .map(Value::Time)
-            .unwrap_or(Value::Null),
+        ColumnData::Date(_) => decoded_temporal(NaiveDate::from_sql(cd), Value::Date, "date"),
+        ColumnData::Time(_) => decoded_temporal(NaiveTime::from_sql(cd), Value::Time, "time"),
         ColumnData::DateTime(_) | ColumnData::SmallDateTime(_) | ColumnData::DateTime2(_) => {
-            NaiveDateTime::from_sql(cd)
-                .ok()
-                .flatten()
-                .map(Value::DateTime)
-                .unwrap_or(Value::Null)
+            decoded_temporal(NaiveDateTime::from_sql(cd), Value::DateTime, "datetime")
         }
-        ColumnData::DateTimeOffset(_) => DateTime::<Utc>::from_sql(cd)
-            .ok()
-            .flatten()
-            .map(Value::TimestampTz)
-            .unwrap_or(Value::Null),
+        ColumnData::DateTimeOffset(_) => {
+            decoded_temporal(DateTime::<Utc>::from_sql(cd), Value::TimestampTz, "datetimeoffset")
+        }
         ColumnData::Xml(v) => v.as_ref().map(|x| Value::Text(x.to_string())).unwrap_or(Value::Null),
     }
+}
+
+/// tiberius decodes a temporal column in two steps: the outer `Result`
+/// reports a value it could not convert, the inner `Option` reports SQL
+/// NULL. Collapsing both to NULL would present an unreadable timestamp as
+/// an editable empty cell and let it be written back as NULL.
+fn decoded_temporal<T, E>(decoded: Result<Option<T>, E>, wrap: fn(T) -> Value, type_name: &str) -> Value {
+    match decoded {
+        Ok(Some(value)) => wrap(value),
+        Ok(None) => Value::Null,
+        Err(_) => undecodable(type_name),
+    }
+}
+
+fn undecodable(type_name: &str) -> Value {
+    tracing::warn!(
+        type_name,
+        "sql server column value could not be decoded; showing it as undecodable"
+    );
+    Value::Undecodable(type_name.to_string())
 }
 
 fn column_type_to_string(ct: ColumnType) -> String {
@@ -1072,6 +1078,28 @@ mod tests {
         assert_eq!(map_referential_action("SET_NULL"), Some("SET NULL".to_string()));
         assert_eq!(map_referential_action("SET_DEFAULT"), Some("SET DEFAULT".to_string()));
         assert_eq!(map_referential_action("NO_ACTION"), None);
+    }
+
+    #[test]
+    fn a_temporal_column_the_driver_cannot_convert_is_not_reported_as_null() {
+        let failed: Result<Option<NaiveDate>, &str> = Err("out of range");
+        assert_eq!(
+            decoded_temporal(failed, Value::Date, "date"),
+            Value::Undecodable("date".to_string())
+        );
+    }
+
+    #[test]
+    fn a_temporal_column_holding_sql_null_stays_null() {
+        let stored_null: Result<Option<NaiveDate>, &str> = Ok(None);
+        assert_eq!(decoded_temporal(stored_null, Value::Date, "date"), Value::Null);
+    }
+
+    #[test]
+    fn a_temporal_column_that_converts_keeps_its_value() {
+        let date = NaiveDate::from_ymd_opt(2026, 9, 18).expect("a valid date");
+        let decoded: Result<Option<NaiveDate>, &str> = Ok(Some(date));
+        assert_eq!(decoded_temporal(decoded, Value::Date, "date"), Value::Date(date));
     }
 
     #[test]
