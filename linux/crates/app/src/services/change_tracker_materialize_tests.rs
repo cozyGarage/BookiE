@@ -206,7 +206,7 @@ fn a_table_without_a_primary_key_refuses_to_build_an_update() {
     let error = tracker
         .materialize("postgres", None, "t", &columns)
         .expect_err("without a key there is no safe WHERE clause");
-    assert!(matches!(error, BuildSqlError::NoPrimaryKey));
+    assert!(matches!(error, MaterializeError::BuildSql(BuildSqlError::NoPrimaryKey)));
 }
 
 /// H11: a Structure tab dropping a column must not panic a pending Browse
@@ -221,7 +221,7 @@ fn an_update_targeting_a_column_dropped_since_it_was_tracked_refuses_instead_of_
     let error = tracker
         .materialize("postgres", None, "t", &narrow_columns)
         .expect_err("an index into the old column list must not be reused against the new one");
-    assert!(matches!(error, BuildSqlError::StaleColumns));
+    assert!(matches!(error, MaterializeError::BuildSql(BuildSqlError::StaleColumns)));
 }
 
 /// H11's other half: a delete recorded against a wider primary key (before
@@ -237,7 +237,7 @@ fn a_delete_targeting_a_shrunk_primary_key_refuses_instead_of_panicking() {
     let error = tracker
         .materialize("postgres", None, "t", &narrow_columns)
         .expect_err("a PK shape recorded before the drop must not be reused against the new one");
-    assert!(matches!(error, BuildSqlError::StaleColumns));
+    assert!(matches!(error, MaterializeError::BuildSql(BuildSqlError::StaleColumns)));
 }
 
 #[test]
