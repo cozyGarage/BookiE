@@ -10,7 +10,7 @@ use secrecy::ExposeSecret;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, TableInfo, Value,
+    QueryResult, TableInfo, Value, looks_like_tls_failure,
 };
 
 const SAMPLE_DOCS: i64 = 50;
@@ -697,33 +697,16 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
     })
 }
 
+/// The mongodb crate boxes the transport error inside `ErrorKind::Io`
+/// rather than exposing it through `source()`, so the handshake cause is
+/// only reachable by walking that box as a second chain.
 fn error_chain_text(err: &mongodb::error::Error) -> String {
-    let mut parts = Vec::new();
-    let mut current: Option<&dyn std::error::Error> = Some(err);
-    while let Some(error) = current {
-        parts.push(error.to_string());
-        current = error.source();
-    }
+    let mut text = tablepro_core::error_chain_text(err);
     if let mongodb::error::ErrorKind::Io(io) = &*err.kind {
-        let mut nested: Option<&dyn std::error::Error> = Some(io.as_ref());
-        while let Some(error) = nested {
-            parts.push(error.to_string());
-            nested = error.source();
-        }
+        text.push(' ');
+        text.push_str(&tablepro_core::error_chain_text(io.as_ref()));
     }
-    parts.join(" ")
-}
-
-fn looks_like_tls_failure(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-    lower.contains("certificate")
-        || lower.contains("notvalidforname")
-        || lower.contains("not valid for name")
-        || lower.contains("hostname")
-        || lower.contains("invaliddnsname")
-        || lower.contains("tls handshake")
-        || lower.contains("unknown issuer")
-        || lower.contains("unknown ca")
+    text
 }
 
 fn mongo_error_can_hide_tls(kind: &mongodb::error::ErrorKind) -> bool {
@@ -848,6 +831,51 @@ mod tests {
         let io = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
         let error = mongodb::error::Error::from(io);
         assert!(matches!(map_mongo_error(error), DriverError::Query { .. }));
+    }
+
+    /// The mongodb error's own Display prints only the io error's message,
+    /// not the chain behind it, so a handshake cause one layer deeper is
+    /// lost unless the Io box is walked as its own chain.
+    #[test]
+    fn a_handshake_cause_nested_under_the_io_error_still_reaches_the_text() {
+        #[derive(Debug)]
+        struct Handshake;
+
+        impl std::fmt::Display for Handshake {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("invalid peer certificate: NotValidForName")
+            }
+        }
+
+        impl std::error::Error for Handshake {}
+
+        #[derive(Debug)]
+        struct Transport(Handshake);
+
+        impl std::fmt::Display for Transport {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("transport closed")
+            }
+        }
+
+        impl std::error::Error for Transport {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        let io = std::io::Error::other(Transport(Handshake));
+        let err = mongodb::error::Error::from(io);
+
+        let text = error_chain_text(&err);
+        assert!(
+            looks_like_tls_failure(&text),
+            "the nested handshake cause must survive into the chain: {text}"
+        );
+        assert!(
+            !looks_like_tls_failure(&tablepro_core::error_chain_text(&err)),
+            "this case is only reachable by walking the Io box"
+        );
     }
 
     #[test]

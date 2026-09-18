@@ -417,8 +417,7 @@ isolated-test inventory passed. Debian package fixture could not run because
   itself a deliberately fixed bug (masking bad data as absent data), so the
   real fix is a new "undecodable cell" value representation threaded through
   `tablepro-core` and the grid UI, not a quick patch. Lower-severity cleanup
-  also noted: duplicated TLS-detection/error-chain code across the
-  clickhouse/mongodb/redis driver crates, a second hand-rolled background
+  also noted: a second hand-rolled background
   writer in `workspace_state.rs` duplicating `StateFile<T>`, and a few
   comments in `app/src/lib.rs`, `logging.rs`,
   `sql_format/mod.rs`, and `storage/query_history.rs` that violate the

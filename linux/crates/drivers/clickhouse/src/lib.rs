@@ -12,7 +12,8 @@ use serde::Deserialize;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Value, run_server_cancellable, sql_dialect::quote_ident,
+    MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Value, error_chain_text, looks_like_tls_failure,
+    run_server_cancellable, sql_dialect::quote_ident,
 };
 
 const DRIVER_ID: &str = "clickhouse";
@@ -882,28 +883,6 @@ fn hex_encode(bytes: &[u8]) -> String {
 /// 192 UNKNOWN_USER, 193 WRONG_PASSWORD, 194 REQUIRED_PASSWORD,
 /// 497 ACCESS_DENIED, 516 AUTHENTICATION_FAILED.
 const AUTH_CODES: [&str; 5] = ["code: 192", "code: 193", "code: 194", "code: 497", "code: 516"];
-
-fn error_chain_text(err: &dyn std::error::Error) -> String {
-    let mut parts = Vec::new();
-    let mut current = Some(err);
-    while let Some(error) = current {
-        parts.push(error.to_string());
-        current = error.source();
-    }
-    parts.join(" ")
-}
-
-fn looks_like_tls_failure(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-    lower.contains("certificate")
-        || lower.contains("notvalidforname")
-        || lower.contains("not valid for name")
-        || lower.contains("hostname")
-        || lower.contains("invaliddnsname")
-        || lower.contains("tls handshake")
-        || lower.contains("unknown issuer")
-        || lower.contains("unknown ca")
-}
 
 fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bool) -> DriverError {
     let is_ambiguous_network_disconnect = matches!(&err, clickhouse::error::Error::Network(_));

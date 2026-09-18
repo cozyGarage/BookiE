@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, TableInfo, Value,
+    QueryResult, TableInfo, Value, error_chain_text, looks_like_tls_failure,
 };
 
 pub struct RedisDriver;
@@ -550,28 +550,6 @@ fn urlencoding_lite(s: &str) -> String {
 async fn establish_connection_manager(client: Client) -> Result<ConnectionManager, RedisError> {
     client.get_multiplexed_async_connection().await?;
     ConnectionManager::new(client).await
-}
-
-fn error_chain_text(err: &RedisError) -> String {
-    let mut parts = Vec::new();
-    let mut current: Option<&dyn std::error::Error> = Some(err);
-    while let Some(error) = current {
-        parts.push(error.to_string());
-        current = error.source();
-    }
-    parts.join(" ")
-}
-
-fn looks_like_tls_failure(text: &str) -> bool {
-    let lower = text.to_ascii_lowercase();
-    lower.contains("certificate")
-        || lower.contains("notvalidforname")
-        || lower.contains("not valid for name")
-        || lower.contains("hostname")
-        || lower.contains("invaliddnsname")
-        || lower.contains("tls handshake")
-        || lower.contains("unknown issuer")
-        || lower.contains("unknown ca")
 }
 
 fn redis_error_can_hide_tls(err: &RedisError) -> bool {
