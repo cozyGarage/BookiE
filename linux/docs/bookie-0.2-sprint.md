@@ -17,7 +17,14 @@ for the 30-commit review, remaining risks, and revised handoff order.
 | --- | --- | --- |
 | Our Linux | `143a389ae2b9e5abc13306d7c6f22299a94a6fb7` | Current implementation and plans |
 | Upstream main | `fc8b887af7cf2b2e72c5d01f5b5b5c952c93f4e3` | 74 commits after `035ffe8f`, targeted source inspection |
-| Upstream Linux | `5730238f5c72b4924669efbb7c0e79372de50a36` | All 60 subjects after `807d28094`, targeted source inspection |
+| Upstream Linux | `5730238f5c72b4924669efbb7c0e79372de50a36` (dangling) | All 60 subjects after `807d28094`, targeted source inspection |
+
+Upstream force-pushed its `linux` branch after this table was written, so the
+Upstream Linux pin no longer resolves and `807d28094` is no longer an ancestor of
+`origin/linux`. That pin's commit is now `f3cbf7361 fix(linux): rebuild the
+GSettings schema when it changes and cover SQLite in dev-env`. The
+[2026-09-19 re-survey](upstream-sync.md) re-establishes the boundary and lists
+what is genuinely new.
 
 [Build Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088529)
 and [Flatpak Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088530)

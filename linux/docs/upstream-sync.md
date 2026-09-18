@@ -3,6 +3,68 @@
 The approved [BookiE convergence sprint](bookie-0.2-sprint.md) now includes shared
 Rust/Linux foundations as well as behavior review. Apple source trees remain excluded.
 
+## 2026-09-19: re-survey after upstream rewrote its Linux branch
+
+`origin/linux` is 1,017 commits ahead of ours and 396 behind. The number is
+misleading in three ways, and each one matters more than the total.
+
+**The old pins are gone.** Upstream force-pushed `linux`, so
+`5730238f5c72b4924669efbb7c0e79372de50a36`, the pin this document and the sprint
+plan both cite, no longer resolves in the repository. `807d280944a9…` resolves
+but is no longer an ancestor of `origin/linux`. Every "commits after X" count in
+those documents is unverifiable against the current remote. Pin by subject as
+well as SHA from now on; upstream `5730238f5` is the commit now called
+`f3cbf7361 fix(linux): rebuild the GSettings schema when it changes and cover
+SQLite in dev-env`.
+
+**Only 200 of the 1,017 touch `linux/`.** The other 817 are Apple targets, the
+plugin system, iOS sync and AI chat, all excluded by `CLAUDE.md`. Upstream now
+ships database engines as versioned plugins (`plugin-teradata`, `plugin-trino`,
+`plugin-typesense`, `plugin-weaviate` tags). That is the opposite of
+[ADR 0001](decisions/0001-no-plugin-system.md) and of compile-time driver
+registration. No action; recorded so the divergence is not rediscovered as a gap.
+
+**Of those 200, 19 are new since our last review.** The rest are the rewritten
+SHAs of commits the sprint plan already dispositioned. The 19 are:
+
+| Kind | Commits |
+| --- | --- |
+| Features we do not have | CSV import, Excel export, INSERT-statement export, Markdown/HTML/XML export, connection groups, connection import/export, connection colour tags, duplicate a connection, named saved queries, column comments, open a SQL file, JSON log format |
+| Fixes in code we share | `3bcd8df75` column rename, `92aea7112` export precision |
+| Fixes in code we do not have | `55528b854` OpenSSH 9 askpass fingerprint parsing |
+| Housekeeping | roadmap, i18n extraction, two test-stability fixes |
+
+### What the shared fixes cost us
+
+`3bcd8df75` found a real defect in our tree. We already emit `RenameColumn`
+ahead of the alter, but our alter guard still counted the name as a change, so a
+column whose name alone changed raised an `AlterColumn` with nothing to do.
+PostgreSQL and SQL Server swallowed it as `NoChange`. SQLite refused the entire
+save, because it refuses every alter. MySQL emitted a redundant `MODIFY COLUMN`
+that restates the definition from a model carrying no collation, character set
+or comment. Fixed with a cross-dialect regression test.
+
+`55528b854` does not apply: we have no askpass bridge. Carry it forward if the
+system OpenSSH transport is ever adopted in B4.
+
+### What the excluded trees still taught us
+
+`242b76e02 fix(plugin-postgresql): quote every catalog literal so a backslash
+cannot escape it` is a whole bug class we are immune to: our PostgreSQL catalog
+queries bind `$1`/`$2` rather than interpolating literals. The optional DuckDB
+driver is the one place that still interpolates a schema and table name into a
+quoted literal, through an `escape_literal` that doubles quotes and ignores
+backslashes. DuckDB does not treat a backslash as an escape in an ordinary
+string, so this is not the same defect, but binding the parameters would remove
+the question.
+
+`fix(plugin-postgresql): report each column's declared type, and compare it`
+(#2959) is the most useful thing in the whole survey for B3. Upstream concluded
+that a column needs both the name it is classified by and the spelling its own
+schema declares, because collapsing them loses collation, MySQL display width,
+enum label case and schema-qualified spellings. Our `ColumnInfo.data_type` is a
+single string. Design B3 for two fields, not one.
+
 ## 2026-09-16: script planner and safe formatting
 
 - Reference: `TableProApp/TablePro` Linux `5730238f5c72b4924669efbb7c0e79372de50a36`,
