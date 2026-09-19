@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Logs can be written as structured JSON lines by setting the log format environment variable, for collection by a log agent. Any other value keeps the human-readable format.
+
 ### Changed
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
