@@ -14,6 +14,12 @@ pub enum ExportError {
     MissingSqlTarget,
     #[error(transparent)]
     Statement(#[from] BuildSqlError),
+    #[error("An Excel worksheet holds at most {limit} rows and this result has {rows}")]
+    WorkbookTooLarge { limit: usize, rows: usize },
+    #[error("An Excel worksheet holds at most 16384 columns and this result has {columns}")]
+    WorkbookColumnLimit { columns: usize },
+    #[error("The Excel workbook could not be built")]
+    Workbook(#[from] rust_xlsxwriter::XlsxError),
 }
 
 impl ExportError {

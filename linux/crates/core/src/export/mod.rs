@@ -16,6 +16,7 @@ mod in_clause;
 mod json;
 mod markdown;
 mod sql;
+mod xlsx;
 mod xml;
 
 pub use csv::{
@@ -27,6 +28,7 @@ pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};
 pub use in_clause::{InClause, render_in_clause};
 pub use json::{json_field_names, render_json, row_to_json};
 pub use markdown::render_markdown;
+pub use xlsx::MAX_WORKBOOK_ROWS;
 
 pub(crate) fn value_to_text(value: &Value) -> Option<String> {
     match value {

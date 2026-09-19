@@ -8,6 +8,7 @@ use super::json::JsonWriter;
 use super::markdown::MarkdownWriter;
 use super::sql::SqlWriter;
 use super::write_atomically_checked;
+use super::xlsx::XlsxWriter;
 use super::xml::XmlWriter;
 use crate::QueryResult;
 use crate::query::{ColumnInfo, Value};
@@ -20,6 +21,7 @@ pub enum ResultFormat {
     Html,
     Xml,
     Sql,
+    Xlsx,
 }
 
 pub struct SqlTarget<'a> {
@@ -42,7 +44,7 @@ pub(crate) trait ResultWriter {
     fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError>;
 }
 
-fn writer_for(export: &ResultExport<'_>) -> Result<Box<dyn ResultWriter>, ExportError> {
+fn writer_for(export: &ResultExport<'_>, result: &QueryResult) -> Result<Box<dyn ResultWriter>, ExportError> {
     Ok(match export.format {
         ResultFormat::Csv => Box::new(CsvWriter::new(export.csv)),
         ResultFormat::Json => Box::new(JsonWriter::new()),
@@ -53,6 +55,7 @@ fn writer_for(export: &ResultExport<'_>) -> Result<Box<dyn ResultWriter>, Export
             Some(target) => Box::new(SqlWriter::new(target)?),
             None => return Err(ExportError::MissingSqlTarget),
         },
+        ResultFormat::Xlsx => Box::new(XlsxWriter::new(result.rows.len())?),
     })
 }
 
@@ -73,7 +76,7 @@ pub fn write_result_file(
         }
     };
     check()?;
-    let mut writer = writer_for(export)?;
+    let mut writer = writer_for(export, result)?;
     write_atomically_checked(
         path,
         |output| {
@@ -225,6 +228,44 @@ mod tests {
     }
 
     #[test]
+    fn an_excel_export_over_the_row_limit_is_refused_before_the_destination_is_touched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result");
+        let options = CsvOptions::default();
+        let oversized = QueryResult {
+            columns: ["id"].map(column).to_vec(),
+            rows: vec![Vec::new(); crate::export::MAX_WORKBOOK_ROWS + 1],
+            truncated: false,
+        };
+        let error = write_result_file(
+            &path,
+            &oversized,
+            &plain(ResultFormat::Xlsx, &options),
+            || false,
+            |_| {},
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, ExportError::WorkbookTooLarge { limit, rows }
+                if limit == crate::export::MAX_WORKBOOK_ROWS && rows == crate::export::MAX_WORKBOOK_ROWS + 1),
+            "{error:?}"
+        );
+        assert!(!path.exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn an_excel_export_publishes_a_complete_workbook() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result");
+        let options = CsvOptions::default();
+        write_result_file(&path, &result(), &plain(ResultFormat::Xlsx, &options), || false, |_| {}).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[..2], b"PK");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
     fn every_format_stops_at_the_first_cancelled_row_without_touching_the_destination() {
         let options = CsvOptions::default();
         for format in [
@@ -233,6 +274,7 @@ mod tests {
             ResultFormat::Markdown,
             ResultFormat::Html,
             ResultFormat::Xml,
+            ResultFormat::Xlsx,
         ] {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("result");
