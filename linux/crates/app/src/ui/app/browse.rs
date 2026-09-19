@@ -321,8 +321,11 @@ impl App {
         crate::ui::export_dialog::present_with_format(
             &self.window,
             &self.toast_overlay,
-            result,
-            table_label,
+            crate::ui::export_dialog::ExportRequest {
+                result,
+                suggested_name: table_label,
+                driver_id: self.driver_id().to_string(),
+            },
             matches!(format, ExportFormat::Json),
             &self.preferences,
         );

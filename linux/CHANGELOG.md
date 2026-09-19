@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export that would exceed a worksheet's row limit is refused before any file is written.
+
 ### Changed
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.

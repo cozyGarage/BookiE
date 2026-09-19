@@ -7,48 +7,145 @@ use tablepro_core::QueryResult;
 
 use crate::services::preferences::PreferencesStore;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ExportRequest {
+    pub(crate) result: QueryResult,
+    pub(crate) suggested_name: String,
+    pub(crate) driver_id: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ExportFormat {
     Csv,
     Json,
+    Markdown,
+    Html,
+    Xml,
+    Sql,
+    Xlsx,
 }
 
+struct FormatSpec {
+    format: ExportFormat,
+    label: &'static str,
+    extension: &'static str,
+    mime_type: &'static str,
+    csv_options: bool,
+}
+
+const FORMATS: [FormatSpec; 7] = [
+    FormatSpec {
+        format: ExportFormat::Csv,
+        label: "CSV",
+        extension: "csv",
+        mime_type: "text/csv",
+        csv_options: true,
+    },
+    FormatSpec {
+        format: ExportFormat::Json,
+        label: "JSON",
+        extension: "json",
+        mime_type: "application/json",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::Markdown,
+        label: "Markdown",
+        extension: "md",
+        mime_type: "text/markdown",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::Html,
+        label: "HTML",
+        extension: "html",
+        mime_type: "text/html",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::Xml,
+        label: "XML",
+        extension: "xml",
+        mime_type: "application/xml",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::Sql,
+        label: "SQL INSERT statements",
+        extension: "sql",
+        mime_type: "application/sql",
+        csv_options: false,
+    },
+    FormatSpec {
+        format: ExportFormat::Xlsx,
+        label: "Excel workbook",
+        extension: "xlsx",
+        mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        csv_options: false,
+    },
+];
+
 impl ExportFormat {
-    const ALL: [Self; 2] = [Self::Csv, Self::Json];
+    fn spec(self) -> &'static FormatSpec {
+        FORMATS.iter().find(|spec| spec.format == self).unwrap_or(&FORMATS[0])
+    }
 
     fn label(self) -> &'static str {
-        match self {
-            Self::Csv => "CSV",
-            Self::Json => "JSON",
-        }
+        self.spec().label
     }
 
     fn extension(self) -> &'static str {
-        match self {
-            Self::Csv => "csv",
-            Self::Json => "json",
-        }
+        self.spec().extension
     }
 
     fn mime_type(self) -> &'static str {
-        match self {
-            Self::Csv => "text/csv",
-            Self::Json => "application/json",
-        }
+        self.spec().mime_type
+    }
+
+    fn shows_csv_options(self) -> bool {
+        self.spec().csv_options
     }
 }
 
-fn selected_format(index: u32) -> ExportFormat {
-    ExportFormat::ALL
-        .get(index as usize)
-        .copied()
-        .unwrap_or(ExportFormat::Csv)
+fn available_formats(driver_id: &str) -> Vec<ExportFormat> {
+    let statements = tablepro_core::export::supports_sql_literals(driver_id);
+    FORMATS
+        .iter()
+        .filter(|spec| statements || spec.format != ExportFormat::Sql)
+        .map(|spec| spec.format)
+        .collect()
+}
+
+fn selected_format(formats: &[ExportFormat], index: u32) -> ExportFormat {
+    formats.get(index as usize).copied().unwrap_or(ExportFormat::Csv)
+}
+
+fn build_sql_group(suggested_name: &str) -> (adw::PreferencesGroup, adw::EntryRow) {
+    let (schema, table) = insert_target(suggested_name);
+    let group = adw::PreferencesGroup::builder()
+        .title(crate::tr!("SQL options"))
+        .build();
+    let target = adw::EntryRow::builder().title(crate::tr!("Table name")).build();
+    target.set_text(&match schema {
+        Some(schema) => format!("{schema}.{table}"),
+        None => table,
+    });
+    group.add(&target);
+    (group, target)
+}
+
+fn insert_target(name: &str) -> (Option<String>, String) {
+    match name.rsplit_once('.') {
+        Some((schema, table)) if !schema.is_empty() && !table.is_empty() => {
+            (Some(schema.to_string()), table.to_string())
+        }
+        _ => (None, name.to_string()),
+    }
 }
 
 fn suggested_file_name(name: &str, format: ExportFormat) -> String {
-    let base = name
-        .strip_suffix(".csv")
-        .or_else(|| name.strip_suffix(".json"))
+    let base = FORMATS
+        .iter()
+        .find_map(|spec| name.strip_suffix(&format!(".{}", spec.extension)))
         .filter(|base| !base.is_empty())
         .unwrap_or(name);
     format!("{base}.{}", format.extension())
@@ -57,25 +154,29 @@ fn suggested_file_name(name: &str, format: ExportFormat) -> String {
 pub(crate) fn present(
     parent: &adw::ApplicationWindow,
     toast_overlay: &adw::ToastOverlay,
-    result: QueryResult,
-    suggested_name: String,
+    request: ExportRequest,
     preferences: &PreferencesStore,
 ) {
-    present_with_format(parent, toast_overlay, result, suggested_name, false, preferences);
+    present_with_format(parent, toast_overlay, request, false, preferences);
 }
 
 pub(crate) fn present_with_format(
     parent: &adw::ApplicationWindow,
     toast_overlay: &adw::ToastOverlay,
-    result: QueryResult,
-    suggested_name: String,
+    request: ExportRequest,
     json: bool,
     preferences: &PreferencesStore,
 ) {
+    let ExportRequest {
+        result,
+        suggested_name,
+        driver_id,
+    } = request;
     let page = adw::PreferencesPage::new();
 
     let format_group = adw::PreferencesGroup::new();
-    let labels: Vec<&str> = ExportFormat::ALL.iter().map(|format| format.label()).collect();
+    let formats = available_formats(&driver_id);
+    let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
         .title(crate::tr!("Format"))
         .subtitle(
@@ -112,14 +213,22 @@ pub(crate) fn present_with_format(
     csv_group.set_visible(!json);
     page.add(&csv_group);
 
+    let (sql_group, sql_target) = build_sql_group(&suggested_name);
+    sql_group.set_visible(false);
+    page.add(&sql_group);
+
     let preferences_for_toggle = preferences.clone();
     include_header.connect_active_notify(move |row| {
         preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active());
     });
 
     let csv_group_for_format = csv_group.clone();
+    let sql_group_for_format = sql_group.clone();
+    let formats_for_visibility = formats.clone();
     format_row.connect_selected_notify(move |row| {
-        csv_group_for_format.set_visible(selected_format(row.selected()) == ExportFormat::Csv);
+        let format = selected_format(&formats_for_visibility, row.selected());
+        csv_group_for_format.set_visible(format.shows_csv_options());
+        sql_group_for_format.set_visible(format == ExportFormat::Sql);
     });
 
     let reset_button = gtk::Button::builder().label(crate::tr!("Reset to Defaults")).build();
@@ -162,32 +271,47 @@ pub(crate) fn present_with_format(
     let dialog_for_export = dialog.clone();
     let include_header_for_export = include_header.clone();
     export_button.connect_clicked(move |_| {
-        let format = selected_format(format_row.selected());
+        let format = selected_format(&formats, format_row.selected());
         let include_header = include_header_for_export.is_active();
         dialog_for_export.close();
         save_with_file_dialog(
             &parent_for_export,
             &toast_overlay_for_export,
-            format,
-            &suggested_name,
-            result.clone(),
-            include_header,
-            safe_csv.is_active(),
+            SaveRequest {
+                format,
+                suggested_name: suggested_name.clone(),
+                driver_id: driver_id.clone(),
+                result: result.clone(),
+                include_header,
+                sanitize_formulas: safe_csv.is_active(),
+                sql_target: sql_target.text().to_string(),
+            },
         );
     });
 
     dialog.present(Some(parent));
 }
 
-fn save_with_file_dialog(
-    parent: &adw::ApplicationWindow,
-    toast_overlay: &adw::ToastOverlay,
+struct SaveRequest {
     format: ExportFormat,
-    suggested_name: &str,
+    suggested_name: String,
+    driver_id: String,
     result: QueryResult,
     include_header: bool,
     sanitize_formulas: bool,
-) {
+    sql_target: String,
+}
+
+fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
+    let SaveRequest {
+        format,
+        suggested_name,
+        driver_id,
+        result,
+        include_header,
+        sanitize_formulas,
+        sql_target,
+    } = request;
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&crate::tr!("{format} files").replace("{format}", format.label())));
     filter.add_mime_type(format.mime_type());
@@ -197,7 +321,7 @@ fn save_with_file_dialog(
     let file_dialog = gtk::FileDialog::builder()
         .title(crate::tr!("Export Results"))
         .modal(true)
-        .initial_name(suggested_file_name(suggested_name, format))
+        .initial_name(suggested_file_name(&suggested_name, format))
         .default_filter(&filter)
         .filters(&filters)
         .build();
@@ -216,11 +340,28 @@ fn save_with_file_dialog(
             sanitize_formulas,
             ..Default::default()
         };
-        file::start(&parent_for_alert, &toast_overlay, path, result, format, options);
+        let (schema, table) = insert_target(&sql_target);
+        file::start(
+            &parent_for_alert,
+            &toast_overlay,
+            file::ExportJob {
+                path,
+                result: result.clone(),
+                format,
+                options,
+                driver_id: driver_id.clone(),
+                schema,
+                table,
+            },
+        );
     });
 }
 
-fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, error: &std::io::Error) {
+fn show_export_error(
+    parent: &adw::ApplicationWindow,
+    path: &std::path::Path,
+    error: &tablepro_core::export::ExportError,
+) {
     let alert = adw::AlertDialog::new(
         Some(&crate::tr!("Couldn't export")),
         Some(
@@ -238,6 +379,79 @@ fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_qualified_result_name_becomes_a_schema_and_table_for_sql_statements() {
+        assert_eq!(
+            insert_target("public.customers"),
+            (Some("public".into()), "customers".into())
+        );
+        assert_eq!(insert_target("customers"), (None, "customers".into()));
+        assert_eq!(insert_target("Query 1"), (None, "Query 1".into()));
+        assert_eq!(insert_target(".customers"), (None, ".customers".into()));
+    }
+
+    #[test]
+    fn a_result_with_no_source_table_offers_its_label_for_the_user_to_correct() {
+        assert_eq!(insert_target("query-results"), (None, "query-results".into()));
+        assert_eq!(
+            insert_target("orders"),
+            (None, "orders".into()),
+            "an edited table name is used verbatim rather than the result label"
+        );
+    }
+
+    #[test]
+    fn a_connection_without_sql_literals_is_not_offered_the_statement_format() {
+        assert!(available_formats("postgres").contains(&ExportFormat::Sql));
+        for driver_id in ["mongodb", "redis"] {
+            assert!(
+                !available_formats(driver_id).contains(&ExportFormat::Sql),
+                "{driver_id}"
+            );
+            assert_eq!(available_formats(driver_id).len(), FORMATS.len() - 1);
+        }
+    }
+
+    #[test]
+    fn the_csv_options_group_belongs_to_csv_alone() {
+        for spec in &FORMATS {
+            assert_eq!(
+                spec.format.shows_csv_options(),
+                spec.format == ExportFormat::Csv,
+                "{:?}",
+                spec.format
+            );
+        }
+    }
+
+    #[test]
+    fn the_selected_row_maps_to_the_format_offered_at_that_position() {
+        let formats = available_formats("mongodb");
+        assert_eq!(selected_format(&formats, 0), ExportFormat::Csv);
+        assert_eq!(selected_format(&formats, 5), ExportFormat::Xlsx);
+        assert_eq!(selected_format(&formats, 99), ExportFormat::Csv);
+        assert_eq!(selected_format(&available_formats("postgres"), 5), ExportFormat::Sql);
+    }
+
+    #[test]
+    fn every_offered_format_has_its_own_extension_and_media_type() {
+        for spec in &FORMATS {
+            assert_eq!(spec.format.extension(), spec.extension);
+            assert_eq!(spec.format.mime_type(), spec.mime_type);
+            assert_eq!(
+                FORMATS.iter().filter(|other| other.extension == spec.extension).count(),
+                1,
+                "{}",
+                spec.extension
+            );
+        }
+        assert_eq!(
+            suggested_file_name("customers.csv", ExportFormat::Xlsx),
+            "customers.xlsx"
+        );
+        assert_eq!(suggested_file_name("customers.md", ExportFormat::Sql), "customers.sql");
+    }
 
     #[test]
     fn suggested_file_name_uses_the_selected_format() {
