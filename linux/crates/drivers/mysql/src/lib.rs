@@ -111,7 +111,8 @@ impl Connection for MysqlConnection {
             "SELECT CAST(column_name AS CHAR), CAST(column_type AS CHAR),
                     CAST(is_nullable AS CHAR), CAST(column_key AS CHAR),
                     CAST(extra AS CHAR), CAST(column_default AS CHAR),
-                    CAST(generation_expression AS CHAR)
+                    CAST(generation_expression AS CHAR),
+                    CAST(column_comment AS CHAR)
              FROM information_schema.columns
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?
              ORDER BY ordinal_position",
@@ -121,44 +122,7 @@ impl Connection for MysqlConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| {
-                let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-                // information_schema.column_default uses NULL for "no
-                // default", but some sqlx + MySQL combinations surface
-                // it as an empty string. Treat empty as absent so the
-                // build_insert_from_draft "omit when default present"
-                // heuristic doesn't trigger on phantom defaults.
-                let default_value: Option<String> = r
-                    .try_get::<Option<String>, _>(5)
-                    .unwrap_or(None)
-                    .filter(|s| !s.is_empty());
-                let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
-                ColumnInfo {
-                    name: r.get::<String, _>(0),
-                    data_type: r.get::<String, _>(1),
-                    nullable: r.get::<String, _>(2) == "YES",
-                    primary_key: r.get::<String, _>(3) == "PRI",
-                    is_auto_increment: extra.contains("auto_increment"),
-                    default_value,
-                    // Two false-positives to guard against:
-                    //   1. MySQL 8.0.13+ marks expression-default columns
-                    //      (e.g. DEFAULT CURRENT_TIMESTAMP) with extra =
-                    //      "DEFAULT_GENERATED" — contains "generated" but
-                    //      not a generated column. Match the explicit
-                    //      keywords instead.
-                    //   2. information_schema.generation_expression returns
-                    //      an *empty string* for non-generated columns,
-                    //      not NULL — so `generation_expr.is_some()` is
-                    //      true even for plain columns. Check non-empty.
-                    is_generated: generation_expr.as_deref().is_some_and(|s| !s.is_empty())
-                        || extra.contains("virtual generated")
-                        || extra.contains("stored generated"),
-                    comment: None,
-                }
-            })
-            .collect())
+        Ok(rows.iter().map(row_to_column_info).collect())
     }
 
     async fn fetch_rows(
@@ -773,6 +737,47 @@ fn qualified(schema: Option<&str>, table: &str) -> String {
     match schema {
         Some(s) => format!("{}.{}", quote_ident(s), quote_ident(table)),
         None => quote_ident(table),
+    }
+}
+
+fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
+    let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
+    // information_schema.column_default uses NULL for "no
+    // default", but some sqlx + MySQL combinations surface
+    // it as an empty string. Treat empty as absent so the
+    // build_insert_from_draft "omit when default present"
+    // heuristic doesn't trigger on phantom defaults.
+    let default_value: Option<String> = r
+        .try_get::<Option<String>, _>(5)
+        .unwrap_or(None)
+        .filter(|s| !s.is_empty());
+    let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
+    ColumnInfo {
+        name: r.get::<String, _>(0),
+        data_type: r.get::<String, _>(1),
+        nullable: r.get::<String, _>(2) == "YES",
+        primary_key: r.get::<String, _>(3) == "PRI",
+        is_auto_increment: extra.contains("auto_increment"),
+        default_value,
+        // Two false-positives to guard against:
+        //   1. MySQL 8.0.13+ marks expression-default columns
+        //      (e.g. DEFAULT CURRENT_TIMESTAMP) with extra =
+        //      "DEFAULT_GENERATED" — contains "generated" but
+        //      not a generated column. Match the explicit
+        //      keywords instead.
+        //   2. information_schema.generation_expression returns
+        //      an *empty string* for non-generated columns,
+        //      not NULL — so `generation_expr.is_some()` is
+        //      true even for plain columns. Check non-empty.
+        is_generated: generation_expr.as_deref().is_some_and(|s| !s.is_empty())
+            || extra.contains("virtual generated")
+            || extra.contains("stored generated"),
+        // information_schema.column_comment is an empty
+        // string, never NULL, for a column with no comment.
+        comment: r
+            .try_get::<Option<String>, _>(7)
+            .unwrap_or(None)
+            .filter(|s| !s.is_empty()),
     }
 }
 

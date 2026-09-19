@@ -435,3 +435,29 @@ async fn a_completed_controlled_statement_leaves_the_connection_usable() {
     let second = connection.query("SELECT 2").await.expect("the connection stays usable");
     assert_eq!(second.rows, vec![vec![Value::Int(2)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_column_comment_round_trips_from_its_extended_property() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+
+    conn.execute("CREATE TABLE comment_demo (id int NOT NULL, label nvarchar(64) NULL)")
+        .await
+        .unwrap();
+    conn.execute(
+        "EXEC sp_addextendedproperty @name = N'MS_Description', \
+         @value = N'what the row is called', \
+         @level0type = N'SCHEMA', @level0name = dbo, \
+         @level1type = N'TABLE', @level1name = comment_demo, \
+         @level2type = N'COLUMN', @level2name = label",
+    )
+    .await
+    .unwrap();
+
+    let columns = conn.fetch_columns(None, "comment_demo").await.unwrap();
+    let id = columns.iter().find(|c| c.name == "id").unwrap();
+    let label = columns.iter().find(|c| c.name == "label").unwrap();
+    assert_eq!(label.comment.as_deref(), Some("what the row is called"));
+    assert_eq!(id.comment, None);
+}

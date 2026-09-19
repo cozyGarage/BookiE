@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The structure editor reads each column's comment on PostgreSQL, MySQL, SQL Server and ClickHouse.
+
 ### Changed
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
