@@ -241,7 +241,7 @@ pub fn materialize_ops(ops: &[StructureOp], driver_id: &str) -> Result<Vec<Strin
     }
     for op in ops {
         if let StructureOp::AddColumn { schema, table, column } = op {
-            out.push(build_add_column(driver_id, schema.as_deref(), table, column)?);
+            out.extend(build_add_column(driver_id, schema.as_deref(), table, column)?);
         }
     }
     for op in ops {

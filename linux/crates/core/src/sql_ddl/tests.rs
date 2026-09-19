@@ -18,6 +18,7 @@ fn dc(name: &str, ty: &str) -> DraftColumn {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     }
 }
 
@@ -273,7 +274,7 @@ fn add_column_basic() {
     let col = nn(def(dc("created_at", "timestamp"), "now()"));
     assert_eq!(
         build_add_column("postgres", None, "users", &col).unwrap(),
-        "ALTER TABLE \"users\" ADD COLUMN \"created_at\" timestamp NOT NULL DEFAULT now()"
+        vec!["ALTER TABLE \"users\" ADD COLUMN \"created_at\" timestamp NOT NULL DEFAULT now()"]
     );
 }
 
@@ -287,19 +288,19 @@ fn add_column_sqlite_not_null_without_default_rejected() {
 #[test]
 fn add_column_sqlite_with_default_ok() {
     let col = nn(def(dc("name", "TEXT"), "''"));
-    let sql = build_add_column("sqlite", None, "t", &col).unwrap();
-    assert!(sql.starts_with("ALTER TABLE \"t\" ADD COLUMN"));
+    let stmts = build_add_column("sqlite", None, "t", &col).unwrap();
+    assert!(stmts[0].starts_with("ALTER TABLE \"t\" ADD COLUMN"));
 }
 
 #[test]
 fn add_column_mssql_no_column_keyword() {
     let col = nn(def(dc("created_at", "DATETIME2"), "SYSUTCDATETIME()"));
-    let sql = build_add_column("mssql", None, "users", &col).unwrap();
+    let stmts = build_add_column("mssql", None, "users", &col).unwrap();
     assert_eq!(
-        sql,
-        "ALTER TABLE [users] ADD [created_at] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()"
+        stmts,
+        vec!["ALTER TABLE [users] ADD [created_at] DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()"]
     );
-    assert!(!sql.contains("ADD COLUMN"));
+    assert!(!stmts[0].contains("ADD COLUMN"));
 }
 
 #[test]
@@ -375,6 +376,7 @@ fn alter_column_postgres_type_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     let joined = stmts.join("\n");
@@ -401,6 +403,7 @@ fn alter_column_postgres_nullable_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET NOT NULL")));
@@ -425,6 +428,7 @@ fn alter_column_postgres_default_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'pending'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET DEFAULT 'pending'")));
@@ -460,6 +464,7 @@ fn alter_column_postgres_emits_three_statements_when_all_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'fallback'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     // Type, nullable AND default all changed — all three must
@@ -497,6 +502,7 @@ fn alter_column_mssql_type_and_nullable_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -522,6 +528,7 @@ fn alter_column_mssql_default_only_replaces_the_constraint() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'pending'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 2);
@@ -551,6 +558,7 @@ fn alter_column_mssql_clearing_a_default_only_drops() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -577,6 +585,7 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("0".into()),
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 3);
@@ -604,6 +613,7 @@ fn alter_column_mssql_unchanged_is_no_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let err = build_alter_column("mssql", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::NoChange));
@@ -628,6 +638,7 @@ fn alter_column_mssql_drop_default_escapes_literals() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", Some("s'x"), "t'q", &col).unwrap();
     assert!(stmts[0].contains("OBJECT_ID('[s''x].[t''q]')"));
@@ -930,6 +941,7 @@ fn alter_column_postgres_rejects_injection_in_type() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let err = build_alter_column("postgres", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::UnsafeType(_)), "got {err:?}");
@@ -971,6 +983,7 @@ fn materialize_ops_mssql_orders_rename_alter_then_add() {
                 primary_key: false,
                 auto_increment: false,
                 default_value: Some("'x'".into()),
+                comment: None,
             },
         },
         StructureOp::AddColumn {
@@ -1071,7 +1084,7 @@ fn a_pure_column_rename_needs_no_alter_on_any_dialect() {
     assert_eq!(
         materialize_ops(&ops, "mysql").unwrap(),
         vec!["ALTER TABLE `t` RENAME COLUMN `label` TO `title`".to_string()],
-        "a redundant MODIFY COLUMN would restate the definition without collation or comment"
+        "a redundant MODIFY COLUMN would restate the definition without its collation"
     );
     assert_eq!(
         materialize_ops(&ops, "mssql").unwrap(),

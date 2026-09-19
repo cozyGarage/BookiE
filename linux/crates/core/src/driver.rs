@@ -77,6 +77,17 @@ pub trait DatabaseDriver: Send + Sync {
         false
     }
 
+    /// Whether this driver's engine stores a comment on a column. The
+    /// answer comes from the DDL builder's placement table rather than
+    /// a per-driver override, so a driver cannot advertise a capability
+    /// the builder would refuse to emit.
+    fn supports_column_comments(&self) -> bool {
+        !matches!(
+            crate::sql_ddl::column_comment_placement(self.id()),
+            crate::sql_ddl::CommentPlacement::Unsupported
+        )
+    }
+
     fn supports_view_metadata(&self) -> bool {
         false
     }
@@ -131,5 +142,6 @@ mod tests {
         assert!(!driver.supports_index_metadata());
         assert!(!driver.supports_foreign_key_metadata());
         assert!(!driver.supports_view_metadata());
+        assert!(!driver.supports_column_comments());
     }
 }

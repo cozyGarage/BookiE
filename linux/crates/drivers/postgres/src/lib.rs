@@ -165,6 +165,9 @@ impl Connection for PgConnection {
         //     length / precision (e.g. "character varying(255)") which
         //     matches what the user wrote in CREATE TABLE.
         //   - pg_get_expr() returns the default expression text.
+        //   - col_description() is the column-level comment accessor;
+        //     obj_description() answers for the relation, so using it
+        //     here would give every column the table's comment.
         let rows = sqlx::query(
             "SELECT
                 a.attname,
@@ -178,7 +181,8 @@ impl Connection for PgConnection {
                 ) AS is_pk,
                 pg_catalog.pg_get_expr(d.adbin, d.adrelid) AS default_value,
                 a.attidentity <> '' AS is_identity,
-                a.attgenerated <> '' AS is_generated
+                a.attgenerated <> '' AS is_generated,
+                pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
@@ -225,7 +229,10 @@ impl Connection for PgConnection {
                     is_auto_increment: is_identity || is_serial,
                     default_value,
                     is_generated,
-                    comment: None,
+                    comment: r
+                        .try_get::<Option<String>, _>(7)
+                        .unwrap_or(None)
+                        .filter(|c| !c.is_empty()),
                 }
             })
             .collect())

@@ -48,7 +48,6 @@ crates/app/src/ui/welcome_view.rs 1
 crates/core/src/activity.rs 1
 crates/core/src/filter.rs 1
 crates/core/src/pagination.rs 1
-crates/core/src/sql_ddl/column.rs 1
 crates/core/src/sql_ddl/diff.rs 2
 crates/core/src/sql_ddl/types.rs 1
 crates/drivers/clickhouse/src/lib.rs 1

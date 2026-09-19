@@ -529,3 +529,35 @@ async fn activity_duration_types_decode_as_text() {
         result.rows[0][7]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_column_comment_round_trips_and_a_table_comment_does_not_leak_into_it() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE TABLE comment_demo (id integer, label text)")
+        .await
+        .unwrap();
+    connection
+        .execute("COMMENT ON TABLE comment_demo IS 'the whole table'")
+        .await
+        .unwrap();
+    connection
+        .execute("COMMENT ON COLUMN comment_demo.label IS 'what the row is called'")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "comment_demo").await.unwrap();
+    let id = columns.iter().find(|c| c.name == "id").unwrap();
+    let label = columns.iter().find(|c| c.name == "label").unwrap();
+    assert_eq!(label.comment.as_deref(), Some("what the row is called"));
+    assert_eq!(id.comment, None, "the table comment must not reach a column");
+
+    connection
+        .execute("COMMENT ON COLUMN comment_demo.label IS NULL")
+        .await
+        .unwrap();
+    let cleared = connection.fetch_columns(None, "comment_demo").await.unwrap();
+    assert_eq!(cleared.iter().find(|c| c.name == "label").unwrap().comment, None);
+}

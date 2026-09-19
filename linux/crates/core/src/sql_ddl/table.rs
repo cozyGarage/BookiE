@@ -3,7 +3,8 @@ use crate::sql_dialect::quote_ident;
 
 use super::index_fk::{build_add_foreign_key, build_create_index};
 use super::types::{
-    BuildDdlError, DraftColumn, qualified_table, render_column_definition, sql_literal, validate_table,
+    BuildDdlError, DraftColumn, column_comment_statement, qualified_table, render_column_definition, sql_literal,
+    validate_table,
 };
 
 /// Build CREATE TABLE plus secondary CREATE INDEX / ADD FOREIGN KEY
@@ -47,6 +48,14 @@ pub fn build_create_table(
         col_defs.join(",\n  ")
     );
     out.push(create_sql);
+
+    for column in columns {
+        if column.comment.is_some()
+            && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
+        {
+            out.push(comment_stmt);
+        }
+    }
 
     for index in indexes {
         if index.primary {

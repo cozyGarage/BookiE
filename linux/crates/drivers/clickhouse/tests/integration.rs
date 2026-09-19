@@ -431,3 +431,28 @@ async fn a_cancelled_query_is_killed_on_the_server_and_the_client_stays_usable()
     let result = connection.query("SELECT 1").await.expect("the client remains usable");
     assert_eq!(result.rows, vec![vec![Value::Int(1)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_column_comment_round_trips_and_an_uncommented_column_reads_as_none() {
+    let (_c, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE comment_demo (
+            id UInt64,
+            label String COMMENT 'what the row is called'
+        ) ENGINE = MergeTree
+        ORDER BY id",
+    )
+    .await
+    .unwrap();
+
+    let cols = conn.fetch_columns(None, "comment_demo").await.unwrap();
+    let id = cols.iter().find(|c| c.name == "id").unwrap();
+    let label = cols.iter().find(|c| c.name == "label").unwrap();
+    assert_eq!(label.comment.as_deref(), Some("what the row is called"));
+    assert_eq!(
+        id.comment, None,
+        "an uncommented column reports the engine's empty string as no comment"
+    );
+}

@@ -8,7 +8,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{ComponentSender, adw, gtk};
 
-use tablepro_core::sql_ddl::DraftColumn;
+use tablepro_core::sql_ddl::{CommentPlacement, DraftColumn, column_comment_placement};
 
 use super::{ColumnField, StructureTab, StructureTabInput};
 
@@ -305,7 +305,7 @@ pub(super) fn build_column_expander_row(
         .sync_create()
         .build();
     let sender_for_auto = sender.clone();
-    let suppress_for_auto = suppress_emit;
+    let suppress_for_auto = suppress_emit.clone();
     auto_row.connect_active_notify(move |s| {
         if suppress_for_auto.get() {
             return;
@@ -317,7 +317,72 @@ pub(super) fn build_column_expander_row(
     });
     row.add_row(&auto_row);
 
+    add_comment_row(&row, index, col, driver_id, sender, suppress_emit);
+
     row
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum CommentEditability {
+    Editable,
+    CreateOnly,
+    Unsupported,
+}
+
+/// Whether this column's comment can be edited now. ClickHouse has no
+/// ALTER for a column comment, so an existing column's comment is
+/// readable but fixed, while a column being drafted into a CREATE
+/// TABLE still carries one.
+pub(super) fn comment_editability(driver_id: &str, is_existing: bool) -> CommentEditability {
+    if column_comment_placement(driver_id) == CommentPlacement::Unsupported {
+        return CommentEditability::Unsupported;
+    }
+    if driver_id == "clickhouse" && is_existing {
+        return CommentEditability::CreateOnly;
+    }
+    CommentEditability::Editable
+}
+
+/// Comment (AdwEntryRow). Empty input means no comment, matching the
+/// default-value row. The field stays visible but insensitive where
+/// the engine cannot store one, or where it can only store one at
+/// CREATE time.
+fn add_comment_row(
+    row: &adw::ExpanderRow,
+    index: usize,
+    col: &DraftColumn,
+    driver_id: &str,
+    sender: ComponentSender<StructureTab>,
+    suppress_emit: Rc<Cell<bool>>,
+) {
+    let comment_row = adw::EntryRow::builder().title(crate::tr!("Comment")).build();
+    comment_row.set_text(col.comment.as_deref().unwrap_or(""));
+    comment_row.set_widget_name(&format!("col-comment-{index}"));
+    match comment_editability(driver_id, col.original.is_some()) {
+        CommentEditability::Unsupported => {
+            comment_row.set_sensitive(false);
+            comment_row.set_tooltip_text(Some(&crate::tr!("This database has no column comments.")));
+        }
+        CommentEditability::CreateOnly => {
+            comment_row.set_sensitive(false);
+            comment_row.set_tooltip_text(Some(&crate::tr!(
+                "ClickHouse can only set a column comment when the table is created."
+            )));
+        }
+        CommentEditability::Editable => {}
+    }
+    comment_row.connect_changed(move |e| {
+        if suppress_emit.get() {
+            return;
+        }
+        let text = e.text().to_string();
+        let value = if text.is_empty() { None } else { Some(text) };
+        sender.input(StructureTabInput::ColumnEdited {
+            index,
+            field: ColumnField::Comment(value),
+        });
+    });
+    row.add_row(&comment_row);
 }
 
 /// Build a suffix MenuButton for the type AdwEntryRow that opens a
@@ -381,4 +446,30 @@ fn build_type_suggestions_button(driver_id: &str, target: &adw::EntryRow) -> (gt
     // owning column row is torn down on Refresh.
     let popover = button.popover();
     (button, popover)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CommentEditability, comment_editability};
+
+    #[test]
+    fn a_comment_is_editable_where_the_engine_can_alter_one() {
+        for driver_id in ["postgres", "mysql", "mssql"] {
+            assert_eq!(comment_editability(driver_id, true), CommentEditability::Editable);
+            assert_eq!(comment_editability(driver_id, false), CommentEditability::Editable);
+        }
+    }
+
+    #[test]
+    fn a_clickhouse_comment_is_editable_only_while_the_column_is_new() {
+        assert_eq!(comment_editability("clickhouse", false), CommentEditability::Editable);
+        assert_eq!(comment_editability("clickhouse", true), CommentEditability::CreateOnly);
+    }
+
+    #[test]
+    fn an_engine_without_column_comments_shows_the_field_as_unsupported() {
+        for driver_id in ["sqlite", "duckdb", "mongodb", "redis"] {
+            assert_eq!(comment_editability(driver_id, false), CommentEditability::Unsupported);
+        }
+    }
 }

@@ -477,3 +477,27 @@ async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null(
         "a value that failed to decode must not be indistinguishable from a stored NULL"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_column_comment_round_trips_and_an_uncommented_column_reads_as_none() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts).await;
+    connection
+        .execute(
+            "CREATE TABLE comment_demo (\
+                id int NOT NULL, \
+                label varchar(64) COMMENT 'what the row is called')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "comment_demo").await.unwrap();
+    let id = columns.iter().find(|c| c.name == "id").unwrap();
+    let label = columns.iter().find(|c| c.name == "label").unwrap();
+    assert_eq!(label.comment.as_deref(), Some("what the row is called"));
+    assert_eq!(
+        id.comment, None,
+        "an uncommented column reports the engine's empty string as no comment"
+    );
+}

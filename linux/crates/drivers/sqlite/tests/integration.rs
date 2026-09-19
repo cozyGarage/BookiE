@@ -203,3 +203,16 @@ async fn a_declared_structure_capability_returns_real_catalog_rows() {
         "a driver that declares foreign-key support must return the constraint it created: {foreign_keys:?}"
     );
 }
+
+#[tokio::test]
+async fn sqlite_columns_report_no_comment() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection
+        .execute("CREATE TABLE comment_demo (id INTEGER PRIMARY KEY, label TEXT)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "comment_demo").await.unwrap();
+    assert!(!columns.is_empty());
+    assert!(columns.iter().all(|c| c.comment.is_none()));
+}

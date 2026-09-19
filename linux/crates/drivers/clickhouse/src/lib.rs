@@ -168,16 +168,6 @@ impl Connection for ClickhouseConnection {
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        #[derive(Debug, Deserialize, clickhouse::Row)]
-        struct Row {
-            name: String,
-            #[serde(rename = "type")]
-            data_type: String,
-            is_in_primary_key: u8,
-            default_kind: String,
-            default_expression: String,
-        }
-
         let rows = self
             .client
             .query(
@@ -186,7 +176,8 @@ impl Connection for ClickhouseConnection {
                     type,
                     is_in_primary_key,
                     default_kind,
-                    default_expression
+                    default_expression,
+                    comment
                  FROM system.columns
                  WHERE database = ?
                    AND table = ?
@@ -194,36 +185,11 @@ impl Connection for ClickhouseConnection {
             )
             .bind(self.database_of(schema))
             .bind(table)
-            .fetch_all::<Row>()
+            .fetch_all::<CatalogColumnRow>()
             .await
             .map_err(map_clickhouse_error)?;
 
-        Ok(rows
-            .into_iter()
-            .map(|r| {
-                let is_generated = matches!(r.default_kind.as_str(), "MATERIALIZED" | "ALIAS" | "EPHEMERAL");
-                let default_value = if r.default_expression.is_empty() {
-                    None
-                } else {
-                    Some(r.default_expression)
-                };
-                ColumnInfo {
-                    nullable: type_is_nullable(&r.data_type),
-                    name: r.name,
-                    data_type: r.data_type,
-                    // A MergeTree sorting key is the closest thing to a
-                    // row identifier ClickHouse has, but it is not
-                    // unique. The edit path needs *some* key to build a
-                    // WHERE from; see `fetch_indexes` for why it is not
-                    // advertised as unique.
-                    primary_key: r.is_in_primary_key != 0,
-                    is_auto_increment: false,
-                    default_value,
-                    is_generated,
-                    comment: None,
-                }
-            })
-            .collect())
+        Ok(rows.into_iter().map(catalog_row_to_column_info).collect())
     }
 
     async fn fetch_rows(
@@ -571,6 +537,43 @@ fn base_type(type_name: &str) -> &str {
 
 /// `Nullable(T)` survives inside `LowCardinality`, so the wrapper has to
 /// come off before the nullability test.
+#[derive(Debug, Deserialize, clickhouse::Row)]
+struct CatalogColumnRow {
+    name: String,
+    #[serde(rename = "type")]
+    data_type: String,
+    is_in_primary_key: u8,
+    default_kind: String,
+    default_expression: String,
+    comment: String,
+}
+
+fn catalog_row_to_column_info(r: CatalogColumnRow) -> ColumnInfo {
+    let is_generated = matches!(r.default_kind.as_str(), "MATERIALIZED" | "ALIAS" | "EPHEMERAL");
+    let default_value = if r.default_expression.is_empty() {
+        None
+    } else {
+        Some(r.default_expression)
+    };
+    // system.columns.comment is an empty string, never NULL, for a
+    // column with no comment.
+    let comment = Some(r.comment).filter(|c| !c.is_empty());
+    ColumnInfo {
+        nullable: type_is_nullable(&r.data_type),
+        name: r.name,
+        data_type: r.data_type,
+        // A MergeTree sorting key is the closest thing to a row
+        // identifier ClickHouse has, but it is not unique. The edit
+        // path needs *some* key to build a WHERE from; see
+        // `fetch_indexes` for why it is not advertised as unique.
+        primary_key: r.is_in_primary_key != 0,
+        is_auto_increment: false,
+        default_value,
+        is_generated,
+        comment,
+    }
+}
+
 fn type_is_nullable(type_name: &str) -> bool {
     let t = type_name.trim();
     let inner = unwrap_type(t, "LowCardinality").unwrap_or(t);
