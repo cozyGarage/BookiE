@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- A CSV file can be loaded into an existing table from the table's context menu. The file's separator and header row are detected and can be changed, each table column is mapped to a field before anything runs, and the whole import is approved once. It commits in bounded batches, shows progress, can be cancelled, and reports how many rows were written when it stops early.
+
 ### Changed
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.

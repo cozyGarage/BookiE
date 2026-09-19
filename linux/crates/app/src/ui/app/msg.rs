@@ -170,4 +170,17 @@ pub enum AppMsg {
     },
     ReopenClosedTab,
     ShowFilterDialog,
+    ImportCsvIntoTable {
+        schema: Option<String>,
+        table: String,
+    },
+    CsvFileChosen {
+        schema: Option<String>,
+        table: String,
+        path: std::path::PathBuf,
+    },
+    CsvImportPrepared(Box<super::import::CsvImportPreparation>),
+    StartCsvImport(Box<crate::ui::import_dialog::ImportChoice>),
+    CsvImportProgress(u64),
+    CsvImportFinished(Box<super::import::CsvImportReport>),
 }

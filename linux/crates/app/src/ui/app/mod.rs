@@ -1,6 +1,7 @@
 mod browse;
 mod connection;
 mod favorites;
+pub(crate) mod import;
 mod init_css;
 mod init_sidebar;
 mod init_window;
@@ -153,6 +154,9 @@ pub struct App {
     /// additive, so a window must resolve its own connection rather than
     /// whichever one was focused most recently.
     connection_id: Option<Uuid>,
+    /// The running CSV import's progress window, held while its batches
+    /// run and dropped when it reaches its terminal state.
+    csv_import_progress: Option<crate::ui::import_dialog::ImportProgress>,
     /// Serialized connection-switch state. The candidate is fully validated
     /// before it can replace the active connection.
     connection_transition: ConnectionTransition,
@@ -482,6 +486,7 @@ impl SimpleComponent for App {
             connection_organization: ConnectionOrganizationIndex::default(),
             connected: false,
             connection_id: None,
+            csv_import_progress: None,
             connection_transition: ConnectionTransition::Idle,
             prepared_connection: None,
             switch_saves_pending: std::collections::HashMap::new(),
@@ -818,6 +823,12 @@ impl SimpleComponent for App {
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
+            AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
+            AppMsg::CsvFileChosen { schema, table, path } => self.on_csv_file_chosen(schema, table, path, sender),
+            AppMsg::CsvImportPrepared(preparation) => self.on_csv_import_prepared(*preparation, sender),
+            AppMsg::StartCsvImport(choice) => self.on_start_csv_import(*choice, sender),
+            AppMsg::CsvImportProgress(committed) => self.on_csv_import_progress(committed),
+            AppMsg::CsvImportFinished(report) => self.on_csv_import_finished(*report, sender),
             AppMsg::ShowFilterDialog => self.on_show_filter_dialog(),
         }
     }

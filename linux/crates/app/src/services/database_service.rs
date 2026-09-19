@@ -272,11 +272,24 @@ impl DatabaseService {
         self.handle_with_identity(id, principal).map(|(handle, _)| handle)
     }
 
+    /// The same guarded handle as [`handle`], kept as its concrete type so
+    /// a caller can open a scoped bulk insert on it. It is the same
+    /// `PolicyGuard`; nothing here reaches the driver underneath.
+    pub fn guard(&self, id: Uuid, principal: Principal) -> Option<Arc<PolicyGuard>> {
+        self.guard_with_identity(id, principal)
+            .map(|(guard, _)| Arc::new(guard))
+    }
+
     fn handle_with_identity(
         &self,
         id: Uuid,
         principal: Principal,
     ) -> Option<(Arc<dyn Connection>, ConnectionIdentity)> {
+        let (guard, identity) = self.guard_with_identity(id, principal)?;
+        Some((Arc::new(guard) as Arc<dyn Connection>, identity))
+    }
+
+    fn guard_with_identity(&self, id: Uuid, principal: Principal) -> Option<(PolicyGuard, ConnectionIdentity)> {
         let entries = self.connections.lock().unwrap_or_else(|e| e.into_inner());
         let entry = entries.get(&id)?;
         let inner = entry.inner.lock().unwrap_or_else(|e| e.into_inner());
@@ -299,7 +312,7 @@ impl DatabaseService {
             fault: entry.fault.clone(),
         });
         Some((
-            Arc::new(PolicyGuard::new(inner.connection.clone(), ctx).with_fault_sink(fault)) as Arc<dyn Connection>,
+            PolicyGuard::new(inner.connection.clone(), ctx).with_fault_sink(fault),
             ConnectionIdentity(Arc::downgrade(&inner.connection)),
         ))
     }
