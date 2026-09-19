@@ -31,6 +31,10 @@ pub struct ConnectionOrganization {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "is_not_set")]
     pub favorite: bool,
+    /// Colour tag, restricted to the fixed palette in
+    /// `connection_color`. A value outside it reads as no colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
     /// Keys written by a newer TablePro. Carried through a rewrite so a
     /// downgrade does not strip settings the newer version depends on.
     #[serde(flatten)]
@@ -69,12 +73,22 @@ impl ConnectionOrganization {
             group,
             tags: normalized,
             favorite,
+            color: None,
             extra: serde_json::Map::new(),
         })
     }
 
+    /// Set the colour tag. A name outside the palette clears it rather
+    /// than storing text that would later reach a CSS class name.
+    pub fn with_color(mut self, color: Option<&str>) -> Self {
+        self.color = color
+            .and_then(crate::connection_color::connection_color)
+            .map(str::to_owned);
+        self
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.group.is_none() && self.tags.is_empty() && !self.favorite && self.extra.is_empty()
+        self.group.is_none() && self.tags.is_empty() && !self.favorite && self.color.is_none() && self.extra.is_empty()
     }
 
     fn sanitized(self) -> Self {
@@ -103,6 +117,11 @@ impl ConnectionOrganization {
             group,
             tags,
             favorite: self.favorite,
+            color: self
+                .color
+                .as_deref()
+                .and_then(crate::connection_color::connection_color)
+                .map(str::to_owned),
             extra: self.extra,
         }
     }
@@ -267,6 +286,9 @@ pub(crate) async fn save_to(path: &Path, index: &ConnectionOrganizationIndex) ->
         }
         if baseline.is_none_or(|entry| entry.favorite != desired.favorite) {
             merged.favorite = desired.favorite;
+        }
+        if baseline.is_none_or(|entry| entry.color != desired.color) {
+            merged.color.clone_from(&desired.color);
         }
         if merged.is_empty() {
             entries.remove(id);

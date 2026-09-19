@@ -6,6 +6,7 @@
 
 - A saved connection can be given a name; leaving the name blank keeps the address-derived label.
 - A saved connection can be duplicated; the copy starts without saved credentials.
+- A saved connection can carry a colour tag from a fixed palette, shown beside it in the connection list.
 
 ### Changed
 

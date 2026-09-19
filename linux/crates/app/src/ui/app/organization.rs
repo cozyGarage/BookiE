@@ -1,7 +1,9 @@
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender, adw, gtk};
 
-use tablepro_storage::{ConnectionOrganization, ConnectionOrganizationIndex, MAX_TAGS_PER_CONNECTION, SavedConnection};
+use tablepro_storage::{
+    CONNECTION_COLORS, ConnectionOrganization, ConnectionOrganizationIndex, MAX_TAGS_PER_CONNECTION, SavedConnection,
+};
 use uuid::Uuid;
 
 use super::{App, AppMsg};
@@ -71,12 +73,21 @@ impl App {
             .build();
         tags_row.set_text(&current.tags.join(", "));
 
+        let color_labels: Vec<String> = color_choice_labels();
+        let color_refs: Vec<&str> = color_labels.iter().map(String::as_str).collect();
+        let color_row = adw::ComboRow::builder()
+            .title(crate::tr!("Colour"))
+            .model(&gtk::StringList::new(&color_refs))
+            .build();
+        color_row.set_selected(color_choice_index(current.color.as_deref()));
+
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
             .css_classes(["boxed-list"])
             .build();
         list.append(&group_row);
         list.append(&tags_row);
+        list.append(&color_row);
         dialog.set_extra_child(Some(&list));
         dialog.add_response("cancel", &crate::tr!("Cancel"));
         dialog.add_response("save", &crate::tr!("Save"));
@@ -93,7 +104,10 @@ impl App {
                 return;
             }
             let tags = split_tags(&tags_row.text());
-            match ConnectionOrganization::new(Some(&group_row.text()), &tags, favorite) {
+            let color = color_for_choice(color_row.selected());
+            match ConnectionOrganization::new(Some(&group_row.text()), &tags, favorite)
+                .map(|organization| organization.with_color(color))
+            {
                 Ok(organization) => {
                     let _ = input_sender.send(AppMsg::SetConnectionOrganization(id, organization));
                 }
@@ -241,6 +255,32 @@ fn secret(password: &secrecy::SecretString) -> &str {
     password.expose_secret()
 }
 
+/// The picker's rows: "No colour" first, then the fixed palette. The
+/// palette is closed, so the row index maps back to a palette entry
+/// without any free-form colour string reaching storage.
+fn color_choice_labels() -> Vec<String> {
+    let mut labels = vec![crate::tr!("No colour")];
+    labels.extend(CONNECTION_COLORS.iter().map(|name| crate::tr!(*name)));
+    labels
+}
+
+fn color_choice_index(color: Option<&str>) -> u32 {
+    let Some(color) = color.and_then(tablepro_storage::connection_color) else {
+        return 0;
+    };
+    CONNECTION_COLORS
+        .iter()
+        .position(|name| *name == color)
+        .map_or(0, |index| index as u32 + 1)
+}
+
+fn color_for_choice(row: u32) -> Option<&'static str> {
+    if row == 0 {
+        return None;
+    }
+    CONNECTION_COLORS.get(row as usize - 1).copied()
+}
+
 /// Split a comma-separated tag entry. Empty segments are dropped here so
 /// a trailing comma while typing is not an error, and the ceiling keeps
 /// a pasted wall of text from reaching the validator as thousands of
@@ -257,6 +297,28 @@ fn split_tags(raw: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_colour_picker_round_trips_every_palette_entry() {
+        assert_eq!(color_choice_index(None), 0);
+        assert_eq!(color_for_choice(0), None);
+        for (offset, name) in CONNECTION_COLORS.iter().enumerate() {
+            let row = offset as u32 + 1;
+            assert_eq!(color_for_choice(row), Some(*name));
+            assert_eq!(color_choice_index(Some(name)), row);
+        }
+    }
+
+    #[test]
+    fn a_colour_outside_the_palette_selects_no_colour() {
+        assert_eq!(color_choice_index(Some("#ff0000")), 0);
+        assert_eq!(color_for_choice(CONNECTION_COLORS.len() as u32 + 1), None);
+    }
+
+    #[test]
+    fn the_picker_offers_no_colour_plus_the_whole_palette() {
+        assert_eq!(color_choice_labels().len(), CONNECTION_COLORS.len() + 1);
+    }
 
     #[test]
     fn tag_entry_text_becomes_trimmed_non_empty_tags() {

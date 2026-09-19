@@ -64,6 +64,15 @@ impl FactoryComponent for ConnectionRow {
             connect_activated => ConnectionRowMsg::Open,
 
             add_prefix = &gtk::Box {
+                set_valign: gtk::Align::Center,
+                set_hexpand: false,
+                set_width_request: 10,
+                set_visible: color_css_class(&self.organization).is_some(),
+                set_css_classes: &color_classes(&self.organization),
+                set_tooltip_text: self.organization.color.as_deref(),
+            },
+
+            add_prefix = &gtk::Box {
                 add_css_class: "tp-env-swatch",
                 add_css_class: environment_css_class(self.saved.environment),
                 set_valign: gtk::Align::Fill,
@@ -191,6 +200,21 @@ impl FactoryComponent for ConnectionRow {
     }
 }
 
+/// The palette class for a row's colour tag, or `None` when it has no
+/// colour or one outside the palette.
+fn color_css_class(organization: &ConnectionOrganization) -> Option<&'static str> {
+    organization
+        .color
+        .as_deref()
+        .and_then(tablepro_storage::connection_color_css_class)
+}
+
+fn color_classes(organization: &ConnectionOrganization) -> Vec<&'static str> {
+    let mut classes = vec!["tp-color-swatch"];
+    classes.extend(color_css_class(organization));
+    classes
+}
+
 pub(crate) fn environment_css_class(environment: Environment) -> &'static str {
     match environment {
         Environment::Local => "tp-env-local",
@@ -290,6 +314,28 @@ mod tests {
             subtitle_for(&saved("sa", AuthMode::Password), &plain()),
             endpoint_for(&saved("sa", AuthMode::Password))
         );
+    }
+
+    #[test]
+    fn a_palette_colour_adds_its_class_to_the_swatch() {
+        let organization = ConnectionOrganization::default().with_color(Some("teal"));
+        assert_eq!(color_css_class(&organization), Some("tp-color-teal"));
+        assert_eq!(color_classes(&organization), vec!["tp-color-swatch", "tp-color-teal"]);
+    }
+
+    #[test]
+    fn an_uncoloured_row_carries_only_the_swatch_class() {
+        let organization = ConnectionOrganization::default();
+        assert_eq!(color_css_class(&organization), None);
+        assert_eq!(color_classes(&organization), vec!["tp-color-swatch"]);
+    }
+
+    #[test]
+    fn a_colour_outside_the_palette_never_reaches_a_css_class() {
+        let mut organization = ConnectionOrganization::default();
+        organization.color = Some("red; background: url(x)".into());
+        assert_eq!(color_css_class(&organization), None);
+        assert_eq!(color_classes(&organization), vec!["tp-color-swatch"]);
     }
 
     #[test]

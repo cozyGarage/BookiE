@@ -53,3 +53,18 @@
             .tp-env-dev { background-color: @accent_color; }
             .tp-env-staging { background-color: @warning_color; }
             .tp-env-prod { background-color: @error_color; }
+            .tp-color-swatch {
+                min-width: 10px;
+                min-height: 10px;
+                border-radius: 5px;
+                margin-top: 12px;
+                margin-bottom: 12px;
+            }
+            .tp-color-blue { background-color: #3584e4; }
+            .tp-color-teal { background-color: #2190a4; }
+            .tp-color-green { background-color: #3a944a; }
+            .tp-color-yellow { background-color: #c88800; }
+            .tp-color-orange { background-color: #ed5b00; }
+            .tp-color-red { background-color: #e62d42; }
+            .tp-color-purple { background-color: #9141ac; }
+            .tp-color-brown { background-color: #986a44; }
