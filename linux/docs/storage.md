@@ -86,3 +86,94 @@ When changing storage behavior:
 ## Query favorites
 
 `$XDG_CONFIG_HOME/tablepro/favorites.json` holds saved queries as `{version, favorites[]}`, written through a temporary file and a rename. Each entry keeps an id, name, statement, optional driver and connection ids, a creation time, and a last-used time. Saving a name that already exists replaces that entry's statement and keeps its id. The file is capped at 500 entries, and a name or statement that is only whitespace is rejected.
+
+## Connection bundles
+
+A connection bundle is a single JSON document a user exports and another
+machine imports. It is not a storage location: nothing reads or writes it
+automatically.
+
+```json
+{"format": "tablepro.connection-bundle", "version": 1, "producer": "...", "exported_at": "...", "payload": {...}}
+```
+
+`payload.kind` is `plaintext` or `encrypted`, matched by hand rather than
+through an internally tagged enum, because `#[serde(deny_unknown_fields)]`
+does not reach through `#[serde(tag = ...)]`.
+
+### What a bundle carries
+
+Exported: `id`, `name`, `driver_id`, `host`, `port`, `socket_dir`,
+`database`, `username`, `tls_mode`, `tls_root_cert`, `read_only`,
+`auth_mode`, `environment`, `ssh`, plus the group, tags and colour from
+the organisation sidecar.
+
+Withheld: `use_tls` (the legacy boolean `tls_mode` replaced, so no bundle
+can claim `use_tls: true, tls_mode: disabled`), `last_opened_at` (local
+telemetry), unknown keys carried from a newer version, the contents of
+`tls_root_cert` and any SSH private key (paths only), and policy
+`connection_overrides`.
+
+`BUNDLE_INCLUDED_FIELDS` and `BUNDLE_EXCLUDED_FIELDS` must together equal
+`KNOWN_CONNECTION_FIELDS`. A unit test asserts this, so a new field on
+`SavedConnection` fails the build until someone classifies it.
+
+### Credentials
+
+A plaintext bundle carries no credentials at all. Only the encryption
+path populates `secrets`, and the parser rejects a plaintext payload that
+arrives with a non-empty `secrets` list.
+
+An encrypted bundle carries the database password, SSH password and SSH
+key passphrase. It never carries an MCP token in either shape: a token is
+an authorization grant tied to allowlists on the exporting machine, a
+different trust class from a database credential.
+
+### Encryption
+
+Argon2id derives the key (`memory_kib = 131072`, `iterations = 3`,
+`parallelism = 1`, 16-byte salt, 32-byte output), because a bundle is
+offline-attackable and the KDF has to be memory-hard. On import the header
+parameters are range-checked before any derivation runs: memory
+19456..=1048576 KiB, iterations 1..=16, parallelism 1..=4, salt exactly 16
+bytes. An unchecked header is a memory bomb.
+
+AES-256-GCM seals the body with a 12-byte random nonce. The header is
+bound to the ciphertext through the AAD, so an attacker cannot hand back a
+bundle whose `memory_kib` has been downgraded. The AAD has a fixed byte
+layout built by a dedicated function rather than re-serialized JSON,
+because this workspace's `serde_json` runs with `preserve_order` and a
+rewritten document is not byte-stable.
+
+A wrong passphrase and a tampered file produce one indistinguishable
+error.
+
+### Importing
+
+`plan_import` is pure and decides one disposition per entry:
+
+| Situation | Disposition |
+|---|---|
+| The id is not in use locally | `New` — keep the id, so a restored backup lines up with a restored keyring, organisation file, favourites and history |
+| The id is in use at the same endpoint | `UpdateInPlace` |
+| The id is in use at a different endpoint | `Remapped` — a fresh `Uuid`; the audit journal, history rows and policy overrides already bind that id to another server |
+| Two bundle entries share an id | The whole bundle is rejected |
+| A local connection the bundle omits | Untouched; import is additive and has no delete path |
+
+An endpoint is `(driver_id, lowercased host, port, socket_dir, database,
+username, SSH hop chain)`. Name, TLS mode, read-only, environment and auth
+mode are settings, not identity.
+
+On an in-place update safety never downgrades: `read_only` is the OR of
+both, `environment` the higher of Local < Dev < Staging < Prod, `tls_mode`
+the stricter of Disabled < Prefer < Require < VerifyCa < VerifyFull, and
+`last_opened_at` keeps the local value. A bundle can tighten a local
+connection and never loosen it.
+
+`apply_import` takes the connection-file lock once and rewrites the file
+in a single pass, so a plan lands whole rather than as N upserts racing
+another process.
+
+Exporting a bundle is not recorded in the audit journal. The journal is
+hash-chained and its event schema is SQL-shaped, so carrying a non-SQL
+event through it needs its own change.

@@ -8,6 +8,7 @@
 - A saved connection can be duplicated; the copy starts without saved credentials.
 - A saved connection can carry a colour tag from a fixed palette, shown beside it in the connection list.
 - The connection list is split into a section per group, with ungrouped connections in their own section.
+- Saved connections can be exported to and imported from a connection bundle file. A bundle without a passphrase carries no credentials, a passphrase-protected bundle encrypts them, and an import shows every connection and what will happen to it before anything is written.
 
 ### Changed
 
