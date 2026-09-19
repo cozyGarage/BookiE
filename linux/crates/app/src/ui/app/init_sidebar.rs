@@ -49,6 +49,7 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             SidebarRowOutput::ShowCreateTable { schema, name } => {
                 AppMsg::ShowCreateTableForExisting { schema, table: name }
             }
+            SidebarRowOutput::ImportCsv { schema, name } => AppMsg::ImportCsvIntoTable { schema, table: name },
             SidebarRowOutput::DropTable { schema, name } => AppMsg::DropTablePrompt { schema, table: name },
         });
 
@@ -234,6 +235,23 @@ pub(super) fn build_sidebar(widgets: &AppWidgets, sender: &ComponentSender<App>)
             });
         });
         header_box.append(&new_table_button);
+        let from_csv_button = gtk::Button::builder()
+            .icon_name("document-open-symbolic")
+            .tooltip_text(match current.as_deref() {
+                Some(s) => crate::tr!("Table from CSV in {schema}…").replace("{schema}", s),
+                None => crate::tr!("Table from CSV…"),
+            })
+            .valign(gtk::Align::Center)
+            .build();
+        from_csv_button.add_css_class("flat");
+        let sender_for_csv = sender_for_header.clone();
+        let schema_for_csv = current.clone();
+        from_csv_button.connect_clicked(move |_| {
+            sender_for_csv.input(AppMsg::CreateTableFromCsv {
+                schema: schema_for_csv.clone(),
+            });
+        });
+        header_box.append(&from_csv_button);
         row.set_header(Some(&header_box));
     });
     SidebarParts {

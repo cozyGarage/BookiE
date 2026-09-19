@@ -4,6 +4,7 @@ mod driver;
 mod error;
 pub mod export;
 pub mod filter;
+pub mod import;
 mod operation;
 mod pagination;
 mod params;

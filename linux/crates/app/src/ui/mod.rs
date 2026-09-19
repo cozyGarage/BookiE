@@ -11,6 +11,7 @@ mod export_dialog;
 mod filter_strip;
 mod grid;
 mod history_dialog;
+mod import_dialog;
 mod mcp_preferences;
 mod parameters_dialog;
 mod preferences;
