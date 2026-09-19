@@ -1,16 +1,19 @@
 use crate::sql_dialect::quote_ident;
 
 use super::types::{
-    BuildDdlError, DraftColumn, mssql_drop_default_constraint, qualified_table, render_column_definition, sql_literal,
-    validate_column_name, validate_safe_type, validate_table, validated_default,
+    BuildDdlError, DraftColumn, column_comment_statement, comment_changed, mssql_drop_default_constraint,
+    qualified_table, render_column_definition, sql_literal, validate_column_name, validate_safe_type, validate_table,
+    validated_default,
 };
 
+/// Add a column. Returns more than one statement on a dialect that
+/// keeps a column comment outside the column definition.
 pub fn build_add_column(
     driver_id: &str,
     schema: Option<&str>,
     table: &str,
     column: &DraftColumn,
-) -> Result<String, BuildDdlError> {
+) -> Result<Vec<String>, BuildDdlError> {
     validate_table(table)?;
     let column_def = render_column_definition(driver_id, column, false)?;
     if driver_id == "sqlite" && !column.nullable && column.default_value.as_deref().unwrap_or("").is_empty() {
@@ -21,12 +24,18 @@ pub fn build_add_column(
         return Err(BuildDdlError::SqliteNotSupported("ADD COLUMN NOT NULL without DEFAULT"));
     }
     let keyword = if driver_id == "mssql" { "ADD" } else { "ADD COLUMN" };
-    Ok(format!(
+    let mut stmts = vec![format!(
         "ALTER TABLE {} {} {}",
         qualified_table(driver_id, schema, table),
         keyword,
         column_def
-    ))
+    )];
+    if column.comment.is_some()
+        && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
+    {
+        stmts.push(comment_stmt);
+    }
+    Ok(stmts)
 }
 
 pub fn build_drop_column(
@@ -179,6 +188,11 @@ fn alter_column_postgres(
             None => format!("ALTER TABLE {} ALTER COLUMN {} DROP DEFAULT", qualified, name),
         });
     }
+    if comment_changed(column)
+        && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
+    {
+        stmts.push(comment_stmt);
+    }
     if stmts.is_empty() {
         return Err(BuildDdlError::NoChange);
     }
@@ -219,6 +233,11 @@ fn alter_column_mssql(
                 qualified, default, name
             ));
         }
+    }
+    if comment_changed(column)
+        && let Some(comment_stmt) = column_comment_statement(driver_id, schema, table, column)?
+    {
+        stmts.push(comment_stmt);
     }
     if stmts.is_empty() {
         return Err(BuildDdlError::NoChange);

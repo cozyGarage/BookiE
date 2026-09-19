@@ -4,7 +4,7 @@
 
 ### Added
 
-- The structure editor reads each column's comment on PostgreSQL, MySQL, SQL Server and ClickHouse.
+- The structure editor reads each column's comment on PostgreSQL, MySQL, SQL Server and ClickHouse, and writes it when creating a table, adding a column or editing one. SQLite refuses a comment with a clear message instead of dropping it silently.
 
 ### Changed
 

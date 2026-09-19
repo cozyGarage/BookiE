@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::query::{ColumnInfo, ForeignKeyInfo, IndexInfo};
 use crate::sql_dialect::quote_ident;
+use crate::sql_literal::quote_literal;
 
 #[derive(Debug, Error)]
 pub enum BuildDdlError {
@@ -57,6 +58,11 @@ pub enum BuildDdlError {
 const MAX_TYPE_LEN: usize = 200;
 const MAX_DEFAULT_LEN: usize = 500;
 
+/// MySQL caps a column `COMMENT` at 1024 characters and rejects a
+/// longer one outright, so the shortest engine limit is the limit for
+/// every dialect.
+const MAX_COMMENT_LEN: usize = 1024;
+
 /// Characters that some SQL drivers (notably MySQL with certain
 /// client encodings) treat as effective statement terminators or
 /// line breaks. ASCII LF/CR are the obvious cases; Unicode
@@ -106,6 +112,43 @@ pub(crate) fn validate_safe_default(s: &str) -> Result<(), BuildDdlError> {
         return Err(BuildDdlError::UnsafeDefault(s.into()));
     }
     Ok(())
+}
+
+/// A comment is a fully quoted string literal, so `;`, `--` and `/*`
+/// carry no syntactic weight inside it and prose legitimately contains
+/// them. Only the characters that could terminate the literal's line
+/// or the statement itself are rejected.
+pub(crate) fn validate_safe_comment(comment: &str) -> Result<(), BuildDdlError> {
+    if comment.chars().count() > MAX_COMMENT_LEN {
+        return Err(BuildDdlError::UnsafeComment(comment.into()));
+    }
+    if contains_forbidden_control(comment) {
+        return Err(BuildDdlError::UnsafeComment(comment.into()));
+    }
+    Ok(())
+}
+
+/// Normalise and validate a drafted comment. An empty comment is no
+/// comment: a driver that returned one would make the diff fire on
+/// every load.
+pub(crate) fn validated_comment(comment: Option<&str>) -> Result<Option<&str>, BuildDdlError> {
+    let Some(comment) = comment.filter(|c| !c.is_empty()) else {
+        return Ok(None);
+    };
+    validate_safe_comment(comment)?;
+    Ok(Some(comment))
+}
+
+/// True when the drafted comment differs from the loaded one, with an
+/// empty string and a missing comment treated as the same state.
+pub(crate) fn comment_changed(column: &DraftColumn) -> bool {
+    let original = column
+        .original
+        .as_ref()
+        .and_then(|o| o.comment.as_deref())
+        .filter(|c| !c.is_empty());
+    let drafted = column.comment.as_deref().filter(|c| !c.is_empty());
+    original != drafted
 }
 
 /// Where a dialect accepts a column comment.
@@ -339,6 +382,86 @@ EXEC('ALTER TABLE {table_literal} DROP CONSTRAINT [' + @default_constraint + ']'
     )
 }
 
+/// Statement that writes or clears a column comment on a dialect that
+/// keeps it outside the column definition.
+pub(crate) fn column_comment_statement(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    column: &DraftColumn,
+) -> Result<Option<String>, BuildDdlError> {
+    if column_comment_placement(driver_id) != CommentPlacement::Separate {
+        return Ok(None);
+    }
+    let comment = validated_comment(column.comment.as_deref())?;
+    if driver_id == "mssql" {
+        return Ok(Some(mssql_set_column_comment(
+            driver_id,
+            schema,
+            table,
+            &column.name,
+            comment,
+        )));
+    }
+    let target = format!(
+        "{}.{}",
+        qualified_table(driver_id, schema, table),
+        quote_ident(driver_id, &column.name)
+    );
+    // Postgres deletes the pg_description row for `IS NULL`; `IS ''`
+    // would store an empty comment instead of removing it.
+    let value = match comment {
+        Some(comment) => quote_literal(driver_id, comment),
+        None => "NULL".to_string(),
+    };
+    Ok(Some(format!("COMMENT ON COLUMN {target} IS {value}")))
+}
+
+/// Write, update or drop the `MS_Description` extended property that
+/// SQL Server uses for a column comment. `sp_addextendedproperty`
+/// fails when the property exists and `sp_updateextendedproperty`
+/// fails when it does not, so the branch is resolved in the batch.
+/// `@level0name` must be a bare schema name, hence the `sysname`
+/// variable with a `SCHEMA_NAME()` fallback, and `@value` is passed as
+/// `N'...'` so a non-ASCII comment survives a non-Unicode collation.
+pub(crate) fn mssql_set_column_comment(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    column: &str,
+    comment: Option<&str>,
+) -> String {
+    let qualified = qualified_table(driver_id, schema, table);
+    let object_literal = sql_literal(&qualified);
+    let table_literal = sql_literal(table.trim());
+    let column_literal = sql_literal(column.trim());
+    let schema_literal = match schema.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(schema) => format!("'{}'", sql_literal(schema)),
+        None => "NULL".to_string(),
+    };
+    let levels = format!(
+        "@level0type = N'SCHEMA', @level0name = @schema, \
+@level1type = N'TABLE', @level1name = '{table_literal}', \
+@level2type = N'COLUMN', @level2name = '{column_literal}'"
+    );
+    let exists = format!(
+        "EXISTS (SELECT 1 FROM sys.extended_properties \
+WHERE class = 1 AND major_id = OBJECT_ID('{object_literal}') \
+AND minor_id = COLUMNPROPERTY(OBJECT_ID('{object_literal}'), '{column_literal}', 'ColumnId') \
+AND name = 'MS_Description')"
+    );
+    let declare = format!("DECLARE @schema sysname = COALESCE({schema_literal}, SCHEMA_NAME()); ");
+    let Some(comment) = comment else {
+        return format!("{declare}IF {exists} EXEC sp_dropextendedproperty @name = N'MS_Description', {levels}");
+    };
+    let value = quote_literal(driver_id, comment);
+    format!(
+        "{declare}IF {exists} \
+EXEC sp_updateextendedproperty @name = N'MS_Description', @value = N{value}, {levels} \
+ELSE EXEC sp_addextendedproperty @name = N'MS_Description', @value = N{value}, {levels}"
+    )
+}
+
 pub(crate) fn validate_table(table: &str) -> Result<(), BuildDdlError> {
     match crate::sql_dialect::validate_ident(table) {
         Ok(()) => Ok(()),
@@ -381,6 +504,7 @@ pub(crate) fn render_column_definition(
 ) -> Result<String, BuildDdlError> {
     validate_column_name(&column.name)?;
     validate_column_type(&column.data_type)?;
+    let comment_clause = inline_comment_clause(driver_id, column)?;
     let mut parts = vec![quote_ident(driver_id, &column.name), column.data_type.clone()];
 
     // SQLite: INTEGER PRIMARY KEY (with optional AUTOINCREMENT) is
@@ -452,5 +576,43 @@ pub(crate) fn render_column_definition(
         parts.push("PRIMARY KEY".into());
     }
 
+    // MySQL's grammar puts COMMENT last in a column definition.
+    if let Some(clause) = comment_clause {
+        parts.push(clause);
+    }
+
     Ok(parts.join(" "))
+}
+
+/// Comment clause for a dialect that carries the comment inside the
+/// column definition, and the rejection for a dialect that has no
+/// column comment at all.
+///
+/// MySQL has no syntax for removing a comment, so a cleared one is
+/// restated as the empty string. A column that never had one emits
+/// nothing, which keeps `CREATE TABLE` free of a stray `COMMENT ''`.
+fn inline_comment_clause(driver_id: &str, column: &DraftColumn) -> Result<Option<String>, BuildDdlError> {
+    let comment = validated_comment(column.comment.as_deref())?;
+    let placement = column_comment_placement(driver_id);
+    if placement == CommentPlacement::Unsupported {
+        if comment.is_some() {
+            return Err(BuildDdlError::CommentsNotSupported(driver_id.into()));
+        }
+        return Ok(None);
+    }
+    if placement != CommentPlacement::Inline {
+        return Ok(None);
+    }
+    if let Some(comment) = comment {
+        return Ok(Some(format!("COMMENT {}", quote_literal(driver_id, comment))));
+    }
+    let had_comment = column
+        .original
+        .as_ref()
+        .and_then(|original| original.comment.as_deref())
+        .is_some_and(|comment| !comment.is_empty());
+    if had_comment {
+        return Ok(Some(format!("COMMENT {}", quote_literal(driver_id, ""))));
+    }
+    Ok(None)
 }

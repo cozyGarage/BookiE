@@ -377,3 +377,116 @@ async fn structure_batches_do_not_commit_or_rollback_an_editor_transaction() {
         .await
         .unwrap();
 }
+
+fn commented(name: &str, data_type: &str, comment: &str) -> DraftColumn {
+    DraftColumn {
+        comment: Some(comment.into()),
+        ..draft(name, data_type, true, false)
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires the postgres release fixture"]
+async fn column_comments_are_created_added_edited_and_cleared() {
+    let fixture = Fixture::from_env();
+    let connection = fixture.connect_verified().await;
+    reset(connection.as_ref()).await;
+
+    apply(
+        connection.as_ref(),
+        &[StructureOp::CreateTable {
+            schema: None,
+            table: PARENT.into(),
+            columns: vec![
+                draft("id", "integer", false, true),
+                commented("label", "text", "what the row is called"),
+                commented("scratch", "text", "temporary"),
+            ],
+            indexes: vec![],
+            fks: vec![],
+        }],
+    )
+    .await;
+
+    let created = connection.fetch_columns(None, PARENT).await.expect("fetch columns");
+    assert_eq!(
+        column(&created, "label").comment.as_deref(),
+        Some("what the row is called"),
+        "a created column keeps its comment"
+    );
+    assert_eq!(column(&created, "id").comment, None);
+
+    let mut drafts: Vec<DraftColumn> = created.iter().cloned().map(DraftColumn::from_info).collect();
+    for column in &mut drafts {
+        if column.name == "label" {
+            column.comment = Some("renamed and re-commented".into());
+        }
+        if column.name == "scratch" {
+            column.comment = None;
+        }
+    }
+    drafts.push(commented("amount", "integer", "how much"));
+
+    let ops = diff_to_ops(None, PARENT, PARENT, &created, &drafts, &[], &[], &[], &[]);
+    apply(connection.as_ref(), &ops).await;
+
+    let updated = connection.fetch_columns(None, PARENT).await.expect("fetch columns");
+    assert_eq!(
+        column(&updated, "label").comment.as_deref(),
+        Some("renamed and re-commented"),
+        "an edited comment is applied"
+    );
+    assert_eq!(
+        column(&updated, "scratch").comment,
+        None,
+        "a cleared comment is removed, not stored as an empty string"
+    );
+    assert_eq!(
+        column(&updated, "amount").comment.as_deref(),
+        Some("how much"),
+        "an added column keeps its comment"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the postgres release fixture"]
+async fn a_renamed_column_keeps_a_comment_edited_in_the_same_save() {
+    let fixture = Fixture::from_env();
+    let connection = fixture.connect_verified().await;
+    reset(connection.as_ref()).await;
+
+    apply(
+        connection.as_ref(),
+        &[StructureOp::CreateTable {
+            schema: None,
+            table: PARENT.into(),
+            columns: vec![
+                draft("id", "integer", false, true),
+                commented("label", "text", "the old note"),
+            ],
+            indexes: vec![],
+            fks: vec![],
+        }],
+    )
+    .await;
+
+    let original = connection.fetch_columns(None, PARENT).await.expect("fetch columns");
+    let mut drafts: Vec<DraftColumn> = original.iter().cloned().map(DraftColumn::from_info).collect();
+    for column in &mut drafts {
+        if column.name == "label" {
+            column.name = "title".into();
+            column.comment = Some("the new note".into());
+        }
+    }
+
+    let ops = diff_to_ops(None, PARENT, PARENT, &original, &drafts, &[], &[], &[], &[]);
+    apply(connection.as_ref(), &ops).await;
+
+    let updated = connection.fetch_columns(None, PARENT).await.expect("fetch columns");
+    assert!(updated.iter().all(|c| c.name != "label"));
+    assert_eq!(
+        column(&updated, "title").comment.as_deref(),
+        Some("the new note"),
+        "the comment statement must address the post-rename name"
+    );
+}
