@@ -209,6 +209,7 @@ pub enum ColumnField {
     PrimaryKey(bool),
     AutoIncrement(bool),
     Default(Option<String>),
+    Comment(Option<String>),
 }
 
 #[derive(Debug)]
@@ -908,6 +909,7 @@ impl SimpleComponent for StructureTab {
                     }
                     ColumnField::AutoIncrement(b) => col.auto_increment = b,
                     ColumnField::Default(s) => col.default_value = s,
+                    ColumnField::Comment(s) => col.comment = s,
                 }
                 let new_col = col.clone();
                 drop(cols);
