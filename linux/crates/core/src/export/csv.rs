@@ -2,6 +2,7 @@ use std::io::{self, Write};
 
 use serde::{Deserialize, Serialize};
 
+use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
 
@@ -233,6 +234,42 @@ fn escape_tsv_field(value: &str) -> String {
         quote_field(value)
     } else {
         value.to_string()
+    }
+}
+
+pub(crate) struct CsvWriter {
+    header: CsvOptions,
+    rows: CsvOptions,
+}
+
+impl CsvWriter {
+    pub(crate) fn new(options: &CsvOptions) -> Self {
+        Self {
+            header: options.clone(),
+            rows: CsvOptions {
+                header_row: false,
+                ..options.clone()
+            },
+        }
+    }
+}
+
+impl ResultWriter for CsvWriter {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+        if !self.header.header_row {
+            return Ok(());
+        }
+        output.write_all(csv_header_line(columns, &self.header).as_bytes())?;
+        output.write_all(self.header.line_break.as_str().as_bytes())
+    }
+
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
+        output.write_all(csv_row_line(row, &self.rows).as_bytes())?;
+        output.write_all(self.rows.line_break.as_str().as_bytes())
+    }
+
+    fn finish(&mut self, _output: &mut dyn Write) -> io::Result<()> {
+        Ok(())
     }
 }
 

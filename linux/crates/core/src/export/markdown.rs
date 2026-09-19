@@ -1,3 +1,6 @@
+use std::io::{self, Write};
+
+use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
 
@@ -46,6 +49,32 @@ fn markdown_value_cell(value: &Value) -> String {
         None => "NULL".to_string(),
     };
     markdown_cell(&text)
+}
+
+pub(crate) struct MarkdownWriter {
+    columns: usize,
+}
+
+impl MarkdownWriter {
+    pub(crate) fn new() -> Self {
+        Self { columns: 0 }
+    }
+}
+
+impl ResultWriter for MarkdownWriter {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+        self.columns = columns.len();
+        writeln!(output, "{}", markdown_header_line(columns))?;
+        writeln!(output, "{}", markdown_separator_line(self.columns))
+    }
+
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
+        writeln!(output, "{}", markdown_row_line(row))
+    }
+
+    fn finish(&mut self, _output: &mut dyn Write) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

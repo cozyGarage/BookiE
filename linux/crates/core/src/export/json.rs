@@ -1,5 +1,7 @@
 use std::collections::HashSet;
+use std::io::{self, Write};
 
+use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
 
@@ -68,6 +70,35 @@ fn value_to_json(value: &Value) -> serde_json::Value {
         },
         Value::Json(value) => value.clone(),
         _ => value_to_text(value).map_or(serde_json::Value::Null, serde_json::Value::String),
+    }
+}
+
+pub(crate) struct JsonWriter {
+    names: Vec<String>,
+}
+
+impl JsonWriter {
+    pub(crate) fn new() -> Self {
+        Self { names: Vec::new() }
+    }
+}
+
+impl ResultWriter for JsonWriter {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+        self.names = json_field_names(columns);
+        output.write_all(b"[\n")
+    }
+
+    fn write_row(&mut self, output: &mut dyn Write, index: usize, row: &[Value]) -> io::Result<()> {
+        if index != 0 {
+            output.write_all(b",\n")?;
+        }
+        serde_json::to_writer(&mut *output, &row_to_json_object(&self.names, row))?;
+        Ok(())
+    }
+
+    fn finish(&mut self, output: &mut dyn Write) -> io::Result<()> {
+        output.write_all(b"\n]\n")
     }
 }
 

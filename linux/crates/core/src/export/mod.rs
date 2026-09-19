@@ -10,9 +10,11 @@ use crate::query::Value;
 
 mod csv;
 mod file;
+mod html;
 mod in_clause;
 mod json;
 mod markdown;
+mod xml;
 
 pub use csv::{
     CsvDecimal, CsvDelimiter, CsvLineBreak, CsvOptions, CsvQuote, render_csv, render_tsv, write_csv_header,
