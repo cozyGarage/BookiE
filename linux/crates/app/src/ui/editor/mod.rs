@@ -959,6 +959,7 @@ impl SqlEditor {
             duration_ms: Some(duration_ms),
             rows_affected,
             outcome,
+            source: tablepro_storage::query_history::Source::Editor,
         };
         relm4::spawn(async move {
             if let Err(e) = history.record(entry).await {

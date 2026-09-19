@@ -672,6 +672,7 @@ impl HistoryDialog {
             success_only,
             exclude_cancelled,
             min_executed_at,
+            source: None,
             limit: 200,
         }
     }

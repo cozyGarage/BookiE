@@ -15,6 +15,32 @@ pub struct HistoryStore {
     path: PathBuf,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Source {
+    #[default]
+    Editor,
+    Structure,
+    Browse,
+}
+
+impl Source {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Source::Editor => "editor",
+            Source::Structure => "structure",
+            Source::Browse => "browse",
+        }
+    }
+
+    pub fn from_stored(raw: &str) -> Source {
+        match raw {
+            "structure" => Source::Structure,
+            "browse" => Source::Browse,
+            _ => Source::Editor,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Outcome {
     Success,
@@ -32,6 +58,7 @@ pub struct NewEntry {
     pub duration_ms: Option<i64>,
     pub rows_affected: Option<i64>,
     pub outcome: Outcome,
+    pub source: Source,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +75,7 @@ pub struct Entry {
     pub cancelled: bool,
     pub pinned: bool,
     pub error: Option<String>,
+    pub source: Source,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -57,6 +85,7 @@ pub struct SearchFilter {
     pub success_only: Option<bool>,
     pub exclude_cancelled: Option<bool>,
     pub min_executed_at: Option<SystemTime>,
+    pub source: Option<Source>,
     pub limit: usize,
 }
 
@@ -185,9 +214,17 @@ const BASE_SCHEMA: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS history_connection_idx ON history (connection_id, executed_at DESC)",
 ];
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    statements: BASE_SCHEMA,
-}];
+/// SQLite fills existing rows from the constant DEFAULT and rewrites only the
+/// table header, so the external-content FTS5 index over `history` keeps its
+/// rowid mapping and needs no rebuild.
+const ADD_SOURCE: &[&str] = &["ALTER TABLE history ADD COLUMN source TEXT NOT NULL DEFAULT 'editor'"];
+
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        statements: BASE_SCHEMA,
+    },
+    Migration { statements: ADD_SOURCE },
+];
 
 async fn user_version(pool: &SqlitePool) -> Result<i64, StorageError> {
     let row = sqlx::query("PRAGMA user_version").fetch_one(pool).await?;
@@ -253,9 +290,9 @@ impl HistoryStore {
         INSERT INTO history (
             query, driver_id, connection_id, connection_name,
             executed_at, duration_ms, rows_affected,
-            success, cancelled, error
+            success, cancelled, error, source
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
         )
         .bind(&entry.query)
@@ -268,6 +305,7 @@ impl HistoryStore {
         .bind(success)
         .bind(cancelled)
         .bind(error_text)
+        .bind(entry.source.as_str())
         .execute(pool)
         .await?
         .last_insert_rowid();
@@ -283,7 +321,7 @@ impl HistoryStore {
 
         let mut sql = String::from(
             "SELECT h.id, h.query, h.driver_id, h.connection_id, h.connection_name, \
-         h.executed_at, h.duration_ms, h.rows_affected, h.success, h.cancelled, h.pinned, h.error \
+         h.executed_at, h.duration_ms, h.rows_affected, h.success, h.cancelled, h.pinned, h.error, h.source \
          FROM history h ",
         );
         let mut wheres: Vec<&str> = Vec::new();
@@ -313,6 +351,9 @@ impl HistoryStore {
         if filter.min_executed_at.is_some() {
             wheres.push("h.executed_at >= ?");
         }
+        if filter.source.is_some() {
+            wheres.push("h.source = ?");
+        }
         if !wheres.is_empty() {
             sql.push_str("WHERE ");
             sql.push_str(&wheres.join(" AND "));
@@ -330,6 +371,9 @@ impl HistoryStore {
         if let Some(min_ts) = filter.min_executed_at {
             q = q.bind(to_unix(min_ts));
         }
+        if let Some(source) = filter.source {
+            q = q.bind(source.as_str());
+        }
         q = q.bind(limit);
 
         let rows = q.fetch_all(pool).await?;
@@ -343,6 +387,7 @@ impl HistoryStore {
         let success_i: i64 = row.try_get("success")?;
         let cancelled_i: i64 = row.try_get("cancelled")?;
         let pinned_i: i64 = row.try_get("pinned")?;
+        let source: String = row.try_get("source")?;
         Ok(Entry {
             id: row.try_get("id")?,
             query: row.try_get("query")?,
@@ -356,6 +401,7 @@ impl HistoryStore {
             cancelled: cancelled_i != 0,
             pinned: pinned_i != 0,
             error: row.try_get::<Option<String>, _>("error")?,
+            source: Source::from_stored(&source),
         })
     }
 
@@ -440,7 +486,7 @@ impl HistoryStore {
         let placeholders = vec!["?"; ids.len()].join(",");
         let sql = format!(
             "SELECT id, query, driver_id, connection_id, connection_name, executed_at, \
-         duration_ms, rows_affected, success, cancelled, pinned, error \
+         duration_ms, rows_affected, success, cancelled, pinned, error, source \
          FROM history WHERE id IN ({placeholders}) ORDER BY pinned DESC, executed_at DESC"
         );
         let mut q = sqlx::query(sqlx::AssertSqlSafe(sql.as_str()));
@@ -599,6 +645,73 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_older_database_gains_the_source_column_and_reads_as_editor() {
+        let pool = legacy_pool().await;
+
+        apply_schema(&pool).await.expect("upgrade");
+
+        let entries = store_over(pool).search(SearchFilter::default()).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].source, Source::Editor);
+    }
+
+    #[tokio::test]
+    async fn full_text_search_still_finds_an_entry_written_before_the_upgrade() {
+        let pool = legacy_pool().await;
+        apply_schema(&pool).await.expect("upgrade");
+
+        let found = store_over(pool)
+            .search(SearchFilter {
+                needle: Some("SELECT".into()),
+                ..SearchFilter::default()
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(found.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_source_filter_keeps_only_the_entries_that_came_from_it() {
+        let store = fresh_store().await;
+        for source in [Source::Editor, Source::Structure, Source::Browse] {
+            store
+                .record(NewEntry {
+                    source,
+                    ..sample_new_entry()
+                })
+                .await
+                .unwrap();
+        }
+
+        let structure = store
+            .search(SearchFilter {
+                source: Some(Source::Structure),
+                ..SearchFilter::default()
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(structure.len(), 1);
+        assert_eq!(structure[0].source, Source::Structure);
+        assert_eq!(store.search(SearchFilter::default()).await.unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    async fn an_unknown_stored_source_reads_as_editor_rather_than_failing() {
+        let store = fresh_store().await;
+        store.record(sample_new_entry()).await.unwrap();
+        sqlx::query("UPDATE history SET source = 'from-the-future'")
+            .execute(&store.pool)
+            .await
+            .unwrap();
+
+        let entries = store.search(SearchFilter::default()).await.unwrap();
+
+        assert_eq!(entries[0].source, Source::Editor);
+    }
+
+    #[tokio::test]
     async fn a_version_from_a_newer_build_is_left_alone() {
         let pool = legacy_pool().await;
         sqlx::query(sqlx::AssertSqlSafe(format!(
@@ -640,6 +753,7 @@ mod tests {
             duration_ms: Some(1),
             rows_affected: Some(0),
             outcome: Outcome::Success,
+            source: Source::Editor,
         };
         let err = store.record(entry).await.unwrap_err();
         assert!(matches!(err, StorageError::TooLarge { .. }));
@@ -659,6 +773,7 @@ mod tests {
                 duration_ms: None,
                 rows_affected: None,
                 outcome: Outcome::Success,
+                source: Source::Editor,
             })
             .await
             .unwrap();
@@ -675,6 +790,20 @@ mod tests {
         assert_eq!(csv_field("line\n"), "\"line\n\"");
     }
 
+    fn sample_new_entry() -> NewEntry {
+        NewEntry {
+            query: "SELECT 1".into(),
+            driver_id: "sqlite".into(),
+            connection_id: Uuid::nil(),
+            connection_name: "test".into(),
+            executed_at: SystemTime::now(),
+            duration_ms: None,
+            rows_affected: None,
+            outcome: Outcome::Success,
+            source: Source::Editor,
+        }
+    }
+
     fn sample_entry() -> Entry {
         Entry {
             id: 1,
@@ -689,6 +818,7 @@ mod tests {
             cancelled: false,
             pinned: false,
             error: None,
+            source: Source::Editor,
         }
     }
 
