@@ -1,7 +1,9 @@
 use std::io;
 use std::path::Path;
 
-use super::{CsvOptions, json_field_names, render_csv, row_to_json_object, write_atomically_checked};
+use super::csv::{CsvOptions, render_csv};
+use super::json::{json_field_names, row_to_json_object};
+use super::write_atomically_checked;
 use crate::QueryResult;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,7 +110,7 @@ mod tests {
         .unwrap();
         let actual: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let expected: serde_json::Value =
-            serde_json::from_str(&super::super::render_json(&data.columns, &data.rows)).unwrap();
+            serde_json::from_str(&crate::export::render_json(&data.columns, &data.rows)).unwrap();
         assert_eq!(actual, expected);
         assert_eq!(actual[0]["id"], "\\x00ff");
         let before = std::fs::read(&path).unwrap();
