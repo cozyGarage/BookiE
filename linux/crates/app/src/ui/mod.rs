@@ -3,6 +3,7 @@ mod app;
 mod browse_tab;
 mod cell_editor;
 mod connect_dialog;
+pub(crate) mod connection_bundle;
 mod connection_row;
 mod editor;
 pub(crate) mod error_text;

@@ -1,4 +1,6 @@
 mod audit_journal;
+mod connection_bundle;
+mod connection_bundle_crypto;
 mod connection_color;
 mod connection_organization;
 mod connection_url;
@@ -11,6 +13,13 @@ pub mod query_history;
 mod secrets;
 
 pub use audit_journal::{AuditJournal, AuditJournalRecovery, LegacyJournalRotation, sample_event};
+pub use connection_bundle::{
+    BUNDLE_EXCLUDED_FIELDS, BUNDLE_FORMAT, BUNDLE_INCLUDED_FIELDS, BUNDLE_VERSION, BundleBody, BundleConnection,
+    BundleError, BundleExport, BundleOrganization, BundleSecrets, EncryptedBundle, ImportDisposition, ImportItem,
+    ImportPlan, MAX_BUNDLE_CONNECTIONS, MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, bundle_organization,
+    collect_bundle_secrets, export_encrypted, export_plaintext, forget_imported_secrets, parse_bundle, plan_import,
+    store_bundle_secrets,
+};
 pub use connection_color::{CONNECTION_COLORS, connection_color, connection_color_css_class};
 pub use connection_organization::{
     ConnectionOrganization, ConnectionOrganizationIndex, MAX_LABEL_LEN, MAX_ORGANIZED_CONNECTIONS,
@@ -18,8 +27,8 @@ pub use connection_organization::{
 };
 pub use connection_url::{ParsedConnectionUrl, parse_connection_url};
 pub use connections::{
-    SavedConnection, SavedSshAuth, SavedSshConfig, delete_connection, duplicate_connection, load_connections,
-    save_connections, touch_last_opened,
+    SavedConnection, SavedSshAuth, SavedSshConfig, apply_import, delete_connection, duplicate_connection,
+    load_connections, restore_connection, save_connections, touch_last_opened,
 };
 pub use error::StorageError;
 pub use favorites::{

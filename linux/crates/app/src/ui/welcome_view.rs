@@ -12,7 +12,11 @@ pub struct WelcomeView {
     connections: Vec<SavedConnection>,
     organization: ConnectionOrganizationIndex,
     filter: String,
-    factory: FactoryVecDeque<ConnectionRow>,
+    /// One factory per rendered group. A `FactoryVecDeque` owns exactly
+    /// one list box, so a per-group section needs its own factory; the
+    /// vector is rebuilt whenever the arrangement changes.
+    sections: Vec<FactoryVecDeque<ConnectionRow>>,
+    sections_box: gtk::Box,
     stack: gtk::Stack,
     search: gtk::SearchEntry,
     empty_filter_page: adw::StatusPage,
@@ -31,6 +35,8 @@ pub enum WelcomeViewInput {
     Organize(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
+    ExportBundle,
+    ImportBundle,
 }
 
 #[derive(Debug)]
@@ -43,6 +49,8 @@ pub enum WelcomeViewOutput {
     Organize(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
+    ExportBundle,
+    ImportBundle,
 }
 
 #[derive(Debug, Default)]
@@ -60,21 +68,6 @@ impl SimpleComponent for WelcomeView {
     }
 
     fn init(_init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        let factory: FactoryVecDeque<ConnectionRow> = FactoryVecDeque::builder()
-            .launch(
-                gtk::ListBox::builder()
-                    .selection_mode(gtk::SelectionMode::None)
-                    .css_classes(["boxed-list"])
-                    .build(),
-            )
-            .forward(sender.input_sender(), |out| match out {
-                ConnectionRowOutput::Open(saved) => WelcomeViewInput::OpenSaved(saved),
-                ConnectionRowOutput::ToggleFavorite(id) => WelcomeViewInput::ToggleFavorite(id),
-                ConnectionRowOutput::Organize(saved) => WelcomeViewInput::Organize(saved),
-                ConnectionRowOutput::Duplicate(id) => WelcomeViewInput::Duplicate(id),
-                ConnectionRowOutput::Delete(id) => WelcomeViewInput::Delete(id),
-            });
-
         // Empty page — no saved connections yet. GNOME convention is
         // state / instruction / action — title states the situation,
         // description tells the user what to do, the button restates
@@ -149,7 +142,30 @@ impl SimpleComponent for WelcomeView {
             .orientation(gtk::Orientation::Horizontal)
             .spacing(6)
             .build();
+        let bundle_btn = gtk::MenuButton::builder()
+            .icon_name("document-send-symbolic")
+            .tooltip_text(crate::tr!("Export or import connections"))
+            .valign(gtk::Align::Center)
+            .build();
+        bundle_btn.add_css_class("flat");
+        let bundle_menu = gtk::gio::Menu::new();
+        bundle_menu.append(Some(&crate::tr!("Export connections…")), Some("welcome.export-bundle"));
+        bundle_menu.append(Some(&crate::tr!("Import connections…")), Some("welcome.import-bundle"));
+        bundle_btn.set_menu_model(Some(&bundle_menu));
+
+        let actions = gtk::gio::SimpleActionGroup::new();
+        let export_action = gtk::gio::SimpleAction::new("export-bundle", None);
+        let s_export = sender.clone();
+        export_action.connect_activate(move |_, _| s_export.input(WelcomeViewInput::ExportBundle));
+        actions.add_action(&export_action);
+        let import_action = gtk::gio::SimpleAction::new("import-bundle", None);
+        let s_bundle_import = sender.clone();
+        import_action.connect_activate(move |_, _| s_bundle_import.input(WelcomeViewInput::ImportBundle));
+        actions.add_action(&import_action);
+        root.insert_action_group("welcome", Some(&actions));
+
         header_actions.append(&import_btn);
+        header_actions.append(&bundle_btn);
         header_actions.append(&header_btn);
         group.set_header_suffix(Some(&header_actions));
 
@@ -167,8 +183,12 @@ impl SimpleComponent for WelcomeView {
             s_search.input(WelcomeViewInput::FilterChanged(entry.text().to_string()));
         });
         outer.append(&search);
-        group.add(factory.widget());
         outer.append(&group);
+        let sections_box = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(12)
+            .build();
+        outer.append(&sections_box);
 
         // Shown in place of the list when every connection is filtered
         // out. Distinct from the "no connections yet" page: the fix is
@@ -191,7 +211,8 @@ impl SimpleComponent for WelcomeView {
             connections: Vec::new(),
             organization: ConnectionOrganizationIndex::default(),
             filter: String::new(),
-            factory,
+            sections: Vec::new(),
+            sections_box,
             stack: root.clone(),
             search,
             empty_filter_page,
@@ -203,15 +224,15 @@ impl SimpleComponent for WelcomeView {
         match msg {
             WelcomeViewInput::SetConnections(connections) => {
                 self.connections = connections;
-                self.rebuild_rows();
+                self.rebuild_rows(&sender);
             }
             WelcomeViewInput::SetOrganization(organization) => {
                 self.organization = organization;
-                self.rebuild_rows();
+                self.rebuild_rows(&sender);
             }
             WelcomeViewInput::FilterChanged(filter) => {
                 self.filter = filter;
-                self.rebuild_rows();
+                self.rebuild_rows(&sender);
             }
             WelcomeViewInput::OpenConnect => {
                 let _ = sender.output(WelcomeViewOutput::OpenConnect);
@@ -231,6 +252,12 @@ impl SimpleComponent for WelcomeView {
             WelcomeViewInput::Duplicate(id) => {
                 let _ = sender.output(WelcomeViewOutput::Duplicate(id));
             }
+            WelcomeViewInput::ExportBundle => {
+                let _ = sender.output(WelcomeViewOutput::ExportBundle);
+            }
+            WelcomeViewInput::ImportBundle => {
+                let _ = sender.output(WelcomeViewOutput::ImportBundle);
+            }
             WelcomeViewInput::Delete(id) => {
                 let _ = sender.output(WelcomeViewOutput::Delete(id));
             }
@@ -244,22 +271,24 @@ impl SimpleComponent for WelcomeView {
 const FILTER_REVEAL_THRESHOLD: usize = 6;
 
 impl WelcomeView {
-    fn rebuild_rows(&mut self) {
+    fn rebuild_rows(&mut self, sender: &ComponentSender<Self>) {
         // Favourites first, then group, then name — the ordering lives
         // in tablepro-storage so the same arrangement is testable
         // without a GTK main context. Recency is a deliberate casualty:
         // an explicit favourite outranks "whatever I opened last".
         let arranged = arrange_connections(&self.connections, &self.organization, &self.filter);
-        let mut guard = self.factory.guard();
-        guard.clear();
-        for saved in &arranged {
-            let organization = self.organization.get(saved.id);
-            guard.push_back(ConnectionRowInit {
-                saved: saved.clone(),
-                organization,
-            });
+        let sections = group_sections(&arranged, &self.organization);
+
+        for factory in self.sections.drain(..) {
+            self.sections_box.remove(factory.widget());
         }
-        drop(guard);
+        while let Some(child) = self.sections_box.first_child() {
+            self.sections_box.remove(&child);
+        }
+        for (group, members) in sections {
+            self.sections
+                .push(self.build_section(group.as_deref(), &members, sender));
+        }
 
         self.search
             .set_visible(self.connections.len() >= FILTER_REVEAL_THRESHOLD);
@@ -271,5 +300,158 @@ impl WelcomeView {
             "populated"
         };
         self.stack.set_visible_child_name(name);
+    }
+
+    fn build_section(
+        &self,
+        group: Option<&str>,
+        members: &[SavedConnection],
+        sender: &ComponentSender<Self>,
+    ) -> FactoryVecDeque<ConnectionRow> {
+        let mut factory: FactoryVecDeque<ConnectionRow> = FactoryVecDeque::builder()
+            .launch(
+                gtk::ListBox::builder()
+                    .selection_mode(gtk::SelectionMode::None)
+                    .css_classes(["boxed-list"])
+                    .build(),
+            )
+            .forward(sender.input_sender(), |out| match out {
+                ConnectionRowOutput::Open(saved) => WelcomeViewInput::OpenSaved(saved),
+                ConnectionRowOutput::ToggleFavorite(id) => WelcomeViewInput::ToggleFavorite(id),
+                ConnectionRowOutput::Organize(saved) => WelcomeViewInput::Organize(saved),
+                ConnectionRowOutput::Duplicate(id) => WelcomeViewInput::Duplicate(id),
+                ConnectionRowOutput::Delete(id) => WelcomeViewInput::Delete(id),
+            });
+        let mut guard = factory.guard();
+        for saved in members {
+            let organization = self.organization.get(saved.id);
+            guard.push_back(ConnectionRowInit {
+                saved: saved.clone(),
+                organization,
+            });
+        }
+        drop(guard);
+
+        let section = adw::PreferencesGroup::builder()
+            .title(group.map_or_else(|| crate::tr!("Ungrouped"), str::to_owned))
+            .build();
+        section.add(factory.widget());
+        self.sections_box.append(&section);
+        factory
+    }
+}
+
+/// Bucket an already-arranged list into the groups the list renders.
+/// Bucket order and the order inside each bucket both follow
+/// `arrange_connections`, so grouping never reorders what the user
+/// already sees; it only draws a heading between runs.
+fn group_sections(
+    arranged: &[SavedConnection],
+    index: &ConnectionOrganizationIndex,
+) -> Vec<(Option<String>, Vec<SavedConnection>)> {
+    let mut sections: Vec<(Option<String>, Vec<SavedConnection>)> = Vec::new();
+    for saved in arranged {
+        let group = index.get(saved.id).group;
+        match sections.iter_mut().find(|(name, _)| *name == group) {
+            Some((_, members)) => members.push(saved.clone()),
+            None => sections.push((group, vec![saved.clone()])),
+        }
+    }
+    sections
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tablepro_core::{AuthMode, Environment, TlsMode};
+    use tablepro_storage::ConnectionOrganization;
+
+    fn saved(name: &str) -> SavedConnection {
+        SavedConnection {
+            id: Uuid::new_v4(),
+            name: name.into(),
+            driver_id: "postgres".into(),
+            host: "localhost".into(),
+            port: 5432,
+            socket_dir: None,
+            database: "app".into(),
+            username: "app".into(),
+            use_tls: false,
+            tls_mode: Some(TlsMode::Disabled),
+            tls_root_cert: None,
+            read_only: false,
+            auth_mode: AuthMode::Password,
+            environment: Environment::Local,
+            ssh: None,
+            last_opened_at: None,
+        }
+    }
+
+    fn index(entries: &[(Uuid, Option<&str>, bool)]) -> ConnectionOrganizationIndex {
+        let mut index = ConnectionOrganizationIndex::default();
+        for (id, group, favorite) in entries {
+            let organization = ConnectionOrganization::new(*group, &[], *favorite).expect("valid organization");
+            index.set(*id, organization).expect("set");
+        }
+        index
+    }
+
+    #[test]
+    fn connections_without_a_group_render_as_one_ungrouped_section() {
+        let first = saved("alpha");
+        let second = saved("beta");
+        let arranged = vec![first.clone(), second.clone()];
+
+        let sections = group_sections(&arranged, &ConnectionOrganizationIndex::default());
+
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].0, None);
+        assert_eq!(sections[0].1.len(), 2);
+    }
+
+    #[test]
+    fn each_group_becomes_its_own_section_in_arranged_order() {
+        let prod = saved("prod db");
+        let staging = saved("staging db");
+        let loose = saved("scratch");
+        let index = index(&[
+            (prod.id, Some("Production"), false),
+            (staging.id, Some("Staging"), false),
+        ]);
+        let arranged = vec![prod.clone(), staging.clone(), loose.clone()];
+
+        let sections = group_sections(&arranged, &index);
+
+        assert_eq!(
+            sections.iter().map(|(name, _)| name.clone()).collect::<Vec<_>>(),
+            vec![Some("Production".to_owned()), Some("Staging".to_owned()), None,]
+        );
+        assert_eq!(sections[2].1[0].id, loose.id);
+    }
+
+    #[test]
+    fn a_group_that_reappears_later_keeps_one_section() {
+        let first = saved("a");
+        let other = saved("b");
+        let third = saved("c");
+        let index = index(&[
+            (first.id, Some("Production"), false),
+            (other.id, Some("Staging"), false),
+            (third.id, Some("Production"), false),
+        ]);
+        let arranged = vec![first.clone(), other, third.clone()];
+
+        let sections = group_sections(&arranged, &index);
+
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0.as_deref(), Some("Production"));
+        assert_eq!(sections[0].1.len(), 2);
+        assert_eq!(sections[0].1[0].id, first.id);
+        assert_eq!(sections[0].1[1].id, third.id);
+    }
+
+    #[test]
+    fn an_empty_arrangement_renders_no_sections() {
+        assert!(group_sections(&[], &ConnectionOrganizationIndex::default()).is_empty());
     }
 }

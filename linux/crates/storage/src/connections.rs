@@ -24,7 +24,7 @@ pub(crate) const MAX_SSH_HOPS: usize = 8;
 /// the newer version depends on. Keys inside the list are always taken
 /// from the freshly serialized record — a cleared `Option` must not be
 /// resurrected from the copy on disk.
-const KNOWN_CONNECTION_FIELDS: &[&str] = &[
+pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "id",
     "name",
     "driver_id",
@@ -148,6 +148,37 @@ pub async fn save_connections(connections: &[SavedConnection]) -> Result<(), Sto
 
 pub async fn delete_connection(id: Uuid) -> Result<(), StorageError> {
     delete_from(&connections_path()?, id).await
+}
+
+/// Apply an import plan as one rewrite. Taking the lock once means the
+/// whole plan lands or none of it does, rather than N upserts racing
+/// another process between them.
+pub async fn apply_import(plan: &crate::connection_bundle::ImportPlan) -> Result<(), StorageError> {
+    apply_import_to(&connections_path()?, plan).await
+}
+
+pub(crate) async fn apply_import_to(
+    path: &Path,
+    plan: &crate::connection_bundle::ImportPlan,
+) -> Result<(), StorageError> {
+    let _guard = lock_path(path).await?;
+    let mut existing = load_from(path).await?;
+    for item in &plan.items {
+        existing.retain(|saved| saved.id != item.connection.id);
+        existing.push(item.connection.clone());
+    }
+    save_to_unlocked(path, &existing).await
+}
+
+/// Undo one item of an import. A record that existed before the import
+/// is restored from its snapshot; one the import created is removed.
+/// There is no path here that removes a record the bundle did not
+/// create, because import is additive.
+pub async fn restore_connection(previous: Option<&SavedConnection>, id: Uuid) -> Result<(), StorageError> {
+    match previous {
+        Some(connection) => save_connections(std::slice::from_ref(connection)).await,
+        None => delete_connection(id).await,
+    }
 }
 
 /// A copy of `id` under a fresh `Uuid` and a distinct name. The new id
@@ -466,6 +497,73 @@ mod tests {
             };
         }
         hop
+    }
+
+    #[tokio::test]
+    async fn an_import_plan_lands_as_one_rewrite() {
+        use crate::connection_bundle::{BundleBody, BundleConnection, plan_import};
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let untouched = sample_connection();
+        let mut existing = sample_connection();
+        existing.name = "Shared".into();
+        save_to(&path, &[untouched.clone(), existing.clone()]).await.unwrap();
+
+        let mut incoming = existing.clone();
+        incoming.name = "Shared reporting".into();
+        let fresh = sample_connection();
+        let body = BundleBody {
+            connections: vec![
+                BundleConnection::from_saved(&incoming),
+                BundleConnection::from_saved(&fresh),
+            ],
+            ..Default::default()
+        };
+        let plan = plan_import(&load_from(&path).await.unwrap(), &body).unwrap();
+
+        apply_import_to(&path, &plan).await.unwrap();
+
+        let stored = load_from(&path).await.unwrap();
+        assert_eq!(stored.len(), 3);
+        assert!(stored.iter().any(|c| c.id == untouched.id && c.name == untouched.name));
+        assert!(
+            stored
+                .iter()
+                .any(|c| c.id == existing.id && c.name == "Shared reporting")
+        );
+        assert!(stored.iter().any(|c| c.id == fresh.id));
+    }
+
+    #[tokio::test]
+    async fn an_import_never_removes_a_connection_the_bundle_omits() {
+        use crate::connection_bundle::{BundleBody, plan_import};
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let kept = sample_connection();
+        save_to(&path, std::slice::from_ref(&kept)).await.unwrap();
+
+        let plan = plan_import(&load_from(&path).await.unwrap(), &BundleBody::default()).unwrap();
+        apply_import_to(&path, &plan).await.unwrap();
+
+        assert_eq!(load_from(&path).await.unwrap(), vec![kept]);
+    }
+
+    #[tokio::test]
+    async fn rolling_back_an_updated_connection_restores_its_previous_record() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let original = sample_connection();
+        save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        let mut changed = original.clone();
+        changed.name = "Overwritten".into();
+        upsert_to(&path, std::slice::from_ref(&changed)).await.unwrap();
+        upsert_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        let stored = load_from(&path).await.unwrap();
+        assert_eq!(stored, vec![original]);
     }
 
     #[tokio::test]

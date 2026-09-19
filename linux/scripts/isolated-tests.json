@@ -1,12 +1,56 @@
 {
   "gtk": [
-    ["tablepro-app", "--lib", "ui::grid::column::tests::bind_does_not_open_binary_bytes_in_a_text_column_for_editing"],
-    ["tablepro-app", "--lib", "ui::grid::column::tests::boolean_affinity_mismatch_cannot_emit_an_edit"],
-    ["tablepro-app", "--lib", "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"]
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column::tests::bind_does_not_open_binary_bytes_in_a_text_column_for_editing"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column::tests::boolean_affinity_mismatch_cannot_emit_an_edit"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"
+    ]
   ],
   "keyring": [
-    ["tablepro-storage", "--lib", "secrets::tests::round_trip_via_secret_service"],
-    ["tablepro-transport", "--lib", "tests::hop_zero_password_auth_still_works"],
-    ["tablepro-agentd", "saved_transport", "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"]
+    [
+      "tablepro-storage",
+      "--lib",
+      "secrets::tests::round_trip_via_secret_service"
+    ],
+    [
+      "tablepro-transport",
+      "--lib",
+      "tests::hop_zero_password_auth_still_works"
+    ],
+    [
+      "tablepro-agentd",
+      "saved_transport",
+      "a_saved_ssh_hop_is_used_instead_of_dialling_the_database_directly"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::an_export_collects_every_credential_kind_for_a_connection"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::an_import_keeps_the_local_password_until_replacement_is_asked_for"
+    ],
+    [
+      "tablepro-storage",
+      "--lib",
+      "connection_bundle::tests::rolling_back_an_import_removes_only_the_credentials_it_wrote"
+    ]
   ]
 }
