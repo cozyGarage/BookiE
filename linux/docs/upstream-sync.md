@@ -53,6 +53,16 @@ below the boundary, inside the 60 the sprint plan already dispositioned, under
 "converge serializers". That row records an intention, not a verification, so
 whether our exporter matches the declared precision is still unconfirmed.
 
+### What we imported
+
+`crates/core/src/import/csv_import.rs` is adapted from upstream `d91c70a92`
+(`linux/crates/core/src/import/csv_import.rs`). Only the parser came across, and it was
+rewritten against our `ColumnInfo` and `Value`: upstream's `CellInput`/`ColumnType` model
+is part of their B3 contract and does not exist here. Nothing of their write path was
+taken. Upstream's importer has no policy layer, so ours builds its statements with
+`sql_dialect::build_insert_from_draft` and commits through a scoped approval on
+`PolicyGuard` instead.
+
 ### What the excluded trees still taught us
 
 `242b76e02 fix(plugin-postgresql): quote every catalog literal so a backslash
