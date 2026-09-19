@@ -19,8 +19,81 @@ ROOT = Path(__file__).resolve().parent.parent
 CRATES = ROOT / "crates"
 BASELINES = ROOT / "function-size-baselines.txt"
 
+RAW_STRING = re.compile(r'(?:b?r)(?P<hashes>#*)"')
+CHAR_LITERAL = re.compile(r"b?'(?:\\\\.|[^\\\\'])'")
+
 SIGNATURE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:default\s+)?(?:const\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+\"[^\"]*\"\s+)?fn\s+(\w+)")
 CFG_TEST = re.compile(r"^\s*#\[cfg\(test\)\]")
+
+
+def strip_literals(text: str) -> str:
+    """Blank out comments and literals so brace counting sees only code.
+
+    Rust allows a brace inside a string, byte string or char literal, and a
+    lexer that counts braces textually measures such a function to the end of
+    the file, hiding every function after it from the check. Newlines are kept
+    so line numbers still line up.
+    """
+    out = []
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if char == "/" and index + 1 < length and text[index + 1] == "/":
+            while index < length and text[index] != "\n":
+                out.append(" ")
+                index += 1
+            continue
+        if char == "/" and index + 1 < length and text[index + 1] == "*":
+            depth = 0
+            while index < length:
+                if text.startswith("/*", index):
+                    depth += 1
+                    out.append("  ")
+                    index += 2
+                    continue
+                if text.startswith("*/", index):
+                    depth -= 1
+                    out.append("  ")
+                    index += 2
+                    if depth == 0:
+                        break
+                    continue
+                out.append("\n" if text[index] == "\n" else " ")
+                index += 1
+            continue
+        if char in "rb" and (match := RAW_STRING.match(text, index)):
+            hashes = match.group("hashes")
+            terminator = '"' + hashes
+            end = text.find(terminator, match.end())
+            end = length if end < 0 else end + len(terminator)
+            out.append(blank(text[index:end]))
+            index = end
+            continue
+        if char == '"' or (char == "b" and text.startswith('b"', index)):
+            start = index
+            index += 2 if char == "b" else 1
+            while index < length:
+                if text[index] == "\\":
+                    index += 2
+                    continue
+                if text[index] == '"':
+                    index += 1
+                    break
+                index += 1
+            out.append(blank(text[start:index]))
+            continue
+        if (match := CHAR_LITERAL.match(text, index)) is not None:
+            out.append(blank(match.group(0)))
+            index = match.end()
+            continue
+        out.append(char)
+        index += 1
+    return "".join(out)
+
+
+def blank(fragment: str) -> str:
+    return "".join("\n" if c == "\n" else " " for c in fragment)
 
 
 def test_module_ranges(lines: list[str]) -> list[tuple[int, int]]:
@@ -45,7 +118,8 @@ def test_module_ranges(lines: list[str]) -> list[tuple[int, int]]:
 
 
 def measure(path: Path) -> list[tuple[str, int, int]]:
-    lines = path.read_text(encoding="utf8", errors="replace").split("\n")
+    source = path.read_text(encoding="utf8", errors="replace")
+    lines = strip_literals(source).split("\n")
     skip = test_module_ranges(lines)
     found = []
     index = 0

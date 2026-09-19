@@ -514,7 +514,7 @@ fn no_error_message_carries_a_secret_a_host_or_a_database_name() {
 
 #[test]
 fn a_bundle_over_the_size_limit_is_refused_before_parsing() {
-    let oversized = vec![0x7bu8; MAX_BUNDLE_BYTES + 1];
+    let oversized = vec![b'{'; MAX_BUNDLE_BYTES + 1];
     assert!(matches!(parse_bundle(&oversized), Err(BundleError::TooLarge { .. })));
 }
 
