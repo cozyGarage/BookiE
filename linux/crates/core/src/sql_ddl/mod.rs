@@ -19,10 +19,14 @@ mod table;
 mod types;
 
 #[cfg(test)]
+mod comment_tests;
+#[cfg(test)]
 mod tests;
 
 pub use column::{build_add_column, build_alter_column, build_drop_column, build_rename_column, build_reorder_column};
 pub use diff::{diff_to_ops, materialize_ops};
 pub use index_fk::{build_add_foreign_key, build_create_index, build_drop_foreign_key, build_drop_index};
 pub use table::{build_create_table, build_drop_table, build_rename_table};
-pub use types::{BuildDdlError, DraftColumn, StructureOp, supported_fk_actions};
+pub use types::{
+    BuildDdlError, CommentPlacement, DraftColumn, StructureOp, column_comment_placement, supported_fk_actions,
+};

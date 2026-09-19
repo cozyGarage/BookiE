@@ -18,6 +18,7 @@ fn dc(name: &str, ty: &str) -> DraftColumn {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     }
 }
 
@@ -375,6 +376,7 @@ fn alter_column_postgres_type_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     let joined = stmts.join("\n");
@@ -401,6 +403,7 @@ fn alter_column_postgres_nullable_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET NOT NULL")));
@@ -425,6 +428,7 @@ fn alter_column_postgres_default_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'pending'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET DEFAULT 'pending'")));
@@ -460,6 +464,7 @@ fn alter_column_postgres_emits_three_statements_when_all_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'fallback'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     // Type, nullable AND default all changed — all three must
@@ -497,6 +502,7 @@ fn alter_column_mssql_type_and_nullable_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -522,6 +528,7 @@ fn alter_column_mssql_default_only_replaces_the_constraint() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'pending'".into()),
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 2);
@@ -551,6 +558,7 @@ fn alter_column_mssql_clearing_a_default_only_drops() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -577,6 +585,7 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("0".into()),
+        comment: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 3);
@@ -604,6 +613,7 @@ fn alter_column_mssql_unchanged_is_no_change() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let err = build_alter_column("mssql", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::NoChange));
@@ -628,6 +638,7 @@ fn alter_column_mssql_drop_default_escapes_literals() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let stmts = build_alter_column("mssql", Some("s'x"), "t'q", &col).unwrap();
     assert!(stmts[0].contains("OBJECT_ID('[s''x].[t''q]')"));
@@ -930,6 +941,7 @@ fn alter_column_postgres_rejects_injection_in_type() {
         primary_key: false,
         auto_increment: false,
         default_value: None,
+        comment: None,
     };
     let err = build_alter_column("postgres", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::UnsafeType(_)), "got {err:?}");
@@ -971,6 +983,7 @@ fn materialize_ops_mssql_orders_rename_alter_then_add() {
                 primary_key: false,
                 auto_increment: false,
                 default_value: Some("'x'".into()),
+                comment: None,
             },
         },
         StructureOp::AddColumn {

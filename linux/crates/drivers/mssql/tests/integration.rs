@@ -265,6 +265,7 @@ async fn alter_column_default_round_trips() {
         primary_key: false,
         auto_increment: false,
         default_value: Some("'pending'".into()),
+        comment: None,
     };
     for sql in tablepro_core::sql_ddl::build_alter_column("mssql", None, "def_demo", &column).unwrap() {
         conn.execute(&sql).await.unwrap();

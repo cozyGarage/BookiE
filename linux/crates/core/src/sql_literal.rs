@@ -31,7 +31,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> String {
     }
 }
 
-fn quote_literal(driver_id: &str, text: &str) -> String {
+pub(crate) fn quote_literal(driver_id: &str, text: &str) -> String {
     let escaped = match driver_id {
         "mysql" | "clickhouse" => text.replace('\\', "\\\\").replace('\'', "''"),
         _ => text.replace('\'', "''"),

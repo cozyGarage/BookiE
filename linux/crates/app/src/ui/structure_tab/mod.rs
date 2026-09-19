@@ -934,6 +934,7 @@ impl SimpleComponent for StructureTab {
                     primary_key: false,
                     auto_increment: false,
                     default_value: None,
+                    comment: None,
                 };
                 self.columns.borrow_mut().push(new_col);
                 self.recompute_dirty_state(&sender);

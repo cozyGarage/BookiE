@@ -46,6 +46,12 @@ pub enum BuildDdlError {
 
     #[error("unsafe identifier: {0}")]
     UnsafeIdentifier(String),
+
+    #[error("column comments are not supported by this driver: {0}")]
+    CommentsNotSupported(String),
+
+    #[error("unsafe column comment: {0}")]
+    UnsafeComment(String),
 }
 
 const MAX_TYPE_LEN: usize = 200;
@@ -102,6 +108,26 @@ pub(crate) fn validate_safe_default(s: &str) -> Result<(), BuildDdlError> {
     Ok(())
 }
 
+/// Where a dialect accepts a column comment.
+///
+/// `Inline` engines carry it inside the column definition, so it is
+/// restated on every `MODIFY COLUMN`. `Separate` engines keep it in a
+/// catalog written by its own statement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentPlacement {
+    Inline,
+    Separate,
+    Unsupported,
+}
+
+pub fn column_comment_placement(driver_id: &str) -> CommentPlacement {
+    match driver_id {
+        "mysql" | "clickhouse" => CommentPlacement::Inline,
+        "postgres" | "mssql" => CommentPlacement::Separate,
+        _ => CommentPlacement::Unsupported,
+    }
+}
+
 const FK_ACTIONS: &[&str] = &["NO ACTION", "RESTRICT", "CASCADE", "SET NULL", "SET DEFAULT"];
 
 /// T-SQL's `ON DELETE` / `ON UPDATE` grammar has no `RESTRICT`; the
@@ -142,6 +168,7 @@ pub struct DraftColumn {
     pub primary_key: bool,
     pub auto_increment: bool,
     pub default_value: Option<String>,
+    pub comment: Option<String>,
 }
 
 impl DraftColumn {
@@ -154,6 +181,7 @@ impl DraftColumn {
         let primary_key = info.primary_key;
         let auto_increment = info.is_auto_increment;
         let default_value = info.default_value.clone();
+        let comment = info.comment.clone();
         let name = info.name.clone();
         Self {
             original: Some(info),
@@ -163,6 +191,7 @@ impl DraftColumn {
             primary_key,
             auto_increment,
             default_value,
+            comment,
         }
     }
 
@@ -179,7 +208,7 @@ impl DraftColumn {
     /// its own op, so a column that only changed name must not raise an
     /// alter: SQLite refuses every alter and would fail the whole save,
     /// and MySQL would restate the column definition from a model that
-    /// does not carry collation, character set or comment.
+    /// does not carry collation or character set.
     pub fn differs_beyond_name(&self) -> bool {
         match &self.original {
             None => true,
@@ -189,6 +218,7 @@ impl DraftColumn {
                     || orig.primary_key != self.primary_key
                     || orig.is_auto_increment != self.auto_increment
                     || orig.default_value != self.default_value
+                    || orig.comment != self.comment
             }
         }
     }
