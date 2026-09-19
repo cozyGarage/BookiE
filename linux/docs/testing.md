@@ -150,6 +150,13 @@ It exposes a PostgreSQL 16 socket directory from a disposable container and
 verifies query, write, pre-dispatch cancellation, close, and reconnect without
 opening a TCP database port.
 
+## Manual verification after the 0.2 feature sprint
+
+The upstream feature adoption merged in September 2026 added GTK surfaces whose
+logic is unit-tested and whose layout has never been displayed. The checklist is
+[manual-verification-0.2-features.md](manual-verification-0.2-features.md). Treat it
+as outstanding until each line carries a result.
+
 ## GTK tests
 
 Run the installed safety suite with:

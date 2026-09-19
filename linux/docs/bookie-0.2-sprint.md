@@ -90,6 +90,17 @@ client panics and parser DoS need 0.62.4 or newer.
   SQLite, cross-engine transfers, advanced array editors and diagrams.
 - Exclude Apple frameworks/UI, Sparkle, iOS sync, licensing and plugin ABI.
 
+## Upstream feature adoption, September 2026
+
+Eleven of the thirteen features the [2026-09-19 re-survey](upstream-sync.md) found
+missing are merged; the other two already existed here in a different shape. The work
+ran as five parallel worktree branches and is recorded in `CHANGELOG.md` under
+`[Unreleased]`.
+
+It is not verified. No new GTK surface has been rendered, so
+[manual-verification-0.2-features.md](manual-verification-0.2-features.md) is the gate
+between this and any release candidate. B3 and B4 follow after that.
+
 ## Ordered packages
 
 One primary implementation stream. Small reviewable commits with upstream
