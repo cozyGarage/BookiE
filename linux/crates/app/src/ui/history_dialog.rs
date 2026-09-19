@@ -6,7 +6,7 @@ use relm4::gtk::{gio, glib};
 use relm4::prelude::*;
 use relm4::{adw, gtk};
 
-use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter};
+use tablepro_storage::query_history::{Entry, HistoryStore, SearchFilter, Source};
 
 use crate::services::database_service::ConnectionMetadata;
 
@@ -24,6 +24,7 @@ pub struct HistoryDialog {
     filter_connection: adw::ComboRow,
     filter_status: adw::ComboRow,
     filter_window: adw::ComboRow,
+    filter_source: adw::ComboRow,
     /// Pending debounced search timeout. Replaces the previous fire-
     /// on-every-keystroke behaviour: typing or flipping a filter
     /// schedules a Refresh 150 ms later and cancels any earlier
@@ -152,6 +153,19 @@ impl Component for HistoryDialog {
             .model(&window_model)
             .build();
 
+        let source_strings = [
+            crate::tr!("Anywhere"),
+            crate::tr!("SQL editor"),
+            crate::tr!("Table structure"),
+            crate::tr!("Row edits"),
+        ];
+        let source_strings_ref: Vec<&str> = source_strings.iter().map(String::as_str).collect();
+        let source_model = gtk::StringList::new(&source_strings_ref);
+        let filter_source = adw::ComboRow::builder()
+            .title(crate::tr!("Ran from"))
+            .model(&source_model)
+            .build();
+
         let reset_button = gtk::Button::builder()
             .label(crate::tr!("Reset"))
             .halign(gtk::Align::End)
@@ -161,10 +175,12 @@ impl Component for HistoryDialog {
         let reset_conn = filter_connection.clone();
         let reset_status = filter_status.clone();
         let reset_window = filter_window.clone();
+        let reset_source = filter_source.clone();
         reset_button.connect_clicked(move |_| {
             reset_conn.set_selected(0);
             reset_status.set_selected(0);
             reset_window.set_selected(0);
+            reset_source.set_selected(0);
         });
 
         // Native popover content: a single AdwPreferencesGroup of
@@ -176,6 +192,7 @@ impl Component for HistoryDialog {
         filter_group.add(&filter_connection);
         filter_group.add(&filter_status);
         filter_group.add(&filter_window);
+        filter_group.add(&filter_source);
 
         // Reset lives in the group's header-suffix slot so the
         // popover content is just the AdwPreferencesGroup — no
@@ -183,7 +200,7 @@ impl Component for HistoryDialog {
         filter_group.set_header_suffix(Some(&reset_button));
         filter_popover.set_child(Some(&filter_group));
 
-        for combo in [&filter_connection, &filter_status, &filter_window] {
+        for combo in [&filter_connection, &filter_status, &filter_window, &filter_source] {
             let s = sender.clone();
             combo.connect_selected_notify(move |_| s.input(HistoryDialogInput::FiltersChanged));
         }
@@ -377,6 +394,7 @@ impl Component for HistoryDialog {
             filter_connection,
             filter_status,
             filter_window,
+            filter_source,
             filter_debounce: std::rc::Rc::new(std::cell::RefCell::new(None)),
             selection_bar,
             selection_label,
@@ -672,9 +690,20 @@ impl HistoryDialog {
             success_only,
             exclude_cancelled,
             min_executed_at,
-            source: None,
+            source: source_for_index(self.filter_source.selected()),
             limit: 200,
         }
+    }
+
+    fn has_narrowing_search(&self) -> bool {
+        !self.search.text().to_string().trim().is_empty()
+    }
+
+    fn has_narrowing_filter(&self) -> bool {
+        self.filter_connection.selected() != 0
+            || self.filter_status.selected() != 0
+            || self.filter_window.selected() != 0
+            || self.filter_source.selected() != 0
     }
 
     fn render_entries(&mut self, entries: Vec<Entry>, sender: &ComponentSender<Self>) {
@@ -696,11 +725,7 @@ impl HistoryDialog {
         if entries.is_empty() {
             self.pinned_group.set_visible(false);
             self.list_group.set_visible(false);
-            let has_search = !self.search.text().to_string().trim().is_empty();
-            let has_filter = self.filter_connection.selected() != 0
-                || self.filter_status.selected() != 0
-                || self.filter_window.selected() != 0;
-            if has_search || has_filter {
+            if self.has_narrowing_search() || self.has_narrowing_filter() {
                 self.status_page.set_title(&crate::tr!("No matches"));
                 self.status_page
                     .set_description(Some(&crate::tr!("Try a different search term or change the filters.")));
@@ -1044,5 +1069,36 @@ fn format_relative_time(when: SystemTime) -> String {
 fn clear_listbox(listbox: &gtk::ListBox) {
     while let Some(child) = listbox.first_child() {
         listbox.remove(&child);
+    }
+}
+
+fn source_for_index(index: u32) -> Option<Source> {
+    match index {
+        1 => Some(Source::Editor),
+        2 => Some(Source::Structure),
+        3 => Some(Source::Browse),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_first_ran_from_choice_keeps_every_source() {
+        assert_eq!(source_for_index(0), None);
+    }
+
+    #[test]
+    fn each_ran_from_choice_selects_its_own_source() {
+        assert_eq!(source_for_index(1), Some(Source::Editor));
+        assert_eq!(source_for_index(2), Some(Source::Structure));
+        assert_eq!(source_for_index(3), Some(Source::Browse));
+    }
+
+    #[test]
+    fn an_index_beyond_the_ran_from_list_keeps_every_source() {
+        assert_eq!(source_for_index(9), None);
     }
 }

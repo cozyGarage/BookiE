@@ -13,9 +13,11 @@ use relm4::{ComponentController, ComponentSender, adw};
 use uuid::Uuid;
 
 use tablepro_core::{ColumnInfo, Value};
+use tablepro_storage::query_history::{Outcome, Source};
 
 use crate::services::catalog::CatalogOrigin;
 use crate::services::structure_tracker;
+use crate::ui::app::ran_statements::finish_if_recorded;
 use crate::ui::app::{App, AppMsg, WorkspaceTab};
 use crate::ui::error_text;
 use crate::ui::structure_tab::{StructureMode, StructureTabInput};
@@ -314,6 +316,7 @@ impl App {
         };
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
+        let mut recorded = self.ran_statements(Source::Structure, &statements);
         let connection = origin.connection(&self.database);
         let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         sender.command(move |_, shutdown| {
@@ -328,18 +331,22 @@ impl App {
                         let batch: Vec<(String, Vec<Value>)> =
                             statements.iter().map(|sql| (sql.clone(), Vec::new())).collect();
                         if let Err(e) = conn.execute_in_transaction_controlled(&batch, &control).await {
-                            sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, error_text::driver_message(&e)));
+                            let msg = error_text::driver_message(&e);
+                            finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
+                            sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, msg));
                             return;
                         }
                     } else {
                         for sql in &statements {
                             if let Err(e) = conn.execute_controlled(sql, &control).await {
-                                sender_for_cmd
-                                    .input(AppMsg::StructureSaveFailed(tab_id, error_text::driver_message(&e)));
+                                let msg = error_text::driver_message(&e);
+                                finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
+                                sender_for_cmd.input(AppMsg::StructureSaveFailed(tab_id, msg));
                                 return;
                             }
                         }
                     }
+                    finish_if_recorded(&mut recorded, Outcome::Success).await;
                     sender_for_cmd.input(AppMsg::StructureSaveCompleted {
                         origin: Some(origin.clone()),
                         tab_id,

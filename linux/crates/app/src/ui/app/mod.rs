@@ -7,6 +7,7 @@ mod init_window;
 mod init_workspace;
 mod msg;
 mod organization;
+mod ran_statements;
 mod render;
 mod row_ops;
 mod schema_index;

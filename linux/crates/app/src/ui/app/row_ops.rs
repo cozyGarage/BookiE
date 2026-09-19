@@ -2,12 +2,14 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender};
 
 use tablepro_core::{DriverError, Value};
+use tablepro_storage::query_history::{Outcome, Source};
 use uuid::Uuid;
 
 use crate::services::change_tracker::StatementSource;
 use crate::ui::browse_tab::BrowseTabInput;
 use crate::ui::error_text;
 
+use super::ran_statements::{finish_if_recorded, sql_without_parameters};
 use super::{App, AppMsg};
 
 impl App {
@@ -45,6 +47,7 @@ impl App {
         // outcome.
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
+        let mut recorded = self.ran_statements(Source::Browse, &sql_without_parameters(&statements));
         let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
         sender.command(move |_, shutdown| {
             shutdown
@@ -65,6 +68,7 @@ impl App {
                             let warning = reports_rows_affected
                                 .then(|| compute_concurrency_warning(&statements, &affected))
                                 .flatten();
+                            finish_if_recorded(&mut recorded, Outcome::Success).await;
                             sender_for_cmd.input(AppMsg::RowOpStarted);
                             sender_for_cmd.input(AppMsg::WorkspaceSchemaWordsChanged);
                             sender_for_cmd.input(AppMsg::SaveCompletedForTab(tab_id, warning));
@@ -82,6 +86,7 @@ impl App {
                                 sender_for_cmd.input(AppMsg::FlashErrorRowForTab(tab_id, source));
                             }
                             let msg = error_text::driver_message(&e);
+                            finish_if_recorded(&mut recorded, Outcome::Error(msg.clone())).await;
                             sender_for_cmd.input(AppMsg::SaveFailedForTab(tab_id, msg));
                         }
                     }
