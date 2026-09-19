@@ -186,6 +186,8 @@ cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
 ```
 
+Run these scripts unpiped. `bash linux/scripts/preflight.sh | tail -3` reports `tail`'s exit status, not the script's, so a failing build looks like a pass. Redirect to a file and read the status, or check `${PIPESTATUS[0]}`.
+
 `linux/scripts/preflight.sh` runs the file-size, function-size, panic-site and bounded-operation guards, formatting, Clippy, the unit tier and the sandbox tier in one pass, and is the quicker way to cover most of the above.
 
 If required GTK development packages, database services, containers, or `cargo-deny` are unavailable, report which validation could not run and why.
