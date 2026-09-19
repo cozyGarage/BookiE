@@ -35,6 +35,7 @@ impl App {
             .launch(ConnectDialogInit {
                 registry: self.registry.clone(),
                 preferences: self.preferences.clone(),
+                bound_connection_id: None,
             })
             .forward(sender.input_sender(), |out| match out {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
