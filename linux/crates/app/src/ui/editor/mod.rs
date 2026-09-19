@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+pub(crate) mod open_file;
 use tablepro_core::sql_format as format_plan;
 mod outcomes;
 mod schema;
@@ -134,7 +135,7 @@ pub enum SqlEditorOutput {
     ExportResults { result: QueryResult, name: String },
 }
 
-const MAX_DROPPED_SQL_BYTES: u64 = 8 * 1024 * 1024;
+pub(super) const MAX_SQL_FILE_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug)]
 struct ExecutionContext {
@@ -465,7 +466,7 @@ impl SimpleComponent for SqlEditor {
             let sender = sender_for_drop.clone();
             let request = drop_generation_for_drop.begin();
             std::thread::spawn(move || {
-                let message = match read_dropped_sql(&path, MAX_DROPPED_SQL_BYTES) {
+                let message = match read_sql_text(&path, MAX_SQL_FILE_BYTES) {
                     Ok(text) => SqlEditorInput::InsertDroppedSql { request, text },
                     Err(message) => SqlEditorInput::DroppedSqlFailed { request, message },
                 };
@@ -959,6 +960,7 @@ impl SqlEditor {
             duration_ms: Some(duration_ms),
             rows_affected,
             outcome,
+            source: tablepro_storage::query_history::Source::Editor,
         };
         relm4::spawn(async move {
             if let Err(e) = history.record(entry).await {
@@ -968,16 +970,16 @@ impl SqlEditor {
     }
 }
 
-fn read_dropped_sql(path: &std::path::Path, max_bytes: u64) -> Result<String, String> {
-    let file = std::fs::File::open(path).map_err(|_| crate::tr!("Couldn't read the dropped SQL file"))?;
+pub(super) fn read_sql_text(path: &std::path::Path, max_bytes: u64) -> Result<String, String> {
+    let file = std::fs::File::open(path).map_err(|_| crate::tr!("Couldn't read the SQL file"))?;
     let mut bytes = Vec::new();
     file.take(max_bytes.saturating_add(1))
         .read_to_end(&mut bytes)
-        .map_err(|_| crate::tr!("Couldn't read the dropped SQL file"))?;
+        .map_err(|_| crate::tr!("Couldn't read the SQL file"))?;
     if bytes.len() as u64 > max_bytes {
-        return Err(crate::tr!("The dropped SQL file is too large"));
+        return Err(crate::tr!("The SQL file is too large"));
     }
-    String::from_utf8(bytes).map_err(|_| crate::tr!("The dropped SQL file is not valid UTF-8"))
+    String::from_utf8(bytes).map_err(|_| crate::tr!("The SQL file is not valid UTF-8"))
 }
 
 fn export_name_for_query(query: &str) -> String {
@@ -1031,7 +1033,7 @@ fn build_completion_refresh(
 
 #[cfg(test)]
 mod tests {
-    use super::{DropGeneration, RunGeneration, export_name_for_query, read_dropped_sql};
+    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text};
     use std::io::Write;
 
     #[test]
@@ -1095,8 +1097,8 @@ mod tests {
         file.write_all(b"SELECT 1;").unwrap();
         drop(file);
 
-        assert_eq!(read_dropped_sql(&path, 9).unwrap(), "SELECT 1;");
-        assert!(read_dropped_sql(&path, 8).is_err());
+        assert_eq!(read_sql_text(&path, 9).unwrap(), "SELECT 1;");
+        assert!(read_sql_text(&path, 8).is_err());
         std::fs::remove_file(path).unwrap();
     }
 }

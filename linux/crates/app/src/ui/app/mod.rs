@@ -7,6 +7,7 @@ mod init_window;
 mod init_workspace;
 mod msg;
 mod organization;
+mod ran_statements;
 mod render;
 mod row_ops;
 mod schema_index;
@@ -130,6 +131,7 @@ pub struct App {
     /// does not re-issue the same fetch.
     requested_columns: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
     history_dialog: Option<Controller<HistoryDialog>>,
+    saved_queries_dialog: Option<Controller<crate::ui::saved_queries_dialog::SavedQueriesDialog>>,
     welcome_view: Controller<WelcomeView>,
     /// Driver id is connection-wide, not per-tab.
     current_driver_id: Option<String>,
@@ -473,6 +475,7 @@ impl SimpleComponent for App {
             schema_index: std::rc::Rc::new(std::cell::RefCell::new(crate::ui::editor::SchemaIndex::default())),
             requested_columns: std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new())),
             history_dialog: None,
+            saved_queries_dialog: None,
             welcome_view,
             current_driver_id: None,
             table_names: Vec::new(),
@@ -712,6 +715,9 @@ impl SimpleComponent for App {
                 self.on_connections_loaded(&conns, sender);
             }
             AppMsg::NewEditorTab => self.append_editor_tab(None, sender),
+            AppMsg::OpenSqlFile => self.on_open_sql_file(sender),
+            AppMsg::SqlFileOpened(text) => self.append_editor_tab(Some(text), sender),
+            AppMsg::SqlFileFailed(message) => self.show_toast(&message),
             AppMsg::EditorTabRunStateChanged(id, running) => {
                 self.on_editor_tab_run_state_changed(id, running);
                 self.continue_connection_switch(sender);
@@ -724,6 +730,8 @@ impl SimpleComponent for App {
             AppMsg::FavoriteSaved => self.show_toast(&crate::tr!("Saved as favorite")),
             AppMsg::FavoriteSaveFailed(reason) => self.show_toast(&reason),
             AppMsg::SaveQueryAsFavorite => self.on_save_query_as_favorite(sender),
+            AppMsg::ShowSavedQueries => self.on_show_saved_queries(sender),
+            AppMsg::SavedQueriesChanged(saved) => self.on_favorites_loaded(saved),
             AppMsg::ShowQuickSwitcher => self.on_show_quick_switcher(sender),
             AppMsg::QuickSwitcherChose(target) => self.on_quick_switcher_chose(target, sender),
             AppMsg::ShowHistory => self.on_show_history(sender),
@@ -847,5 +855,28 @@ impl SimpleComponent for App {
         if let Some(source) = self.history_prune_source.take() {
             source.remove();
         }
+    }
+}
+
+impl App {
+    pub(super) fn on_show_saved_queries(&mut self, sender: ComponentSender<Self>) {
+        let dialog = crate::ui::saved_queries_dialog::SavedQueriesDialog::builder()
+            .launch(self.favorites.clone())
+            .forward(sender.input_sender(), |out| match out {
+                crate::ui::saved_queries_dialog::SavedQueriesOutput::OpenInNewTab(sql) => AppMsg::OpenHistoryQuery(sql),
+                crate::ui::saved_queries_dialog::SavedQueriesOutput::Changed(saved) => {
+                    AppMsg::SavedQueriesChanged(saved)
+                }
+            });
+        dialog.model().dialog().present(Some(&self.window));
+        self.saved_queries_dialog = Some(dialog);
+    }
+
+    pub(super) fn on_open_sql_file(&self, sender: ComponentSender<Self>) {
+        let parent = self.window.clone().upcast::<gtk::Window>();
+        crate::ui::editor::open_file::choose_sql_file(Some(parent), move |outcome| match outcome {
+            Ok(text) => sender.input(AppMsg::SqlFileOpened(text)),
+            Err(message) => sender.input(AppMsg::SqlFileFailed(message)),
+        });
     }
 }

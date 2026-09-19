@@ -5,6 +5,10 @@
 ### Added
 
 - Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export that would exceed a worksheet's row limit is refused before any file is written.
+- Saved queries have a management dialog (Ctrl+Shift+D): search them, open one in a new editor tab, rename it, or delete it. Until now a saved query could only be reached through the quick switcher and could not be removed.
+- Ctrl+O opens a .sql file in a new editor tab. A file larger than the editor's limit is refused with an explanation instead of being cut short.
+- Query history now also records the statements the app itself runs when you save a table structure change or save edited rows, and the history dialog can filter by where a statement came from.
+- Logs can be written as structured JSON lines by setting the log format environment variable, for collection by a log agent. Any other value keeps the human-readable format.
 
 ### Changed
 

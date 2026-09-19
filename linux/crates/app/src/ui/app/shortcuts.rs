@@ -55,6 +55,7 @@ pub(super) fn install_window_actions(
         input_action!("about", AppMsg::ShowAbout),
         quit,
         input_action!("open-editor", AppMsg::NewEditorTab),
+        input_action!("open-file", AppMsg::OpenSqlFile),
         input_action!("close-current", AppMsg::CloseActiveWorkspaceTab),
         input_action!("preferences", AppMsg::ShowPreferences),
         input_action!("new-window", AppMsg::NewWindow),
@@ -72,6 +73,7 @@ pub(super) fn install_window_actions(
         input_action!("open-filter", AppMsg::ShowFilterDialog),
         input_action!("open-quickly", AppMsg::ShowQuickSwitcher),
         input_action!("save-favorite", AppMsg::SaveQueryAsFavorite),
+        input_action!("show-saved-queries", AppMsg::ShowSavedQueries),
     ]);
     let disconnect_action = gio::SimpleAction::new("disconnect", None);
     let disconnect_sender = sender.clone();
@@ -93,6 +95,7 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         ("<Primary>w", "win.close-current"),
         ("<Primary>e", "win.open-editor"),
         ("<Primary>t", "win.open-editor"),
+        ("<Primary>o", "win.open-file"),
         ("F5", "win.refresh-page"),
         ("<Primary>f", "win.open-filter"),
         ("<Primary>comma", "win.preferences"),
@@ -100,6 +103,7 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         ("<Primary>p", "win.open-quickly"),
         ("<Primary><Shift>j", "win.jump-column"),
         ("<Primary>d", "win.save-favorite"),
+        ("<Primary><Shift>d", "win.show-saved-queries"),
         ("<Primary>s", "win.save-changes"),
         ("<Primary>z", "win.undo-change"),
         ("<Primary>y", "win.redo-change"),
@@ -125,11 +129,13 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &crate::tr!("General"),
         &[
             ("<Primary>e", crate::tr!("Open SQL editor")),
+            ("<Primary>o", crate::tr!("Open a SQL file in a new editor tab")),
             ("F5", crate::tr!("Refresh table")),
             ("<Primary>comma", crate::tr!("Open Preferences")),
             ("<Primary>h", crate::tr!("Open Query History")),
             ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
+            ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
             ("<Primary>s", crate::tr!("Save pending changes")),
             ("<Primary>z", crate::tr!("Undo pending change")),
             ("<Primary>y", crate::tr!("Redo pending change")),

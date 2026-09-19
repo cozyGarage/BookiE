@@ -39,7 +39,7 @@ russh = "0.63"
 rust_xlsxwriter = { version = "0.99", default-features = false, features = ["chrono"] }
 secrecy = { version = "0.10", features = ["serde"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 clickhouse = { version = "0.15", default-features = false, features = ["rustls-tls-aws-lc", "rustls-tls-webpki-roots"] }
 sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "chrono", "rust_decimal", "uuid", "json"] }
 # native-tls (OpenSSL on Linux) avoids tiberius's pinned rustls 0.21 /
