@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::io::{self, Write};
 
+use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
@@ -84,21 +85,23 @@ impl JsonWriter {
 }
 
 impl ResultWriter for JsonWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         self.names = json_field_names(columns);
-        output.write_all(b"[\n")
-    }
-
-    fn write_row(&mut self, output: &mut dyn Write, index: usize, row: &[Value]) -> io::Result<()> {
-        if index != 0 {
-            output.write_all(b",\n")?;
-        }
-        serde_json::to_writer(&mut *output, &row_to_json_object(&self.names, row))?;
+        output.write_all(b"[\n")?;
         Ok(())
     }
 
-    fn finish(&mut self, output: &mut dyn Write) -> io::Result<()> {
-        output.write_all(b"\n]\n")
+    fn write_row(&mut self, output: &mut dyn Write, index: usize, row: &[Value]) -> Result<(), ExportError> {
+        if index != 0 {
+            output.write_all(b",\n")?;
+        }
+        serde_json::to_writer(&mut *output, &row_to_json_object(&self.names, row)).map_err(io::Error::from)?;
+        Ok(())
+    }
+
+    fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError> {
+        output.write_all(b"\n]\n")?;
+        Ok(())
     }
 }
 

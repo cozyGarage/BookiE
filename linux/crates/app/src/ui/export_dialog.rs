@@ -7,6 +7,12 @@ use tablepro_core::QueryResult;
 
 use crate::services::preferences::PreferencesStore;
 
+pub(crate) struct ExportRequest {
+    pub(crate) result: QueryResult,
+    pub(crate) suggested_name: String,
+    pub(crate) driver_id: String,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ExportFormat {
     Csv,
@@ -45,6 +51,15 @@ fn selected_format(index: u32) -> ExportFormat {
         .unwrap_or(ExportFormat::Csv)
 }
 
+fn insert_target(name: &str) -> (Option<String>, String) {
+    match name.rsplit_once('.') {
+        Some((schema, table)) if !schema.is_empty() && !table.is_empty() => {
+            (Some(schema.to_string()), table.to_string())
+        }
+        _ => (None, name.to_string()),
+    }
+}
+
 fn suggested_file_name(name: &str, format: ExportFormat) -> String {
     let base = name
         .strip_suffix(".csv")
@@ -57,21 +72,24 @@ fn suggested_file_name(name: &str, format: ExportFormat) -> String {
 pub(crate) fn present(
     parent: &adw::ApplicationWindow,
     toast_overlay: &adw::ToastOverlay,
-    result: QueryResult,
-    suggested_name: String,
+    request: ExportRequest,
     preferences: &PreferencesStore,
 ) {
-    present_with_format(parent, toast_overlay, result, suggested_name, false, preferences);
+    present_with_format(parent, toast_overlay, request, false, preferences);
 }
 
 pub(crate) fn present_with_format(
     parent: &adw::ApplicationWindow,
     toast_overlay: &adw::ToastOverlay,
-    result: QueryResult,
-    suggested_name: String,
+    request: ExportRequest,
     json: bool,
     preferences: &PreferencesStore,
 ) {
+    let ExportRequest {
+        result,
+        suggested_name,
+        driver_id,
+    } = request;
     let page = adw::PreferencesPage::new();
 
     let format_group = adw::PreferencesGroup::new();
@@ -168,26 +186,38 @@ pub(crate) fn present_with_format(
         save_with_file_dialog(
             &parent_for_export,
             &toast_overlay_for_export,
-            format,
-            &suggested_name,
-            result.clone(),
-            include_header,
-            safe_csv.is_active(),
+            SaveRequest {
+                format,
+                suggested_name: suggested_name.clone(),
+                driver_id: driver_id.clone(),
+                result: result.clone(),
+                include_header,
+                sanitize_formulas: safe_csv.is_active(),
+            },
         );
     });
 
     dialog.present(Some(parent));
 }
 
-fn save_with_file_dialog(
-    parent: &adw::ApplicationWindow,
-    toast_overlay: &adw::ToastOverlay,
+struct SaveRequest {
     format: ExportFormat,
-    suggested_name: &str,
+    suggested_name: String,
+    driver_id: String,
     result: QueryResult,
     include_header: bool,
     sanitize_formulas: bool,
-) {
+}
+
+fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
+    let SaveRequest {
+        format,
+        suggested_name,
+        driver_id,
+        result,
+        include_header,
+        sanitize_formulas,
+    } = request;
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&crate::tr!("{format} files").replace("{format}", format.label())));
     filter.add_mime_type(format.mime_type());
@@ -197,7 +227,7 @@ fn save_with_file_dialog(
     let file_dialog = gtk::FileDialog::builder()
         .title(crate::tr!("Export Results"))
         .modal(true)
-        .initial_name(suggested_file_name(suggested_name, format))
+        .initial_name(suggested_file_name(&suggested_name, format))
         .default_filter(&filter)
         .filters(&filters)
         .build();
@@ -216,11 +246,28 @@ fn save_with_file_dialog(
             sanitize_formulas,
             ..Default::default()
         };
-        file::start(&parent_for_alert, &toast_overlay, path, result, format, options);
+        let (schema, table) = insert_target(&suggested_name);
+        file::start(
+            &parent_for_alert,
+            &toast_overlay,
+            file::ExportJob {
+                path,
+                result: result.clone(),
+                format,
+                options,
+                driver_id: driver_id.clone(),
+                schema,
+                table,
+            },
+        );
     });
 }
 
-fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, error: &std::io::Error) {
+fn show_export_error(
+    parent: &adw::ApplicationWindow,
+    path: &std::path::Path,
+    error: &tablepro_core::export::ExportError,
+) {
     let alert = adw::AlertDialog::new(
         Some(&crate::tr!("Couldn't export")),
         Some(
@@ -238,6 +285,17 @@ fn show_export_error(parent: &adw::ApplicationWindow, path: &std::path::Path, er
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_qualified_result_name_becomes_a_schema_and_table_for_sql_statements() {
+        assert_eq!(
+            insert_target("public.customers"),
+            (Some("public".into()), "customers".into())
+        );
+        assert_eq!(insert_target("customers"), (None, "customers".into()));
+        assert_eq!(insert_target("Query 1"), (None, "Query 1".into()));
+        assert_eq!(insert_target(".customers"), (None, ".customers".into()));
+    }
 
     #[test]
     fn suggested_file_name_uses_the_selected_format() {

@@ -9,18 +9,21 @@ use std::path::Path;
 use crate::query::Value;
 
 mod csv;
+mod error;
 mod file;
 mod html;
 mod in_clause;
 mod json;
 mod markdown;
+mod sql;
 mod xml;
 
 pub use csv::{
     CsvDecimal, CsvDelimiter, CsvLineBreak, CsvOptions, CsvQuote, render_csv, render_tsv, write_csv_header,
     write_csv_row,
 };
-pub use file::{ResultFormat, write_result_file};
+pub use error::ExportError;
+pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};
 pub use in_clause::{InClause, render_in_clause};
 pub use json::{json_field_names, render_json, row_to_json};
 pub use markdown::render_markdown;
@@ -72,9 +75,10 @@ where
     write_atomically_checked(path, fill, || Ok(()))
 }
 
-fn write_atomically_checked<F>(path: &Path, fill: F, before_publish: impl FnOnce() -> io::Result<()>) -> io::Result<()>
+fn write_atomically_checked<E, F>(path: &Path, fill: F, before_publish: impl FnOnce() -> Result<(), E>) -> Result<(), E>
 where
-    F: FnOnce(&mut dyn Write) -> io::Result<()>,
+    E: From<io::Error>,
+    F: FnOnce(&mut dyn Write) -> Result<(), E>,
 {
     let directory = match path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
         Some(parent) => parent,

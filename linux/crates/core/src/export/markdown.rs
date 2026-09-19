@@ -1,5 +1,6 @@
-use std::io::{self, Write};
+use std::io::Write;
 
+use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
@@ -62,17 +63,19 @@ impl MarkdownWriter {
 }
 
 impl ResultWriter for MarkdownWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         self.columns = columns.len();
         writeln!(output, "{}", markdown_header_line(columns))?;
-        writeln!(output, "{}", markdown_separator_line(self.columns))
+        writeln!(output, "{}", markdown_separator_line(self.columns))?;
+        Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
-        writeln!(output, "{}", markdown_row_line(row))
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
+        writeln!(output, "{}", markdown_row_line(row))?;
+        Ok(())
     }
 
-    fn finish(&mut self, _output: &mut dyn Write) -> io::Result<()> {
+    fn finish(&mut self, _output: &mut dyn Write) -> Result<(), ExportError> {
         Ok(())
     }
 }

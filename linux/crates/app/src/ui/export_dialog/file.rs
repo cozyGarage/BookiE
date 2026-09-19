@@ -4,19 +4,50 @@ use std::sync::{
     Arc,
     atomic::{AtomicUsize, Ordering},
 };
-use tablepro_core::export::{CsvOptions, ResultFormat};
+use tablepro_core::export::{CsvOptions, ExportError, ResultExport, ResultFormat, SqlTarget};
+use tokio_util::sync::CancellationToken;
 
-pub(super) fn start(
-    parent: &adw::ApplicationWindow,
-    toast: &adw::ToastOverlay,
-    path: std::path::PathBuf,
-    result: tablepro_core::QueryResult,
-    format: super::ExportFormat,
-    options: CsvOptions,
-) {
-    let cancel = tokio_util::sync::CancellationToken::new();
+pub(super) struct ExportJob {
+    pub(super) path: std::path::PathBuf,
+    pub(super) result: tablepro_core::QueryResult,
+    pub(super) format: super::ExportFormat,
+    pub(super) options: CsvOptions,
+    pub(super) driver_id: String,
+    pub(super) schema: Option<String>,
+    pub(super) table: String,
+}
+
+fn write_export(job: &ExportJob, cancel: &CancellationToken, completed: &AtomicUsize) -> Result<(), ExportError> {
+    let export = ResultExport {
+        format: result_format(job.format),
+        csv: &job.options,
+        sql: Some(SqlTarget {
+            driver_id: &job.driver_id,
+            schema: job.schema.as_deref(),
+            table: &job.table,
+        }),
+    };
+    tablepro_core::export::write_result_file(
+        &job.path,
+        &job.result,
+        &export,
+        || cancel.is_cancelled(),
+        |rows| completed.store(rows, Ordering::Relaxed),
+    )
+}
+
+fn result_format(format: super::ExportFormat) -> ResultFormat {
+    match format {
+        super::ExportFormat::Csv => ResultFormat::Csv,
+        super::ExportFormat::Json => ResultFormat::Json,
+    }
+}
+
+pub(super) fn start(parent: &adw::ApplicationWindow, toast: &adw::ToastOverlay, job: ExportJob) {
+    let cancel = CancellationToken::new();
     let completed = Arc::new(AtomicUsize::new(0));
-    let total = result.rows.len();
+    let total = job.result.rows.len();
+    let path = job.path.clone();
     let label = gtk::Label::new(Some(&crate::tr!("Exporting loaded rows…")));
     let progress = gtk::ProgressBar::new();
     let stop = gtk::Button::with_label(&crate::tr!("Cancel"));
@@ -49,28 +80,13 @@ pub(super) fn start(
     });
     dialog.present(Some(parent));
     let (send, recv) = async_channel::bounded(1);
-    let output_path = path.clone();
     let count = completed.clone();
     let worker = std::thread::Builder::new().name("result-export".into()).spawn(move || {
-        let format = match format {
-            super::ExportFormat::Csv => ResultFormat::Csv,
-            super::ExportFormat::Json => ResultFormat::Json,
-        };
-        let outcome = tablepro_core::export::write_result_file(
-            &output_path,
-            &result,
-            format,
-            &options,
-            || cancel.is_cancelled(),
-            |rows| {
-                count.store(rows, Ordering::Relaxed);
-            },
-        );
-        let _ = send.send_blocking(outcome);
+        let _ = send.send_blocking(write_export(&job, &cancel, &count));
     });
     if let Err(error) = worker {
         dialog.close();
-        super::show_export_error(parent, &path, &error);
+        super::show_export_error(parent, &path, &ExportError::Write(error));
         return;
     }
     let timer = glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
@@ -99,7 +115,7 @@ pub(super) fn start(
                     ));
                 }
             }
-            Ok(Err(error)) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Ok(Err(error)) if error.is_cancelled() => {}
             Ok(Err(error)) => {
                 if let Some(parent) = parent.upgrade() {
                     super::show_export_error(&parent, &path, &error);
@@ -107,7 +123,8 @@ pub(super) fn start(
             }
             Err(_) => {
                 if let Some(parent) = parent.upgrade() {
-                    super::show_export_error(&parent, &path, &std::io::Error::other("Export worker stopped"));
+                    let stopped = ExportError::Write(std::io::Error::other("Export worker stopped"));
+                    super::show_export_error(&parent, &path, &stopped);
                 }
             }
         }

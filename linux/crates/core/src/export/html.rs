@@ -1,5 +1,6 @@
-use std::io::{self, Write};
+use std::io::Write;
 
+use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
@@ -7,17 +8,18 @@ use crate::query::{ColumnInfo, Value};
 pub(crate) struct HtmlWriter;
 
 impl ResultWriter for HtmlWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         output.write_all(
             b"<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>Exported rows</title>\n</head>\n<body>\n<table>\n<thead>\n<tr>",
         )?;
         for column in columns {
             write!(output, "<th>{}</th>", escape_html(&column.name))?;
         }
-        output.write_all(b"</tr>\n</thead>\n<tbody>\n")
+        output.write_all(b"</tr>\n</thead>\n<tbody>\n")?;
+        Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
         output.write_all(b"<tr>")?;
         for value in row {
             match value_to_text(value) {
@@ -25,11 +27,13 @@ impl ResultWriter for HtmlWriter {
                 None => output.write_all(b"<td class=\"null\"></td>")?,
             }
         }
-        output.write_all(b"</tr>\n")
+        output.write_all(b"</tr>\n")?;
+        Ok(())
     }
 
-    fn finish(&mut self, output: &mut dyn Write) -> io::Result<()> {
-        output.write_all(b"</tbody>\n</table>\n</body>\n</html>\n")
+    fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError> {
+        output.write_all(b"</tbody>\n</table>\n</body>\n</html>\n")?;
+        Ok(())
     }
 }
 

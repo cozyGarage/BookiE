@@ -1,10 +1,12 @@
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
 
 use super::csv::{CsvOptions, CsvWriter};
+use super::error::ExportError;
 use super::html::HtmlWriter;
 use super::json::JsonWriter;
 use super::markdown::MarkdownWriter;
+use super::sql::SqlWriter;
 use super::write_atomically_checked;
 use super::xml::XmlWriter;
 use crate::QueryResult;
@@ -17,24 +19,41 @@ pub enum ResultFormat {
     Markdown,
     Html,
     Xml,
+    Sql,
+}
+
+pub struct SqlTarget<'a> {
+    pub driver_id: &'a str,
+    pub schema: Option<&'a str>,
+    pub table: &'a str,
+}
+
+pub struct ResultExport<'a> {
+    pub format: ResultFormat,
+    pub csv: &'a CsvOptions,
+    pub sql: Option<SqlTarget<'a>>,
 }
 
 pub(crate) trait ResultWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()>;
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError>;
 
-    fn write_row(&mut self, output: &mut dyn Write, index: usize, row: &[Value]) -> io::Result<()>;
+    fn write_row(&mut self, output: &mut dyn Write, index: usize, row: &[Value]) -> Result<(), ExportError>;
 
-    fn finish(&mut self, output: &mut dyn Write) -> io::Result<()>;
+    fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError>;
 }
 
-fn writer_for(format: ResultFormat, options: &CsvOptions) -> Box<dyn ResultWriter> {
-    match format {
-        ResultFormat::Csv => Box::new(CsvWriter::new(options)),
+fn writer_for(export: &ResultExport<'_>) -> Result<Box<dyn ResultWriter>, ExportError> {
+    Ok(match export.format {
+        ResultFormat::Csv => Box::new(CsvWriter::new(export.csv)),
         ResultFormat::Json => Box::new(JsonWriter::new()),
         ResultFormat::Markdown => Box::new(MarkdownWriter::new()),
         ResultFormat::Html => Box::new(HtmlWriter),
         ResultFormat::Xml => Box::new(XmlWriter::new()),
-    }
+        ResultFormat::Sql => match &export.sql {
+            Some(target) => Box::new(SqlWriter::new(target)?),
+            None => return Err(ExportError::MissingSqlTarget),
+        },
+    })
 }
 
 /// Export an already materialized result. Extra memory is bounded to one row.
@@ -42,20 +61,19 @@ fn writer_for(format: ResultFormat, options: &CsvOptions) -> Box<dyn ResultWrite
 pub fn write_result_file(
     path: &Path,
     result: &QueryResult,
-    format: ResultFormat,
-    options: &CsvOptions,
+    export: &ResultExport<'_>,
     cancelled: impl Fn() -> bool,
     progress: impl Fn(usize),
-) -> io::Result<()> {
+) -> Result<(), ExportError> {
     let check = || {
         if cancelled() {
-            Err(io::Error::new(io::ErrorKind::Interrupted, "Export cancelled"))
+            Err(ExportError::Cancelled)
         } else {
             Ok(())
         }
     };
     check()?;
-    let mut writer = writer_for(format, options);
+    let mut writer = writer_for(export)?;
     write_atomically_checked(
         path,
         |output| {
@@ -89,10 +107,19 @@ mod tests {
         }
     }
 
+    fn plain(format: ResultFormat, options: &CsvOptions) -> ResultExport<'_> {
+        ResultExport {
+            format,
+            csv: options,
+            sql: None,
+        }
+    }
+
     fn exported(format: ResultFormat) -> String {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("result");
-        write_result_file(&path, &result(), format, &CsvOptions::default(), || false, |_| {}).unwrap();
+        let options = CsvOptions::default();
+        write_result_file(&path, &result(), &plain(format, &options), || false, |_| {}).unwrap();
         std::fs::read_to_string(&path).unwrap()
     }
 
@@ -101,15 +128,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("result");
         let data = result();
-        write_result_file(
-            &path,
-            &data,
-            ResultFormat::Json,
-            &CsvOptions::default(),
-            || false,
-            |_| {},
-        )
-        .unwrap();
+        let options = CsvOptions::default();
+        write_result_file(&path, &data, &plain(ResultFormat::Json, &options), || false, |_| {}).unwrap();
         let actual: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         let expected: serde_json::Value =
             serde_json::from_str(&crate::export::render_json(&data.columns, &data.rows)).unwrap();
@@ -120,13 +140,12 @@ mod tests {
         let error = write_result_file(
             &path,
             &data,
-            ResultFormat::Csv,
-            &CsvOptions::default(),
+            &plain(ResultFormat::Csv, &options),
             || cancel.get(),
             |_| cancel.set(true),
         )
         .unwrap_err();
-        assert_eq!(error.kind(), io::ErrorKind::Interrupted);
+        assert!(error.is_cancelled(), "{error:?}");
         assert_eq!(std::fs::read(&path).unwrap(), before);
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
     }
@@ -172,7 +191,42 @@ mod tests {
     }
 
     #[test]
+    fn a_sql_export_without_a_table_is_refused_before_the_destination_is_touched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result");
+        let options = CsvOptions::default();
+        let error =
+            write_result_file(&path, &result(), &plain(ResultFormat::Sql, &options), || false, |_| {}).unwrap_err();
+        assert!(matches!(error, ExportError::MissingSqlTarget), "{error:?}");
+        assert!(!path.exists());
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn a_sql_export_names_the_table_the_rows_came_from() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result");
+        let options = CsvOptions::default();
+        let export = ResultExport {
+            format: ResultFormat::Sql,
+            csv: &options,
+            sql: Some(SqlTarget {
+                driver_id: "postgres",
+                schema: Some("public"),
+                table: "people",
+            }),
+        };
+        write_result_file(&path, &result(), &export, || false, |_| {}).unwrap();
+        let sql = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            sql.starts_with("INSERT INTO \"public\".\"people\" (\"id\", \"id\", \"id_2\")"),
+            "{sql}"
+        );
+    }
+
+    #[test]
     fn every_format_stops_at_the_first_cancelled_row_without_touching_the_destination() {
+        let options = CsvOptions::default();
         for format in [
             ResultFormat::Csv,
             ResultFormat::Json,
@@ -182,9 +236,8 @@ mod tests {
         ] {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("result");
-            let error =
-                write_result_file(&path, &result(), format, &CsvOptions::default(), || true, |_| {}).unwrap_err();
-            assert_eq!(error.kind(), io::ErrorKind::Interrupted, "{format:?}");
+            let error = write_result_file(&path, &result(), &plain(format, &options), || true, |_| {}).unwrap_err();
+            assert!(error.is_cancelled(), "{format:?}");
             assert!(!path.exists(), "{format:?}");
             assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0, "{format:?}");
         }

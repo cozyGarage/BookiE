@@ -2,6 +2,7 @@ use std::io::{self, Write};
 
 use serde::{Deserialize, Serialize};
 
+use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
@@ -255,20 +256,22 @@ impl CsvWriter {
 }
 
 impl ResultWriter for CsvWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         if !self.header.header_row {
             return Ok(());
         }
         output.write_all(csv_header_line(columns, &self.header).as_bytes())?;
-        output.write_all(self.header.line_break.as_str().as_bytes())
+        output.write_all(self.header.line_break.as_str().as_bytes())?;
+        Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
         output.write_all(csv_row_line(row, &self.rows).as_bytes())?;
-        output.write_all(self.rows.line_break.as_str().as_bytes())
+        output.write_all(self.rows.line_break.as_str().as_bytes())?;
+        Ok(())
     }
 
-    fn finish(&mut self, _output: &mut dyn Write) -> io::Result<()> {
+    fn finish(&mut self, _output: &mut dyn Write) -> Result<(), ExportError> {
         Ok(())
     }
 }

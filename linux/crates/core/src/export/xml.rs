@@ -1,5 +1,6 @@
-use std::io::{self, Write};
+use std::io::Write;
 
+use super::error::ExportError;
 use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
@@ -17,12 +18,13 @@ impl XmlWriter {
 }
 
 impl ResultWriter for XmlWriter {
-    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> io::Result<()> {
+    fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         self.elements = columns.iter().map(|column| element_name(&column.name)).collect();
-        output.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rows>\n")
+        output.write_all(b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rows>\n")?;
+        Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> io::Result<()> {
+    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
         output.write_all(b"  <row>\n")?;
         for (index, value) in row.iter().enumerate() {
             let element = match self.elements.get(index) {
@@ -34,11 +36,13 @@ impl ResultWriter for XmlWriter {
                 None => writeln!(output, "    <{element} null=\"true\"/>")?,
             }
         }
-        output.write_all(b"  </row>\n")
+        output.write_all(b"  </row>\n")?;
+        Ok(())
     }
 
-    fn finish(&mut self, output: &mut dyn Write) -> io::Result<()> {
-        output.write_all(b"</rows>\n")
+    fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError> {
+        output.write_all(b"</rows>\n")?;
+        Ok(())
     }
 }
 
