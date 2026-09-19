@@ -806,8 +806,11 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
     }
 }
 
+mod bulk;
 mod connection;
 mod panic_boundary;
+
+pub use bulk::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET};
 
 #[cfg(test)]
 #[path = "guard_tests.rs"]
