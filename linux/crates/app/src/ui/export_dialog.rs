@@ -119,6 +119,20 @@ fn selected_format(formats: &[ExportFormat], index: u32) -> ExportFormat {
     formats.get(index as usize).copied().unwrap_or(ExportFormat::Csv)
 }
 
+fn build_sql_group(suggested_name: &str) -> (adw::PreferencesGroup, adw::EntryRow) {
+    let (schema, table) = insert_target(suggested_name);
+    let group = adw::PreferencesGroup::builder()
+        .title(crate::tr!("SQL options"))
+        .build();
+    let target = adw::EntryRow::builder().title(crate::tr!("Table name")).build();
+    target.set_text(&match schema {
+        Some(schema) => format!("{schema}.{table}"),
+        None => table,
+    });
+    group.add(&target);
+    (group, target)
+}
+
 fn insert_target(name: &str) -> (Option<String>, String) {
     match name.rsplit_once('.') {
         Some((schema, table)) if !schema.is_empty() && !table.is_empty() => {
@@ -199,15 +213,22 @@ pub(crate) fn present_with_format(
     csv_group.set_visible(!json);
     page.add(&csv_group);
 
+    let (sql_group, sql_target) = build_sql_group(&suggested_name);
+    sql_group.set_visible(false);
+    page.add(&sql_group);
+
     let preferences_for_toggle = preferences.clone();
     include_header.connect_active_notify(move |row| {
         preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active());
     });
 
     let csv_group_for_format = csv_group.clone();
+    let sql_group_for_format = sql_group.clone();
     let formats_for_visibility = formats.clone();
     format_row.connect_selected_notify(move |row| {
-        csv_group_for_format.set_visible(selected_format(&formats_for_visibility, row.selected()).shows_csv_options());
+        let format = selected_format(&formats_for_visibility, row.selected());
+        csv_group_for_format.set_visible(format.shows_csv_options());
+        sql_group_for_format.set_visible(format == ExportFormat::Sql);
     });
 
     let reset_button = gtk::Button::builder().label(crate::tr!("Reset to Defaults")).build();
@@ -263,6 +284,7 @@ pub(crate) fn present_with_format(
                 result: result.clone(),
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
+                sql_target: sql_target.text().to_string(),
             },
         );
     });
@@ -277,6 +299,7 @@ struct SaveRequest {
     result: QueryResult,
     include_header: bool,
     sanitize_formulas: bool,
+    sql_target: String,
 }
 
 fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::ToastOverlay, request: SaveRequest) {
@@ -287,6 +310,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         result,
         include_header,
         sanitize_formulas,
+        sql_target,
     } = request;
     let filter = gtk::FileFilter::new();
     filter.set_name(Some(&crate::tr!("{format} files").replace("{format}", format.label())));
@@ -316,7 +340,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             sanitize_formulas,
             ..Default::default()
         };
-        let (schema, table) = insert_target(&suggested_name);
+        let (schema, table) = insert_target(&sql_target);
         file::start(
             &parent_for_alert,
             &toast_overlay,
@@ -365,6 +389,16 @@ mod tests {
         assert_eq!(insert_target("customers"), (None, "customers".into()));
         assert_eq!(insert_target("Query 1"), (None, "Query 1".into()));
         assert_eq!(insert_target(".customers"), (None, ".customers".into()));
+    }
+
+    #[test]
+    fn a_result_with_no_source_table_offers_its_label_for_the_user_to_correct() {
+        assert_eq!(insert_target("query-results"), (None, "query-results".into()));
+        assert_eq!(
+            insert_target("orders"),
+            (None, "orders".into()),
+            "an edited table name is used verbatim rather than the result label"
+        );
     }
 
     #[test]
