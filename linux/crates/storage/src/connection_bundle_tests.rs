@@ -514,7 +514,7 @@ fn no_error_message_carries_a_secret_a_host_or_a_database_name() {
 
 #[test]
 fn a_bundle_over_the_size_limit_is_refused_before_parsing() {
-    let oversized = vec![b'{'; MAX_BUNDLE_BYTES + 1];
+    let oversized = vec![0x7bu8; MAX_BUNDLE_BYTES + 1];
     assert!(matches!(parse_bundle(&oversized), Err(BundleError::TooLarge { .. })));
 }
 
@@ -542,4 +542,90 @@ fn an_import_keeps_an_existing_local_password_unless_replacement_is_asked_for() 
     assert!(should_write(existing(), true));
     assert!(should_write(None, false));
     assert!(should_write(None, true));
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn an_export_collects_every_credential_kind_for_a_connection() {
+    let id = Uuid::new_v4();
+    crate::secrets::store_password(id, "db-pw", "bundle-test")
+        .await
+        .unwrap();
+    crate::secrets::store_ssh_password(id, "ssh-pw", "bundle-test")
+        .await
+        .unwrap();
+
+    let collected = collect_bundle_secrets(std::slice::from_ref(&id)).await.unwrap();
+
+    assert_eq!(collected.len(), 1);
+    assert_eq!(collected[0].connection_id, id);
+    assert_eq!(collected[0].db_password().map(|v| v.expose_secret()), Some("db-pw"));
+    assert_eq!(collected[0].ssh_password().map(|v| v.expose_secret()), Some("ssh-pw"));
+    assert!(collected[0].ssh_passphrase().is_none());
+
+    forget_imported_secrets(id).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn a_connection_with_no_stored_credentials_contributes_nothing_to_a_bundle() {
+    let id = Uuid::new_v4();
+    assert!(
+        collect_bundle_secrets(std::slice::from_ref(&id))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn an_import_keeps_the_local_password_until_replacement_is_asked_for() {
+    let target = Uuid::new_v4();
+    crate::secrets::store_password(target, "local-pw", "bundle-test")
+        .await
+        .unwrap();
+    let carried = BundleSecrets::new(
+        Uuid::new_v4(),
+        Some(SecretString::new("bundled-pw".to_owned().into())),
+        None,
+        None,
+    );
+
+    store_bundle_secrets(target, &carried, "bundle-test", false)
+        .await
+        .unwrap();
+    let kept = crate::secrets::load_password(target).await.unwrap();
+    assert_eq!(kept.map(|v| v.expose_secret().to_owned()), Some("local-pw".to_owned()));
+
+    store_bundle_secrets(target, &carried, "bundle-test", true)
+        .await
+        .unwrap();
+    let replaced = crate::secrets::load_password(target).await.unwrap();
+    assert_eq!(
+        replaced.map(|v| v.expose_secret().to_owned()),
+        Some("bundled-pw".to_owned())
+    );
+
+    forget_imported_secrets(target).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a running Secret Service; scripts/test-secret-service.sh provides one"]
+async fn rolling_back_an_import_removes_only_the_credentials_it_wrote() {
+    let target = Uuid::new_v4();
+    let carried = BundleSecrets::new(
+        target,
+        Some(SecretString::new("bundled-pw".to_owned().into())),
+        Some(SecretString::new("bundled-ssh".to_owned().into())),
+        None,
+    );
+    store_bundle_secrets(target, &carried, "bundle-test", false)
+        .await
+        .unwrap();
+
+    forget_imported_secrets(target).await;
+
+    assert!(crate::secrets::load_password(target).await.unwrap().is_none());
+    assert!(crate::secrets::load_ssh_password(target).await.unwrap().is_none());
 }
