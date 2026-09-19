@@ -135,9 +135,12 @@ fn restrict_permissions(path: &Path) -> Result<(), StorageError> {
     Ok(())
 }
 
-async fn apply_schema(pool: &SqlitePool) -> Result<(), StorageError> {
-    sqlx::query(
-        r#"
+struct Migration {
+    statements: &'static [&'static str],
+}
+
+const BASE_SCHEMA: &[&str] = &[
+    r#"
         CREATE TABLE IF NOT EXISTS history (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             query           TEXT NOT NULL,
@@ -153,12 +156,7 @@ async fn apply_schema(pool: &SqlitePool) -> Result<(), StorageError> {
             error           TEXT
         )
         "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
+    r#"
         CREATE VIRTUAL TABLE IF NOT EXISTS history_fts USING fts5(
             query,
             content='history',
@@ -166,51 +164,55 @@ async fn apply_schema(pool: &SqlitePool) -> Result<(), StorageError> {
             tokenize='unicode61 remove_diacritics 2'
         )
         "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
+    r#"
         CREATE TRIGGER IF NOT EXISTS history_ai AFTER INSERT ON history BEGIN
             INSERT INTO history_fts(rowid, query) VALUES (new.id, new.query);
         END
         "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
+    r#"
         CREATE TRIGGER IF NOT EXISTS history_ad AFTER DELETE ON history BEGIN
             INSERT INTO history_fts(history_fts, rowid, query) VALUES('delete', old.id, old.query);
         END
         "#,
-    )
-    .execute(pool)
-    .await?;
-
-    sqlx::query(
-        r#"
+    r#"
         CREATE TRIGGER IF NOT EXISTS history_au AFTER UPDATE OF query ON history BEGIN
             INSERT INTO history_fts(history_fts, rowid, query) VALUES('delete', old.id, old.query);
             INSERT INTO history_fts(rowid, query) VALUES (new.id, new.query);
         END
         "#,
-    )
-    .execute(pool)
-    .await?;
+    "CREATE INDEX IF NOT EXISTS history_executed_at_idx ON history (executed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS history_pinned_idx ON history (pinned DESC, executed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS history_connection_idx ON history (connection_id, executed_at DESC)",
+];
 
-    sqlx::query("CREATE INDEX IF NOT EXISTS history_executed_at_idx ON history (executed_at DESC)")
-        .execute(pool)
-        .await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS history_pinned_idx ON history (pinned DESC, executed_at DESC)")
-        .execute(pool)
-        .await?;
-    sqlx::query("CREATE INDEX IF NOT EXISTS history_connection_idx ON history (connection_id, executed_at DESC)")
-        .execute(pool)
-        .await?;
+const MIGRATIONS: &[Migration] = &[Migration {
+    statements: BASE_SCHEMA,
+}];
 
+async fn user_version(pool: &SqlitePool) -> Result<i64, StorageError> {
+    let row = sqlx::query("PRAGMA user_version").fetch_one(pool).await?;
+    Ok(row.try_get::<i64, _>(0)?)
+}
+
+fn pending_migrations(applied: i64) -> &'static [Migration] {
+    let applied = applied.clamp(0, MIGRATIONS.len() as i64) as usize;
+    &MIGRATIONS[applied..]
+}
+
+async fn apply_schema(pool: &SqlitePool) -> Result<(), StorageError> {
+    let applied = user_version(pool).await?;
+    let mut version = applied.clamp(0, MIGRATIONS.len() as i64);
+    for migration in pending_migrations(applied) {
+        let mut tx = pool.begin().await?;
+        for statement in migration.statements {
+            sqlx::query(*statement).execute(&mut *tx).await?;
+        }
+        version += 1;
+        sqlx::query(sqlx::AssertSqlSafe(format!("PRAGMA user_version = {version}")))
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+    }
     Ok(())
 }
 
@@ -538,6 +540,79 @@ fn outcome_summary(entry: &Entry) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn legacy_pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("memory pool");
+        for statement in BASE_SCHEMA {
+            sqlx::query(*statement).execute(&pool).await.expect("legacy schema");
+        }
+        sqlx::query(
+            "INSERT INTO history (query, driver_id, connection_id, connection_name, executed_at, success, cancelled) \
+             VALUES ('SELECT 1', 'sqlite', '00000000-0000-0000-0000-000000000000', 'legacy', 1, 1, 0)",
+        )
+        .execute(&pool)
+        .await
+        .expect("legacy row");
+        pool
+    }
+
+    fn store_over(pool: SqlitePool) -> HistoryStore {
+        HistoryStore {
+            pool,
+            path: PathBuf::from(":memory:"),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_database_written_before_versioning_is_stamped_with_the_current_version() {
+        let pool = legacy_pool().await;
+        assert_eq!(user_version(&pool).await.unwrap(), 0);
+
+        apply_schema(&pool).await.expect("upgrade");
+
+        assert_eq!(user_version(&pool).await.unwrap(), MIGRATIONS.len() as i64);
+    }
+
+    #[tokio::test]
+    async fn upgrading_an_older_database_keeps_the_entries_it_already_holds() {
+        let pool = legacy_pool().await;
+        apply_schema(&pool).await.expect("upgrade");
+
+        let entries = store_over(pool).search(SearchFilter::default()).await.unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].query, "SELECT 1");
+    }
+
+    #[tokio::test]
+    async fn reopening_an_up_to_date_database_applies_nothing_further() {
+        let pool = legacy_pool().await;
+        apply_schema(&pool).await.expect("upgrade");
+        apply_schema(&pool).await.expect("second open");
+
+        assert_eq!(user_version(&pool).await.unwrap(), MIGRATIONS.len() as i64);
+        assert!(pending_migrations(user_version(&pool).await.unwrap()).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_version_from_a_newer_build_is_left_alone() {
+        let pool = legacy_pool().await;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "PRAGMA user_version = {}",
+            MIGRATIONS.len() + 5
+        )))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        apply_schema(&pool).await.expect("no downgrade");
+
+        assert_eq!(user_version(&pool).await.unwrap(), MIGRATIONS.len() as i64 + 5);
+    }
 
     async fn fresh_store() -> HistoryStore {
         let pool = SqlitePoolOptions::new()
