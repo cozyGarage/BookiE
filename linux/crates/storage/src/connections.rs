@@ -12,6 +12,11 @@ const CURRENT_VERSION: u32 = 1;
 const MAX_CONNECTIONS_FILE_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CONNECTIONS: usize = 1_000;
 const MAX_CONNECTION_VALUE_BYTES: usize = 64 * 1024;
+/// Hops one saved SSH chain may declare. `jump` deserializes
+/// recursively, so without a cap here the only thing standing between
+/// an edited connections file and a deep recursive parse is
+/// serde_json's default 128-level nesting limit.
+pub(crate) const MAX_SSH_HOPS: usize = 8;
 
 /// Every JSON key `SavedConnection` owns. A key outside this list came
 /// from a newer TablePro (or a hand edit) and is carried through a
@@ -312,7 +317,14 @@ fn validate_connection(connection: &SavedConnection) -> Result<(), StorageError>
         validate_value_size(path.as_os_str().as_encoded_bytes().len())?;
     }
     let mut ssh = connection.ssh.as_ref();
+    let mut hops = 0usize;
     while let Some(hop) = ssh {
+        hops += 1;
+        if hops > MAX_SSH_HOPS {
+            return Err(StorageError::Schema(format!(
+                "an SSH chain is limited to {MAX_SSH_HOPS} hops"
+            )));
+        }
         validate_value_size(hop.host.len())?;
         validate_value_size(hop.username.len())?;
         if let SavedSshAuth::PrivateKey { path, .. } = &hop.auth {
@@ -434,6 +446,64 @@ mod tests {
         let raw = std::fs::read_to_string(&path).unwrap();
         assert!(raw.contains("\"version\": 1"));
         assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
+    }
+
+    fn ssh_chain(depth: usize) -> SavedSshConfig {
+        let mut hop = SavedSshConfig {
+            host: "bastion".into(),
+            port: 22,
+            username: "jump".into(),
+            auth: SavedSshAuth::Password,
+            jump: None,
+        };
+        for _ in 1..depth {
+            hop = SavedSshConfig {
+                host: "bastion".into(),
+                port: 22,
+                username: "jump".into(),
+                auth: SavedSshAuth::Password,
+                jump: Some(Box::new(hop)),
+            };
+        }
+        hop
+    }
+
+    #[tokio::test]
+    async fn an_ssh_chain_at_the_hop_cap_is_accepted() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut connection = sample_connection();
+        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS));
+
+        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
+        assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
+    }
+
+    #[tokio::test]
+    async fn an_ssh_chain_past_the_hop_cap_is_refused() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut connection = sample_connection();
+        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
+
+        let error = save_to(&path, std::slice::from_ref(&connection)).await.unwrap_err();
+        assert!(matches!(error, StorageError::Schema(_)), "{error:?}");
+        assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn a_file_holding_an_over_deep_ssh_chain_is_refused_on_load() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut connection = sample_connection();
+        connection.ssh = Some(ssh_chain(MAX_SSH_HOPS + 1));
+        let document = serde_json::json!({
+            "version": 1,
+            "connections": [serde_json::to_value(&connection).unwrap()],
+        });
+        std::fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+
+        assert!(load_from(&path).await.is_err());
     }
 
     #[tokio::test]

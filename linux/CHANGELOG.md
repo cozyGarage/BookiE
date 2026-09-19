@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- A saved connection can be given a name; leaving the name blank keeps the address-derived label.
+- A saved connection can be duplicated; the copy starts without saved credentials.
+
 ### Changed
 
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
@@ -25,6 +30,10 @@
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
 - A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, a row whose key could not be read is refused with an explanation instead of being changed or deleted silently, and SQL exports write a fixed placeholder comment for such a cell.
+
+### Security
+
+- A saved connection's SSH jump chain is capped at eight hops, so an edited connection file cannot force a deep recursive parse.
 
 ## [0.1.4] - 2026-09-17
 
@@ -88,8 +97,6 @@
 
 ### Added
 
-- A saved connection can be duplicated; the copy starts without saved credentials.
-- A saved connection can be given a name; leaving the name blank keeps the address-derived label.
 - Jump to Column searches browse/result metadata, distinguishes duplicate names by ordinal, and supports Ctrl+Shift+J.
 - BookiE display name and original book icon; new package commands retain legacy aliases.
 - Arch candidates can be built from an explicit local commit SHA and version before publishing a tag.
