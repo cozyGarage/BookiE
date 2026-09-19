@@ -58,6 +58,23 @@ pub enum ColumnKind {
     Text,
 }
 
+impl ColumnKind {
+    pub const ALL: [Self; 12] = [
+        Self::Text,
+        Self::Int,
+        Self::Float,
+        Self::Decimal,
+        Self::Bool,
+        Self::Date,
+        Self::Time,
+        Self::DateTime,
+        Self::TimestampTz,
+        Self::Uuid,
+        Self::Json,
+        Self::Bytes,
+    ];
+}
+
 /// Read a catalog type name as the value shape the import must produce.
 /// Anything unrecognised is text, which is the reading that never loses
 /// what the file said.

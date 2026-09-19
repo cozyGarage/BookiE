@@ -174,9 +174,12 @@ pub enum AppMsg {
         schema: Option<String>,
         table: String,
     },
+    CreateTableFromCsv {
+        schema: Option<String>,
+    },
     CsvFileChosen {
         schema: Option<String>,
-        table: String,
+        table: Option<String>,
         path: std::path::PathBuf,
     },
     CsvImportPrepared(Box<super::import::CsvImportPreparation>),

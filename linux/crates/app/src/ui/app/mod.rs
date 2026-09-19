@@ -824,6 +824,7 @@ impl SimpleComponent for App {
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
+            AppMsg::CreateTableFromCsv { schema } => self.on_create_table_from_csv(schema, sender),
             AppMsg::CsvFileChosen { schema, table, path } => self.on_csv_file_chosen(schema, table, path, sender),
             AppMsg::CsvImportPrepared(preparation) => self.on_csv_import_prepared(*preparation, sender),
             AppMsg::StartCsvImport(choice) => self.on_start_csv_import(*choice, sender),

@@ -9,12 +9,13 @@ use tablepro_core::import::{
     CsvFormat, DEFAULT_IMPORT_BATCH_ROWS, ImportTarget, InsertPlan, MAX_FILE_BYTES, PlanError, build_insert_plan,
     detect_format, read_csv,
 };
-use tablepro_core::{ColumnInfo, DriverError, OperationControl};
+use tablepro_core::sql_ddl::build_create_table;
+use tablepro_core::{ColumnInfo, Connection, DriverError, OperationControl};
 use tablepro_policy::{BulkBatch, BulkInsertEnd, BulkInsertRequest, PolicyGuard};
 use tokio_util::sync::CancellationToken;
 
 use crate::ui::error_text;
-use crate::ui::import_dialog::{ImportChoice, ImportRequest};
+use crate::ui::import_dialog::{ImportChoice, ImportMode, ImportRequest};
 
 use super::{App, AppMsg};
 
@@ -22,11 +23,13 @@ use super::{App, AppMsg};
 #[derive(Debug)]
 pub struct CsvImportPreparation {
     pub schema: Option<String>,
-    pub table: String,
+    /// The existing table, or `None` when the import is creating one.
+    pub table: Option<String>,
     pub path: PathBuf,
     pub bytes: Vec<u8>,
     pub format: CsvFormat,
     pub columns: Vec<ColumnInfo>,
+    pub driver_id: String,
 }
 
 /// How an import ended, as the GTK thread hears it.
@@ -45,6 +48,14 @@ impl App {
         table: String,
         sender: ComponentSender<Self>,
     ) {
+        self.choose_csv_file(schema, Some(table), sender);
+    }
+
+    pub(super) fn on_create_table_from_csv(&self, schema: Option<String>, sender: ComponentSender<Self>) {
+        self.choose_csv_file(schema, None, sender);
+    }
+
+    fn choose_csv_file(&self, schema: Option<String>, table: Option<String>, sender: ComponentSender<Self>) {
         if let Some(message) = self.import_refusal() {
             self.show_error_alert(&crate::tr!("Can't import"), &message);
             return;
@@ -99,11 +110,11 @@ impl App {
     pub(super) fn on_csv_file_chosen(
         &self,
         schema: Option<String>,
-        table: String,
+        table: Option<String>,
         path: PathBuf,
         sender: ComponentSender<Self>,
     ) {
-        let Some(connection_id) = self.connection_id else {
+        let (Some(connection_id), Some(driver_id)) = (self.connection_id, self.current_driver_id.clone()) else {
             return;
         };
         let Some(conn) = self.database.get(connection_id) else {
@@ -114,7 +125,18 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    match prepare_import(conn, &control, schema, table, path).await {
+                    match prepare_import(
+                        conn,
+                        &control,
+                        Prepare {
+                            schema,
+                            table,
+                            path,
+                            driver_id,
+                        },
+                    )
+                    .await
+                    {
                         Ok(preparation) => sender.input(AppMsg::CsvImportPrepared(Box::new(preparation))),
                         Err(message) => sender.input(AppMsg::ShowAlert {
                             title: crate::tr!("Can't import"),
@@ -127,13 +149,22 @@ impl App {
     }
 
     pub(super) fn on_csv_import_prepared(&self, preparation: CsvImportPreparation, sender: ComponentSender<Self>) {
+        let mode = match preparation.table {
+            Some(table) => ImportMode::ExistingTable {
+                table,
+                columns: preparation.columns,
+            },
+            None => ImportMode::NewTable {
+                driver_id: preparation.driver_id,
+                suggested_table: suggested_table_name(&preparation.path),
+            },
+        };
         let request = ImportRequest {
             schema: preparation.schema,
-            table: preparation.table,
             path: preparation.path,
             bytes: preparation.bytes,
             format: preparation.format,
-            columns: preparation.columns,
+            mode,
         };
         crate::ui::import_dialog::present(&self.window, request, move |choice| {
             sender.input(AppMsg::StartCsvImport(Box::new(choice)));
@@ -155,6 +186,13 @@ impl App {
                 return;
             }
         };
+        let create_sql = match create_statement(&driver_id, &choice) {
+            Ok(sql) => sql,
+            Err(message) => {
+                self.show_error_alert(&crate::tr!("Can't import"), &message);
+                return;
+            }
+        };
         let Some(guard) = self
             .database
             .guard(connection_id, tablepro_policy::Principal::human_gui())
@@ -165,13 +203,14 @@ impl App {
         let progress = crate::ui::import_dialog::present_progress(&self.window, &choice.table, plan.row_count());
         let token = progress.cancel_token();
         self.csv_import_progress = Some(progress);
-        self.run_import(guard, plan, choice, token, sender);
+        self.run_import(guard, plan, create_sql, choice, token, sender);
     }
 
     fn run_import(
         &self,
         guard: Arc<PolicyGuard>,
         plan: InsertPlan,
+        create_sql: Option<String>,
         choice: ImportChoice,
         token: CancellationToken,
         sender: ComponentSender<Self>,
@@ -184,6 +223,7 @@ impl App {
                     let run = ImportRun {
                         guard,
                         plan,
+                        create_sql,
                         schema: choice.schema,
                         table: choice.table,
                         token,
@@ -229,6 +269,9 @@ impl App {
 struct ImportRun {
     guard: Arc<PolicyGuard>,
     plan: InsertPlan,
+    /// The CREATE TABLE this import runs first, as its own governed
+    /// statement. It is classified, decided and audited on its own.
+    create_sql: Option<String>,
     schema: Option<String>,
     table: String,
     token: CancellationToken,
@@ -238,6 +281,14 @@ struct ImportRun {
 impl ImportRun {
     async fn execute(self, sender: &ComponentSender<App>) -> CsvImportReport {
         let total = self.plan.row_count();
+        if let Err(message) = self.create_table().await {
+            return CsvImportReport {
+                table: self.table,
+                committed: 0,
+                total,
+                error: Some(message),
+            };
+        }
         let request = BulkInsertRequest {
             schema: self.schema.clone(),
             table: self.table.clone(),
@@ -272,6 +323,18 @@ impl ImportRun {
             total,
             error: stop_message(outcome),
         }
+    }
+
+    async fn create_table(&self) -> Result<(), String> {
+        let Some(sql) = &self.create_sql else {
+            return Ok(());
+        };
+        let control = self.control();
+        self.guard
+            .execute_controlled(sql, &control)
+            .await
+            .map(|_| ())
+            .map_err(|error| error_text::driver_message(&error))
     }
 
     async fn run_batches(
@@ -319,30 +382,78 @@ fn stop_message(outcome: Result<(), BatchStop>) -> Option<String> {
     }
 }
 
-async fn prepare_import(
-    conn: Arc<dyn tablepro_core::Connection>,
-    control: &OperationControl,
+struct Prepare {
     schema: Option<String>,
-    table: String,
+    table: Option<String>,
     path: PathBuf,
+    driver_id: String,
+}
+
+async fn prepare_import(
+    conn: Arc<dyn Connection>,
+    control: &OperationControl,
+    prepare: Prepare,
 ) -> Result<CsvImportPreparation, String> {
-    let bytes = read_file(&path)?;
+    let bytes = read_file(&prepare.path)?;
     let format = detect_format(&bytes);
+    let columns = match &prepare.table {
+        None => Vec::new(),
+        Some(table) => existing_columns(conn, control, prepare.schema.as_deref(), table).await?,
+    };
+    Ok(CsvImportPreparation {
+        schema: prepare.schema,
+        table: prepare.table,
+        path: prepare.path,
+        bytes,
+        format,
+        columns,
+        driver_id: prepare.driver_id,
+    })
+}
+
+async fn existing_columns(
+    conn: Arc<dyn Connection>,
+    control: &OperationControl,
+    schema: Option<&str>,
+    table: &str,
+) -> Result<Vec<ColumnInfo>, String> {
     let columns = conn
-        .fetch_columns_controlled(schema.as_deref(), &table, control)
+        .fetch_columns_controlled(schema, table, control)
         .await
         .map_err(|error| error_text::driver_message(&error))?;
     if columns.is_empty() {
         return Err(crate::tr!("The table has no columns to import into."));
     }
-    Ok(CsvImportPreparation {
-        schema,
-        table,
-        path,
-        bytes,
-        format,
-        columns,
-    })
+    Ok(columns)
+}
+
+/// The CREATE the import runs before its first row, or nothing when the
+/// table is already there.
+fn create_statement(driver_id: &str, choice: &ImportChoice) -> Result<Option<String>, String> {
+    let Some(drafts) = &choice.create else {
+        return Ok(None);
+    };
+    let statements = build_create_table(driver_id, choice.schema.as_deref(), &choice.table, drafts, &[], &[])
+        .map_err(|error| error.to_string())?;
+    statements
+        .into_iter()
+        .next()
+        .map(Some)
+        .ok_or_else(|| crate::tr!("The table could not be built from the file."))
+}
+
+fn suggested_table_name(path: &std::path::Path) -> String {
+    let stem = path.file_stem().map(|stem| stem.to_string_lossy().to_string());
+    let cleaned: String = stem
+        .unwrap_or_default()
+        .chars()
+        .map(|character| if character.is_alphanumeric() { character } else { '_' })
+        .collect();
+    let cleaned = cleaned.trim_matches('_').to_lowercase();
+    if cleaned.is_empty() {
+        return "imported_table".to_owned();
+    }
+    cleaned
 }
 
 fn read_file(path: &std::path::Path) -> Result<Vec<u8>, String> {
@@ -383,4 +494,65 @@ fn plan_error_text(error: PlanError) -> String {
         })
         .collect();
     format!("{}\n\n{}", error, lines.join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tablepro_core::import::CsvImportOptions;
+    use tablepro_core::sql_ddl::DraftColumn;
+
+    fn draft(name: &str, data_type: &str) -> DraftColumn {
+        DraftColumn {
+            original: None,
+            name: name.to_owned(),
+            data_type: data_type.to_owned(),
+            nullable: true,
+            primary_key: false,
+            auto_increment: false,
+            default_value: None,
+        }
+    }
+
+    fn choice(create: Option<Vec<DraftColumn>>) -> ImportChoice {
+        ImportChoice {
+            schema: None,
+            table: "people".into(),
+            bytes: Vec::new(),
+            options: CsvImportOptions::default(),
+            mapping: Vec::new(),
+            columns: Vec::new(),
+            create,
+        }
+    }
+
+    #[test]
+    fn an_import_into_an_existing_table_creates_nothing() {
+        assert_eq!(create_statement("postgres", &choice(None)), Ok(None));
+    }
+
+    #[test]
+    fn a_new_table_is_created_by_one_statement_with_quoted_identifiers() {
+        let drafts = vec![draft("id", "BIGINT"), draft("na\"me", "TEXT")];
+
+        let sql = create_statement("postgres", &choice(Some(drafts)))
+            .expect("built")
+            .expect("a statement");
+
+        assert!(sql.starts_with("CREATE TABLE \"people\""));
+        assert!(sql.contains("\"na\"\"me\" TEXT"));
+        assert!(!sql.contains(';'));
+    }
+
+    #[test]
+    fn a_file_name_becomes_a_table_name_that_can_be_an_identifier() {
+        assert_eq!(
+            suggested_table_name(std::path::Path::new("/tmp/People List 2024.csv")),
+            "people_list_2024"
+        );
+        assert_eq!(
+            suggested_table_name(std::path::Path::new("/tmp/---.csv")),
+            "imported_table"
+        );
+    }
 }
