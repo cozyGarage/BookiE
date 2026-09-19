@@ -533,3 +533,13 @@ fn a_socket_connection_keeps_its_directory_through_a_bundle() {
     let plan = plan_import(std::slice::from_ref(&connection), &body).expect("plan");
     assert_eq!(plan.items[0].disposition, ImportDisposition::UpdateInPlace);
 }
+
+#[test]
+fn an_import_keeps_an_existing_local_password_unless_replacement_is_asked_for() {
+    let existing = || Some(SecretString::new("local".to_owned().into()));
+
+    assert!(!should_write(existing(), false));
+    assert!(should_write(existing(), true));
+    assert!(should_write(None, false));
+    assert!(should_write(None, true));
+}

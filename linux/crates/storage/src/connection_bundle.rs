@@ -372,6 +372,12 @@ pub struct EncryptedBundle {
     sealed: SealedBundle,
 }
 
+impl std::fmt::Debug for EncryptedBundle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EncryptedBundle").finish_non_exhaustive()
+    }
+}
+
 pub fn parse_bundle(bytes: &[u8]) -> Result<ParsedBundle, BundleError> {
     if bytes.len() > MAX_BUNDLE_BYTES {
         return Err(BundleError::TooLarge {
@@ -477,6 +483,79 @@ pub fn check_ssh_depth(ssh: Option<&SavedSshConfig>) -> Result<(), BundleError> 
         cursor = hop.jump.as_deref();
     }
     Ok(())
+}
+
+/// Read every credential a bundle may carry for these connections.
+/// Fails closed: a keyring that cannot answer for one connection aborts
+/// the whole export, because a bundle quietly missing passwords the user
+/// believed were in it is worse than no bundle.
+pub async fn collect_bundle_secrets(ids: &[Uuid]) -> Result<Vec<BundleSecrets>, BundleError> {
+    let mut collected = Vec::with_capacity(ids.len());
+    for id in ids {
+        let secrets = BundleSecrets::new(
+            *id,
+            crate::secrets::load_password(*id)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(*id))?,
+            crate::secrets::load_ssh_password(*id)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(*id))?,
+            crate::secrets::load_ssh_passphrase(*id)
+                .await
+                .map_err(|_| BundleError::SecretUnavailable(*id))?,
+        );
+        if secrets.is_empty() {
+            continue;
+        }
+        collected.push(secrets);
+    }
+    Ok(collected)
+}
+
+/// Write an imported connection's credentials under `target`. An
+/// existing local secret is kept unless `replace_existing` is set, so an
+/// import cannot silently swap a password the user still relies on.
+pub async fn store_bundle_secrets(
+    target: Uuid,
+    secrets: &BundleSecrets,
+    label: &str,
+    replace_existing: bool,
+) -> Result<(), crate::error::StorageError> {
+    if let Some(value) = secrets.db_password()
+        && should_write(crate::secrets::load_password(target).await?, replace_existing)
+    {
+        crate::secrets::store_password(target, value.expose_secret(), label).await?;
+    }
+    if let Some(value) = secrets.ssh_password()
+        && should_write(crate::secrets::load_ssh_password(target).await?, replace_existing)
+    {
+        crate::secrets::store_ssh_password(target, value.expose_secret(), label).await?;
+    }
+    if let Some(value) = secrets.ssh_passphrase()
+        && should_write(crate::secrets::load_ssh_passphrase(target).await?, replace_existing)
+    {
+        crate::secrets::store_ssh_passphrase(target, value.expose_secret(), label).await?;
+    }
+    Ok(())
+}
+
+pub(crate) fn should_write(existing: Option<SecretString>, replace_existing: bool) -> bool {
+    existing.is_none() || replace_existing
+}
+
+/// Best-effort removal of the credentials an import wrote for a
+/// connection it created. Used only on the rollback path for a `New`
+/// item, never for one that existed before the import.
+pub async fn forget_imported_secrets(target: Uuid) {
+    for outcome in [
+        crate::secrets::delete_password(target).await,
+        crate::secrets::delete_ssh_password(target).await,
+        crate::secrets::delete_ssh_passphrase(target).await,
+    ] {
+        if let Err(error) = outcome {
+            tracing::warn!(error = %error, "removing a partially imported credential failed");
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

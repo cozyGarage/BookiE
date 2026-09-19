@@ -1,4 +1,5 @@
 mod browse;
+mod bundle;
 mod connection;
 mod favorites;
 mod init_css;
@@ -148,6 +149,11 @@ pub struct App {
     /// the model so the welcome view can be re-arranged without another
     /// disk read on every keystroke in the filter box.
     connection_organization: ConnectionOrganizationIndex,
+    /// A parsed bundle waiting on the preview dialog. Nothing reaches
+    /// disk until the user confirms the plan it holds.
+    pending_import: Option<Box<bundle::PendingImport>>,
+    /// An encrypted bundle waiting on its passphrase.
+    pending_bundle: Option<tablepro_storage::EncryptedBundle>,
     connected: bool,
     /// The connection this window owns. Activation is process-wide and
     /// additive, so a window must resolve its own connection rather than
@@ -431,6 +437,8 @@ impl SimpleComponent for App {
                     WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
                     WelcomeViewOutput::Organize(saved) => AppMsg::OrganizeConnection(saved),
                     WelcomeViewOutput::Duplicate(id) => AppMsg::DuplicateConnection(id),
+                    WelcomeViewOutput::ExportBundle => AppMsg::ExportConnections,
+                    WelcomeViewOutput::ImportBundle => AppMsg::ImportBundle,
                     WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
                 });
 
@@ -481,6 +489,8 @@ impl SimpleComponent for App {
             default_page_size,
             saved_connections: Vec::new(),
             connection_organization: ConnectionOrganizationIndex::default(),
+            pending_import: None,
+            pending_bundle: None,
             connected: false,
             connection_id: None,
             connection_transition: ConnectionTransition::Idle,
@@ -807,6 +817,17 @@ impl SimpleComponent for App {
             AppMsg::CopyRowAsInsert { tab_id, row_position } => self.on_copy_row_as_insert(tab_id, row_position),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
             AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),
+            AppMsg::ExportConnections => self.on_export_connections(sender),
+            AppMsg::ExportConnectionsTo(choice) => self.on_export_connections_to(choice, sender),
+            AppMsg::ExportConnectionsSucceeded(count) => self.on_export_connections_succeeded(count),
+            AppMsg::ImportBundle => self.on_import_bundle(sender),
+            AppMsg::ImportBundleFile(path) => self.on_import_bundle_file(path, sender),
+            AppMsg::ImportBundleEncrypted(sealed) => self.on_import_bundle_encrypted(sealed, sender),
+            AppMsg::ImportBundleUnlock(passphrase) => self.on_import_bundle_unlock(passphrase, sender),
+            AppMsg::ImportBundlePlanned(pending) => self.on_import_bundle_planned(pending, sender),
+            AppMsg::ImportBundleConfirmed(choice) => self.on_import_bundle_confirmed(choice, sender),
+            AppMsg::ImportBundleFinished(imported, planned) => self.on_import_bundle_finished(imported, planned),
+            AppMsg::BundleFailed(message) => self.on_bundle_failed(&message),
             AppMsg::DuplicateConnectionSucceeded(name) => self.on_duplicate_connection_succeeded(&name),
             AppMsg::DuplicateConnectionFailed => self.on_duplicate_connection_failed(),
             AppMsg::ConnectionOrganizationLoaded(index) => self.on_connection_organization_loaded(index),

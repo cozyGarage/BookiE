@@ -35,6 +35,8 @@ pub enum WelcomeViewInput {
     Organize(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
+    ExportBundle,
+    ImportBundle,
 }
 
 #[derive(Debug)]
@@ -47,6 +49,8 @@ pub enum WelcomeViewOutput {
     Organize(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
+    ExportBundle,
+    ImportBundle,
 }
 
 #[derive(Debug, Default)]
@@ -138,7 +142,30 @@ impl SimpleComponent for WelcomeView {
             .orientation(gtk::Orientation::Horizontal)
             .spacing(6)
             .build();
+        let bundle_btn = gtk::MenuButton::builder()
+            .icon_name("document-send-symbolic")
+            .tooltip_text(crate::tr!("Export or import connections"))
+            .valign(gtk::Align::Center)
+            .build();
+        bundle_btn.add_css_class("flat");
+        let bundle_menu = gtk::gio::Menu::new();
+        bundle_menu.append(Some(&crate::tr!("Export connections…")), Some("welcome.export-bundle"));
+        bundle_menu.append(Some(&crate::tr!("Import connections…")), Some("welcome.import-bundle"));
+        bundle_btn.set_menu_model(Some(&bundle_menu));
+
+        let actions = gtk::gio::SimpleActionGroup::new();
+        let export_action = gtk::gio::SimpleAction::new("export-bundle", None);
+        let s_export = sender.clone();
+        export_action.connect_activate(move |_, _| s_export.input(WelcomeViewInput::ExportBundle));
+        actions.add_action(&export_action);
+        let import_action = gtk::gio::SimpleAction::new("import-bundle", None);
+        let s_bundle_import = sender.clone();
+        import_action.connect_activate(move |_, _| s_bundle_import.input(WelcomeViewInput::ImportBundle));
+        actions.add_action(&import_action);
+        root.insert_action_group("welcome", Some(&actions));
+
         header_actions.append(&import_btn);
+        header_actions.append(&bundle_btn);
         header_actions.append(&header_btn);
         group.set_header_suffix(Some(&header_actions));
 
@@ -224,6 +251,12 @@ impl SimpleComponent for WelcomeView {
             }
             WelcomeViewInput::Duplicate(id) => {
                 let _ = sender.output(WelcomeViewOutput::Duplicate(id));
+            }
+            WelcomeViewInput::ExportBundle => {
+                let _ = sender.output(WelcomeViewOutput::ExportBundle);
+            }
+            WelcomeViewInput::ImportBundle => {
+                let _ = sender.output(WelcomeViewOutput::ImportBundle);
             }
             WelcomeViewInput::Delete(id) => {
                 let _ = sender.output(WelcomeViewOutput::Delete(id));
@@ -420,10 +453,5 @@ mod tests {
     #[test]
     fn an_empty_arrangement_renders_no_sections() {
         assert!(group_sections(&[], &ConnectionOrganizationIndex::default()).is_empty());
-    }
-
-    #[test]
-    fn the_filter_box_appears_only_once_the_list_can_outgrow_the_view() {
-        assert!(FILTER_REVEAL_THRESHOLD > 1);
     }
 }

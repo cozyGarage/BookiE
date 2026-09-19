@@ -17,7 +17,8 @@ pub use connection_bundle::{
     BUNDLE_EXCLUDED_FIELDS, BUNDLE_FORMAT, BUNDLE_INCLUDED_FIELDS, BUNDLE_VERSION, BundleBody, BundleConnection,
     BundleError, BundleExport, BundleOrganization, BundleSecrets, EncryptedBundle, ImportDisposition, ImportItem,
     ImportPlan, MAX_BUNDLE_CONNECTIONS, MAX_SSH_HOPS as BUNDLE_MAX_SSH_HOPS, ParsedBundle, bundle_organization,
-    export_encrypted, export_plaintext, parse_bundle, plan_import,
+    collect_bundle_secrets, export_encrypted, export_plaintext, forget_imported_secrets, parse_bundle, plan_import,
+    store_bundle_secrets,
 };
 pub use connection_color::{CONNECTION_COLORS, connection_color, connection_color_css_class};
 pub use connection_organization::{
