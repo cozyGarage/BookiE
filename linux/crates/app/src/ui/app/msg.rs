@@ -48,6 +48,8 @@ pub enum AppMsg {
     FavoriteSaved,
     FavoriteSaveFailed(String),
     SaveQueryAsFavorite,
+    ShowSavedQueries,
+    SavedQueriesChanged(Vec<tablepro_storage::SavedQuery>),
     ShowQuickSwitcher,
     QuickSwitcherChose(crate::services::quick_switcher::QuickTarget),
     SchemaColumnsFetched(crate::ui::editor::SchemaRequest, Result<Vec<String>, ()>),

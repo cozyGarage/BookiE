@@ -73,6 +73,7 @@ pub(super) fn install_window_actions(
         input_action!("open-filter", AppMsg::ShowFilterDialog),
         input_action!("open-quickly", AppMsg::ShowQuickSwitcher),
         input_action!("save-favorite", AppMsg::SaveQueryAsFavorite),
+        input_action!("show-saved-queries", AppMsg::ShowSavedQueries),
     ]);
     let disconnect_action = gio::SimpleAction::new("disconnect", None);
     let disconnect_sender = sender.clone();
@@ -102,6 +103,7 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         ("<Primary>p", "win.open-quickly"),
         ("<Primary><Shift>j", "win.jump-column"),
         ("<Primary>d", "win.save-favorite"),
+        ("<Primary><Shift>d", "win.show-saved-queries"),
         ("<Primary>s", "win.save-changes"),
         ("<Primary>z", "win.undo-change"),
         ("<Primary>y", "win.redo-change"),
@@ -133,6 +135,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>h", crate::tr!("Open Query History")),
             ("<Primary>p", crate::tr!("Open Quickly: favorites and open tabs")),
             ("<Primary>d", crate::tr!("Save the editor query as a favorite")),
+            ("<Primary><Shift>d", crate::tr!("Manage saved queries")),
             ("<Primary>s", crate::tr!("Save pending changes")),
             ("<Primary>z", crate::tr!("Undo pending change")),
             ("<Primary>y", crate::tr!("Redo pending change")),
