@@ -706,6 +706,9 @@ impl SimpleComponent for App {
                 self.on_connections_loaded(&conns, sender);
             }
             AppMsg::NewEditorTab => self.append_editor_tab(None, sender),
+            AppMsg::OpenSqlFile => self.on_open_sql_file(sender),
+            AppMsg::SqlFileOpened(text) => self.append_editor_tab(Some(text), sender),
+            AppMsg::SqlFileFailed(message) => self.show_toast(&message),
             AppMsg::EditorTabRunStateChanged(id, running) => {
                 self.on_editor_tab_run_state_changed(id, running);
                 self.continue_connection_switch(sender);
@@ -841,5 +844,15 @@ impl SimpleComponent for App {
         if let Some(source) = self.history_prune_source.take() {
             source.remove();
         }
+    }
+}
+
+impl App {
+    pub(super) fn on_open_sql_file(&self, sender: ComponentSender<Self>) {
+        let parent = self.window.clone().upcast::<gtk::Window>();
+        crate::ui::editor::open_file::choose_sql_file(Some(parent), move |outcome| match outcome {
+            Ok(text) => sender.input(AppMsg::SqlFileOpened(text)),
+            Err(message) => sender.input(AppMsg::SqlFileFailed(message)),
+        });
     }
 }

@@ -55,6 +55,7 @@ pub(super) fn install_window_actions(
         input_action!("about", AppMsg::ShowAbout),
         quit,
         input_action!("open-editor", AppMsg::NewEditorTab),
+        input_action!("open-file", AppMsg::OpenSqlFile),
         input_action!("close-current", AppMsg::CloseActiveWorkspaceTab),
         input_action!("preferences", AppMsg::ShowPreferences),
         input_action!("new-window", AppMsg::NewWindow),
@@ -93,6 +94,7 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         ("<Primary>w", "win.close-current"),
         ("<Primary>e", "win.open-editor"),
         ("<Primary>t", "win.open-editor"),
+        ("<Primary>o", "win.open-file"),
         ("F5", "win.refresh-page"),
         ("<Primary>f", "win.open-filter"),
         ("<Primary>comma", "win.preferences"),
@@ -125,6 +127,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &crate::tr!("General"),
         &[
             ("<Primary>e", crate::tr!("Open SQL editor")),
+            ("<Primary>o", crate::tr!("Open a SQL file in a new editor tab")),
             ("F5", crate::tr!("Refresh table")),
             ("<Primary>comma", crate::tr!("Open Preferences")),
             ("<Primary>h", crate::tr!("Open Query History")),
