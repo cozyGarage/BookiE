@@ -28,6 +28,7 @@ pub(super) fn build_workspace_chrome(widgets: &AppWidgets, sender: &ComponentSen
             ConnectionRowOutput::Open(saved) => AppMsg::OpenSaved(saved),
             ConnectionRowOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
             ConnectionRowOutput::Organize(saved) => AppMsg::OrganizeConnection(saved),
+            ConnectionRowOutput::Duplicate(id) => AppMsg::DuplicateConnection(id),
             ConnectionRowOutput::Delete(id) => AppMsg::DeleteConnection(id),
         });
 

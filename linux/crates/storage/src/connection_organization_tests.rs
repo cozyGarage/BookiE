@@ -328,6 +328,77 @@ async fn concurrent_stale_indexes_merge_distinct_fields_on_one_record() {
     assert!(loaded.favorite);
 }
 
+#[test]
+fn a_colour_outside_the_palette_is_not_stored() {
+    let entry = organization(None, &[], false).with_color(Some("#ff0000"));
+    assert_eq!(entry.color, None);
+    assert!(entry.is_empty());
+}
+
+#[test]
+fn a_palette_colour_is_stored_normalised() {
+    let entry = organization(None, &[], false).with_color(Some(" Blue "));
+    assert_eq!(entry.color.as_deref(), Some("blue"));
+    assert!(!entry.is_empty());
+}
+
+#[tokio::test]
+async fn a_colour_tag_round_trips_through_the_sidecar() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connection-organization.json");
+    let id = Uuid::new_v4();
+    let mut index = ConnectionOrganizationIndex::default();
+    index
+        .set(id, organization(Some("Prod"), &[], false).with_color(Some("red")))
+        .unwrap();
+    save_to(&path, &index).await.unwrap();
+
+    let loaded = load_from(&path).await.unwrap().get(id);
+    assert_eq!(loaded.color.as_deref(), Some("red"));
+    assert_eq!(loaded.group.as_deref(), Some("Prod"));
+}
+
+#[tokio::test]
+async fn a_colour_outside_the_palette_on_disk_reads_as_no_colour() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connection-organization.json");
+    let id = Uuid::new_v4();
+    let document = serde_json::json!({
+        "version": 1,
+        "connections": { id.to_string(): { "group": "Prod", "color": "url(javascript:alert(1))" } },
+    });
+    tokio::fs::write(&path, serde_json::to_vec(&document).unwrap())
+        .await
+        .unwrap();
+
+    let loaded = load_from(&path).await.unwrap().get(id);
+    assert_eq!(loaded.color, None);
+    assert_eq!(loaded.group.as_deref(), Some("Prod"));
+}
+
+#[tokio::test]
+async fn concurrent_indexes_merge_a_colour_against_a_group() {
+    let dir = TempDir::new().unwrap();
+    let path = dir.path().join("connection-organization.json");
+    let id = Uuid::new_v4();
+    let mut initial = ConnectionOrganizationIndex::default();
+    initial.set(id, organization(None, &["base"], false)).unwrap();
+    save_to(&path, &initial).await.unwrap();
+    let mut grouped = load_from(&path).await.unwrap();
+    let mut coloured = load_from(&path).await.unwrap();
+    grouped.set(id, organization(Some("Prod"), &["base"], false)).unwrap();
+    coloured
+        .set(id, organization(None, &["base"], false).with_color(Some("teal")))
+        .unwrap();
+
+    save_to(&path, &grouped).await.unwrap();
+    save_to(&path, &coloured).await.unwrap();
+
+    let loaded = load_from(&path).await.unwrap().get(id);
+    assert_eq!(loaded.group.as_deref(), Some("Prod"));
+    assert_eq!(loaded.color.as_deref(), Some("teal"));
+}
+
 #[tokio::test]
 async fn a_malformed_organization_file_survives_a_write() {
     let dir = TempDir::new().unwrap();

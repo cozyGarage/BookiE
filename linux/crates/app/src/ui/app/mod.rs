@@ -436,6 +436,7 @@ impl SimpleComponent for App {
                     WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(saved),
                     WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
                     WelcomeViewOutput::Organize(saved) => AppMsg::OrganizeConnection(saved),
+                    WelcomeViewOutput::Duplicate(id) => AppMsg::DuplicateConnection(id),
                     WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
                 });
 
@@ -825,6 +826,9 @@ impl SimpleComponent for App {
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsInsert { tab_id, row_position } => self.on_copy_row_as_insert(tab_id, row_position),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
+            AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),
+            AppMsg::DuplicateConnectionSucceeded(name) => self.on_duplicate_connection_succeeded(&name),
+            AppMsg::DuplicateConnectionFailed => self.on_duplicate_connection_failed(),
             AppMsg::ConnectionOrganizationLoaded(index) => self.on_connection_organization_loaded(index),
             AppMsg::ToggleConnectionFavorite(id) => self.on_toggle_connection_favorite(id, sender),
             AppMsg::OrganizeConnection(saved) => self.on_organize_connection(saved, sender),
