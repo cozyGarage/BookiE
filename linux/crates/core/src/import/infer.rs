@@ -38,6 +38,7 @@ pub fn infer_columns(sheet: &CsvSheet, options: &CsvImportOptions, driver_id: &s
                 primary_key: false,
                 auto_increment: false,
                 default_value: None,
+                comment: None,
             }
         })
         .collect()

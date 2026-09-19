@@ -332,6 +332,7 @@ impl NewColumns {
                 primary_key: false,
                 auto_increment: false,
                 default_value: None,
+                comment: None,
             });
         }
         if !all_ok {
