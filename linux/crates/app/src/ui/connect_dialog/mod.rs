@@ -20,6 +20,7 @@ pub struct ConnectDialog {
     drivers: Vec<DriverEntry>,
     driver_combo: adw::ComboRow,
     endpoint_combo: adw::ComboRow,
+    name: adw::EntryRow,
     host: adw::EntryRow,
     port: adw::SpinRow,
     socket_dir: adw::EntryRow,
@@ -66,7 +67,7 @@ mod form;
 mod identity;
 
 use form::{AuthFormState, EndpointFormState, resolved_socket_path, socket_directory_is_valid};
-use identity::{ConnectionIdentity, find_existing};
+use identity::{ConnectionIdentity, find_existing, saved_connection_name};
 
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
@@ -180,6 +181,7 @@ impl Component for ConnectDialog {
             sender_for_endpoint.input(ConnectDialogInput::EndpointChanged);
         });
 
+        let name = adw::EntryRow::builder().title(crate::tr!("Name (optional)")).build();
         let host = adw::EntryRow::builder()
             .title(crate::tr!("Host"))
             .text("localhost")
@@ -255,6 +257,7 @@ impl Component for ConnectDialog {
         // standard Adwaita section spacing & headers.
         let connection_group = adw::PreferencesGroup::builder().title(crate::tr!("Connection")).build();
         connection_group.add(&driver_combo);
+        connection_group.add(&name);
         connection_group.add(&endpoint_combo);
         connection_group.add(&host);
         connection_group.add(&port);
@@ -313,6 +316,7 @@ impl Component for ConnectDialog {
             drivers: drivers.clone(),
             driver_combo,
             endpoint_combo,
+            name,
             host,
             port,
             socket_dir,
@@ -417,15 +421,7 @@ impl Component for ConnectDialog {
 
                 let opts = self.collect_options(driver.as_ref());
 
-                let label = if entry.id == "sqlite" {
-                    opts.database.clone()
-                } else if let Some(directory) = &opts.local_socket_dir {
-                    format!("{}@{}", opts.username, directory.display())
-                } else if opts.auth_mode == AuthMode::Kerberos {
-                    opts.host.clone()
-                } else {
-                    format!("{}@{}", opts.username, opts.host)
-                };
+                let label = saved_connection_name(self.name.text().as_str(), &entry.id, &opts);
                 let driver_id = entry.id.clone();
 
                 let ssh_inputs = if self.ssh.is_enabled() {

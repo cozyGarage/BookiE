@@ -15,6 +15,30 @@ pub(super) struct ConnectionIdentity<'a> {
     pub ssh: Option<&'a SshInputs>,
 }
 
+/// The name a saved record gets. A name the user typed wins; blank
+/// falls back to the endpoint-derived label, which is what every
+/// connection saved before naming shipped already carries.
+pub(super) fn saved_connection_name(entered: &str, driver_id: &str, opts: &ConnectOptions) -> String {
+    let entered = entered.trim();
+    if !entered.is_empty() {
+        return entered.to_owned();
+    }
+    derived_connection_name(driver_id, opts)
+}
+
+fn derived_connection_name(driver_id: &str, opts: &ConnectOptions) -> String {
+    if driver_id == "sqlite" {
+        return opts.database.clone();
+    }
+    if let Some(directory) = &opts.local_socket_dir {
+        return format!("{}@{}", opts.username, directory.display());
+    }
+    if opts.auth_mode == tablepro_core::AuthMode::Kerberos {
+        return opts.host.clone();
+    }
+    format!("{}@{}", opts.username, opts.host)
+}
+
 pub(super) async fn find_existing(identity: &ConnectionIdentity<'_>) -> Option<SavedConnection> {
     let existing = tablepro_storage::load_connections().await.ok()?;
     select_existing(&existing, identity).cloned()
@@ -189,6 +213,36 @@ mod tests {
         finance.database = "finance".into();
         assert!(matches_existing(&sales, &identity("mssql", &same, false)));
         assert!(!matches_existing(&sales, &identity("mssql", &finance, false)));
+    }
+
+    #[test]
+    fn a_blank_name_falls_back_to_the_endpoint_label() {
+        let network = opts("sa", AuthMode::Password);
+        assert_eq!(saved_connection_name("   ", "mssql", &network), "sa@sql.corp.example");
+
+        let mut kerberos = opts("", AuthMode::Kerberos);
+        kerberos.host = "sql.corp.example".into();
+        assert_eq!(saved_connection_name("", "mssql", &kerberos), "sql.corp.example");
+
+        let mut file = opts("", AuthMode::Password);
+        file.database = "/tmp/books.db".into();
+        assert_eq!(saved_connection_name("", "sqlite", &file), "/tmp/books.db");
+
+        let mut socket = opts("postgres", AuthMode::Password);
+        socket.local_socket_dir = Some(std::path::PathBuf::from("/run/postgresql"));
+        assert_eq!(
+            saved_connection_name("", "postgres", &socket),
+            "postgres@/run/postgresql"
+        );
+    }
+
+    #[test]
+    fn a_typed_name_replaces_the_endpoint_label() {
+        let network = opts("sa", AuthMode::Password);
+        assert_eq!(
+            saved_connection_name("  Sales reporting  ", "mssql", &network),
+            "Sales reporting"
+        );
     }
 
     #[test]
