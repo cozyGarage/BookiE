@@ -145,6 +145,47 @@ pub async fn delete_connection(id: Uuid) -> Result<(), StorageError> {
     delete_from(&connections_path()?, id).await
 }
 
+/// A copy of `id` under a fresh `Uuid` and a distinct name. The new id
+/// has no Secret Service entries, so the copy starts without any saved
+/// credentials and the caller must say so.
+pub async fn duplicate_connection(id: Uuid) -> Result<SavedConnection, StorageError> {
+    duplicate_from(&connections_path()?, id).await
+}
+
+async fn duplicate_from(path: &Path, id: Uuid) -> Result<SavedConnection, StorageError> {
+    let _guard = lock_path(path).await?;
+    let mut existing = load_from(path).await?;
+    let Some(source) = existing.iter().find(|connection| connection.id == id) else {
+        return Err(StorageError::Schema("no saved connection with that id".into()));
+    };
+    let copy = SavedConnection {
+        id: Uuid::new_v4(),
+        name: distinct_copy_name(&source.name, &existing),
+        last_opened_at: None,
+        ..source.clone()
+    };
+    existing.push(copy.clone());
+    save_to_unlocked(path, &existing).await?;
+    Ok(copy)
+}
+
+/// `name (copy)`, then `name (copy 2)` upward, so a second duplicate
+/// does not produce two rows the user cannot tell apart.
+fn distinct_copy_name(source: &str, existing: &[SavedConnection]) -> String {
+    let taken = |candidate: &str| existing.iter().any(|connection| connection.name == candidate);
+    let first = format!("{source} (copy)");
+    if !taken(&first) {
+        return first;
+    }
+    for suffix in 2..=MAX_CONNECTIONS {
+        let candidate = format!("{source} (copy {suffix})");
+        if !taken(&candidate) {
+            return candidate;
+        }
+    }
+    format!("{source} (copy {})", Uuid::new_v4())
+}
+
 async fn delete_from(path: &Path, id: Uuid) -> Result<(), StorageError> {
     let _guard = lock_path(path).await?;
     let mut existing = load_from(path).await?;
@@ -393,6 +434,69 @@ mod tests {
         let raw = std::fs::read_to_string(&path).unwrap();
         assert!(raw.contains("\"version\": 1"));
         assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_gets_a_fresh_id_and_a_distinct_name() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let original = sample_connection();
+        save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        let copy = duplicate_from(&path, original.id).await.unwrap();
+
+        assert_ne!(copy.id, original.id);
+        assert_eq!(copy.name, "Local Postgres (copy)");
+        assert_eq!(copy.host, original.host);
+        assert_eq!(copy.database, original.database);
+        assert_eq!(copy.last_opened_at, None);
+
+        let stored = load_from(&path).await.unwrap();
+        assert_eq!(stored.len(), 2);
+        assert!(stored.iter().any(|connection| connection.id == original.id));
+        assert!(stored.iter().any(|connection| connection.id == copy.id));
+    }
+
+    #[tokio::test]
+    async fn a_second_duplicate_does_not_reuse_the_first_copy_name() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let original = sample_connection();
+        save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        let first = duplicate_from(&path, original.id).await.unwrap();
+        let second = duplicate_from(&path, original.id).await.unwrap();
+
+        assert_eq!(first.name, "Local Postgres (copy)");
+        assert_eq!(second.name, "Local Postgres (copy 2)");
+        assert_ne!(first.id, second.id);
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_keeps_the_recorded_open_time_off_the_copy() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut original = sample_connection();
+        original.last_opened_at = Some(Utc::now());
+        save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        let copy = duplicate_from(&path, original.id).await.unwrap();
+
+        assert!(copy.last_opened_at.is_none());
+        let stored = load_from(&path).await.unwrap();
+        let kept = stored.iter().find(|c| c.id == original.id).unwrap();
+        assert_eq!(kept.last_opened_at, original.last_opened_at);
+    }
+
+    #[tokio::test]
+    async fn duplicating_an_unknown_id_is_an_error_and_writes_nothing() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let original = sample_connection();
+        save_to(&path, std::slice::from_ref(&original)).await.unwrap();
+
+        assert!(duplicate_from(&path, Uuid::new_v4()).await.is_err());
+        assert_eq!(load_from(&path).await.unwrap().len(), 1);
     }
 
     #[tokio::test]

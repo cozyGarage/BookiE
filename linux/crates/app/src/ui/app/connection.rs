@@ -622,6 +622,47 @@ impl App {
     }
 }
 
+impl App {
+    /// Copy a saved connection under a fresh id. Credentials are not
+    /// copied: Secret Service items are keyed by connection id, and
+    /// reusing another connection's stored password would hide which
+    /// record a credential really belongs to.
+    pub(super) fn on_duplicate_connection(&self, id: Uuid, sender: ComponentSender<Self>) {
+        let sender_clone = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    match tablepro_storage::duplicate_connection(id).await {
+                        Ok(copy) => {
+                            sender_clone.input(AppMsg::DuplicateConnectionSucceeded(copy.name));
+                            sender_clone.input(AppMsg::ReloadConnections);
+                        }
+                        Err(error) => {
+                            tracing::warn!(error = %error, "duplicating the connection failed");
+                            sender_clone.input(AppMsg::DuplicateConnectionFailed);
+                        }
+                    }
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn on_duplicate_connection_succeeded(&self, name: &str) {
+        self.show_toast(&duplicate_connection_message(name));
+    }
+
+    pub(super) fn on_duplicate_connection_failed(&self) {
+        self.show_toast(&crate::tr!("The connection could not be duplicated."));
+    }
+}
+
+/// Says plainly that the copy has no credentials. A copy that silently
+/// shared the original's password would look ready to open and then
+/// fail at connect time.
+fn duplicate_connection_message(name: &str) -> String {
+    crate::tr!("Created “{name}”. Enter its password the first time you connect.").replace("{name}", name)
+}
+
 /// Performs the actual disk + keyring teardown for a saved connection.
 /// Extracted from `on_delete_connection` so the confirm-yes branch and
 /// the prefs-disabled branch share one implementation.
@@ -665,4 +706,16 @@ fn execute_delete_connection(
             })
             .drop_on_shutdown()
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::duplicate_connection_message;
+
+    #[test]
+    fn the_duplicate_toast_says_the_copy_has_no_saved_password() {
+        let message = duplicate_connection_message("Sales (copy)");
+        assert!(message.contains("Sales (copy)"));
+        assert!(message.to_lowercase().contains("password"));
+    }
 }

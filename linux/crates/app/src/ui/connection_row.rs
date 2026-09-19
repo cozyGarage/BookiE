@@ -31,6 +31,7 @@ pub enum ConnectionRowMsg {
     Open,
     ToggleFavorite,
     Organize,
+    Duplicate,
     /// Trash button pressed. Triggers a confirmation dialog before
     /// any actual delete is dispatched — saved connections include
     /// credentials and SSH config and a misclick is unrecoverable.
@@ -43,6 +44,7 @@ pub enum ConnectionRowOutput {
     Open(SavedConnection),
     ToggleFavorite(Uuid),
     Organize(SavedConnection),
+    Duplicate(Uuid),
     Delete(Uuid),
 }
 
@@ -95,6 +97,14 @@ impl FactoryComponent for ConnectionRow {
             },
 
             add_suffix = &gtk::Button {
+                set_icon_name: "edit-copy-symbolic",
+                set_valign: gtk::Align::Center,
+                set_tooltip_text: Some(crate::tr!("Duplicate connection").as_str()),
+                add_css_class: "flat",
+                connect_clicked => ConnectionRowMsg::Duplicate,
+            },
+
+            add_suffix = &gtk::Button {
                 set_icon_name: "go-next-symbolic",
                 set_valign: gtk::Align::Center,
                 set_tooltip_text: Some(crate::tr!("Open connection").as_str()),
@@ -144,6 +154,9 @@ impl FactoryComponent for ConnectionRow {
             }
             ConnectionRowMsg::Organize => {
                 let _ = sender.output(ConnectionRowOutput::Organize(self.saved.clone()));
+            }
+            ConnectionRowMsg::Duplicate => {
+                let _ = sender.output(ConnectionRowOutput::Duplicate(self.saved.id));
             }
             ConnectionRowMsg::RequestDelete => {
                 // GNOME HIG: destructive actions need explicit

@@ -88,6 +88,7 @@
 
 ### Added
 
+- A saved connection can be duplicated; the copy starts without saved credentials.
 - A saved connection can be given a name; leaving the name blank keeps the address-derived label.
 - Jump to Column searches browse/result metadata, distinguishes duplicate names by ordinal, and supports Ctrl+Shift+J.
 - BookiE display name and original book icon; new package commands retain legacy aliases.
