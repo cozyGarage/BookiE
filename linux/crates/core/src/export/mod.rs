@@ -77,7 +77,11 @@ where
     write_atomically_checked(path, fill, || Ok(()))
 }
 
-fn write_atomically_checked<E, F>(path: &Path, fill: F, before_publish: impl FnOnce() -> Result<(), E>) -> Result<(), E>
+pub(crate) fn write_atomically_checked<E, F>(
+    path: &Path,
+    fill: F,
+    before_publish: impl FnOnce() -> Result<(), E>,
+) -> Result<(), E>
 where
     E: From<io::Error>,
     F: FnOnce(&mut dyn Write) -> Result<(), E>,

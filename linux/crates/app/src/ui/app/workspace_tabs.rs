@@ -207,6 +207,7 @@ impl App {
                 page: page.clone(),
                 query: String::new(),
                 running: false,
+                file: None,
             };
             {
                 let mut tabs = workspace_tabs_for_create.borrow_mut();
@@ -551,6 +552,7 @@ impl App {
             page: page.clone(),
             query,
             running: false,
+            file: None,
         };
         self.workspace_tabs
             .borrow_mut()
@@ -586,7 +588,7 @@ impl App {
                         crate::services::structure_tracker::with_tab_ref(s.id, |tr| tr.has_pending()).unwrap_or(false);
                     Some(data_dirty || struct_dirty)
                 }
-                _ => None,
+                WorkspaceTab::Editor(s) => Some(s.has_unsaved_file_changes()),
             })
             .unwrap_or(false);
         if pending {
@@ -632,6 +634,10 @@ impl App {
             let data_dirty = crate::services::change_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
             let struct_dirty =
                 crate::services::structure_tracker::with_tab_ref(id, |tr| tr.has_pending()).unwrap_or(false);
+            let file_dirty = matches!(
+                self.workspace_tabs.borrow().get(&id),
+                Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
+            );
             dialog.connect_response(None, move |dlg, response| {
                 dlg.close();
                 match response {
@@ -652,7 +658,8 @@ impl App {
                         // close fires only after BOTH saves drain it.
                         // SaveFailed removes the entry entirely and
                         // aborts the close.
-                        let pending_saves: u32 = u32::from(data_dirty) + u32::from(struct_dirty);
+                        let pending_saves: u32 =
+                            u32::from(data_dirty) + u32::from(struct_dirty) + u32::from(file_dirty);
                         if pending_saves > 0 {
                             *close_after_save.borrow_mut().entry(id).or_insert(0) += pending_saves;
                         }
@@ -665,6 +672,12 @@ impl App {
                         }
                         if struct_dirty {
                             sender_for_resp.input(AppMsg::SaveActiveStructureTabById(id));
+                        }
+                        if file_dirty {
+                            sender_for_resp.input(AppMsg::SaveEditorFile {
+                                tab: id,
+                                overwrite: false,
+                            });
                         }
                     }
                     _ => {
@@ -956,6 +969,7 @@ impl App {
             let tooltip = editor_tab_tooltip(&query, &label).unwrap_or_default();
             slot.page.set_tooltip(&tooltip);
             slot.query = query;
+            Self::refresh_editor_file_title(slot);
         }
         self.persist_workspace_state();
     }

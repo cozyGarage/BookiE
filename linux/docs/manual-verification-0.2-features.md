@@ -83,7 +83,17 @@ icon button in a schema header for Table from CSV.
 
 ## Editor and history
 
-- [ ] Ctrl+O opens a `.sql` file into a new tab.
+- [ ] Ctrl+O opens a `.sql` file into a new tab titled with the file name.
+- [ ] Typing marks the title with `•`; Ctrl+S saves, clears the mark and shows "Saved".
+- [ ] Ctrl+S on an editor tab never opened from a file asks where to save.
+- [ ] Ctrl+Shift+S saves to a new file and the tab then follows that file.
+- [ ] Change the file in another editor, then press Ctrl+S: the "changed on disk"
+      dialog appears. Cancel leaves both copies alone; Overwrite writes yours;
+      Save As… writes elsewhere.
+- [ ] Closing a tab with unsaved file changes asks Save/Discard/Cancel, and Save
+      closes it only after the file is written.
+- [ ] Saving a file that is a symlink updates its target and keeps the link.
+- [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not
       truncated.
 - [ ] Ctrl+Shift+D lists saved queries; open, rename and delete all work.

@@ -31,6 +31,46 @@ pub struct EditorTabSlot {
     pub page: adw::TabPage,
     pub query: String,
     pub running: bool,
+    pub file: Option<EditorFile>,
+}
+
+impl EditorTabSlot {
+    pub fn has_unsaved_file_changes(&self) -> bool {
+        self.file.as_ref().is_some_and(|file| file.is_dirty(&self.query))
+    }
+}
+
+pub struct EditorFile {
+    pub path: std::path::PathBuf,
+    pub version: tablepro_core::text_file::FileVersion,
+    pub saved_text: String,
+}
+
+impl EditorFile {
+    pub fn from_disk(file: tablepro_core::text_file::TextFile) -> Self {
+        Self {
+            path: file.path,
+            version: file.version,
+            saved_text: file.text,
+        }
+    }
+
+    pub fn is_dirty(&self, query: &str) -> bool {
+        self.saved_text != query
+    }
+
+    pub fn title(&self, query: &str) -> String {
+        let name = self
+            .path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| self.path.display().to_string());
+        if self.is_dirty(query) {
+            format!("• {name}")
+        } else {
+            name
+        }
+    }
 }
 
 pub struct StructureTabSlot {

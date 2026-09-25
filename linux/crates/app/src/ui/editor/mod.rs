@@ -7,7 +7,6 @@ mod schema;
 mod sql_text;
 mod statement_cursor;
 
-use std::io::Read;
 use std::time::SystemTime;
 
 use relm4::adw::prelude::*;
@@ -971,15 +970,9 @@ impl SqlEditor {
 }
 
 pub(super) fn read_sql_text(path: &std::path::Path, max_bytes: u64) -> Result<String, String> {
-    let file = std::fs::File::open(path).map_err(|_| crate::tr!("Couldn't read the SQL file"))?;
-    let mut bytes = Vec::new();
-    file.take(max_bytes.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|_| crate::tr!("Couldn't read the SQL file"))?;
-    if bytes.len() as u64 > max_bytes {
-        return Err(crate::tr!("The SQL file is too large"));
-    }
-    String::from_utf8(bytes).map_err(|_| crate::tr!("The SQL file is not valid UTF-8"))
+    tablepro_core::text_file::read_text_file(path, max_bytes)
+        .map(|file| file.text)
+        .map_err(|error| open_file::file_error_message(&error))
 }
 
 fn export_name_for_query(query: &str) -> String {

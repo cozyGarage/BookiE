@@ -1,6 +1,7 @@
 mod browse;
 mod bundle;
 mod connection;
+mod editor_files;
 mod favorites;
 pub(crate) mod import;
 mod init_css;
@@ -643,7 +644,9 @@ impl SimpleComponent for App {
                 self.dispatch_to_tab(tab_id, BrowseTabInput::FlashErrorRow(source));
             }
             AppMsg::SaveActiveBrowseTab => {
-                if let Some(id) = self.selected_browse_tab_id() {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.save_editor_file(id, false, sender);
+                } else if let Some(id) = self.selected_browse_tab_id() {
                     self.dispatch_to_tab(id, BrowseTabInput::CommitSave);
                 }
             }
@@ -732,8 +735,19 @@ impl SimpleComponent for App {
             }
             AppMsg::NewEditorTab => self.append_editor_tab(None, sender),
             AppMsg::OpenSqlFile => self.on_open_sql_file(sender),
-            AppMsg::SqlFileOpened(text) => self.append_editor_tab(Some(text), sender),
+            AppMsg::SqlFileOpened(file) => self.on_sql_file_opened(file, sender),
             AppMsg::SqlFileFailed(message) => self.show_toast(&message),
+            AppMsg::SaveActiveEditorFileAs => {
+                if let Some(id) = self.selected_editor_tab_id() {
+                    self.save_editor_file_as(id, sender);
+                }
+            }
+            AppMsg::SaveEditorFileAs(tab) => self.save_editor_file_as(tab, sender),
+            AppMsg::SaveEditorFile { tab, overwrite } => self.save_editor_file(tab, overwrite, sender),
+            AppMsg::EditorFileSaved(tab, file) => self.on_editor_file_saved(tab, file, sender),
+            AppMsg::EditorFileSaveFailed(tab, message) => self.on_editor_file_save_failed(tab, &message),
+            AppMsg::EditorFileSaveCancelled(tab) => self.on_editor_file_save_cancelled(tab),
+            AppMsg::EditorFileChangedOnDisk(tab) => self.on_editor_file_changed_on_disk(tab, sender),
             AppMsg::EditorTabRunStateChanged(id, running) => {
                 self.on_editor_tab_run_state_changed(id, running);
                 self.continue_connection_switch(sender);
