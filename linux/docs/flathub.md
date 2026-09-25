@@ -34,3 +34,9 @@ Reference them from metainfo `<screenshots>` once captured on GNOME.
 Runtime permissions stay minimal: network, home (saved connections /
 SSH keys), and talk to `org.freedesktop.secrets` for passwords and MCP
 tokens.
+
+The manifests grant `--socket=ssh-auth`, so the built-in SSH client's "SSH agent"
+authentication reaches the host ssh-agent. The system OpenSSH client option needs
+a host `ssh` program, which the sandbox cannot run, so Flatpak builds use the
+built-in client.
+
