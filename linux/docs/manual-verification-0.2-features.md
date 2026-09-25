@@ -102,7 +102,7 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
-## Editor sessions (PostgreSQL)
+## Editor sessions (PostgreSQL and MySQL)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP
       TABLE` from one run are still in effect on the next run.
@@ -113,7 +113,7 @@ icon button in a schema header for Table from CSV.
 - [ ] Closing the tab with a transaction open asks first; Roll Back and Close
       leaves the table unchanged.
 - [ ] Without Session, a lone `BEGIN` is refused and the message mentions Session.
-- [ ] On SQLite or MySQL, turning Session on explains that the engine does not
+- [ ] On SQLite or SQL Server, turning Session on explains that the engine does not
       offer it yet and the button turns back off.
 - [ ] The audit journal shows the session's COMMIT or ROLLBACK against the same
       batch as the statements inside it.

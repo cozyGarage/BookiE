@@ -213,8 +213,8 @@ loses in practice: a column collation, read on PostgreSQL and MySQL and kept by 
 structure editor's alter statements. Schema columns keep the declared spelling in
 `data_type`; a separate declared-type field waits for a consumer. SQL Server also
 drops a collation on ALTER COLUMN and is not covered yet. B4: agentd refuses unknown SSH host keys; lone transaction statements are refused
-on shared connections; PostgreSQL editor tabs can opt into a governed dedicated session
-(MySQL, SQLite and the others answer that sessions are unsupported). The OpenSSH
+on shared connections; PostgreSQL and MySQL editor tabs can opt into a governed dedicated
+session (SQLite, SQL Server and the others answer that sessions are unsupported). The OpenSSH
 transport is being ported separately and is not yet wired into connections.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,

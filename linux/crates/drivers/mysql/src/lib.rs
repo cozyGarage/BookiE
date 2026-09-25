@@ -8,6 +8,8 @@ use sqlx::{Column, Connection as SqlxConnection, Pool, Row, TypeInfo, ValueRef};
 
 use futures::stream::StreamExt;
 
+mod session;
+
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
     MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Transport, Value, check_pre_dispatch,
@@ -51,6 +53,7 @@ impl DatabaseDriver for MysqlDriver {
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let mysql_opts = mysql_connect_options(&opts);
         let cancellation_options = mysql_opts.clone();
+        let session_options = mysql_opts.clone();
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
@@ -68,6 +71,7 @@ impl DatabaseDriver for MysqlDriver {
         Ok(Box::new(MysqlConnection {
             pool,
             cancellation_pool,
+            session_options,
         }))
     }
 }
@@ -75,6 +79,7 @@ impl DatabaseDriver for MysqlDriver {
 struct MysqlConnection {
     pool: Pool<MySql>,
     cancellation_pool: Pool<MySql>,
+    session_options: MySqlConnectOptions,
 }
 
 #[async_trait]
@@ -332,6 +337,10 @@ impl Connection for MysqlConnection {
             .await
             .map_err(map_sqlx_error)?;
         Ok(())
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        session::open(&self.session_options, self.cancellation_pool.clone()).await
     }
 
     async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {

@@ -62,6 +62,52 @@ async fn a_column_collation_survives_a_nullability_change() {
     assert_eq!(label.collation.as_deref(), Some("utf8mb4_bin"));
 }
 
+async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
+    result.rows[0][0].clone()
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_variables_temp_tables_and_its_transaction_between_statements() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE ledger (id int)").await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    for sql in [
+        "SET @kept = 41",
+        "CREATE TEMPORARY TABLE scratch (n int)",
+        "INSERT INTO scratch VALUES (7)",
+    ] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(session_value(&mut session, "SELECT @kept + 1").await, Value::Int(42));
+    assert_eq!(
+        session_value(&mut session, "SELECT n FROM scratch").await,
+        Value::Int(7)
+    );
+    for sql in ["START TRANSACTION", "INSERT INTO ledger VALUES (1)", "ROLLBACK"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT COUNT(*) FROM ledger").await,
+        Value::Int(0)
+    );
+    session.close().await.unwrap();
+
+    let mut sessions = Vec::new();
+    for _ in 0..6 {
+        sessions.push(conn.open_session().await.unwrap());
+    }
+    assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
+    for session in sessions {
+        session.close().await.unwrap();
+    }
+}
+
 async fn tagged_query_is_active(connection: &dyn Connection, tag: &str) -> bool {
     let sql = format!(
         "SELECT count(*) FROM information_schema.processlist \
