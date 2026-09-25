@@ -1,4 +1,5 @@
 mod activity;
+mod catalog;
 mod connection;
 mod driver;
 mod error;
@@ -22,6 +23,7 @@ mod tls;
 mod transaction;
 
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
+pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
 pub use connection::{AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
 pub use driver::{DatabaseDriver, DriverMaturity};
 pub use error::DriverError;

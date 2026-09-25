@@ -326,3 +326,83 @@ async fn list_views_records_a_governed_read_outcome() {
         "list_views must write a metadata audit record"
     );
 }
+
+#[tokio::test]
+async fn list_objects_reports_an_unsupported_kind_and_audits_the_read_with_its_target() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .list_objects(tablepro_core::CatalogObjectKind::Routine, Some("public"))
+        .await
+        .expect_err("the mock driver declares no catalog kinds");
+    assert!(matches!(error, DriverError::Unsupported(_)), "{error:?}");
+
+    let events = audit.events.lock().expect("event lock");
+    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST OBJECTS"));
+    assert!(
+        events.iter().any(|event| event.decision_rule == "metadata_read"
+            && event.sql_hash == expected_hash
+            && event.targets == vec!["routine:public".to_string()]),
+        "list_objects must write a metadata audit record naming kind and schema"
+    );
+}
+
+#[tokio::test]
+async fn list_objects_is_denied_when_the_agent_read_intent_cannot_be_recorded() {
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::Agent {
+                token: "token".into(),
+                client: None,
+                model: None,
+            },
+            Environment::Local,
+            allowed_agent_policy(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![AuditRecordPhase::Intent])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .list_objects(tablepro_core::CatalogObjectKind::Role, None)
+        .await
+        .expect_err("a failed read intent must deny the listing");
+
+    assert!(!matches!(error, DriverError::Unsupported(_)), "{error:?}");
+}
+
+#[tokio::test]
+async fn list_objects_audit_target_leaves_out_the_schema_for_unscoped_kinds() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let _ = guard
+        .list_objects(tablepro_core::CatalogObjectKind::Role, Some("public"))
+        .await;
+
+    let events = audit.events.lock().expect("event lock");
+    assert!(events.iter().any(|event| event.targets == vec!["role".to_string()]));
+}

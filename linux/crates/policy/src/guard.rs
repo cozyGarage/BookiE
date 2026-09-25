@@ -711,6 +711,13 @@ impl PolicyGuard {
     }
 }
 
+fn catalog_target(kind: tablepro_core::CatalogObjectKind, schema: Option<&str>) -> Vec<String> {
+    match schema.filter(|_| kind.is_schema_scoped()) {
+        Some(schema) => vec![format!("{}:{schema}", kind.as_str())],
+        None => vec![kind.as_str().to_string()],
+    }
+}
+
 fn sanitized_principal(principal: &Principal) -> Principal {
     match principal {
         Principal::Human { session } => Principal::Human {

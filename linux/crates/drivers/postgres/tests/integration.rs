@@ -45,6 +45,86 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
+    use tablepro_core::CatalogObjectKind as Kind;
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    for statement in [
+        "CREATE SCHEMA \"odd'schema\"",
+        "CREATE TABLE \"odd'schema\".events (id serial PRIMARY KEY, happened timestamptz)",
+        "CREATE FUNCTION \"odd'schema\".touch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$",
+        "CREATE TRIGGER events_touch BEFORE INSERT ON \"odd'schema\".events FOR EACH ROW EXECUTE FUNCTION \"odd'schema\".touch()",
+        "CREATE PROCEDURE \"odd'schema\".archive(days int) LANGUAGE sql AS $$ SELECT 1 $$",
+        "CREATE SEQUENCE \"odd'schema\".ticket_numbers AS bigint",
+        "CREATE TYPE \"odd'schema\".mood AS ENUM ('ok', 'sad')",
+        "CREATE TYPE \"odd'schema\".point2 AS (x int, y int)",
+        "CREATE DOMAIN \"odd'schema\".positive AS int CHECK (VALUE > 0)",
+        "CREATE TYPE \"odd'schema\".hours AS RANGE (subtype = int4)",
+        "CREATE ROLE report_reader LOGIN",
+        "CREATE FUNCTION public.elsewhere() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$",
+    ] {
+        conn.execute(statement)
+            .await
+            .unwrap_or_else(|e| panic!("{statement}: {e}"));
+    }
+    let listed = |kind| {
+        let conn = &conn;
+        async move {
+            let objects = conn.list_objects(kind, Some("odd'schema")).await.unwrap();
+            objects
+                .into_iter()
+                .map(|o| (o.name, o.detail.unwrap_or_default()))
+                .collect::<Vec<_>>()
+        }
+    };
+
+    let routines = listed(Kind::Routine).await;
+    assert_eq!(
+        routines,
+        vec![
+            ("archive".into(), "procedure(IN days integer)".into()),
+            ("touch".into(), "function()".into())
+        ]
+    );
+    assert!(!routines.iter().any(|(name, _)| name == "elsewhere"));
+    assert_eq!(
+        listed(Kind::Trigger).await,
+        vec![("events_touch".into(), "on events".into())]
+    );
+    let sequences = listed(Kind::Sequence).await;
+    assert!(
+        sequences.contains(&("ticket_numbers".into(), "bigint".into())),
+        "{sequences:?}"
+    );
+    assert!(sequences.iter().any(|(name, _)| name == "events_id_seq"));
+    let types = listed(Kind::Type).await;
+    for expected in [
+        ("hours", "range"),
+        ("mood", "enum"),
+        ("point2", "composite"),
+        ("positive", "domain over integer"),
+    ] {
+        assert!(types.contains(&(expected.0.into(), expected.1.into())), "{types:?}");
+    }
+    assert!(
+        !types.iter().any(|(name, _)| name == "events"),
+        "a table row type is not a composite type"
+    );
+
+    let extensions = conn.list_objects(Kind::Extension, Some("odd'schema")).await.unwrap();
+    assert!(extensions.iter().any(|e| e.name == "plpgsql"), "{extensions:?}");
+    let roles = conn.list_objects(Kind::Role, None).await.unwrap();
+    let reader = roles.iter().find(|r| r.name == "report_reader").unwrap();
+    assert_eq!(reader.detail.as_deref(), Some("login"));
+    assert!(!roles.iter().any(|r| r.name.starts_with("pg_")));
+
+    let every_schema = conn.list_objects(Kind::Routine, None).await.unwrap();
+    assert!(every_schema.iter().any(|o| o.name == "elsewhere"));
+    assert!(!every_schema.iter().any(|o| o.schema.as_deref() == Some("pg_catalog")));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn indexes_report_expression_keys_predicates_and_leave_out_included_columns() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;

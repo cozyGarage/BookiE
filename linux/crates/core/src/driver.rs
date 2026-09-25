@@ -92,6 +92,10 @@ pub trait DatabaseDriver: Send + Sync {
         false
     }
 
+    fn catalog_object_kinds(&self) -> &'static [crate::CatalogObjectKind] {
+        &[]
+    }
+
     fn supports_integrated_auth(&self) -> bool {
         false
     }

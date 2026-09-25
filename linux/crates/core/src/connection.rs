@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 
+use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, run_controlled};
 use crate::query::{ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, Value};
@@ -114,6 +115,21 @@ pub trait Connection: Send + Sync {
     }
     async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_views(), control).await
+    }
+    async fn list_objects(
+        &self,
+        kind: CatalogObjectKind,
+        _schema: Option<&str>,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        Err(DriverError::Unsupported(format!("listing {} objects", kind.as_str())))
+    }
+    async fn list_objects_controlled(
+        &self,
+        kind: CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<CatalogObject>, DriverError> {
+        run_controlled(self.list_objects(kind, schema), control).await
     }
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError>;
     async fn fetch_columns_controlled(

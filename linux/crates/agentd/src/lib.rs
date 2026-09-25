@@ -53,6 +53,23 @@ impl Connection for SessionConnection {
         self.inner.list_views_controlled(control).await
     }
 
+    async fn list_objects(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        self.inner.list_objects(kind, schema).await
+    }
+
+    async fn list_objects_controlled(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        self.inner.list_objects_controlled(kind, schema, control).await
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         self.inner.fetch_columns(schema, table).await
     }

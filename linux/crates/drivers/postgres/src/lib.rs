@@ -14,6 +14,7 @@ use tablepro_core::{
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
+mod catalog;
 mod decode;
 
 pub struct PgDriver;
@@ -42,6 +43,10 @@ impl DatabaseDriver for PgDriver {
 
     fn supports_foreign_key_metadata(&self) -> bool {
         true
+    }
+
+    fn catalog_object_kinds(&self) -> &'static [tablepro_core::CatalogObjectKind] {
+        catalog::SUPPORTED_KINDS
     }
 
     fn supports_view_metadata(&self) -> bool {
@@ -152,6 +157,14 @@ impl Connection for PgConnection {
                 name: r.get::<String, _>(1),
             })
             .collect())
+    }
+
+    async fn list_objects(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        catalog::list_objects(&self.pool, kind, schema).await
     }
 
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {

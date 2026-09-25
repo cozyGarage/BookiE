@@ -26,6 +26,33 @@ impl Connection for ViewConnection {
         self.list_views().await
     }
 
+    async fn list_objects(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        if self.fail {
+            return Err(DriverError::Disconnected);
+        }
+        Ok(vec![tablepro_core::CatalogObject {
+            kind,
+            schema: schema.map(str::to_string),
+            name: "audit_row".into(),
+            detail: None,
+        }])
+    }
+
+    async fn list_objects_controlled(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        tablepro_core::check_pre_dispatch(control)?;
+        self.controlled.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.list_objects(kind, schema).await
+    }
+
     async fn fetch_columns(&self, _schema: Option<&str>, _table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         Err(DriverError::Unsupported("unused test operation".into()))
     }
@@ -142,6 +169,33 @@ async fn session_preserves_views_errors_and_controlled_dispatch() {
             Err(DriverError::Cancelled)
         ));
         assert!(!controlled.load(Ordering::SeqCst));
+    }
+}
+
+#[tokio::test]
+async fn session_forwards_catalog_listing_errors_and_controlled_dispatch() {
+    for fail in [false, true] {
+        let controlled = Arc::new(AtomicBool::new(false));
+        let session = SessionConnection {
+            inner: Arc::new(ViewConnection {
+                fail,
+                controlled: controlled.clone(),
+            }),
+            _tunnel: None,
+        };
+        let kind = tablepro_core::CatalogObjectKind::Trigger;
+        let control = OperationControl::with_timeout(Duration::from_secs(1));
+        let ordinary = session.list_objects(kind, Some("public")).await;
+        let bounded = session.list_objects_controlled(kind, Some("public"), &control).await;
+        assert!(controlled.load(Ordering::SeqCst));
+        if fail {
+            assert!(matches!(ordinary, Err(DriverError::Disconnected)));
+            assert!(matches!(bounded, Err(DriverError::Disconnected)));
+        } else {
+            let names: Vec<String> = bounded.unwrap().into_iter().map(|object| object.name).collect();
+            assert_eq!(names, vec!["audit_row".to_string()]);
+            assert_eq!(ordinary.unwrap()[0].schema.as_deref(), Some("public"));
+        }
     }
 }
 

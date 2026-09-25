@@ -59,6 +59,44 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn list_objects(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        let operation = self.metadata_operation("LIST OBJECTS", catalog_target(kind, schema));
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read("LIST OBJECTS", self.inner.list_objects(kind, schema))
+            .await;
+        let rows = result.as_ref().ok().map(|objects| objects.len() as u64);
+        self.audit_read_result(&operation, start, &result, rows).await?;
+        result
+    }
+
+    async fn list_objects_controlled(
+        &self,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<&str>,
+        control: &OperationControl,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, DriverError> {
+        check_pre_dispatch(control)?;
+        let operation = self.metadata_operation("LIST OBJECTS", catalog_target(kind, schema));
+        self.prepare_governed_read(&operation).await?;
+        let start = Instant::now();
+        let result = self
+            .caught_read(
+                "LIST OBJECTS",
+                self.inner.list_objects_controlled(kind, schema, control),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|objects| objects.len() as u64);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     async fn fetch_columns(&self, schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
         let operation = self.metadata_operation("FETCH COLUMNS", vec![target]);
