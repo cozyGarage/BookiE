@@ -36,6 +36,7 @@
 
 ### Fixed
 
+- Changing a PostgreSQL column's type in the structure editor keeps the column's own collation instead of resetting it to the type default, and a MySQL column edit keeps its collation instead of taking the table default.
 - A database driver that stops unexpectedly is reported as a failed operation, with writes marked as having an unknown result, instead of leaving the request waiting forever. The connection is then replaced rather than reused.
 - Embedded application icons now use the same BookiE artwork as installed packages.
 - Malformed MongoDB SCRAM nonces are rejected instead of crashing authentication.

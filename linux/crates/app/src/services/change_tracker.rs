@@ -798,6 +798,7 @@ mod tests {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 
@@ -811,6 +812,7 @@ mod tests {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 
@@ -942,6 +944,7 @@ mod tests {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             },
             ColumnInfo {
                 name: "b".into(),
@@ -952,6 +955,7 @@ mod tests {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             },
             data_col("name"),
         ];
@@ -980,6 +984,7 @@ mod tests {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             },
             data_col("name"),
         ];

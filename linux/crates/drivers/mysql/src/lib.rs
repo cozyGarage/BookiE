@@ -112,7 +112,8 @@ impl Connection for MysqlConnection {
                     CAST(is_nullable AS CHAR), CAST(column_key AS CHAR),
                     CAST(extra AS CHAR), CAST(column_default AS CHAR),
                     CAST(generation_expression AS CHAR),
-                    CAST(column_comment AS CHAR)
+                    CAST(column_comment AS CHAR),
+                    CAST(collation_name AS CHAR)
              FROM information_schema.columns
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?
              ORDER BY ordinal_position",
@@ -387,6 +388,7 @@ impl tablepro_core::Transaction for MysqlTransaction {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             })
             .collect();
         let data: Vec<Vec<Value>> = rows
@@ -469,6 +471,7 @@ fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         })
         .collect();
     let rows: Vec<Vec<Value>> = collected
@@ -779,6 +782,10 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
             .try_get::<Option<String>, _>(7)
             .unwrap_or(None)
             .filter(|s| !s.is_empty()),
+        collation: r
+            .try_get::<Option<String>, _>(8)
+            .unwrap_or(None)
+            .filter(|c| !c.is_empty()),
     }
 }
 

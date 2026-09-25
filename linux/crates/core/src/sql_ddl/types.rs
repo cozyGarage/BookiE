@@ -21,6 +21,9 @@ pub enum BuildDdlError {
     #[error("index name is empty")]
     EmptyIndexName,
 
+    #[error("collation name is not safe to use: {0}")]
+    UnsafeCollation(String),
+
     #[error("a partial index cannot be recreated from its catalog description")]
     PartialIndex,
 
@@ -84,6 +87,42 @@ fn contains_forbidden_control(s: &str) -> bool {
 /// spaces (`DOUBLE PRECISION`), parens (`VARCHAR(255)`), commas
 /// (`DECIMAL(10,2)`), brackets (`INT[]`), single quotes for
 /// `ENUM('a','b')`, and dots for schema-qualified user types.
+const MAX_COLLATION_LEN: usize = 128;
+
+const COLLATABLE_TYPE_PREFIXES: &[&str] = &[
+    "char",
+    "varchar",
+    "character",
+    "national",
+    "nchar",
+    "nvarchar",
+    "text",
+    "tinytext",
+    "mediumtext",
+    "longtext",
+    "citext",
+    "enum",
+    "set",
+];
+
+fn is_collatable_type(data_type: &str) -> bool {
+    let lower = data_type.trim().to_ascii_lowercase();
+    COLLATABLE_TYPE_PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
+}
+
+pub(crate) fn collation_clause(driver_id: &str, column: &DraftColumn) -> Result<Option<String>, BuildDdlError> {
+    let Some(collation) = column.collation.as_deref() else {
+        return Ok(None);
+    };
+    if !matches!(driver_id, "postgres" | "mysql") || !is_collatable_type(&column.data_type) {
+        return Ok(None);
+    }
+    if collation.trim().is_empty() || collation.len() > MAX_COLLATION_LEN || contains_forbidden_control(collation) {
+        return Err(BuildDdlError::UnsafeCollation(collation.into()));
+    }
+    Ok(Some(format!("COLLATE {}", quote_ident(driver_id, collation))))
+}
+
 pub(crate) fn validate_safe_type(s: &str) -> Result<(), BuildDdlError> {
     if s.len() > MAX_TYPE_LEN {
         return Err(BuildDdlError::UnsafeType(s.into()));
@@ -215,6 +254,7 @@ pub struct DraftColumn {
     pub auto_increment: bool,
     pub default_value: Option<String>,
     pub comment: Option<String>,
+    pub collation: Option<String>,
 }
 
 impl DraftColumn {
@@ -228,6 +268,7 @@ impl DraftColumn {
         let auto_increment = info.is_auto_increment;
         let default_value = info.default_value.clone();
         let comment = info.comment.clone();
+        let collation = info.collation.clone();
         let name = info.name.clone();
         Self {
             original: Some(info),
@@ -238,6 +279,7 @@ impl DraftColumn {
             auto_increment,
             default_value,
             comment,
+            collation,
         }
     }
 
@@ -509,6 +551,9 @@ pub(crate) fn render_column_definition(
     validate_column_type(&column.data_type)?;
     let comment_clause = inline_comment_clause(driver_id, column)?;
     let mut parts = vec![quote_ident(driver_id, &column.name), column.data_type.clone()];
+    if let Some(collation) = collation_clause(driver_id, column)? {
+        parts.push(collation);
+    }
 
     // SQLite: INTEGER PRIMARY KEY (with optional AUTOINCREMENT) is
     // the canonical rowid alias and is its own paragraph in the

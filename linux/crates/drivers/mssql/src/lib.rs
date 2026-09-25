@@ -584,6 +584,7 @@ fn col_to_info(c: &Column) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 
@@ -710,6 +711,7 @@ fn row_to_column_info(row: &[Value]) -> ColumnInfo {
         },
         is_generated: as_bool(row.get(7)).unwrap_or(false),
         comment: as_text(row.get(10)).filter(|c| !c.is_empty()),
+        collation: None,
     }
 }
 

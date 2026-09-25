@@ -1,9 +1,9 @@
 use crate::sql_dialect::quote_ident;
 
 use super::types::{
-    BuildDdlError, DraftColumn, column_comment_statement, comment_changed, mssql_drop_default_constraint,
-    qualified_table, render_column_definition, sql_literal, validate_column_name, validate_safe_type, validate_table,
-    validated_default,
+    BuildDdlError, DraftColumn, collation_clause, column_comment_statement, comment_changed,
+    mssql_drop_default_constraint, qualified_table, render_column_definition, sql_literal, validate_column_name,
+    validate_safe_type, validate_table, validated_default,
 };
 
 /// Add a column. Returns more than one statement on a dialect that
@@ -166,9 +166,12 @@ fn alter_column_postgres(
     let mut stmts: Vec<String> = Vec::new();
     if changed.data_type {
         validate_safe_type(&column.data_type)?;
+        let collation = collation_clause(driver_id, column)?
+            .map(|clause| format!(" {clause}"))
+            .unwrap_or_default();
         stmts.push(format!(
-            "ALTER TABLE {} ALTER COLUMN {} TYPE {} USING {}::{}",
-            qualified, name, column.data_type, name, column.data_type,
+            "ALTER TABLE {} ALTER COLUMN {} TYPE {}{} USING {}::{}",
+            qualified, name, column.data_type, collation, name, column.data_type,
         ));
     }
     if changed.nullable {

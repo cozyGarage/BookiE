@@ -324,6 +324,7 @@ mod tests {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 
@@ -570,6 +571,7 @@ mod tests {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 
@@ -583,6 +585,7 @@ mod tests {
             default_value: Some(default.into()),
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 
@@ -596,6 +599,7 @@ mod tests {
             default_value: None,
             is_generated: true,
             comment: None,
+            collation: None,
         }
     }
 

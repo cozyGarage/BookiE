@@ -45,6 +45,30 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_column_collation_is_read_and_survives_a_type_change() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE collated (label varchar(40) COLLATE \"C\", plain text)")
+        .await
+        .unwrap();
+
+    let columns = conn.fetch_columns(None, "collated").await.unwrap();
+    assert_eq!(columns[0].collation.as_deref(), Some("C"));
+    assert_eq!(columns[1].collation, None);
+
+    let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(columns[0].clone());
+    draft.data_type = "character varying(80)".into();
+    for statement in tablepro_core::sql_ddl::build_alter_column("postgres", None, "collated", &draft).unwrap() {
+        conn.execute(&statement).await.unwrap();
+    }
+
+    let altered = conn.fetch_columns(None, "collated").await.unwrap();
+    assert_eq!(altered[0].data_type, "character varying(80)");
+    assert_eq!(altered[0].collation.as_deref(), Some("C"));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn the_session_reports_the_application_name_it_was_given() {
     let (_c, mut opts) = start_pg().await;
     opts.application_name = Some("BookiE".into());

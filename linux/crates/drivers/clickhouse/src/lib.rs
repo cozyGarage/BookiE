@@ -484,6 +484,7 @@ async fn fetch_result(
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         })
         .collect();
 
@@ -572,6 +573,7 @@ fn catalog_row_to_column_info(r: CatalogColumnRow) -> ColumnInfo {
         default_value,
         is_generated,
         comment,
+        collation: None,
     }
 }
 

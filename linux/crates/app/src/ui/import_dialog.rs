@@ -333,6 +333,7 @@ impl NewColumns {
                 auto_increment: false,
                 default_value: None,
                 comment: None,
+                collation: None,
             });
         }
         if !all_ok {
@@ -363,6 +364,7 @@ fn draft_to_info(draft: &DraftColumn) -> ColumnInfo {
         default_value: draft.default_value.clone(),
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 

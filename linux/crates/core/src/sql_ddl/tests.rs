@@ -19,6 +19,7 @@ fn dc(name: &str, ty: &str) -> DraftColumn {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     }
 }
 
@@ -371,6 +372,7 @@ fn alter_column_postgres_type_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "bigint".into(),
@@ -379,6 +381,7 @@ fn alter_column_postgres_type_change() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     let joined = stmts.join("\n");
@@ -398,6 +401,7 @@ fn alter_column_postgres_nullable_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "text".into(),
@@ -406,6 +410,7 @@ fn alter_column_postgres_nullable_change() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET NOT NULL")));
@@ -423,6 +428,7 @@ fn alter_column_postgres_default_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "text".into(),
@@ -431,6 +437,7 @@ fn alter_column_postgres_default_change() {
         auto_increment: false,
         default_value: Some("'pending'".into()),
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     assert!(stmts.iter().any(|s| s.contains("SET DEFAULT 'pending'")));
@@ -459,6 +466,7 @@ fn alter_column_postgres_emits_three_statements_when_all_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "bigint".into(),
@@ -467,6 +475,7 @@ fn alter_column_postgres_emits_three_statements_when_all_change() {
         auto_increment: false,
         default_value: Some("'fallback'".into()),
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("postgres", None, "t", &col).unwrap();
     // Type, nullable AND default all changed — all three must
@@ -497,6 +506,7 @@ fn alter_column_mssql_type_and_nullable_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "int".into(),
@@ -505,6 +515,7 @@ fn alter_column_mssql_type_and_nullable_change() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -523,6 +534,7 @@ fn alter_column_mssql_default_only_replaces_the_constraint() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "text".into(),
@@ -531,6 +543,7 @@ fn alter_column_mssql_default_only_replaces_the_constraint() {
         auto_increment: false,
         default_value: Some("'pending'".into()),
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 2);
@@ -553,6 +566,7 @@ fn alter_column_mssql_clearing_a_default_only_drops() {
             default_value: Some("'pending'".into()),
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "text".into(),
@@ -561,6 +575,7 @@ fn alter_column_mssql_clearing_a_default_only_drops() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 1);
@@ -580,6 +595,7 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "bigint".into(),
@@ -588,6 +604,7 @@ fn alter_column_mssql_applies_default_alongside_type_change() {
         auto_increment: false,
         default_value: Some("0".into()),
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("mssql", None, "t", &col).unwrap();
     assert_eq!(stmts.len(), 3);
@@ -608,6 +625,7 @@ fn alter_column_mssql_unchanged_is_no_change() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "int".into(),
@@ -616,6 +634,7 @@ fn alter_column_mssql_unchanged_is_no_change() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let err = build_alter_column("mssql", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::NoChange));
@@ -633,6 +652,7 @@ fn alter_column_mssql_drop_default_escapes_literals() {
             default_value: Some("0".into()),
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "o'brien".into(),
         data_type: "int".into(),
@@ -641,6 +661,7 @@ fn alter_column_mssql_drop_default_escapes_literals() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let stmts = build_alter_column("mssql", Some("s'x"), "t'q", &col).unwrap();
     assert!(stmts[0].contains("OBJECT_ID('[s''x].[t''q]')"));
@@ -953,6 +974,7 @@ fn alter_column_postgres_rejects_injection_in_type() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }),
         name: "x".into(),
         data_type: "bigint; DROP TABLE u; --".into(),
@@ -961,6 +983,7 @@ fn alter_column_postgres_rejects_injection_in_type() {
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     };
     let err = build_alter_column("postgres", None, "t", &col).unwrap_err();
     assert!(matches!(err, BuildDdlError::UnsafeType(_)), "got {err:?}");
@@ -995,6 +1018,7 @@ fn materialize_ops_mssql_orders_rename_alter_then_add() {
                     default_value: None,
                     is_generated: false,
                     comment: None,
+                    collation: None,
                 }),
                 name: "x".into(),
                 data_type: "text".into(),
@@ -1003,6 +1027,7 @@ fn materialize_ops_mssql_orders_rename_alter_then_add() {
                 auto_increment: false,
                 default_value: Some("'x'".into()),
                 comment: None,
+                collation: None,
             },
         },
         StructureOp::AddColumn {
@@ -1029,6 +1054,7 @@ fn existing(name: &str, data_type: &str) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 

@@ -37,6 +37,31 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     MysqlDriver.connect(opts).await.expect("connect")
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_column_collation_survives_a_nullability_change() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE collated (id int PRIMARY KEY, label varchar(40) COLLATE utf8mb4_bin NULL)")
+        .await
+        .unwrap();
+
+    let columns = conn.fetch_columns(None, "collated").await.unwrap();
+    let label = columns.iter().find(|c| c.name == "label").unwrap().clone();
+    assert_eq!(label.collation.as_deref(), Some("utf8mb4_bin"));
+
+    let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(label);
+    draft.nullable = false;
+    for statement in tablepro_core::sql_ddl::build_alter_column("mysql", None, "collated", &draft).unwrap() {
+        conn.execute(&statement).await.unwrap();
+    }
+
+    let altered = conn.fetch_columns(None, "collated").await.unwrap();
+    let label = altered.iter().find(|c| c.name == "label").unwrap();
+    assert!(!label.nullable);
+    assert_eq!(label.collation.as_deref(), Some("utf8mb4_bin"));
+}
+
 async fn tagged_query_is_active(connection: &dyn Connection, tag: &str) -> bool {
     let sql = format!(
         "SELECT count(*) FROM information_schema.processlist \

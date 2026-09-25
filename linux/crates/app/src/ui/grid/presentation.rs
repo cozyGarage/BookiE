@@ -30,6 +30,7 @@ mod tests {
             is_generated: false,
             comment: None,
             default_value: None,
+            collation: None,
         };
         for value in [Value::Bytes(vec![1]), Value::Text("true".into()), Value::Int(2)] {
             assert!(!cell_allows_inline_edit(&column, &value));
@@ -52,6 +53,7 @@ mod tests {
             is_generated: false,
             comment: None,
             default_value: None,
+            collation: None,
         };
         assert!(cell_allows_inline_edit(&column, &Value::Null));
         assert!(!cell_allows_inline_edit(&column, &Value::Undecodable("NUMERIC".into())));
@@ -68,6 +70,7 @@ mod tests {
             is_generated: false,
             comment: None,
             default_value: None,
+            collation: None,
         };
         for value in [
             Value::Null,

@@ -201,10 +201,14 @@ impl Connection for PgConnection {
                 pg_catalog.pg_get_expr(d.adbin, d.adrelid) AS default_value,
                 a.attidentity <> '' AS is_identity,
                 a.attgenerated <> '' AS is_generated,
-                pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment
+                pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment,
+                CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
+                    THEN co.collname::text END AS collation
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
+             JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
+             LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d
                  ON d.adrelid = a.attrelid AND d.adnum = a.attnum
              WHERE n.nspname = COALESCE($2, current_schema())
@@ -252,6 +256,7 @@ impl Connection for PgConnection {
                         .try_get::<Option<String>, _>(7)
                         .unwrap_or(None)
                         .filter(|c| !c.is_empty()),
+                    collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
                 }
             })
             .collect())
@@ -803,6 +808,7 @@ where
                     default_value: None,
                     is_generated: false,
                     comment: None,
+                    collation: None,
                 })
                 .collect();
         }

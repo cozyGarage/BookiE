@@ -129,6 +129,7 @@ mod tests {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         }
     }
 

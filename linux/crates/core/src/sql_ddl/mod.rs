@@ -19,6 +19,8 @@ mod table;
 mod types;
 
 #[cfg(test)]
+mod collation_tests;
+#[cfg(test)]
 mod comment_tests;
 #[cfg(test)]
 mod tests;

@@ -181,6 +181,7 @@ async fn a_csv_file_creates_the_table_it_is_loaded_into_and_fills_it() {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         })
         .collect();
     let plan = plan_for("people", &columns, csv);
@@ -373,5 +374,6 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }

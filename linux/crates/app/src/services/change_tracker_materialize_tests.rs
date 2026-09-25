@@ -15,6 +15,7 @@ fn pk(name: &str) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 
@@ -28,6 +29,7 @@ fn data(name: &str) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 

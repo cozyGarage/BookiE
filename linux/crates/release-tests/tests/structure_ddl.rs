@@ -16,6 +16,7 @@ fn draft(name: &str, data_type: &str, nullable: bool, primary_key: bool) -> Draf
         auto_increment: false,
         default_value: None,
         comment: None,
+        collation: None,
     }
 }
 

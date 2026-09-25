@@ -512,6 +512,7 @@ fn column(name: &str) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: None,
+        collation: None,
     }
 }
 

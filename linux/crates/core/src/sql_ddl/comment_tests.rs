@@ -17,6 +17,7 @@ fn info(comment: Option<&str>) -> ColumnInfo {
         default_value: None,
         is_generated: false,
         comment: comment.map(str::to_string),
+        collation: None,
     }
 }
 
@@ -59,6 +60,7 @@ fn draft(name: &str, comment: Option<&str>) -> DraftColumn {
         auto_increment: false,
         default_value: None,
         comment: comment.map(str::to_string),
+        collation: None,
     }
 }
 

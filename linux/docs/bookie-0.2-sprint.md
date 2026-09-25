@@ -208,8 +208,11 @@ binding is not yet restored after a restart (its text is, through drafts). B6 li
 `list_objects(kind, schema)` shared by the Catalog window and the MCP tool covers
 routines, triggers, sequences, extensions, roles and enum/composite/domain/range
 types; per-object grants remain. Types are a kind of `list_objects` rather than a
-separate `list_types`. B3 and B4 have not
-started.
+separate `list_types`. B3 is narrowed for 0.2 to what the single type string
+loses in practice: a column collation, read on PostgreSQL and MySQL and kept by the
+structure editor's alter statements. Schema columns keep the declared spelling in
+`data_type`; a separate declared-type field waits for a consumer. SQL Server also
+drops a collation on ALTER COLUMN and is not covered yet. B4 has not started.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,
 new engines, all-connection/window restoration, dashboards, built-in AI.

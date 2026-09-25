@@ -156,6 +156,7 @@ mod tests {
             auto_increment: false,
             default_value: None,
             comment: None,
+            collation: None,
         }
     }
 

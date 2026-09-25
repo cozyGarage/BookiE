@@ -149,6 +149,7 @@ impl Connection for MongodbConnection {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             });
         }
         for (name, data_type) in union {
@@ -161,6 +162,7 @@ impl Connection for MongodbConnection {
                 default_value: None,
                 is_generated: false,
                 comment: None,
+                collation: None,
             });
         }
         Ok(columns)
@@ -393,6 +395,7 @@ fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         });
     }
     for (name, data_type) in union {
@@ -405,6 +408,7 @@ fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
             default_value: None,
             is_generated: false,
             comment: None,
+            collation: None,
         });
     }
     columns
