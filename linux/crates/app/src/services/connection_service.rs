@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use tablepro_core::{ConnectOptions, Connection, DriverRegistry};
-use tablepro_ssh::{SshConfig, SshTunnel};
 use tablepro_storage::SavedConnection;
 use tablepro_transport::TransportError;
+use tablepro_transport::{SshEnvironment, SshRoute, Tunnel};
 use uuid::Uuid;
 
 use super::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
@@ -19,7 +19,7 @@ pub struct PreparedConnection {
     id: uuid::Uuid,
     metadata: ConnectionMetadata,
     connection: Box<dyn Connection>,
-    tunnel: Option<SshTunnel>,
+    tunnel: Option<Tunnel>,
     read_only: bool,
     params: ReconnectParams,
 }
@@ -57,7 +57,7 @@ impl PreparedConnection {
         driver_id: String,
         metadata: ConnectionMetadata,
         connection: Box<dyn Connection>,
-        tunnel: Option<SshTunnel>,
+        tunnel: Option<Tunnel>,
         params: ReconnectParams,
     ) -> Self {
         Self {
@@ -106,6 +106,7 @@ pub async fn open_saved(
     registry: Arc<DriverRegistry>,
     saved: SavedConnection,
     timeout_secs: u32,
+    ssh_environment: SshEnvironment,
 ) -> Result<PreparedConnection, String> {
     let driver = registry
         .get(&saved.driver_id)
@@ -114,11 +115,11 @@ pub async fn open_saved(
     let environment = saved.environment;
     let read_only = saved.read_only;
 
-    let ssh_hops = tablepro_transport::saved_ssh_chain(&saved).await.map_err(message)?;
+    let ssh_hops = tablepro_transport::saved_ssh_route(&saved).await.map_err(message)?;
     let mut opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
     opts.application_name = Some("BookiE".into());
 
-    let (conn, tunnel) = establish(&*driver, opts.clone(), ssh_hops.clone()).await?;
+    let (conn, tunnel) = establish(&*driver, opts.clone(), ssh_hops.clone(), &ssh_environment).await?;
     let server_version = conn.server_version().await.ok().flatten();
     let control = crate::services::operation_control::bounded(timeout_secs);
     let tables = conn
@@ -141,6 +142,7 @@ pub async fn open_saved(
         driver,
         opts,
         ssh: ssh_hops,
+        environment: ssh_environment,
     };
     Ok(PreparedConnection::new(
         tables,
@@ -156,9 +158,10 @@ pub async fn open_saved(
 pub async fn establish(
     driver: &dyn tablepro_core::DatabaseDriver,
     opts: ConnectOptions,
-    ssh: Option<Vec<SshConfig>>,
-) -> Result<(Box<dyn Connection>, Option<SshTunnel>), String> {
-    tablepro_transport::establish(driver, opts, ssh, tablepro_ssh::UnknownHostKey::Learn)
+    ssh: Option<SshRoute>,
+    environment: &SshEnvironment,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
+    tablepro_transport::establish(driver, opts, ssh, environment)
         .await
         .map_err(message)
 }

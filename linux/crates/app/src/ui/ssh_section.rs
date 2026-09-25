@@ -182,6 +182,7 @@ impl SshSection {
                 username,
                 auth: saved_auth,
                 jump: None,
+                client: Default::default(),
             },
             secret_to_store: secret,
         })

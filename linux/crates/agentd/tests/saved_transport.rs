@@ -112,6 +112,7 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
                 has_passphrase: false,
             },
             jump: None,
+            client: Default::default(),
         }),
         last_opened_at: None,
     }

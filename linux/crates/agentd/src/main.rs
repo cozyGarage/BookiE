@@ -205,6 +205,27 @@ fn build_registry() -> DriverRegistry {
     r
 }
 
+async fn daemon_provider(
+    policy: Arc<tablepro_policy::PolicyConfig>,
+    audit: Arc<dyn tablepro_policy::AuditSink>,
+    approval: Arc<dyn tablepro_policy::ApprovalSink>,
+) -> DaemonProvider {
+    let provider = DaemonProvider::new(
+        Arc::new(build_registry()),
+        policy,
+        audit,
+        Arc::new(AuditState::new()),
+        approval,
+    );
+    match tablepro_transport::system_openssh(Arc::new(tablepro_ssh::openssh::UnattendedPrompter)).await {
+        Ok(openssh) => provider.with_system_openssh(openssh),
+        Err(error) => {
+            tracing::info!(error = %error, "system OpenSSH connections are unavailable");
+            provider
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tablepro_transport::install_crypto_provider();
@@ -255,13 +276,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let audit: Arc<dyn tablepro_policy::AuditSink> = Arc::new(journal);
 
-    let provider = Arc::new(DaemonProvider::new(
-        Arc::new(build_registry()),
-        policy,
-        audit,
-        Arc::new(AuditState::new()),
-        approval,
-    ));
+    let provider = Arc::new(daemon_provider(policy, audit, approval).await);
     let bridge = Arc::new(McpBridge::new(provider, tokens));
 
     serve_stdio(bridge).await?;

@@ -162,6 +162,7 @@ mod tests {
                 has_passphrase: false,
             },
             jump: None,
+            client: Default::default(),
         }
     }
 

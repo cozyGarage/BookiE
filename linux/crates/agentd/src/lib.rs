@@ -15,7 +15,6 @@ use tablepro_core::{
 };
 use tablepro_mcp::ConnectionProvider;
 use tablepro_policy::{AuditState, GuardContext, PolicyConfig, PolicyGuard, Principal};
-use tablepro_ssh::SshTunnel;
 use tablepro_storage::{SavedConnection, SavedSshConfig, load_connections};
 use uuid::Uuid;
 
@@ -30,7 +29,7 @@ struct OpenSession {
 
 struct SessionConnection {
     inner: Arc<dyn Connection>,
-    _tunnel: Option<SshTunnel>,
+    _tunnel: Option<tablepro_transport::Tunnel>,
 }
 
 #[async_trait]
@@ -246,6 +245,7 @@ pub struct DaemonProvider {
     approval: Arc<dyn tablepro_policy::ApprovalSink>,
     sessions: Mutex<HashMap<Uuid, OpenSession>>,
     session_locks: Mutex<HashMap<Uuid, Arc<tokio::sync::Mutex<()>>>>,
+    ssh: tablepro_transport::SshEnvironment,
 }
 
 #[async_trait]
@@ -295,7 +295,13 @@ impl DaemonProvider {
             approval,
             sessions: Mutex::new(HashMap::new()),
             session_locks: Mutex::new(HashMap::new()),
+            ssh: tablepro_transport::SshEnvironment::builtin(AGENT_UNKNOWN_HOST_KEY),
         }
+    }
+
+    pub fn with_system_openssh(mut self, openssh: tablepro_transport::OpenSshEnvironment) -> Self {
+        self.ssh.openssh = Some(openssh);
+        self
     }
 
     async fn open_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
@@ -331,14 +337,14 @@ impl DaemonProvider {
             .registry
             .get(&saved.driver_id)
             .ok_or_else(|| format!("driver {} not registered", saved.driver_id))?;
-        let ssh = tablepro_transport::saved_ssh_chain(saved)
+        let ssh = tablepro_transport::saved_ssh_route(saved)
             .await
             .map_err(|e| e.to_string())?;
         let mut opts = tablepro_transport::connect_options_for(saved)
             .await
             .map_err(|e| e.to_string())?;
         opts.application_name = Some("BookiE agent".into());
-        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, AGENT_UNKNOWN_HOST_KEY)
+        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, &self.ssh)
             .await
             .map_err(|e| e.to_string())?;
         let connection: Arc<dyn Connection> = Arc::new(SessionConnection {
@@ -591,6 +597,7 @@ mod tests {
                 has_passphrase: false,
             },
             jump: None,
+            client: Default::default(),
         });
         let key = SessionKey::from_saved(&saved, [0; 32]);
         let mut opts = ConnectOptions {

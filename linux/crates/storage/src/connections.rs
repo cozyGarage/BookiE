@@ -106,6 +106,22 @@ pub struct SavedSshConfig {
     /// Omitted in legacy files via `#[serde(default)]`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jump: Option<Box<SavedSshConfig>>,
+    #[serde(default, skip_serializing_if = "SshClient::is_builtin")]
+    pub client: SshClient,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SshClient {
+    #[default]
+    Builtin,
+    OpenSsh,
+}
+
+impl SshClient {
+    fn is_builtin(&self) -> bool {
+        *self == Self::Builtin
+    }
 }
 
 impl SavedSshConfig {
@@ -486,6 +502,7 @@ mod tests {
             username: "jump".into(),
             auth: SavedSshAuth::Password,
             jump: None,
+            client: Default::default(),
         };
         for _ in 1..depth {
             hop = SavedSshConfig {
@@ -494,6 +511,7 @@ mod tests {
                 username: "jump".into(),
                 auth: SavedSshAuth::Password,
                 jump: Some(Box::new(hop)),
+                client: Default::default(),
             };
         }
         hop
@@ -914,6 +932,7 @@ mod tests {
                 has_passphrase: true,
             },
             jump: None,
+            client: Default::default(),
         });
         save_to(&path, &[conn.clone()]).await.unwrap();
         let loaded = load_from(&path).await.unwrap();
@@ -939,7 +958,9 @@ mod tests {
                     has_passphrase: false,
                 },
                 jump: None,
+                client: Default::default(),
             })),
+            client: Default::default(),
         });
         save_to(&path, &[conn.clone()]).await.unwrap();
         let loaded = load_from(&path).await.unwrap();
@@ -1015,6 +1036,7 @@ mod tests {
             username: "u".into(),
             auth: SavedSshAuth::Password,
             jump: None,
+            client: Default::default(),
         });
         let value = serde_json::to_value(&connection).unwrap();
         let keys: Vec<&String> = value.as_object().unwrap().keys().collect();

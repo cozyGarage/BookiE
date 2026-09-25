@@ -280,6 +280,7 @@ mod tests {
             driver,
             opts: options,
             ssh: None,
+            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
         };
         assert!(service.activate(id, metadata, connection, None, false, reconnect));
         service.get(id).expect("guarded handle")

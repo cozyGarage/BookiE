@@ -27,7 +27,7 @@ pub use connection_organization::{
 };
 pub use connection_url::{ParsedConnectionUrl, parse_connection_url};
 pub use connections::{
-    SavedConnection, SavedSshAuth, SavedSshConfig, apply_import, delete_connection, duplicate_connection,
+    SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, apply_import, delete_connection, duplicate_connection,
     load_connections, restore_connection, save_connections, touch_last_opened,
 };
 pub use error::StorageError;

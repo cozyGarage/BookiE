@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tablepro_core::{AuthMode, Environment, TlsMode, Transport};
 use tablepro_ssh::SshAuth;
 use tablepro_storage::{SavedConnection, SavedSshAuth, SavedSshConfig};
-use tablepro_transport::{connect_options_for, saved_ssh_chain};
+use tablepro_transport::{SshRoute, connect_options_for, saved_ssh_route};
 use uuid::Uuid;
 
 fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
@@ -38,6 +38,7 @@ fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> S
             has_passphrase: false,
         },
         jump: jump.map(Box::new),
+        client: Default::default(),
     }
 }
 
@@ -58,7 +59,7 @@ async fn a_direct_connection_carries_no_tunnel_state() {
             port: 5432
         }
     );
-    assert!(saved_ssh_chain(&connection).await.expect("no ssh chain").is_none());
+    assert!(saved_ssh_route(&connection).await.expect("no ssh chain").is_none());
 }
 
 #[tokio::test]
@@ -131,10 +132,9 @@ async fn a_jump_chain_resolves_in_hop_order() {
         Some(hop("inner.corp.example", 2222, "inner", None)),
     ));
 
-    let chain = saved_ssh_chain(&connection)
-        .await
-        .expect("resolve chain")
-        .expect("an ssh chain is configured");
+    let Some(SshRoute::Builtin(chain)) = saved_ssh_route(&connection).await.expect("resolve chain") else {
+        panic!("a built-in ssh chain is configured");
+    };
 
     assert_eq!(chain.len(), 2);
     assert_eq!(chain[0].host, "bastion.corp.example");
@@ -157,4 +157,28 @@ async fn a_tunnelled_connection_still_starts_from_the_database_hostname() {
         "the tunnel is applied by establish, not by option assembly"
     );
     assert!(opts.forwarded_socket_dir.is_none());
+}
+
+#[tokio::test]
+async fn an_openssh_connection_becomes_a_single_destination_and_refuses_a_saved_jump_chain() {
+    let mut connection = saved(Some(TlsMode::VerifyFull), false);
+    let mut single = hop("bastion.corp.example", 2222, "deploy", None);
+    single.client = tablepro_storage::SshClient::OpenSsh;
+    connection.ssh = Some(single.clone());
+
+    let Some(SshRoute::OpenSsh(config)) = saved_ssh_route(&connection).await.expect("resolve route") else {
+        panic!("an OpenSSH route is configured");
+    };
+    assert_eq!(config.destination.host(), "bastion.corp.example");
+    assert_eq!(config.destination.port(), Some(2222));
+    assert_eq!(config.destination.user(), Some("deploy"));
+    assert!(config.jump_hosts.is_empty());
+
+    single.jump = Some(Box::new(hop("inner.corp.example", 22, "inner", None)));
+    connection.ssh = Some(single);
+    let error = saved_ssh_route(&connection)
+        .await
+        .err()
+        .expect("a saved jump chain is refused");
+    assert!(error.to_string().contains("ProxyJump"), "{error}");
 }

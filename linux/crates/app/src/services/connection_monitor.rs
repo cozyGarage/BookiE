@@ -5,7 +5,7 @@ use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
 use tablepro_core::Connection;
-use tablepro_ssh::SshTunnel;
+use tablepro_transport::Tunnel;
 
 use super::connection_service;
 use super::database_service::{ConnectionHealth, EntryInner, ReconnectParams};
@@ -90,11 +90,17 @@ fn next_delay(prev: Duration) -> Duration {
     std::cmp::min(prev.saturating_mul(2), BACKOFF_MAX)
 }
 
-async fn try_reconnect(params: &ReconnectParams) -> Result<(Box<dyn Connection>, Option<SshTunnel>), String> {
-    connection_service::establish(params.driver.as_ref(), params.opts.clone(), params.ssh.clone()).await
+async fn try_reconnect(params: &ReconnectParams) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
+    connection_service::establish(
+        params.driver.as_ref(),
+        params.opts.clone(),
+        params.ssh.clone(),
+        &params.environment,
+    )
+    .await
 }
 
-fn swap_connection(inner: &Arc<Mutex<EntryInner>>, conn: Box<dyn Connection>, tunnel: Option<SshTunnel>) {
+fn swap_connection(inner: &Arc<Mutex<EntryInner>>, conn: Box<dyn Connection>, tunnel: Option<Tunnel>) {
     let arc: Arc<dyn Connection> = Arc::from(conn);
     if let Ok(mut g) = inner.lock() {
         g.connection = arc;
@@ -201,6 +207,7 @@ mod tests {
             }),
             opts: ConnectOptions::default(),
             ssh: None,
+            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
         };
         let cancel = CancellationToken::new();
         let fault = Arc::new(Notify::new());

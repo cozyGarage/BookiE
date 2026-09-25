@@ -39,8 +39,8 @@ async fn the_shared_transport_verifies_the_database_hostname_through_the_bastion
     let (connection, tunnel) = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(chain(&fixture)),
-        tablepro_ssh::UnknownHostKey::Learn,
+        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
     )
     .await
     .expect("a tunnelled VerifyFull session");
@@ -67,8 +67,8 @@ async fn a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable() {
     let error = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(vec![hop]),
-        tablepro_ssh::UnknownHostKey::Learn,
+        Some(tablepro_transport::SshRoute::Builtin(vec![hop])),
+        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
     )
     .await
     .err()
@@ -88,8 +88,8 @@ async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
     let (tunnelled, _tunnel) = establish(
         &PgDriver,
         verifying_options(&fixture),
-        Some(chain(&fixture)),
-        tablepro_ssh::UnknownHostKey::Learn,
+        Some(tablepro_transport::SshRoute::Builtin(chain(&fixture))),
+        &tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
     )
     .await
     .expect("a tunnelled VerifyFull session");

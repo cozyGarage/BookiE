@@ -9,8 +9,8 @@ use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
 use tablepro_policy::{
     AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_from_path,
 };
-use tablepro_ssh::{SshConfig, SshTunnel};
 use tablepro_storage::AuditJournal;
+use tablepro_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
 
 use super::config_io::xdg_config_path;
 use super::connection_monitor;
@@ -41,7 +41,7 @@ impl Eq for ConnectionIdentity {}
 
 pub(super) struct EntryInner {
     pub(super) connection: Arc<dyn Connection>,
-    pub(super) tunnel: Option<SshTunnel>,
+    pub(super) tunnel: Option<Tunnel>,
     pub(super) health: ConnectionHealth,
 }
 
@@ -64,7 +64,8 @@ pub enum ConnectionHealth {
 pub struct ReconnectParams {
     pub driver: Arc<dyn DatabaseDriver>,
     pub opts: ConnectOptions,
-    pub ssh: Option<Vec<SshConfig>>,
+    pub ssh: Option<SshRoute>,
+    pub environment: SshEnvironment,
 }
 
 struct Entry {
@@ -150,6 +151,7 @@ pub struct DatabaseService {
     policy_available: bool,
     audit_state: Arc<AuditState>,
     approval: Mutex<Arc<dyn tablepro_policy::ApprovalSink>>,
+    ssh_environment: Mutex<SshEnvironment>,
 }
 
 impl DatabaseService {
@@ -173,6 +175,7 @@ impl DatabaseService {
             policy_available,
             audit_state: audit.state,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
+            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn)),
         }
     }
 
@@ -189,6 +192,14 @@ impl DatabaseService {
     /// work: switching databases must not hide a newly ambiguous write.
     pub fn governed_writes_disabled(&self) -> bool {
         self.audit_state.governed_writes_disabled()
+    }
+
+    pub fn ssh_environment(&self) -> SshEnvironment {
+        self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
+        self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
     }
 
     pub fn set_approval_sink(&self, sink: Arc<dyn tablepro_policy::ApprovalSink>) {
@@ -231,7 +242,7 @@ impl DatabaseService {
         id: Uuid,
         metadata: ConnectionMetadata,
         connection: Box<dyn Connection>,
-        tunnel: Option<SshTunnel>,
+        tunnel: Option<Tunnel>,
         read_only: bool,
         params: ReconnectParams,
     ) -> bool {
@@ -424,6 +435,7 @@ mod tests {
                 driver,
                 opts: options,
                 ssh: None,
+                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
             },
         );
         assert!(activated, "the id is freshly generated, so activation must succeed");
@@ -477,6 +489,7 @@ mod tests {
                 driver: driver.clone(),
                 opts: options.clone(),
                 ssh: None,
+                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
             },
         ));
 
@@ -499,6 +512,7 @@ mod tests {
                 driver,
                 opts: options,
                 ssh: None,
+                environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
             },
         );
 

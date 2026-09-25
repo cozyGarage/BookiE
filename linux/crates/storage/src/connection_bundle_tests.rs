@@ -243,6 +243,7 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
         username: "jump".into(),
         auth: SavedSshAuth::Password,
         jump: None,
+        client: Default::default(),
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
@@ -251,6 +252,7 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
             username: "jump".into(),
             auth: SavedSshAuth::Password,
             jump: Some(Box::new(hop)),
+            client: Default::default(),
         };
     }
     hop

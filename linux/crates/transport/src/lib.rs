@@ -4,12 +4,14 @@ use std::time::Duration;
 use tablepro_core::{AuthMode, ConnectOptions, Connection, DatabaseDriver, DriverError, TlsConfig, TlsMode};
 use tablepro_ssh::{SshAuth, SshConfig, SshTunnel};
 use tablepro_storage::{
-    SavedConnection, SavedSshAuth, SavedSshConfig, load_password, load_ssh_passphrase, load_ssh_password,
+    SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, load_password, load_ssh_passphrase, load_ssh_password,
 };
 use uuid::Uuid;
 
+mod route;
 mod session_material;
 
+pub use route::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel, system_openssh};
 pub use session_material::session_material_digest;
 
 const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -83,44 +85,83 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
     })
 }
 
-pub async fn saved_ssh_chain(saved: &SavedConnection) -> Result<Option<Vec<SshConfig>>, TransportError> {
+pub async fn saved_ssh_route(saved: &SavedConnection) -> Result<Option<SshRoute>, TransportError> {
     let Some(ssh) = &saved.ssh else {
         return Ok(None);
     };
-    resolve_saved_ssh_chain(saved.id, ssh).await.map(Some)
+    match ssh.client {
+        SshClient::Builtin => resolve_saved_ssh_chain(saved.id, ssh)
+            .await
+            .map(|hops| Some(SshRoute::Builtin(hops))),
+        SshClient::OpenSsh => route::openssh_config(saved.id, ssh)
+            .await
+            .map(|config| Some(SshRoute::OpenSsh(config))),
+    }
 }
 
 pub async fn establish(
     driver: &dyn DatabaseDriver,
     mut opts: ConnectOptions,
-    ssh: Option<Vec<SshConfig>>,
-    unknown_host_key: tablepro_ssh::UnknownHostKey,
-) -> Result<(Box<dyn Connection>, Option<SshTunnel>), TransportError> {
+    ssh: Option<SshRoute>,
+    environment: &SshEnvironment,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
-    validate_local_socket(&opts, driver, ssh.as_deref())?;
+    validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
-
-    let tunnel = if let Some(hops) = ssh {
-        if hops.is_empty() {
-            return Err(TransportError::Ssh("jump chain is empty".into()));
-        }
-        let remote = (std::mem::take(&mut opts.host), opts.port);
-        let socket_name = forwarded_socket_name(driver, opts.tls.mode, remote.1);
-        let tun = match &socket_name {
-            Some(name) => SshTunnel::open_chain_socket(&hops, remote.0.clone(), remote.1, name, unknown_host_key).await,
-            None => SshTunnel::open_chain(&hops, remote.0.clone(), remote.1, unknown_host_key).await,
-        }
-        .map_err(|e| TransportError::Ssh(e.to_string()))?;
-        match tun.socket_dir() {
-            Some(directory) => forward_through_socket(&mut opts, remote, directory.to_path_buf()),
-            None => redirect_through_tunnel(&mut opts, remote, (tun.local_host().to_string(), tun.local_port())),
-        }
-        Some(tun)
-    } else {
-        None
+    let tunnel = match ssh {
+        Some(route) => Some(open_tunnel(driver, &mut opts, route, environment).await?),
+        None => None,
     };
     let raw = connect_with_timeout(driver, opts, DATABASE_CONNECT_TIMEOUT).await?;
     Ok((raw, tunnel))
+}
+
+async fn open_tunnel(
+    driver: &dyn DatabaseDriver,
+    opts: &mut ConnectOptions,
+    route: SshRoute,
+    environment: &SshEnvironment,
+) -> Result<Tunnel, TransportError> {
+    let remote = (std::mem::take(&mut opts.host), opts.port);
+    let socket_name = forwarded_socket_name(driver, opts.tls.mode, remote.1);
+    let tunnel = match route {
+        SshRoute::Builtin(hops) => Tunnel::Builtin(open_builtin(&hops, &remote, socket_name, environment).await?),
+        SshRoute::OpenSsh(config) => {
+            Tunnel::OpenSsh(route::open_openssh(&config, environment, (&remote.0, remote.1), socket_name).await?)
+        }
+    };
+    match (&tunnel, tunnel.socket_dir()) {
+        (_, Some(directory)) => forward_through_socket(opts, remote, directory.to_path_buf()),
+        (Tunnel::Builtin(tun), None) => {
+            redirect_through_tunnel(opts, remote, (tun.local_host().to_string(), tun.local_port()))
+        }
+        (Tunnel::OpenSsh(forward), None) => match forward.local_endpoint() {
+            tablepro_ssh::openssh::LocalEndpoint::Tcp(address) => {
+                redirect_through_tunnel(opts, remote, (address.ip().to_string(), address.port()))
+            }
+            tablepro_ssh::openssh::LocalEndpoint::Unix(_) => {
+                return Err(TransportError::Ssh("the forwarded socket has no directory".into()));
+            }
+        },
+    }
+    Ok(tunnel)
+}
+
+async fn open_builtin(
+    hops: &[SshConfig],
+    remote: &(String, u16),
+    socket_name: Option<String>,
+    environment: &SshEnvironment,
+) -> Result<SshTunnel, TransportError> {
+    if hops.is_empty() {
+        return Err(TransportError::Ssh("jump chain is empty".into()));
+    }
+    let unknown = environment.unknown_host_key;
+    match &socket_name {
+        Some(name) => SshTunnel::open_chain_socket(hops, remote.0.clone(), remote.1, name, unknown).await,
+        None => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
+    }
+    .map_err(|e| TransportError::Ssh(e.to_string()))
 }
 
 async fn connect_with_timeout(
@@ -139,7 +180,7 @@ async fn connect_with_timeout(
 fn validate_local_socket(
     opts: &ConnectOptions,
     driver: &dyn DatabaseDriver,
-    ssh: Option<&[SshConfig]>,
+    has_ssh: bool,
 ) -> Result<(), TransportError> {
     let Some(directory) = opts.local_socket_dir.as_deref() else {
         return Ok(());
@@ -149,7 +190,7 @@ fn validate_local_socket(
             driver.display_name().to_string(),
         ));
     }
-    if ssh.is_some() {
+    if has_ssh {
         return Err(TransportError::LocalSocketWithSsh);
     }
     if opts.tls.mode != TlsMode::Disabled {
@@ -259,26 +300,13 @@ async fn resolve_saved_ssh_hop(
             // closed instead.
             return Err(jump_hop_password_refused(hop_index));
         }
-        SavedSshAuth::Password => {
-            let pw = load_ssh_password(id)
-                .await
-                .map_err(|e| TransportError::Secret(format!("load ssh password: {e}")))?
-                .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))?;
-            SshAuth::Password { password: pw }
-        }
-        SavedSshAuth::PrivateKey { path, has_passphrase } => {
-            let passphrase = if *has_passphrase {
-                load_ssh_passphrase(id)
-                    .await
-                    .map_err(|e| TransportError::Secret(format!("load ssh passphrase: {e}")))?
-            } else {
-                None
-            };
-            SshAuth::PrivateKey {
-                path: path.clone(),
-                passphrase,
-            }
-        }
+        SavedSshAuth::Password => SshAuth::Password {
+            password: saved_ssh_password(id).await?,
+        },
+        SavedSshAuth::PrivateKey { path, has_passphrase } => SshAuth::PrivateKey {
+            path: path.clone(),
+            passphrase: saved_ssh_passphrase(id, *has_passphrase).await?,
+        },
     };
     Ok(SshConfig {
         host: saved.host.clone(),
@@ -286,6 +314,22 @@ async fn resolve_saved_ssh_hop(
         username: saved.username.clone(),
         auth,
     })
+}
+
+async fn saved_ssh_password(id: Uuid) -> Result<SecretString, TransportError> {
+    load_ssh_password(id)
+        .await
+        .map_err(|e| TransportError::Secret(format!("load ssh password: {e}")))?
+        .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))
+}
+
+async fn saved_ssh_passphrase(id: Uuid, has_passphrase: bool) -> Result<Option<SecretString>, TransportError> {
+    if !has_passphrase {
+        return Ok(None);
+    }
+    load_ssh_passphrase(id)
+        .await
+        .map_err(|e| TransportError::Secret(format!("load ssh passphrase: {e}")))
 }
 
 #[cfg(test)]
@@ -400,33 +444,33 @@ mod tests {
         };
 
         assert!(matches!(
-            validate_local_socket(&opts, &TcpOnlyDriver, None),
+            validate_local_socket(&opts, &TcpOnlyDriver, false),
             Err(TransportError::LocalSocketUnsupported(_))
         ));
         assert!(matches!(
-            validate_local_socket(&opts, &SocketDriver, Some(&[])),
+            validate_local_socket(&opts, &SocketDriver, true),
             Err(TransportError::LocalSocketWithSsh)
         ));
 
         opts.tls = tls_config(TlsMode::VerifyFull);
         assert!(matches!(
-            validate_local_socket(&opts, &SocketDriver, None),
+            validate_local_socket(&opts, &SocketDriver, false),
             Err(TransportError::LocalSocketWithTls)
         ));
         opts.tls = tls_config(TlsMode::Disabled);
         assert!(matches!(
-            validate_local_socket(&opts, &SocketDriver, None),
+            validate_local_socket(&opts, &SocketDriver, false),
             Err(TransportError::InvalidLocalSocket(_))
         ));
         opts.port = 0;
         assert!(matches!(
-            validate_local_socket(&opts, &SocketDriver, None),
+            validate_local_socket(&opts, &SocketDriver, false),
             Err(TransportError::InvalidLocalSocket(_))
         ));
         opts.port = 5432;
         opts.local_socket_dir = Some(std::path::PathBuf::from("relative"));
         assert!(matches!(
-            validate_local_socket(&opts, &SocketDriver, None),
+            validate_local_socket(&opts, &SocketDriver, false),
             Err(TransportError::InvalidLocalSocket(_))
         ));
     }
@@ -488,10 +532,15 @@ mod tests {
             ..Default::default()
         };
 
-        let error = establish(&SocketDriver, opts, None, tablepro_ssh::UnknownHostKey::Learn)
-            .await
-            .err()
-            .expect("test driver refuses to connect");
+        let error = establish(
+            &SocketDriver,
+            opts,
+            None,
+            &SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        )
+        .await
+        .err()
+        .expect("test driver refuses to connect");
 
         assert!(error.to_string().contains("test driver"), "unexpected error: {error}");
     }
@@ -523,6 +572,7 @@ mod tests {
                 has_passphrase: false,
             },
             jump: None,
+            client: Default::default(),
         }
     }
 
