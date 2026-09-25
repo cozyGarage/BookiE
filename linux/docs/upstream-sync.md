@@ -3,6 +3,67 @@
 The approved [BookiE convergence sprint](bookie-0.2-sprint.md) now includes shared
 Rust/Linux foundations as well as behavior review. Apple source trees remain excluded.
 
+## 2026-09-25: system OpenSSH transport
+
+`crates/ssh/src/openssh/` ports upstream's system OpenSSH transport as a second
+backend beside the russh `SshTunnel`, which is unchanged. Nothing outside the ssh
+crate uses it yet; wiring it into `transport`, storage, the app and `agentd` is a
+later slice.
+
+Source: upstream `refs/remotes/upstream/linux` at `0e542e3c1`, files
+`linux/crates/ssh/src/{argv,askpass_bridge,destination,prompt,runtime,session,forward,stderr_classify,supervisor,sweep}.rs`,
+`src/bin/tablepro-askpass.rs`, `tests/{askpass_helper.rs,openssh_session.rs}` and
+`tests/fixtures/stderr/*`. The feature landed in `d03430020 feat(ssh): add the system
+OpenSSH transport with an askpass bridge`; `55528b854 fix(ssh): read the host key
+fingerprint line from OpenSSH 9 as well` is carried in the prompt parser, which
+closes the item the 2026-09-19 entry left open.
+
+Taken largely as written: the ControlMaster argv and `-O` control commands, the
+destination and jump-list parser, the askpass frame format and helper, the
+handshake loop with its prompt-paused deadline, the supervisor's `-O exit`, grace
+and kill sequence, the flock-guarded sweep, and the stderr classifier with its
+fixture files copied verbatim.
+
+Rewritten:
+
+- Errors map to a new `OpenSshError` in the ssh crate. Upstream's
+  `tablepro_core::SshFailure`, `TransportError`, `LivenessPolicy`,
+  `NetworkEndpoint` and `Transport` trait do not exist here, so the crate keeps no
+  dependency on `core`. Timeouts are an `OpenSshTimeouts` value, and a forward
+  returns its local endpoint and the original target so a caller keeps the service
+  host for TLS verification.
+- No process-global state. Upstream's `TASKS` tracker and `SshServices`/
+  `SshRuntimeCell` singletons became an explicit `OpenSshContext` holding the
+  runtime, program paths and timeouts. The runtime base is
+  `$XDG_RUNTIME_DIR/tablepro`, falling back to a private `tablepro-<uid>` directory
+  in the temp dir.
+- Forced options add `StrictHostKeyChecking=ask`, so a user's `~/.ssh/config` cannot
+  turn host-key checking off for the destination, plus `StreamLocalBindUnlink=no`,
+  `SessionType=none` and `GatewayPorts=no`. Forwards can also use a loopback TCP
+  port, not only a Unix socket.
+- Credential answering is a security rewrite. Upstream answers the first
+  `'s password:` prompt with the stored password whatever account it names, so a
+  jump host could receive the destination's password. Here a stored password answers
+  only a prompt naming exactly the configured `user@host`, and a stored passphrase
+  only a prompt naming exactly the configured key path. Keyboard-interactive text is
+  classified before the password suffix, so a server-supplied prompt cannot pose as
+  a password prompt. Everything else, and every host-key confirmation, goes to a
+  `Prompter` trait; `UnattendedPrompter` declines all of it. Confirmations need an
+  explicit accept and secret prompts need a secret, so a mismatched answer cancels.
+- The bridge rejects a peer with another uid as an error, bounds each frame to
+  64 KiB, times out a peer that sends no prompt, and builds replies in `Zeroizing`
+  buffers. The helper keeps the reply in a `Zeroizing` buffer too.
+- Not ported: `known_hosts.rs` (`forget_host_key`) and upstream's
+  `CredentialPrompt` mapping, which belong to the UI slice.
+
+Tests: unit tests per module, a sandbox-tier `tests/openssh_fake_ssh.rs` that drives
+a shell-script `ssh` through spawn, askpass, deadline, cancel, drop, kill-after-grace,
+forwards and the sweep, and the Docker-gated `tests/openssh_session.rs`, which adds a
+jump-host case proving the stored password never reaches the jump host's prompt.
+
+Open: `-J` hops run a separate `ssh` that receives none of our `-o` options, so the
+user's config still decides host-key checking for jump hosts.
+
 ## 2026-09-19: re-survey after upstream rewrote its Linux branch
 
 `origin/linux` is 1,017 commits ahead of ours and 396 behind. The number is
