@@ -760,16 +760,15 @@ fn format_mssql_type(type_name: &str, max_length: i64, precision: i64, scale: i6
     }
 }
 
-/// `sys.default_constraints.definition` wraps the expression in parentheses
-/// (sometimes doubled) and quotes string literals: `((0))`, `('pending')`,
-/// `(getdate())`. Peel balanced outer parens, then outer single quotes, so
-/// the value reads like the user typed it — matching the other drivers.
+// sys.default_constraints.definition wraps the expression in one or two
+// pairs of parentheses (`((0))`, `('pending')`); they are peeled so the
+// default reads as the DEFAULT clause that created it.
 fn normalize_mssql_default(raw: &str) -> String {
     let mut s = raw.trim();
     while outer_parens_wrap(s) {
         s = s[1..s.len() - 1].trim();
     }
-    strip_outer_single_quotes(s)
+    s.to_string()
 }
 
 fn outer_parens_wrap(s: &str) -> bool {
@@ -794,14 +793,6 @@ fn outer_parens_wrap(s: &str) -> bool {
         }
     }
     depth == 0
-}
-
-fn strip_outer_single_quotes(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    if bytes.len() >= 2 && bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'' {
-        return raw[1..raw.len() - 1].replace("''", "'");
-    }
-    raw.to_string()
 }
 
 /// Map SQL Server's `*_referential_action_desc` text to the canonical SQL
@@ -1084,12 +1075,14 @@ mod tests {
     }
 
     #[test]
-    fn normalize_default_peels_parens_and_quotes() {
+    fn normalize_default_peels_parens_and_keeps_literal_quotes() {
         assert_eq!(normalize_mssql_default("((0))"), "0");
-        assert_eq!(normalize_mssql_default("('pending')"), "pending");
+        assert_eq!(normalize_mssql_default("('pending')"), "'pending'");
+        assert_eq!(normalize_mssql_default("('')"), "''");
+        assert_eq!(normalize_mssql_default("(NULL)"), "NULL");
         assert_eq!(normalize_mssql_default("(getdate())"), "getdate()");
         assert_eq!(normalize_mssql_default("(N'x')"), "N'x'");
-        assert_eq!(normalize_mssql_default("('it''s')"), "it's");
+        assert_eq!(normalize_mssql_default("('it''s')"), "'it''s'");
     }
 
     #[test]

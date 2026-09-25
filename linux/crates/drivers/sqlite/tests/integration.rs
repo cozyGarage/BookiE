@@ -336,3 +336,53 @@ async fn an_in_memory_database_refuses_a_session() {
 
     assert!(matches!(error, DriverError::Unsupported(_)), "{error:?}");
 }
+
+#[tokio::test]
+async fn fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapply_exactly() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection
+        .execute(
+            "CREATE TABLE defaults_kept (id INTEGER PRIMARY KEY, bare TEXT, explicit_null TEXT DEFAULT NULL, \
+             blank TEXT DEFAULT '', word TEXT DEFAULT 'it''s', amount INTEGER DEFAULT 0)",
+        )
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "defaults_kept").await.unwrap();
+    let defaults: Vec<(&str, Option<&str>)> = columns
+        .iter()
+        .map(|c| (c.name.as_str(), c.default_value.as_deref()))
+        .collect();
+    assert_eq!(
+        defaults,
+        vec![
+            ("id", None),
+            ("bare", None),
+            ("explicit_null", Some("NULL")),
+            ("blank", Some("''")),
+            ("word", Some("'it''s'")),
+            ("amount", Some("0")),
+        ]
+    );
+
+    for info in columns.into_iter().filter(|c| c.name != "id") {
+        let mut copy = tablepro_core::sql_ddl::DraftColumn::from_info(info.clone());
+        copy.original = None;
+        copy.name = format!("{}_copy", info.name);
+        for statement in tablepro_core::sql_ddl::build_add_column("sqlite", None, "defaults_kept", &copy).unwrap() {
+            connection.execute(&statement).await.unwrap();
+        }
+    }
+    connection
+        .execute("INSERT INTO defaults_kept (id) VALUES (1)")
+        .await
+        .unwrap();
+    let same = connection
+        .query(
+            "SELECT bare IS bare_copy, explicit_null IS explicit_null_copy, blank IS blank_copy, \
+             word IS word_copy, amount IS amount_copy, blank_copy = '' FROM defaults_kept WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(same.rows[0], vec![Value::Int(1); 6]);
+}

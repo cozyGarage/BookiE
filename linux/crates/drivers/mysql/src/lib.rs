@@ -753,21 +753,52 @@ fn qualified(schema: Option<&str>, table: &str) -> String {
     }
 }
 
+const UNQUOTED_DEFAULT_TYPE_PREFIXES: [&str; 12] = [
+    "tinyint",
+    "smallint",
+    "mediumint",
+    "int",
+    "bigint",
+    "decimal",
+    "numeric",
+    "float",
+    "double",
+    "real",
+    "bit",
+    "year",
+];
+
+// MySQL reports a literal default in information_schema.column_default as
+// its bare value (`pending`, an empty string for ''), which is not a valid
+// DEFAULT clause. MySQL 8 flags an expression default with
+// DEFAULT_GENERATED in `extra`; 5.7 reports CURRENT_TIMESTAMP bare on a
+// temporal column. Anything else on a non-numeric column is a string
+// literal and is quoted back so restating the column keeps its default.
+fn default_expression(raw: Option<String>, column_type: &str, extra: &str) -> Option<String> {
+    let raw = raw?;
+    let lower_type = column_type.to_ascii_lowercase();
+    let numeric = UNQUOTED_DEFAULT_TYPE_PREFIXES
+        .iter()
+        .any(|prefix| lower_type.starts_with(prefix));
+    let temporal_now = (lower_type.starts_with("timestamp") || lower_type.starts_with("datetime"))
+        && raw.to_ascii_lowercase().starts_with("current_timestamp");
+    if numeric || temporal_now || extra.contains("default_generated") {
+        return Some(raw);
+    }
+    Some(tablepro_core::sql_literal::render_sql_literal(
+        "mysql",
+        &Value::Text(raw),
+    ))
+}
+
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
-    // information_schema.column_default uses NULL for "no
-    // default", but some sqlx + MySQL combinations surface
-    // it as an empty string. Treat empty as absent so the
-    // build_insert_from_draft "omit when default present"
-    // heuristic doesn't trigger on phantom defaults.
-    let default_value: Option<String> = r
-        .try_get::<Option<String>, _>(5)
-        .unwrap_or(None)
-        .filter(|s| !s.is_empty());
+    let column_type = r.get::<String, _>(1);
+    let default_value = default_expression(r.try_get::<Option<String>, _>(5).unwrap_or(None), &column_type, &extra);
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
     ColumnInfo {
         name: r.get::<String, _>(0),
-        data_type: r.get::<String, _>(1),
+        data_type: column_type,
         nullable: r.get::<String, _>(2) == "YES",
         primary_key: r.get::<String, _>(3) == "PRI",
         is_auto_increment: extra.contains("auto_increment"),

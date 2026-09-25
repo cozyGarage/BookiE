@@ -857,3 +857,80 @@ async fn a_column_comment_round_trips_and_a_table_comment_does_not_leak_into_it(
     let cleared = connection.fetch_columns(None, "comment_demo").await.unwrap();
     assert_eq!(cleared.iter().find(|c| c.name == "label").unwrap().comment, None);
 }
+
+async fn column_defaults(conn: &dyn Connection, table: &str) -> Vec<(String, Option<String>)> {
+    let columns = conn.fetch_columns(None, table).await.unwrap();
+    columns.into_iter().map(|c| (c.name, c.default_value)).collect()
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapply_exactly() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE defaults_kept (id int PRIMARY KEY, \
+         bare text, \
+         explicit_null text DEFAULT NULL, \
+         blank text DEFAULT '', \
+         word text DEFAULT 'it''s', \
+         amount int DEFAULT 0, \
+         lowered text DEFAULT lower('X'), \
+         tags text[] DEFAULT '{}'::text[])",
+    )
+    .await
+    .unwrap();
+    let expected: Vec<(String, Option<String>)> = [
+        ("id", None),
+        ("bare", None),
+        ("explicit_null", None),
+        ("blank", Some("''")),
+        ("word", Some("'it''s'")),
+        ("amount", Some("0")),
+        ("lowered", Some("lower('X'::text)")),
+        ("tags", Some("'{}'")),
+    ]
+    .into_iter()
+    .map(|(name, default)| (name.to_string(), default.map(str::to_string)))
+    .collect();
+    assert_eq!(column_defaults(conn.as_ref(), "defaults_kept").await, expected);
+
+    let columns = conn.fetch_columns(None, "defaults_kept").await.unwrap();
+    for info in columns.into_iter().filter(|c| c.name != "id") {
+        let mut copy = tablepro_core::sql_ddl::DraftColumn::from_info(info.clone());
+        copy.original = None;
+        copy.name = format!("{}_copy", info.name);
+        for statement in tablepro_core::sql_ddl::build_add_column("postgres", None, "defaults_kept", &copy).unwrap() {
+            conn.execute(&statement).await.unwrap();
+        }
+        let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(info);
+        draft.nullable = false;
+        if draft.default_value.is_none() {
+            continue;
+        }
+        for statement in tablepro_core::sql_ddl::build_alter_column("postgres", None, "defaults_kept", &draft).unwrap()
+        {
+            conn.execute(&statement).await.unwrap();
+        }
+    }
+
+    let after = column_defaults(conn.as_ref(), "defaults_kept").await;
+    for (name, default) in &expected {
+        assert!(
+            after.contains(&(name.clone(), default.clone())),
+            "{name} kept {default:?}: {after:?}"
+        );
+    }
+    conn.execute("INSERT INTO defaults_kept (id) VALUES (1)").await.unwrap();
+    let pairs = conn
+        .query(
+            "SELECT blank IS NOT DISTINCT FROM blank_copy, word IS NOT DISTINCT FROM word_copy, \
+             explicit_null IS NOT DISTINCT FROM explicit_null_copy, bare_copy IS NULL, \
+             amount IS NOT DISTINCT FROM amount_copy, lowered IS NOT DISTINCT FROM lowered_copy, \
+             tags IS NOT DISTINCT FROM tags_copy, blank = '' \
+             FROM defaults_kept WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(pairs.rows[0], vec![Value::Bool(true); 8]);
+}

@@ -572,3 +572,77 @@ async fn a_column_comment_round_trips_and_an_uncommented_column_reads_as_none() 
         "an uncommented column reports the engine's empty string as no comment"
     );
 }
+
+async fn column_default(conn: &dyn Connection, table: &str, column: &str) -> Option<String> {
+    let columns = conn.fetch_columns(None, table).await.unwrap();
+    columns.into_iter().find(|c| c.name == column).unwrap().default_value
+}
+
+const KEPT_DEFAULTS: [(&str, Option<&str>); 7] = [
+    ("bare", None),
+    ("explicit_null", None),
+    ("blank", Some("''")),
+    ("word", Some("'it''s'")),
+    ("digits", Some("'007'")),
+    ("amount", Some("0")),
+    ("stamped", Some("CURRENT_TIMESTAMP")),
+];
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_apart() {
+    let (_c, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE defaults_kept (id int PRIMARY KEY, \
+         bare varchar(20) NULL, \
+         explicit_null varchar(20) NULL DEFAULT NULL, \
+         blank varchar(20) NULL DEFAULT '', \
+         word varchar(20) NULL DEFAULT 'it''s', \
+         digits varchar(20) NULL DEFAULT '007', \
+         amount int NULL DEFAULT 0, \
+         stamped timestamp NULL DEFAULT CURRENT_TIMESTAMP)",
+    )
+    .await
+    .unwrap();
+    for (name, default) in KEPT_DEFAULTS {
+        assert_eq!(
+            column_default(conn.as_ref(), "defaults_kept", name).await.as_deref(),
+            default,
+            "{name}"
+        );
+    }
+
+    let columns = conn.fetch_columns(None, "defaults_kept").await.unwrap();
+    for info in columns.into_iter().filter(|c| c.name != "id") {
+        let mut draft = tablepro_core::sql_ddl::DraftColumn::from_info(info);
+        draft.nullable = false;
+        for statement in tablepro_core::sql_ddl::build_alter_column("mysql", None, "defaults_kept", &draft).unwrap() {
+            conn.execute(&statement).await.unwrap();
+        }
+    }
+
+    for (name, default) in KEPT_DEFAULTS {
+        assert_eq!(
+            column_default(conn.as_ref(), "defaults_kept", name).await.as_deref(),
+            default,
+            "{name}"
+        );
+    }
+    conn.execute("INSERT INTO defaults_kept (id, bare, explicit_null) VALUES (1, 'a', 'b')")
+        .await
+        .unwrap();
+    let row = conn
+        .query("SELECT blank, word, digits, amount FROM defaults_kept WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        row.rows[0],
+        vec![
+            Value::Text(String::new()),
+            Value::Text("it's".into()),
+            Value::Text("007".into()),
+            Value::Int(0),
+        ]
+    );
+}

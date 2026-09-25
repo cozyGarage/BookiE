@@ -945,39 +945,22 @@ fn quote_ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-/// Normalize the `default_value` text returned by `pg_get_expr`.
-/// PG appends an explicit type cast to typed literal defaults
-/// (`'hi'::text`, `42::integer`, `'2024-01-01'::date`); strip the
-/// trailing `::TYPE` cast for display so the value reads as the user
-/// would type it. Then, if the result is a single-quoted string
-/// literal, strip the outer quotes (matching the SQLite driver's
-/// behaviour) so default values look the same across all engines.
-/// Function-call defaults like `now()` and complex expressions are
-/// returned unchanged.
 fn normalize_pg_default(raw: String) -> String {
-    let stripped = strip_pg_type_cast(&raw).unwrap_or(raw.as_str()).to_string();
-    strip_outer_single_quotes(&stripped)
+    match raw.rsplit_once("::") {
+        Some((operand, _)) if is_plain_literal(operand) => operand.to_string(),
+        _ => raw,
+    }
 }
 
-fn strip_pg_type_cast(raw: &str) -> Option<&str> {
-    let idx = raw.rfind("::")?;
-    let suffix = &raw[idx + 2..];
-    if suffix.is_empty() {
-        return None;
-    }
-    let is_type_name = suffix
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '(' || c == ')' || c == ',' || c == '_');
-    if is_type_name { Some(&raw[..idx]) } else { None }
+fn is_plain_literal(operand: &str) -> bool {
+    is_quoted_literal(operand) || operand.eq_ignore_ascii_case("null") || operand.parse::<f64>().is_ok()
 }
 
-fn strip_outer_single_quotes(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    if bytes.len() >= 2 && bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'' {
-        // PG escapes embedded apostrophes by doubling, same as SQLite.
-        return raw[1..raw.len() - 1].replace("''", "'");
-    }
-    raw.to_string()
+fn is_quoted_literal(operand: &str) -> bool {
+    let Some(inner) = operand.strip_prefix('\'').and_then(|rest| rest.strip_suffix('\'')) else {
+        return false;
+    };
+    !inner.replace("''", "").contains('\'')
 }
 
 fn qualified(schema: Option<&str>, table: &str) -> String {
@@ -1146,36 +1129,35 @@ mod tests {
     }
 
     #[test]
-    fn normalize_pg_default_strips_type_cast_and_quotes() {
-        assert_eq!(normalize_pg_default("'hi'::text".into()), "hi");
+    fn normalize_pg_default_strips_only_the_cast_on_a_plain_literal() {
+        assert_eq!(normalize_pg_default("'hi'::text".into()), "'hi'");
+        assert_eq!(normalize_pg_default("''::text".into()), "''");
+        assert_eq!(normalize_pg_default("NULL::character varying".into()), "NULL");
         assert_eq!(normalize_pg_default("42::integer".into()), "42");
-        assert_eq!(normalize_pg_default("'2024-01-01'::date".into()), "2024-01-01");
+        assert_eq!(normalize_pg_default("'-1'::integer".into()), "'-1'");
+        assert_eq!(normalize_pg_default("'2024-01-01'::date".into()), "'2024-01-01'");
         assert_eq!(
             normalize_pg_default("'2024-01-01 12:00:00'::timestamp without time zone".into()),
-            "2024-01-01 12:00:00"
+            "'2024-01-01 12:00:00'"
         );
-        assert_eq!(normalize_pg_default("'it''s'::text".into()), "it's");
+        assert_eq!(normalize_pg_default("'it''s'::text".into()), "'it''s'");
+        assert_eq!(normalize_pg_default("'{}'::text[]".into()), "'{}'");
     }
 
     #[test]
-    fn normalize_pg_default_leaves_function_calls_alone() {
-        // now() has no cast — return as-is.
+    fn normalize_pg_default_keeps_an_expression_whole() {
         assert_eq!(normalize_pg_default("now()".into()), "now()");
         assert_eq!(normalize_pg_default("CURRENT_TIMESTAMP".into()), "CURRENT_TIMESTAMP");
-        // Already-unquoted expression: untouched.
         assert_eq!(normalize_pg_default("gen_random_uuid()".into()), "gen_random_uuid()");
-    }
-
-    #[test]
-    fn normalize_pg_default_handles_nested_casts() {
-        // (a::int + b)::numeric → strip outer ::numeric, leave inner alone.
-        assert_eq!(normalize_pg_default("(a::int + b)::numeric".into()), "(a::int + b)");
-    }
-
-    #[test]
-    fn normalize_pg_default_unquoted_string_passthrough() {
-        // Already-unquoted (e.g. legacy MySQL-style) — no double-strip.
-        assert_eq!(normalize_pg_default("hello".into()), "hello");
+        assert_eq!(normalize_pg_default("lower('X'::text)".into()), "lower('X'::text)");
+        assert_eq!(
+            normalize_pg_default("(a::int + b)::numeric".into()),
+            "(a::int + b)::numeric"
+        );
+        assert_eq!(
+            normalize_pg_default("'a'::text || 'b'::text".into()),
+            "'a'::text || 'b'::text"
+        );
         assert_eq!(normalize_pg_default("'unbalanced".into()), "'unbalanced");
     }
 }

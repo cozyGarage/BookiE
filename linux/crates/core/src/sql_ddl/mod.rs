@@ -23,6 +23,8 @@ mod collation_tests;
 #[cfg(test)]
 mod comment_tests;
 #[cfg(test)]
+mod default_tests;
+#[cfg(test)]
 mod tests;
 
 pub use column::{build_add_column, build_alter_column, build_drop_column, build_rename_column, build_reorder_column};

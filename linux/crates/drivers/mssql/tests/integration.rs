@@ -302,7 +302,7 @@ async fn alter_column_default_round_trips() {
     }
     let status = |cols: Vec<tablepro_core::ColumnInfo>| cols.into_iter().find(|c| c.name == "status").unwrap();
     let after_add = status(conn.fetch_columns(None, "def_demo").await.unwrap());
-    assert_eq!(after_add.default_value.as_deref(), Some("pending"));
+    assert_eq!(after_add.default_value.as_deref(), Some("'pending'"));
 
     conn.execute("INSERT INTO def_demo (id) VALUES (1)").await.unwrap();
     let rows = conn.query("SELECT status FROM def_demo").await.unwrap();

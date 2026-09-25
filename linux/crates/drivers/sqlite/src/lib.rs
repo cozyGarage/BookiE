@@ -169,14 +169,13 @@ impl Connection for SqliteConnection {
                 // insert UI.
                 let is_auto_increment =
                     primary_key && is_int_type && single_col_pk && (table_has_autoincrement || dflt.is_none());
-                let default_value = dflt.map(normalize_default_value);
                 ColumnInfo {
                     name,
                     data_type,
                     nullable: r.get::<i64, _>(3) == 0,
                     primary_key,
                     is_auto_increment,
-                    default_value,
+                    default_value: dflt,
                     is_generated,
                     comment: None,
                     collation: None,
@@ -664,23 +663,6 @@ fn quote_ident(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
-/// Normalize the `default_value` text returned by `pragma_table_xinfo`.
-/// SQLite stores string defaults with the surrounding apostrophes
-/// (`'pending'` literal in the dflt_value column); other drivers return
-/// the raw expression. Strip a single matched pair of outer single
-/// quotes so the value reads as the user would type it. Numeric and
-/// expression defaults (e.g. `CURRENT_TIMESTAMP`) are returned
-/// unchanged.
-fn normalize_default_value(raw: String) -> String {
-    let bytes = raw.as_bytes();
-    if bytes.len() >= 2 && bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\'' {
-        // SQLite escapes embedded apostrophes by doubling them; collapse.
-        let inner = &raw[1..raw.len() - 1];
-        return inner.replace("''", "'");
-    }
-    raw
-}
-
 async fn params_into_result<'e, E>(
     executor: E,
     sql: &str,
@@ -977,14 +959,5 @@ mod tests {
         let cols = conn.fetch_columns(None, "t").await.unwrap();
         assert!(cols[0].is_auto_increment, "id is INTEGER PRIMARY KEY (rowid alias)");
         assert!(!cols[1].is_auto_increment, "non-PK INTEGER must not be flagged");
-    }
-
-    #[test]
-    fn normalize_default_value_strips_outer_quotes() {
-        assert_eq!(normalize_default_value("'pending'".into()), "pending");
-        assert_eq!(normalize_default_value("'it''s'".into()), "it's");
-        assert_eq!(normalize_default_value("0".into()), "0");
-        assert_eq!(normalize_default_value("CURRENT_TIMESTAMP".into()), "CURRENT_TIMESTAMP");
-        assert_eq!(normalize_default_value("'unbalanced".into()), "'unbalanced");
     }
 }
