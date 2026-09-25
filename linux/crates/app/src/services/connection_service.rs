@@ -169,6 +169,7 @@ pub async fn establish(
 fn message(error: TransportError) -> String {
     match error {
         TransportError::Driver(error) => crate::ui::error_text::driver_message(&error),
+        TransportError::Keyring(failure) => crate::ui::error_text::keyring_message(&failure),
         TransportError::IntegratedAuthUnsupported(driver_name) => {
             crate::tr!("The {driver} driver does not support Windows (Kerberos) authentication.")
                 .replace("{driver}", &driver_name)

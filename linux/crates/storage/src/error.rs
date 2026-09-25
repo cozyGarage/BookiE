@@ -22,4 +22,19 @@ pub enum StorageError {
 
     #[error("not found")]
     NotFound,
+
+    #[error("keyring: {0}")]
+    Keyring(KeyringFailure),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum KeyringFailure {
+    #[error("no Secret Service keyring is running")]
+    Unavailable,
+    #[error("the keyring is locked")]
+    Locked,
+    #[error("unlocking the keyring was cancelled")]
+    UnlockCancelled,
+    #[error("{0}")]
+    Other(String),
 }

@@ -22,6 +22,8 @@ pub enum TransportError {
     Ssh(String),
     #[error("{0}")]
     Secret(String),
+    #[error("{0}")]
+    Keyring(tablepro_storage::KeyringFailure),
     #[error("integrated authentication is not supported by the {0} driver")]
     IntegratedAuthUnsupported(String),
     #[error("local Unix sockets are not supported by the {0} driver")]
@@ -61,7 +63,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
     let password = if loads_database_password(saved) {
         load_password(saved.id)
             .await
-            .map_err(|error| TransportError::Secret(format!("load database password: {error}")))?
+            .map_err(|error| secret_error("load database password", error))?
             .unwrap_or_else(|| SecretString::new(String::new().into()))
     } else {
         SecretString::new(String::new().into())
@@ -316,10 +318,17 @@ pub(crate) async fn resolve_saved_ssh_hop(
     })
 }
 
+pub(crate) fn secret_error(context: &str, error: tablepro_storage::StorageError) -> TransportError {
+    match error {
+        tablepro_storage::StorageError::Keyring(failure) => TransportError::Keyring(failure),
+        other => TransportError::Secret(format!("{context}: {other}")),
+    }
+}
+
 async fn saved_ssh_password(id: Uuid) -> Result<SecretString, TransportError> {
     load_ssh_password(id)
         .await
-        .map_err(|e| TransportError::Secret(format!("load ssh password: {e}")))?
+        .map_err(|e| secret_error("load ssh password", e))?
         .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))
 }
 
@@ -329,7 +338,7 @@ async fn saved_ssh_passphrase(id: Uuid, has_passphrase: bool) -> Result<Option<S
     }
     load_ssh_passphrase(id)
         .await
-        .map_err(|e| TransportError::Secret(format!("load ssh passphrase: {e}")))
+        .map_err(|e| secret_error("load ssh passphrase", e))
 }
 
 #[cfg(test)]

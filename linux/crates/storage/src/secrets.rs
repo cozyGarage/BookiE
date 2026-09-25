@@ -86,13 +86,40 @@ async fn delete_secret(id: Uuid, kind: &str) -> Result<(), StorageError> {
 }
 
 async fn open() -> Result<Keyring, StorageError> {
-    Keyring::new()
-        .await
-        .map_err(|e| StorageError::Schema(format!("secret service unavailable: {e}")))
+    Keyring::new().await.map_err(|error| match keyring_failure(&error) {
+        crate::KeyringFailure::Other(_) => StorageError::Keyring(crate::KeyringFailure::Unavailable),
+        failure => StorageError::Keyring(failure),
+    })
 }
 
 fn map_err(e: oo7::Error) -> StorageError {
-    StorageError::Schema(format!("secret service: {e}"))
+    StorageError::Keyring(keyring_failure(&e))
+}
+
+// A Secret Service that is not running surfaces as a D-Bus ServiceUnknown or
+// NameHasNoOwner method error; a locked collection as IsLocked; a closed
+// unlock prompt as Dismissed.
+fn keyring_failure(error: &oo7::Error) -> crate::KeyringFailure {
+    use oo7::dbus::{Error as DBus, ServiceError};
+    match error {
+        oo7::Error::DBus(DBus::Dismissed) => crate::KeyringFailure::UnlockCancelled,
+        oo7::Error::DBus(DBus::Service(ServiceError::IsLocked(_))) => crate::KeyringFailure::Locked,
+        oo7::Error::DBus(DBus::ZBus(zbus_error)) if names_missing_service(&zbus_error.to_string()) => {
+            crate::KeyringFailure::Unavailable
+        }
+        other => crate::KeyringFailure::Other(other.to_string()),
+    }
+}
+
+fn names_missing_service(detail: &str) -> bool {
+    [
+        "ServiceUnknown",
+        "NameHasNoOwner",
+        "No such file or directory",
+        "Connection refused",
+    ]
+    .iter()
+    .any(|marker| detail.contains(marker))
 }
 
 fn attrs_for(id: Uuid, kind: &str) -> HashMap<&'static str, String> {
@@ -105,6 +132,33 @@ fn attrs_for(id: Uuid, kind: &str) -> HashMap<&'static str, String> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn keyring_failures_are_told_apart() {
+        use oo7::dbus::{Error as DBus, ServiceError};
+        assert_eq!(
+            keyring_failure(&oo7::Error::DBus(DBus::Dismissed)),
+            crate::KeyringFailure::UnlockCancelled
+        );
+        assert_eq!(
+            keyring_failure(&oo7::Error::DBus(DBus::Service(ServiceError::IsLocked("login".into())))),
+            crate::KeyringFailure::Locked
+        );
+        assert!(matches!(
+            keyring_failure(&oo7::Error::DBus(DBus::Deleted)),
+            crate::KeyringFailure::Other(_)
+        ));
+    }
+
+    #[test]
+    fn a_missing_secret_service_is_recognised_from_the_dbus_error_text() {
+        assert!(names_missing_service(
+            "org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable"
+        ));
+        assert!(names_missing_service("org.freedesktop.DBus.Error.NameHasNoOwner"));
+        assert!(!names_missing_service("org.freedesktop.Secret.Error.IsLocked"));
+    }
+
     use super::*;
 
     #[test]
@@ -146,16 +200,13 @@ mod tests {
     }
 
     #[test]
-    fn map_err_produces_storage_error_schema() {
-        // map_err shouldn't lose the underlying message, since downstream
-        // surfaces it in the user-facing error UI.
+    fn map_err_keeps_the_underlying_message_for_an_unclassified_failure() {
         let oo7_err: oo7::Error = oo7::dbus::Error::Deleted.into();
-        let mapped = map_err(oo7_err);
-        match mapped {
-            StorageError::Schema(msg) => {
-                assert!(msg.starts_with("secret service:"), "missing prefix: {msg}");
+        match map_err(oo7_err) {
+            StorageError::Keyring(crate::KeyringFailure::Other(msg)) => {
+                assert!(msg.contains("deleted"), "lost the underlying message: {msg}");
             }
-            other => panic!("expected Schema variant, got {other:?}"),
+            other => panic!("expected an unclassified keyring failure, got {other:?}"),
         }
     }
 

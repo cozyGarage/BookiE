@@ -30,7 +30,7 @@ pub use connections::{
     SavedConnection, SavedSshAuth, SavedSshConfig, SshClient, apply_import, delete_connection, duplicate_connection,
     load_connections, restore_connection, save_connections, touch_last_opened,
 };
-pub use error::StorageError;
+pub use error::{KeyringFailure, StorageError};
 pub use favorites::{
     SavedQuery, delete_favorite, load_favorites, matches_filter, rank_favorites, save_favorite, touch_favorite,
 };

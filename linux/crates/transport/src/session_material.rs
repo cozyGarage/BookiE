@@ -41,7 +41,7 @@ async fn append_db_password(hasher: &mut MaterialHasher, saved: &SavedConnection
     let password = if loads_database_password(saved) {
         load_password(saved.id)
             .await
-            .map_err(|error| TransportError::Secret(format!("load database password: {error}")))?
+            .map_err(|error| crate::secret_error("load database password", error))?
             .unwrap_or_else(|| SecretString::new(String::new().into()))
     } else {
         SecretString::new(String::new().into())
@@ -60,7 +60,7 @@ async fn append_ssh_material(hasher: &mut MaterialHasher, saved: &SavedConnectio
             SavedSshAuth::Password => {
                 let password = load_ssh_password(saved.id)
                     .await
-                    .map_err(|error| TransportError::Secret(format!("load ssh password: {error}")))?
+                    .map_err(|error| crate::secret_error("load ssh password", error))?
                     .ok_or_else(|| TransportError::Secret("ssh password not in keyring".into()))?;
                 hasher.tag(b"ssh_password", password.expose_secret().as_bytes());
             }
@@ -69,7 +69,7 @@ async fn append_ssh_material(hasher: &mut MaterialHasher, saved: &SavedConnectio
                 if *has_passphrase {
                     match load_ssh_passphrase(saved.id)
                         .await
-                        .map_err(|error| TransportError::Secret(format!("load ssh passphrase: {error}")))?
+                        .map_err(|error| crate::secret_error("load ssh passphrase", error))?
                     {
                         Some(passphrase) => hasher.tag(b"ssh_passphrase", passphrase.expose_secret().as_bytes()),
                         None => hasher.tag(b"ssh_passphrase", &[]),

@@ -59,8 +59,47 @@ pub fn driver_message(error: &DriverError) -> String {
     }
 }
 
+pub fn keyring_message(failure: &tablepro_storage::KeyringFailure) -> String {
+    use tablepro_storage::KeyringFailure;
+    match failure {
+        KeyringFailure::Unavailable => crate::tr!(
+            "No keyring is running, so saved passwords can't be read. Start GNOME Keyring, KeePassXC with Secret Service, or another Secret Service provider, then try again."
+        ),
+        KeyringFailure::Locked => crate::tr!(
+            "The keyring is locked. Unlock it, for example by signing in again or opening Passwords and Keys, then try again."
+        ),
+        KeyringFailure::UnlockCancelled => {
+            crate::tr!(
+                "Unlocking the keyring was cancelled, so the saved password was not read. Try again and unlock it when asked."
+            )
+        }
+        KeyringFailure::Other(detail) => {
+            crate::tr!("The keyring could not be used: {detail}").replace("{detail}", detail)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn each_keyring_failure_says_what_to_do_next() {
+        use tablepro_storage::KeyringFailure;
+        let texts: Vec<String> = [
+            KeyringFailure::Unavailable,
+            KeyringFailure::Locked,
+            KeyringFailure::UnlockCancelled,
+            KeyringFailure::Other("boom".into()),
+        ]
+        .iter()
+        .map(keyring_message)
+        .collect();
+        assert!(texts[0].contains("Start"));
+        assert!(texts[1].contains("Unlock"));
+        assert!(texts[2].contains("Try again"));
+        assert!(texts[3].contains("boom"));
+    }
+
     use super::*;
 
     #[test]

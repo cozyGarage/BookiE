@@ -29,6 +29,7 @@
 
 ### Changed
 
+- When a saved password can't be read because no keyring is running, the keyring is locked, or its unlock prompt was cancelled, the connection error now says which one and what to do, instead of showing the raw D-Bus error.
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
 - Development builds isolate connections, history, audit, drafts, settings, the policy file, locks, and keyring items from installed builds.
 - Column-width and filter persistence is owned by the application and shared explicitly with its windows and tabs.
