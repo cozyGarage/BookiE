@@ -6435,10 +6435,13 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "testcontainers",
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
  "tracing",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]

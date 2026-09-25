@@ -10,6 +10,10 @@ publish = false
 name = "tablepro_ssh"
 path = "src/lib.rs"
 
+[[bin]]
+name = "tablepro-askpass"
+path = "src/bin/tablepro-askpass.rs"
+
 [dependencies]
 async-trait.workspace = true
 futures.workspace = true
@@ -17,13 +21,16 @@ russh.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 thiserror.workspace = true
-tokio = { workspace = true, features = ["io-util"] }
+tokio = { workspace = true, features = ["io-util", "process", "fs"] }
 tokio-util.workspace = true
 tracing.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true
 tempfile.workspace = true
+testcontainers.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "test-util"] }
 
 [lints]

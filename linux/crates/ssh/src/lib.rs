@@ -15,6 +15,8 @@ use russh::keys::known_hosts::{check_known_hosts_path, known_host_keys_path, lea
 use russh::keys::ssh_key::{HashAlg, PublicKey};
 use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 
+pub mod openssh;
+
 const LOCAL_BIND_HOST: &str = "127.0.0.1";
 
 #[derive(Debug, Clone)]
