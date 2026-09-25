@@ -208,8 +208,8 @@ rollback. B5 has Open, Save, Save As, a
 changed-on-disk check before every save and a close prompt; a tab's file
 binding is not yet restored after a restart (its text is, through drafts). B6 lists views and materialized views, and a guarded
 `list_objects(kind, schema)` shared by the Catalog window and the MCP tool covers
-routines, triggers, sequences, extensions, roles and enum/composite/domain/range
-types; per-object grants remain. Types are a kind of `list_objects` rather than a
+routines, triggers, sequences, extensions, roles, enum/composite/domain/range
+types and per-table privileges by role. Types are a kind of `list_objects` rather than a
 separate `list_types`. B3 is narrowed for 0.2 to what the single type string
 loses in practice: a column collation, read on PostgreSQL and MySQL and kept by the
 structure editor's alter statements. Schema columns keep the declared spelling in

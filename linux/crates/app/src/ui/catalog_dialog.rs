@@ -175,6 +175,7 @@ fn kind_label(kind: CatalogObjectKind) -> String {
         CatalogObjectKind::Extension => tr!("Extensions"),
         CatalogObjectKind::Role => tr!("Roles"),
         CatalogObjectKind::Type => tr!("Types"),
+        CatalogObjectKind::Grant => tr!("Privileges"),
     }
 }
 

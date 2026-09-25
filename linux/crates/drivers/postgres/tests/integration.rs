@@ -219,6 +219,7 @@ async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
         "CREATE TYPE \"odd'schema\".hours AS RANGE (subtype = int4)",
         "CREATE ROLE report_reader LOGIN",
         "CREATE FUNCTION public.elsewhere() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$",
+        "GRANT SELECT, INSERT ON \"odd'schema\".events TO report_reader",
     ] {
         conn.execute(statement)
             .await
@@ -274,6 +275,18 @@ async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
     let reader = roles.iter().find(|r| r.name == "report_reader").unwrap();
     assert_eq!(reader.detail.as_deref(), Some("login"));
     assert!(!roles.iter().any(|r| r.name.starts_with("pg_")));
+
+    let grants = listed(Kind::Grant).await;
+    assert!(
+        grants.contains(&("events".into(), "report_reader: INSERT, SELECT".into())),
+        "{grants:?}"
+    );
+    assert!(
+        grants
+            .iter()
+            .any(|(name, detail)| name == "events" && detail.starts_with("postgres: ")),
+        "{grants:?}"
+    );
 
     let every_schema = conn.list_objects(Kind::Routine, None).await.unwrap();
     assert!(every_schema.iter().any(|o| o.name == "elsewhere"));

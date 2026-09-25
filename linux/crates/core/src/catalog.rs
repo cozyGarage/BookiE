@@ -11,16 +11,18 @@ pub enum CatalogObjectKind {
     Extension,
     Role,
     Type,
+    Grant,
 }
 
 impl CatalogObjectKind {
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Routine,
         Self::Trigger,
         Self::Sequence,
         Self::Extension,
         Self::Role,
         Self::Type,
+        Self::Grant,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -31,6 +33,7 @@ impl CatalogObjectKind {
             Self::Extension => "extension",
             Self::Role => "role",
             Self::Type => "type",
+            Self::Grant => "grant",
         }
     }
 

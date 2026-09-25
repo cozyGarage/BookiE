@@ -267,7 +267,7 @@ fn tool_description(name: &str) -> &'static str {
         "list_connections" => "List saved database connections visible to this token",
         "list_tables" => "List tables on a connection",
         "list_objects" => {
-            "List routines, triggers, sequences, extensions, roles or types on a connection, optionally in one schema"
+            "List routines, triggers, sequences, extensions, roles, types or table privileges on a connection, optionally in one schema"
         }
         "describe_table" => "Describe columns of a table",
         "execute_query" => "Run a read SQL query (writes require tools:write scope and policy approval)",

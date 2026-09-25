@@ -67,6 +67,20 @@ fn types_sql() -> String {
     )
 }
 
+fn grants_sql() -> String {
+    format!(
+        "SELECT n.nspname, c.relname,
+             CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END
+                 || ': ' || string_agg(a.privilege_type, ', ' ORDER BY a.privilege_type)
+         FROM pg_catalog.pg_class c
+         JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+         CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) a
+         WHERE c.relkind IN ('r', 'p', 'v', 'm', 'f') AND {USER_SCHEMA}
+         GROUP BY n.nspname, c.relname, a.grantee
+         ORDER BY 1, 2, 3 LIMIT $2"
+    )
+}
+
 const EXTENSIONS_SQL: &str = "SELECT n.nspname, e.extname, e.extversion
      FROM pg_catalog.pg_extension e
      JOIN pg_catalog.pg_namespace n ON n.oid = e.extnamespace
@@ -88,6 +102,7 @@ fn sql_for(kind: CatalogObjectKind) -> String {
         CatalogObjectKind::Trigger => triggers_sql(),
         CatalogObjectKind::Sequence => sequences_sql(),
         CatalogObjectKind::Type => types_sql(),
+        CatalogObjectKind::Grant => grants_sql(),
         CatalogObjectKind::Extension => EXTENSIONS_SQL.to_string(),
         CatalogObjectKind::Role => ROLES_SQL.to_string(),
     }
