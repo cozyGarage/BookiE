@@ -114,6 +114,7 @@ pub enum AppMsg {
     FetchBrowseRowCount(Uuid),
     WorkspaceSchemaWordsChanged,
     WorkspaceTabClosed(Uuid),
+    FinishCloseWorkspaceTab(Uuid),
     CloseOtherWorkspaceTabs(Uuid),
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,

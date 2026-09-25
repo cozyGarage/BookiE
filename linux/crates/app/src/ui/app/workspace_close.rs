@@ -2,8 +2,8 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw};
 use uuid::Uuid;
 
-use super::App;
-use super::types::read_workspace_tab_id;
+use super::types::{WorkspaceTab, read_workspace_tab_id};
+use super::{App, AppMsg};
 
 impl App {
     pub(super) fn close_active_workspace_tab(&mut self, sender: ComponentSender<Self>) {
@@ -60,5 +60,37 @@ impl App {
         for page in targets {
             tab_view.close_page(&page);
         }
+    }
+
+    pub(super) fn confirm_close_with_open_transaction(
+        &self,
+        id: Uuid,
+        tab_view: &adw::TabView,
+        sender: ComponentSender<Self>,
+    ) -> bool {
+        let page = match self.workspace_tabs.borrow().get(&id) {
+            Some(WorkspaceTab::Editor(slot))
+                if relm4::ComponentController::model(&slot.controller).session_transaction_open() =>
+            {
+                slot.page.clone()
+            }
+            _ => return false,
+        };
+        let dialog = adw::AlertDialog::new(
+            Some(&crate::tr!("Close with an open transaction?")),
+            Some(&crate::tr!("The transaction is rolled back when the tab closes.")),
+        );
+        dialog.add_response("cancel", &crate::tr!("Cancel"));
+        dialog.add_response("close", &crate::tr!("Roll Back and Close"));
+        dialog.set_response_appearance("close", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let tab_view = tab_view.clone();
+        dialog.connect_response(None, move |_, response| match response {
+            "close" => sender.input(AppMsg::FinishCloseWorkspaceTab(id)),
+            _ => tab_view.close_page_finish(&page, false),
+        });
+        dialog.present(Some(&self.window));
+        true
     }
 }

@@ -4,6 +4,7 @@ pub(crate) mod open_file;
 use tablepro_core::sql_format as format_plan;
 mod outcomes;
 mod schema;
+mod session_mode;
 mod sql_text;
 mod statement_cursor;
 
@@ -37,6 +38,8 @@ pub struct SqlEditor {
     diagnostics: diagnostics::Diagnostics,
     source_view: sourceview5::View,
     run_button: gtk::Button,
+    session_button: gtk::ToggleButton,
+    session: Option<session_mode::EditorSession>,
     cancel_button: gtk::Button,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
@@ -121,6 +124,15 @@ pub enum SqlEditorInput {
     ToggleLineComment,
     Explain,
     Grid(GridMsg),
+    SessionToggled(bool),
+    SessionOpened {
+        connection_id: Uuid,
+        result: Result<session_mode::OpenedSession, String>,
+    },
+    SessionState(bool),
+    SessionEnd {
+        commit: bool,
+    },
 }
 
 #[derive(Debug)]
@@ -268,6 +280,16 @@ impl SimpleComponent for SqlEditor {
                     set_visible: false,
                     add_css_class: "flat",
                     connect_clicked => SqlEditorInput::Cancel,
+                },
+
+                #[name = "session_button"]
+                gtk::ToggleButton {
+                    set_label: &crate::tr!("Session"),
+                    set_tooltip_text: Some(crate::tr!("Run this tab on its own connection, so settings, temporary tables and transactions carry over between runs").as_str()),
+                    add_css_class: "flat",
+                    connect_toggled[sender] => move |button| {
+                        sender.input(SqlEditorInput::SessionToggled(button.is_active()));
+                    },
                 },
 
                 #[name = "explain_button"]
@@ -492,6 +514,8 @@ impl SimpleComponent for SqlEditor {
             ),
             source_view: widgets.source_view.clone(),
             run_button: widgets.run_button.clone(),
+            session_button: widgets.session_button.clone(),
+            session: None,
             cancel_button: widgets.cancel_button.clone(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
@@ -510,6 +534,7 @@ impl SimpleComponent for SqlEditor {
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         self.diagnostics.stop();
+        self.end_session(false);
         if let Some(handler) = self.dark_notify_handler.take() {
             adw::StyleManager::default().disconnect(handler);
         }
@@ -542,6 +567,10 @@ impl SimpleComponent for SqlEditor {
                 });
             }
             SqlEditorInput::Grid(_) => {}
+            SqlEditorInput::SessionToggled(enabled) => self.on_session_toggled(enabled, &sender),
+            SqlEditorInput::SessionOpened { connection_id, result } => self.on_session_opened(connection_id, result),
+            SqlEditorInput::SessionState(open) => self.on_session_state(open),
+            SqlEditorInput::SessionEnd { commit } => self.end_session(commit),
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -870,6 +899,7 @@ impl SqlEditor {
             .get(&generation)
             .map(|context| context.metadata.driver_id.clone())
             .unwrap_or_default();
+        let target = self.statement_target(conn);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -885,7 +915,7 @@ impl SqlEditor {
                         }
                     };
                     let msg = match run_statements(
-                        conn,
+                        target.clone(),
                         statements,
                         &driver_id,
                         &parameter_values,
@@ -914,6 +944,9 @@ impl SqlEditor {
                             SqlEditorInput::ShowOutcomes { generation, outcomes }
                         }
                     };
+                    if let Some(open) = target.transaction_open().await {
+                        sender_clone.input(SqlEditorInput::SessionState(open));
+                    }
                     sender_clone.input(msg);
                 })
                 .drop_on_shutdown()

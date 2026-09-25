@@ -17,6 +17,7 @@
 - A browsed table's cell menu has Filter by This Value, which narrows the table to rows holding that value, or to rows where the column is NULL for an empty cell. It replaces an existing rule on the same column and keeps the others.
 - PostgreSQL sessions opened by the app report the application name BookiE, and those opened for agents report BookiE agent, so they can be told apart in `pg_stat_activity`.
 - PostgreSQL materialized views are listed with views in the sidebar and open read-only.
+- An editor tab can turn on Session to run on its own PostgreSQL connection, so settings, temporary tables and a transaction started with BEGIN carry over between runs. The button shows when a transaction is open, and turning Session off or closing the tab with one open asks whether to commit or roll back. Every statement still goes through policy, approval and the audit journal, and COMMIT and ROLLBACK are recorded as transaction outcomes.
 - A Catalog window in the main menu lists a PostgreSQL connection's functions and procedures, triggers, sequences, extensions, roles and user-defined types, optionally within one schema. An engine without catalog support, a listing refused by policy, a failed listing and an empty one each say so differently.
 - Agents can list a PostgreSQL connection's routines, triggers, sequences, extensions, roles and user-defined types through the new `list_objects` MCP tool, optionally within one schema. It needs only a read token, is limited to the token's allowed connections, and is audited like other catalog reads; an engine without catalog support answers that the listing is unsupported rather than returning an empty list.
 - A saved connection can be given a name; leaving the name blank keeps the address-derived label.
@@ -58,7 +59,7 @@
 ### Security
 
 - The agent daemon no longer trusts an SSH host key it has not seen before. An unattended connection to an unknown host fails and names the key's fingerprint; connecting once from the app or with `ssh` records it. A changed key is still refused everywhere.
-- A lone BEGIN, COMMIT or ROLLBACK is refused with an explanation, in the SQL editor and through MCP. Each statement ran on a shared connection, so a script such as `BEGIN; UPDATE …; ROLLBACK;` committed the update while reporting every step as successful. A whole transaction sent as one batch, such as a SQL Server `GO` batch, still runs.
+- A lone BEGIN, COMMIT or ROLLBACK on a shared connection is refused with an explanation, in the SQL editor and through MCP. Each statement ran on a shared connection, so a script such as `BEGIN; UPDATE …; ROLLBACK;` committed the update while reporting every step as successful. A whole transaction sent as one batch, such as a SQL Server `GO` batch, still runs.
 - A saved connection's SSH jump chain is capped at eight hops, so an edited connection file cannot force a deep recursive parse.
 
 ## [0.1.4] - 2026-09-17

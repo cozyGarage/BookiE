@@ -19,7 +19,7 @@ pub(crate) enum ScriptRunResult {
 }
 
 pub(crate) async fn run_statements(
-    conn: std::sync::Arc<dyn tablepro_core::Connection>,
+    target: super::session_mode::StatementTarget,
     statements: Vec<String>,
     driver_id: &str,
     parameter_values: &std::collections::HashMap<String, tablepro_core::Value>,
@@ -56,7 +56,7 @@ pub(crate) async fn run_statements(
                 continue;
             }
         };
-        let kind = match conn.query_params_controlled(&bound.sql, &bound.values, control).await {
+        let kind = match target.query(&bound.sql, &bound.values, control).await {
             Ok(qr) => {
                 succeeded(&sql);
                 StatementOutcomeKind::Rows(qr)
@@ -240,6 +240,7 @@ pub(crate) fn render_outcomes(
 
 #[cfg(test)]
 mod tests {
+    use super::super::session_mode::StatementTarget;
     use super::{BatchErrorPolicy, ScriptRunResult, StatementOutcomeKind, run_statements, sql_preview, summary_label};
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
@@ -295,7 +296,7 @@ mod tests {
             .unwrap();
 
         let result = run_statements(
-            conn.clone(),
+            StatementTarget::Pool(conn.clone()),
             vec!["BEGIN".into(), "INSERT INTO t VALUES (1)".into(), "ROLLBACK".into()],
             "sqlite",
             &Default::default(),
@@ -323,7 +324,7 @@ mod tests {
         let statements = vec!["CREATE TABLE t (id int)".into(), "not sql".into(), "SELECT 1".into()];
         let control = crate::services::operation_control::bounded(0);
         let result = run_statements(
-            conn,
+            StatementTarget::Pool(conn),
             statements,
             "sqlite",
             &Default::default(),
@@ -351,7 +352,7 @@ mod tests {
         ];
         let control = crate::services::operation_control::bounded(0);
         let result = run_statements(
-            conn,
+            StatementTarget::Pool(conn),
             statements,
             "sqlite",
             &Default::default(),
@@ -375,7 +376,7 @@ mod tests {
         let statements = vec!["SELECT :missing".into(), "SELECT 1".into()];
         let control = crate::services::operation_control::bounded(0);
         let result = run_statements(
-            conn,
+            StatementTarget::Pool(conn),
             statements,
             "sqlite",
             &Default::default(),
@@ -400,7 +401,7 @@ mod tests {
         let statements = vec!["CREATE TABLE t (id int)".into(), "not sql".into(), "SELECT 1".into()];
         let control = crate::services::operation_control::bounded(0);
         let result = run_statements(
-            conn,
+            StatementTarget::Pool(conn),
             statements,
             "sqlite",
             &Default::default(),

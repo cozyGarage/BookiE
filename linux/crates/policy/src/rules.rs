@@ -50,9 +50,9 @@ pub(crate) fn shared_connection_decision(facts: &StatementFacts) -> Option<Decis
     if facts.class == StatementClass::Transaction && !facts.is_multi_statement {
         return Some(Decision::Deny {
             rule: "transaction_control_needs_session".into(),
-            message: "BEGIN, COMMIT and ROLLBACK cannot run on their own: each statement runs on a shared \
-                      connection, so the transaction would not cover the statements after it. Put the whole \
-                      transaction in one statement batch, or run the statements without them"
+            message: "BEGIN, COMMIT and ROLLBACK cannot run on a shared connection, because the transaction would not \
+                      cover the statements after it. Turn on Session for this editor tab to keep a transaction \
+                      open between statements, or send the whole transaction as one batch"
                 .into(),
         });
     }

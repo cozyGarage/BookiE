@@ -212,7 +212,10 @@ separate `list_types`. B3 is narrowed for 0.2 to what the single type string
 loses in practice: a column collation, read on PostgreSQL and MySQL and kept by the
 structure editor's alter statements. Schema columns keep the declared spelling in
 `data_type`; a separate declared-type field waits for a consumer. SQL Server also
-drops a collation on ALTER COLUMN and is not covered yet. B4 has not started.
+drops a collation on ALTER COLUMN and is not covered yet. B4: agentd refuses unknown SSH host keys; lone transaction statements are refused
+on shared connections; PostgreSQL editor tabs can opt into a governed dedicated session
+(MySQL, SQLite and the others answer that sessions are unsupported). The OpenSSH
+transport is being ported separately and is not yet wired into connections.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,
 new engines, all-connection/window restoration, dashboards, built-in AI.
