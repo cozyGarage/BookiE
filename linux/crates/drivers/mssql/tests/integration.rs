@@ -526,3 +526,61 @@ async fn a_column_comment_round_trips_from_its_extended_property() {
     assert_eq!(label.comment.as_deref(), Some("what the row is called"));
     assert_eq!(id.comment, None);
 }
+
+async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session.query_params_controlled(sql, &[], &control).await.unwrap().rows[0][0].clone()
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_temp_tables_and_its_transaction_between_statements() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE ledger (id int)").await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    for sql in ["CREATE TABLE #scratch (n int)", "INSERT INTO #scratch VALUES (7)"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT n FROM #scratch").await,
+        Value::Int(7)
+    );
+    for sql in ["BEGIN TRANSACTION", "INSERT INTO ledger VALUES (1)", "ROLLBACK"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT COUNT(*) FROM ledger").await,
+        Value::Int(0)
+    );
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared_connection() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+    let mut session = conn.open_session().await.unwrap();
+    let token = tokio_util::sync::CancellationToken::new();
+    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let canceller = tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        token.cancel();
+    });
+
+    let error = session
+        .query_params_controlled("WAITFOR DELAY '00:00:30'", &[], &control)
+        .await
+        .unwrap_err();
+    canceller.await.unwrap();
+
+    assert!(
+        matches!(error, tablepro_core::DriverError::OperationOutcomeUnknown { .. }),
+        "{error:?}"
+    );
+    assert!(!session.is_usable());
+    assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
+}

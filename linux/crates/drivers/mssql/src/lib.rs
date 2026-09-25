@@ -19,6 +19,8 @@ use tablepro_core::{
     run_server_cancellable,
 };
 
+mod session;
+
 type MssqlClient = Client<Compat<TcpStream>>;
 
 /// Matches the `acquire_timeout` the sqlx-backed drivers give their
@@ -84,7 +86,7 @@ impl DatabaseDriver for MssqlDriver {
             AuthMode::Kerberos => open_kerberos_client(target).await?,
         };
 
-        Ok(Box::new(MssqlConnection::new(client)))
+        Ok(Box::new(MssqlConnection::new(client, opts)))
     }
 }
 
@@ -169,13 +171,15 @@ async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
 struct MssqlConnection {
     client: Mutex<MssqlClient>,
     usable: AtomicBool,
+    session_options: ConnectOptions,
 }
 
 impl MssqlConnection {
-    fn new(client: MssqlClient) -> Self {
+    fn new(client: MssqlClient, session_options: ConnectOptions) -> Self {
         Self {
             client: Mutex::new(client),
             usable: AtomicBool::new(true),
+            session_options,
         }
     }
 
@@ -213,6 +217,10 @@ impl MssqlConnection {
 
 #[async_trait]
 impl Connection for MssqlConnection {
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        session::open(&self.session_options).await
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let sql = "SELECT s.name AS schema_name, t.name AS table_name \
                    FROM sys.tables t \
@@ -497,7 +505,19 @@ async fn run_query(
 ) -> Result<QueryResult, DriverError> {
     let boxes = boxed_params(params);
     let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
-    let mut stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
+    let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
+    collect_result(stream, limit).await
+}
+
+// A parameterized query travels through sp_executesql, whose scope drops a
+// #temp table and refuses a transaction left open when it returns. A
+// statement without parameters is sent as a plain batch so both survive.
+async fn run_batch(client: &mut MssqlClient, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
+    let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
+    collect_result(stream, limit).await
+}
+
+async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> Result<QueryResult, DriverError> {
     let mut columns: Vec<ColumnInfo> = Vec::new();
     let mut rows: Vec<Vec<Value>> = Vec::new();
     let mut truncated = false;

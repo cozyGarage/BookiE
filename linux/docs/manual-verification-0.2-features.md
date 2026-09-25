@@ -118,7 +118,7 @@ beside the app binary, or an installed package).
       verifies the database hostname.
 - [ ] After closing the app, no `ssh -M` process is left running.
 
-## Editor sessions (PostgreSQL, MySQL and SQLite files)
+## Editor sessions (PostgreSQL, MySQL, SQL Server and SQLite files)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP
       TABLE` from one run are still in effect on the next run.
@@ -129,7 +129,7 @@ beside the app binary, or an installed package).
 - [ ] Closing the tab with a transaction open asks first; Roll Back and Close
       leaves the table unchanged.
 - [ ] Without Session, a lone `BEGIN` is refused and the message mentions Session.
-- [ ] On SQL Server or an in-memory SQLite database, turning Session on explains that the engine does not
+- [ ] On ClickHouse or an in-memory SQLite database, turning Session on explains that the engine does not
       offer it yet and the button turns back off.
 - [ ] The audit journal shows the session's COMMIT or ROLLBACK against the same
       batch as the statements inside it.

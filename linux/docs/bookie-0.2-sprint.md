@@ -217,9 +217,10 @@ structure editor's alter statements. Schema columns keep the declared spelling i
 collation is now read from the catalog and restated on ALTER COLUMN, with a
 real-server regression check. B4: agentd refuses unknown SSH host keys; lone
 transaction statements are refused
-on shared connections; PostgreSQL, MySQL and SQLite-file editor tabs can opt into a governed
-dedicated session (in-memory SQLite, SQL Server and the others answer that sessions
-are unsupported). A saved connection
+on shared connections; PostgreSQL, MySQL, SQL Server and SQLite-file editor tabs can opt into a
+governed dedicated session (in-memory SQLite, ClickHouse and the other engines
+answer that sessions are unsupported; an interrupted SQL Server session is retired,
+not reused). A saved connection
 can use the system OpenSSH client (forced host-key checking, per-host secret
 binding, ProxyJump from ssh_config); the GUI prompts through GTK and agentd runs
 unattended. The askpass helper ships in the Arch, Debian and Meson builds; Flatpak
