@@ -680,7 +680,7 @@ async fn forwarder_loop(
 
 async fn forward_one<S>(
     session: Arc<Handle<ClientHandler>>,
-    mut socket: S,
+    socket: S,
     originator_host: String,
     originator_port: u32,
     remote_host: String,
@@ -690,42 +690,68 @@ async fn forward_one<S>(
 where
     S: AsyncRead + AsyncWrite + Unpin + Send,
 {
-    let mut channel = session
+    let channel = session
         .channel_open_direct_tcpip(remote_host, u32::from(remote_port), originator_host, originator_port)
         .await?;
 
+    relay(socket, channel, cancel).await;
+    Ok(())
+}
+
+trait RelayChannel {
+    async fn send(&mut self, bytes: &[u8]) -> bool;
+    async fn send_eof(&mut self);
+    async fn next_message(&mut self) -> Option<ChannelMsg>;
+}
+
+impl RelayChannel for russh::Channel<client::Msg> {
+    async fn send(&mut self, bytes: &[u8]) -> bool {
+        self.data(bytes).await.is_ok()
+    }
+
+    async fn send_eof(&mut self) {
+        let _ = self.eof().await;
+    }
+
+    async fn next_message(&mut self) -> Option<ChannelMsg> {
+        self.wait().await
+    }
+}
+
+async fn relay<S, C>(mut socket: S, mut channel: C, cancel: CancellationToken)
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    C: RelayChannel,
+{
     let mut buf = vec![0u8; 65536];
     let mut local_eof = false;
     loop {
         tokio::select! {
             _ = cancel.cancelled() => {
-                let _ = channel.eof().await;
-                return Ok(());
+                channel.send_eof().await;
+                return;
             }
-            r = socket.read(&mut buf), if !local_eof => {
-                match r {
-                    Ok(0) => {
-                        local_eof = true;
-                        let _ = channel.eof().await;
-                    }
-                    Ok(n) => {
-                        if channel.data(&buf[..n]).await.is_err() {
-                            return Ok(());
-                        }
-                    }
-                    Err(_) => return Ok(()),
+            r = socket.read(&mut buf), if !local_eof => match r {
+                Ok(0) => {
+                    local_eof = true;
+                    channel.send_eof().await;
                 }
-            }
-            msg = channel.wait() => match msg {
+                Ok(n) => {
+                    if !channel.send(&buf[..n]).await {
+                        return;
+                    }
+                }
+                Err(_) => return,
+            },
+            msg = channel.next_message() => match msg {
                 Some(ChannelMsg::Data { data }) => {
                     if socket.write_all(&data).await.is_err() {
-                        return Ok(());
+                        return;
                     }
                 }
-                Some(ChannelMsg::ExtendedData { .. }) => {}
                 Some(ChannelMsg::Eof) | Some(ChannelMsg::Close) | None => {
                     let _ = socket.shutdown().await;
-                    return Ok(());
+                    return;
                 }
                 Some(_) => {}
             }
@@ -950,5 +976,125 @@ mod tests {
     #[test]
     fn socket_dir_path_fits_rejects_one_byte_over_the_limit() {
         assert!(!socket_dir_path_fits(MAX_SOCKET_PATH_LEN - 7, 7));
+    }
+
+    struct FakeChannel {
+        incoming: tokio::sync::mpsc::UnboundedReceiver<ChannelMsg>,
+        sent: Arc<Mutex<Vec<u8>>>,
+        eof_calls: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl RelayChannel for FakeChannel {
+        async fn send(&mut self, bytes: &[u8]) -> bool {
+            self.sent.lock().unwrap().extend_from_slice(bytes);
+            true
+        }
+
+        async fn send_eof(&mut self) {
+            self.eof_calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+
+        async fn next_message(&mut self) -> Option<ChannelMsg> {
+            self.incoming.recv().await
+        }
+    }
+
+    struct RelayHarness {
+        client: tokio::io::DuplexStream,
+        remote: tokio::sync::mpsc::UnboundedSender<ChannelMsg>,
+        sent: Arc<Mutex<Vec<u8>>>,
+        eof_calls: Arc<std::sync::atomic::AtomicUsize>,
+        task: tokio::task::JoinHandle<()>,
+    }
+
+    fn start_relay() -> RelayHarness {
+        let (client, server) = tokio::io::duplex(1024);
+        let (remote, incoming) = tokio::sync::mpsc::unbounded_channel();
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let eof_calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let channel = FakeChannel {
+            incoming,
+            sent: sent.clone(),
+            eof_calls: eof_calls.clone(),
+        };
+        let task = tokio::spawn(relay(server, channel, CancellationToken::new()));
+        RelayHarness {
+            client,
+            remote,
+            sent,
+            eof_calls,
+            task,
+        }
+    }
+
+    const RELAY_DEADLINE: Duration = Duration::from_secs(2);
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn relay_sends_one_eof_after_the_local_client_closes_and_does_not_spin() {
+        let mut harness = start_relay();
+        harness.client.write_all(b"select 1").await.unwrap();
+        harness.client.shutdown().await.unwrap();
+
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        assert_eq!(harness.eof_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(harness.sent.lock().unwrap().as_slice(), b"select 1");
+        assert!(!harness.task.is_finished());
+
+        harness
+            .remote
+            .send(ChannelMsg::Data {
+                data: b"row".to_vec().into(),
+            })
+            .unwrap();
+        harness.remote.send(ChannelMsg::Close).unwrap();
+        tokio::time::timeout(RELAY_DEADLINE, harness.task)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let mut received = Vec::new();
+        harness.client.read_to_end(&mut received).await.unwrap();
+        assert_eq!(received, b"row");
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn relay_stops_and_closes_the_local_client_when_the_remote_sends_eof() {
+        let mut harness = start_relay();
+        harness.remote.send(ChannelMsg::Eof).unwrap();
+
+        tokio::time::timeout(RELAY_DEADLINE, harness.task)
+            .await
+            .unwrap()
+            .unwrap();
+
+        let mut received = Vec::new();
+        harness.client.read_to_end(&mut received).await.unwrap();
+        assert!(received.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn relay_stops_when_the_remote_channel_is_gone() {
+        let harness = start_relay();
+        drop(harness.remote);
+
+        tokio::time::timeout(RELAY_DEADLINE, harness.task)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn relay_stops_when_the_local_client_is_dropped_and_the_remote_closes() {
+        let harness = start_relay();
+        drop(harness.client);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        assert_eq!(harness.eof_calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        harness.remote.send(ChannelMsg::Close).unwrap();
+        tokio::time::timeout(RELAY_DEADLINE, harness.task)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }
