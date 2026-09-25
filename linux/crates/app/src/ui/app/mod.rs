@@ -755,6 +755,7 @@ impl SimpleComponent for App {
             AppMsg::EditorFileSaveFailed(tab, message) => self.on_editor_file_save_failed(tab, &message),
             AppMsg::EditorFileSaveCancelled(tab) => self.on_editor_file_save_cancelled(tab),
             AppMsg::EditorFileChangedOnDisk(tab) => self.on_editor_file_changed_on_disk(tab, sender),
+            AppMsg::EditorFileRestored(tab, outcome) => self.on_editor_file_restored(tab, outcome),
             AppMsg::EditorTabRunStateChanged(id, running) => {
                 self.on_editor_tab_run_state_changed(id, running);
                 self.continue_connection_switch(sender);

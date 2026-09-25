@@ -94,6 +94,7 @@ fn do_persist_workspace_state(
                 WorkspaceTab::Editor(s) => Some(WorkspaceTabRecord::Editor {
                     query: s.query.clone(),
                     draft_id: Some(id),
+                    file: s.file.as_ref().map(|file| file.path.clone()),
                 }),
                 WorkspaceTab::Structure(_) => None,
                 WorkspaceTab::Table(s) if s.table.is_empty() => None,

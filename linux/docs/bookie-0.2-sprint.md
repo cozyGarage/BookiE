@@ -205,8 +205,9 @@ B1 lacks a real Flatpak build and installed-package checks. B2 now includes
 private pre-migration backups for history, preferences and window geometry, a
 GSettings schema shipped by Meson/Arch/Flatpak, and JSON mirrors for package
 rollback. B5 has Open, Save, Save As, a
-changed-on-disk check before every save and a close prompt; a tab's file
-binding is not yet restored after a restart (its text is, through drafts). B6 lists views and materialized views, and a guarded
+changed-on-disk check before every save and a close prompt, and a restart
+relinks each tab to its file (an absolute, bounded path added to the workspace
+record; older builds ignore the field). B6 lists views and materialized views, and a guarded
 `list_objects(kind, schema)` shared by the Catalog window and the MCP tool covers
 routines, triggers, sequences, extensions, roles, enum/composite/domain/range
 types and per-table privileges by role. Types are a kind of `list_objects` rather than a

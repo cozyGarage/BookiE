@@ -63,6 +63,7 @@ pub enum AppMsg {
     EditorFileSaved(Uuid, tablepro_core::text_file::TextFile),
     EditorFileSaveFailed(Uuid, String),
     EditorFileChangedOnDisk(Uuid),
+    EditorFileRestored(Uuid, Result<tablepro_core::text_file::TextFile, String>),
     CloseActiveWorkspaceTab,
     EditorTabRunStateChanged(Uuid, bool),
     EditorTabQueryChanged(Uuid, String),

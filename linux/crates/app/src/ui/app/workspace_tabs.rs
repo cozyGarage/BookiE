@@ -240,8 +240,11 @@ impl App {
         }
         for record in &saved.tabs {
             match workspace_state::restored_workspace_tab(record) {
-                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id }) => {
+                Some(workspace_state::RestoredWorkspaceTab::Editor { query, draft_id, file }) => {
                     self.append_editor_draft(Some(query), draft_id, sender.clone());
+                    if let (Some(path), Some(tab)) = (file, self.selected_editor_tab_id()) {
+                        self.restore_editor_file(tab, path, sender.clone());
+                    }
                 }
                 Some(workspace_state::RestoredWorkspaceTab::Table {
                     schema,

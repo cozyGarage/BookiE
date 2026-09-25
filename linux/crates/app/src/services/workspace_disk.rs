@@ -15,10 +15,8 @@ pub fn load(path: &Path, drafts: &Path) -> std::io::Result<WorkspaceState> {
     for (connection, workspace) in &mut state.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
         for tab in &mut workspace.tabs {
-            if let WorkspaceTabRecord::Editor {
-                query,
-                draft_id: Some(id),
-            } = tab
+            if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab
+                && let Some(id) = *draft_id
             {
                 match std::fs::read_to_string(drafts.join(connection.to_string()).join(format!("{id}.sql"))) {
                     Ok(text) => *query = text,
@@ -29,10 +27,8 @@ pub fn load(path: &Path, drafts: &Path) -> std::io::Result<WorkspaceState> {
                             %error,
                             "workspace draft could not be read; the tab will restore with an empty query"
                         );
-                        *tab = WorkspaceTabRecord::Editor {
-                            query: String::new(),
-                            draft_id: None,
-                        };
+                        query.clear();
+                        *draft_id = None;
                     }
                 }
             }
@@ -65,7 +61,7 @@ pub fn save(path: &Path, drafts: &Path, state: &WorkspaceState) -> std::io::Resu
     for (connection, workspace) in &mut snapshot.connections {
         let connection = Uuid::parse_str(connection).map_err(std::io::Error::other)?;
         for tab in &mut workspace.tabs {
-            if let WorkspaceTabRecord::Editor { query, draft_id } = tab {
+            if let WorkspaceTabRecord::Editor { query, draft_id, .. } = tab {
                 let id = *draft_id.get_or_insert_with(Uuid::new_v4);
                 atomic_write_bytes(
                     &drafts.join(connection.to_string()).join(format!("{id}.sql")),
@@ -97,6 +93,7 @@ mod tests {
                 tabs: vec![WorkspaceTabRecord::Editor {
                     query: query.clone(),
                     draft_id: None,
+                    file: None,
                 }],
                 active_idx: 0,
             },
@@ -111,7 +108,7 @@ mod tests {
         assert!(std::fs::metadata(&path).unwrap().len() < 1024);
         let loaded = load(&path, &drafts).unwrap();
         assert!(
-            matches!(&loaded.connections[&id].tabs[0], WorkspaceTabRecord::Editor { query: text, draft_id: Some(_) } if text == &query)
+            matches!(&loaded.connections[&id].tabs[0], WorkspaceTabRecord::Editor { query: text, draft_id: Some(_), .. } if text == &query)
         );
         save(&path, &drafts, &loaded).unwrap();
         assert_eq!(
@@ -136,6 +133,7 @@ mod tests {
                 tabs: vec![WorkspaceTabRecord::Editor {
                     query: "SELECT 1".into(),
                     draft_id: Some(Uuid::new_v4()),
+                    file: Some("/home/me/report.sql".into()),
                 }],
                 active_idx: 0,
             },
@@ -146,6 +144,7 @@ mod tests {
                 tabs: vec![WorkspaceTabRecord::Editor {
                     query: "SELECT 2".into(),
                     draft_id: Some(healthy_draft),
+                    file: None,
                 }],
                 active_idx: 0,
             },
@@ -160,7 +159,7 @@ mod tests {
 
         let loaded = load(&path, &drafts).unwrap();
         assert!(
-            matches!(&loaded.connections[&broken_id].tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None } if query.is_empty())
+            matches!(&loaded.connections[&broken_id].tabs[0], WorkspaceTabRecord::Editor { query, draft_id: None, file: Some(file) } if query.is_empty() && file.ends_with("report.sql"))
         );
         assert!(
             matches!(&loaded.connections[&healthy_id].tabs[0], WorkspaceTabRecord::Editor { query, .. } if query == "SELECT 2")
@@ -180,6 +179,7 @@ mod tests {
                 tabs: vec![WorkspaceTabRecord::Editor {
                     query: "SELECT 1".into(),
                     draft_id: Some(Uuid::new_v4()),
+                    file: None,
                 }],
                 active_idx: 0,
             },

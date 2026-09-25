@@ -4,7 +4,7 @@ use relm4::{adw, gtk};
 use tablepro_core::text_file::{TextFile, TextFileError};
 use uuid::Uuid;
 
-use crate::ui::editor::open_file::{choose_save_path, file_error_message, save_sql_file};
+use crate::ui::editor::open_file::{choose_save_path, file_error_message, read_sql_file, save_sql_file};
 
 use super::types::{EditorFile, WorkspaceTab};
 use super::{App, AppMsg, dec_close_after_save};
@@ -23,6 +23,19 @@ impl App {
             return;
         };
         self.bind_editor_file(id, EditorFile::from_disk(file));
+    }
+
+    pub(super) fn restore_editor_file(&self, tab: Uuid, path: std::path::PathBuf, sender: ComponentSender<Self>) {
+        std::thread::spawn(move || sender.input(AppMsg::EditorFileRestored(tab, read_sql_file(&path))));
+    }
+
+    pub(super) fn on_editor_file_restored(&self, tab: Uuid, outcome: Result<TextFile, String>) {
+        match outcome {
+            Ok(file) => self.bind_editor_file(tab, EditorFile::from_disk(file)),
+            Err(message) => self.show_toast(
+                &crate::tr!("A reopened tab is no longer linked to its file: {reason}").replace("{reason}", &message),
+            ),
+        }
     }
 
     pub(super) fn save_editor_file(&self, tab: Uuid, overwrite: bool, sender: ComponentSender<Self>) {

@@ -160,6 +160,8 @@ pub enum WorkspaceTabRecord {
         query: String,
         #[serde(default)]
         draft_id: Option<Uuid>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        file: Option<std::path::PathBuf>,
     },
     /// Persisted Structure tab (Edit mode only — `New` mode tabs are
     /// drafts for tables that don't exist yet, so they don't survive
@@ -209,6 +211,7 @@ pub(crate) enum RestoredWorkspaceTab {
     Editor {
         query: String,
         draft_id: Option<Uuid>,
+        file: Option<std::path::PathBuf>,
     },
     Table {
         schema: Option<String>,
@@ -225,9 +228,10 @@ pub(crate) enum RestoredWorkspaceTab {
 
 pub(crate) fn restored_workspace_tab(record: &WorkspaceTabRecord) -> Option<RestoredWorkspaceTab> {
     match record {
-        WorkspaceTabRecord::Editor { query, draft_id } => Some(RestoredWorkspaceTab::Editor {
+        WorkspaceTabRecord::Editor { query, draft_id, file } => Some(RestoredWorkspaceTab::Editor {
             query: query.clone(),
             draft_id: *draft_id,
+            file: file.clone(),
         }),
         WorkspaceTabRecord::Table {
             schema,
@@ -537,7 +541,11 @@ fn clamp_connection(conn: &mut ConnectionWorkspaceState) {
     }
     for tab in &mut conn.tabs {
         match tab {
-            WorkspaceTabRecord::Editor { .. } => {}
+            WorkspaceTabRecord::Editor { file, .. } => {
+                if file.as_deref().is_some_and(|path| !is_restorable_file(path)) {
+                    *file = None;
+                }
+            }
             WorkspaceTabRecord::Table {
                 schema,
                 table,
@@ -582,9 +590,63 @@ fn floor_char_boundary(s: &str, idx: usize) -> usize {
     b
 }
 
+const MAX_FILE_PATH_BYTES: usize = 4096;
+
+fn is_restorable_file(path: &std::path::Path) -> bool {
+    path.is_absolute() && path.as_os_str().len() <= MAX_FILE_PATH_BYTES
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn editor_with_file(path: &str) -> WorkspaceTabRecord {
+        WorkspaceTabRecord::Editor {
+            query: "SELECT 1".into(),
+            draft_id: None,
+            file: Some(std::path::PathBuf::from(path)),
+        }
+    }
+
+    fn file_of(record: &WorkspaceTabRecord) -> Option<&std::path::Path> {
+        match record {
+            WorkspaceTabRecord::Editor { file, .. } => file.as_deref(),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn only_an_absolute_bounded_file_path_is_restored() {
+        let long = format!("/{}", "a".repeat(MAX_FILE_PATH_BYTES));
+        let mut state = ConnectionWorkspaceState {
+            tabs: vec![
+                editor_with_file("/home/me/report.sql"),
+                editor_with_file("relative/report.sql"),
+                editor_with_file(&long),
+            ],
+            active_idx: 0,
+        };
+        clamp_connection(&mut state);
+
+        assert_eq!(
+            file_of(&state.tabs[0]),
+            Some(std::path::Path::new("/home/me/report.sql"))
+        );
+        assert_eq!(file_of(&state.tabs[1]), None);
+        assert_eq!(file_of(&state.tabs[2]), None);
+    }
+
+    #[test]
+    fn an_editor_record_without_a_file_keeps_the_older_format() {
+        let json = serde_json::to_value(editor("SELECT 1")).unwrap();
+        assert!(json.get("file").is_none(), "{json}");
+        let back: WorkspaceTabRecord = serde_json::from_value(json).unwrap();
+        assert_eq!(file_of(&back), None);
+
+        let with_file = serde_json::to_value(editor_with_file("/tmp/a.sql")).unwrap();
+        let restored: WorkspaceTabRecord = serde_json::from_value(with_file).unwrap();
+        assert_eq!(file_of(&restored), Some(std::path::Path::new("/tmp/a.sql")));
+    }
 
     #[test]
     fn dropping_unknown_tabs_preserves_the_selected_editor() {
@@ -623,6 +685,7 @@ mod tests {
         WorkspaceTabRecord::Editor {
             query: query.into(),
             draft_id: None,
+            file: None,
         }
     }
 

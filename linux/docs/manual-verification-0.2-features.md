@@ -93,6 +93,10 @@ icon button in a schema header for Table from CSV.
 - [ ] Closing a tab with unsaved file changes asks Save/Discard/Cancel, and Save
       closes it only after the file is written.
 - [ ] Saving a file that is a symlink updates its target and keeps the link.
+- [ ] Restart with a file tab open: the tab is titled by the file again, unsaved
+      edits still show `•`, and Ctrl+S saves to the same file.
+- [ ] Delete that file, then restart: the tab keeps its text and a toast says it
+      is no longer linked.
 - [ ] Ctrl+S on a browse or structure tab still saves pending edits there.
 - [ ] A `.sql` file above the size limit is refused with an explanation, not
       truncated.
