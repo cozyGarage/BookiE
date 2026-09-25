@@ -7,12 +7,25 @@ use uuid::Uuid;
 
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
 use tablepro_policy::{
-    AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_policy,
+    AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_from_path,
 };
 use tablepro_ssh::{SshConfig, SshTunnel};
 use tablepro_storage::AuditJournal;
 
+use super::config_io::xdg_config_path;
 use super::connection_monitor;
+
+fn load_policy() -> Result<PolicyConfig, String> {
+    let path = xdg_config_path("policy.toml").ok_or("neither XDG_CONFIG_HOME nor HOME is set")?;
+    load_policy_file(&path)
+}
+
+fn load_policy_file(path: &std::path::Path) -> Result<PolicyConfig, String> {
+    if !path.exists() {
+        return Ok(PolicyConfig::default());
+    }
+    load_from_path(path)
+}
 
 /// Opaque identity of the underlying session, independent of the fresh
 /// PolicyGuard allocated for each request. It grants no database access.
@@ -352,6 +365,22 @@ impl DatabaseService {
 mod tests {
     use super::*;
     use tablepro_core::DatabaseDriver;
+
+    #[test]
+    fn policy_file_is_read_from_the_build_profile_config_directory() {
+        let path = xdg_config_path("policy.toml").unwrap();
+        let expected = std::path::Path::new(crate::config::storage_dir_name()).join("policy.toml");
+        assert!(path.ends_with(expected));
+    }
+
+    #[test]
+    fn a_missing_policy_file_uses_defaults_and_an_invalid_one_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("policy.toml");
+        assert!(load_policy_file(&path).is_ok());
+        std::fs::write(&path, "[environments.nowhere]\n").unwrap();
+        assert!(load_policy_file(&path).is_err());
+    }
 
     #[test]
     fn separate_instances_do_not_share_connections() {

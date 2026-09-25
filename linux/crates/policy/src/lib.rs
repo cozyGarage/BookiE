@@ -21,7 +21,7 @@ pub use audit::{
 };
 pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_mutation};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};
-pub use config::{EnvPolicy, MaskRule, PolicyConfig, WritePolicy, load_from_path, load_policy, policy_path};
+pub use config::{EnvPolicy, MaskRule, PolicyConfig, WritePolicy, load_from_path};
 pub use guard::{
     BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, ConnectionFaultSink, GuardContext,
     MAX_BULK_ROW_BUDGET, PolicyGuard,

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use tablepro_core::Environment;
@@ -189,28 +189,6 @@ impl PolicyConfig {
             .map_or(environment_policy.clone(), |overrides| {
                 overrides.apply_to(environment_policy)
             })
-    }
-}
-
-pub fn policy_path() -> Result<PathBuf, String> {
-    let base = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|h| {
-                let mut p = PathBuf::from(h);
-                p.push(".config");
-                p
-            })
-        })
-        .ok_or_else(|| "neither XDG_CONFIG_HOME nor HOME is set".to_string())?;
-    Ok(base.join("tablepro").join("policy.toml"))
-}
-
-pub fn load_policy() -> Result<PolicyConfig, String> {
-    match policy_path() {
-        Ok(path) if path.exists() => load_from_path(&path),
-        Ok(_) => Ok(PolicyConfig::default()),
-        Err(error) => Err(error),
     }
 }
 
