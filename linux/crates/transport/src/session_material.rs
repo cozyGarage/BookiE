@@ -165,6 +165,7 @@ mod tests {
             },
             jump: None,
             client: Default::default(),
+            agent: false,
         }
     }
 

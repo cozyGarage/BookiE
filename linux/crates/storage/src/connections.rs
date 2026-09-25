@@ -112,6 +112,8 @@ pub struct SavedSshConfig {
     pub jump: Option<Box<SavedSshConfig>>,
     #[serde(default, skip_serializing_if = "SshClient::is_builtin")]
     pub client: SshClient,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub agent: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -509,6 +511,7 @@ mod tests {
             auth: SavedSshAuth::Password,
             jump: None,
             client: Default::default(),
+            agent: false,
         };
         for _ in 1..depth {
             hop = SavedSshConfig {
@@ -518,6 +521,7 @@ mod tests {
                 auth: SavedSshAuth::Password,
                 jump: Some(Box::new(hop)),
                 client: Default::default(),
+                agent: false,
             };
         }
         hop
@@ -860,6 +864,27 @@ mod tests {
         assert_eq!(loaded[0].tls_root_cert, connection.tls_root_cert);
     }
 
+    #[test]
+    fn the_agent_flag_is_written_only_when_set_so_older_builds_still_read_the_file() {
+        let mut ssh = SavedSshConfig {
+            host: "bastion".into(),
+            port: 22,
+            username: "deploy".into(),
+            auth: SavedSshAuth::PrivateKey {
+                path: PathBuf::from("/home/me/.ssh/id_ed25519"),
+                has_passphrase: false,
+            },
+            jump: None,
+            client: SshClient::Builtin,
+            agent: false,
+        };
+        assert!(!serde_json::to_string(&ssh).unwrap().contains("agent"));
+        ssh.agent = true;
+        let text = serde_json::to_string(&ssh).unwrap();
+        assert!(text.contains("\"agent\":true"), "{text}");
+        assert!(serde_json::from_str::<SavedSshConfig>(&text).unwrap().agent);
+    }
+
     #[tokio::test]
     async fn per_connection_timeouts_round_trip_and_are_absent_by_default() {
         let dir = TempDir::new().unwrap();
@@ -958,6 +983,7 @@ mod tests {
             },
             jump: None,
             client: Default::default(),
+            agent: false,
         });
         save_to(&path, &[conn.clone()]).await.unwrap();
         let loaded = load_from(&path).await.unwrap();
@@ -984,8 +1010,10 @@ mod tests {
                 },
                 jump: None,
                 client: Default::default(),
+                agent: false,
             })),
             client: Default::default(),
+            agent: false,
         });
         save_to(&path, &[conn.clone()]).await.unwrap();
         let loaded = load_from(&path).await.unwrap();
@@ -1062,6 +1090,7 @@ mod tests {
             auth: SavedSshAuth::Password,
             jump: None,
             client: Default::default(),
+            agent: false,
         });
         let value = serde_json::to_value(&connection).unwrap();
         let keys: Vec<&String> = value.as_object().unwrap().keys().collect();

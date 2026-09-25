@@ -41,6 +41,7 @@ fn hop(host: &str, port: u16, username: &str, jump: Option<SavedSshConfig>) -> S
         },
         jump: jump.map(Box::new),
         client: Default::default(),
+        agent: false,
     }
 }
 
@@ -183,4 +184,24 @@ async fn an_openssh_connection_becomes_a_single_destination_and_refuses_a_saved_
         .err()
         .expect("a saved jump chain is refused");
     assert!(error.to_string().contains("ProxyJump"), "{error}");
+}
+
+#[tokio::test]
+async fn an_agent_hop_uses_the_agent_on_either_client_and_needs_no_keyring() {
+    let mut connection = saved(Some(TlsMode::VerifyFull), false);
+    let mut agent_hop = hop("bastion.corp.example", 22, "deploy", None);
+    agent_hop.agent = true;
+    connection.ssh = Some(agent_hop.clone());
+
+    let Some(SshRoute::Builtin(chain)) = saved_ssh_route(&connection).await.expect("resolve route") else {
+        panic!("a built-in route is configured");
+    };
+    assert!(matches!(chain[0].auth, SshAuth::Agent));
+
+    agent_hop.client = tablepro_storage::SshClient::OpenSsh;
+    connection.ssh = Some(agent_hop);
+    let Some(SshRoute::OpenSsh(config)) = saved_ssh_route(&connection).await.expect("resolve route") else {
+        panic!("an OpenSSH route is configured");
+    };
+    assert!(matches!(config.auth, tablepro_ssh::openssh::OpenSshAuth::Agent));
 }

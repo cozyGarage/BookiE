@@ -246,6 +246,7 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
         auth: SavedSshAuth::Password,
         jump: None,
         client: Default::default(),
+        agent: false,
     };
     for _ in 1..depth {
         hop = SavedSshConfig {
@@ -255,6 +256,7 @@ fn ssh_chain(depth: usize) -> SavedSshConfig {
             auth: SavedSshAuth::Password,
             jump: Some(Box::new(hop)),
             client: Default::default(),
+            agent: false,
         };
     }
     hop

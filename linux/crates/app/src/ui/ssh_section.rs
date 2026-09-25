@@ -9,6 +9,7 @@ use tablepro_storage::{SavedSshAuth, SavedSshConfig};
 
 const SSH_AUTH_PASSWORD: u32 = 0;
 const SSH_AUTH_KEY: u32 = 1;
+const SSH_AUTH_AGENT: u32 = 2;
 
 /// SSH section uses a single `AdwPreferencesGroup` containing one
 /// `AdwExpanderRow`. The expander's enable-switch toggles whether the
@@ -64,7 +65,8 @@ impl SshSection {
 
         let auth_pwd = crate::tr!("Password");
         let auth_key = crate::tr!("Private key");
-        let auth_model = gtk::StringList::new(&[auth_pwd.as_str(), auth_key.as_str()]);
+        let auth_agent = crate::tr!("SSH agent");
+        let auth_model = gtk::StringList::new(&[auth_pwd.as_str(), auth_key.as_str(), auth_agent.as_str()]);
         let auth_combo = adw::ComboRow::builder()
             .title(crate::tr!("Authentication"))
             .model(&auth_model)
@@ -117,10 +119,10 @@ impl SshSection {
     }
 
     pub fn refresh_auth_visibility(&self) {
-        let is_password = self.auth_combo.selected() == SSH_AUTH_PASSWORD;
-        self.password.set_visible(is_password);
-        self.key_path.set_visible(!is_password);
-        self.passphrase.set_visible(!is_password);
+        let selected = self.auth_combo.selected();
+        self.password.set_visible(selected == SSH_AUTH_PASSWORD);
+        self.key_path.set_visible(selected == SSH_AUTH_KEY);
+        self.passphrase.set_visible(selected == SSH_AUTH_KEY);
     }
 
     pub fn collect(&self) -> Result<SshInputs, String> {
@@ -134,7 +136,16 @@ impl SshSection {
             return Err(crate::tr!("SSH username is required"));
         }
 
+        let agent = self.auth_combo.selected() == SSH_AUTH_AGENT;
         let (auth, saved_auth, secret) = match self.auth_combo.selected() {
+            SSH_AUTH_AGENT => (
+                SshAuth::Agent,
+                SavedSshAuth::PrivateKey {
+                    path: PathBuf::from(self.key_path.text().as_str()),
+                    has_passphrase: false,
+                },
+                SshSecretToStore::None,
+            ),
             SSH_AUTH_KEY => {
                 let path = self.key_path.text().to_string();
                 if path.trim().is_empty() {
@@ -186,6 +197,7 @@ impl SshSection {
                 username,
                 auth: saved_auth,
                 jump: None,
+                agent,
                 client: if self.system_client.is_active() {
                     tablepro_storage::SshClient::OpenSsh
                 } else {

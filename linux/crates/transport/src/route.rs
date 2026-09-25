@@ -78,6 +78,7 @@ pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, Transport
             path: Some(path.clone()),
             passphrase: passphrase.clone(),
         },
+        SshAuth::Agent => OpenSshAuth::Agent,
     };
     Ok(OpenSshConfig {
         destination,

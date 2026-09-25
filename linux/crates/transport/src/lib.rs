@@ -304,6 +304,7 @@ pub(crate) async fn resolve_saved_ssh_hop(
     hop_index: usize,
 ) -> Result<SshConfig, TransportError> {
     let auth = match &saved.auth {
+        _ if saved.agent => SshAuth::Agent,
         SavedSshAuth::Password if hop_index > 0 => {
             // The keyring holds one SSH password per connection, not per hop
             // (storage::secrets keys on connection id and secret kind only),
@@ -602,6 +603,7 @@ mod tests {
             },
             jump: None,
             client: Default::default(),
+            agent: false,
         }
     }
 

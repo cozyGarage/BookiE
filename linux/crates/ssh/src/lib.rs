@@ -42,6 +42,7 @@ pub enum SshAuth {
         path: PathBuf,
         passphrase: Option<SecretString>,
     },
+    Agent,
 }
 
 #[derive(Debug, Error)]
@@ -84,6 +85,8 @@ pub enum SshError {
     },
     #[error("known_hosts: {0}")]
     KnownHosts(String),
+    #[error("ssh-agent: {0}")]
+    Agent(String),
     #[error("ssh: {0}")]
     Ssh(#[from] russh::Error),
     #[error("{stage} to {host}:{port} did not complete within {seconds} seconds")]
@@ -553,6 +556,7 @@ async fn connect_and_auth(
                     .await
                     .map_err(SshError::Ssh)
             }
+            SshAuth::Agent => authenticate_with_agent(&mut session, &cfg.username).await,
         }
     };
     let auth = match tokio::time::timeout(AUTH_TIMEOUT, authenticating).await {
@@ -564,6 +568,40 @@ async fn connect_and_auth(
         return Err(SshError::Auth);
     }
     Ok(session)
+}
+
+async fn authenticate_with_agent(
+    session: &mut Handle<ClientHandler>,
+    username: &str,
+) -> Result<client::AuthResult, SshError> {
+    let agent_error = |error: &dyn std::fmt::Display| SshError::Agent(error.to_string());
+    let mut agent = russh::keys::agent::client::AgentClient::connect_env()
+        .await
+        .map_err(|error| agent_error(&error))?;
+    let keys: Vec<PublicKey> = agent
+        .request_identities()
+        .await
+        .map_err(|error| agent_error(&error))?
+        .into_iter()
+        .filter_map(|identity| match identity {
+            russh::keys::agent::AgentIdentity::PublicKey { key, .. } => Some(key),
+            _ => None,
+        })
+        .collect();
+    if keys.is_empty() {
+        return Err(SshError::Agent("the agent holds no keys".into()));
+    }
+    let hash = session.best_supported_rsa_hash().await?.flatten();
+    for key in keys {
+        let result = session
+            .authenticate_publickey_with(username, key, hash, &mut agent)
+            .await
+            .map_err(|error| agent_error(&error))?;
+        if result.success() {
+            return Ok(result);
+        }
+    }
+    Err(SshError::Auth)
 }
 
 fn map_connect_error(

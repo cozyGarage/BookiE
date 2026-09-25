@@ -118,6 +118,12 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
+## SSH agent (built-in client)
+
+- [ ] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the
+      connection authenticates without a password or key file prompt.
+- [ ] With the agent stopped, the error says the agent could not be reached.
+
 ## System OpenSSH tunnel
 
 Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-askpass`

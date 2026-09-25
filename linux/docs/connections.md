@@ -296,3 +296,12 @@ in a private runtime directory and forwards the database port through it, so
   The Flatpak build cannot run the host `ssh`, so the option fails there with a
   clear message.
 
+## ssh-agent
+
+A saved SSH hop with `"agent": true` authenticates through the agent at
+`$SSH_AUTH_SOCK`, trying each key the agent holds. It works on every hop of a
+built-in jump chain, because it needs no per-hop secret, and maps to agent
+authentication when the hop uses the system OpenSSH client. The hop still records
+a private-key path, so an older build that ignores the flag falls back to that key
+file instead of failing to read the connections file.
+

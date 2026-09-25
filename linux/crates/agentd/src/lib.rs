@@ -600,6 +600,7 @@ mod tests {
             },
             jump: None,
             client: Default::default(),
+            agent: false,
         });
         let key = SessionKey::from_saved(&saved, [0; 32]);
         let mut opts = ConnectOptions {
