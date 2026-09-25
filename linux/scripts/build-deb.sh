@@ -44,6 +44,7 @@ ln -s bookie "$STAGE/usr/bin/tablepro"
 ln -s bookie-agentd "$STAGE/usr/bin/tablepro-agentd"
 install -Dm644 flatpak/com.tablepro.linux.desktop "$STAGE/usr/share/applications/com.tablepro.linux.desktop"
 install -Dm644 flatpak/com.tablepro.linux.metainfo.xml "$STAGE/usr/share/metainfo/com.tablepro.linux.metainfo.xml"
+install -Dm644 data/com.tablepro.linux.gschema.xml "$STAGE/usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml"
 install -Dm644 flatpak/icons/scalable/com.tablepro.linux.svg \
   "$STAGE/usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg"
 install -Dm644 packaging/policy.example.toml "$STAGE/usr/share/doc/tablepro/policy.example.toml"
