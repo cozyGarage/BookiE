@@ -43,6 +43,107 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     PgDriver.connect(opts).await.expect("connect")
 }
 
+fn no_timeout() -> OperationControl {
+    OperationControl::new(CancellationToken::new(), None)
+}
+
+async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+    let result = session.query_params_controlled(sql, &[], &no_timeout()).await.unwrap();
+    result.rows[0][0].clone()
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_keeps_settings_temp_tables_and_its_transaction_between_statements() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE TABLE ledger (id int)").await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = no_timeout();
+
+    for sql in [
+        "SET search_path TO pg_catalog, public",
+        "CREATE TEMP TABLE scratch (n int)",
+        "INSERT INTO scratch VALUES (7)",
+    ] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT current_setting('search_path')").await,
+        Value::Text("pg_catalog, public".into())
+    );
+    assert_eq!(
+        session_value(&mut session, "SELECT n FROM scratch").await,
+        Value::Int(7)
+    );
+
+    for sql in ["BEGIN", "INSERT INTO public.ledger VALUES (1)", "ROLLBACK"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT count(*)::bigint FROM public.ledger").await,
+        Value::Int(0)
+    );
+
+    session.close().await.unwrap();
+    let after = conn
+        .query("SELECT count(*)::bigint FROM pg_tables WHERE tablename = 'scratch'")
+        .await
+        .unwrap();
+    assert_eq!(after.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn open_sessions_do_not_take_connections_from_the_shared_pool() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let mut sessions = Vec::new();
+    for _ in 0..6 {
+        sessions.push(conn.open_session().await.unwrap());
+    }
+
+    let result = conn.query("SELECT 1").await.unwrap();
+
+    assert_eq!(result.rows, vec![vec![Value::Int(1)]]);
+    for session in sessions {
+        session.close().await.unwrap();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_cancelled_session_statement_stops_on_the_server_and_keeps_the_session() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts.clone()).await;
+    let observer = connect(opts).await;
+    let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("SET application_name TO 'kept'", &[], &no_timeout())
+        .await
+        .unwrap();
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let cancel = token.clone();
+    let observed = tokio::spawn(async move {
+        wait_for_tagged_query(observer.as_ref(), "bookie_session_cancel", true).await;
+        cancel.cancel();
+    });
+
+    let error = session
+        .query_params_controlled("SELECT pg_sleep(30) /* bookie_session_cancel */", &[], &control)
+        .await
+        .unwrap_err();
+    observed.await.unwrap();
+
+    assert!(matches!(error, DriverError::Cancelled), "{error:?}");
+    assert!(session.is_usable());
+    assert_eq!(
+        session_value(&mut session, "SELECT current_setting('application_name')").await,
+        Value::Text("kept".into())
+    );
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {

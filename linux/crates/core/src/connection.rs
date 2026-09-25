@@ -118,6 +118,9 @@ pub trait Connection: Send + Sync {
     async fn list_views_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_views(), control).await
     }
+    async fn open_session(&self) -> Result<Box<dyn crate::Session>, DriverError> {
+        Err(DriverError::Unsupported("dedicated sessions".into()))
+    }
     async fn list_objects(
         &self,
         kind: CatalogObjectKind,

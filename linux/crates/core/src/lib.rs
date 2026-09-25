@@ -11,6 +11,7 @@ mod pagination;
 mod params;
 mod query;
 mod registry;
+mod session;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
 pub mod sql_dialect;
@@ -38,5 +39,6 @@ pub use pagination::{KEYSET_OFFSET_THRESHOLD, KeysetError, keyset_order_by, keys
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
 pub use query::{ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, QueryResult, TableInfo, Value};
 pub use registry::DriverRegistry;
+pub use session::Session;
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;

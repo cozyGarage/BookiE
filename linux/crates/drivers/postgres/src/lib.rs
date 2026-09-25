@@ -16,6 +16,7 @@ use tablepro_core::{
 
 mod catalog;
 mod decode;
+mod session;
 
 pub struct PgDriver;
 
@@ -93,6 +94,7 @@ impl DatabaseDriver for PgDriver {
             pg_opts = pg_opts.application_name(name);
         }
         let cancellation_options = pg_opts.clone();
+        let session_options = pg_opts.clone();
         let pool = PgPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
@@ -110,6 +112,7 @@ impl DatabaseDriver for PgDriver {
         Ok(Box::new(PgConnection {
             pool,
             cancellation_pool,
+            session_options,
         }))
     }
 }
@@ -117,6 +120,7 @@ impl DatabaseDriver for PgDriver {
 struct PgConnection {
     pool: Pool<Postgres>,
     cancellation_pool: Pool<Postgres>,
+    session_options: PgConnectOptions,
 }
 
 #[async_trait]
@@ -476,6 +480,10 @@ impl Connection for PgConnection {
             .await
             .map_err(map_sqlx_error)?;
         Ok(())
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        session::open(&self.session_options, self.cancellation_pool.clone()).await
     }
 
     async fn begin(&self) -> Result<Box<dyn tablepro_core::Transaction>, DriverError> {
