@@ -73,6 +73,21 @@ struct SqliteConnection {
     pool: Pool<Sqlite>,
 }
 
+// Catalog reads use the table-valued `pragma_*()` form. A bare PRAGMA
+// statement answers from the connection's cached schema and can miss a table
+// another pooled connection just created; a SELECT re-checks the schema when
+// it is prepared. `foreign_key_list.to` is NULL when a key references the
+// parent's primary key implicitly.
+impl SqliteConnection {
+    async fn primary_key_columns(&self, table: &str) -> Result<Vec<String>, DriverError> {
+        sqlx::query_scalar("SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk")
+            .bind(table)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)
+    }
+}
+
 #[async_trait]
 impl Connection for SqliteConnection {
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
@@ -98,8 +113,8 @@ impl Connection for SqliteConnection {
         // to detect virtual / generated columns. Falls back to
         // table_info on older SQLite (< 3.37) — both have the same
         // first 6 columns: cid, name, type, notnull, dflt_value, pk.
-        let pragma_sql = format!("PRAGMA table_xinfo({})", quote_ident(table));
-        let rows = sqlx::query(sqlx::AssertSqlSafe(pragma_sql.as_str()))
+        let rows = sqlx::query("SELECT * FROM pragma_table_xinfo(?)")
+            .bind(table)
             .fetch_all(&self.pool)
             .await
             .map_err(map_sqlx_error)?;
@@ -280,13 +295,11 @@ impl Connection for SqliteConnection {
         // ordering. PK index doesn't always show up in index_list (a
         // bare INTEGER PRIMARY KEY uses the rowid alias, no real
         // index), so we synthesise one from table_info if missing.
-        let list = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "PRAGMA index_list({})",
-            quote_ident(table)
-        )))
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let list = sqlx::query("SELECT * FROM pragma_index_list(?)")
+            .bind(table)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         let mut out: Vec<IndexInfo> = Vec::with_capacity(list.len());
         let mut saw_primary = false;
         for r in list {
@@ -297,13 +310,11 @@ impl Connection for SqliteConnection {
             if primary {
                 saw_primary = true;
             }
-            let info_rows = sqlx::query(sqlx::AssertSqlSafe(format!(
-                "PRAGMA index_info({})",
-                quote_ident(&name)
-            )))
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
+            let info_rows = sqlx::query("SELECT * FROM pragma_index_info(?)")
+                .bind(&name)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(map_sqlx_error)?;
             let columns: Vec<String> = info_rows
                 .into_iter()
                 .map(|c| c.try_get::<String, _>(2).unwrap_or_default())
@@ -319,18 +330,7 @@ impl Connection for SqliteConnection {
             // Synthesise the implicit PK index from PRAGMA table_info
             // so the UI can render PK columns even when SQLite chose
             // the rowid-alias path.
-            let table_info = sqlx::query(sqlx::AssertSqlSafe(format!(
-                "PRAGMA table_info({})",
-                quote_ident(table)
-            )))
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
-            let pk_cols: Vec<String> = table_info
-                .into_iter()
-                .filter(|r| r.try_get::<i64, _>(5).unwrap_or(0) > 0)
-                .map(|r| r.try_get::<String, _>(1).unwrap_or_default())
-                .collect();
+            let pk_cols = self.primary_key_columns(table).await?;
             if !pk_cols.is_empty() {
                 out.push(IndexInfo {
                     name: "PRIMARY".into(),
@@ -349,19 +349,17 @@ impl Connection for SqliteConnection {
         // stored by SQLite, so we synthesise "fk_{table}_{id}" — stable
         // across re-runs of the same schema. Group by id and build
         // ForeignKeyInfo.
-        let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
-            "PRAGMA foreign_key_list({})",
-            quote_ident(table)
-        )))
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_sqlx_error)?;
+        let rows = sqlx::query("SELECT * FROM pragma_foreign_key_list(?) ORDER BY id, seq")
+            .bind(table)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_sqlx_error)?;
         let mut by_id: std::collections::BTreeMap<i64, ForeignKeyInfo> = std::collections::BTreeMap::new();
         for r in rows {
             let id: i64 = r.try_get(0).unwrap_or(0);
             let ref_table: String = r.try_get(2).unwrap_or_default();
             let from_col: String = r.try_get(3).unwrap_or_default();
-            let to_col: String = r.try_get(4).unwrap_or_default();
+            let to_col: String = r.try_get::<Option<String>, _>(4).ok().flatten().unwrap_or_default();
             let on_update: String = r.try_get(5).unwrap_or_default();
             let on_delete: String = r.try_get(6).unwrap_or_default();
             let entry = by_id.entry(id).or_insert_with(|| ForeignKeyInfo {
@@ -376,7 +374,13 @@ impl Connection for SqliteConnection {
             entry.columns.push(from_col);
             entry.ref_columns.push(to_col);
         }
-        Ok(by_id.into_values().collect())
+        let mut keys: Vec<ForeignKeyInfo> = by_id.into_values().collect();
+        for key in &mut keys {
+            if key.ref_columns.iter().all(String::is_empty) {
+                key.ref_columns = self.primary_key_columns(&key.ref_table).await?;
+            }
+        }
+        Ok(keys)
     }
 
     async fn ping(&self) -> Result<(), DriverError> {

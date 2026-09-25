@@ -37,6 +37,8 @@
 - ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 - A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
+- SQLite foreign keys that reference the parent table without naming its columns now show the parent's primary key columns instead of blanks.
+- SQLite foreign keys, indexes and columns read right after a structure change are no longer missing when the read lands on another pooled connection.
 - A SQL Server batch that raises an error after its first result set now reports the error instead of showing the first result as a success.
 - A SQL Server result cut at the row limit now waits for the rest of the batch to finish, instead of leaving it running on the server with its locks held until the next query.
 - MongoDB accepts `DROP TABLE people` as well as the quoted form, instead of reporting the statement as unsupported.

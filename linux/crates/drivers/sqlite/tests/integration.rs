@@ -204,6 +204,54 @@ async fn a_declared_structure_capability_returns_real_catalog_rows() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread")]
+async fn a_foreign_key_read_right_after_its_table_is_created_is_listed() {
+    for _ in 0..5 {
+        let directory = TempDir::new().expect("temp dir");
+        let connection = connect_file(&directory).await;
+        connection
+            .execute("CREATE TABLE parent (a INTEGER, b TEXT, PRIMARY KEY (b, a))")
+            .await
+            .expect("create the referenced table");
+        connection
+            .execute("CREATE TABLE child (id INTEGER PRIMARY KEY, pa INTEGER, pb TEXT, FOREIGN KEY (pb, pa) REFERENCES parent(b, a))")
+            .await
+            .expect("create the referencing table");
+
+        let foreign_keys = connection
+            .fetch_foreign_keys(None, "child")
+            .await
+            .expect("fetch foreign keys");
+
+        assert_eq!(foreign_keys.len(), 1, "{foreign_keys:?}");
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_foreign_key_to_the_implicit_parent_key_names_the_primary_key_columns() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection
+        .execute("CREATE TABLE parent (a INTEGER, b TEXT, note TEXT, PRIMARY KEY (b, a))")
+        .await
+        .expect("create the referenced table");
+    connection
+        .execute(
+            "CREATE TABLE child (id INTEGER PRIMARY KEY, pa INTEGER, pb TEXT, FOREIGN KEY (pb, pa) REFERENCES parent)",
+        )
+        .await
+        .expect("create the referencing table");
+
+    let foreign_keys = connection
+        .fetch_foreign_keys(None, "child")
+        .await
+        .expect("fetch foreign keys");
+
+    assert_eq!(foreign_keys.len(), 1, "{foreign_keys:?}");
+    assert_eq!(foreign_keys[0].columns, vec!["pb".to_string(), "pa".to_string()]);
+    assert_eq!(foreign_keys[0].ref_columns, vec!["b".to_string(), "a".to_string()]);
+}
+
 #[tokio::test]
 async fn sqlite_columns_report_no_comment() {
     let directory = TempDir::new().expect("temp dir");
