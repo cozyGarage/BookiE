@@ -1,4 +1,5 @@
-use std::path::PathBuf;
+use std::io;
+use std::path::{Path, PathBuf};
 
 use thiserror::Error;
 
@@ -64,6 +65,47 @@ pub enum OpenSshError {
     Cancelled,
     #[error("the SSH master process exited")]
     MasterExited { status: Option<i32>, detail: String },
+    #[error("could not reserve a local port for the SSH forward: {detail}")]
+    LocalBind { detail: String },
     #[error("OpenSSH failed: {detail}")]
     Protocol { detail: String },
+}
+
+pub(crate) fn spawn_failure(program: &Path, error: &io::Error) -> OpenSshError {
+    if error.kind() == io::ErrorKind::NotFound {
+        return OpenSshError::ClientMissing {
+            program: program.to_owned(),
+        };
+    }
+    OpenSshError::Spawn {
+        program: program.to_owned(),
+        detail: error.to_string(),
+    }
+}
+
+pub(crate) fn unsafe_dir(path: &Path, detail: impl ToString) -> OpenSshError {
+    OpenSshError::RuntimeDirUnsafe {
+        path: path.to_owned(),
+        detail: detail.to_string(),
+    }
+}
+
+pub(crate) fn protocol(detail: impl Into<String>) -> OpenSshError {
+    OpenSshError::Protocol { detail: detail.into() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_missing_program_is_reported_as_a_missing_client() {
+        let missing = spawn_failure(Path::new("/nonexistent/ssh"), &io::Error::from(io::ErrorKind::NotFound));
+        assert!(matches!(missing, OpenSshError::ClientMissing { .. }));
+        let denied = spawn_failure(
+            Path::new("/usr/bin/ssh"),
+            &io::Error::from(io::ErrorKind::PermissionDenied),
+        );
+        assert!(matches!(denied, OpenSshError::Spawn { .. }));
+    }
 }
