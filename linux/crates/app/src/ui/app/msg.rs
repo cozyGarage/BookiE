@@ -87,6 +87,7 @@ pub enum AppMsg {
     ShowShortcuts,
     ShowAbout,
     ShowActivity,
+    ShowCatalog,
     ExplainActiveQuery,
     ShowPreferences,
     NewWindow,

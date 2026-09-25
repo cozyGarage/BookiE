@@ -204,7 +204,11 @@ the 0.1.2–0.1.4 work, not from a frozen 0.2 candidate. A5 and B1–B7 stay ope
 B1 lacks a real Flatpak build and installed-package checks. B2 lacks the
 GSettings and history-format migrations. B5 has Open, Save, Save As, a
 changed-on-disk check before every save and a close prompt; a tab's file
-binding is not yet restored after a restart (its text is, through drafts). B6 lists PostgreSQL views only. B3 and B4 have not
+binding is not yet restored after a restart (its text is, through drafts). B6 lists views and materialized views, and a guarded
+`list_objects(kind, schema)` shared by the Catalog window and the MCP tool covers
+routines, triggers, sequences, extensions, roles and enum/composite/domain/range
+types; per-object grants remain. Types are a kind of `list_objects` rather than a
+separate `list_types`. B3 and B4 have not
 started.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,

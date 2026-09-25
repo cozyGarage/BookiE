@@ -791,6 +791,12 @@ impl SimpleComponent for App {
                     &self.preferences,
                 );
             }
+            AppMsg::ShowCatalog => crate::ui::catalog_dialog::present(
+                self.window.upcast_ref::<gtk::Window>(),
+                self.connection_id,
+                &self.database,
+                &self.preferences,
+            ),
             AppMsg::ExplainActiveQuery => self.on_explain_active_query(),
             AppMsg::ShowPreferences => super::preferences::present(
                 &self.window,

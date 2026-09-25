@@ -1,6 +1,7 @@
 mod activity_dialog;
 mod app;
 mod browse_tab;
+mod catalog_dialog;
 mod cell_editor;
 mod connect_dialog;
 pub(crate) mod connection_bundle;

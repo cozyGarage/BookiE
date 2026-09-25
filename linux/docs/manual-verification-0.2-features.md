@@ -102,6 +102,17 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
+## Catalog window
+
+Main menu, then Catalog, on a PostgreSQL connection with a few objects of each kind.
+
+- [ ] Each kind in the dropdown lists its objects with schema and detail.
+- [ ] Typing a schema name and pressing Enter narrows the list; clearing it lists all.
+- [ ] On SQLite or MySQL the status says the engine does not list that kind,
+      not "Nothing of this kind was found".
+- [ ] Switching kind quickly never shows the previous kind's rows under the new one.
+- [ ] Closing the window mid-load leaves no error toast behind.
+
 ## Carried over from the earlier sprint
 
 - [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the
