@@ -97,6 +97,7 @@ const COLLATABLE_TYPE_PREFIXES: &[&str] = &[
     "nchar",
     "nvarchar",
     "text",
+    "ntext",
     "tinytext",
     "mediumtext",
     "longtext",
@@ -114,11 +115,17 @@ pub(crate) fn collation_clause(driver_id: &str, column: &DraftColumn) -> Result<
     let Some(collation) = column.collation.as_deref() else {
         return Ok(None);
     };
-    if !matches!(driver_id, "postgres" | "mysql") || !is_collatable_type(&column.data_type) {
+    if !matches!(driver_id, "postgres" | "mysql" | "mssql") || !is_collatable_type(&column.data_type) {
         return Ok(None);
     }
     if collation.trim().is_empty() || collation.len() > MAX_COLLATION_LEN || contains_forbidden_control(collation) {
         return Err(BuildDdlError::UnsafeCollation(collation.into()));
+    }
+    if driver_id == "mssql" {
+        if !collation.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+            return Err(BuildDdlError::UnsafeCollation(collation.into()));
+        }
+        return Ok(Some(format!("COLLATE {collation}")));
     }
     Ok(Some(format!("COLLATE {}", quote_ident(driver_id, collation))))
 }

@@ -4,11 +4,13 @@ use super::*;
 struct SessionScript {
     sent: Mutex<Vec<String>>,
     lose_on: Option<&'static str>,
+    fail_once_on: Option<&'static str>,
 }
 
 struct ScriptedSession {
     script: Arc<SessionScript>,
     usable: bool,
+    failed_once: bool,
 }
 
 #[async_trait]
@@ -20,6 +22,10 @@ impl tablepro_core::Session for ScriptedSession {
         _control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
+        if !self.failed_once && self.script.fail_once_on == Some(sql) {
+            self.failed_once = true;
+            return Err(DriverError::TimedOut);
+        }
         if self.script.lose_on == Some(sql) {
             self.usable = false;
             return Err(DriverError::Cancelled);
@@ -74,6 +80,7 @@ impl Connection for SessionConn {
         Ok(Box::new(ScriptedSession {
             script: self.script.clone(),
             usable: true,
+            failed_once: false,
         }))
     }
 
@@ -185,6 +192,35 @@ async fn a_committed_session_transaction_records_the_commit() {
     assert_eq!(commits.len(), 1);
     assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Committed);
     assert!(!session.transaction_open());
+}
+
+#[tokio::test]
+async fn a_failed_rollback_keeps_the_batch_until_a_retry_succeeds() {
+    let h = harness(
+        SessionScript {
+            fail_once_on: Some("ROLLBACK"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+
+    assert!(matches!(
+        run(&mut session, "ROLLBACK").await,
+        Err(DriverError::TimedOut)
+    ));
+    assert!(session.transaction_open());
+    run(&mut session, "ROLLBACK").await.expect("retry rollback");
+    assert!(!session.transaction_open());
+
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 2);
+    assert_eq!(rollbacks[0].batch_id, rollbacks[1].batch_id);
+    assert_eq!(rollbacks[1].transaction_outcome, AuditTransactionOutcome::RolledBack);
 }
 
 #[tokio::test]

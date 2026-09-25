@@ -219,9 +219,12 @@ fn alter_column_mssql(
     if changed.data_type || changed.nullable {
         validate_safe_type(&column.data_type)?;
         let nullability = if column.nullable { "NULL" } else { "NOT NULL" };
+        let collation = collation_clause(driver_id, column)?
+            .map(|clause| format!(" {clause}"))
+            .unwrap_or_default();
         stmts.push(format!(
-            "ALTER TABLE {} ALTER COLUMN {} {} {}",
-            qualified, name, column.data_type, nullability
+            "ALTER TABLE {} ALTER COLUMN {} {}{} {}",
+            qualified, name, column.data_type, collation, nullability
         ));
     }
     if changed.default_value {

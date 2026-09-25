@@ -238,6 +238,35 @@ async fn ddl_batch_commits_and_rolls_back_as_a_unit() {
     conn.execute("CREATE TABLE tx_demo_after (id int)").await.unwrap();
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn alter_column_keeps_its_collation() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE collation_demo (id int PRIMARY KEY, label nvarchar(40) COLLATE Latin1_General_100_BIN2 NULL)",
+    )
+    .await
+    .unwrap();
+    let mut column = tablepro_core::sql_ddl::DraftColumn::from_info(
+        conn.fetch_columns(None, "collation_demo")
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|column| column.name == "label")
+            .unwrap(),
+    );
+    assert_eq!(column.collation.as_deref(), Some("Latin1_General_100_BIN2"));
+    column.nullable = false;
+    for sql in tablepro_core::sql_ddl::build_alter_column("mssql", None, "collation_demo", &column).unwrap() {
+        conn.execute(&sql).await.unwrap();
+    }
+    let altered = conn.fetch_columns(None, "collation_demo").await.unwrap();
+    let label = altered.iter().find(|column| column.name == "label").unwrap();
+    assert!(!label.nullable);
+    assert_eq!(label.collation.as_deref(), Some("Latin1_General_100_BIN2"));
+}
+
 /// Default constraints are separate objects here, so a default change
 /// is drop-then-add against a server-generated constraint name.
 #[tokio::test]

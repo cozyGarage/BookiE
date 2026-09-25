@@ -286,7 +286,14 @@ impl PolicySession {
                 },
             )
             .await;
-        self.batch = (result.is_ok() && chain).then(OpenBatch::new);
+        self.batch = if result.is_ok() {
+            chain.then(OpenBatch::new)
+        } else {
+            Some(OpenBatch {
+                uncertain: batch.uncertain || ambiguous,
+                ..batch
+            })
+        };
         self.guard.handle_write_outcome_failure(audit_result)?;
         pending_write.disarm();
         result

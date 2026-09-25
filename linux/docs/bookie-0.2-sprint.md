@@ -211,8 +211,10 @@ types; per-object grants remain. Types are a kind of `list_objects` rather than 
 separate `list_types`. B3 is narrowed for 0.2 to what the single type string
 loses in practice: a column collation, read on PostgreSQL and MySQL and kept by the
 structure editor's alter statements. Schema columns keep the declared spelling in
-`data_type`; a separate declared-type field waits for a consumer. SQL Server also
-drops a collation on ALTER COLUMN and is not covered yet. B4: agentd refuses unknown SSH host keys; lone transaction statements are refused
+`data_type`; a separate declared-type field waits for a consumer. SQL Server
+collation is now read from the catalog and restated on ALTER COLUMN, with a
+real-server regression check. B4: agentd refuses unknown SSH host keys; lone
+transaction statements are refused
 on shared connections; PostgreSQL and MySQL editor tabs can opt into a governed dedicated
 session (SQLite, SQL Server and the others answer that sessions are unsupported). A saved connection
 can use the system OpenSSH client (forced host-key checking, per-host secret
@@ -564,3 +566,20 @@ isolated-test inventory passed. Debian package fixture could not run because
   connection's stale schema; catalog reads now use table-valued pragmas.
   The GUI policy file now follows the build profile. Container suites for
   SQL Server, PostgreSQL and SQLite passed; GTK tiers were not run.
+
+- 2026-09-25 working tree, B4 safety follow-up: a failed COMMIT or ROLLBACK
+  retains its governed transaction batch until a confirmed ending. A failed
+  editor Commit now leaves the dedicated session open, reports the error and
+  permits retry; closing it still follows guarded session cleanup. Editor Save
+  and Close keeps the tab open when text changes after the save snapshot, and a
+  closed connection cancels a pending Catalog listing. Focused tests passed: policy 151, app 356
+  (3 ignored), PostgreSQL session container 6, MySQL session container 1,
+  OpenSSH container 7; app/policy Clippy passed with warnings denied. These
+  checks do not verify the new GTK paths on an installed package; the 0.2
+  manual checklist and candidate gates remain open.
+
+- 2026-09-25 working tree, B3 SQL Server collation: `fetch_columns` reads
+  `sys.columns.collation_name`, and column DDL restates the validated collation
+  during ALTER COLUMN. Six focused builder tests and one SQL Server container
+  round trip passed; the full core unit suite passed (395 tests). B3 remains
+  open for its other value and metadata contracts.

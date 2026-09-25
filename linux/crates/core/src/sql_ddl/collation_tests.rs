@@ -56,6 +56,27 @@ fn a_mysql_modify_restates_the_collation_even_when_only_nullability_changed() {
 }
 
 #[test]
+fn a_mssql_nullability_change_keeps_the_column_collation() {
+    let mut column = collated("nvarchar(40)", Some("Latin1_General_100_BIN2"));
+    column.nullable = false;
+
+    let statements = build_alter_column("mssql", None, "people", &column).unwrap();
+
+    assert_eq!(
+        statements,
+        vec![
+            "ALTER TABLE [people] ALTER COLUMN [label] nvarchar(40) COLLATE Latin1_General_100_BIN2 NOT NULL"
+                .to_string()
+        ]
+    );
+    column.collation = Some("bad;DROP TABLE people".into());
+    assert!(matches!(
+        build_alter_column("mssql", None, "people", &column),
+        Err(BuildDdlError::UnsafeCollation(_))
+    ));
+}
+
+#[test]
 fn a_collation_name_from_the_catalog_is_quoted_or_refused() {
     let mut quoted = collated("text", Some("odd\"name"));
     quoted.nullable = false;

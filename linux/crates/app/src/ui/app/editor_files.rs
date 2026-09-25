@@ -61,6 +61,13 @@ impl App {
     pub(super) fn on_editor_file_saved(&mut self, tab: Uuid, file: TextFile, sender: ComponentSender<Self>) {
         self.bind_editor_file(tab, EditorFile::from_disk(file));
         self.show_toast(&crate::tr!("Saved"));
+        if matches!(
+            self.workspace_tabs.borrow().get(&tab),
+            Some(WorkspaceTab::Editor(slot)) if slot.has_unsaved_file_changes()
+        ) {
+            self.close_after_save.borrow_mut().remove(&tab);
+            return;
+        }
         if dec_close_after_save(&mut self.close_after_save.borrow_mut(), &tab) {
             sender.input(AppMsg::WorkspaceTabClosed(tab));
         }

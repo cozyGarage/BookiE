@@ -125,12 +125,12 @@ fn load(
     status: &gtk::Label,
 ) {
     list.remove_all();
+    let token = replace_in_flight(&source.in_flight);
     let Some(conn) = source.database.get(source.connection) else {
         status.set_text(&tr!("Connection closed."));
         return;
     };
     status.set_text(&tr!("Loading…"));
-    let token = replace_in_flight(&source.in_flight);
     let timeout_secs = crate::services::operation_control::configured_timeout_secs(&source.preferences);
     let (list, status) = (list.clone(), status.clone());
     glib::spawn_future_local(async move {

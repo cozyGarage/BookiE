@@ -77,10 +77,13 @@ impl SqlEditor {
     }
 
     pub(super) fn on_session_toggled(&mut self, enabled: bool, sender: &ComponentSender<Self>) {
+        if self.session_ending {
+            return;
+        }
         match (enabled, &self.session) {
             (true, None) => self.open_session(sender),
             (false, Some(session)) if session.transaction_open => self.confirm_session_end(sender),
-            (false, Some(_)) => self.end_session(false),
+            (false, Some(_)) => self.end_session(),
             _ => {}
         }
     }
@@ -117,7 +120,7 @@ impl SqlEditor {
                 });
                 self.session_button.set_label(&session_label(false));
             }
-            Ok(OpenedSession(shared)) => close_detached(shared, false),
+            Ok(OpenedSession(shared)) => close_detached(shared),
             Err(message) => {
                 self.session_button.set_active(false);
                 self.status.set_label(&message);
@@ -138,14 +141,49 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn end_session(&mut self, commit: bool) {
+    pub(super) fn end_session(&mut self) {
         self.session_button.set_label(&session_label(false));
         self.session_button.remove_css_class("warning");
         if self.session_button.is_active() {
             self.session_button.set_active(false);
         }
         if let Some(session) = self.session.take() {
-            close_detached(session.shared, commit);
+            close_detached(session.shared);
+        }
+    }
+
+    pub(super) fn commit_and_end(&mut self, sender: &ComponentSender<Self>) {
+        let Some(session) = self.session.as_ref() else {
+            return;
+        };
+        if self.session_ending {
+            return;
+        }
+        self.session_ending = true;
+        self.session_button.set_sensitive(false);
+        self.status.set_label(&crate::tr!("Committing session…"));
+        let shared = session.shared.clone();
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let result = commit_session(&shared)
+                .await
+                .map_err(|error| crate::ui::error_text::driver_message(&error));
+            sender.input(SqlEditorInput::SessionCommitFinished(result));
+        });
+    }
+
+    pub(super) fn on_session_commit_finished(&mut self, result: Result<(), String>) {
+        self.session_ending = false;
+        self.session_button.set_sensitive(true);
+        match result {
+            Ok(()) => {
+                self.end_session();
+                self.status.set_label(&crate::tr!("Session committed"));
+            }
+            Err(message) => {
+                self.session_button.set_active(true);
+                self.status.set_label(&message);
+            }
         }
     }
 
@@ -174,17 +212,21 @@ impl SqlEditor {
     }
 }
 
-pub(crate) fn close_detached(shared: SharedSession, commit: bool) {
+async fn commit_session(shared: &SharedSession) -> Result<(), DriverError> {
+    let mut guard = shared.lock().await;
+    let session = guard
+        .as_mut()
+        .ok_or_else(|| DriverError::Unsupported("the session was closed".into()))?;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session.query_params_controlled("COMMIT", &[], &control).await?;
+    Ok(())
+}
+
+pub(crate) fn close_detached(shared: SharedSession) {
     relm4::spawn(async move {
-        let Some(mut session) = shared.lock().await.take() else {
+        let Some(session) = shared.lock().await.take() else {
             return;
         };
-        if commit {
-            let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
-            if let Err(error) = session.query_params_controlled("COMMIT", &[], &control).await {
-                tracing::warn!(error = %error, "session commit failed; the transaction is rolled back on close");
-            }
-        }
         if let Err(error) = session.close().await {
             tracing::warn!(error = %error, "closing a dedicated session failed");
         }
@@ -201,6 +243,45 @@ fn session_open_message(error: &DriverError) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct FailFirstCommit(bool);
+
+    #[async_trait::async_trait]
+    impl Session for FailFirstCommit {
+        async fn query_params_controlled(
+            &mut self,
+            sql: &str,
+            _params: &[Value],
+            _control: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            assert_eq!(sql, "COMMIT");
+            if self.0 {
+                self.0 = false;
+                return Err(DriverError::TimedOut);
+            }
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+
+        fn is_usable(&self) -> bool {
+            true
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failed_commit_leaves_the_session_available_for_retry() {
+        let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailFirstCommit(true)))));
+        assert!(matches!(commit_session(&shared).await, Err(DriverError::TimedOut)));
+        assert!(shared.lock().await.is_some());
+        commit_session(&shared).await.expect("retry commit");
+    }
 
     #[test]
     fn the_session_button_says_when_a_transaction_is_open() {

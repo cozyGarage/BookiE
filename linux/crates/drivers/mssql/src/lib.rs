@@ -253,7 +253,8 @@ impl Connection for MssqlConnection {
                        c.is_computed, \
                        dc.definition AS default_def, \
                        CASE WHEN pk.column_id IS NOT NULL THEN 1 ELSE 0 END AS is_pk, \
-                       CAST(ep.value AS nvarchar(max)) AS column_comment \
+                       CAST(ep.value AS nvarchar(max)) AS column_comment, \
+                       c.collation_name AS collation_name \
                    FROM sys.columns c \
                    JOIN sys.objects o ON c.object_id = o.object_id \
                    JOIN sys.schemas sc ON o.schema_id = sc.schema_id \
@@ -711,7 +712,7 @@ fn row_to_column_info(row: &[Value]) -> ColumnInfo {
         },
         is_generated: as_bool(row.get(7)).unwrap_or(false),
         comment: as_text(row.get(10)).filter(|c| !c.is_empty()),
-        collation: None,
+        collation: as_text(row.get(11)).filter(|c| !c.is_empty()),
     }
 }
 
