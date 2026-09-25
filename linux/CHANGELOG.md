@@ -14,6 +14,7 @@
 - A CSV file can also create the table it is loaded into, from the schema header in the sidebar. The column names and a type guessed from the first rows of the file are shown for every column and can be changed before the table is created. A guess falls back to text whenever any value in the sample does not fit a narrower type.
 - The structure editor shows a Comment field for each column, and reads each column's comment on PostgreSQL, MySQL, SQL Server and ClickHouse, and writes it when creating a table, adding a column or editing one. SQLite refuses a comment with a clear message instead of dropping it silently.
 - PostgreSQL materialized views are listed with views in the sidebar and open read-only.
+- Agents can list a PostgreSQL connection's routines, triggers, sequences, extensions, roles and user-defined types through the new `list_objects` MCP tool, optionally within one schema. It needs only a read token, is limited to the token's allowed connections, and is audited like other catalog reads; an engine without catalog support answers that the listing is unsupported rather than returning an empty list.
 - A saved connection can be given a name; leaving the name blank keeps the address-derived label.
 - A saved connection can be duplicated; the copy starts without saved credentials.
 - A saved connection can carry a colour tag from a fixed palette, shown beside it in the connection list.

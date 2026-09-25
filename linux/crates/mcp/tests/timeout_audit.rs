@@ -768,6 +768,19 @@ async fn a_metadata_read_is_denied_when_audit_intent_cannot_be_persisted() {
                 .await
                 .err(),
         ),
+        (
+            "list_objects",
+            harness
+                .bridge
+                .list_objects(
+                    &harness.token,
+                    harness.connection_id,
+                    tablepro_core::CatalogObjectKind::Routine,
+                    None,
+                )
+                .await
+                .err(),
+        ),
     ] {
         let error = error.unwrap_or_else(|| panic!("{tool} must be denied when audit is unavailable"));
         assert!(error.contains("denied"), "{tool}: {error}");

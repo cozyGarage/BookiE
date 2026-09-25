@@ -266,6 +266,9 @@ fn tool_description(name: &str) -> &'static str {
     match name {
         "list_connections" => "List saved database connections visible to this token",
         "list_tables" => "List tables on a connection",
+        "list_objects" => {
+            "List routines, triggers, sequences, extensions, roles or types on a connection, optionally in one schema"
+        }
         "describe_table" => "Describe columns of a table",
         "execute_query" => "Run a read SQL query (writes require tools:write scope and policy approval)",
         "execute_write" => "Run a write with optional transaction preview (preview=true by default)",
@@ -291,6 +294,19 @@ fn tool_schema(name: &str) -> JsonValue {
                 "token": {"type": "string"}
             },
             "required": ["connection_id"]
+        }),
+        "list_objects" => json!({
+            "type": "object",
+            "properties": {
+                "connection_id": {"type": "string"},
+                "kind": {
+                    "type": "string",
+                    "enum": tablepro_core::CatalogObjectKind::ALL.iter().map(|kind| kind.as_str()).collect::<Vec<_>>()
+                },
+                "schema": {"type": "string"},
+                "token": {"type": "string"}
+            },
+            "required": ["connection_id", "kind"]
         }),
         "describe_table" | "table_schema" | "count_rows" => json!({
             "type": "object",

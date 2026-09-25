@@ -200,6 +200,27 @@ impl McpBridge {
         .await
     }
 
+    pub async fn list_objects(
+        &self,
+        token: &McpToken,
+        connection_id: Uuid,
+        kind: tablepro_core::CatalogObjectKind,
+        schema: Option<String>,
+    ) -> Result<Vec<tablepro_core::CatalogObject>, String> {
+        let schema = match schema {
+            Some(schema) => Some(validated_identifier(&schema)?),
+            None => None,
+        };
+        self.with_connection(token, connection_id, move |conn, control| {
+            Box::pin(async move {
+                conn.list_objects_controlled(kind, schema.as_deref(), &control)
+                    .await
+                    .map_err(|error| error.to_string())
+            })
+        })
+        .await
+    }
+
     pub async fn describe_table(
         &self,
         token: &McpToken,

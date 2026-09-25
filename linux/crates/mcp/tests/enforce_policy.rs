@@ -664,3 +664,46 @@ impl ConnectionProvider for RecordingProvider {
         }))
     }
 }
+
+#[tokio::test]
+async fn list_objects_is_denied_for_a_token_with_an_empty_allowlist() {
+    let (provider, bridge, token, _dir) = read_only_harness(vec![]).await;
+
+    let error = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "list_objects",
+        serde_json::json!({"connection_id": Uuid::nil().to_string(), "kind": "routine"}),
+    )
+    .await
+    .unwrap_err();
+
+    assert!(error.contains("allowlist"), "{error}");
+    assert_eq!(provider.connection_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn list_objects_rejects_an_unknown_kind_and_a_hostile_schema_before_connecting() {
+    let (provider, bridge, token, _dir) = read_only_harness(vec![Uuid::nil()]).await;
+
+    let unknown = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "list_objects",
+        serde_json::json!({"connection_id": Uuid::nil().to_string(), "kind": "table"}),
+    )
+    .await
+    .unwrap_err();
+    assert!(unknown.contains("unknown kind"), "{unknown}");
+
+    let hostile = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "list_objects",
+        serde_json::json!({"connection_id": Uuid::nil().to_string(), "kind": "routine", "schema": "a\u{0}b"}),
+    )
+    .await
+    .unwrap_err();
+    assert!(hostile.contains("control characters"), "{hostile}");
+    assert_eq!(provider.connection_calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+}

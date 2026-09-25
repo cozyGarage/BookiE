@@ -3,6 +3,7 @@
 pub const TOOL_NAMES: &[&str] = &[
     "list_connections",
     "list_tables",
+    "list_objects",
     "describe_table",
     "execute_query",
     "execute_write",
@@ -46,6 +47,13 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
                     .map(|t| json!({"schema": t.schema, "name": t.name}))
                     .collect::<Vec<_>>()
             ))
+        }
+        "list_objects" => {
+            let id = parse_uuid(&args, "connection_id")?;
+            let kind = parse_catalog_kind(&args)?;
+            let schema = args.get("schema").and_then(|v| v.as_str()).map(str::to_string);
+            let objects = bridge.list_objects(token, id, kind, schema).await?;
+            Ok(json!(objects))
         }
         "describe_table" => {
             let id = parse_uuid(&args, "connection_id")?;
@@ -246,6 +254,17 @@ fn parse_u64(args: &JsonValue, key: &str, default: u64) -> Result<u64, String> {
             .as_u64()
             .ok_or_else(|| format!("{key} must be a non-negative integer")),
     }
+}
+
+fn parse_catalog_kind(args: &JsonValue) -> Result<tablepro_core::CatalogObjectKind, String> {
+    let raw = args.get("kind").and_then(|v| v.as_str()).ok_or("missing kind")?;
+    tablepro_core::CatalogObjectKind::parse(raw).ok_or_else(|| {
+        let known: Vec<&str> = tablepro_core::CatalogObjectKind::ALL
+            .iter()
+            .map(|k| k.as_str())
+            .collect();
+        format!("unknown kind {raw:?}; expected one of {}", known.join(", "))
+    })
 }
 
 fn parse_uuid(args: &JsonValue, key: &str) -> Result<Uuid, String> {
