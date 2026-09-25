@@ -814,6 +814,35 @@ mod row_identity_tests {
     }
 
     #[test]
+    fn duplicating_a_row_carries_the_full_long_text_into_the_insert_not_the_display_text() {
+        let long_text = "é".repeat(250_000);
+        let long_utf8_bytes = "z".repeat(90_000).into_bytes();
+        let columns = [column("id", true), column("body", false), column("raw", false)];
+        let source = [
+            Value::Int(1),
+            Value::Text(long_text.clone()),
+            Value::Bytes(long_utf8_bytes.clone()),
+        ];
+        assert_ne!(
+            crate::ui::grid::value_to_display_text(&source[1]),
+            long_text,
+            "the value must be long enough for the grid to truncate it"
+        );
+
+        let values = duplicate_row_values(&columns, &source);
+        assert_eq!(values[1], Value::Text(long_text.clone()));
+        assert_eq!(values[2], Value::Bytes(long_utf8_bytes.clone()));
+
+        let mut tracker = crate::services::change_tracker::TabChangeTracker::new();
+        tracker.track_insert(values);
+        let (statements, _) = tracker.materialize("mysql", None, "t", &columns).unwrap();
+        assert_eq!(
+            statements[0].1,
+            vec![Value::Null, Value::Text(long_text), Value::Bytes(long_utf8_bytes)]
+        );
+    }
+
+    #[test]
     fn duplicating_a_row_pads_missing_source_cells_with_null() {
         let columns = [column("id", true), column("note", false)];
         assert_eq!(
