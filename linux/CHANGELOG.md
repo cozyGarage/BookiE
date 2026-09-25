@@ -6,6 +6,7 @@
 
 - Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export that would exceed a worksheet's row limit is refused before any file is written.
 - Saved queries have a management dialog (Ctrl+Shift+D): search them, open one in a new editor tab, rename it, or delete it. Until now a saved query could only be reached through the quick switcher and could not be removed.
+- A query that runs for 10 seconds or longer shows a desktop notification when it finishes while the window is not focused.
 - Ctrl+O opens a .sql file in a new editor tab. A file larger than the editor's limit is refused with an explanation instead of being cut short.
 - An editor tab opened from a .sql file is titled by the file, marked while it has unsaved changes, and saves back to it with Ctrl+S; Ctrl+Shift+S saves to a new file, and Ctrl+S on an unsaved query asks where to save it. If another program changed or removed the file since it was opened, the save stops and offers Overwrite or Save As instead of replacing the other program's changes. Closing a tab with unsaved file changes asks first, and after a restart the tab is linked to its file again; if the file is gone, the tab keeps its text and says it is no longer linked.
 - Query history now also records the statements the app itself runs when you save a table structure change or save edited rows, and the history dialog can filter by where a statement came from.

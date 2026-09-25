@@ -58,6 +58,11 @@ icon button in a schema header for Table from CSV.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to
       each. This is the regression the id-first identity change fixed.
 
+## Long-query notice
+
+- [ ] Run `SELECT pg_sleep(12)`, switch to another window: a "Query finished"
+      notification appears when it ends. With the window focused, none appears.
+
 ## Per-connection timeouts
 
 - [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default.

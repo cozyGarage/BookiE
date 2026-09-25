@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+mod finish_notice;
 pub(crate) mod open_file;
 use tablepro_core::sql_format as format_plan;
 mod outcomes;
@@ -979,6 +980,9 @@ impl SqlEditor {
         let context = self.executions.remove(&generation)?;
         if terminal.became_idle {
             self.set_running(false, sender);
+            if let Ok(elapsed) = context.started_at.elapsed() {
+                finish_notice::notify_if_unattended(&self.source_view, elapsed);
+            }
         }
         Some((terminal, context))
     }
