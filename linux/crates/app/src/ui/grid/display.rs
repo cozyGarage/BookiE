@@ -330,6 +330,25 @@ mod tests {
     }
 
     #[test]
+    fn a_large_binary_value_shows_its_exact_byte_count() {
+        let mut blob = vec![0xFFu8; 100_001];
+        blob[0] = 0x00;
+        assert_eq!(value_to_display_text(&Value::Bytes(blob)), "<100001 bytes>");
+        assert_eq!(value_to_display_text(&Value::Bytes(vec![0x00])), "<1 bytes>");
+    }
+
+    #[test]
+    fn utf8_bytes_past_the_display_limit_mark_the_truncation_with_the_exact_remainder() {
+        let text = "b".repeat(DISPLAY_TEXT_BYTES_THRESHOLD + 7);
+        let display = value_to_display_text(&Value::Bytes(text.into_bytes()));
+        let remaining = DISPLAY_TEXT_BYTES_THRESHOLD + 7 - DISPLAY_TEXT_MAX_CHARS;
+        assert_eq!(
+            display,
+            format!("{}… (+{remaining} more chars)", "b".repeat(DISPLAY_TEXT_MAX_CHARS))
+        );
+    }
+
+    #[test]
     fn display_text_truncates_huge_text_value() {
         let huge = "x".repeat(1_000_000);
         let display = value_to_display_text(&Value::Text(huge));

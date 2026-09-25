@@ -275,6 +275,23 @@ mod tests {
     }
 
     #[test]
+    fn exported_bytes_are_complete_zero_padded_hex() {
+        assert_eq!(value_to_text(&Value::Bytes(Vec::new())), Some("\\x".into()));
+        assert_eq!(
+            value_to_text(&Value::Bytes(vec![0x00, 0x0f, 0xf0, 0xff])),
+            Some("\\x000ff0ff".into())
+        );
+        let blob: Vec<u8> = (0..=255u8).cycle().take(100_001).collect();
+        let text = value_to_text(&Value::Bytes(blob.clone())).unwrap();
+        assert_eq!(text.len(), 2 + 2 * blob.len());
+        let decoded: Vec<u8> = text.as_bytes()[2..]
+            .chunks(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect();
+        assert_eq!(decoded, blob);
+    }
+
+    #[test]
     fn value_to_text_preserves_non_json_value_representations() {
         assert_eq!(value_to_text(&Value::Bytes(vec![0xde, 0xad])), Some("\\xdead".into()));
         assert_eq!(value_to_text(&Value::Null), None);

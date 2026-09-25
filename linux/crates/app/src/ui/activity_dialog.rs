@@ -267,7 +267,7 @@ fn value_to_string(v: &Value) -> String {
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
         Value::Text(s) => s.replace(['\t', '\n'], " "),
-        Value::Bytes(b) => format!("\\x{} bytes", b.len()),
+        Value::Bytes(b) => format!("<{} bytes>", b.len()),
         Value::Date(d) => d.to_string(),
         Value::Time(t) => t.to_string(),
         Value::DateTime(dt) => dt.to_string(),
@@ -276,5 +276,16 @@ fn value_to_string(v: &Value) -> String {
         Value::Uuid(u) => u.to_string(),
         Value::Json(j) => j.to_string(),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_binary_cell_reads_as_its_byte_count_not_a_hex_escape() {
+        assert_eq!(value_to_string(&Value::Bytes(vec![0xAB; 16])), "<16 bytes>");
+        assert_eq!(value_to_string(&Value::Bytes(Vec::new())), "<0 bytes>");
     }
 }

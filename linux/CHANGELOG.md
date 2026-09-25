@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- The server activity view shows a binary value as its byte count instead of a label that read like a hexadecimal escape.
 - The structure editor shows a column default as the SQL that defines it, so an empty-string default no longer reads as no default, and a MySQL column edit no longer drops an empty-string default or fails on a text default.
 - On X11 the app's windows now group under its launcher in docks and task switchers, whichever command started it.
 - Changing a PostgreSQL column's type in the structure editor keeps the column's own collation instead of resetting it to the type default, and a MySQL column edit keeps its collation instead of taking the table default.
