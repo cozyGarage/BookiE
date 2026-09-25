@@ -264,3 +264,75 @@ async fn sqlite_columns_report_no_comment() {
     assert!(!columns.is_empty());
     assert!(columns.iter().all(|c| c.comment.is_none()));
 }
+
+async fn session_value(session: &mut Box<dyn tablepro_core::Session>, sql: &str) -> Value {
+    let control = OperationControl::with_timeout(Duration::from_secs(30));
+    session.query_params_controlled(sql, &[], &control).await.unwrap().rows[0][0].clone()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_session_keeps_temp_tables_and_its_transaction_between_statements() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection.execute("CREATE TABLE ledger (id int)").await.unwrap();
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(Duration::from_secs(30));
+
+    for sql in ["CREATE TEMP TABLE scratch (n int)", "INSERT INTO scratch VALUES (7)"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT n FROM scratch").await,
+        Value::Int(7)
+    );
+    for sql in ["BEGIN", "INSERT INTO ledger VALUES (1)", "ROLLBACK"] {
+        session.query_params_controlled(sql, &[], &control).await.unwrap();
+    }
+    assert_eq!(
+        session_value(&mut session, "SELECT count(*) FROM ledger").await,
+        Value::Int(0)
+    );
+    session.close().await.unwrap();
+
+    let temp = connection
+        .query("SELECT count(*) FROM sqlite_temp_master")
+        .await
+        .unwrap();
+    assert_eq!(temp.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cancelled_session_statement_is_interrupted_and_the_session_stays_usable() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    let mut session = connection.open_session().await.unwrap();
+    let token = CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let canceller = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        token.cancel();
+    });
+
+    let error = session
+        .query_params_controlled(LONG_QUERY, &[], &control)
+        .await
+        .unwrap_err();
+    canceller.await.unwrap();
+
+    assert!(matches!(error, DriverError::Cancelled), "{error:?}");
+    assert!(session.is_usable());
+    assert_eq!(session_value(&mut session, "SELECT 1").await, Value::Int(1));
+}
+
+#[tokio::test]
+async fn an_in_memory_database_refuses_a_session() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+
+    let error = connection
+        .open_session()
+        .await
+        .err()
+        .expect("an in-memory session is refused");
+
+    assert!(matches!(error, DriverError::Unsupported(_)), "{error:?}");
+}

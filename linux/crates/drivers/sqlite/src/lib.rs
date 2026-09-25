@@ -15,6 +15,7 @@ use tablepro_core::{
 };
 
 mod interrupt;
+mod session;
 
 use interrupt::InterruptHandle;
 
@@ -51,7 +52,8 @@ impl DatabaseDriver for SqliteDriver {
     }
 
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        let url = if opts.database.is_empty() || opts.database == ":memory:" {
+        let in_memory = opts.database.is_empty() || opts.database == ":memory:";
+        let url = if in_memory {
             "sqlite::memory:".to_string()
         } else {
             format!("sqlite:{}", opts.database)
@@ -59,18 +61,20 @@ impl DatabaseDriver for SqliteDriver {
         let connect_opts = SqliteConnectOptions::from_str(&url)
             .map_err(map_sqlx_error)?
             .create_if_missing(true);
+        let session_options = (!in_memory).then(|| connect_opts.clone());
         let pool = SqlitePoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
             .connect_with(connect_opts)
             .await
             .map_err(map_sqlx_error)?;
-        Ok(Box::new(SqliteConnection { pool }))
+        Ok(Box::new(SqliteConnection { pool, session_options }))
     }
 }
 
 struct SqliteConnection {
     pool: Pool<Sqlite>,
+    session_options: Option<SqliteConnectOptions>,
 }
 
 // Catalog reads use the table-valued `pragma_*()` form. A bare PRAGMA
@@ -202,6 +206,15 @@ impl Connection for SqliteConnection {
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         self.query_params_controlled(sql, &[], control).await
+    }
+
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        match &self.session_options {
+            Some(options) => session::open(options).await,
+            None => Err(DriverError::Unsupported(
+                "dedicated sessions on an in-memory database, which each connection sees separately".into(),
+            )),
+        }
     }
 
     async fn query_params_controlled(
