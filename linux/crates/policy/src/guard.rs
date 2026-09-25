@@ -20,7 +20,7 @@ use crate::classify::{StatementFacts, classify};
 use crate::config::PolicyConfig;
 use crate::mask::apply_masking;
 use crate::principal::Principal;
-use crate::rules::{Decision, evaluate_categorical, evaluate_eligible_write};
+use crate::rules::{Decision, evaluate_categorical, evaluate_eligible_write, shared_connection_decision};
 
 const BLAST_RADIUS_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -110,6 +110,18 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let facts = classify(sql, &self.ctx.driver_id);
+        if let Some(decision) = shared_connection_decision(&facts) {
+            return self.resolve_authorization(sql, facts, decision, None).await;
+        }
+        self.authorize_classified(sql, facts, control).await
+    }
+
+    async fn authorize_classified(
+        &self,
+        sql: &str,
+        facts: StatementFacts,
+        control: Option<&OperationControl>,
+    ) -> Result<Authorization, DriverError> {
         let env_policy = self
             .ctx
             .policy
@@ -816,6 +828,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
 mod bulk;
 mod connection;
 mod panic_boundary;
+mod session;
 
 pub use bulk::{BulkBatch, BulkInsertEnd, BulkInsertRequest, BulkInsertScope, MAX_BULK_ROW_BUDGET};
 

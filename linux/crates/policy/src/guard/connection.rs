@@ -424,6 +424,11 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
+        let inner = self.caught_read("OPEN SESSION", self.inner.open_session()).await?;
+        Ok(self.wrap_session(inner))
+    }
+
     async fn begin(&self) -> Result<Box<dyn Transaction>, DriverError> {
         let inner = self.caught_write("BEGIN", self.inner.begin()).await?;
         Ok(Box::new(PolicyTransaction {

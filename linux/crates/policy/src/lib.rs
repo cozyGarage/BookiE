@@ -13,6 +13,7 @@ mod mask;
 mod principal;
 mod rules;
 mod sensitive_projection;
+mod transaction_control;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
 pub use audit::{
@@ -29,3 +30,4 @@ pub use guard::{
 pub use mask::{DEFAULT_SENSITIVE_PATTERNS, apply_masking, column_is_sensitive};
 pub use principal::Principal;
 pub use rules::{Decision, evaluate};
+pub use transaction_control::{TransactionControl, transaction_control};

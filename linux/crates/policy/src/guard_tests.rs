@@ -563,3 +563,5 @@ mod audit;
 mod bulk;
 #[path = "guard_tests_gating.rs"]
 mod gating;
+#[path = "guard_tests_session.rs"]
+mod session;
