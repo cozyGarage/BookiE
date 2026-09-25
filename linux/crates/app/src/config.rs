@@ -53,6 +53,16 @@ mod tests {
     }
 
     #[test]
+    fn the_desktop_file_window_class_is_the_program_name_the_app_sets() {
+        let desktop = include_str!("../../../flatpak/com.tablepro.linux.desktop");
+        let class = desktop
+            .lines()
+            .find_map(|line| line.strip_prefix("StartupWMClass="))
+            .expect("the desktop file names a window class");
+        assert_eq!(class, SCHEMA_ID);
+    }
+
+    #[test]
     fn app_id_extends_the_schema_id() {
         assert!(APP_ID.starts_with(SCHEMA_ID));
     }

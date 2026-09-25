@@ -11,6 +11,7 @@ mod services;
 mod ui;
 
 pub fn run() {
+    glib::set_prgname(Some(config::APP_ID));
     tablepro_transport::install_crypto_provider();
     i18n::init();
 
