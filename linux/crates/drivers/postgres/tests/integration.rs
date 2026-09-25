@@ -45,6 +45,26 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {
+    let (_c, mut opts) = start_pg().await;
+    opts.application_name = Some("pool-probe".into());
+    let conn = connect(opts).await;
+
+    let _ = conn.execute("BEGIN").await;
+    let _ = conn.query("SELECT 1").await;
+
+    let idle_in_transaction = conn
+        .query(
+            "SELECT count(*)::bigint FROM pg_stat_activity \
+             WHERE application_name = 'pool-probe' AND state = 'idle in transaction'",
+        )
+        .await
+        .unwrap();
+    assert_eq!(idle_in_transaction.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_column_collation_is_read_and_survives_a_type_change() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;

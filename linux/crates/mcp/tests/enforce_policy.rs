@@ -227,6 +227,17 @@ async fn guarded_tool_path_journals_policy_decision() {
         !text.trim().is_empty(),
         "expected at least one journalled policy decision, got empty journal"
     );
+
+    let refused = bridge
+        .execute_query(&token, conn_id, "BEGIN")
+        .await
+        .expect_err("a lone BEGIN cannot hold a transaction on a shared connection");
+    assert!(refused.contains("transaction"), "{refused}");
+    let text = std::fs::read_to_string(&journal_path).unwrap_or_default();
+    assert!(
+        text.contains("transaction_control_needs_session"),
+        "the refusal must be journalled"
+    );
 }
 
 #[tokio::test]

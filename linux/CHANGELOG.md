@@ -57,6 +57,7 @@
 
 ### Security
 
+- A lone BEGIN, COMMIT or ROLLBACK is refused with an explanation, in the SQL editor and through MCP. Each statement ran on a shared connection, so a script such as `BEGIN; UPDATE …; ROLLBACK;` committed the update while reporting every step as successful. A whole transaction sent as one batch, such as a SQL Server `GO` batch, still runs.
 - A saved connection's SSH jump chain is capped at eight hops, so an edited connection file cannot force a deep recursive parse.
 
 ## [0.1.4] - 2026-09-17

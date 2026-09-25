@@ -60,6 +60,16 @@ pub(crate) fn evaluate_categorical(
         });
     }
 
+    if facts.class == StatementClass::Transaction && !facts.is_multi_statement {
+        return Some(Decision::Deny {
+            rule: "transaction_control_needs_session".into(),
+            message: "BEGIN, COMMIT and ROLLBACK cannot run on their own: each statement runs on a shared \
+                      connection, so the transaction would not cover the statements after it. Put the whole \
+                      transaction in one statement batch, or run the statements without them"
+                .into(),
+        });
+    }
+
     if facts.class == StatementClass::Unparseable {
         let decision = decide_unparseable(principal, env_policy);
         if matches!(decision, Decision::Deny { .. }) {
@@ -333,6 +343,48 @@ mod tests {
                 assert!(matches!(human_decision, Decision::RequireApproval { .. }));
             }
         }
+    }
+
+    #[test]
+    fn a_lone_transaction_statement_is_refused_and_a_whole_transaction_batch_is_not() {
+        let policy = env_policy(Environment::Local);
+        for (sql, driver) in [
+            ("BEGIN", "postgres"),
+            ("START TRANSACTION", "mysql"),
+            ("COMMIT", "postgres"),
+            ("ROLLBACK", "sqlite"),
+            ("BEGIN TRANSACTION", "mssql"),
+        ] {
+            let decision = evaluate(
+                &Principal::human_gui(),
+                Environment::Local,
+                &classify(sql, driver),
+                false,
+                &policy,
+                Some(1),
+            );
+            assert_eq!(
+                decision.rule_name(),
+                "transaction_control_needs_session",
+                "{driver}: {sql}"
+            );
+        }
+        let batch = classify(
+            "BEGIN TRANSACTION; UPDATE items SET v = 1 WHERE id = 1; ROLLBACK",
+            "mssql",
+        );
+        let decision = evaluate(
+            &Principal::human_gui(),
+            Environment::Local,
+            &batch,
+            false,
+            &policy,
+            Some(1),
+        );
+        assert_ne!(decision.rule_name(), "transaction_control_needs_session");
+        let read = classify("SELECT 1", "postgres");
+        let decision = evaluate(&Principal::human_gui(), Environment::Local, &read, false, &policy, None);
+        assert!(decision.is_allow());
     }
 
     #[test]

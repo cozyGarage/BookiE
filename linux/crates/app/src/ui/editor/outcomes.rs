@@ -255,6 +255,68 @@ mod tests {
         std::sync::Arc::from(connection)
     }
 
+    async fn guarded_sqlite_file(
+        service: &crate::services::database_service::DatabaseService,
+        path: &std::path::Path,
+    ) -> std::sync::Arc<dyn tablepro_core::Connection> {
+        use crate::services::database_service::{ConnectionMetadata, ReconnectParams};
+        let driver: std::sync::Arc<dyn DatabaseDriver> = std::sync::Arc::new(drivers_sqlite::SqliteDriver);
+        let options = ConnectOptions {
+            database: path.to_string_lossy().into_owned(),
+            ..Default::default()
+        };
+        let id = uuid::Uuid::new_v4();
+        let connection = driver.connect(options.clone()).await.expect("sqlite file connection");
+        let metadata = ConnectionMetadata {
+            id,
+            name: "script".into(),
+            driver_id: "sqlite".into(),
+            environment: tablepro_core::Environment::Local,
+            read_only: false,
+            server_version: None,
+        };
+        let reconnect = ReconnectParams {
+            driver,
+            opts: options,
+            ssh: None,
+        };
+        assert!(service.activate(id, metadata, connection, None, false, reconnect));
+        service.get(id).expect("guarded handle")
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_script_rollback_cannot_silently_commit_the_statements_before_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let service = crate::services::database_service::DatabaseService::new();
+        let conn = guarded_sqlite_file(&service, &directory.path().join("script.db")).await;
+        let control = crate::services::operation_control::bounded(0);
+        conn.execute_controlled("CREATE TABLE t (id int)", &control)
+            .await
+            .unwrap();
+
+        let result = run_statements(
+            conn.clone(),
+            vec!["BEGIN".into(), "INSERT INTO t VALUES (1)".into(), "ROLLBACK".into()],
+            "sqlite",
+            &Default::default(),
+            &control,
+            BatchErrorPolicy::StopScript,
+            |_| {},
+        )
+        .await;
+
+        let ScriptRunResult::Completed(outcomes) = result else {
+            panic!("expected the run to complete")
+        };
+        let StatementOutcomeKind::Error(message) = &outcomes[0].kind else {
+            panic!("BEGIN must be refused: {:?}", outcomes[0].kind)
+        };
+        assert!(message.contains("transaction"), "{message}");
+        assert!(matches!(outcomes[1].kind, StatementOutcomeKind::NotRun));
+        let rows = conn.query_controlled("SELECT count(*) FROM t", &control).await.unwrap();
+        assert_eq!(rows.rows, vec![vec![tablepro_core::Value::Int(0)]]);
+    }
+
     #[tokio::test]
     async fn stop_script_policy_skips_statements_after_the_first_error() {
         let conn = sqlite_connection().await;
