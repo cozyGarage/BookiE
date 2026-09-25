@@ -108,16 +108,16 @@ references, tests, and differences. Implementation and release verification diff
 
 ### A: BookiE 0.1.1
 
-- [ ] **A1 correctness**: reproduce/fix false-NULL decoding, SSH secret-save
+- [x] **A1 correctness**: reproduce/fix false-NULL decoding, SSH secret-save
   reporting, ordered settings persistence. Failed decoding never becomes editable/
   exportable NULL. Preserve unreadable files and last durable state.
-- [ ] **A2 editor persistence**: complete drafts, upstream script planning and
+- [x] **A2 editor persistence**: complete drafts, upstream script planning and
   token-safe formatting. Read old inline drafts; persist new files before references.
   Save failures remain visible/recoverable.
-- [ ] **A3 Jump to Column**: search loaded browse/result metadata by source ordinal
+- [x] **A3 Jump to Column**: search loaded browse/result metadata by source ordinal
   and generation, including duplicate/hidden/reordered columns. Reveal/scroll/focus
   without data changes. Keyboard and stale-picker tests.
-- [ ] **A4 identity**: BookiE/original branding, `bookie`/`bookie-agentd` with old
+- [x] **A4 identity**: BookiE/original branding, `bookie`/`bookie-agentd` with old
   command compatibility. Arch `bookie` replaces/conflicts with `tablepro`. Keep app
   ID, paths, keyring schema, UUIDs, audit format and protocol contracts.
 - [ ] **A5 candidate**: explicit candidate SHA/version packaging without a published
@@ -198,6 +198,13 @@ retaining history. Keep shared Rust close to upstream, import with attribution,
 isolate branding/governance/compatibility/additional drivers. Never merge Apple
 source. Prepare upstream-compatible fixes separately. Contacting authors, upstream
 PRs, publication and repository rename are outside this task's authorization.
+
+Status on 2026-09-25: A1–A4 are implemented and ticked; their evidence is from
+the 0.1.2–0.1.4 work, not from a frozen 0.2 candidate. A5 and B1–B7 stay open.
+B1 lacks a real Flatpak build and installed-package checks. B2 lacks the
+GSettings and history-format migrations. B5 has Open only: no Save, Save As or
+external-change detection. B6 lists PostgreSQL views only. B3 and B4 have not
+started.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,
 new engines, all-connection/window restoration, dashboards, built-in AI.
@@ -530,3 +537,16 @@ isolated-test inventory passed. Debian package fixture could not run because
   complete; GSettings migration and history-format migration (also named
   under B2) were out of scope for this pass and remain open, so the
   checklist item stays unmarked until qualified. B3–B7 and A5 remain open.
+
+- 2026-09-25: re-surveyed upstream `main` from `fc8b887af` to `e6678a93b`
+  (189 commits, v0.72 to v0.75.0); upstream `linux` has nothing after
+  `0e542e3c1` (2026-09-18), already covered on 2026-09-19. Ported four fixes
+  whose defect class existed here, each with a regression test that failed
+  first: SQL Server batches are read to the end so later errors surface and
+  a row-limited batch finishes on the server; PostgreSQL indexes keep
+  expression keys and partial predicates and drop INCLUDE columns; SQLite
+  foreign keys to an implicit parent key name the key columns. The SQLite
+  work also found that a bare catalog PRAGMA can answer from a pooled
+  connection's stale schema; catalog reads now use table-valued pragmas.
+  The GUI policy file now follows the build profile. Container suites for
+  SQL Server, PostgreSQL and SQLite passed; GTK tiers were not run.
