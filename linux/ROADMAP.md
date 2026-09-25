@@ -29,14 +29,14 @@ Status terms:
 | PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse | Implemented | PostgreSQL is release-verified through the fixture; the other engines have container integration tests only. Server-side cancellation is verified against a real engine on PostgreSQL, MySQL, ClickHouse and SQLite; SQL Server declares it unsupported because tiberius cannot send the TDS attention packet |
 | Redis, MongoDB, DuckDB | Implemented | Experimental; DuckDB requires a Cargo feature. Redis and MongoDB TLS is release-verified |
 | Browse/edit/filter/sort/pagination | Implemented | Keyset helper exists; integers wider than 2^53 edit exactly; large-result behavior needs release tests |
-| SQL editor and multiple result tabs | Integrated | PostgreSQL timeout and cancel stop the server query and wait for terminal audit state. One dialect-aware lexer sets statement boundaries, so a PostgreSQL function body runs whole |
+| SQL editor and multiple result tabs | Integrated | PostgreSQL timeout and cancel stop the server query and wait for terminal audit state. One dialect-aware lexer sets statement boundaries, so a PostgreSQL function body runs whole. A lone BEGIN/COMMIT/ROLLBACK is refused on the shared connection; an opt-in per-tab Session (PostgreSQL, MySQL, SQL Server, SQLite files) keeps settings, temp tables and transactions, governed and audited. SQL files open, save and relink after restart, with a changed-on-disk check; GTK rendering unverified |
 | Bounded operations | Integrated | Every database call the interface starts carries a deadline, gated by `scripts/check-bounded-operations.sh` |
-| Structure editor | Implemented | Tables, columns, indexes, and foreign keys |
+| Structure editor | Implemented | Tables, columns, indexes, foreign keys and column comments; expression and partial PostgreSQL indexes are shown read-only; a column collation is kept on PostgreSQL, MySQL and SQL Server alters |
 | Saved connections and libsecret | Implemented | Keyring failure UX needs hardening |
-| SSH and jump chains | Integrated | A verifying PostgreSQL connection forwards through a private Unix socket and is release-verified, headlessly as well as in the GUI; jump chains are JSON-only in the current GTK form |
+| SSH and jump chains | Integrated | A verifying PostgreSQL connection forwards through a private Unix socket and is release-verified, headlessly as well as in the GUI; jump chains are JSON-only in the current GTK form. An optional system OpenSSH client (forced host-key prompts, per-host secret binding, ProxyJump from ssh_config) is implemented and tested against a real sshd, not release-verified. agentd refuses unknown host keys |
 | TLS modes | Partial | Release-verified on PostgreSQL, including `VerifyFull` through SSH. Release-verified on MySQL, ClickHouse, MongoDB, and Redis through the driver TLS fixture. Mapped but untested on SQL Server; custom certificate authorities are implemented but their real-server verification remains unproven. Saved connections carry a certificate authority. See [docs/connections.md](docs/connections.md) |
 | Query history | Implemented | MCP access must be isolated before being re-exposed |
-| CSV/JSON export | Implemented | GUI CSV and JSON export the loaded page only; full-table snapshot streaming and Parquet are deferred |
+| Export and import | Implemented | Loaded results export as CSV, JSON, Markdown, HTML, XML, SQL INSERT or Excel; CSV imports into a new or existing table under one scoped approval. Full-table snapshot streaming and Parquet are deferred |
 | Activity and EXPLAIN | Implemented | Administrative classification and numeric session-ID validation are covered |
 | Policy, MCP, and agentd | Integrated | Approval and audit failures deny governed operations; a policy file that cannot be read keeps the last good policy and leaves MCP off; `list_tables` and `describe_table` use the same timeout and identifier checks as the other metadata tools; read-only denial is release-verified against PostgreSQL; the GUI and agentd share one connection transport, release-verified through the fixture bastion |
 | Audit journal | Integrated | Durable intent/outcome records, recovery, private mode, and cross-process locking are locally verified |
@@ -125,7 +125,7 @@ Phase 5 documentation is maintained as part of each change, not as a one-time ta
 
 - [x] Named query parameters bound by the driver, release-verified against PostgreSQL and in the installed GTK suite
 - [x] Schema-aware editor completion, saved favorites, and Open Quickly, release-verified in the installed GTK suite
-- [ ] SQL file open/save with external-change detection
+- [x] SQL file open/save with external-change detection (implemented; GTK unverified)
 - [ ] PostgreSQL objects, users/roles, and administration
 - [ ] Import/export and backup/restore
 - [x] Connection groups, tags, favourites, search, URL import, and environment colour (Phase 10.2)
@@ -159,17 +159,19 @@ The repository extraction completed on 2026-08-17. Product planning now follows 
 - [ ] A typed sessions and locks console with capability-declared driver support and governed session termination
 - [ ] A PostgreSQL server health panel that degrades cleanly when a statistics extension is absent
 - [ ] Configurable pool size and timeouts per saved connection, honoured by the driver
-- [ ] Read-only review of views, routines, triggers, sequences, extensions, roles, and grants (PostgreSQL views are listing)
+- [x] Read-only review of views, materialized views, routines, triggers, sequences, extensions, roles, types and grants on PostgreSQL, through the Catalog window and the `list_objects` MCP tool (implemented; GTK unverified)
 - [ ] A decision record, design, and measured prototype for an out-of-process Python runner
 
 Phase 10 is in progress. Slice 10.2 added connection organisation: groups, tags, favourites, search across name/group/tag/driver, and URL import whose password reaches the keyring and never the saved file. Its first slice retired the one-active-connection limit: activation is additive and every window owns and releases its own connection, proven by two windows writing to two databases in the installed suite. Every connection it exposes stays policy-guarded, and no slice ships DDL or server configuration writes.
 
 ## Next implementation target
 
-Deliver 0.1.1 correctness, complete drafts, safe formatting, Jump to Column and
-BookiE identity first. Then converge the platform/runtime/driver/transport contracts
-and deliver editor file workflows plus read-only PostgreSQL catalog/types for 0.2.
-See the [approved sprint](docs/bookie-0.2-sprint.md) for package order and acceptance.
+The 0.2 feature work in the [approved sprint](docs/bookie-0.2-sprint.md) is
+implemented: editor file workflows, read-only PostgreSQL catalog and types, dedicated
+editor sessions, the system OpenSSH transport, GSettings and history migrations, and
+the narrowed column-collation contract. What remains is qualification: render every
+new surface in [manual-verification-0.2-features.md](docs/manual-verification-0.2-features.md)
+in light and dark, a real Flatpak build, and the release-candidate gates below.
 Existing formatting, run-at-cursor, connection organization and DuckDB flat-file
 opening must not be recreated from historical backlog entries.
 
