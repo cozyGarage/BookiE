@@ -8,10 +8,11 @@ use super::stderr_classify::{ClassifyContext, classify};
 use super::supervisor::{ForwardCancel, run_control};
 use super::{ForwardTarget, LocalEndpoint, OpenSshError, OpenSshSession, TimeoutPhase};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum ForwardRoute {
     #[default]
     UnixSocket,
+    NamedUnixSocket(String),
     LoopbackTcp,
 }
 
@@ -83,8 +84,25 @@ impl OpenSshSession {
                 let index = self.next_forward.fetch_add(1, Ordering::Relaxed);
                 Ok(LocalEndpoint::Unix(self.master_dir.join(format!("f{index}"))))
             }
+            ForwardRoute::NamedUnixSocket(name) => self.named_socket(&name),
             ForwardRoute::LoopbackTcp => free_loopback_port().map(LocalEndpoint::Tcp),
         }
+    }
+
+    fn named_socket(&self, name: &str) -> Result<LocalEndpoint, OpenSshError> {
+        if name.is_empty() || name.contains('/') || name == "." || name == ".." {
+            return Err(OpenSshError::LocalBind {
+                detail: "a forwarded socket name must be a single path component".into(),
+            });
+        }
+        let index = self.next_forward.fetch_add(1, Ordering::Relaxed);
+        let directory = self.master_dir.join(format!("f{index}"));
+        std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+            .create(&directory)
+            .map_err(|error| OpenSshError::LocalBind {
+                detail: error.to_string(),
+            })?;
+        Ok(LocalEndpoint::Unix(directory.join(name)))
     }
 }
 

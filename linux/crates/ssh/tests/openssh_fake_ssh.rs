@@ -264,6 +264,38 @@ async fn a_killed_master_closes_the_session() {
 }
 
 #[tokio::test]
+async fn a_named_socket_forward_lives_in_its_own_private_directory() {
+    use std::os::unix::fs::PermissionsExt;
+    let fake = Fake::new();
+    let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
+    let target = ForwardTarget::new("db.internal", 5432).unwrap();
+
+    let forward = session
+        .forward(target.clone(), ForwardRoute::NamedUnixSocket(".s.PGSQL.5432".into()))
+        .await
+        .unwrap();
+
+    let LocalEndpoint::Unix(socket) = forward.local_endpoint().clone() else {
+        panic!("expected a unix socket");
+    };
+    assert_eq!(socket.file_name().unwrap(), ".s.PGSQL.5432");
+    let directory = socket.parent().unwrap();
+    assert_eq!(
+        std::fs::metadata(directory).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    for bad in ["", "..", "a/b"] {
+        assert!(
+            session
+                .forward(target.clone(), ForwardRoute::NamedUnixSocket(bad.into()))
+                .await
+                .is_err(),
+            "{bad:?}"
+        );
+    }
+}
+
+#[tokio::test]
 async fn each_forward_gets_its_own_socket_and_is_cancelled_on_drop() {
     let fake = Fake::new();
     let session = fake.connect(OpenSshAuth::Agent).await.unwrap();
