@@ -44,7 +44,14 @@ async fn a_host_that_accepts_and_never_answers_times_out() {
 
     let (port, accepting) = silent_listener().await;
     let started = std::time::Instant::now();
-    let error = match SshTunnel::open(config(port), "db.example".into(), 5432).await {
+    let error = match SshTunnel::open(
+        config(port),
+        "db.example".into(),
+        5432,
+        tablepro_ssh::UnknownHostKey::Learn,
+    )
+    .await
+    {
         Ok(_) => panic!("a silent server must not produce a usable tunnel"),
         Err(error) => error,
     };
@@ -74,7 +81,14 @@ async fn a_timeout_names_the_host_it_could_not_reach() {
     unsafe { std::env::set_var("XDG_CONFIG_HOME", config_dir.path()) };
 
     let (port, accepting) = silent_listener().await;
-    let error = match SshTunnel::open(config(port), "db.example".into(), 5432).await {
+    let error = match SshTunnel::open(
+        config(port),
+        "db.example".into(),
+        5432,
+        tablepro_ssh::UnknownHostKey::Learn,
+    )
+    .await
+    {
         Ok(_) => panic!("a silent server must fail"),
         Err(error) => error,
     };

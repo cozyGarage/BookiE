@@ -181,16 +181,20 @@ use and reconnects lazily, with no monitor and no backoff. A tool call that
 arrives during an outage retries as fast as the caller retries, bounded only by
 the MCP rate limiter.
 
-### 10. An unknown SSH host key is trusted without asking
+### 10. An unknown SSH host key is trusted without asking in the GUI
 
-Not fixed. Recorded as a deliberate, documented posture rather than an
+Fixed for the agent daemon; not fixed in the GUI. Recorded as a deliberate, documented posture rather than an
 oversight, because closing it needs a user-facing decision.
 
 A **changed** host key is refused: the connection fails with the recorded
 line number and both fingerprints, and nothing is written. That is the
 case that matters most, and it is covered by tests.
 
-An **unknown** host key is written to `known_hosts` and the connection
+`tablepro-agentd` refuses an **unknown** host key: an unattended agent
+connection fails, naming the fingerprint, until the key is in
+`known_hosts` from a GUI connection or from `ssh`. Nothing is written.
+
+In the GUI, an **unknown** host key is written to `known_hosts` and the connection
 proceeds. There is no confirmation step, so the first connection to a
 host trusts whatever answers. That is the same exposure `ssh
 -o StrictHostKeyChecking=accept-new` accepts, and it is weaker than

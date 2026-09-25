@@ -21,6 +21,8 @@ use uuid::Uuid;
 
 const SESSION_PING_TIMEOUT: Duration = Duration::from_secs(5);
 
+pub(crate) const AGENT_UNKNOWN_HOST_KEY: tablepro_ssh::UnknownHostKey = tablepro_ssh::UnknownHostKey::Refuse;
+
 struct OpenSession {
     key: SessionKey,
     connection: Arc<dyn Connection>,
@@ -336,7 +338,7 @@ impl DaemonProvider {
             .await
             .map_err(|e| e.to_string())?;
         opts.application_name = Some("BookiE agent".into());
-        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh)
+        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, AGENT_UNKNOWN_HOST_KEY)
             .await
             .map_err(|e| e.to_string())?;
         let connection: Arc<dyn Connection> = Arc::new(SessionConnection {
@@ -432,6 +434,11 @@ mod tests {
     use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Environment};
     use tablepro_policy::{DenyApprovalSink, NullAuditSink};
     use tablepro_storage::SavedSshAuth;
+
+    #[test]
+    fn the_agent_never_adds_an_unknown_ssh_host_key() {
+        assert_eq!(AGENT_UNKNOWN_HOST_KEY, tablepro_ssh::UnknownHostKey::Refuse);
+    }
 
     fn saved_connection() -> SavedConnection {
         SavedConnection {

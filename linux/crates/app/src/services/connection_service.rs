@@ -158,7 +158,9 @@ pub async fn establish(
     opts: ConnectOptions,
     ssh: Option<Vec<SshConfig>>,
 ) -> Result<(Box<dyn Connection>, Option<SshTunnel>), String> {
-    tablepro_transport::establish(driver, opts, ssh).await.map_err(message)
+    tablepro_transport::establish(driver, opts, ssh, tablepro_ssh::UnknownHostKey::Learn)
+        .await
+        .map_err(message)
 }
 
 fn message(error: TransportError) -> String {

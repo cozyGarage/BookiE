@@ -98,7 +98,7 @@ async fn refusal(
     ssh: Option<Vec<SshConfig>>,
     what: &str,
 ) -> TransportError {
-    match tablepro_transport::establish(driver, opts, ssh).await {
+    match tablepro_transport::establish(driver, opts, ssh, tablepro_ssh::UnknownHostKey::Learn).await {
         Ok(_) => panic!("{what}"),
         Err(error) => error,
     }

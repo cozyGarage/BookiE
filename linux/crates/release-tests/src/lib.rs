@@ -101,9 +101,14 @@ impl Fixture {
     }
 
     pub async fn open_tunnel(&self) -> SshTunnel {
-        SshTunnel::open(self.ssh_config(), self.database_hostname.clone(), self.database_port)
-            .await
-            .expect("open ssh tunnel to the fixture database")
+        SshTunnel::open(
+            self.ssh_config(),
+            self.database_hostname.clone(),
+            self.database_port,
+            tablepro_ssh::UnknownHostKey::Learn,
+        )
+        .await
+        .expect("open ssh tunnel to the fixture database")
     }
 
     pub async fn open_socket_tunnel(&self, socket_name: &str) -> SshTunnel {
@@ -112,6 +117,7 @@ impl Fixture {
             self.database_hostname.clone(),
             self.database_port,
             socket_name,
+            tablepro_ssh::UnknownHostKey::Learn,
         )
         .await
         .expect("open a socket-forwarded ssh tunnel to the fixture database")

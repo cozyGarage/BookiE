@@ -25,6 +25,12 @@ pub struct SshConfig {
     pub auth: SshAuth,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnknownHostKey {
+    Learn,
+    Refuse,
+}
+
 #[derive(Debug, Clone)]
 pub enum SshAuth {
     Password {
@@ -62,6 +68,16 @@ pub enum SshError {
         port: u16,
         new_fingerprint: String,
         line: usize,
+        known_hosts: PathBuf,
+    },
+    #[error(
+        "host key for {host}:{port} is not in {known_hosts}, and this connection does not add new keys. \
+         Connect once from BookiE or ssh to confirm fingerprint {fingerprint}"
+    )]
+    UnknownHostKey {
+        host: String,
+        port: u16,
+        fingerprint: String,
         known_hosts: PathBuf,
     },
     #[error("known_hosts: {0}")]
@@ -160,15 +176,25 @@ impl Drop for LocalSocketDir {
 
 impl SshTunnel {
     /// Single-hop convenience: tunnel through `cfg` to `remote_host:remote_port`.
-    pub async fn open(cfg: SshConfig, remote_host: String, remote_port: u16) -> Result<Self, SshError> {
-        Self::open_chain(std::slice::from_ref(&cfg), remote_host, remote_port).await
+    pub async fn open(
+        cfg: SshConfig,
+        remote_host: String,
+        remote_port: u16,
+        unknown: UnknownHostKey,
+    ) -> Result<Self, SshError> {
+        Self::open_chain(std::slice::from_ref(&cfg), remote_host, remote_port, unknown).await
     }
 
     /// Multi-hop tunnel. `hops[0]` is the first bastion (TCP connect
     /// goes there directly); `hops[n-1]` is the last jump before the
     /// database. Nested local forwards: hop0 → hop1:22 → … → remote.
-    pub async fn open_chain(hops: &[SshConfig], remote_host: String, remote_port: u16) -> Result<Self, SshError> {
-        Self::open_chain_with(hops, remote_host, remote_port, LocalBind::Tcp).await
+    pub async fn open_chain(
+        hops: &[SshConfig],
+        remote_host: String,
+        remote_port: u16,
+        unknown: UnknownHostKey,
+    ) -> Result<Self, SshError> {
+        Self::open_chain_with(hops, remote_host, remote_port, LocalBind::Tcp, unknown).await
     }
 
     /// Multi-hop tunnel whose final local endpoint is a Unix socket
@@ -180,6 +206,7 @@ impl SshTunnel {
         remote_host: String,
         remote_port: u16,
         socket_name: &str,
+        unknown: UnknownHostKey,
     ) -> Result<Self, SshError> {
         Self::open_chain_with(
             hops,
@@ -188,6 +215,7 @@ impl SshTunnel {
             LocalBind::Socket {
                 name: socket_name.to_string(),
             },
+            unknown,
         )
         .await
     }
@@ -197,6 +225,7 @@ impl SshTunnel {
         remote_host: String,
         remote_port: u16,
         bind: LocalBind,
+        unknown: UnknownHostKey,
     ) -> Result<Self, SshError> {
         if hops.is_empty() {
             return Err(SshError::EmptyChain);
@@ -215,7 +244,16 @@ impl SshTunnel {
             };
 
             let hop_bind = if is_last { bind.clone() } else { LocalBind::Tcp };
-            let mut tunnel = open_single(hop, &tcp_host, tcp_port, fwd_host.to_string(), fwd_port, hop_bind).await?;
+            let mut tunnel = open_single(
+                hop,
+                &tcp_host,
+                tcp_port,
+                fwd_host.to_string(),
+                fwd_port,
+                hop_bind,
+                unknown,
+            )
+            .await?;
 
             if is_last {
                 tunnel._upstream = upstream;
@@ -256,6 +294,7 @@ enum HostKeyOutcome {
     Trusted,
     LearnedNew { fingerprint: String },
     Changed { fingerprint: String, line: usize },
+    Unknown { fingerprint: String },
     KnownHostsIo(String),
 }
 
@@ -263,6 +302,7 @@ struct ClientHandler {
     target_host: String,
     target_port: u16,
     known_hosts_path: PathBuf,
+    unknown: UnknownHostKey,
     outcome: Arc<Mutex<Option<HostKeyOutcome>>>,
 }
 
@@ -285,6 +325,7 @@ impl client::Handler for ClientHandler {
             key,
             &self.known_hosts_path,
             &fingerprint,
+            self.unknown,
         );
         let allow = matches!(outcome, HostKeyOutcome::Trusted | HostKeyOutcome::LearnedNew { .. });
         if let Ok(mut slot) = self.outcome.lock() {
@@ -294,13 +335,23 @@ impl client::Handler for ClientHandler {
     }
 }
 
-fn verify_or_learn(host: &str, port: u16, key: &PublicKey, known_hosts: &Path, fingerprint: &str) -> HostKeyOutcome {
+fn verify_or_learn(
+    host: &str,
+    port: u16,
+    key: &PublicKey,
+    known_hosts: &Path,
+    fingerprint: &str,
+    unknown: UnknownHostKey,
+) -> HostKeyOutcome {
     match check_known_hosts_path(host, port, key, known_hosts) {
         Ok(true) => HostKeyOutcome::Trusted,
         Ok(false) => match known_host_keys_path(host, port, known_hosts) {
             Ok(existing) if !existing.is_empty() => HostKeyOutcome::Changed {
                 fingerprint: fingerprint.to_string(),
                 line: existing[0].0,
+            },
+            Ok(_) if unknown == UnknownHostKey::Refuse => HostKeyOutcome::Unknown {
+                fingerprint: fingerprint.to_string(),
             },
             Ok(_) => match ensure_parent_dir(known_hosts).and_then(|_| {
                 learn_known_hosts_path(host, port, key, known_hosts).map_err(|e| std::io::Error::other(format!("{e}")))
@@ -343,8 +394,9 @@ async fn open_single(
     fwd_host: String,
     fwd_port: u16,
     bind: LocalBind,
+    unknown: UnknownHostKey,
 ) -> Result<SshTunnel, SshError> {
-    let session = Arc::new(connect_and_auth(cfg, tcp_host, tcp_port).await?);
+    let session = Arc::new(connect_and_auth(cfg, tcp_host, tcp_port, unknown).await?);
     let (listener, local_port, socket_dir) = bind_local(bind).await?;
 
     tracing::info!(
@@ -429,7 +481,12 @@ impl LocalListener {
     }
 }
 
-async fn connect_and_auth(cfg: &SshConfig, tcp_host: &str, tcp_port: u16) -> Result<Handle<ClientHandler>, SshError> {
+async fn connect_and_auth(
+    cfg: &SshConfig,
+    tcp_host: &str,
+    tcp_port: u16,
+    unknown: UnknownHostKey,
+) -> Result<Handle<ClientHandler>, SshError> {
     let known_hosts_path = default_known_hosts_path()
         .ok_or_else(|| SshError::KnownHosts("neither XDG_CONFIG_HOME nor HOME is set".into()))?;
     let outcome = Arc::new(Mutex::new(None));
@@ -437,6 +494,7 @@ async fn connect_and_auth(cfg: &SshConfig, tcp_host: &str, tcp_port: u16) -> Res
         target_host: cfg.host.clone(),
         target_port: cfg.port,
         known_hosts_path: known_hosts_path.clone(),
+        unknown,
         outcome: outcome.clone(),
     };
 
@@ -460,6 +518,9 @@ async fn connect_and_auth(cfg: &SshConfig, tcp_host: &str, tcp_port: u16) -> Res
         ),
         Some(HostKeyOutcome::Trusted) => tracing::debug!(host = %cfg.host, "ssh: host key matches known_hosts"),
         Some(HostKeyOutcome::KnownHostsIo(e)) => return Err(SshError::KnownHosts(e)),
+        Some(HostKeyOutcome::Unknown { fingerprint }) => {
+            return Err(unknown_host_key(&cfg.host, cfg.port, fingerprint, &known_hosts_path));
+        }
         Some(HostKeyOutcome::Changed { fingerprint, line }) => {
             return Err(SshError::HostKeyMismatch {
                 host: cfg.host.clone(),
@@ -522,7 +583,17 @@ fn map_connect_error(
             known_hosts: known_hosts.to_path_buf(),
         },
         Some(HostKeyOutcome::KnownHostsIo(e)) => SshError::KnownHosts(e),
+        Some(HostKeyOutcome::Unknown { fingerprint }) => unknown_host_key(host, port, fingerprint, known_hosts),
         _ => SshError::Connect(err.to_string()),
+    }
+}
+
+fn unknown_host_key(host: &str, port: u16, fingerprint: String, known_hosts: &Path) -> SshError {
+    SshError::UnknownHostKey {
+        host: host.to_string(),
+        port,
+        fingerprint,
+        known_hosts: known_hosts.to_path_buf(),
     }
 }
 
@@ -641,7 +712,7 @@ mod tests {
             .enable_all()
             .build()
             .unwrap()
-            .block_on(SshTunnel::open_chain(&[], "db".into(), 5432));
+            .block_on(SshTunnel::open_chain(&[], "db".into(), 5432, UnknownHostKey::Learn));
         assert!(matches!(result, Err(SshError::EmptyChain)));
     }
 
@@ -673,9 +744,27 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("nested").join("known_hosts");
         let key = parse_key(KEY_A_BASE64);
-        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp");
+        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Learn);
         assert!(matches!(outcome, HostKeyOutcome::LearnedNew { .. }));
         assert!(path.exists());
+    }
+
+    #[test]
+    fn a_refusing_connection_does_not_learn_an_unknown_key_but_still_trusts_a_known_one() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("known_hosts");
+        let key = parse_key(KEY_A_BASE64);
+
+        let refused = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Refuse);
+        assert!(matches!(refused, HostKeyOutcome::Unknown { ref fingerprint } if fingerprint == "fp"));
+        assert!(!path.exists(), "a refused key must not be written to known_hosts");
+
+        let _ = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Learn);
+        let known = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Refuse);
+        assert!(matches!(known, HostKeyOutcome::Trusted));
+        let other = parse_key(KEY_B_BASE64);
+        let changed = verify_or_learn("bastion.example.com", 22, &other, &path, "fp_b", UnknownHostKey::Refuse);
+        assert!(matches!(changed, HostKeyOutcome::Changed { .. }));
     }
 
     #[test]
@@ -683,8 +772,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("known_hosts");
         let key = parse_key(KEY_A_BASE64);
-        let _ = verify_or_learn("bastion.example.com", 22, &key, &path, "fp");
-        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp");
+        let _ = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Learn);
+        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Learn);
         assert!(matches!(outcome, HostKeyOutcome::Trusted));
     }
 
@@ -694,8 +783,15 @@ mod tests {
         let path = dir.path().join("known_hosts");
         let ed25519 = parse_key(KEY_A_BASE64);
         let rsa = parse_key(RSA_KEY_BASE64);
-        let _ = verify_or_learn("bastion.example.com", 22, &ed25519, &path, "ed25519");
-        let outcome = verify_or_learn("bastion.example.com", 22, &rsa, &path, "rsa");
+        let _ = verify_or_learn(
+            "bastion.example.com",
+            22,
+            &ed25519,
+            &path,
+            "ed25519",
+            UnknownHostKey::Learn,
+        );
+        let outcome = verify_or_learn("bastion.example.com", 22, &rsa, &path, "rsa", UnknownHostKey::Learn);
         assert!(matches!(outcome, HostKeyOutcome::Changed { fingerprint, .. } if fingerprint == "rsa"));
     }
 
@@ -705,8 +801,8 @@ mod tests {
         let path = dir.path().join("known_hosts");
         let key_a = parse_key(KEY_A_BASE64);
         let key_b = parse_key(KEY_B_BASE64);
-        let _ = verify_or_learn("bastion.example.com", 22, &key_a, &path, "fp_a");
-        let outcome = verify_or_learn("bastion.example.com", 22, &key_b, &path, "fp_b");
+        let _ = verify_or_learn("bastion.example.com", 22, &key_a, &path, "fp_a", UnknownHostKey::Learn);
+        let outcome = verify_or_learn("bastion.example.com", 22, &key_b, &path, "fp_b", UnknownHostKey::Learn);
         match outcome {
             HostKeyOutcome::Changed { fingerprint, .. } => assert_eq!(fingerprint, "fp_b"),
             other => panic!("expected Changed, got {other:?}"),
@@ -719,7 +815,7 @@ mod tests {
         let path = dir.path().join("known_hosts_dir");
         std::fs::create_dir(&path).unwrap();
         let key = parse_key(KEY_A_BASE64);
-        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp");
+        let outcome = verify_or_learn("bastion.example.com", 22, &key, &path, "fp", UnknownHostKey::Learn);
         assert!(
             matches!(outcome, HostKeyOutcome::KnownHostsIo(_)),
             "expected KnownHostsIo, got {outcome:?}"

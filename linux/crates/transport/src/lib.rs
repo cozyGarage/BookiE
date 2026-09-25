@@ -94,6 +94,7 @@ pub async fn establish(
     driver: &dyn DatabaseDriver,
     mut opts: ConnectOptions,
     ssh: Option<Vec<SshConfig>>,
+    unknown_host_key: tablepro_ssh::UnknownHostKey,
 ) -> Result<(Box<dyn Connection>, Option<SshTunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
     validate_local_socket(&opts, driver, ssh.as_deref())?;
@@ -106,8 +107,8 @@ pub async fn establish(
         let remote = (std::mem::take(&mut opts.host), opts.port);
         let socket_name = forwarded_socket_name(driver, opts.tls.mode, remote.1);
         let tun = match &socket_name {
-            Some(name) => SshTunnel::open_chain_socket(&hops, remote.0.clone(), remote.1, name).await,
-            None => SshTunnel::open_chain(&hops, remote.0.clone(), remote.1).await,
+            Some(name) => SshTunnel::open_chain_socket(&hops, remote.0.clone(), remote.1, name, unknown_host_key).await,
+            None => SshTunnel::open_chain(&hops, remote.0.clone(), remote.1, unknown_host_key).await,
         }
         .map_err(|e| TransportError::Ssh(e.to_string()))?;
         match tun.socket_dir() {
@@ -487,7 +488,7 @@ mod tests {
             ..Default::default()
         };
 
-        let error = establish(&SocketDriver, opts, None)
+        let error = establish(&SocketDriver, opts, None, tablepro_ssh::UnknownHostKey::Learn)
             .await
             .err()
             .expect("test driver refuses to connect");

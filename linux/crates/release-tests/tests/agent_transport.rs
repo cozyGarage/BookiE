@@ -36,9 +36,14 @@ fn chain(fixture: &Fixture) -> Vec<SshConfig> {
 #[ignore = "requires the postgres release fixture"]
 async fn the_shared_transport_verifies_the_database_hostname_through_the_bastion() {
     let fixture = Fixture::from_env();
-    let (connection, tunnel) = establish(&PgDriver, verifying_options(&fixture), Some(chain(&fixture)))
-        .await
-        .expect("a tunnelled VerifyFull session");
+    let (connection, tunnel) = establish(
+        &PgDriver,
+        verifying_options(&fixture),
+        Some(chain(&fixture)),
+        tablepro_ssh::UnknownHostKey::Learn,
+    )
+    .await
+    .expect("a tunnelled VerifyFull session");
     let tunnel = tunnel.expect("an ssh chain must produce a tunnel");
     assert!(
         tunnel.socket_dir().is_some(),
@@ -59,10 +64,15 @@ async fn a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable() {
     let mut hop = fixture.ssh_config();
     hop.port = 1;
 
-    let error = establish(&PgDriver, verifying_options(&fixture), Some(vec![hop]))
-        .await
-        .err()
-        .expect("an unreachable bastion must fail the connection");
+    let error = establish(
+        &PgDriver,
+        verifying_options(&fixture),
+        Some(vec![hop]),
+        tablepro_ssh::UnknownHostKey::Learn,
+    )
+    .await
+    .err()
+    .expect("an unreachable bastion must fail the connection");
 
     assert!(
         error.to_string().starts_with("ssh:"),
@@ -75,9 +85,14 @@ async fn a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable() {
 async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
     let fixture = Fixture::from_env();
     let direct: Arc<dyn Connection> = Arc::from(fixture.connect_verified().await);
-    let (tunnelled, _tunnel) = establish(&PgDriver, verifying_options(&fixture), Some(chain(&fixture)))
-        .await
-        .expect("a tunnelled VerifyFull session");
+    let (tunnelled, _tunnel) = establish(
+        &PgDriver,
+        verifying_options(&fixture),
+        Some(chain(&fixture)),
+        tablepro_ssh::UnknownHostKey::Learn,
+    )
+    .await
+    .expect("a tunnelled VerifyFull session");
 
     direct
         .execute("CREATE TABLE IF NOT EXISTS agent_transport_probe (note text)")

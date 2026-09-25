@@ -37,7 +37,7 @@ async fn connect(fixture: &Fixture, saved: &SavedConnection) -> Result<(), Trans
     // the keyring is supplied here. Everything else, including the certificate
     // authority under test, comes from the saved connection.
     opts.password = SecretString::new(fixture.password.clone().into());
-    let (connection, _tunnel) = establish(&PgDriver, opts, None).await?;
+    let (connection, _tunnel) = establish(&PgDriver, opts, None, tablepro_ssh::UnknownHostKey::Learn).await?;
     connection
         .query("SELECT count(*) FROM release_items")
         .await
