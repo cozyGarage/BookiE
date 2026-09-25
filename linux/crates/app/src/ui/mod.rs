@@ -22,12 +22,14 @@ mod row_object;
 mod saved_queries_dialog;
 pub(crate) mod shortcut;
 mod sidebar_row;
+mod ssh_prompt;
 mod ssh_section;
 mod structure_tab;
 mod structure_tab_dialogs;
 mod welcome_view;
 
 pub use app::{App, AppInit};
+pub(crate) use ssh_prompt::GtkPrompter;
 
 #[cfg(test)]
 pub(crate) use editor::SchemaIndex;

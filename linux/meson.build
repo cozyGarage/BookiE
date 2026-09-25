@@ -28,12 +28,12 @@ custom_target('cargo-build',
   build_always_stale: true,
   build_by_default: true,
   console: true,
-  output: ['bookie', 'bookie-agentd'],
+  output: ['bookie', 'bookie-agentd', 'tablepro-askpass'],
   env: cargo_env,
   command: [find_program('python3'), files('scripts/meson-cargo-build.py'),
-    meson.project_source_root(), profile, get_option('kerberos').to_string(), '@OUTPUT0@', '@OUTPUT1@'],
+    meson.project_source_root(), profile, get_option('kerberos').to_string(), '@OUTPUT0@', '@OUTPUT1@', '@OUTPUT2@'],
   install: true,
-  install_dir: [get_option('bindir'), get_option('bindir')],
+  install_dir: [get_option('bindir'), get_option('bindir'), get_option('bindir')],
 )
 install_symlink('tablepro', pointing_to: 'bookie', install_dir: get_option('bindir'))
 install_symlink('tablepro-agentd', pointing_to: 'bookie-agentd', install_dir: get_option('bindir'))

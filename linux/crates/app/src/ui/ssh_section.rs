@@ -25,6 +25,7 @@ pub struct SshSection {
     password: adw::PasswordEntryRow,
     key_path: adw::EntryRow,
     passphrase: adw::PasswordEntryRow,
+    system_client: adw::SwitchRow,
 }
 
 #[derive(Clone)]
@@ -77,6 +78,7 @@ impl SshSection {
             .build();
         attach_key_browse_button(&key_path);
         let passphrase = adw::PasswordEntryRow::builder().title(crate::tr!("Passphrase")).build();
+        let system_client = system_client_row();
 
         expander.add_row(&host);
         expander.add_row(&port);
@@ -85,6 +87,7 @@ impl SshSection {
         expander.add_row(&password);
         expander.add_row(&key_path);
         expander.add_row(&passphrase);
+        expander.add_row(&system_client);
 
         let section = Self {
             group,
@@ -96,6 +99,7 @@ impl SshSection {
             password,
             key_path,
             passphrase,
+            system_client,
         };
         section.refresh_auth_visibility();
         section
@@ -182,11 +186,35 @@ impl SshSection {
                 username,
                 auth: saved_auth,
                 jump: None,
-                client: Default::default(),
+                client: if self.system_client.is_active() {
+                    tablepro_storage::SshClient::OpenSsh
+                } else {
+                    tablepro_storage::SshClient::Builtin
+                },
             },
             secret_to_store: secret,
         })
     }
+}
+
+impl SshInputs {
+    pub fn route(&self) -> Result<tablepro_transport::SshRoute, String> {
+        match self.saved.client {
+            tablepro_storage::SshClient::Builtin => Ok(tablepro_transport::SshRoute::Builtin(vec![self.cfg.clone()])),
+            tablepro_storage::SshClient::OpenSsh => tablepro_transport::openssh_config_for(&self.cfg)
+                .map(tablepro_transport::SshRoute::OpenSsh)
+                .map_err(|error| error.to_string()),
+        }
+    }
+}
+
+fn system_client_row() -> adw::SwitchRow {
+    adw::SwitchRow::builder()
+        .title(crate::tr!("Use system OpenSSH"))
+        .subtitle(crate::tr!(
+            "Run the ssh program so ~/.ssh/config, ProxyJump, ssh-agent and host certificates apply"
+        ))
+        .build()
 }
 
 fn default_ssh_key_path() -> String {

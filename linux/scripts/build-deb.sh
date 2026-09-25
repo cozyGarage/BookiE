@@ -23,11 +23,12 @@ fi
 if [[ "${DEB_SKIP_BUILD:-0}" != "1" ]]; then
   echo "==> cargo build --release -p tablepro-app -p tablepro-agentd"
   cargo build --release -p tablepro-app -p tablepro-agentd --locked
+  cargo build --release -p tablepro-ssh --bin tablepro-askpass --locked
 else
   echo "==> DEB_SKIP_BUILD=1; packaging existing release binaries"
 fi
 
-for bin in tablepro-app tablepro-agentd; do
+for bin in tablepro-app tablepro-agentd tablepro-askpass; do
   if [[ ! -x "$CARGO_TARGET_DIR/release/$bin" ]]; then
     echo "missing $CARGO_TARGET_DIR/release/$bin; run without DEB_SKIP_BUILD" >&2
     exit 1
@@ -38,6 +39,7 @@ STAGE="$OUT/$PKG_NAME"
 rm -rf "$STAGE"
 install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-app" "$STAGE/usr/bin/bookie"
 install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-agentd" "$STAGE/usr/bin/bookie-agentd"
+install -Dm755 "$CARGO_TARGET_DIR/release/tablepro-askpass" "$STAGE/usr/bin/tablepro-askpass"
 ln -s bookie "$STAGE/usr/bin/tablepro"
 ln -s bookie-agentd "$STAGE/usr/bin/tablepro-agentd"
 install -Dm644 flatpak/com.tablepro.linux.desktop "$STAGE/usr/share/applications/com.tablepro.linux.desktop"

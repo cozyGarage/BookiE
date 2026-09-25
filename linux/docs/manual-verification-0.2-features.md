@@ -102,6 +102,22 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
+## System OpenSSH tunnel
+
+Build and install with the helper (`cargo build -p tablepro-ssh --bin tablepro-askpass`
+beside the app binary, or an installed package).
+
+- [ ] Turn on "Use system OpenSSH" in the SSH section and connect to a host
+      already in `~/.ssh/known_hosts`: no prompt, the connection works.
+- [ ] Connect to a new host: a "Trust this SSH host?" dialog shows the
+      fingerprint; Cancel fails the connection and writes nothing.
+- [ ] A host reached through a `ProxyJump` line in `~/.ssh/config` connects.
+- [ ] A saved password is used for the target host; a jump host asking for a
+      password gets a dialog instead of the saved one.
+- [ ] A PostgreSQL connection with Verify Full through the OpenSSH tunnel
+      verifies the database hostname.
+- [ ] After closing the app, no `ssh -M` process is left running.
+
 ## Editor sessions (PostgreSQL and MySQL)
 
 - [ ] Turn on Session in an editor tab: `SET search_path` and a `CREATE TEMP

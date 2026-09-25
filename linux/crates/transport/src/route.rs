@@ -5,8 +5,8 @@ use tablepro_ssh::openssh::{
     ForwardRoute, ForwardTarget, LocalEndpoint, OpenSshAuth, OpenSshConfig, OpenSshContext, OpenSshForward,
     OpenSshSession, Prompter, SshDestination,
 };
-use tablepro_ssh::{SshConfig, SshTunnel, UnknownHostKey};
-use tablepro_storage::{SavedSshAuth, SavedSshConfig};
+use tablepro_ssh::{SshAuth, SshConfig, SshTunnel, UnknownHostKey};
+use tablepro_storage::SavedSshConfig;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -64,15 +64,19 @@ pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<O
                 .into(),
         ));
     }
-    let destination = SshDestination::new(&saved.host, Some(saved.port), Some(saved.username.clone()))
+    openssh_config_for(&crate::resolve_saved_ssh_hop(id, saved, 0).await?)
+}
+
+pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, TransportError> {
+    let destination = SshDestination::new(&config.host, Some(config.port), Some(config.username.clone()))
         .map_err(|error| TransportError::Ssh(error.to_string()))?;
-    let auth = match &saved.auth {
-        SavedSshAuth::Password => OpenSshAuth::Password {
-            password: crate::saved_ssh_password(id).await?,
+    let auth = match &config.auth {
+        SshAuth::Password { password } => OpenSshAuth::Password {
+            password: password.clone(),
         },
-        SavedSshAuth::PrivateKey { path, has_passphrase } => OpenSshAuth::PrivateKey {
+        SshAuth::PrivateKey { path, passphrase } => OpenSshAuth::PrivateKey {
             path: Some(path.clone()),
-            passphrase: crate::saved_ssh_passphrase(id, *has_passphrase).await?,
+            passphrase: passphrase.clone(),
         },
     };
     Ok(OpenSshConfig {

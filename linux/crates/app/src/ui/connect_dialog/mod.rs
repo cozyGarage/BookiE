@@ -41,6 +41,7 @@ pub struct ConnectDialog {
     form: AuthFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
+    ssh_environment: tablepro_transport::SshEnvironment,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +77,7 @@ pub struct ConnectDialogInit {
     /// record is written, so two connections to one endpoint stay
     /// separate instead of folding into whichever matched first.
     pub bound_connection_id: Option<Uuid>,
+    pub ssh_environment: tablepro_transport::SshEnvironment,
 }
 
 #[derive(Debug)]
@@ -337,6 +339,7 @@ impl Component for ConnectDialog {
             form: AuthFormState::default(),
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
+            ssh_environment: init.ssh_environment,
         };
         let widgets = view_output!();
 
@@ -439,6 +442,7 @@ impl Component for ConnectDialog {
                 let read_only = self.read_only.is_active();
                 let environment = self.selected_environment();
                 let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+                let ssh_environment = self.ssh_environment.clone();
 
                 let bound_id = self.bound_connection_id;
                 sender.command(move |out, shutdown| {
@@ -451,6 +455,7 @@ impl Component for ConnectDialog {
                                 label,
                                 opts,
                                 ssh: ssh_inputs,
+                                ssh_environment,
                                 read_only,
                                 environment,
                                 timeout_secs,
@@ -478,8 +483,8 @@ impl Component for ConnectDialog {
                 };
                 let opts = self.collect_options(driver.as_ref());
                 let ssh_inputs = if self.ssh.is_enabled() {
-                    match self.ssh.collect() {
-                        Ok(inputs) => Some(vec![inputs.cfg]),
+                    match self.ssh.collect().and_then(|inputs| inputs.route()) {
+                        Ok(route) => Some(route),
                         Err(e) => {
                             self.set_busy(BusyKind::None);
                             self.show_toast(&e);
@@ -491,6 +496,7 @@ impl Component for ConnectDialog {
                 };
 
                 let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+                let ssh_environment = self.ssh_environment.clone();
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
@@ -498,8 +504,8 @@ impl Component for ConnectDialog {
                             let result = match connection_service::establish(
                                 driver.as_ref(),
                                 opts,
-                                ssh_inputs.map(tablepro_transport::SshRoute::Builtin),
-                                &builtin_ssh_environment(),
+                                ssh_inputs,
+                                &ssh_environment,
                             )
                             .await
                             {
@@ -774,6 +780,7 @@ struct ConnectRequest {
     label: String,
     opts: ConnectOptions,
     ssh: Option<SshInputs>,
+    ssh_environment: tablepro_transport::SshEnvironment,
     read_only: bool,
     environment: Environment,
     timeout_secs: u32,
@@ -787,21 +794,20 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         label,
         opts,
         ssh,
+        ssh_environment,
         read_only,
         environment,
         timeout_secs,
     } = request;
     let stored_password: SecretString = opts.password.clone();
-    let ssh_for_establish = ssh
-        .as_ref()
-        .map(|s| tablepro_transport::SshRoute::Builtin(vec![s.cfg.clone()]));
+    let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
 
     let (conn, tunnel) = connection_service::establish(
         driver.as_ref(),
         opts.clone(),
         ssh_for_establish.clone(),
-        &builtin_ssh_environment(),
+        &ssh_environment,
     )
     .await?;
     let server_version = conn.server_version().await.ok().flatten();
@@ -907,7 +913,7 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         driver: driver.clone(),
         opts: opts_clone,
         ssh: ssh_for_establish,
-        environment: builtin_ssh_environment(),
+        environment: ssh_environment,
     };
     let metadata = crate::services::database_service::ConnectionMetadata {
         id: saved.id,
@@ -952,8 +958,4 @@ mod tests {
         assert_eq!(auth_mode_for_row(1), AuthMode::Kerberos);
         assert_eq!(auth_mode_for_row(7), AuthMode::Password);
     }
-}
-
-fn builtin_ssh_environment() -> tablepro_transport::SshEnvironment {
-    tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn)
 }

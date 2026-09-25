@@ -11,7 +11,7 @@ use uuid::Uuid;
 mod route;
 mod session_material;
 
-pub use route::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel, system_openssh};
+pub use route::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel, openssh_config_for, system_openssh};
 pub use session_material::session_material_digest;
 
 const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -286,7 +286,7 @@ async fn resolve_saved_ssh_chain(id: Uuid, saved: &SavedSshConfig) -> Result<Vec
     Ok(out)
 }
 
-async fn resolve_saved_ssh_hop(
+pub(crate) async fn resolve_saved_ssh_hop(
     id: Uuid,
     saved: &SavedSshConfig,
     hop_index: usize,

@@ -36,6 +36,7 @@ impl App {
                 registry: self.registry.clone(),
                 preferences: self.preferences.clone(),
                 bound_connection_id: None,
+                ssh_environment: self.database.ssh_environment(),
             })
             .forward(sender.input_sender(), |out| match out {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),

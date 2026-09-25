@@ -276,3 +276,23 @@ that would have caught both.
 7. **A TLS fixture per network driver.** The PostgreSQL fixture is the model.
    Until MySQL, SQL Server, and ClickHouse have one, their TLS behaviour is
    asserted only by reading the code — which is how items 1, 2, and 5 survived.
+
+## System OpenSSH client
+
+A saved SSH tunnel can set `"client": "open_ssh"` (the connect dialog's "Use
+system OpenSSH" switch). The app then runs the user's `ssh` as a ControlMaster
+in a private runtime directory and forwards the database port through it, so
+`~/.ssh/config`, `ProxyJump`, ssh-agent and host certificates apply.
+
+- Host keys: `StrictHostKeyChecking=ask` is forced on the command line, which
+  takes precedence over `~/.ssh/config`. The GUI asks before trusting a new key;
+  `tablepro-agentd` declines every prompt, so an unknown host fails.
+- Secrets: the saved password answers only a prompt naming the saved user and
+  host, and the saved passphrase only a prompt naming the saved key path. Any
+  other prompt goes to the user, or is declined by agentd.
+- Jump hosts come from `~/.ssh/config`. A saved `ssh.jump` chain is refused in
+  this mode; use the built-in client for per-hop saved credentials.
+- The `tablepro-askpass` helper must be installed beside the app or on `PATH`.
+  The Flatpak build cannot run the host `ssh`, so the option fails there with a
+  clear message.
+

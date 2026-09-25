@@ -214,8 +214,11 @@ structure editor's alter statements. Schema columns keep the declared spelling i
 `data_type`; a separate declared-type field waits for a consumer. SQL Server also
 drops a collation on ALTER COLUMN and is not covered yet. B4: agentd refuses unknown SSH host keys; lone transaction statements are refused
 on shared connections; PostgreSQL and MySQL editor tabs can opt into a governed dedicated
-session (SQLite, SQL Server and the others answer that sessions are unsupported). The OpenSSH
-transport is being ported separately and is not yet wired into connections.
+session (SQLite, SQL Server and the others answer that sessions are unsupported). A saved connection
+can use the system OpenSSH client (forced host-key checking, per-host secret
+binding, ProxyJump from ssh_config); the GUI prompts through GTK and agentd runs
+unattended. The askpass helper ships in the Arch, Debian and Meson builds; Flatpak
+cannot reach the host ssh and falls back to the built-in client.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,
 new engines, all-connection/window restoration, dashboards, built-in AI.

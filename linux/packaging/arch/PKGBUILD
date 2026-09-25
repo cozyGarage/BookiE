@@ -33,6 +33,7 @@ build() {
   cd "$srcdir/TablePro-${_commit}/linux"
   export CARGO_TARGET_DIR="$srcdir/target"
   cargo build --release --locked -p tablepro-app -p tablepro-agentd
+  cargo build --release --locked -p tablepro-ssh --bin tablepro-askpass
 }
 
 check() {
@@ -47,6 +48,7 @@ package() {
   cd "$srcdir/TablePro-${_commit}/linux"
   install -Dm755 "$srcdir/target/release/tablepro-app" "$pkgdir/usr/bin/bookie"
   install -Dm755 "$srcdir/target/release/tablepro-agentd" "$pkgdir/usr/bin/bookie-agentd"
+  install -Dm755 "$srcdir/target/release/tablepro-askpass" "$pkgdir/usr/bin/tablepro-askpass"
   ln -s bookie "$pkgdir/usr/bin/tablepro"
   ln -s bookie-agentd "$pkgdir/usr/bin/tablepro-agentd"
   install -Dm644 flatpak/com.tablepro.linux.desktop \

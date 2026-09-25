@@ -85,6 +85,7 @@ pub fn run() {
     database.set_approval_sink(Arc::new(approval_router));
 
     let mcp_bridge = services::mcp_service::start_background(database.clone());
+    enable_system_openssh(database.clone());
 
     let app = RelmApp::new(config::APP_ID);
     app.run::<ui::App>(ui::AppInit {
@@ -118,4 +119,13 @@ fn build_registry() -> DriverRegistry {
     r.register(Arc::new(drivers_redis::RedisDriver));
     r.register(Arc::new(drivers_sqlite::SqliteDriver));
     r
+}
+
+fn enable_system_openssh(database: Arc<services::database_service::DatabaseService>) {
+    relm4::spawn(async move {
+        match tablepro_transport::system_openssh(Arc::new(ui::GtkPrompter)).await {
+            Ok(openssh) => database.enable_system_openssh(openssh),
+            Err(error) => tracing::info!(error = %error, "system OpenSSH connections are unavailable"),
+        }
+    });
 }
