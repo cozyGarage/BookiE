@@ -4,6 +4,7 @@
 
 use super::*;
 use tablepro_core::ColumnInfo;
+use tablepro_core::sql_dialect::BuildSqlError;
 
 fn pk(name: &str) -> ColumnInfo {
     ColumnInfo {
@@ -264,4 +265,34 @@ fn the_batch_is_identical_however_the_edits_arrived() {
     }
 
     assert_eq!(materialize(&forwards).0, materialize(&backwards).0);
+}
+
+#[test]
+fn typed_primary_keys_reach_the_where_clause_unchanged() {
+    let wide = rust_decimal::Decimal::from_str_exact("18446744073709551615").unwrap();
+    let id = uuid::Uuid::parse_str("6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b").unwrap();
+    let keys = [
+        vec![Value::Uuid(id)],
+        vec![Value::Int(9_007_199_254_740_993)],
+        vec![Value::Decimal(wide)],
+        vec![Value::Bytes(id.as_bytes().to_vec())],
+        vec![Value::Int(1), Value::Text("a".into())],
+    ];
+    for key_values in keys {
+        let columns: Vec<ColumnInfo> = (0..key_values.len())
+            .map(|i| pk(&format!("k{i}")))
+            .chain(std::iter::once(data("note")))
+            .collect();
+        let note = columns.len() - 1;
+        let row_key = RowKey::from_pk_values(&key_values).unwrap();
+        let mut tracker = TabChangeTracker::new();
+        tracker.track_cell_edit(row_key.clone(), note, Value::Null, Value::Text("edited".into()));
+        tracker.track_delete(row_key, Vec::new());
+
+        let (statements, _) = tracker.materialize("postgres", None, "t", &columns).unwrap();
+        let mut update_params = vec![Value::Text("edited".into())];
+        update_params.extend(key_values.iter().cloned());
+        assert_eq!(statements[0].1, update_params);
+        assert_eq!(statements[1].1, key_values);
+    }
 }

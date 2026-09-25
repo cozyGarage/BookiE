@@ -4,7 +4,6 @@
 # Lower a count when you split a function. Do not raise one.
 # Empty means every function under crates/ is within the limit.
 crates/app/src/lib.rs 1
-crates/app/src/services/change_tracker.rs 1
 crates/app/src/services/gtk_approval.rs 1
 crates/app/src/services/workspace_state.rs 1
 crates/app/src/ui/activity_dialog.rs 1

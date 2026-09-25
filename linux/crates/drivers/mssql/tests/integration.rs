@@ -584,3 +584,92 @@ async fn an_interrupted_session_statement_retires_the_session_but_not_the_shared
     assert!(!session.is_usable());
     assert_eq!(conn.query("SELECT 1").await.unwrap().rows, vec![vec![Value::Int(1)]]);
 }
+
+async fn notes_in(conn: &dyn Connection, table: &str) -> Vec<String> {
+    let rows = conn.query(&format!("SELECT note FROM {table}")).await.unwrap();
+    let mut notes: Vec<String> = rows
+        .rows
+        .iter()
+        .map(|row| match &row[0] {
+            Value::Text(text) => text.clone(),
+            other => panic!("note must be text, got {other:?}"),
+        })
+        .collect();
+    notes.sort();
+    notes
+}
+
+async fn grid_edits_and_deletes_only_the_keyed_row(conn: &dyn Connection, driver_id: &str, table: &str) {
+    let columns = conn.fetch_columns(None, table).await.unwrap();
+    let note = columns.iter().position(|c| c.name == "note").unwrap();
+    let rows = conn.fetch_rows(None, table, 0, 10).await.unwrap();
+    let target = rows
+        .rows
+        .iter()
+        .find(|row| row[note] == Value::Text("target".into()))
+        .unwrap();
+    let pk_values: Vec<Value> = columns
+        .iter()
+        .zip(target)
+        .filter(|(column, _)| column.primary_key)
+        .map(|(_, value)| value.clone())
+        .collect();
+    assert!(!pk_values.is_empty(), "{table} must report its primary key");
+    let before = notes_in(conn, table).await;
+    let others: Vec<String> = before.iter().filter(|n| *n != "target").cloned().collect();
+
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        driver_id,
+        None,
+        table,
+        &columns,
+        &[(note, Value::Text("edited".into()))],
+        &pk_values,
+    )
+    .unwrap();
+    assert_eq!(
+        conn.execute_in_transaction(&[update]).await.unwrap(),
+        vec![1],
+        "{table} update"
+    );
+    let mut expected = others.clone();
+    expected.insert(0, "edited".to_string());
+    assert_eq!(
+        notes_in(conn, table).await,
+        expected,
+        "{table} update touched only the keyed row"
+    );
+
+    let delete = tablepro_core::sql_dialect::build_keyed_delete(driver_id, None, table, &columns, &pk_values).unwrap();
+    assert_eq!(
+        conn.execute_in_transaction(&[delete]).await.unwrap(),
+        vec![1],
+        "{table} delete"
+    );
+    assert_eq!(
+        notes_in(conn, table).await,
+        others,
+        "{table} delete removed only the keyed row"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+    for sql in [
+        "CREATE TABLE keyed_uuid (id uniqueidentifier PRIMARY KEY, note nvarchar(20))",
+        "INSERT INTO keyed_uuid VALUES ('6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5b', N'target'), \
+         ('6f1c2a8e-3b4d-4e5f-8a9b-0c1d2e3f4a5c', N'other')",
+        "CREATE TABLE keyed_composite (tenant int, code nvarchar(10), note nvarchar(20), PRIMARY KEY (tenant, code))",
+        "INSERT INTO keyed_composite VALUES (1, N'a', N'target'), (1, N'b', N'other'), (2, N'a', N'other')",
+        "CREATE TABLE keyed_bigint (id bigint PRIMARY KEY, note nvarchar(20))",
+        "INSERT INTO keyed_bigint VALUES (9007199254740993, N'target'), (9007199254740992, N'other')",
+    ] {
+        conn.execute(sql).await.unwrap();
+    }
+    for table in ["keyed_uuid", "keyed_composite", "keyed_bigint"] {
+        grid_edits_and_deletes_only_the_keyed_row(conn.as_ref(), "mssql", table).await;
+    }
+}

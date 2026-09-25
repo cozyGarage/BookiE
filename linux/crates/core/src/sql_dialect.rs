@@ -276,6 +276,95 @@ pub fn build_insert_from_draft(
     Ok((sql, params))
 }
 
+pub fn build_keyed_update(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    edits: &[(usize, Value)],
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    if edits.is_empty() {
+        return Err(BuildSqlError::NothingToUpdate);
+    }
+    if edits.iter().any(|(col_idx, _)| *col_idx >= columns.len()) {
+        return Err(BuildSqlError::StaleColumns);
+    }
+    let mut params: Vec<Value> = Vec::with_capacity(edits.len() + pk_values.len());
+    let set_clauses: Vec<String> = edits
+        .iter()
+        .map(|(col_idx, new_value)| {
+            let clause = format!(
+                "{} = {}",
+                quote_ident(driver_id, &columns[*col_idx].name),
+                placeholder_for(driver_id, params.len())
+            );
+            params.push(new_value.clone());
+            clause
+        })
+        .collect();
+    let where_clause = keyed_where_clause(driver_id, columns, &pk_indexes, pk_values, &mut params);
+    let qualified = qualified_table(driver_id, schema, table);
+    let sql = build_update(driver_id, &qualified, &set_clauses.join(", "), &where_clause);
+    Ok((sql, params))
+}
+
+pub fn build_keyed_delete(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    let mut params: Vec<Value> = Vec::with_capacity(pk_values.len());
+    let where_clause = keyed_where_clause(driver_id, columns, &pk_indexes, pk_values, &mut params);
+    let qualified = qualified_table(driver_id, schema, table);
+    Ok((format!("DELETE FROM {qualified} WHERE {where_clause}"), params))
+}
+
+fn checked_pk_indexes(columns: &[ColumnInfo], pk_values: &[Value]) -> Result<Vec<usize>, BuildSqlError> {
+    let pk_indexes = collect_pk_indexes(columns);
+    if pk_indexes.is_empty() {
+        return Err(BuildSqlError::NoPrimaryKey);
+    }
+    if pk_values.len() != pk_indexes.len() {
+        return Err(BuildSqlError::StaleColumns);
+    }
+    Ok(pk_indexes)
+}
+
+fn keyed_where_clause(
+    driver_id: &str,
+    columns: &[ColumnInfo],
+    pk_indexes: &[usize],
+    pk_values: &[Value],
+    params: &mut Vec<Value>,
+) -> String {
+    let clauses: Vec<String> = pk_indexes
+        .iter()
+        .zip(pk_values)
+        .map(|(&col_idx, value)| {
+            let ident = quote_ident(driver_id, &columns[col_idx].name);
+            if matches!(value, Value::Null) {
+                return format!("{ident} IS NULL");
+            }
+            let clause = format!("{ident} = {}", placeholder_for(driver_id, params.len()));
+            params.push(value.clone());
+            clause
+        })
+        .collect();
+    clauses.join(" AND ")
+}
+
+fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
+    match schema {
+        Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
+        None => quote_ident(driver_id, table),
+    }
+}
+
 fn collect_pk_indexes(columns: &[ColumnInfo]) -> Vec<usize> {
     columns
         .iter()
@@ -713,5 +802,56 @@ mod tests {
     #[test]
     fn explain_rejects_empty_sql() {
         assert_eq!(explain_statement("postgres", "   "), None);
+    }
+
+    #[test]
+    fn a_keyed_update_binds_new_values_then_every_key_component_in_order() {
+        let columns = [col("tenant", true), col("note", false), col("code", true)];
+        let (sql, params) = build_keyed_update(
+            "mssql",
+            Some("dbo"),
+            "t",
+            &columns,
+            &[(1, Value::Text("edited".into()))],
+            &[Value::Int(9_007_199_254_740_993), Value::Text("a".into())],
+        )
+        .unwrap();
+        assert_eq!(
+            sql,
+            "UPDATE [dbo].[t] SET [note] = @P1 WHERE [tenant] = @P2 AND [code] = @P3"
+        );
+        assert_eq!(
+            params,
+            vec![
+                Value::Text("edited".into()),
+                Value::Int(9_007_199_254_740_993),
+                Value::Text("a".into())
+            ]
+        );
+    }
+
+    #[test]
+    fn a_keyed_delete_matches_a_null_key_component_with_is_null() {
+        let columns = [col("a", true), col("b", true)];
+        let (sql, params) = build_keyed_delete("postgres", None, "t", &columns, &[Value::Null, Value::Int(2)]).unwrap();
+        assert_eq!(sql, r#"DELETE FROM "t" WHERE "a" IS NULL AND "b" = $1"#);
+        assert_eq!(params, vec![Value::Int(2)]);
+    }
+
+    #[test]
+    fn keyed_statements_refuse_a_key_or_column_that_no_longer_fits_the_table() {
+        let columns = [col("id", true), col("note", false)];
+        assert!(matches!(
+            build_keyed_delete("postgres", None, "t", &[col("note", false)], &[Value::Int(1)]),
+            Err(BuildSqlError::NoPrimaryKey)
+        ));
+        assert!(matches!(
+            build_keyed_delete("postgres", None, "t", &columns, &[Value::Int(1), Value::Int(2)]),
+            Err(BuildSqlError::StaleColumns)
+        ));
+        assert!(matches!(
+            build_keyed_update("postgres", None, "t", &columns, &[(2, Value::Null)], &[Value::Int(1)]),
+            Err(BuildSqlError::StaleColumns)
+        ));
     }
 }

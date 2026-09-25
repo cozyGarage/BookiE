@@ -32,7 +32,7 @@ use uuid::Uuid;
 
 use tablepro_core::{
     ColumnInfo, Value,
-    sql_dialect::{BuildSqlError, build_insert_from_draft, build_update, placeholder_for, quote_ident},
+    sql_dialect::{build_insert_from_draft, build_keyed_delete, build_keyed_update},
 };
 
 #[path = "change_tracker_row_identity.rs"]
@@ -516,12 +516,12 @@ impl TabChangeTracker {
         }
         // Group updates by row_key so each row becomes ONE UPDATE
         // (a multi-cell edit on one row is one statement, not N).
-        let mut per_row: HashMap<RowKey, Vec<(usize, Value, Value)>> = HashMap::new();
+        let mut per_row: HashMap<RowKey, Vec<(usize, Value)>> = HashMap::new();
         for ((row_key, col), edit) in &self.updates {
             per_row
                 .entry(row_key.clone())
                 .or_default()
-                .push((*col, edit.prev_value.clone(), edit.new_value.clone()));
+                .push((*col, edit.new_value.clone()));
         }
         // `per_row` is a HashMap, so iterating it emits statements in an
         // order that changes between processes. Two windows saving
@@ -529,150 +529,43 @@ impl TabChangeTracker {
         // and deadlock against each other, and a partial failure could
         // report a different row each run. Sort by primary key so the
         // batch is reproducible and every client locks in one order.
-        let mut per_row: Vec<(RowKey, Vec<(usize, Value, Value)>)> = per_row.into_iter().collect();
+        let mut per_row: Vec<(RowKey, Vec<(usize, Value)>)> = per_row.into_iter().collect();
         per_row.sort_by(|left, right| left.0.cmp(&right.0));
         for (row_key, mut edits) in per_row {
             edits.sort_by_key(|e| e.0);
-            // `build_full_row_update` writes every non-PK column, which
-            // would clobber concurrent edits to columns this user never
-            // touched. Build the SET list from the tracked edits instead
-            // and render it through the shared dialect helper.
             let RowKey::Persisted(pk_keyvalues) = &row_key else {
-                continue; // Drafts don't go through UPDATE
+                continue;
             };
-            let pk_indices: Vec<usize> = columns
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| c.primary_key)
-                .map(|(i, _)| i)
-                .collect();
-            if pk_indices.is_empty() {
-                return Err(BuildSqlError::NoPrimaryKey.into());
-            }
-            // Reconstruct PK values (KeyValue → Value is lossy but
-            // acceptable: PK values were captured from the original
-            // row at edit time and are still equality-correct).
-            let pk_values: Vec<Value> = pk_keyvalues.iter().map(keyvalue_to_value).collect();
-            // An undecodable key component binds as NULL, so the WHERE
-            // clause would match no row while the tracker cleared the
-            // edit and the UI reported a successful save.
-            if pk_values_are_unreadable(&pk_values) {
-                return Err(MaterializeError::UnreadableRowKey);
-            }
-            // Both col_idx (per edit) and pk_indices (derived from the
-            // current `columns`) were computed against whatever schema
-            // was current when the edit was tracked. If a Structure tab
-            // dropped or reordered a column since, those indices can run
-            // past the current columns/pk_values -- indexing them
-            // directly would panic and abort the app mid-save.
-            if edits.iter().any(|(col_idx, ..)| *col_idx >= columns.len()) || pk_values.len() != pk_indices.len() {
-                return Err(BuildSqlError::StaleColumns.into());
-            }
-            let mut params: Vec<Value> = Vec::new();
-            let mut placeholder_idx = 0;
-            let set_clauses: Vec<String> = edits
-                .iter()
-                .map(|(col_idx, _, new_val)| {
-                    let s = format!(
-                        "{} = {}",
-                        quote_ident(driver_id, &columns[*col_idx].name),
-                        placeholder_for(driver_id, placeholder_idx)
-                    );
-                    placeholder_idx += 1;
-                    params.push(new_val.clone());
-                    s
-                })
-                .collect();
-            // NULL-safe WHERE: `col = NULL` is never true under SQL
-            // three-valued logic. A nullable PK component holding NULL
-            // must use `IS NULL` or the UPDATE silently matches zero
-            // rows and the user thinks their save worked.
-            let where_clauses: Vec<String> = pk_indices
-                .iter()
-                .enumerate()
-                .map(|(local_idx, &col_idx)| {
-                    let ident = quote_ident(driver_id, &columns[col_idx].name);
-                    if matches!(pk_values[local_idx], Value::Null) {
-                        format!("{ident} IS NULL")
-                    } else {
-                        let s = format!("{ident} = {}", placeholder_for(driver_id, placeholder_idx));
-                        placeholder_idx += 1;
-                        params.push(pk_values[local_idx].clone());
-                        s
-                    }
-                })
-                .collect();
-            let qualified = match schema {
-                Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
-                None => quote_ident(driver_id, table),
-            };
-            let sql = build_update(
-                driver_id,
-                &qualified,
-                &set_clauses.join(", "),
-                &where_clauses.join(" AND "),
-            );
-            out.push((sql, params));
+            let pk_values = readable_pk_values(pk_keyvalues)?;
+            out.push(build_keyed_update(
+                driver_id, schema, table, columns, &edits, &pk_values,
+            )?);
             sources.push(StatementSource::Update {
                 row_key: row_key.clone(),
             });
         }
-        // Deletes last so FK references unblocked first, and sorted for
-        // the same reason as the updates above.
         let mut delete_keys: Vec<&RowKey> = self.deletes.keys().collect();
         delete_keys.sort();
         for row_key in delete_keys {
             let RowKey::Persisted(pk_keyvalues) = row_key else {
                 continue;
             };
-            let pk_indices: Vec<usize> = columns
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| c.primary_key)
-                .map(|(i, _)| i)
-                .collect();
-            if pk_indices.is_empty() {
-                return Err(BuildSqlError::NoPrimaryKey.into());
-            }
-            let pk_values: Vec<Value> = pk_keyvalues.iter().map(keyvalue_to_value).collect();
-            // Same unreadable-key guard as the UPDATE path above.
-            if pk_values_are_unreadable(&pk_values) {
-                return Err(MaterializeError::UnreadableRowKey);
-            }
-            // Same staleness guard as the UPDATE path above: the PK
-            // shape recorded when this delete was tracked may no longer
-            // match the table's current primary key.
-            if pk_values.len() != pk_indices.len() {
-                return Err(BuildSqlError::StaleColumns.into());
-            }
-            let mut params: Vec<Value> = Vec::new();
-            // Same NULL-safe rewrite as the UPDATE path above.
-            let where_clauses: Vec<String> = pk_indices
-                .iter()
-                .enumerate()
-                .map(|(local_idx, &col_idx)| {
-                    let ident = quote_ident(driver_id, &columns[col_idx].name);
-                    if matches!(pk_values[local_idx], Value::Null) {
-                        format!("{ident} IS NULL")
-                    } else {
-                        let s = format!("{ident} = {}", placeholder_for(driver_id, params.len()));
-                        params.push(pk_values[local_idx].clone());
-                        s
-                    }
-                })
-                .collect();
-            let qualified = match schema {
-                Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
-                None => quote_ident(driver_id, table),
-            };
-            let sql = format!("DELETE FROM {qualified} WHERE {}", where_clauses.join(" AND "));
-            out.push((sql, params));
+            let pk_values = readable_pk_values(pk_keyvalues)?;
+            out.push(build_keyed_delete(driver_id, schema, table, columns, &pk_values)?);
             sources.push(StatementSource::Delete {
                 row_key: row_key.clone(),
             });
         }
         Ok((out, sources))
     }
+}
+
+fn readable_pk_values(pk_keyvalues: &[KeyValue]) -> Result<Vec<Value>, MaterializeError> {
+    let pk_values: Vec<Value> = pk_keyvalues.iter().map(keyvalue_to_value).collect();
+    if pk_values_are_unreadable(&pk_values) {
+        return Err(MaterializeError::UnreadableRowKey);
+    }
+    Ok(pk_values)
 }
 
 fn undo_op_matches_draft(op: &UndoOp, draft_id: u64) -> bool {
