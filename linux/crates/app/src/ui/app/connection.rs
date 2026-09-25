@@ -568,6 +568,7 @@ impl App {
     }
 
     pub(super) fn repopulate_sidebar(&mut self, tables: &[TableInfo]) {
+        self.sidebar_tables = tables.to_vec();
         {
             let mut schemas = self.sidebar_schemas.borrow_mut();
             schemas.clear();

@@ -4,7 +4,7 @@ use relm4::{adw, gtk};
 use tablepro_storage::SavedQuery;
 use uuid::Uuid;
 
-use crate::services::quick_switcher::{QuickItem, QuickTarget, favorite_items};
+use crate::services::quick_switcher::{QuickItem, QuickTarget, favorite_items, relation_items};
 
 use super::types::{WorkspaceTab, read_workspace_tab_id};
 use super::{App, AppMsg};
@@ -91,6 +91,7 @@ impl App {
     pub(super) fn on_show_quick_switcher(&self, sender: ComponentSender<Self>) {
         let mut items = favorite_items(&self.favorites);
         items.extend(self.open_tab_items());
+        items.extend(relation_items(&self.sidebar_tables, &self.sidebar_views));
         items.extend(self.connection_items());
         let sender_for_choice = sender.clone();
         crate::ui::quick_switcher_dialog::present(&self.window, items, move |target| {
@@ -116,6 +117,11 @@ impl App {
                 });
             }
             QuickTarget::Tab(id) => self.select_workspace_tab(id),
+            QuickTarget::Relation { schema, name } => sender.input(AppMsg::SelectTable {
+                schema,
+                name,
+                open_mode: super::OpenMode::SwitchOrAppend,
+            }),
             QuickTarget::Connection(id) => {
                 let Some(saved) = self
                     .saved_connections

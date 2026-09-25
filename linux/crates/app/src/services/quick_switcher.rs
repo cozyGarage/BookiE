@@ -1,3 +1,4 @@
+use tablepro_core::TableInfo;
 use tablepro_storage::SavedQuery;
 use uuid::Uuid;
 
@@ -6,6 +7,7 @@ pub enum QuickTarget {
     Favorite(Uuid),
     Tab(Uuid),
     Connection(Uuid),
+    Relation { schema: Option<String>, name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,6 +28,25 @@ pub fn favorite_items(favorites: &[SavedQuery]) -> Vec<QuickItem> {
         .collect()
 }
 
+pub fn relation_items(tables: &[TableInfo], views: &[TableInfo]) -> Vec<QuickItem> {
+    let tables = tables.iter().map(|table| (table, crate::tr!("Table")));
+    let views = views.iter().map(|view| (view, crate::tr!("View")));
+    tables
+        .chain(views)
+        .map(|(relation, kind)| QuickItem {
+            target: QuickTarget::Relation {
+                schema: relation.schema.clone(),
+                name: relation.name.clone(),
+            },
+            title: match &relation.schema {
+                Some(schema) => format!("{schema}.{}", relation.name),
+                None => relation.name.clone(),
+            },
+            subtitle: kind,
+        })
+        .collect()
+}
+
 pub fn filter(items: &[QuickItem], needle: &str) -> Vec<QuickItem> {
     let needle = needle.trim().to_lowercase();
     if needle.is_empty() {
@@ -42,10 +63,14 @@ pub fn filter(items: &[QuickItem], needle: &str) -> Vec<QuickItem> {
 
 fn score(item: &QuickItem, needle: &str) -> Option<u32> {
     let title = item.title.to_lowercase();
-    if title == needle {
+    let name = match &item.target {
+        QuickTarget::Relation { name, .. } => name.to_lowercase(),
+        _ => title.clone(),
+    };
+    if title == needle || name == needle {
         return Some(100);
     }
-    if title.starts_with(needle) {
+    if title.starts_with(needle) || name.starts_with(needle) {
         return Some(80);
     }
     if title.contains(needle) {
@@ -120,6 +145,43 @@ mod tests {
         let items = vec![item("daily revenue export", "")];
         assert_eq!(filter(&items, "dre").len(), 1);
         assert!(filter(&items, "zzz").is_empty());
+    }
+
+    fn relation(schema: Option<&str>, name: &str) -> TableInfo {
+        TableInfo {
+            schema: schema.map(str::to_string),
+            name: name.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_table_matches_by_its_own_name_and_by_its_schema_qualified_name() {
+        let items = relation_items(
+            &[
+                relation(Some("sales"), "orders"),
+                relation(Some("public"), "order_lines"),
+            ],
+            &[relation(Some("reporting"), "orders")],
+        );
+
+        let by_name: Vec<String> = filter(&items, "orders").into_iter().map(|item| item.title).collect();
+        assert_eq!(by_name, vec!["sales.orders", "reporting.orders", "public.order_lines"]);
+
+        let qualified = filter(&items, "reporting.ord");
+        assert_eq!(qualified.len(), 1);
+        assert_eq!(
+            qualified[0].target,
+            QuickTarget::Relation {
+                schema: Some("reporting".into()),
+                name: "orders".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_table_without_a_schema_is_titled_by_its_name() {
+        let items = relation_items(&[relation(None, "notes")], &[]);
+        assert_eq!(items[0].title, "notes");
     }
 
     #[test]

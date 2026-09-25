@@ -98,6 +98,7 @@ where
                     QuickTarget::Favorite(_) => "starred-symbolic",
                     QuickTarget::Tab(_) => "tab-new-symbolic",
                     QuickTarget::Connection(_) => "network-server-symbolic",
+                    QuickTarget::Relation { .. } => "view-list-symbolic",
                 };
                 row.add_prefix(&gtk::Image::from_icon_name(icon));
                 let open_label = tr!("Open {name}").replace("{name}", &item.title);
