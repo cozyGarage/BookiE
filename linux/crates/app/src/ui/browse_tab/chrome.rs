@@ -303,6 +303,45 @@ impl BrowseTab {
     /// the badge and falls back to the generic shortcut hint. Called
     /// from FilterApplied + once on init so a restored filter shows
     /// immediately.
+    pub(super) fn apply_filter(&mut self, set: tablepro_core::FilterSet, sender: &ComponentSender<Self>) {
+        // No change to the rule list → don't churn the disk
+        // or refetch. Re-fetch on identical filter would just
+        // duplicate the F5 path, which the user can take
+        // explicitly.
+        if set == self.current_filter {
+            return;
+        }
+        self.current_filter = set.clone();
+        if let (Some(conn_id), Some(store)) = (self.connection_id, &self.persistence.filter_settings)
+            && let Err(error) = store.save(conn_id, self.schema.as_deref(), &self.table, set.clone())
+        {
+            let _ = sender.output(BrowseTabOutput::ShowToast(error));
+        }
+        // Filtered counts shift; jump back to page 1 so the
+        // user isn't stranded on offset N where N might be
+        // beyond the new filtered total.
+        self.current_offset = 0;
+        self.keyset_cursor = None;
+        self.refresh_filter_chrome();
+        if let Some(strip) = self.filter_strip.as_ref() {
+            strip.update_filter(set);
+        }
+        let _ = sender.output(BrowseTabOutput::FetchPage);
+        let _ = sender.output(BrowseTabOutput::FetchRowCount);
+        let _ = sender.output(BrowseTabOutput::StateChanged);
+    }
+
+    pub(super) fn filter_by_value(&self, column: &str, value: &tablepro_core::Value, sender: &ComponentSender<Self>) {
+        match tablepro_core::equality_rule(column, value) {
+            Some(rule) => sender.input(BrowseTabInput::FilterApplied(self.current_filter.narrowed_to(rule))),
+            None => {
+                let _ = sender.output(BrowseTabOutput::ShowToast(crate::tr!(
+                    "Values of this type can't be used as a filter"
+                )));
+            }
+        }
+    }
+
     pub(super) fn refresh_filter_chrome(&self) {
         let n = self.current_filter.len();
         if n == 0 {

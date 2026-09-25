@@ -30,12 +30,13 @@ pub(super) fn install_grid_context_menus(
     sender: relm4::Sender<GridMsg>,
     result: &QueryResult,
     driver_id: String,
+    filterable: bool,
 ) -> GridMenus {
     let context: Rc<RefCell<Option<CellContext>>> = Rc::new(RefCell::new(None));
     let columns = Rc::new(result.columns.clone());
     let truncated = result.truncated;
-    let editable_menu = build_menu(true, true, true);
-    let readonly_menu = build_menu(false, false, true);
+    let editable_menu = build_menu(true, true, true, filterable);
+    let readonly_menu = build_menu(false, false, true, filterable);
     let empty_menu = gio::Menu::new();
     empty_menu.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
     empty_menu.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
@@ -233,6 +234,7 @@ pub(super) fn install_grid_context_menus(
             })
             .build()
     };
+    let filter_action = filter_by_value_action(context.clone(), sender.clone(), column_view, columns.clone());
     let duplicate_row_action = {
         let context = context.clone();
         gio::ActionEntry::builder("duplicate-row")
@@ -265,6 +267,7 @@ pub(super) fn install_grid_context_menus(
         set_null_action,
         delete_row_action,
         duplicate_row_action,
+        filter_action,
     ]);
     column_view.insert_action_group("cell", Some(&group));
     if let Some(action) = group
@@ -313,7 +316,7 @@ pub(super) fn install_grid_context_menus(
     }
 }
 
-fn build_menu(editable: bool, row_operations: bool, insert_copy: bool) -> gio::Menu {
+fn build_menu(editable: bool, row_operations: bool, insert_copy: bool, filterable: bool) -> gio::Menu {
     let menu = gio::Menu::new();
     if editable {
         let section = gio::Menu::new();
@@ -339,6 +342,9 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool) -> gio::M
     copy.append(Some(&crate::tr!("Copy column name")), Some("cell.copy-column-name"));
     menu.append_section(None, &copy);
     let display = gio::Menu::new();
+    if filterable {
+        display.append(Some(&crate::tr!("Filter by This Value")), Some("cell.filter-by-value"));
+    }
     display.append(Some(&crate::tr!("Show Row as JSON")), Some("cell.show-row-json"));
     menu.append_section(None, &display);
     let actions = gio::Menu::new();
@@ -352,6 +358,34 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool) -> gio::M
     }
     menu.append_section(None, &actions);
     menu
+}
+
+fn filter_by_value_action(
+    context: Rc<RefCell<Option<CellContext>>>,
+    sender: relm4::Sender<GridMsg>,
+    column_view: &gtk::ColumnView,
+    columns: Rc<Vec<ColumnInfo>>,
+) -> gio::ActionEntry<gio::SimpleActionGroup> {
+    let view = column_view.downgrade();
+    gio::ActionEntry::builder("filter-by-value")
+        .activate(move |_, _, _| {
+            let context = context.borrow();
+            let Some(slot) = context.as_ref() else { return };
+            let Some(view) = view.upgrade() else { return };
+            let Some(value) = row_at(&view, position(slot)).and_then(|row| row.get(slot.col_index).cloned()) else {
+                return;
+            };
+            let Some(column) = columns.get(slot.col_index) else {
+                return;
+            };
+            sender
+                .send(GridMsg::FilterByValue {
+                    column: column.name.clone(),
+                    value,
+                })
+                .ok();
+        })
+        .build()
 }
 
 fn copy_rows_action<F>(

@@ -51,6 +51,10 @@ pub enum GridMsg {
     DuplicateRow {
         row_position: u32,
     },
+    FilterByValue {
+        column: String,
+        value: tablepro_core::Value,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -96,7 +100,13 @@ pub fn build_column_view(
             .and_then(|id| database.metadata(id))
             .map(|metadata| metadata.driver_id)
             .unwrap_or_default();
-        install_grid_context_menus(&column_view, sender.clone(), result, driver_id)
+        install_grid_context_menus(
+            &column_view,
+            sender.clone(),
+            result,
+            driver_id,
+            tab_ctx.tab_id.is_some(),
+        )
     });
 
     let default_min_width = if result.columns.len() > WIDE_TABLE_THRESHOLD {

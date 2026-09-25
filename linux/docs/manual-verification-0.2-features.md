@@ -102,6 +102,15 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
+## Filter by This Value
+
+- [ ] Right-click a cell in a browsed table: Filter by This Value narrows the rows
+      and the filter strip shows the new rule.
+- [ ] On a NULL cell it filters with IS NULL.
+- [ ] Doing it again on another value of the same column replaces that rule.
+- [ ] A JSON or binary cell shows "Values of this type can't be used as a filter".
+- [ ] The item is absent from SQL editor result grids.
+
 ## Catalog window
 
 Main menu, then Catalog, on a PostgreSQL connection with a few objects of each kind.

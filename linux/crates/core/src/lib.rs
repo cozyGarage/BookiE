@@ -27,7 +27,9 @@ pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
 pub use connection::{AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
 pub use driver::{DatabaseDriver, DriverMaturity};
 pub use error::DriverError;
-pub use filter::{BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+pub use filter::{
+    BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where, equality_rule,
+};
 pub use operation::{
     CANCELLATION_DISPATCH_TIMEOUT, CANCELLATION_GRACE, CONTROL_SETUP_TIMEOUT, Interruption, OperationControl,
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,

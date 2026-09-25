@@ -114,6 +114,47 @@ impl FilterSet {
     pub fn len(&self) -> usize {
         self.rules.len() + usize::from(!extra_is_blank(self.extra_sql.as_deref()))
     }
+
+    pub fn narrowed_to(&self, rule: FilterRule) -> FilterSet {
+        if self.combinator == Combinator::Or {
+            return FilterSet {
+                rules: vec![rule],
+                ..FilterSet::default()
+            };
+        }
+        let mut narrowed = self.clone();
+        narrowed.rules.retain(|existing| existing.column != rule.column);
+        narrowed.rules.push(rule);
+        narrowed
+    }
+}
+
+pub fn equality_rule(column: &str, value: &Value) -> Option<FilterRule> {
+    let text = match value {
+        Value::Null => {
+            return Some(FilterRule {
+                column: column.to_string(),
+                op: FilterOp::IsNull,
+                value: None,
+            });
+        }
+        Value::Bool(b) => b.to_string(),
+        Value::Int(i) => i.to_string(),
+        Value::Float(f) => f.to_string(),
+        Value::Decimal(d) => d.to_string(),
+        Value::Text(t) => t.clone(),
+        Value::Date(d) => d.format("%Y-%m-%d").to_string(),
+        Value::Time(t) => t.format("%H:%M:%S%.f").to_string(),
+        Value::DateTime(dt) => dt.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
+        Value::TimestampTz(ts) => ts.to_rfc3339(),
+        Value::Uuid(u) => u.to_string(),
+        Value::Json(_) | Value::Bytes(_) | Value::Undecodable(_) => return None,
+    };
+    Some(FilterRule {
+        column: column.to_string(),
+        op: FilterOp::Eq,
+        value: Some(FilterValue::Single(text)),
+    })
 }
 
 fn extra_is_blank(extra: Option<&str>) -> bool {
@@ -478,6 +519,77 @@ fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_equality_rule_parses_back_to_the_value_it_was_built_from() {
+        let cases = [
+            ("boolean", Value::Bool(true)),
+            ("bigint", Value::Int(-9_007_199_254_740_993)),
+            ("double precision", Value::Float(0.1)),
+            ("numeric", Value::Decimal("12.3400".parse().unwrap())),
+            ("text", Value::Text(" padded 'quoted' ".into())),
+            ("date", Value::Date(NaiveDate::from_ymd_opt(2026, 9, 25).unwrap())),
+            (
+                "time",
+                Value::Time(NaiveTime::from_hms_milli_opt(7, 8, 9, 250).unwrap()),
+            ),
+            (
+                "timestamp",
+                Value::DateTime(
+                    NaiveDate::from_ymd_opt(2026, 9, 25)
+                        .unwrap()
+                        .and_hms_micro_opt(1, 2, 3, 4)
+                        .unwrap(),
+                ),
+            ),
+            (
+                "timestamptz",
+                Value::TimestampTz(DateTime::from_timestamp(1_790_000_000, 5_000).unwrap()),
+            ),
+            ("uuid", Value::Uuid(Uuid::from_u128(7))),
+        ];
+        for (data_type, value) in cases {
+            let rule = equality_rule("c", &value).unwrap();
+            let Some(FilterValue::Single(text)) = &rule.value else {
+                panic!("{data_type}: {rule:?}");
+            };
+            assert_eq!(
+                parse_value_for(&col("c", data_type), text).unwrap(),
+                value,
+                "{data_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_null_cell_filters_with_is_null_and_unfilterable_cells_offer_nothing() {
+        assert_eq!(equality_rule("c", &Value::Null).unwrap().op, FilterOp::IsNull);
+        assert!(equality_rule("c", &Value::Json(serde_json::json!({"a": 1}))).is_none());
+        assert!(equality_rule("c", &Value::Bytes(vec![1])).is_none());
+        assert!(equality_rule("c", &Value::Undecodable("xml".into())).is_none());
+    }
+
+    #[test]
+    fn narrowing_replaces_the_column_rule_and_keeps_the_others() {
+        let mut set = FilterSet::default();
+        set = set.narrowed_to(equality_rule("a", &Value::Int(1)).unwrap());
+        set = set.narrowed_to(equality_rule("b", &Value::Int(2)).unwrap());
+        set = set.narrowed_to(equality_rule("a", &Value::Int(3)).unwrap());
+
+        let columns: Vec<&str> = set.rules.iter().map(|rule| rule.column.as_str()).collect();
+        assert_eq!(columns, vec!["b", "a"]);
+        assert_eq!(set.rules[1].value, Some(FilterValue::Single("3".into())));
+
+        let or_set = FilterSet {
+            combinator: Combinator::Or,
+            rules: set.rules.clone(),
+            extra_sql: Some("x > 1".into()),
+        };
+        let narrowed = or_set.narrowed_to(equality_rule("c", &Value::Null).unwrap());
+        assert_eq!(narrowed.rules.len(), 1);
+        assert_eq!(narrowed.combinator, Combinator::And);
+        assert!(narrowed.extra_sql.is_none());
+    }
 
     fn col(name: &str, data_type: &str) -> ColumnInfo {
         ColumnInfo {

@@ -269,6 +269,10 @@ pub enum BrowseTabInput {
         new_value: String,
         row_key: Vec<Value>,
     },
+    FilterByValue {
+        column: String,
+        value: tablepro_core::Value,
+    },
     GridSetCellNull {
         row_position: u32,
         col_index: usize,
@@ -841,6 +845,7 @@ impl SimpleComponent for BrowseTab {
             GridMsg::DeleteRowAt { row_position, row_key } => BrowseTabInput::GridDeleteRowAt { row_position, row_key },
             GridMsg::InsertRow => BrowseTabInput::InsertRow,
             GridMsg::DuplicateRow { row_position } => BrowseTabInput::DuplicateRow { row_position },
+            GridMsg::FilterByValue { column, value } => BrowseTabInput::FilterByValue { column, value },
         }));
 
         let model = BrowseTab {
@@ -1045,38 +1050,13 @@ impl SimpleComponent for BrowseTab {
                 }
                 sel.unselect_all();
             }
+            BrowseTabInput::FilterByValue { column, value } => self.filter_by_value(&column, &value, &sender),
             BrowseTabInput::ToggleFilterStrip => {
                 if let Some(strip) = self.filter_strip.as_ref() {
                     strip.toggle();
                 }
             }
-            BrowseTabInput::FilterApplied(set) => {
-                // No change to the rule list → don't churn the disk
-                // or refetch. Re-fetch on identical filter would just
-                // duplicate the F5 path, which the user can take
-                // explicitly.
-                if set == self.current_filter {
-                    return;
-                }
-                self.current_filter = set.clone();
-                if let (Some(conn_id), Some(store)) = (self.connection_id, &self.persistence.filter_settings)
-                    && let Err(error) = store.save(conn_id, self.schema.as_deref(), &self.table, set.clone())
-                {
-                    let _ = sender.output(BrowseTabOutput::ShowToast(error));
-                }
-                // Filtered counts shift; jump back to page 1 so the
-                // user isn't stranded on offset N where N might be
-                // beyond the new filtered total.
-                self.current_offset = 0;
-                self.keyset_cursor = None;
-                self.refresh_filter_chrome();
-                if let Some(strip) = self.filter_strip.as_ref() {
-                    strip.update_filter(set);
-                }
-                let _ = sender.output(BrowseTabOutput::FetchPage);
-                let _ = sender.output(BrowseTabOutput::FetchRowCount);
-                let _ = sender.output(BrowseTabOutput::StateChanged);
-            }
+            BrowseTabInput::FilterApplied(set) => self.apply_filter(set, &sender),
             BrowseTabInput::FirstPage => {
                 if self.current_offset > 0 {
                     self.current_offset = 0;
