@@ -45,6 +45,18 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn the_session_reports_the_application_name_it_was_given() {
+    let (_c, mut opts) = start_pg().await;
+    opts.application_name = Some("BookiE".into());
+    let conn = connect(opts).await;
+
+    let result = conn.query("SELECT current_setting('application_name')").await.unwrap();
+
+    assert_eq!(result.rows, vec![vec![Value::Text("BookiE".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn catalog_objects_are_listed_per_kind_and_filtered_by_schema() {
     use tablepro_core::CatalogObjectKind as Kind;
     let (_c, opts) = start_pg().await;

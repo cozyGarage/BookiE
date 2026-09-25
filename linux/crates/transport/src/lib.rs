@@ -79,6 +79,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         service_endpoint: None,
         local_socket_dir: saved.socket_dir.clone(),
         forwarded_socket_dir: None,
+        application_name: None,
     })
 }
 

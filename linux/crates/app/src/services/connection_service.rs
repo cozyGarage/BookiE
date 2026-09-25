@@ -115,7 +115,8 @@ pub async fn open_saved(
     let read_only = saved.read_only;
 
     let ssh_hops = tablepro_transport::saved_ssh_chain(&saved).await.map_err(message)?;
-    let opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
+    let mut opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
+    opts.application_name = Some("BookiE".into());
 
     let (conn, tunnel) = establish(&*driver, opts.clone(), ssh_hops.clone()).await?;
     let server_version = conn.server_version().await.ok().flatten();

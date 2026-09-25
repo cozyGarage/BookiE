@@ -693,6 +693,7 @@ impl ConnectDialog {
             service_endpoint: None,
             local_socket_dir: socket.then(|| std::path::PathBuf::from(self.socket_dir.text().as_str())),
             forwarded_socket_dir: None,
+            application_name: Some("BookiE".into()),
         }
     }
 

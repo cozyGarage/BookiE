@@ -332,9 +332,10 @@ impl DaemonProvider {
         let ssh = tablepro_transport::saved_ssh_chain(saved)
             .await
             .map_err(|e| e.to_string())?;
-        let opts = tablepro_transport::connect_options_for(saved)
+        let mut opts = tablepro_transport::connect_options_for(saved)
             .await
             .map_err(|e| e.to_string())?;
+        opts.application_name = Some("BookiE agent".into());
         let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh)
             .await
             .map_err(|e| e.to_string())?;

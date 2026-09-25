@@ -89,6 +89,9 @@ impl DatabaseDriver for PgDriver {
         if let Some(path) = &opts.tls.root_cert {
             pg_opts = pg_opts.ssl_root_cert(path);
         }
+        if let Some(name) = &opts.application_name {
+            pg_opts = pg_opts.application_name(name);
+        }
         let cancellation_options = pg_opts.clone();
         let pool = PgPoolOptions::new()
             .max_connections(4)

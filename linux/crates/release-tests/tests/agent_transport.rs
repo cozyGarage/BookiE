@@ -24,6 +24,7 @@ fn verifying_options(fixture: &Fixture) -> tablepro_core::ConnectOptions {
         service_endpoint: None,
         local_socket_dir: None,
         forwarded_socket_dir: None,
+        application_name: None,
     }
 }
 

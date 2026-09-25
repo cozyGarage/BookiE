@@ -33,6 +33,7 @@ pub struct ConnectOptions {
     /// This remains distinct from SSH-created forwarding sockets.
     pub local_socket_dir: Option<PathBuf>,
     pub forwarded_socket_dir: Option<PathBuf>,
+    pub application_name: Option<String>,
 }
 
 impl ConnectOptions {
@@ -100,6 +101,7 @@ impl Default for ConnectOptions {
             service_endpoint: None,
             local_socket_dir: None,
             forwarded_socket_dir: None,
+            application_name: None,
         }
     }
 }
