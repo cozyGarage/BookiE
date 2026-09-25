@@ -134,8 +134,11 @@ impl Connection for PgConnection {
 
     async fn list_views(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
-            "SELECT schemaname, viewname
-             FROM pg_views
+            "SELECT schemaname, viewname FROM (
+                 SELECT schemaname, viewname FROM pg_views
+                 UNION ALL
+                 SELECT schemaname, matviewname FROM pg_matviews
+             ) AS relations
              WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
              ORDER BY schemaname, viewname",
         )

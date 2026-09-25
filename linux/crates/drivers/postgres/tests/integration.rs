@@ -331,6 +331,21 @@ async fn connect_list_tables_and_pk_detection() {
     );
     let view_rows = conn.fetch_rows(None, "pk_demo_names", 0, 100).await.unwrap();
     assert_eq!(view_rows.rows.len(), 2);
+
+    conn.execute("CREATE MATERIALIZED VIEW pk_demo_snapshot AS SELECT id, name FROM pk_demo")
+        .await
+        .unwrap();
+    let views = conn.list_views().await.unwrap();
+    assert!(
+        views.iter().any(|view| view.name == "pk_demo_snapshot"),
+        "list_views must return the materialized view: {views:?}"
+    );
+    let tables = conn.list_tables().await.unwrap();
+    assert!(!tables.iter().any(|table| table.name == "pk_demo_snapshot"));
+    let snapshot_columns = conn.fetch_columns(None, "pk_demo_snapshot").await.unwrap();
+    assert_eq!(snapshot_columns.len(), 2);
+    let snapshot_rows = conn.fetch_rows(None, "pk_demo_snapshot", 0, 100).await.unwrap();
+    assert_eq!(snapshot_rows.rows.len(), 2);
 }
 
 #[tokio::test]

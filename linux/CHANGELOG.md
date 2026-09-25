@@ -13,6 +13,7 @@
 - A CSV file can be loaded into an existing table from the table's context menu. The file's separator and header row are detected and can be changed, each table column is mapped to a field before anything runs, and the whole import is approved once. It commits in bounded batches, shows progress, can be cancelled, and reports how many rows were written when it stops early.
 - A CSV file can also create the table it is loaded into, from the schema header in the sidebar. The column names and a type guessed from the first rows of the file are shown for every column and can be changed before the table is created. A guess falls back to text whenever any value in the sample does not fit a narrower type.
 - The structure editor shows a Comment field for each column, and reads each column's comment on PostgreSQL, MySQL, SQL Server and ClickHouse, and writes it when creating a table, adding a column or editing one. SQLite refuses a comment with a clear message instead of dropping it silently.
+- PostgreSQL materialized views are listed with views in the sidebar and open read-only.
 - A saved connection can be given a name; leaving the name blank keeps the address-derived label.
 - A saved connection can be duplicated; the copy starts without saved credentials.
 - A saved connection can carry a colour tag from a fixed palette, shown beside it in the connection list.
