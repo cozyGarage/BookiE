@@ -80,7 +80,8 @@ impl App {
             }
         };
 
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -123,7 +124,8 @@ impl App {
         let Some(conn) = self.window_connection() else {
             return;
         };
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -157,7 +159,8 @@ impl App {
         let Some(conn) = self.window_connection() else {
             return;
         };
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
@@ -214,7 +217,8 @@ impl App {
             }
         };
 
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown

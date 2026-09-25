@@ -53,6 +53,7 @@ pub struct ConnectionMetadata {
     pub environment: Environment,
     pub read_only: bool,
     pub server_version: Option<String>,
+    pub query_timeout_secs: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -427,6 +428,7 @@ mod tests {
                 environment: Environment::Local,
                 read_only: false,
                 server_version: None,
+                query_timeout_secs: None,
             },
             connection,
             None,
@@ -477,6 +479,7 @@ mod tests {
             environment: Environment::Local,
             read_only: false,
             server_version: None,
+            query_timeout_secs: None,
         };
         let first_conn = driver.connect(options.clone()).await.expect("sqlite connection");
         assert!(service.activate(
@@ -500,6 +503,7 @@ mod tests {
             environment: Environment::Local,
             read_only: false,
             server_version: None,
+            query_timeout_secs: None,
         };
         let second_conn = driver.connect(options.clone()).await.expect("sqlite connection");
         let activated = service.activate(

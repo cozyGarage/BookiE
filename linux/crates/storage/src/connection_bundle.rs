@@ -147,6 +147,8 @@ impl BundleConnection {
             environment: self.environment,
             ssh: self.ssh.clone(),
             last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
         }
     }
 }

@@ -327,5 +327,7 @@ fn saved_connection(id: Uuid) -> SavedConnection {
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }

@@ -103,6 +103,7 @@ mod tests {
             environment: tablepro_core::Environment::Local,
             read_only: false,
             server_version: None,
+            query_timeout_secs: None,
         }
     }
 

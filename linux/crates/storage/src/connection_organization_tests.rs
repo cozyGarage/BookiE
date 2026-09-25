@@ -22,6 +22,8 @@ fn connection(name: &str, driver_id: &str) -> SavedConnection {
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 

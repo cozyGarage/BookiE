@@ -902,7 +902,8 @@ impl SqlEditor {
             },
         );
 
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let driver_id = self
             .executions
             .get(&generation)

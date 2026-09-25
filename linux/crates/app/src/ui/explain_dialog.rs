@@ -89,7 +89,7 @@ pub fn present(
     window.present();
 
     let buffer = view.buffer();
-    let timeout_secs = crate::services::operation_control::configured_timeout_secs(preferences);
+    let timeout_secs = crate::services::operation_control::timeout_for(preferences, database, Some(connection_id));
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded(timeout_secs);
         let text = match conn.query_controlled(&explain_sql, &control).await {

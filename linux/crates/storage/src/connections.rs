@@ -83,6 +83,10 @@ pub struct SavedConnection {
     /// once and fall back to alphabetical against each other.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_opened_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connect_timeout_secs: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_timeout_secs: Option<u32>,
 }
 
 impl SavedConnection {
@@ -461,6 +465,8 @@ mod tests {
             environment: Environment::Local,
             ssh: None,
             last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
         }
     }
 
@@ -855,6 +861,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn per_connection_timeouts_round_trip_and_are_absent_by_default() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let plain = sample_connection();
+        let mut timed = sample_connection();
+        timed.connect_timeout_secs = Some(5);
+        timed.query_timeout_secs = Some(900);
+        save_to(&path, &[plain, timed.clone()]).await.unwrap();
+
+        let text = tokio::fs::read_to_string(&path).await.unwrap();
+        assert_eq!(text.matches("query_timeout_secs").count(), 1, "{text}");
+        let loaded = load_from(&path).await.unwrap();
+        assert_eq!(loaded[0].connect_timeout_secs, None);
+        assert_eq!(loaded[1].connect_timeout_secs, Some(5));
+        assert_eq!(loaded[1].query_timeout_secs, Some(900));
+    }
+
+    #[tokio::test]
     async fn a_file_without_a_certificate_authority_still_loads() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("connections.json");
@@ -869,6 +893,7 @@ mod tests {
         let loaded = load_from(&path).await.unwrap();
         assert!(loaded[0].tls_root_cert.is_none());
         assert_eq!(loaded[0].effective_tls_mode(), TlsMode::VerifyFull);
+        assert_eq!(loaded[0].query_timeout_secs, None);
     }
 
     #[tokio::test]

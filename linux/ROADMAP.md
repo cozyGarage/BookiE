@@ -158,7 +158,7 @@ The repository extraction completed on 2026-08-17. Product planning now follows 
 - [x] Connection groups, tags, favorites, search, URL import, and environment colour on each row
 - [ ] A typed sessions and locks console with capability-declared driver support and governed session termination
 - [ ] A PostgreSQL server health panel that degrades cleanly when a statistics extension is absent
-- [ ] Configurable pool size and timeouts per saved connection, honoured by the driver
+- [ ] Configurable pool size and timeouts per saved connection, honoured by the driver (connect and query timeouts implemented; pool size open)
 - [x] Read-only review of views, materialized views, routines, triggers, sequences, extensions, roles, types and grants on PostgreSQL, through the Catalog window and the `list_objects` MCP tool (implemented; GTK unverified)
 - [ ] A decision record, design, and measured prototype for an out-of-process Python runner
 

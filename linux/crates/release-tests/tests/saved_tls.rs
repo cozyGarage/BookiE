@@ -28,6 +28,8 @@ fn saved(fixture: &Fixture, mode: TlsMode, root_cert: Option<PathBuf>) -> SavedC
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 

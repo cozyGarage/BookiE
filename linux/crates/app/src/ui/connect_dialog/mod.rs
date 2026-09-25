@@ -32,6 +32,8 @@ pub struct ConnectDialog {
     tls_mode: adw::ComboRow,
     tls_root_cert: adw::EntryRow,
     read_only: adw::SwitchRow,
+    connect_timeout: adw::SpinRow,
+    query_timeout: adw::SpinRow,
     environment: adw::ComboRow,
     auth_group: adw::PreferencesGroup,
     ssh: SshSection,
@@ -290,6 +292,9 @@ impl Component for ConnectDialog {
         options_group.add(&tls_mode);
         options_group.add(&tls_root_cert);
         options_group.add(&read_only);
+        let (connect_timeout, query_timeout) = timeout_rows();
+        options_group.add(&connect_timeout);
+        options_group.add(&query_timeout);
         options_group.add(&environment);
 
         let test_button = gtk::Button::builder().label(crate::tr!("Test")).build();
@@ -330,6 +335,8 @@ impl Component for ConnectDialog {
             tls_mode,
             tls_root_cert,
             read_only,
+            connect_timeout,
+            query_timeout,
             environment,
             auth_group,
             ssh,
@@ -441,7 +448,9 @@ impl Component for ConnectDialog {
                 };
                 let read_only = self.read_only.is_active();
                 let environment = self.selected_environment();
-                let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+                let query_timeout_secs = timeout_value(self.query_timeout.value());
+                let timeout_secs = query_timeout_secs
+                    .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
 
                 let bound_id = self.bound_connection_id;
@@ -459,6 +468,7 @@ impl Component for ConnectDialog {
                                 read_only,
                                 environment,
                                 timeout_secs,
+                                query_timeout_secs,
                             })
                             .await;
                             out.send(ConnectDialogCmd::Result(result)).ok();
@@ -495,7 +505,9 @@ impl Component for ConnectDialog {
                     None
                 };
 
-                let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+                let query_timeout_secs = timeout_value(self.query_timeout.value());
+                let timeout_secs = query_timeout_secs
+                    .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
                 sender.command(move |out, shutdown| {
                     shutdown
@@ -707,6 +719,7 @@ impl ConnectDialog {
             local_socket_dir: socket.then(|| std::path::PathBuf::from(self.socket_dir.text().as_str())),
             forwarded_socket_dir: None,
             application_name: Some("BookiE".into()),
+            connect_timeout_secs: timeout_value(self.connect_timeout.value()),
         }
     }
 
@@ -784,6 +797,7 @@ struct ConnectRequest {
     read_only: bool,
     environment: Environment,
     timeout_secs: u32,
+    query_timeout_secs: Option<u32>,
 }
 
 async fn run_connect(request: ConnectRequest) -> Result<connection_service::PreparedConnection, String> {
@@ -798,6 +812,7 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         read_only,
         environment,
         timeout_secs,
+        query_timeout_secs,
     } = request;
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
@@ -853,6 +868,8 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         environment,
         ssh: ssh.as_ref().map(|s| s.saved.clone()),
         last_opened_at: None,
+        connect_timeout_secs: opts_clone.connect_timeout_secs,
+        query_timeout_secs,
     };
 
     save_one(&saved).await.map_err(|e| format!("save: {e}"))?;
@@ -922,6 +939,7 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         environment,
         read_only,
         server_version,
+        query_timeout_secs: saved.query_timeout_secs,
     };
     Ok(connection_service::PreparedConnection::new(
         tables,
@@ -953,9 +971,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_zero_timeout_means_use_the_default() {
+        assert_eq!(timeout_value(0.0), None);
+        assert_eq!(timeout_value(0.4), None);
+        assert_eq!(timeout_value(45.0), Some(45));
+    }
+
+    #[test]
     fn auth_mode_rows_decode_to_their_modes() {
         assert_eq!(auth_mode_for_row(0), AuthMode::Password);
         assert_eq!(auth_mode_for_row(1), AuthMode::Kerberos);
         assert_eq!(auth_mode_for_row(7), AuthMode::Password);
     }
+}
+
+fn timeout_rows() -> (adw::SpinRow, adw::SpinRow) {
+    let connect = adw::SpinRow::with_range(0.0, 600.0, 1.0);
+    connect.set_title(&crate::tr!("Connect timeout (seconds)"));
+    connect.set_subtitle(&crate::tr!("0 uses the default of 30 seconds"));
+    let query = adw::SpinRow::with_range(0.0, 86_400.0, 1.0);
+    query.set_title(&crate::tr!("Query timeout (seconds)"));
+    query.set_subtitle(&crate::tr!("0 uses the timeout set in Preferences"));
+    (connect, query)
+}
+
+fn timeout_value(seconds: f64) -> Option<u32> {
+    let whole = seconds.round();
+    (whole >= 1.0).then(|| whole.min(f64::from(u32::MAX)) as u32)
 }

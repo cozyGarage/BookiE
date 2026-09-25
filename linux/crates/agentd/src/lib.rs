@@ -464,6 +464,8 @@ mod tests {
             environment: Environment::Prod,
             ssh: None,
             last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
         }
     }
 

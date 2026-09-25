@@ -131,7 +131,8 @@ fn load(
         return;
     };
     status.set_text(&tr!("Loading…"));
-    let timeout_secs = crate::services::operation_control::configured_timeout_secs(&source.preferences);
+    let timeout_secs =
+        crate::services::operation_control::timeout_for(&source.preferences, &source.database, Some(source.connection));
     let (list, status) = (list.clone(), status.clone());
     glib::spawn_future_local(async move {
         let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());

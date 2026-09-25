@@ -112,7 +112,11 @@ pub fn present(
             let text_buf = text_buf.clone();
             let status_l = status_l.clone();
             let token = replace_in_flight(&in_flight_for_query);
-            let timeout_secs = crate::services::operation_control::configured_timeout_secs(&preferences_for_query);
+            let timeout_secs = crate::services::operation_control::timeout_for(
+                &preferences_for_query,
+                &database_for_query,
+                Some(connection),
+            );
             glib::spawn_future_local(async move {
                 let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
                 match conn.query_controlled(&sql, &control).await {
@@ -178,7 +182,11 @@ pub fn present(
         let text_buf = text_buf.clone();
         let status_l = status_l.clone();
         let token = replace_in_flight(&in_flight_for_kill);
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&preferences_for_kill);
+        let timeout_secs = crate::services::operation_control::timeout_for(
+            &preferences_for_kill,
+            &database_for_kill,
+            Some(connection),
+        );
         glib::spawn_future_local(async move {
             let control = crate::services::operation_control::bounded_with(timeout_secs, token.clone());
             match conn.execute_controlled(&sql, &control).await {

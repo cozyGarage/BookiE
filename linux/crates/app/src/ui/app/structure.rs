@@ -129,7 +129,8 @@ impl App {
         let table_for_msg = table.clone();
         let sender_for_cmd = sender.clone();
         let connection = origin.connection(&self.database);
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -318,7 +319,8 @@ impl App {
         let sender_for_cmd = sender.clone();
         let mut recorded = self.ran_statements(Source::Structure, &statements);
         let connection = origin.connection(&self.database);
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -506,7 +508,8 @@ impl App {
         let schema_for_cmd = schema.clone();
         let connection_id = self.connection_id;
         let database = self.database.clone();
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -626,7 +629,8 @@ impl App {
         let sender_for_cmd = sender.clone();
         let connection_id = self.connection_id;
         let database = self.database.clone();
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
@@ -763,7 +767,8 @@ impl App {
         }
         let generation = self.catalog_generation.get().wrapping_add(1);
         self.catalog_generation.set(generation);
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         let sender_for_cmd = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown

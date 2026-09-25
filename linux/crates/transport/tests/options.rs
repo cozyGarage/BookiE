@@ -25,6 +25,8 @@ fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
         environment: Environment::Prod,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 

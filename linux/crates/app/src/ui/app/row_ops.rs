@@ -48,7 +48,8 @@ impl App {
         self.in_flight_saves.set(self.in_flight_saves.get() + 1);
         let sender_for_cmd = sender.clone();
         let mut recorded = self.ran_statements(Source::Browse, &sql_without_parameters(&statements));
-        let timeout_secs = crate::services::operation_control::configured_timeout_secs(&self.preferences);
+        let timeout_secs =
+            crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {

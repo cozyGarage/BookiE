@@ -26,6 +26,8 @@ fn saved(name: &str) -> SavedConnection {
         environment: Environment::Dev,
         ssh: None,
         last_opened_at: Some(chrono::Utc::now()),
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 

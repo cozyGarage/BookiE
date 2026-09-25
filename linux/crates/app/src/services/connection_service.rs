@@ -137,6 +137,7 @@ pub async fn open_saved(
         environment,
         read_only,
         server_version,
+        query_timeout_secs: saved.query_timeout_secs,
     };
     let params = ReconnectParams {
         driver,

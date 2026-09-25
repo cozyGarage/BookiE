@@ -115,6 +115,8 @@ pub fn parse_connection_url(input: &str) -> Result<ParsedConnectionUrl, StorageE
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     };
 
     Ok(ParsedConnectionUrl { connection, password })

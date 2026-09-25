@@ -58,6 +58,13 @@ icon button in a schema header for Table from CSV.
 - [ ] Two connections to the same endpoint stay separate after reconnecting to
       each. This is the regression the id-first identity change fixed.
 
+## Per-connection timeouts
+
+- [ ] The connect dialog shows Connect timeout and Query timeout rows; 0 means default.
+- [ ] A connection saved with a 2-second query timeout stops `SELECT pg_sleep(5)` after
+      about 2 seconds, while another connection still uses the Preferences timeout.
+- [ ] A connect timeout of 3 seconds to an unreachable host fails after about 3 seconds.
+
 ## Connection bundles
 
 - [ ] Export without a passphrase, then read the file: it contains hosts and

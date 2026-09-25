@@ -33,6 +33,8 @@ async fn saved_socket_is_available_through_the_agent_provider() {
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     };
     save_connections(std::slice::from_ref(&saved))
         .await

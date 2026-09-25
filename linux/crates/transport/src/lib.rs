@@ -84,6 +84,7 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         local_socket_dir: saved.socket_dir.clone(),
         forwarded_socket_dir: None,
         application_name: None,
+        connect_timeout_secs: saved.connect_timeout_secs,
     })
 }
 
@@ -114,8 +115,17 @@ pub async fn establish(
         Some(route) => Some(open_tunnel(driver, &mut opts, route, environment).await?),
         None => None,
     };
-    let raw = connect_with_timeout(driver, opts, DATABASE_CONNECT_TIMEOUT).await?;
+    let timeout = connect_timeout(&opts);
+    let raw = connect_with_timeout(driver, opts, timeout).await?;
     Ok((raw, tunnel))
+}
+
+fn connect_timeout(opts: &ConnectOptions) -> Duration {
+    opts.connect_timeout_secs
+        .filter(|seconds| *seconds > 0)
+        .map_or(DATABASE_CONNECT_TIMEOUT, |seconds| {
+            Duration::from_secs(u64::from(seconds))
+        })
 }
 
 async fn open_tunnel(
@@ -344,6 +354,16 @@ async fn saved_ssh_passphrase(id: Uuid, has_passphrase: bool) -> Result<Option<S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_saved_connect_timeout_replaces_the_default_and_zero_keeps_it() {
+        let mut opts = ConnectOptions::default();
+        assert_eq!(connect_timeout(&opts), DATABASE_CONNECT_TIMEOUT);
+        opts.connect_timeout_secs = Some(0);
+        assert_eq!(connect_timeout(&opts), DATABASE_CONNECT_TIMEOUT);
+        opts.connect_timeout_secs = Some(5);
+        assert_eq!(connect_timeout(&opts), Duration::from_secs(5));
+    }
 
     struct HangingDriver;
 

@@ -115,6 +115,8 @@ fn saved_with_bastion(host: &str, bastion_port: u16) -> SavedConnection {
             client: Default::default(),
         }),
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 
@@ -136,6 +138,8 @@ fn saved_sqlite(path: &std::path::Path) -> SavedConnection {
         environment: Environment::Local,
         ssh: None,
         last_opened_at: None,
+        connect_timeout_secs: None,
+        query_timeout_secs: None,
     }
 }
 

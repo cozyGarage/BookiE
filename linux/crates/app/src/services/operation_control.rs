@@ -13,6 +13,21 @@ pub fn configured_timeout_secs(preferences: &PreferencesStore) -> u32 {
     preferences.load().query_timeout_secs
 }
 
+pub fn timeout_for(
+    preferences: &PreferencesStore,
+    database: &crate::services::database_service::DatabaseService,
+    connection: Option<uuid::Uuid>,
+) -> u32 {
+    let own = connection
+        .and_then(|id| database.metadata(id))
+        .and_then(|metadata| metadata.query_timeout_secs);
+    effective_timeout(own, configured_timeout_secs(preferences))
+}
+
+fn effective_timeout(own: Option<u32>, global: u32) -> u32 {
+    own.unwrap_or(global)
+}
+
 pub fn deadline_for(timeout_secs: u32) -> Option<tokio::time::Instant> {
     (timeout_secs > 0).then(|| tokio::time::Instant::now() + Duration::from_secs(u64::from(timeout_secs)))
 }
@@ -32,6 +47,12 @@ pub fn bounded_with(timeout_secs: u32, token: CancellationToken) -> OperationCon
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_connection_timeout_overrides_the_global_preference() {
+        assert_eq!(effective_timeout(Some(5), 60), 5);
+        assert_eq!(effective_timeout(None, 60), 60);
+    }
 
     #[tokio::test]
     async fn a_zero_timeout_means_no_deadline() {
