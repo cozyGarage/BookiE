@@ -1,6 +1,8 @@
 project('bookie', version: '0.2.0', meson_version: '>=1.4', license: 'AGPL-3.0-or-later')
 
 gnome = import('gnome')
+subdir('data')
+install_data('data/com.tablepro.linux.gschema.xml', install_dir: get_option('datadir') / 'glib-2.0' / 'schemas')
 python = find_program('python3')
 dependency('glib-2.0', version: '>=2.88')
 dependency('gio-2.0', version: '>=2.88')
@@ -59,4 +61,4 @@ install_data(
 install_data('LICENSE.md', install_dir: get_option('datadir') / 'licenses/bookie')
 install_data('packaging/policy.example.toml', install_dir: get_option('datadir') / 'doc/bookie')
 meson.add_devenv(cargo_env)
-gnome.post_install(gtk_update_icon_cache: true, update_desktop_database: true)
+gnome.post_install(glib_compile_schemas: true, gtk_update_icon_cache: true, update_desktop_database: true)

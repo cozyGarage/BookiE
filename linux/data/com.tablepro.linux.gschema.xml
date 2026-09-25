@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="com.tablepro.linux" path="/com/tablepro/linux/">
+    <key name="preferences-migrated" type="b"><default>false</default></key>
+    <key name="window-migrated" type="b"><default>false</default></key>
+    <key name="window-width" type="i"><default>1200</default></key>
+    <key name="window-height" type="i"><default>760</default></key>
+    <key name="window-maximized" type="b"><default>false</default></key>
+    <key name="default-page-size" type="t"><default>1000</default></key>
+    <key name="confirm-destructive" type="b"><default>true</default></key>
+    <key name="editor-font-size" type="u"><default>12</default></key>
+    <key name="history-retention-days" type="u"><default>30</default></key>
+    <key name="query-timeout-secs" type="u"><default>60</default></key>
+    <key name="csv-include-header" type="b"><default>true</default></key>
+  </schema>
+  <schema id="com.tablepro.linux.Devel" path="/com/tablepro/linux/Devel/">
+    <key name="preferences-migrated" type="b"><default>false</default></key>
+    <key name="window-migrated" type="b"><default>false</default></key>
+    <key name="window-width" type="i"><default>1200</default></key>
+    <key name="window-height" type="i"><default>760</default></key>
+    <key name="window-maximized" type="b"><default>false</default></key>
+    <key name="default-page-size" type="t"><default>1000</default></key>
+    <key name="confirm-destructive" type="b"><default>true</default></key>
+    <key name="editor-font-size" type="u"><default>12</default></key>
+    <key name="history-retention-days" type="u"><default>30</default></key>
+    <key name="query-timeout-secs" type="u"><default>60</default></key>
+    <key name="csv-include-header" type="b"><default>true</default></key>
+  </schema>
+</schemalist>

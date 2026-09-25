@@ -1,10 +1,12 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use gtk4::gio;
+use gtk4::gio::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::config_io::{atomic_write_json, xdg_config_path};
+use super::config_io::{atomic_write_json, backup_file_if_exists, xdg_config_path};
 
 static FILE_LOCK: Mutex<()> = Mutex::new(());
 static SESSION_RESTORE_ATTEMPTED: AtomicBool = AtomicBool::new(false);
@@ -33,19 +35,71 @@ fn load_locked() -> WindowState {
     let Some(path) = xdg_config_path("window.json") else {
         return WindowState::default();
     };
-    std::fs::read(path)
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default()
+    let bytes = std::fs::read(&path).ok();
+    let mut state = bytes
+        .as_deref()
+        .and_then(|b| serde_json::from_slice(b).ok())
+        .unwrap_or_default();
+    if let Some(settings) = super::preferences::settings() {
+        if !settings.boolean("window-migrated") {
+            if let Err(e) = backup_file_if_exists(&path, &path.with_extension("before-gsettings.json"))
+                .map_err(|e| e.to_string())
+                .and_then(|()| save_geometry_settings(&settings, &state))
+            {
+                tracing::warn!(error = %e, "window_state: GSettings migration deferred");
+            }
+        } else if bytes.is_none() {
+            state.width = settings.int("window-width");
+            state.height = settings.int("window-height");
+            state.maximized = settings.boolean("window-maximized");
+        } else if (state.width != settings.int("window-width")
+            || state.height != settings.int("window-height")
+            || state.maximized != settings.boolean("window-maximized"))
+            && let Err(e) = save_geometry_settings(&settings, &state)
+        {
+            tracing::warn!(error = %e, "window_state: rollback changes not synced to GSettings");
+        }
+    }
+    state
 }
 
 fn save_locked(state: &WindowState) {
     let Some(path) = xdg_config_path("window.json") else {
         return;
     };
+    if let Some(settings) = super::preferences::settings()
+        && !settings.boolean("window-migrated")
+        && let Err(e) = backup_file_if_exists(&path, &path.with_extension("before-gsettings.json"))
+    {
+        tracing::warn!(error = %e, "window_state: backup failed");
+        return;
+    }
     if let Err(e) = atomic_write_json(&path, state) {
         tracing::warn!(path = %path.display(), error = %e, "window_state: write failed");
+        return;
     }
+    if let Some(settings) = super::preferences::settings()
+        && let Err(e) = save_geometry_settings(&settings, state)
+    {
+        tracing::warn!(error = %e, "window_state: GSettings write failed");
+    }
+}
+
+fn save_geometry_settings(settings: &gio::Settings, state: &WindowState) -> Result<(), String> {
+    settings.delay();
+    let result = (|| {
+        settings.set_int("window-width", state.width)?;
+        settings.set_int("window-height", state.height)?;
+        settings.set_boolean("window-maximized", state.maximized)?;
+        settings.set_boolean("window-migrated", true)?;
+        Ok::<(), glib::BoolError>(())
+    })();
+    if let Err(e) = result {
+        settings.revert();
+        return Err(e.to_string());
+    }
+    settings.apply();
+    Ok(())
 }
 
 pub fn load() -> WindowState {

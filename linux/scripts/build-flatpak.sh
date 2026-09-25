@@ -13,9 +13,9 @@ flatpak-builder is not installed.
 Debian / Ubuntu:
   sudo apt install -y flatpak flatpak-builder
   flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-  flatpak install -y flathub org.gnome.Sdk//47 org.gnome.Platform//47 \
-    org.freedesktop.Sdk.Extension.rust-stable//24.08 \
-    org.freedesktop.Sdk.Extension.llvm19//24.08
+  flatpak install -y flathub org.gnome.Sdk//50 org.gnome.Platform//50 \
+    org.freedesktop.Sdk.Extension.rust-stable//25.08 \
+    org.freedesktop.Sdk.Extension.llvm22//25.08
 
 Arch:
   sudo pacman -S --needed flatpak flatpak-builder

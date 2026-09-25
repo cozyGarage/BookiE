@@ -134,7 +134,7 @@ references, tests, and differences. Implementation and release verification diff
   shortcuts dialog and calendar API. Cargo compile and Clippy pass on the host;
   the development Meson build/install path also passes. Flatpak execution and
   installed-package qualification remain.
-- [ ] **B2 runtime/storage**: owned Tasks, explicit stores, private durable writes,
+- [x] **B2 runtime/storage**: owned Tasks, explicit stores, private durable writes,
   history migrations, GSettings, coalesced writers. Remove replaced globals/runtime
   calls; flush persistence and settle governed operations at shutdown.
 - [ ] **B3 lossless contracts**: upstream values, columns/results, errors, typed
@@ -200,9 +200,11 @@ source. Prepare upstream-compatible fixes separately. Contacting authors, upstre
 PRs, publication and repository rename are outside this task's authorization.
 
 Status on 2026-09-25: A1–A4 are implemented and ticked; their evidence is from
-the 0.1.2–0.1.4 work, not from a frozen 0.2 candidate. A5 and B1–B7 stay open.
-B1 lacks a real Flatpak build and installed-package checks. B2 lacks the
-GSettings and history-format migrations. B5 has Open, Save, Save As, a
+the 0.1.2–0.1.4 work, not from a frozen 0.2 candidate. A5, B1 and B3–B7 stay open.
+B1 lacks a real Flatpak build and installed-package checks. B2 now includes
+private pre-migration backups for history, preferences and window geometry, a
+GSettings schema shipped by Meson/Arch/Flatpak, and JSON mirrors for package
+rollback. B5 has Open, Save, Save As, a
 changed-on-disk check before every save and a close prompt; a tab's file
 binding is not yet restored after a restart (its text is, through drafts). B6 lists views and materialized views, and a guarded
 `list_objects(kind, schema)` shared by the Catalog window and the MCP tool covers
@@ -549,10 +551,9 @@ isolated-test inventory passed. Debian package fixture could not run because
   being reached globally. No behavior changed in any of the three; each
   landed as its own commit with full workspace fmt, Clippy, `--lib --bins`
   tests (23/23 binaries), the two named `tablepro-mcp` integration tests, and
-  the file-size guard passing. B2's "remove replaced globals" goal is now
-  complete; GSettings migration and history-format migration (also named
-  under B2) were out of scope for this pass and remain open, so the
-  checklist item stays unmarked until qualified. B3–B7 and A5 remain open.
+  the file-size guard passing. B2's "remove replaced globals" goal was
+  completed in this pass. GSettings and history migration were completed in
+  the 2026-09-25 checkpoint below.
 
 - 2026-09-25: re-surveyed upstream `main` from `fc8b887af` to `e6678a93b`
   (189 commits, v0.72 to v0.75.0); upstream `linux` has nothing after
@@ -583,3 +584,15 @@ isolated-test inventory passed. Debian package fixture could not run because
   during ALTER COLUMN. Six focused builder tests and one SQL Server container
   round trip passed; the full core unit suite passed (395 tests). B3 remains
   open for its other value and metadata contracts.
+
+- 2026-09-25 B2 completion checkpoint: preferences and window geometry migrate
+  into isolated stable/development GSettings schemas. The original JSON files
+  receive private backups before migration and remain current for package
+  rollback; newer builds reimport changes made by an older package. History
+  schema upgrades snapshot the SQLite database with `VACUUM INTO` under the
+  storage lock before applying transactional migrations. Focused migration and
+  rollback tests pass. The development Meson build/install compiled both
+  schemas and installed the GUI, daemon and SSH askpass helper. The real-driver
+  integration gate passed: PostgreSQL 21, Unix socket 2, MySQL 14, SQL Server
+  16, ClickHouse 14, Redis 1. A5 still needs an immutable candidate and soak;
+  B1 still needs a real Flatpak build and installed package qualification.

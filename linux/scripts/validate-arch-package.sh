@@ -15,8 +15,10 @@ contents="$(bsdtar -tf "$package")"
 for required in \
   usr/bin/bookie \
   usr/bin/bookie-agentd \
+  usr/bin/tablepro-askpass \
   usr/bin/tablepro \
   usr/bin/tablepro-agentd \
+  usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml \
   usr/share/applications/com.tablepro.linux.desktop \
   usr/share/metainfo/com.tablepro.linux.metainfo.xml \
   usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \

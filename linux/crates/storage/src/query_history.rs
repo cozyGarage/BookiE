@@ -1,3 +1,5 @@
+use std::fs::{File, OpenOptions};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -105,15 +107,17 @@ impl HistoryStore {
     }
 
     pub async fn open(path: PathBuf) -> Result<Self, StorageError> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
+        let _migration_lock = crate::file_access::lock_path(&path).await?;
+        let existed = path.exists();
         create_private_file_if_missing(&path)?;
         let opts = SqliteConnectOptions::new()
             .filename(&path)
             .create_if_missing(true)
             .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal);
         let pool = SqlitePoolOptions::new().max_connections(1).connect_with(opts).await?;
+        if existed && user_version(&pool).await? < MIGRATIONS.len() as i64 {
+            backup_before_migration(&pool, &path).await?;
+        }
         apply_schema(&pool).await?;
         restrict_permissions(&path)?;
         Ok(Self { pool, path })
@@ -251,6 +255,40 @@ async fn apply_schema(pool: &SqlitePool) -> Result<(), StorageError> {
         tx.commit().await?;
     }
     Ok(())
+}
+
+async fn backup_before_migration(pool: &SqlitePool, path: &Path) -> Result<(), StorageError> {
+    let backup = path.with_extension("before-migrations.db");
+    match std::fs::symlink_metadata(&backup) {
+        Ok(meta) if meta.file_type().is_file() => return Ok(()),
+        Ok(_) => return Err(StorageError::Schema("history backup is not a regular file".into())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e.into()),
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| StorageError::Schema("history path has no parent".into()))?;
+    let temp = parent.join(format!(".history-backup-{}.tmp", Uuid::new_v4()));
+    let result = async {
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temp)?;
+        let temp_name = temp
+            .to_str()
+            .ok_or_else(|| StorageError::Schema("history backup path is not UTF-8".into()))?;
+        sqlx::query("VACUUM INTO ?").bind(temp_name).execute(pool).await?;
+        File::open(&temp)?.sync_all()?;
+        std::fs::rename(&temp, &backup)?;
+        File::open(parent)?.sync_all()?;
+        Ok(())
+    }
+    .await;
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
 }
 
 fn to_unix(t: SystemTime) -> i64 {
@@ -632,6 +670,72 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].query, "SELECT 1");
+    }
+
+    #[tokio::test]
+    async fn upgrading_a_history_file_keeps_a_private_pre_migration_snapshot() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("history.db");
+        let options = SqliteConnectOptions::new().filename(&path).create_if_missing(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        for statement in BASE_SCHEMA {
+            sqlx::query(*statement).execute(&pool).await.unwrap();
+        }
+        sqlx::query("PRAGMA user_version = 1").execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO history (query, driver_id, connection_id, connection_name, executed_at, success) VALUES ('SELECT 1', 'sqlite', '', '', 0, 1)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+
+        let store = HistoryStore::open(path.clone()).await.unwrap();
+        let backup = path.with_extension("before-migrations.db");
+        assert_eq!(std::fs::metadata(&backup).unwrap().permissions().mode() & 0o777, 0o600);
+        let backup_options = SqliteConnectOptions::new().filename(&backup);
+        let old = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(backup_options)
+            .await
+            .unwrap();
+        assert_eq!(user_version(&old).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM history")
+                .fetch_one(&old)
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(user_version(&store.pool).await.unwrap(), MIGRATIONS.len() as i64);
+        let before = std::fs::read(&backup).unwrap();
+        old.close().await;
+        store.pool.close().await;
+        let reopened = HistoryStore::open(path.clone()).await.unwrap();
+        assert_eq!(std::fs::read(&backup).unwrap(), before);
+        reopened.pool.close().await;
+        for suffix in ["-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{}", path.display(), suffix));
+        }
+        std::fs::copy(&backup, &path).unwrap();
+        let restored = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(SqliteConnectOptions::new().filename(&path))
+            .await
+            .unwrap();
+        assert_eq!(user_version(&restored).await.unwrap(), 1);
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM history")
+                .fetch_one(&restored)
+                .await
+                .unwrap(),
+            1
+        );
+        restored.close().await;
     }
 
     #[tokio::test]

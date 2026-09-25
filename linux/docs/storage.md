@@ -7,8 +7,8 @@ TablePro uses XDG files for local state, SQLite for query history, a JSONL audit
 | Data | Format | Default path |
 |---|---|---|
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
-| Preferences | JSON | `$XDG_CONFIG_HOME/tablepro/preferences.json` |
-| Window state | JSON | `$XDG_CONFIG_HOME/tablepro/window.json` |
+| Preferences | GSettings with JSON rollback mirror | `com.tablepro.linux` and `$XDG_CONFIG_HOME/tablepro/preferences.json` |
+| Window state | GSettings geometry with JSON rollback mirror | `com.tablepro.linux` and `$XDG_CONFIG_HOME/tablepro/window.json` |
 | Workspace tabs | JSON | `$XDG_CONFIG_HOME/tablepro/workspace_state.json` |
 | Column widths | JSON | `$XDG_CONFIG_HOME/tablepro/column_widths.json` |
 | Table filters | JSON | `$XDG_CONFIG_HOME/tablepro/filter_settings.json` |
@@ -31,13 +31,16 @@ Connection records contain host, port, database, username, TLS mode, read-only s
 
 ## Preferences and UI state
 
-Application services own the JSON files for preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory and use defaults when a file is absent or cannot be decoded.
+Application services own preferences, window state, workspace state, column widths, and table filters. They read from the XDG config directory and use defaults when a file is absent or cannot be decoded. Preferences and window geometry use GSettings when its schema is installed; the development build has a separate `com.tablepro.linux.Devel` schema. The last connection id remains in `window.json`. On first use, legacy `preferences.json` and `window.json` are copied to private `*.before-gsettings.json` files before migration. Every later save also writes the JSON files, so an older package can read current values after rollback. If the schema is unavailable, the JSON files remain the source of both settings. To restore the original pre-migration values, copy `preferences.before-gsettings.json` over `preferences.json` after closing BookiE, then run `gsettings reset com.tablepro.linux preferences-migrated` before restarting the newer package. For window state, use the matching `window.before-gsettings.json` backup and reset `window-migrated`.
 
 Window state stores size, maximize flag, and the last connection id. Closing a window keeps that id so the next launch can reopen the same connection. An explicit disconnect or deleting that saved connection clears it. Geometry writes do not drop the last connection id.
 
 Workspace state is keyed by connection UUID and limited before it is written. Unknown tab variants deserialize as `Unknown` and are dropped during restore. This lets an older build ignore a newer tab kind without rejecting the whole workspace file.
 
 ## Query history
+
+History schema upgrades use SQLite transactions. Before changing an existing database, the store makes a private SQLite snapshot at `history.before-migrations.db` while holding its storage lock. To roll back the history format, close BookiE, move the upgraded `history.db` and its `-wal`/`-shm` companions aside, then copy `history.before-migrations.db` to `history.db` with mode `0600`. History entries added after the snapshot will not be in the restored file.
+
 
 `tablepro_storage::query_history` owns a single SQLite pool. `init()` creates `history.db`, enables WAL mode, creates the `history` table, and creates an FTS5 virtual table with triggers that follow inserts, deletes, and query text updates.
 

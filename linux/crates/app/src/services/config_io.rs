@@ -10,6 +10,20 @@ pub fn xdg_config_path(filename: &str) -> Option<PathBuf> {
     Some(base.join(crate::config::storage_dir_name()).join(filename))
 }
 
+pub fn backup_file_if_exists(path: &Path, backup: &Path) -> std::io::Result<()> {
+    match std::fs::symlink_metadata(backup) {
+        Ok(meta) if meta.file_type().is_file() => return Ok(()),
+        Ok(_) => return Err(std::io::Error::other("backup path is not a regular file")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
+    match std::fs::read(path) {
+        Ok(bytes) => atomic_write_bytes(backup, &bytes),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 pub fn atomic_write_json<T: Serialize>(path: &Path, value: &T) -> std::io::Result<()> {
     atomic_write_bytes(path, &serde_json::to_vec_pretty(value).map_err(std::io::Error::other)?)
 }
