@@ -37,6 +37,8 @@
 - ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 - A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
+- A SQL Server batch that raises an error after its first result set now reports the error instead of showing the first result as a success.
+- A SQL Server result cut at the row limit now waits for the rest of the batch to finish, instead of leaving it running on the server with its locks held until the next query.
 - MongoDB accepts `DROP TABLE people` as well as the quoted form, instead of reporting the statement as unsupported.
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.

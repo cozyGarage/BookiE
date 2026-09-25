@@ -372,6 +372,41 @@ async fn empty_result_set_still_reports_columns() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn an_error_raised_after_the_first_result_set_is_reported() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+
+    let err = conn
+        .query("SELECT 1 AS a; SELECT 2 AS b; SELECT 1/0 AS c")
+        .await
+        .unwrap_err();
+    assert!(format!("{err}").to_lowercase().contains("divide by zero"), "got: {err}");
+
+    let first = conn.query("SELECT 1 AS a; SELECT 'x' AS b, 'y' AS c").await.unwrap();
+    let names: Vec<&str> = first.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(names, vec!["a"]);
+    assert_eq!(first.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_result_cut_at_the_row_limit_still_finishes_the_batch() {
+    let (_c, opts) = start_mssql().await;
+    let conn = connect(opts).await;
+
+    let over_limit = tablepro_core::MAX_QUERY_ROWS + 5;
+    let sql = format!(
+        "SELECT TOP ({over_limit}) 1 AS one FROM sys.all_columns a CROSS JOIN sys.all_columns b; SELECT 1/0 AS c"
+    );
+    let err = conn.query(&sql).await.unwrap_err();
+    assert!(format!("{err}").to_lowercase().contains("divide by zero"), "got: {err}");
+
+    let result = conn.query("SELECT 7 AS n").await.unwrap();
+    assert_eq!(result.rows, vec![vec![Value::Int(7)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn the_driver_does_not_claim_server_side_cancellation() {
     let (_c, opts) = start_mssql().await;
     let connection = connect(opts).await;

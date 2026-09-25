@@ -499,28 +499,22 @@ async fn run_query(
     let mut columns: Vec<ColumnInfo> = Vec::new();
     let mut rows: Vec<Vec<Value>> = Vec::new();
     let mut truncated = false;
-    let mut seen_result_set = false;
+    let mut result_sets = 0usize;
+    // The stream is read to its end rather than dropped early: tiberius only
+    // drains unread tokens at the start of the next call, so an early exit
+    // leaves the batch running on the server holding its locks, and discards
+    // any error the server raises after the first result set.
     while let Some(item) = stream.try_next().await.map_err(map_tiberius_error)? {
         match item {
-            // Metadata arrives before the rows it describes, so a
-            // result set with no rows still reports its columns. A
-            // second one means the batch produced another result set;
-            // the grid renders a single column list, so stop rather
-            // than file the next set's rows under these headers.
             QueryItem::Metadata(meta) => {
-                if seen_result_set {
-                    break;
+                result_sets += 1;
+                if result_sets == 1 {
+                    columns = meta.columns().iter().map(col_to_info).collect();
                 }
-                seen_result_set = true;
-                columns = meta.columns().iter().map(col_to_info).collect();
             }
-            QueryItem::Row(row) => {
-                if rows.len() >= limit {
-                    truncated = true;
-                    break;
-                }
-                rows.push(row.into_iter().map(|cd| column_data_to_value(&cd)).collect());
-            }
+            QueryItem::Row(_) if result_sets > 1 => {}
+            QueryItem::Row(_) if rows.len() >= limit => truncated = true,
+            QueryItem::Row(row) => rows.push(row.into_iter().map(|cd| column_data_to_value(&cd)).collect()),
         }
     }
     Ok(QueryResult {
