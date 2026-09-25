@@ -266,6 +266,7 @@ impl Connection for MysqlConnection {
                 columns: Vec::new(),
                 unique: non_unique == 0,
                 primary: name == "PRIMARY",
+                predicate: None,
             });
             entry.columns.push(column);
         }

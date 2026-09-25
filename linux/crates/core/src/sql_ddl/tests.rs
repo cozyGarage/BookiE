@@ -122,6 +122,7 @@ fn create_table_with_secondary_index() {
         columns: vec!["email".into()],
         unique: true,
         primary: false,
+        predicate: None,
     };
     let stmts = build_create_table("postgres", None, "users", &cols, &[idx], &[]).unwrap();
     assert_eq!(stmts.len(), 2);
@@ -137,6 +138,7 @@ fn create_table_skips_primary_index() {
         columns: vec!["id".into()],
         unique: true,
         primary: true,
+        predicate: None,
     };
     let stmts = build_create_table("postgres", None, "users", &cols, &[pk_idx], &[]).unwrap();
     assert_eq!(stmts.len(), 1, "primary index must not produce a separate CREATE INDEX");
@@ -683,11 +685,25 @@ fn create_index_basic() {
         columns: vec!["email".into()],
         unique: true,
         primary: false,
+        predicate: None,
     };
     assert_eq!(
         build_create_index("postgres", None, "users", &idx).unwrap(),
         "CREATE UNIQUE INDEX \"users_email_idx\" ON \"users\" (\"email\")"
     );
+}
+
+#[test]
+fn create_index_refuses_a_partial_index_instead_of_dropping_its_predicate() {
+    let idx = IndexInfo {
+        name: "active_email".into(),
+        columns: vec!["email".into()],
+        unique: true,
+        primary: false,
+        predicate: Some("deleted_at IS NULL".into()),
+    };
+    let err = build_create_index("postgres", None, "users", &idx).unwrap_err();
+    assert!(matches!(err, BuildDdlError::PartialIndex));
 }
 
 #[test]
@@ -697,6 +713,7 @@ fn create_index_compound_columns() {
         columns: vec!["a".into(), "b".into()],
         unique: false,
         primary: false,
+        predicate: None,
     };
     let sql = build_create_index("mysql", None, "t", &idx).unwrap();
     assert_eq!(sql, "CREATE INDEX `idx_a_b` ON `t` (`a`, `b`)");
@@ -709,6 +726,7 @@ fn create_index_rejects_empty_name() {
         columns: vec!["x".into()],
         unique: false,
         primary: false,
+        predicate: None,
     };
     let err = build_create_index("postgres", None, "t", &idx).unwrap_err();
     assert!(matches!(err, BuildDdlError::EmptyIndexName));
@@ -721,6 +739,7 @@ fn create_index_mssql() {
         columns: vec!["a".into(), "b".into()],
         unique: true,
         primary: false,
+        predicate: None,
     };
     let sql = build_create_index("mssql", None, "t", &idx).unwrap();
     assert_eq!(sql, "CREATE UNIQUE INDEX [idx_a_b] ON [t] ([a], [b])");

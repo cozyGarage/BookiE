@@ -170,6 +170,7 @@ pub(super) fn present_index_dialog(
             columns: cols,
             unique: unique_row.is_active(),
             primary: false,
+            predicate: None,
         }));
         dialog_for_submit.close();
     });

@@ -324,6 +324,7 @@ impl Connection for SqliteConnection {
                 columns,
                 unique: unique == 1,
                 primary,
+                predicate: None,
             });
         }
         if !saw_primary {
@@ -337,6 +338,7 @@ impl Connection for SqliteConnection {
                     columns: pk_cols,
                     unique: true,
                     primary: true,
+                    predicate: None,
                 });
             }
         }

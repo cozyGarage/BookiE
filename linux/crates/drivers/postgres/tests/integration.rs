@@ -45,6 +45,37 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn indexes_report_expression_keys_predicates_and_leave_out_included_columns() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    for statement in [
+        "CREATE TABLE people (id int PRIMARY KEY, email text, \"Nick Name\" text, deleted_at timestamptz)",
+        "CREATE INDEX people_lower_email ON people (lower(email))",
+        "CREATE UNIQUE INDEX people_live_email ON people (email, \"Nick Name\") WHERE deleted_at IS NULL",
+        "CREATE INDEX people_email_covering ON people (email) INCLUDE (deleted_at)",
+    ] {
+        conn.execute(statement).await.unwrap();
+    }
+
+    let indexes = conn.fetch_indexes(None, "people").await.unwrap();
+    let by_name = |name: &str| {
+        indexes
+            .iter()
+            .find(|i| i.name == name)
+            .unwrap_or_else(|| panic!("{indexes:?}"))
+    };
+
+    assert_eq!(by_name("people_lower_email").columns, vec!["lower(email)".to_string()]);
+    assert_eq!(by_name("people_lower_email").predicate, None);
+    let partial = by_name("people_live_email");
+    assert_eq!(partial.columns, vec!["email".to_string(), "Nick Name".to_string()]);
+    assert_eq!(partial.predicate.as_deref(), Some("deleted_at IS NULL"));
+    assert_eq!(by_name("people_email_covering").columns, vec!["email".to_string()]);
+    assert!(by_name("people_pkey").primary);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn formatting_preserves_server_results_for_significant_whitespace() {
     use tablepro_core::sql_syntax::{SqlGrammar, script::LexicalSettings};
     let (_container, opts) = start_pg().await;

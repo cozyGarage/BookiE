@@ -19,6 +19,8 @@ pub struct IndexInfo {
     pub columns: Vec<String>,
     pub unique: bool,
     pub primary: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub predicate: Option<String>,
 }
 
 /// Foreign-key constraint metadata. `on_delete` / `on_update` carry

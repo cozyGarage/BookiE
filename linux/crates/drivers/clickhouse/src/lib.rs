@@ -338,6 +338,7 @@ impl Connection for ClickhouseConnection {
             // built from these columns touches exactly one row.
             unique: false,
             primary: true,
+            predicate: None,
         }])
     }
 

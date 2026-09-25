@@ -66,6 +66,7 @@ async fn a_created_table_matches_the_drafted_columns_indexes_and_keys() {
                 columns: vec!["label".into()],
                 unique: true,
                 primary: false,
+                predicate: None,
             }],
             fks: vec![],
         }],

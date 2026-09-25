@@ -412,6 +412,7 @@ impl Connection for MssqlConnection {
                     columns: vec![col],
                     unique,
                     primary,
+                    predicate: None,
                 }),
             }
         }

@@ -16,6 +16,9 @@ pub fn build_create_index(
     if index.columns.is_empty() {
         return Err(BuildDdlError::NoColumns);
     }
+    if index.predicate.is_some() {
+        return Err(BuildDdlError::PartialIndex);
+    }
     let unique = if index.unique { "UNIQUE " } else { "" };
     let cols: Vec<String> = index.columns.iter().map(|c| quote_ident(driver_id, c)).collect();
     let qualified = qualified_table(driver_id, schema, table);

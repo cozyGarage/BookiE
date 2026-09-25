@@ -21,6 +21,9 @@ pub enum BuildDdlError {
     #[error("index name is empty")]
     EmptyIndexName,
 
+    #[error("a partial index cannot be recreated from its catalog description")]
+    PartialIndex,
+
     #[error("foreign key name is empty")]
     EmptyForeignKeyName,
 

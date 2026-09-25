@@ -348,26 +348,30 @@ impl Connection for PgConnection {
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
-        // pg_index + pg_class + pg_attribute join. `array_agg ORDER BY
-        // ordinality` keeps the column order deterministic; pg_index
-        // stores `indkey` as an int2vector positional reference so we
-        // unnest with `WITH ORDINALITY` to capture position.
+        // `indkey` holds 0 for an expression key and lists INCLUDE columns
+        // after the first `indnkeyatts` key columns; the expression text
+        // comes from `pg_get_indexdef` at that key position.
         let rows = sqlx::query(
             "SELECT
                 i.relname AS index_name,
                 ix.indisunique,
                 ix.indisprimary,
-                array_agg(a.attname ORDER BY k.ordinality) AS columns
+                ARRAY(
+                    SELECT CASE WHEN k.attnum = 0
+                        THEN pg_catalog.pg_get_indexdef(ix.indexrelid, k.ordinality::int, true)
+                        ELSE a.attname::text END
+                    FROM unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality)
+                    LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = k.attnum
+                    WHERE k.ordinality <= ix.indnkeyatts
+                    ORDER BY k.ordinality
+                ) AS columns,
+                pg_catalog.pg_get_expr(ix.indpred, ix.indrelid, true) AS predicate
             FROM pg_catalog.pg_class t
             JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
             JOIN pg_catalog.pg_index ix ON ix.indrelid = t.oid
             JOIN pg_catalog.pg_class i ON i.oid = ix.indexrelid
-            JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ordinality) ON true
-            JOIN pg_catalog.pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
             WHERE n.nspname = COALESCE($2, current_schema())
               AND t.relname = $1
-              AND a.attnum > 0
-            GROUP BY i.relname, ix.indisunique, ix.indisprimary
             ORDER BY i.relname",
         )
         .bind(table)
@@ -375,15 +379,17 @@ impl Connection for PgConnection {
         .fetch_all(&self.pool)
         .await
         .map_err(map_sqlx_error)?;
-        Ok(rows
-            .into_iter()
-            .map(|r| IndexInfo {
-                name: r.get::<String, _>(0),
-                unique: r.get::<bool, _>(1),
-                primary: r.get::<bool, _>(2),
-                columns: r.get::<Vec<String>, _>(3),
+        rows.into_iter()
+            .map(|r| {
+                Ok(IndexInfo {
+                    name: r.try_get(0).map_err(map_sqlx_error)?,
+                    unique: r.try_get(1).map_err(map_sqlx_error)?,
+                    primary: r.try_get(2).map_err(map_sqlx_error)?,
+                    columns: r.try_get(3).map_err(map_sqlx_error)?,
+                    predicate: r.try_get(4).map_err(map_sqlx_error)?,
+                })
             })
-            .collect())
+            .collect()
     }
 
     async fn fetch_foreign_keys(&self, schema: Option<&str>, table: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {

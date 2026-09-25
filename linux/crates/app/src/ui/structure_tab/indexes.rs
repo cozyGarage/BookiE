@@ -26,11 +26,7 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
     // Empty columns array means the driver returned a malformed index
     // (corrupt catalog or driver bug). Render a dim "—" subtitle so
     // the user sees something rather than an empty cell.
-    let subtitle = if idx.columns.is_empty() {
-        "—".to_string()
-    } else {
-        idx.columns.join(", ")
-    };
+    let subtitle = index_subtitle(idx);
     let row = adw::ActionRow::builder()
         .title(glib::markup_escape_text(&idx.name))
         .subtitle(glib::markup_escape_text(&subtitle))
@@ -62,4 +58,33 @@ pub(super) fn build_index_row(index: usize, idx: &IndexInfo, sender: ComponentSe
     row.add_suffix(&remove_button);
 
     row
+}
+
+fn index_subtitle(idx: &IndexInfo) -> String {
+    let columns = if idx.columns.is_empty() {
+        "—".to_string()
+    } else {
+        idx.columns.join(", ")
+    };
+    match &idx.predicate {
+        Some(predicate) => format!("{columns} WHERE {predicate}"),
+        None => columns,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_partial_index_subtitle_names_its_predicate() {
+        let index = IndexInfo {
+            name: "active_email".into(),
+            columns: vec!["lower(email)".into()],
+            unique: true,
+            primary: false,
+            predicate: Some("deleted_at IS NULL".into()),
+        };
+        assert_eq!(index_subtitle(&index), "lower(email) WHERE deleted_at IS NULL");
+    }
 }

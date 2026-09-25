@@ -37,6 +37,7 @@
 - ClickHouse connection timeouts no longer misreport a certificate hostname mismatch.
 - MongoDB server-selection failures (for example, an unreachable host) no longer misreport a certificate hostname mismatch.
 - A SQL Server script now keeps running the next `GO` batch after one batch fails, instead of stopping the whole script.
+- PostgreSQL indexes built on an expression now appear in the structure tab with the expression as their key, a partial index shows its WHERE condition, and INCLUDE columns are no longer listed as index keys.
 - SQLite foreign keys that reference the parent table without naming its columns now show the parent's primary key columns instead of blanks.
 - SQLite foreign keys, indexes and columns read right after a structure change are no longer missing when the read lands on another pooled connection.
 - A SQL Server batch that raises an error after its first result set now reports the error instead of showing the first result as a success.

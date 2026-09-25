@@ -628,6 +628,7 @@ impl Connection for StubConn {
             columns: vec!["id".into()],
             unique: true,
             primary: true,
+            predicate: None,
         }])
     }
     async fn fetch_foreign_keys(&self, _: Option<&str>, _: &str) -> Result<Vec<ForeignKeyInfo>, DriverError> {
