@@ -825,3 +825,14 @@ async fn decimal_results_preserve_all_fractional_digits() {
     };
     assert_eq!(text, "0.123456789012345678901234567891");
 }
+
+#[path = "../../../core/tests/support/value_contract.rs"]
+mod value_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_preserves_scalar_boundaries_through_parameters_and_exports() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    value_contract::assert_scalar_contract(connection.as_ref(), "mysql").await;
+}

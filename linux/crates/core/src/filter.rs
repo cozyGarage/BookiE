@@ -398,8 +398,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
             .parse::<i64>()
             .map(Value::Int)
             .map_err(|_| invalid(col, "integer", trimmed)),
-        Kind::Float => trimmed
-            .parse::<f64>()
+        Kind::Float => crate::parse_float_input(trimmed)
             .map(Value::Float)
             .map_err(|_| invalid(col, "number", trimmed)),
         Kind::Decimal => Decimal::from_str_exact(trimmed)
@@ -518,6 +517,48 @@ fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/value-contract.json"
+        )))
+        .unwrap();
+        for text in corpus["float_rejected"].as_array().unwrap() {
+            assert!(
+                parse_value_for(&col("value", "double precision"), text.as_str().unwrap()).is_err(),
+                "{text}"
+            );
+        }
+        for field in ["integer_rejected", "decimal_rejected"] {
+            let data_type = if field == "integer_rejected" {
+                "bigint"
+            } else {
+                "numeric"
+            };
+            for text in corpus[field].as_array().unwrap() {
+                assert!(
+                    parse_value_for(&col("value", data_type), text.as_str().unwrap()).is_err(),
+                    "{text}"
+                );
+            }
+        }
+        for text in corpus["integers"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(
+                parse_value_for(&col("value", "bigint"), text).unwrap(),
+                Value::Int(text.parse().unwrap())
+            );
+        }
+        for text in corpus["decimals"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(
+                parse_value_for(&col("value", "numeric"), text).unwrap(),
+                Value::Decimal(text.parse().unwrap())
+            );
+        }
+    }
 
     #[test]
     fn decimal_preservation_rejects_a_filter_that_would_round() {

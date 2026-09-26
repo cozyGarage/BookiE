@@ -300,7 +300,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nonfinite_numbers_remain_distinct_from_sql_null() {
+    fn value_contract_nonfinite_numbers_remain_distinct_from_sql_null() {
         for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
                 value_to_json(&tablepro_core::Value::Float(number)),

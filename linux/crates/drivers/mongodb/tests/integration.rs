@@ -168,3 +168,38 @@ async fn browsing_a_missing_collection_is_empty_rather_than_an_error() {
         .expect("browsing an absent collection must not fail");
     assert!(browsed.rows.is_empty(), "an absent collection has no rows");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_preserves_numbers_and_text_through_json_commands() {
+    let (_container, host, port) = start_mongo().await;
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let corpus: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../testdata/value-contract.json")).unwrap();
+    let mut cases = vec![(serde_json::Value::Null, Value::Null)];
+    for text in corpus["integers"].as_array().unwrap() {
+        let number: i64 = text.as_str().unwrap().parse().unwrap();
+        cases.push((serde_json::json!(number), Value::Int(number)));
+    }
+    for text in corpus["floats"].as_array().unwrap() {
+        let number: f64 = text.as_str().unwrap().parse().unwrap();
+        cases.push((serde_json::json!(number), Value::Float(number)));
+    }
+    for text in corpus["texts"].as_array().unwrap() {
+        cases.push((text.clone(), Value::Text(text.as_str().unwrap().into())));
+    }
+    let long = "x".repeat(corpus["long_text_bytes"].as_u64().unwrap() as usize);
+    cases.push((serde_json::json!(&long), Value::Text(long)));
+    for (id, (input, expected)) in cases.into_iter().enumerate() {
+        let document = serde_json::json!({"_id": id, "value": input});
+        connection
+            .execute(&format!("db.values.insertOne({document})"))
+            .await
+            .unwrap();
+        let query = format!("db.values.find({{\"_id\":{id}}})");
+        let result = connection.query(&query).await.unwrap();
+        let column = result.columns.iter().position(|column| column.name == "value").unwrap();
+        assert_eq!(result.rows.len(), 1);
+        assert_eq!(result.rows[0][column], expected);
+    }
+}

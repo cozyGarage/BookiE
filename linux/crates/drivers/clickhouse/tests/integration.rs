@@ -511,3 +511,14 @@ async fn decimal_and_nonfinite_results_are_not_rounded_or_changed_to_null() {
     assert!(matches!(row[4], Value::Float(number) if number == f64::NEG_INFINITY));
     assert_eq!(row[5], Value::Null);
 }
+
+#[path = "../../../core/tests/support/value_contract.rs"]
+mod value_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_preserves_scalar_boundaries_through_parameters_and_exports() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    value_contract::assert_scalar_contract(connection.as_ref(), "clickhouse").await;
+}

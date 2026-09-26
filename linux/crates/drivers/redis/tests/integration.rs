@@ -44,3 +44,33 @@ async fn browsing_another_database_does_not_leak_into_later_queries() {
         .expect("read back on the connection's own db");
     assert_eq!(result.rows, vec![vec![Value::Text("1".into())]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_preserves_integer_and_text_command_arguments() {
+    let (_container, host, port) = start_redis().await;
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    let corpus: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../testdata/value-contract.json")).unwrap();
+    for integer in corpus["integers"].as_array().unwrap() {
+        let integer = integer.as_str().unwrap();
+        connection.query(&format!("SET boundary {integer}")).await.unwrap();
+        assert_eq!(
+            connection.query("INCRBY boundary 0").await.unwrap().rows,
+            vec![vec![Value::Int(integer.parse().unwrap())]]
+        );
+    }
+    for text in corpus["texts"].as_array().unwrap() {
+        let text = text.as_str().unwrap();
+        let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
+        connection.query(&format!("SET boundary \"{escaped}\"")).await.unwrap();
+        assert_eq!(
+            connection.query("GET boundary").await.unwrap().rows,
+            vec![vec![Value::Text(text.into())]]
+        );
+    }
+    assert_eq!(
+        connection.query("GET missing_value").await.unwrap().rows,
+        vec![vec![Value::Null]]
+    );
+}

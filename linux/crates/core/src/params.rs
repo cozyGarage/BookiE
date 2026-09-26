@@ -65,12 +65,9 @@ pub fn parse_parameter_value(kind: ParameterKind, text: &str) -> Result<Value, S
             .parse::<i64>()
             .map(Value::Int)
             .map_err(|_| format!("{trimmed} is not a whole number")),
-        ParameterKind::Decimal => trimmed
-            .parse::<f64>()
-            .ok()
-            .filter(|value| value.is_finite())
-            .map(Value::Float)
-            .ok_or_else(|| format!("{trimmed} is not a decimal number")),
+        ParameterKind::Decimal => parse_decimal_parameter(trimmed)
+            .map(Value::Decimal)
+            .map_err(|_| format!("{trimmed} is not an exactly representable decimal number")),
         ParameterKind::Boolean => match trimmed.to_ascii_lowercase().as_str() {
             "true" | "t" | "1" | "yes" => Ok(Value::Bool(true)),
             "false" | "f" | "0" | "no" => Ok(Value::Bool(false)),
@@ -80,16 +77,24 @@ pub fn parse_parameter_value(kind: ParameterKind, text: &str) -> Result<Value, S
     }
 }
 
+fn parse_decimal_parameter(text: &str) -> Result<rust_decimal::Decimal, rust_decimal::Error> {
+    if let Some((mantissa, _)) = text.split_once(['e', 'E']) {
+        rust_decimal::Decimal::from_str_exact(mantissa)?;
+        rust_decimal::Decimal::from_scientific(text)
+    } else {
+        rust_decimal::Decimal::from_str_exact(text)
+    }
+}
+
 fn infer_parameter_value(text: &str) -> Value {
     let trimmed = text.trim();
     if let Ok(value) = trimmed.parse::<i64>() {
         return Value::Int(value);
     }
     if (trimmed.contains('.') || trimmed.contains('e') || trimmed.contains('E'))
-        && let Ok(value) = trimmed.parse::<f64>()
-        && value.is_finite()
+        && let Ok(value) = parse_decimal_parameter(trimmed)
     {
-        return Value::Float(value);
+        return Value::Decimal(value);
     }
     Value::Text(text.to_string())
 }
@@ -159,6 +164,35 @@ fn parameter_name(rest: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_contract_named_parameters_do_not_round_decimals() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/value-contract.json"
+        )))
+        .unwrap();
+        for text in corpus["decimals"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            let expected = Value::Decimal(text.parse().unwrap());
+            assert_eq!(parse_parameter_value(ParameterKind::Decimal, text).unwrap(), expected);
+            assert_eq!(parse_parameter_value(ParameterKind::Auto, text).unwrap(), expected);
+        }
+        for (input, expected) in [("1e3", "1000"), ("1.25e-2", "0.0125"), ("-1.25E2", "-125")] {
+            let expected = Value::Decimal(expected.parse().unwrap());
+            assert_eq!(parse_parameter_value(ParameterKind::Decimal, input).unwrap(), expected);
+            assert_eq!(parse_parameter_value(ParameterKind::Auto, input).unwrap(), expected);
+        }
+        assert!(parse_parameter_value(ParameterKind::Decimal, "0.123456789012345678901234567891e1").is_err());
+        for text in corpus["decimal_rejected"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert!(parse_parameter_value(ParameterKind::Decimal, text).is_err());
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Auto, text).unwrap(),
+                Value::Text(text.into())
+            );
+        }
+    }
 
     #[test]
     fn rewrites_named_parameters_per_dialect() {
@@ -278,7 +312,7 @@ mod tests {
         assert!(parse_parameter_value(ParameterKind::Integer, "x").is_err());
         assert_eq!(
             parse_parameter_value(ParameterKind::Decimal, "1.5"),
-            Ok(Value::Float(1.5))
+            Ok(Value::Decimal("1.5".parse().unwrap()))
         );
         assert!(parse_parameter_value(ParameterKind::Decimal, "nan").is_err());
         assert_eq!(
@@ -297,7 +331,10 @@ mod tests {
     fn auto_infers_numbers_and_keeps_everything_else_as_text() {
         assert_eq!(parse_parameter_value(ParameterKind::Auto, "7"), Ok(Value::Int(7)));
         assert_eq!(parse_parameter_value(ParameterKind::Auto, "-7"), Ok(Value::Int(-7)));
-        assert_eq!(parse_parameter_value(ParameterKind::Auto, "2.5"), Ok(Value::Float(2.5)));
+        assert_eq!(
+            parse_parameter_value(ParameterKind::Auto, "2.5"),
+            Ok(Value::Decimal("2.5".parse().unwrap()))
+        );
         assert_eq!(
             parse_parameter_value(ParameterKind::Auto, "true"),
             Ok(Value::Text("true".into()))

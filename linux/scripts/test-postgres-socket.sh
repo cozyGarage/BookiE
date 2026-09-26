@@ -41,7 +41,9 @@ TABLEPRO_PG_SOCKET_DIR="$socket_root" \
   cargo test -p tablepro-driver-postgres --test socket_local -- --include-ignored --test-threads=1
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
 CARGO_HOME="$cargo_home" \
+  RUSTUP_HOME="$rustup_home" \
   HOME="$secret_root/home" \
   XDG_CONFIG_HOME="$config_root" \
   XDG_DATA_HOME="$secret_root/data" \

@@ -112,7 +112,7 @@ mod tests {
     use crate::export::test_support::column;
 
     #[test]
-    fn nonfinite_numbers_remain_distinct_from_sql_null() {
+    fn value_contract_nonfinite_numbers_remain_distinct_from_sql_null() {
         let columns = vec![column("value")];
         let rows = vec![
             vec![Value::Float(f64::NAN)],

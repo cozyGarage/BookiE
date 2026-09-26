@@ -32,6 +32,7 @@ run_full() {
   python3 scripts/inventory-ignored-tests.py --check
   python3 scripts/tests/test_arch_candidate.py
   python3 scripts/tests/test_deb_package.py
+  python3 scripts/tests/test_value_contract_runner.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 
@@ -61,18 +62,13 @@ run_full() {
 }
 
 run_integration() {
-  echo "==> Postgres integration"
-  cargo test --test integration -p tablepro-driver-postgres -- --include-ignored --test-threads=1
+  echo "==> SQL and document/key-value driver integration"
+  cargo test --locked --test integration \
+    -p tablepro-driver-postgres -p tablepro-driver-mysql -p tablepro-driver-mssql \
+    -p tablepro-driver-clickhouse -p tablepro-driver-redis -p tablepro-driver-mongodb \
+    -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
-  echo "==> MySQL integration"
-  cargo test --test integration -p tablepro-driver-mysql -- --include-ignored --test-threads=1
-  echo "==> MSSQL integration"
-  cargo test --test integration -p tablepro-driver-mssql -- --include-ignored --test-threads=1
-  echo "==> ClickHouse integration"
-  cargo test --test integration -p tablepro-driver-clickhouse -- --include-ignored --test-threads=1
-  echo "==> Redis integration"
-  cargo test --test integration -p tablepro-driver-redis -- --include-ignored --test-threads=1
   echo "Integration checks passed."
 }
 

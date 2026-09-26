@@ -6,6 +6,7 @@ mod error;
 pub mod export;
 pub mod filter;
 pub mod import;
+mod numeric_input;
 mod operation;
 mod pagination;
 mod params;
@@ -31,6 +32,7 @@ pub use error::DriverError;
 pub use filter::{
     BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where, equality_rule,
 };
+pub use numeric_input::{FloatInputError, parse_float_input};
 pub use operation::{
     CANCELLATION_DISPATCH_TIMEOUT, CANCELLATION_GRACE, CONTROL_SETUP_TIMEOUT, Interruption, OperationControl,
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,

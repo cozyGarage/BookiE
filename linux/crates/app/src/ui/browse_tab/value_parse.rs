@@ -136,7 +136,7 @@ pub(super) fn parse_int_value(text: &str) -> Result<Value, String> {
 }
 
 pub(super) fn parse_float_value(text: &str) -> Result<Value, String> {
-    text.parse::<f64>()
+    tablepro_core::parse_float_input(text)
         .map(Value::Float)
         .map_err(|_| crate::tr!("Invalid number"))
 }
@@ -203,6 +203,35 @@ pub(super) fn parse_time_value(text: &str) -> Result<Value, String> {
 mod tests {
     use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column};
     use tablepro_core::{ColumnInfo, Value};
+
+    #[test]
+    fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/value-contract.json"
+        )))
+        .unwrap();
+        for text in corpus["integer_rejected"].as_array().unwrap() {
+            assert!(super::parse_int_value(text.as_str().unwrap()).is_err(), "{text}");
+        }
+        for text in corpus["integers"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(super::parse_int_value(text).unwrap(), Value::Int(text.parse().unwrap()));
+        }
+        for text in corpus["float_rejected"].as_array().unwrap() {
+            assert!(super::parse_float_value(text.as_str().unwrap()).is_err(), "{text}");
+        }
+        for text in corpus["decimal_rejected"].as_array().unwrap() {
+            assert!(super::parse_decimal_value(text.as_str().unwrap()).is_err(), "{text}");
+        }
+        for text in corpus["decimals"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(
+                super::parse_decimal_value(text).unwrap(),
+                Value::Decimal(text.parse().unwrap())
+            );
+        }
+    }
 
     #[test]
     fn decimal_preservation_rejects_an_edit_that_would_round() {

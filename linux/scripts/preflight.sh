@@ -47,6 +47,7 @@ python3 scripts/inventory-ignored-tests.py --check
 python3 scripts/tests/test_arch_candidate.py
 python3 scripts/tests/test_deb_package.py
 python3 scripts/tests/test_function_size.py
+python3 scripts/tests/test_value_contract_runner.py
 "$ROOT/scripts/check-file-size.sh"
 
 echo "==> bounded database operations in the GUI"

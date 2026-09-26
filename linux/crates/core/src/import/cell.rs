@@ -130,7 +130,9 @@ pub fn parse_cell(text: &str, kind: ColumnKind) -> Result<Value, CellError> {
         ColumnKind::Text => Ok(Value::Text(text.to_owned())),
         ColumnKind::Bool => parse_bool(trimmed),
         ColumnKind::Int => trimmed.parse().map(Value::Int).map_err(|_| CellError::NotAnInteger),
-        ColumnKind::Float => trimmed.parse().map(Value::Float).map_err(|_| CellError::NotANumber),
+        ColumnKind::Float => crate::parse_float_input(trimmed)
+            .map(Value::Float)
+            .map_err(|_| CellError::NotANumber),
         ColumnKind::Decimal => Decimal::from_str_exact(trimmed)
             .map(Value::Decimal)
             .map_err(|_| CellError::NotANumber),
@@ -270,6 +272,44 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+        }
+    }
+
+    #[test]
+    fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/value-contract.json"
+        )))
+        .unwrap();
+        for text in corpus["float_rejected"].as_array().unwrap() {
+            assert!(parse_cell(text.as_str().unwrap(), ColumnKind::Float).is_err(), "{text}");
+        }
+        for (field, kind) in [
+            ("integer_rejected", ColumnKind::Int),
+            ("decimal_rejected", ColumnKind::Decimal),
+        ] {
+            for text in corpus[field].as_array().unwrap() {
+                assert!(parse_cell(text.as_str().unwrap(), kind).is_err(), "{text}");
+            }
+        }
+        for text in corpus["integers"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(
+                parse_cell(text, ColumnKind::Int).unwrap(),
+                Value::Int(text.parse().unwrap())
+            );
+        }
+        for text in corpus["decimals"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(
+                parse_cell(text, ColumnKind::Decimal).unwrap(),
+                Value::Decimal(text.parse().unwrap())
+            );
+        }
+        for text in corpus["texts"].as_array().unwrap() {
+            let text = text.as_str().unwrap();
+            assert_eq!(parse_cell(text, ColumnKind::Text).unwrap(), Value::Text(text.into()));
         }
     }
 

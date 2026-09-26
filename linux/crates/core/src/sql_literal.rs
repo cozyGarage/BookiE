@@ -32,7 +32,8 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bool(value) => value.to_string(),
         Value::Int(value) => value.to_string(),
         Value::Float(value) if !value.is_finite() => return Err(LiteralError::NonFinite),
-        Value::Float(value) => value.to_string(),
+        Value::Float(value) => format!("{value:e}"),
+        Value::Decimal(value) if driver_id == "clickhouse" => format!("toDecimal128('{value}', {})", value.scale()),
         Value::Decimal(value) => value.to_string(),
         Value::Text(text) => quote_literal(driver_id, text),
         Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
@@ -139,6 +140,19 @@ mod tests {
             is_generated: true,
             comment: None,
             ..column(name)
+        }
+    }
+
+    #[test]
+    fn value_contract_numeric_literals_avoid_implicit_decimal_and_float_conversions() {
+        let decimal = Value::Decimal("99999999999999999999.99999999".parse().unwrap());
+        assert_eq!(
+            render_sql_literal("clickhouse", &decimal).unwrap(),
+            "toDecimal128('99999999999999999999.99999999', 8)"
+        );
+        for driver in ["postgres", "mysql", "sqlite", "mssql", "clickhouse", "duckdb"] {
+            assert_eq!(render_sql_literal(driver, &Value::Float(1e-200)).unwrap(), "1e-200");
+            assert_eq!(render_sql_literal(driver, &Value::Float(1e200)).unwrap(), "1e200");
         }
     }
 
@@ -328,7 +342,7 @@ mod tests {
         assert_eq!(render_sql_literal("postgres", &Value::Null).unwrap(), "NULL");
         assert_eq!(render_sql_literal("postgres", &Value::Bool(true)).unwrap(), "true");
         assert_eq!(render_sql_literal("postgres", &Value::Int(-3)).unwrap(), "-3");
-        assert_eq!(render_sql_literal("postgres", &Value::Float(1.5)).unwrap(), "1.5");
+        assert_eq!(render_sql_literal("postgres", &Value::Float(1.5)).unwrap(), "1.5e0");
     }
 
     #[test]

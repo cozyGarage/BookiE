@@ -726,3 +726,14 @@ async fn sql_exports_preserve_unicode_and_boolean_values() {
         vec![row]
     );
 }
+
+#[path = "../../../core/tests/support/value_contract.rs"]
+mod value_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_preserves_scalar_boundaries_through_parameters_and_exports() {
+    let (_container, options) = start_mssql().await;
+    let connection = connect(options).await;
+    value_contract::assert_scalar_contract(connection.as_ref(), "mssql").await;
+}

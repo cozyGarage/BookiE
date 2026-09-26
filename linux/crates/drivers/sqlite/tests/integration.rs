@@ -547,3 +547,13 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         values.into_iter().map(|value| vec![value]).collect::<Vec<_>>()
     );
 }
+
+#[path = "../../../core/tests/support/value_contract.rs"]
+mod value_contract;
+
+#[tokio::test]
+async fn value_contract_preserves_scalar_boundaries_through_parameters_and_exports() {
+    let directory = TempDir::new().unwrap();
+    let connection = connect_file(&directory).await;
+    value_contract::assert_scalar_contract(connection.as_ref(), "sqlite").await;
+}

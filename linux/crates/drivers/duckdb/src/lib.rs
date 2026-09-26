@@ -221,6 +221,13 @@ impl Connection for DuckdbConnection {
         blocking(move || run_query(&conn, &sql, &[], MAX_QUERY_ROWS)).await
     }
 
+    async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        let conn = Arc::clone(&self.conn);
+        let sql = sql.to_owned();
+        let params = params.to_vec();
+        blocking(move || run_query(&conn, &sql, &params, MAX_QUERY_ROWS)).await
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         let conn = Arc::clone(&self.conn);
         let sql = sql.to_string();

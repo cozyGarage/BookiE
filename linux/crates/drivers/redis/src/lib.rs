@@ -520,24 +520,33 @@ pub fn split_redis_cli(input: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     let mut in_quotes = false;
+    let mut token_started = false;
     let mut chars = input.chars().peekable();
     while let Some(c) = chars.next() {
         match c {
-            '"' => in_quotes = !in_quotes,
+            '"' => {
+                in_quotes = !in_quotes;
+                token_started = true;
+            }
             '\\' if in_quotes => {
                 if let Some(next) = chars.next() {
                     cur.push(next);
+                    token_started = true;
                 }
             }
             c if c.is_whitespace() && !in_quotes => {
-                if !cur.is_empty() {
+                if token_started {
                     out.push(std::mem::take(&mut cur));
+                    token_started = false;
                 }
             }
-            _ => cur.push(c),
+            _ => {
+                cur.push(c);
+                token_started = true;
+            }
         }
     }
-    if !cur.is_empty() {
+    if token_started {
         out.push(cur);
     }
     out
@@ -606,6 +615,15 @@ fn map_redis_connect_error(err: RedisError, verifies_cert: bool) -> DriverError 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_contract_empty_quoted_arguments_are_not_dropped() {
+        assert_eq!(split_redis_cli(r#"SET key """#), vec!["SET", "key", ""]);
+        assert_eq!(
+            split_redis_cli(r#"MSET "" "" key "" "#),
+            vec!["MSET", "", "", "key", ""]
+        );
+    }
 
     #[test]
     fn structure_metadata_is_not_declared_without_a_fetch() {

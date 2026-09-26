@@ -6231,6 +6231,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "duckdb",
+ "serde_json",
  "tablepro-core",
  "tempfile",
  "tokio",
@@ -6319,6 +6320,7 @@ dependencies = [
  "async-trait",
  "redis",
  "secrecy",
+ "serde_json",
  "tablepro-core",
  "testcontainers",
  "testcontainers-modules",

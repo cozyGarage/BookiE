@@ -248,6 +248,28 @@ visible undecodable marker is safer than NULL but does not satisfy lossless
 NUMERIC support. Rejecting an inexact decimal edit does not add arbitrary-precision
 editing. B4–B6 acceptance follows B3; their boxes remain open.
 
+### B3 shared boundary contract and build reuse: 2026-09-26
+
+The [value-contract suite](value-contracts.md) uses one corpus across all eight
+drivers and the grid, filter, CSV import, named parameter, JSON and MCP paths.
+SQL engines exercise binding and literal export separately. Driver fixtures do
+not stand in for every server version or every native type.
+
+The new suite reproduced and fixed float overflow/underflow in input parsers,
+floating-point named decimal parameters, MySQL float-export underflow, SQL Server
+float-literal limits, ClickHouse decimal-export rounding, dropped empty Redis
+arguments and missing DuckDB parameterized queries. ClickHouse's explicit SQL-size
+limit is retained, and long result values are checked independently.
+
+All 11 selected suites passed twice, including optional DuckDB and the grid
+parser. The unchanged run compiled in 0.924 seconds with 745 fresh artifacts and
+zero rebuilt packages. Reports and remaining type coverage are linked from the
+suite guide. The local integration runner now includes MongoDB and selects the
+six server drivers together. No existing build artifacts were deleted.
+
+B3 remains open for the native-type and consumer gaps listed above. B4–B6
+acceptance stays next in sequence.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
