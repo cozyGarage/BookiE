@@ -118,7 +118,8 @@ impl Connection for MysqlConnection {
                     CAST(extra AS CHAR), CAST(column_default AS CHAR),
                     CAST(generation_expression AS CHAR),
                     CAST(column_comment AS CHAR),
-                    CAST(collation_name AS CHAR)
+                    CAST(collation_name AS CHAR),
+                    CAST(VERSION() LIKE '%MariaDB%' AS SIGNED)
              FROM information_schema.columns
              WHERE table_schema = COALESCE(?, DATABASE()) AND table_name = ?
              ORDER BY ordinal_position",
@@ -774,8 +775,13 @@ const UNQUOTED_DEFAULT_TYPE_PREFIXES: [&str; 12] = [
 // DEFAULT_GENERATED in `extra`; 5.7 reports CURRENT_TIMESTAMP bare on a
 // temporal column. Anything else on a non-numeric column is a string
 // literal and is quoted back so restating the column keeps its default.
-fn default_expression(raw: Option<String>, column_type: &str, extra: &str) -> Option<String> {
+// MariaDB 10.2.7+ already reports the DEFAULT clause itself and reports a
+// column without a default as the text NULL.
+fn default_expression(raw: Option<String>, column_type: &str, extra: &str, mariadb: bool) -> Option<String> {
     let raw = raw?;
+    if mariadb {
+        return (!raw.eq_ignore_ascii_case("null")).then_some(raw);
+    }
     let lower_type = column_type.to_ascii_lowercase();
     let numeric = UNQUOTED_DEFAULT_TYPE_PREFIXES
         .iter()
@@ -794,7 +800,13 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str) -> Op
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
     let extra = r.try_get::<String, _>(4).unwrap_or_default().to_ascii_lowercase();
     let column_type = r.get::<String, _>(1);
-    let default_value = default_expression(r.try_get::<Option<String>, _>(5).unwrap_or(None), &column_type, &extra);
+    let mariadb = r.try_get::<i64, _>(9).unwrap_or(0) == 1;
+    let default_value = default_expression(
+        r.try_get::<Option<String>, _>(5).unwrap_or(None),
+        &column_type,
+        &extra,
+        mariadb,
+    );
     let generation_expr: Option<String> = r.try_get::<Option<String>, _>(6).unwrap_or(None);
     ColumnInfo {
         name: r.get::<String, _>(0),

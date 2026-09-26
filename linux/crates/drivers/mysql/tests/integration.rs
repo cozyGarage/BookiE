@@ -8,7 +8,8 @@ use serde_json::json;
 use drivers_mysql::MysqlDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ContainerAsync;
-use testcontainers::ImageExt;
+use testcontainers::core::{IntoContainerPort, WaitFor};
+use testcontainers::{GenericImage, ImageExt};
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
@@ -578,7 +579,9 @@ async fn column_default(conn: &dyn Connection, table: &str, column: &str) -> Opt
     columns.into_iter().find(|c| c.name == column).unwrap().default_value
 }
 
-const KEPT_DEFAULTS: [(&str, Option<&str>); 7] = [
+type KeptDefaults = [(&'static str, Option<&'static str>); 7];
+
+const KEPT_DEFAULTS: KeptDefaults = [
     ("bare", None),
     ("explicit_null", None),
     ("blank", Some("''")),
@@ -592,7 +595,35 @@ const KEPT_DEFAULTS: [(&str, Option<&str>); 7] = [
 #[ignore = "requires docker"]
 async fn a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_apart() {
     let (_c, opts) = start_mysql().await;
-    let conn = connect(opts).await;
+    assert_defaults_survive_a_nullability_change(connect(opts).await, KEPT_DEFAULTS).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_mariadb_default_is_reported_as_its_clause_without_quoting_it_twice() {
+    let container = GenericImage::new("mariadb", "11")
+        .with_exposed_port(3306.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
+        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_DATABASE", "test")
+        .start()
+        .await
+        .expect("start mariadb container");
+    let opts = ConnectOptions {
+        host: container.get_host().await.expect("host").to_string(),
+        port: container.get_host_port_ipv4(3306).await.expect("port"),
+        database: "test".into(),
+        username: "root".into(),
+        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        tls: tablepro_core::TlsConfig::disabled(),
+        ..Default::default()
+    };
+    let mut expected = KEPT_DEFAULTS;
+    expected[6] = ("stamped", Some("current_timestamp()"));
+    assert_defaults_survive_a_nullability_change(connect(opts).await, expected).await;
+}
+
+async fn assert_defaults_survive_a_nullability_change(conn: Box<dyn Connection>, expected: KeptDefaults) {
     conn.execute(
         "CREATE TABLE defaults_kept (id int PRIMARY KEY, \
          bare varchar(20) NULL, \
@@ -605,7 +636,7 @@ async fn a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_a
     )
     .await
     .unwrap();
-    for (name, default) in KEPT_DEFAULTS {
+    for (name, default) in expected {
         assert_eq!(
             column_default(conn.as_ref(), "defaults_kept", name).await.as_deref(),
             default,
@@ -622,7 +653,7 @@ async fn a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_a
         }
     }
 
-    for (name, default) in KEPT_DEFAULTS {
+    for (name, default) in expected {
         assert_eq!(
             column_default(conn.as_ref(), "defaults_kept", name).await.as_deref(),
             default,
