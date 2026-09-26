@@ -800,10 +800,7 @@ fn default_expression(raw: Option<String>, column_type: &str, extra: &str, maria
     if numeric || temporal_now || extra.contains("default_generated") {
         return Some(raw);
     }
-    Some(tablepro_core::sql_literal::render_sql_literal(
-        "mysql",
-        &Value::Text(raw),
-    ))
+    tablepro_core::sql_literal::render_sql_literal("mysql", &Value::Text(raw)).ok()
 }
 
 fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {

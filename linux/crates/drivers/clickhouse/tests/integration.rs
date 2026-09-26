@@ -47,7 +47,7 @@ async fn copied_in_clause_keeps_backslash_payload_as_data() {
     let conn = connect(opts).await;
     let payload = Value::Text("x\\' OR 1=1 -- ".into());
     let clause = tablepro_core::export::render_in_clause("clickhouse", &[vec![payload.clone()]], 0);
-    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &payload);
+    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &payload).unwrap();
     let result = conn
         .query(&format!("SELECT {literal} WHERE {literal} IN {}", clause.sql))
         .await
@@ -454,5 +454,41 @@ async fn a_column_comment_round_trips_and_an_uncommented_column_reads_as_none() 
     assert_eq!(
         id.comment, None,
         "an uncommented column reports the engine's empty string as no comment"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
+    let (_container, options) = start_clickhouse().await;
+    let conn = connect(options).await;
+    conn.execute("CREATE TABLE binary_exports (id INTEGER, payload Nullable(String)) ENGINE = Memory")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
+    let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
+    for (id, value) in values.iter().enumerate() {
+        let statement = tablepro_core::sql_literal::build_insert_literal(
+            "clickhouse",
+            None,
+            "binary_exports",
+            &columns,
+            &[Value::Int(id as i64), value.clone()],
+        )
+        .unwrap();
+        conn.execute(&statement).await.unwrap();
+    }
+    let result = conn
+        .query("SELECT lower(hex(payload)) FROM binary_exports ORDER BY id")
+        .await
+        .unwrap();
+    let hex: String = (0u8..=255).map(|byte| format!("{byte:02x}")).collect();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Null],
+            vec![Value::Text(String::new())],
+            vec![Value::Text(hex)]
+        ]
     );
 }

@@ -777,3 +777,34 @@ async fn grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys() {
         grid_edits_and_deletes_only_the_keyed_row(conn.as_ref(), "mysql", table).await;
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
+    let (_container, options) = start_mysql().await;
+    let conn = connect(options).await;
+    conn.execute("CREATE TABLE binary_exports (id INTEGER, payload LONGBLOB)")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
+    let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
+    for (id, value) in values.iter().enumerate() {
+        let statement = tablepro_core::sql_literal::build_insert_literal(
+            "mysql",
+            None,
+            "binary_exports",
+            &columns,
+            &[Value::Int(id as i64), value.clone()],
+        )
+        .unwrap();
+        conn.execute(&statement).await.unwrap();
+    }
+    let result = conn
+        .query("SELECT payload FROM binary_exports ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        values.into_iter().map(|value| vec![value]).collect::<Vec<_>>()
+    );
+}

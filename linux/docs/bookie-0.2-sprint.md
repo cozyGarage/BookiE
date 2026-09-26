@@ -190,6 +190,22 @@ uncommitted work as a resulting commit.
 - 30 consecutive retry-free GTK attempts across six or more runs at one SHA.
   Candidate changes invalidate affected evidence.
 
+## Remaining-work review: 2026-09-26
+
+| Milestone | Implemented evidence | Work still required before closure |
+| --- | --- | --- |
+| B1 | Host build, prior Meson evidence, package fixtures | Real Flatpak and installed Arch/Debian/profile qualification at the candidate SHA |
+| B2 | Owned stores/tasks, migrations, rollback copies, MCP shutdown | Requalify installed upgrade/rollback during B7; do not reopen completed code without a failing case |
+| B3 | Typed row edits, metadata fixes, undecodable-write refusal, five-engine binary INSERT export | Remaining wide numeric/array/temporal/JSON consumer contracts, optional DuckDB, and all-engine acceptance. A separate declared-type field remains deferred until a concrete consumer needs it; the collation-only September 25 note does not prove the full lossless checklist above |
+| B4 | Governed sessions, OpenSSH/agent authentication, container and logic tests | Complete installed session/SSH prompts, cancellation, cleanup and TLS-through-tunnel acceptance; retain unsupported-engine behavior |
+| B5 | Open/Save/Save As, external-change checks, restart relinking | Installed file-dialog/dirty-close/recovery flows and shared-planner highlighting acceptance |
+| B6 | Guarded catalog listing shared by GUI/MCP, real PostgreSQL fixtures | Restricted-role/refresh/stale-result and installed Catalog workflow acceptance |
+| B7 | Fast, driver and isolated widget evidence available | Freeze a candidate, run missing security/optional/package tiers and retry-free Wayland soak; reconcile release evidence at that SHA |
+
+Continue B3 with one consumer contract at a time, then close B4–B6 acceptance
+against the implemented code. The [manual checklist](manual-verification-0.2-features.md)
+is still open; isolated widget tests do not check its boxes automatically.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
@@ -652,3 +668,17 @@ isolated-test inventory passed. Debian package fixture could not run because
   refusing the lossy operation, not by implementing binary SQL literals. B3 is
   still open. See [reconciliation-2026-09-26.md](reconciliation-2026-09-26.md)
   for decisions and combined-tree verification.
+
+- 2026-09-26 continuation from `41fd9876d`: pushed the reconciliation to
+  `fork/linux`. Hosted preflight exposed a Debian fixture missing the newly
+  required schema; `541074adb` adds the schema and a missing-schema rejection
+  case. The fixture passed in a disposable Python/Debian container with the
+  repository mounted read-only. Continued B3 with a fallible SQL literal API:
+  binary INSERT exports preserve exact bytes for PostgreSQL/MySQL/SQLite/SQL
+  Server/ClickHouse; undecodable/non-finite/unsupported values return errors.
+  The SQLite regression failed with binary export disabled, then all five
+  real-engine round trips passed for NULL, empty binary and all 256 byte values.
+  Core library tests passed (405). DuckDB binary export remains explicitly
+  unsupported. Copy as IN keeps its existing skip behavior. Full fast checks passed at
+  `target/quality/20260926T133550496651Z-full/report.json`. Hosted CI remains
+  a separate gate for the resulting pushed commit.

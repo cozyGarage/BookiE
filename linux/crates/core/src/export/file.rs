@@ -219,10 +219,10 @@ mod tests {
                 table: "people",
             }),
         };
-        let mut data = result();
-        data.rows[0][0] = Value::Int(1);
+        let data = result();
         write_result_file(&path, &data, &export, || false, |_| {}).unwrap();
         let sql = std::fs::read_to_string(&path).unwrap();
+        assert!(sql.contains("decode('00ff', 'hex')"));
         assert!(
             sql.starts_with("INSERT INTO \"public\".\"people\" (\"id\", \"id\", \"id_2\")"),
             "{sql}"
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn a_sql_export_with_binary_data_preserves_the_existing_destination() {
+    fn a_sql_export_with_undecodable_data_preserves_the_existing_destination() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("result");
         std::fs::write(&path, "previous export").unwrap();
@@ -244,7 +244,9 @@ mod tests {
                 table: "people",
             }),
         };
-        let error = write_result_file(&path, &result(), &export, || false, |_| {}).unwrap_err();
+        let mut data = result();
+        data.rows[0][0] = Value::Undecodable("NUMERIC".into());
+        let error = write_result_file(&path, &data, &export, || false, |_| {}).unwrap_err();
         assert!(matches!(
             error,
             ExportError::Statement(crate::sql_dialect::BuildSqlError::UnrepresentableValue { .. })

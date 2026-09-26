@@ -41,7 +41,7 @@ fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
             .into(),
         );
     }
-    Some(crate::sql_literal::render_sql_literal(driver_id, value))
+    crate::sql_literal::render_sql_literal(driver_id, value).ok()
 }
 
 #[cfg(test)]

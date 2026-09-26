@@ -1,8 +1,9 @@
 # Manual verification: the 0.2 upstream feature sprint
 
-Everything here was merged with its logic unit-tested and its guards green, and none
-of it has been rendered on a display. The decision logic behind each surface is
-covered by tests; the widget layout, the wiring and the feel are not.
+The features below have logic tests. Four isolated GTK widget regressions passed
+on 2026-09-26, including long-cell edit seeding; this does not qualify the full
+installed workflows, layouts or light/dark appearance below. Unchecked items
+remain pending.
 
 Take light and dark screenshots for each section, per `CLAUDE.md`. Record a result
 beside each item rather than leaving it blank, because a blank line here reads as
@@ -180,8 +181,8 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 
 A text or JSON cell over 40,000 bytes shows a shortened value ending in
 `… (+N more chars)`. Editing used to start from that shortened text; this is
-now fixed (`FULL_EDIT_TEXT_SLOT` in `crates/app/src/ui/grid/display.rs`), but
-has not been rendered on a display. Use a table with a `text` or `json` column
+now fixed (`FULL_EDIT_TEXT_SLOT` in `crates/app/src/ui/grid/display.rs`) and its
+isolated GTK regression passed on 2026-09-26. The installed workflow remains open. Use a table with a `text` or `json` column
 and insert one row with a value of at least 50,000 characters (for example
 `SELECT repeat('a', 50000)` cast to the column's type, or a JSON array with
 enough elements).
@@ -228,7 +229,8 @@ enough elements).
 - Bundle export and import write **no** audit-journal entries. `AuditEvent` is
   SQL-shaped and hash-chained, so an administrative-event class needs its own ADR
   before that gap can be closed. See `storage.md`.
-- SQL-format export and copied INSERT statements render any binary column value
-  as `/* bytes omitted */ NULL` (`crates/core/src/sql_literal.rs`). This is
-  deliberate and marked in the output, but the binary data is not recoverable
-  from the exported SQL. No fix attempted yet.
+- SQL-format export and copied INSERT statements now preserve binary values on
+  PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse, with real-engine tests
+  for NULL, empty blobs and all 256 byte values. DuckDB binary SQL literals remain
+  unsupported and are explicitly refused. Other lossless-contract requirements
+  remain under B3.

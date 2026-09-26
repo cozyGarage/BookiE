@@ -68,7 +68,7 @@
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
 - A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, and a row whose key could not be read is refused instead of being changed or deleted silently.
-- Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export refuses binary, undecodable and non-finite values instead of substituting NULL, while Copy as IN skips undecodable cells.
+- Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export preserves binary values using exact literals on PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse; unsupported binary exports, undecodable values and non-finite numbers are refused instead of substituting NULL. Copy as IN continues to skip binary and undecodable cells.
 
 ### Security
 

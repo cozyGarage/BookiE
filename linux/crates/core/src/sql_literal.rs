@@ -1,6 +1,16 @@
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{BuildSqlError, quote_ident};
 
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum LiteralError {
+    #[error("the value could not be decoded")]
+    Undecodable,
+    #[error("non-finite numbers cannot be exported as SQL literals")]
+    NonFinite,
+    #[error("this engine does not support this SQL literal")]
+    Unsupported,
+}
+
 /// Render `value` as a SQL literal for `driver_id`.
 ///
 /// Escaping is dialect-specific and getting it wrong is not cosmetic.
@@ -12,22 +22,37 @@ use crate::sql_dialect::{BuildSqlError, quote_ident};
 ///
 /// Row values come from the database, which the project treats as
 /// untrusted input.
-pub fn render_sql_literal(driver_id: &str, value: &Value) -> String {
-    match value {
+pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, LiteralError> {
+    if !crate::export::supports_sql_literals(driver_id) {
+        return Err(LiteralError::Unsupported);
+    }
+    Ok(match value {
         Value::Null => "NULL".into(),
         Value::Bool(value) => value.to_string(),
         Value::Int(value) => value.to_string(),
+        Value::Float(value) if !value.is_finite() => return Err(LiteralError::NonFinite),
         Value::Float(value) => value.to_string(),
         Value::Decimal(value) => value.to_string(),
         Value::Text(text) => quote_literal(driver_id, text),
-        Value::Bytes(_) => "/* bytes omitted */ NULL".into(),
+        Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
         Value::Date(date) => quote_literal(driver_id, &date.format("%Y-%m-%d").to_string()),
         Value::Time(time) => quote_literal(driver_id, &time.to_string()),
         Value::DateTime(stamp) => quote_literal(driver_id, &stamp.to_string()),
         Value::TimestampTz(stamp) => quote_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => quote_literal(driver_id, &id.to_string()),
         Value::Json(json) => quote_literal(driver_id, &json.to_string()),
-        Value::Undecodable(_) => "/* undecodable value omitted */ NULL".into(),
+        Value::Undecodable(_) => return Err(LiteralError::Undecodable),
+    })
+}
+
+fn binary_literal(driver_id: &str, bytes: &[u8]) -> Result<String, LiteralError> {
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    match driver_id {
+        "postgres" => Ok(format!("decode('{hex}', 'hex')")),
+        "mysql" | "sqlite" => Ok(format!("X'{hex}'")),
+        "mssql" => Ok(format!("0x{hex}")),
+        "clickhouse" => Ok(format!("unhex('{hex}')")),
+        _ => Err(LiteralError::Unsupported),
     }
 }
 
@@ -66,15 +91,12 @@ pub fn build_insert_literal(
         if column.is_generated {
             continue;
         }
-        if matches!(value, Value::Bytes(_) | Value::Undecodable(_))
-            || matches!(value, Value::Float(number) if !number.is_finite())
-        {
-            return Err(BuildSqlError::UnrepresentableValue {
-                column: column.name.clone(),
-            });
-        }
         names.push(quote_ident(driver_id, &column.name));
-        values.push(render_sql_literal(driver_id, value));
+        values.push(
+            render_sql_literal(driver_id, value).map_err(|_| BuildSqlError::UnrepresentableValue {
+                column: column.name.clone(),
+            })?,
+        );
     }
     if names.is_empty() {
         return Err(BuildSqlError::NothingToUpdate);
@@ -119,11 +141,7 @@ mod tests {
 
     #[test]
     fn insert_export_refuses_values_it_cannot_represent() {
-        for value in [
-            Value::Bytes(vec![0, 255]),
-            Value::Undecodable("NUMERIC".into()),
-            Value::Float(f64::NAN),
-        ] {
+        for value in [Value::Undecodable("NUMERIC".into()), Value::Float(f64::NAN)] {
             let error = build_insert_literal("postgres", None, "items", &[column("value")], &[value])
                 .expect_err("export must not turn a value into SQL NULL");
             assert!(matches!(error, BuildSqlError::UnrepresentableValue { column } if column == "value"));
@@ -131,48 +149,27 @@ mod tests {
     }
 
     #[test]
-    fn an_undecodable_value_is_never_written_back_as_a_bare_null() {
-        let rendered = render_sql_literal("postgres", &Value::Undecodable("NUMERIC".into()));
-        assert!(rendered.starts_with("/*"), "{rendered}");
-        assert!(rendered.ends_with("NULL"), "{rendered}");
-    }
-
-    #[test]
-    fn a_catalog_type_name_cannot_break_out_of_the_undecodable_marker() {
-        let hostile = [
-            "x */, (SELECT 1) --",
-            "*/",
-            "*/; DROP TABLE users; --",
-            "a' OR 1=1 --",
-            "line\nbreak */ UNION ALL SELECT 1",
-            "NUMERIC",
-        ];
-        for driver_id in ["postgres", "mysql", "sqlite", "mssql", "clickhouse"] {
-            for type_name in hostile {
-                let rendered = render_sql_literal(driver_id, &Value::Undecodable(type_name.into()));
-                assert!(rendered.starts_with("/*"), "{driver_id}: {rendered}");
-                let Some((comment, tail)) = rendered.split_once("*/") else {
-                    panic!("{driver_id} produced an unterminated comment: {rendered}");
-                };
-                assert!(
-                    !comment[2..].contains("/*"),
-                    "{driver_id} nested a comment opener: {rendered}"
-                );
+    fn unrepresentable_values_return_errors_without_sql() {
+        for driver in ["postgres", "mysql", "sqlite", "mssql", "clickhouse", "duckdb"] {
+            assert_eq!(
+                render_sql_literal(driver, &Value::Undecodable("*/; DROP TABLE t; --".into())),
+                Err(LiteralError::Undecodable)
+            );
+            for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
                 assert_eq!(
-                    tail, " NULL",
-                    "{driver_id} let {type_name:?} place SQL after the marker: {rendered}"
-                );
-                assert!(
-                    !rendered.contains(';'),
-                    "{driver_id} let {type_name:?} start a second statement: {rendered}"
-                );
-                assert_eq!(
-                    rendered,
-                    render_sql_literal(driver_id, &Value::Undecodable("plain".into())),
-                    "{driver_id} still renders catalog text into SQL"
+                    render_sql_literal(driver, &Value::Float(number)),
+                    Err(LiteralError::NonFinite)
                 );
             }
         }
+        assert_eq!(
+            render_sql_literal("redis", &Value::Int(1)),
+            Err(LiteralError::Unsupported)
+        );
+        assert_eq!(
+            render_sql_literal("duckdb", &Value::Bytes(vec![0])),
+            Err(LiteralError::Unsupported)
+        );
     }
 
     /// The exact shape that escaped a MySQL literal: the trailing
@@ -184,16 +181,16 @@ mod tests {
     #[test]
     fn a_backslash_is_escaped_only_where_the_engine_treats_it_as_an_escape() {
         assert_eq!(
-            render_sql_literal("mysql", &Value::Text(BREAKOUT.into())),
+            render_sql_literal("mysql", &Value::Text(BREAKOUT.into())).unwrap(),
             "'x\\\\'' OR 1=1 -- '"
         );
         assert_eq!(
-            render_sql_literal("clickhouse", &Value::Text(BREAKOUT.into())),
+            render_sql_literal("clickhouse", &Value::Text(BREAKOUT.into())).unwrap(),
             "'x\\\\'' OR 1=1 -- '"
         );
         for driver_id in ["postgres", "sqlite", "mssql"] {
             assert_eq!(
-                render_sql_literal(driver_id, &Value::Text(BREAKOUT.into())),
+                render_sql_literal(driver_id, &Value::Text(BREAKOUT.into())).unwrap(),
                 "'x\\'' OR 1=1 -- '",
                 "{driver_id} must keep a backslash literal"
             );
@@ -219,7 +216,7 @@ mod tests {
         ];
         for driver_id in ["postgres", "mysql", "sqlite", "mssql", "clickhouse"] {
             for text in awkward {
-                let rendered = render_sql_literal(driver_id, &Value::Text(text.into()));
+                let rendered = render_sql_literal(driver_id, &Value::Text(text.into())).unwrap();
                 let (decoded, consumed) = decode_literal(driver_id, &rendered)
                     .unwrap_or_else(|| panic!("{driver_id} produced an unterminated literal for {text:?}: {rendered}"));
                 assert_eq!(decoded, text, "{driver_id} changed the value: {rendered}");
@@ -318,17 +315,17 @@ mod tests {
 
     #[test]
     fn scalar_values_render_without_quotes_and_null_stays_a_keyword() {
-        assert_eq!(render_sql_literal("postgres", &Value::Null), "NULL");
-        assert_eq!(render_sql_literal("postgres", &Value::Bool(true)), "true");
-        assert_eq!(render_sql_literal("postgres", &Value::Int(-3)), "-3");
-        assert_eq!(render_sql_literal("postgres", &Value::Float(1.5)), "1.5");
+        assert_eq!(render_sql_literal("postgres", &Value::Null).unwrap(), "NULL");
+        assert_eq!(render_sql_literal("postgres", &Value::Bool(true)).unwrap(), "true");
+        assert_eq!(render_sql_literal("postgres", &Value::Int(-3)).unwrap(), "-3");
+        assert_eq!(render_sql_literal("postgres", &Value::Float(1.5)).unwrap(), "1.5");
     }
 
     #[test]
     fn a_quote_inside_a_value_is_doubled_for_every_dialect() {
         for driver_id in ["postgres", "mysql", "sqlite", "mssql", "clickhouse"] {
             assert_eq!(
-                render_sql_literal(driver_id, &Value::Text("O'Brien".into())),
+                render_sql_literal(driver_id, &Value::Text("O'Brien".into())).unwrap(),
                 "'O''Brien'",
                 "{driver_id}"
             );
@@ -336,8 +333,19 @@ mod tests {
     }
 
     #[test]
-    fn bytes_are_marked_rather_than_silently_rendered_as_data() {
-        let rendered = render_sql_literal("postgres", &Value::Bytes(vec![1, 2, 3]));
-        assert!(rendered.contains("bytes omitted"), "{rendered}");
+    fn binary_literals_preserve_empty_and_arbitrary_bytes() {
+        for (driver, expected, empty) in [
+            ("postgres", "decode('00275cff', 'hex')", "decode('', 'hex')"),
+            ("mysql", "X'00275cff'", "X''"),
+            ("sqlite", "X'00275cff'", "X''"),
+            ("mssql", "0x00275cff", "0x"),
+            ("clickhouse", "unhex('00275cff')", "unhex('')"),
+        ] {
+            assert_eq!(
+                render_sql_literal(driver, &Value::Bytes(vec![0, 39, 92, 255])).unwrap(),
+                expected
+            );
+            assert_eq!(render_sql_literal(driver, &Value::Bytes(vec![])).unwrap(), empty);
+        }
     }
 }
