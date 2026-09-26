@@ -490,6 +490,40 @@ fn map_duck_error(err: duckdb::Error) -> DriverError {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
+        let conn = DuckdbDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        conn.execute("CREATE TABLE binary_exports (id INTEGER, payload BLOB)")
+            .await
+            .unwrap();
+        let columns = conn.fetch_columns(None, "binary_exports").await.unwrap();
+        let values = [Value::Null, Value::Bytes(vec![]), Value::Bytes((0u8..=255).collect())];
+        for (id, value) in values.iter().enumerate() {
+            let sql = tablepro_core::sql_literal::build_insert_literal(
+                "duckdb",
+                None,
+                "binary_exports",
+                &columns,
+                &[Value::Int(id as i64), value.clone()],
+            )
+            .unwrap();
+            conn.execute(&sql).await.unwrap();
+        }
+        assert_eq!(
+            conn.query("SELECT payload FROM binary_exports ORDER BY id")
+                .await
+                .unwrap()
+                .rows,
+            values.into_iter().map(|value| vec![value]).collect::<Vec<_>>()
+        );
+    }
+
     #[test]
     fn undecodable_cell_cannot_be_bound_as_null() {
         assert!(matches!(

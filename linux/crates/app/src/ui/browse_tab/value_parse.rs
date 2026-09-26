@@ -142,7 +142,7 @@ pub(super) fn parse_float_value(text: &str) -> Result<Value, String> {
 }
 
 pub(super) fn parse_decimal_value(text: &str) -> Result<Value, String> {
-    text.parse::<rust_decimal::Decimal>()
+    rust_decimal::Decimal::from_str_exact(text)
         .map(Value::Decimal)
         .map_err(|_| crate::tr!("Invalid decimal"))
 }
@@ -203,6 +203,12 @@ pub(super) fn parse_time_value(text: &str) -> Result<Value, String> {
 mod tests {
     use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column};
     use tablepro_core::{ColumnInfo, Value};
+
+    #[test]
+    fn decimal_preservation_rejects_an_edit_that_would_round() {
+        assert!(super::parse_decimal_value("0.123456789012345678901234567891").is_err());
+        assert!(super::parse_decimal_value("12.3400").is_ok());
+    }
 
     #[test]
     fn normalize_single_line_leaves_plain_text_untouched() {

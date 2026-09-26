@@ -62,9 +62,10 @@ fn value_to_json(value: &Value) -> serde_json::Value {
         Value::Null => serde_json::Value::Null,
         Value::Bool(value) => serde_json::Value::Bool(*value),
         Value::Int(value) => serde_json::Value::Number((*value).into()),
-        Value::Float(value) => {
-            serde_json::Number::from_f64(*value).map_or(serde_json::Value::Null, serde_json::Value::Number)
-        }
+        Value::Float(value) => serde_json::Number::from_f64(*value).map_or_else(
+            || serde_json::Value::String(value.to_string()),
+            serde_json::Value::Number,
+        ),
         Value::Decimal(value) => match value.to_string().parse() {
             Ok(value) => serde_json::Value::Number(value),
             Err(_) => serde_json::Value::String(value.to_string()),
@@ -109,6 +110,22 @@ impl ResultWriter for JsonWriter {
 mod tests {
     use super::*;
     use crate::export::test_support::column;
+
+    #[test]
+    fn nonfinite_numbers_remain_distinct_from_sql_null() {
+        let columns = vec![column("value")];
+        let rows = vec![
+            vec![Value::Float(f64::NAN)],
+            vec![Value::Float(f64::INFINITY)],
+            vec![Value::Float(f64::NEG_INFINITY)],
+            vec![Value::Null],
+        ];
+        let output: serde_json::Value = serde_json::from_str(&render_json(&columns, &rows)).unwrap();
+        assert_eq!(
+            output,
+            serde_json::json!([{"value": "NaN"}, {"value": "inf"}, {"value": "-inf"}, {"value": null}])
+        );
+    }
 
     #[test]
     fn json_renderer_keeps_value_types_duplicate_columns_and_missing_cells() {

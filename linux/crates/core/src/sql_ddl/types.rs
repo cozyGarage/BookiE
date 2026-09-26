@@ -509,8 +509,8 @@ AND name = 'MS_Description')"
     let value = quote_literal(driver_id, comment);
     format!(
         "{declare}IF {exists} \
-EXEC sp_updateextendedproperty @name = N'MS_Description', @value = N{value}, {levels} \
-ELSE EXEC sp_addextendedproperty @name = N'MS_Description', @value = N{value}, {levels}"
+EXEC sp_updateextendedproperty @name = N'MS_Description', @value = {value}, {levels} \
+ELSE EXEC sp_addextendedproperty @name = N'MS_Description', @value = {value}, {levels}"
     )
 }
 

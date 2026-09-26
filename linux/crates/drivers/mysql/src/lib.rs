@@ -533,11 +533,7 @@ fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> 
         // itself allows (up to 65). A legitimately large value keeps
         // its exact digits as text instead of the row's real number
         // silently disappearing.
-        "DECIMAL" | "NUMERIC" => row
-            .try_get::<rust_decimal::Decimal, _>(idx)
-            .map(Value::Decimal)
-            .ok()
-            .or_else(|| decimal_text_fallback(row, idx)),
+        "DECIMAL" | "NUMERIC" => decode_decimal_exact(row, idx),
         "BOOLEAN" => row.try_get::<bool, _>(idx).map(Value::Bool).ok(),
         "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date).ok(),
         "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time).ok(),
@@ -567,13 +563,17 @@ fn undecodable(idx: usize, type_name: &str) -> Value {
 /// column outright, even though its wire representation is already
 /// text -- decoding through the raw value ref bypasses that check
 /// instead of going through `Row::try_get`.
-fn decimal_text_fallback(row: &MySqlRow, idx: usize) -> Option<Value> {
+fn decode_decimal_exact(row: &MySqlRow, idx: usize) -> Option<Value> {
     let raw = row.try_get_raw(idx).ok()?;
     if raw.is_null() {
         return None;
     }
     <&str as sqlx::Decode<sqlx::MySql>>::decode(raw)
-        .map(|s| Value::Text(s.to_string()))
+        .map(|text| {
+            rust_decimal::Decimal::from_str_exact(text)
+                .map(Value::Decimal)
+                .unwrap_or_else(|_| Value::Text(text.to_owned()))
+        })
         .ok()
 }
 

@@ -458,6 +458,7 @@ async fn fetch_result(
     query_id: Option<&str>,
 ) -> Result<QueryResult, DriverError> {
     let cursor = tag_query(client.query(&escape_bind_markers(sql)), query_id)
+        .with_setting("output_format_json_quote_denormals", "1")
         .fetch_bytes(ROW_FORMAT)
         .map_err(map_clickhouse_error)?;
     let mut reader = LineReader::new(cursor);
@@ -614,12 +615,12 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
             .or_else(|| raw.as_str().and_then(|s| s.parse::<f64>().ok()))
             .map(Value::Float)
             .unwrap_or_else(|| fallback_text(&raw)),
-        "Decimal" | "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" => raw
-            .as_str()
-            .and_then(|s| s.parse::<rust_decimal::Decimal>().ok())
-            .or_else(|| raw.as_f64().and_then(|f| rust_decimal::Decimal::try_from(f).ok()))
-            .map(Value::Decimal)
-            .unwrap_or_else(|| fallback_text(&raw)),
+        "Decimal" | "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" => {
+            let text = raw.as_str().map(str::to_owned).unwrap_or_else(|| raw.to_string());
+            rust_decimal::Decimal::from_str_exact(&text)
+                .map(Value::Decimal)
+                .unwrap_or(Value::Text(text))
+        }
         "Date" | "Date32" => raw
             .as_str()
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
@@ -932,6 +933,28 @@ fn map_clickhouse_error(err: clickhouse::error::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decimal_preservation_never_passes_through_float_or_rounds() {
+        for text in [
+            "12345678901234567890.12345678",
+            "0.123456789012345678901234567891",
+            "1234567890123456789012345678901234567890.123456789",
+        ] {
+            for raw in [
+                serde_json::from_str(text).unwrap(),
+                serde_json::Value::String(text.into()),
+            ] {
+                let value = json_to_value(raw, "Decimal256(30)");
+                let actual = match value {
+                    Value::Decimal(value) => value.to_string(),
+                    Value::Text(value) => value,
+                    other => panic!("unexpected value: {other:?}"),
+                };
+                assert_eq!(actual, text);
+            }
+        }
+    }
 
     #[test]
     fn the_sorting_key_is_declared_but_foreign_keys_are_not() {

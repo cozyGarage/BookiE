@@ -280,6 +280,7 @@ fn value_to_json(v: &tablepro_core::Value) -> JsonValue {
         tablepro_core::Value::Null => JsonValue::Null,
         tablepro_core::Value::Bool(b) => json!(b),
         tablepro_core::Value::Int(i) => json!(i),
+        tablepro_core::Value::Float(f) if !f.is_finite() => json!(f.to_string()),
         tablepro_core::Value::Float(f) => json!(f),
         tablepro_core::Value::Text(s) => json!(s),
         tablepro_core::Value::Bytes(b) => json!(format!("\\x{}", hex::encode(b))),
@@ -297,6 +298,17 @@ fn value_to_json(v: &tablepro_core::Value) -> JsonValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nonfinite_numbers_remain_distinct_from_sql_null() {
+        for number in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                value_to_json(&tablepro_core::Value::Float(number)),
+                json!(number.to_string())
+            );
+        }
+        assert_eq!(value_to_json(&tablepro_core::Value::Null), JsonValue::Null);
+    }
 
     #[test]
     fn shared_query_history_is_not_exposed() {

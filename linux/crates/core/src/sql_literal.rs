@@ -28,6 +28,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
     }
     Ok(match value {
         Value::Null => "NULL".into(),
+        Value::Bool(value) if driver_id == "mssql" => u8::from(*value).to_string(),
         Value::Bool(value) => value.to_string(),
         Value::Int(value) => value.to_string(),
         Value::Float(value) if !value.is_finite() => return Err(LiteralError::NonFinite),
@@ -52,6 +53,7 @@ fn binary_literal(driver_id: &str, bytes: &[u8]) -> Result<String, LiteralError>
         "mysql" | "sqlite" => Ok(format!("X'{hex}'")),
         "mssql" => Ok(format!("0x{hex}")),
         "clickhouse" => Ok(format!("unhex('{hex}')")),
+        "duckdb" => Ok(format!("from_hex('{hex}')")),
         _ => Err(LiteralError::Unsupported),
     }
 }
@@ -61,7 +63,8 @@ pub(crate) fn quote_literal(driver_id: &str, text: &str) -> String {
         "mysql" | "clickhouse" => text.replace('\\', "\\\\").replace('\'', "''"),
         _ => text.replace('\'', "''"),
     };
-    format!("'{escaped}'")
+    let prefix = if driver_id == "mssql" { "N" } else { "" };
+    format!("{prefix}'{escaped}'")
 }
 
 /// Render a complete `INSERT` for one result row, for the user to paste
@@ -140,6 +143,16 @@ mod tests {
     }
 
     #[test]
+    fn sql_server_literals_preserve_unicode_and_use_numeric_booleans() {
+        assert_eq!(
+            render_sql_literal("mssql", &Value::Text("漢字 😀 O'Brien".into())).unwrap(),
+            "N'漢字 😀 O''Brien'"
+        );
+        assert_eq!(render_sql_literal("mssql", &Value::Bool(true)).unwrap(), "1");
+        assert_eq!(render_sql_literal("mssql", &Value::Bool(false)).unwrap(), "0");
+    }
+
+    #[test]
     fn insert_export_refuses_values_it_cannot_represent() {
         for value in [Value::Undecodable("NUMERIC".into()), Value::Float(f64::NAN)] {
             let error = build_insert_literal("postgres", None, "items", &[column("value")], &[value])
@@ -166,10 +179,6 @@ mod tests {
             render_sql_literal("redis", &Value::Int(1)),
             Err(LiteralError::Unsupported)
         );
-        assert_eq!(
-            render_sql_literal("duckdb", &Value::Bytes(vec![0])),
-            Err(LiteralError::Unsupported)
-        );
     }
 
     /// The exact shape that escaped a MySQL literal: the trailing
@@ -188,7 +197,7 @@ mod tests {
             render_sql_literal("clickhouse", &Value::Text(BREAKOUT.into())).unwrap(),
             "'x\\\\'' OR 1=1 -- '"
         );
-        for driver_id in ["postgres", "sqlite", "mssql"] {
+        for driver_id in ["postgres", "sqlite"] {
             assert_eq!(
                 render_sql_literal(driver_id, &Value::Text(BREAKOUT.into())).unwrap(),
                 "'x\\'' OR 1=1 -- '",
@@ -236,11 +245,12 @@ mod tests {
     fn decode_literal(driver_id: &str, rendered: &str) -> Option<(String, usize)> {
         let backslash_escapes = matches!(driver_id, "mysql" | "clickhouse");
         let characters: Vec<char> = rendered.chars().collect();
-        if characters.first() != Some(&'\'') {
+        let prefix = usize::from(driver_id == "mssql");
+        if characters.get(prefix) != Some(&'\'') {
             return None;
         }
         let mut decoded = String::new();
-        let mut index = 1usize;
+        let mut index = prefix + 1;
         while index < characters.len() {
             match characters[index] {
                 '\\' if backslash_escapes => {
@@ -326,7 +336,11 @@ mod tests {
         for driver_id in ["postgres", "mysql", "sqlite", "mssql", "clickhouse"] {
             assert_eq!(
                 render_sql_literal(driver_id, &Value::Text("O'Brien".into())).unwrap(),
-                "'O''Brien'",
+                if driver_id == "mssql" {
+                    "N'O''Brien'"
+                } else {
+                    "'O''Brien'"
+                },
                 "{driver_id}"
             );
         }
@@ -340,6 +354,7 @@ mod tests {
             ("sqlite", "X'00275cff'", "X''"),
             ("mssql", "0x00275cff", "0x"),
             ("clickhouse", "unhex('00275cff')", "unhex('')"),
+            ("duckdb", "from_hex('00275cff')", "from_hex('')"),
         ] {
             assert_eq!(
                 render_sql_literal(driver, &Value::Bytes(vec![0, 39, 92, 255])).unwrap(),

@@ -206,6 +206,40 @@ Continue B3 with one consumer contract at a time, then close B4–B6 acceptance
 against the implemented code. The [manual checklist](manual-verification-0.2-features.md)
 is still open; isolated widget tests do not check its boxes automatically.
 
+### B3 precision and export review: 2026-09-26
+
+Start SHA: `3f73b8c6ce8a5f8bff4058c26b5ee8d89115094c`.
+
+This packet addresses concrete value changes found during review:
+
+- MySQL decimal decoding rounded long fractions. ClickHouse also passed JSON
+  numbers through floating point. Exact parsing now keeps unsupported precision as text.
+- Grid edits and typed filters accepted decimals by rounding them. They now
+  refuse input outside the exact editable range.
+- ClickHouse non-finite floats became NULL in its JSON response. The query now
+  requests quoted non-finite values. JSON exports and MCP responses preserve those values as text.
+- SQL Server INSERT exports used invalid boolean literals and lost Unicode.
+  Numeric booleans and Unicode literals preserve both; column comments retain
+  one Unicode prefix.
+- DuckDB binary INSERT exports now use the engine's hexadecimal decoder.
+
+Verification: 443 core, ClickHouse and DuckDB unit tests passed, including
+DuckDB's NULL/empty/all-byte binary round trip. All 56 ClickHouse, MySQL and
+SQL Server Docker integration tests passed. Each new failure was reproduced
+before its fix. `ci-local.sh full` passed with report
+`target/quality/20260926T140557326075Z-full/report.json`. Debian package fixture
+checks were skipped on this host because `dpkg-deb` is absent; packaging is not
+qualified by this value-contract packet.
+
+These changes do not close B3. PostgreSQL wide NUMERIC decoding, optional DuckDB
+native temporal/interval/collection values, nested values, and exact values through
+MCP and every export format still need dedicated acceptance. Spreadsheet numeric
+cells currently convert wide integers and decimals to floating point and need an
+exact-value regression and fix. In particular, a
+visible undecodable marker is safer than NULL but does not satisfy lossless
+NUMERIC support. Rejecting an inexact decimal edit does not add arbitrary-precision
+editing. B4–B6 acceptance follows B3; their boxes remain open.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while

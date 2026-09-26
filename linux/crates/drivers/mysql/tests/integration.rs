@@ -808,3 +808,20 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         values.into_iter().map(|value| vec![value]).collect::<Vec<_>>()
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn decimal_results_preserve_all_fractional_digits() {
+    let (_container, options) = start_mysql().await;
+    let conn = connect(options).await;
+    let result = conn
+        .query("SELECT CAST('0.123456789012345678901234567891' AS DECIMAL(40,30))")
+        .await
+        .unwrap();
+    let text = match &result.rows[0][0] {
+        Value::Decimal(value) => value.to_string(),
+        Value::Text(value) => value.clone(),
+        other => panic!("unexpected value: {other:?}"),
+    };
+    assert_eq!(text, "0.123456789012345678901234567891");
+}

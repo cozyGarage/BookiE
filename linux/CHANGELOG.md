@@ -42,6 +42,9 @@
 
 ### Fixed
 
+- MySQL and ClickHouse decimals retain their exact digits, including values beyond the editable decimal range. Grid edits and filters reject decimals that would need rounding.
+- ClickHouse non-finite numbers remain distinct from NULL, and JSON exports and agent responses retain NaN and infinity as text instead of substituting NULL.
+- SQL Server INSERT exports preserve Unicode text and render booleans as valid numeric literals.
 - App shutdown now cancels MCP operations and waits for its owned HTTP server before flushing persistence.
 - Preferences migration persists its completion marker across fresh handles, preserves malformed legacy files, and rolls back a settings update if its rollback JSON mirror cannot be written.
 - Repeated CSV headers at the maximum identifier length retain a unique suffix instead of looping during column inference.
@@ -68,7 +71,7 @@
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
 - A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, and a row whose key could not be read is refused instead of being changed or deleted silently.
-- Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export preserves binary values using exact literals on PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse; unsupported binary exports, undecodable values and non-finite numbers are refused instead of substituting NULL. Copy as IN continues to skip binary and undecodable cells.
+- Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export preserves binary values using exact literals on PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse and DuckDB; unsupported binary exports, undecodable values and non-finite numbers are refused instead of substituting NULL. Copy as IN continues to skip binary and undecodable cells.
 
 ### Security
 

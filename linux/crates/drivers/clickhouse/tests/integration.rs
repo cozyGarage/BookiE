@@ -492,3 +492,22 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn decimal_and_nonfinite_results_are_not_rounded_or_changed_to_null() {
+    let (_container, options) = start_clickhouse().await;
+    let conn = connect(options).await;
+    let result = conn.query("SELECT toDecimal256('12345678901234567890.123456789012345678901234567890', 30) AS exact, toString(exact), toFloat64('nan'), toFloat64('inf'), toFloat64('-inf'), CAST(NULL AS Nullable(Float64))").await.unwrap();
+    let row = &result.rows[0];
+    let actual = match &row[0] {
+        Value::Text(text) => text.clone(),
+        Value::Decimal(decimal) => decimal.to_string(),
+        other => panic!("unexpected decimal: {other:?}"),
+    };
+    assert_eq!(row[1], Value::Text(actual));
+    assert!(matches!(row[2], Value::Float(number) if number.is_nan()));
+    assert!(matches!(row[3], Value::Float(number) if number == f64::INFINITY));
+    assert!(matches!(row[4], Value::Float(number) if number == f64::NEG_INFINITY));
+    assert_eq!(row[5], Value::Null);
+}

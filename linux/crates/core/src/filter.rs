@@ -402,8 +402,7 @@ fn parse_value_for(col: &ColumnInfo, text: &str) -> Result<Value, BuildFilterErr
             .parse::<f64>()
             .map(Value::Float)
             .map_err(|_| invalid(col, "number", trimmed)),
-        Kind::Decimal => trimmed
-            .parse::<Decimal>()
+        Kind::Decimal => Decimal::from_str_exact(trimmed)
             .map(Value::Decimal)
             .map_err(|_| invalid(col, "decimal", trimmed)),
         Kind::Date => NaiveDate::parse_from_str(trimmed, "%Y-%m-%d")
@@ -519,6 +518,11 @@ fn parse_naive_datetime(s: &str) -> Option<NaiveDateTime> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decimal_preservation_rejects_a_filter_that_would_round() {
+        assert!(parse_value_for(&col("amount", "numeric"), "0.123456789012345678901234567891").is_err());
+    }
 
     #[test]
     fn an_equality_rule_parses_back_to_the_value_it_was_built_from() {

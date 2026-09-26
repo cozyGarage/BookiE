@@ -704,3 +704,25 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         values.into_iter().map(|value| vec![value]).collect::<Vec<_>>()
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn sql_exports_preserve_unicode_and_boolean_values() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    conn.execute("CREATE TABLE literal_exports (label nvarchar(max), enabled bit)")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "literal_exports").await.unwrap();
+    let row = vec![Value::Text("漢字 😀 O'Brien \\".into()), Value::Bool(true)];
+    let sql =
+        tablepro_core::sql_literal::build_insert_literal("mssql", None, "literal_exports", &columns, &row).unwrap();
+    conn.execute(&sql).await.unwrap();
+    assert_eq!(
+        conn.query("SELECT label, enabled FROM literal_exports")
+            .await
+            .unwrap()
+            .rows,
+        vec![row]
+    );
+}
