@@ -755,6 +755,48 @@ async fn bad_sql_returns_query_error() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_numeric_digits_scale_and_special_values_survive_decoding() {
+    let (_container, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let mut session = conn.open_session().await.unwrap();
+    for input in [
+        "1234567890123456789012345678901234567890",
+        "-1234567890123456789012345678901234567890.0012300",
+        "0.123456789012345678901234567891",
+        "-0.123456789012345678901234567895",
+        "99999999999999999999.99999999",
+        "1.23000000",
+        "0.00000000",
+        "1e1000",
+        "1e-1000",
+        "NaN",
+        "Infinity",
+        "-Infinity",
+    ] {
+        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(input.into())).unwrap();
+        let sql = format!("SELECT {literal}::numeric AS value, ({literal}::numeric)::text AS expected");
+        let direct = conn.query(&sql).await.unwrap();
+        let bound = conn
+            .query_params(
+                "SELECT $1::text::numeric AS value, ($1::text::numeric)::text AS expected",
+                &[Value::Text(input.into())],
+            )
+            .await
+            .unwrap();
+        let session_result = session.query_params_controlled(&sql, &[], &no_timeout()).await.unwrap();
+        for result in [direct, bound, session_result] {
+            let actual = match &result.rows[0][0] {
+                Value::Decimal(value) => value.to_string(),
+                Value::Text(value) => value.clone(),
+                other => panic!("{input}: unexpected {other:?}"),
+            };
+            assert_eq!(Value::Text(actual), result.rows[0][1], "{input}");
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn non_null_decode_failures_are_not_returned_as_null() {
     let (_container, opts) = start_pg().await;
     let conn = connect(opts).await;
@@ -770,7 +812,6 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
     // aborting the whole result set (or silently becoming NULL): the rest
     // of the row, and other rows in the same result, still come back.
     for sql in [
-        "SELECT 1234567890123456789012345678901234567890::numeric",
         "SELECT ARRAY[1, 2]::int[]",
         "SELECT 'infinity'::date",
         "SELECT '-infinity'::timestamp",
@@ -784,7 +825,7 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
             result.rows[0][0]
         );
     }
-    for sql in ["SELECT 1234567890123456789012345678901234567890::numeric, 42::int"] {
+    for sql in ["SELECT ARRAY[1, 2]::int[], 42::int"] {
         let result = conn.query(sql).await.unwrap();
         assert!(matches!(result.rows[0][0], Value::Undecodable(_)));
         assert_eq!(result.rows[0][1], Value::Int(42));

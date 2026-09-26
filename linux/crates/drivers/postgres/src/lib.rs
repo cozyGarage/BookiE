@@ -16,6 +16,7 @@ use tablepro_core::{
 
 mod catalog;
 mod decode;
+mod numeric;
 mod session;
 
 pub struct PgDriver;
@@ -851,6 +852,13 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     if raw.is_null() {
         return Ok(Value::Null);
     }
+    if type_name == "NUMERIC" {
+        let value = match raw.format() {
+            sqlx::postgres::PgValueFormat::Binary => raw.as_bytes().ok().and_then(numeric::decode_binary),
+            sqlx::postgres::PgValueFormat::Text => raw.as_str().ok().and_then(numeric::decode_text),
+        };
+        return Ok(value.unwrap_or_else(|| undecodable(idx, type_name)));
+    }
     if raw.format() == sqlx::postgres::PgValueFormat::Binary {
         if matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ") {
             return Ok(raw
@@ -874,7 +882,6 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
         "INT8" => row.try_get::<i64, _>(idx).map(Value::Int),
         "FLOAT4" => row.try_get::<f32, _>(idx).map(|v| Value::Float(v as f64)),
         "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float),
-        "NUMERIC" => row.try_get::<rust_decimal::Decimal, _>(idx).map(Value::Decimal),
         "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date),
         "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time),
         "TIMESTAMP" => row.try_get::<chrono::NaiveDateTime, _>(idx).map(Value::DateTime),

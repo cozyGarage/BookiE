@@ -48,8 +48,7 @@ SQL harness compare bit patterns. Existing driver tests still cover binary
 exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
-This is a growing contract, not proof of every database type. PostgreSQL wide
-NUMERIC, native arrays, temporal extremes and intervals, nested BSON values,
+This is a growing contract, not proof of every database type. PostgreSQL arbitrary-precision numeric editing, native arrays, temporal extremes and intervals, nested BSON values,
 spreadsheet floating-point/temporal precision and every transport/persistence adapter still need
 focused cases. Add a reproducer before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -121,3 +120,26 @@ check` passed. The full local gate passed at
 `target/quality/20260926T195741317332Z-full/report.json` on the working tree
 based on `49981d123`; Debian validation was skipped because `dpkg-deb` is
 unavailable. The XLSX regression failed before the fix.
+
+## PostgreSQL NUMERIC decoding checkpoint
+
+The real-server regression first returned an undecodable marker for a 40-digit
+NUMERIC. The decoder now reads the base-10000 wire groups directly and retains
+the server scale. Exactly representable values remain Decimal; wider values,
+longer fractions, NaN and infinities remain text. NULL stays separate.
+Direct, bound and session queries are compared with PostgreSQL numeric-to-text
+output, including positive/negative values, 1e1000 and 1e-1000. Unit cases
+exercise maximum wire weight and scale, malformed lengths, invalid groups/signs,
+and values whose nonzero digits would otherwise be truncated by scale.
+
+This closes the scalar decode gap. Arbitrary-precision editing, numeric arrays
+and every downstream consumer still need their own acceptance. The encoding
+follows PostgreSQL [numeric_send](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/numeric.c).
+
+Validation: all 45 PostgreSQL unit/integration tests passed. The full local gate
+passed at `target/quality/20260926T202553866194Z-full/report.json` on the
+working tree based on `28df4581c`; Debian package validation was skipped because
+`dpkg-deb` is unavailable. No new dependencies were added.
+The all-eight-driver suite also passed at
+`target/quality/20260926T202754372916Z-values/report.json`: all 11 selected
+suites, including both PostgreSQL cases and eight core cases.

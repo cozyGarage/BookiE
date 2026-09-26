@@ -239,13 +239,14 @@ config roots. The fixture now uses a persistent keyfile backend per scenario.
 All 19 host Xvfb smoke scenarios passed with the current debug build; hosted
 release-build smoke and candidate Wayland qualification remain separate.
 
-These changes do not close B3. PostgreSQL wide NUMERIC decoding, optional DuckDB
-native temporal/interval/collection values, nested values, and exact values through
+These changes do not close B3. PostgreSQL wide NUMERIC decoding now preserves
+exact text; arbitrary-precision editing remains open. Optional DuckDB native
+temporal/interval/collection values, nested values, and exact values through
 MCP and every export format still need dedicated acceptance. Spreadsheet
 integer/decimal export now has an exact-value regression and fix; floating-point
 and temporal spreadsheet cells still need dedicated coverage. In particular, a
 visible undecodable marker is safer than NULL but does not satisfy lossless
-NUMERIC support. Rejecting an inexact decimal edit does not add arbitrary-precision
+support for the remaining unsupported types. Rejecting an inexact decimal edit does not add arbitrary-precision
 editing. B4–B6 acceptance follows B3; their boxes remain open.
 
 ### B3 shared boundary contract and build reuse: 2026-09-26
