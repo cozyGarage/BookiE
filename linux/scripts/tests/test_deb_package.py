@@ -11,7 +11,7 @@ def _write_executable(path: Path, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
-def _stage_package(source: Path, root: Path, *, include_aliases: bool) -> Path:
+def _stage_package(source: Path, root: Path, *, include_aliases: bool, include_schema: bool = True) -> Path:
     stage = root / "stage"
     for directory in (
         stage / "usr/bin",
@@ -19,6 +19,7 @@ def _stage_package(source: Path, root: Path, *, include_aliases: bool) -> Path:
         stage / "usr/share/metainfo",
         stage / "usr/share/icons/hicolor/scalable/apps",
         stage / "usr/share/doc/tablepro",
+        stage / "usr/share/glib-2.0/schemas",
         stage / "DEBIAN",
     ):
         directory.mkdir(parents=True)
@@ -39,6 +40,11 @@ def _stage_package(source: Path, root: Path, *, include_aliases: bool) -> Path:
     (stage / "usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg").write_text(
         (source / "flatpak/icons/scalable/com.tablepro.linux.svg").read_text()
     )
+    if include_schema:
+        shutil.copyfile(
+            source / "data/com.tablepro.linux.gschema.xml",
+            stage / "usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml",
+        )
     (stage / "usr/share/doc/tablepro/LICENSE.md").write_text((source / "LICENSE.md").read_text())
     (stage / "usr/share/doc/tablepro/policy.example.toml").write_text(
         (source / "packaging/policy.example.toml").read_text()
@@ -89,6 +95,10 @@ def main() -> None:
         )
         assert result.returncode != 0
         assert "package is missing /usr/bin/tablepro" in result.stderr, result.stderr
+        missing_schema = _stage_package(source, root / "missing-schema", include_aliases=True, include_schema=False)
+        result = subprocess.run(["bash", str(validator), str(missing_schema)], capture_output=True, text=True)
+        assert result.returncode != 0
+        assert "package is missing /usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml" in result.stderr, result.stderr
     print("Debian package symlink validation passed")
 
 
