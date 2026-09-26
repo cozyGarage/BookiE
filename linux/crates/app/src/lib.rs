@@ -85,7 +85,8 @@ pub fn run() {
     );
     database.set_approval_sink(Arc::new(approval_router));
 
-    let mcp_bridge = services::mcp_service::start_background(database.clone());
+    let mcp_server = services::mcp_service::start_background(database.clone());
+    let mcp_bridge = mcp_server.as_ref().map(|server| server.bridge.clone());
     enable_system_openssh(database.clone());
 
     let app = RelmApp::new(config::APP_ID);
@@ -95,11 +96,17 @@ pub fn run() {
         workspace,
         history,
         database,
-        preferences,
+        preferences: preferences.clone(),
         mcp_bridge,
     });
 
+    if let Some(server) = mcp_server {
+        server.shutdown();
+    }
     persistence.flush();
+    if let Err(error) = preferences.flush() {
+        tracing::warn!(%error, "preferences flush failed");
+    }
 
     // Dropping a tokio runtime cancels its in-flight tasks at once;
     // shutdown_timeout lets the worker threads finish first.

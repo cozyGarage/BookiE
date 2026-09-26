@@ -294,7 +294,7 @@ impl Connection for PgConnection {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
         let mut stream = query.fetch(&self.pool);
         collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
     }
@@ -333,7 +333,7 @@ impl Connection for PgConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
         let result = query.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: result.rows_affected(),
@@ -359,7 +359,16 @@ impl Connection for PgConnection {
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
             let sql = sql.as_str();
-            let q = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
+                Ok(query) => query,
+                Err(error) => {
+                    let _ = tx.rollback().await;
+                    return Err(DriverError::Transaction {
+                        statement_index: idx,
+                        source: Box::new(error),
+                    });
+                }
+            };
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -762,7 +771,7 @@ async fn query_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut **connection);
     collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
 }
@@ -772,7 +781,7 @@ async fn execute_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let result = query.execute(&mut **connection).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
@@ -915,7 +924,7 @@ fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
 fn bind_pg_params<'q>(
     mut q: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
     params: &'q [Value],
-) -> sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments> {
+) -> Result<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>, DriverError> {
     for p in params {
         q = match p {
             Value::Null => q.bind(Option::<&str>::None),
@@ -931,14 +940,14 @@ fn bind_pg_params<'q>(
             Value::Decimal(d) => q.bind(*d),
             Value::Uuid(u) => q.bind(*u),
             Value::Json(j) => q.bind(j.clone()),
-            // Never produced from user input: the grid marks a cell holding
-            // this variant read-only, so it can only reach here through a
-            // handcrafted MCP write, which the caller's policy layer already
-            // treats as suspect.
-            Value::Undecodable(_) => q.bind(Option::<&str>::None),
+            Value::Undecodable(_) => {
+                return Err(DriverError::Unsupported(
+                    "undecodable cell cannot be bound as a parameter".into(),
+                ));
+            }
         };
     }
-    q
+    Ok(q)
 }
 
 fn quote_ident(name: &str) -> String {
@@ -1016,6 +1025,15 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn undecodable_cell_cannot_be_bound_as_null() {
+        let params = [Value::Undecodable("NUMERIC".into())];
+        assert!(matches!(
+            bind_pg_params(sqlx::query(sqlx::AssertSqlSafe("SELECT $1")), &params),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 
     #[derive(Clone, Default)]
     struct CapturedLogs(Arc<Mutex<Vec<u8>>>);

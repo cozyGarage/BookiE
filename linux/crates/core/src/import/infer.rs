@@ -104,7 +104,9 @@ fn unique_name(name: String, taken: &mut Vec<String>) -> String {
     let mut candidate = name.clone();
     let mut suffix = 2;
     while taken.iter().any(|existing| existing.eq_ignore_ascii_case(&candidate)) {
-        candidate = truncate_to(format!("{name}_{suffix}"), MAX_IDENT_BYTES);
+        let suffix_text = format!("_{suffix}");
+        let prefix = truncate_to(name.clone(), MAX_IDENT_BYTES.saturating_sub(suffix_text.len()));
+        candidate = format!("{prefix}{suffix_text}");
         suffix += 1;
     }
     taken.push(candidate.clone());
@@ -306,6 +308,21 @@ mod tests {
         let columns = inferred(&[long.as_str()], &[&["1"]]);
 
         assert_eq!(columns[0].name.len(), MAX_IDENT_BYTES);
+    }
+
+    #[test]
+    fn repeated_headers_at_the_identifier_limit_keep_a_unique_suffix() {
+        let long = "x".repeat(MAX_IDENT_BYTES);
+        let columns = infer_columns(
+            &sheet(&[long.as_str(), long.as_str()], &[&["1", "2"]]),
+            &CsvImportOptions::default(),
+            "postgres",
+        );
+
+        assert_eq!(columns[0].name.len(), MAX_IDENT_BYTES);
+        assert_eq!(columns[1].name.len(), MAX_IDENT_BYTES);
+        assert!(columns[1].name.ends_with("_2"));
+        assert_ne!(columns[0].name, columns[1].name);
     }
 
     #[test]

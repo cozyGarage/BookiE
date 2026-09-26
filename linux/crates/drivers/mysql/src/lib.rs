@@ -188,7 +188,7 @@ impl Connection for MysqlConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let q = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+        let q = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
         let res = q.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
@@ -227,7 +227,16 @@ impl Connection for MysqlConnection {
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
             let sql = sql.as_str();
-            let q = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+            let q = match bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
+                Ok(query) => query,
+                Err(error) => {
+                    let _ = tx.rollback().await;
+                    return Err(DriverError::Transaction {
+                        statement_index: idx,
+                        source: Box::new(error),
+                    });
+                }
+            };
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -580,7 +589,7 @@ where
     if params.is_empty() {
         return stream_into_result(executor, sql, limit).await;
     }
-    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(executor);
     let mut collected: Vec<MySqlRow> = Vec::new();
     let mut truncated = false;
@@ -599,7 +608,7 @@ async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<E
 where
     E: sqlx::Executor<'e, Database = MySql>,
 {
-    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let result = query.execute(executor).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
@@ -682,7 +691,7 @@ async fn release_connection<T>(connection: PoolConnection<MySql>, result: &Resul
 fn bind_mysql_params<'q>(
     mut q: sqlx::query::Query<'q, MySql, sqlx::mysql::MySqlArguments>,
     params: &'q [Value],
-) -> sqlx::query::Query<'q, MySql, sqlx::mysql::MySqlArguments> {
+) -> Result<sqlx::query::Query<'q, MySql, sqlx::mysql::MySqlArguments>, DriverError> {
     for p in params {
         q = match p {
             Value::Null => q.bind(Option::<&str>::None),
@@ -698,14 +707,14 @@ fn bind_mysql_params<'q>(
             Value::Decimal(d) => q.bind(*d),
             Value::Uuid(u) => q.bind(u.to_string()),
             Value::Json(j) => q.bind(j.clone()),
-            // Never produced from user input: the grid marks a cell holding
-            // this variant read-only, so it can only reach here through a
-            // handcrafted MCP write, which the caller's policy layer already
-            // treats as suspect.
-            Value::Undecodable(_) => q.bind(Option::<&str>::None),
+            Value::Undecodable(_) => {
+                return Err(DriverError::Unsupported(
+                    "undecodable cell cannot be bound as a parameter".into(),
+                ));
+            }
         };
     }
-    q
+    Ok(q)
 }
 
 /// Dial through the SSH-forwarded socket when there is one, keeping the real
@@ -858,6 +867,15 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn undecodable_cell_cannot_be_bound_as_null() {
+        let params = [Value::Undecodable("GEOMETRY".into())];
+        assert!(matches!(
+            bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe("SELECT ?")), &params),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 
     #[test]
     fn structure_metadata_declarations_match_the_connection_impl() {

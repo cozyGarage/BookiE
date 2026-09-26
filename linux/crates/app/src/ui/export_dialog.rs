@@ -219,7 +219,9 @@ pub(crate) fn present_with_format(
 
     let preferences_for_toggle = preferences.clone();
     include_header.connect_active_notify(move |row| {
-        preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active());
+        if let Err(error) = preferences_for_toggle.update(|prefs| prefs.csv_include_header = row.is_active()) {
+            tracing::warn!(%error, "preferences: update rejected");
+        }
     });
 
     let csv_group_for_format = csv_group.clone();

@@ -359,14 +359,35 @@ fn origin_is_allowed(headers: &HeaderMap) -> bool {
 /// Bind a loopback streamable-HTTP endpoint that forwards tool calls to
 /// the same bridge. Loopback only by default.
 pub async fn serve_streamable_http(bridge: Arc<McpBridge>, config: McpServerConfig) -> Result<(), String> {
+    serve_streamable_http_until(bridge, config, tokio_util::sync::CancellationToken::new()).await
+}
+
+pub async fn serve_streamable_http_until(
+    bridge: Arc<McpBridge>,
+    config: McpServerConfig,
+    shutdown: tokio_util::sync::CancellationToken,
+) -> Result<(), String> {
+    let addr = loopback_bind_addr(&config.bind_host, config.bind_port)?;
+    let app = http_router(bridge);
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| e.to_string())?;
+    tracing::info!(%addr, "MCP HTTP listening (loopback)");
+    let server = axum::serve(listener, app).with_graceful_shutdown(shutdown.clone().cancelled_owned());
+    let force_deadline = async move {
+        shutdown.cancelled().await;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    };
+    tokio::select! {
+        result = server => result.map_err(|error| error.to_string()),
+        _ = force_deadline => Err("MCP server shutdown deadline exceeded".into()),
+    }
+}
+
+fn http_router(bridge: Arc<McpBridge>) -> axum::Router {
     use axum::extract::DefaultBodyLimit;
     use axum::response::IntoResponse;
     use axum::{Json, Router, http::StatusCode, routing::post};
 
-    let addr = loopback_bind_addr(&config.bind_host, config.bind_port)?;
-
-    let bridge = bridge.clone();
-    let app = Router::new()
+    Router::new()
         .route(
             "/mcp",
             post(move |headers: HeaderMap, Json(body): Json<JsonValue>| {
@@ -408,11 +429,7 @@ pub async fn serve_streamable_http(bridge: Arc<McpBridge>, config: McpServerConf
         // Matches stdio's own MAX_REQUEST_BYTES instead of axum's larger
         // default, so the sql argument (and everything else in the body)
         // is bounded the same way regardless of which transport carried it.
-        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES));
-
-    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| e.to_string())?;
-    tracing::info!(%addr, "MCP HTTP listening (loopback)");
-    axum::serve(listener, app).await.map_err(|e| e.to_string())
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BYTES))
 }
 
 #[cfg(test)]
@@ -452,6 +469,28 @@ mod tests {
             .issue("test".into(), crate::TokenPermissions::ReadOnly, vec![], None)
             .unwrap();
         (dir, McpBridge::new(Arc::new(NoProvider), store), plaintext)
+    }
+
+    #[tokio::test]
+    async fn streamable_http_server_stops_after_shutdown_is_requested() {
+        let (_dir, bridge, _) = bridge_with_token();
+        let shutdown = tokio_util::sync::CancellationToken::new();
+        let server_shutdown = shutdown.clone();
+        let task = tokio::spawn(async move {
+            serve_streamable_http_until(
+                Arc::new(bridge),
+                McpServerConfig {
+                    bind_host: "127.0.0.1".into(),
+                    bind_port: 0,
+                },
+                server_shutdown,
+            )
+            .await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        shutdown.cancel();
+        let result = task.await.unwrap();
+        assert!(result.is_ok(), "{result:?}");
     }
 
     /// H-adjacent finding: tools/list disclosed the full tool catalogue to

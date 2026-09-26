@@ -1,8 +1,7 @@
 # BookiE 0.1.x → 0.2: upstream convergence and daily workflows
 
 Approved: 2026-09-16. Status: implementation started, no release approved.
-Delivery branch: `linux`, `origin/linux` in `cozyGarage/TablePro` (called `fork`
-in older documents). This document supersedes the 0.1.1 plan for sequencing.
+Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
 ## Goal and baseline
 
@@ -640,3 +639,16 @@ isolated-test inventory passed. Debian package fixture could not run because
   `Value::Bytes` as `/* bytes omitted */ NULL` in SQL export and copied
   INSERT statements, which is a deliberate, marked, but real loss of binary
   column data. No test or fix attempted yet.
+
+- 2026-09-26 local/remote reconciliation: remote `8ae99ad66` is the integration
+  base; original local B2/B3 work is preserved at `47c4dd5d4`. Retained remote
+  sessions, SSH, catalog, defaults, long-value edits, history snapshots and window
+  migration. Combined preferences safeguards with the remote schema IDs, paths,
+  rollback import and packaging, removing the duplicate local schema/installers.
+  Retained local MCP graceful shutdown, CSV header boundary fix, history
+  regressions, invalid-UTF-8 byte preservation, and rejection of undecodable
+  parameters. SQL INSERT exports now reject binary/undecodable/non-finite values
+  instead of substituting NULL; this addresses the export-loss item above by
+  refusing the lossy operation, not by implementing binary SQL literals. B3 is
+  still open. See [reconciliation-2026-09-26.md](reconciliation-2026-09-26.md)
+  for decisions and combined-tree verification.

@@ -81,6 +81,46 @@ async fn declared_types_preserve_nulls_and_binary_affinity_mismatches() {
     );
 }
 
+#[tokio::test]
+async fn undecodable_parameter_is_rejected_without_writing_null() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection
+        .execute("CREATE TABLE values_to_keep (value INTEGER)")
+        .await
+        .unwrap();
+
+    let error = connection
+        .execute_params(
+            "INSERT INTO values_to_keep VALUES (?)",
+            &[Value::Undecodable("NUMERIC".into())],
+        )
+        .await
+        .expect_err("an undecodable result cell cannot be written as NULL");
+    assert!(matches!(error, DriverError::Unsupported(_)));
+
+    let statements = vec![
+        ("INSERT INTO values_to_keep VALUES (?)".into(), vec![Value::Int(7)]),
+        (
+            "INSERT INTO values_to_keep VALUES (?)".into(),
+            vec![Value::Undecodable("NUMERIC".into())],
+        ),
+    ];
+    let error = connection
+        .execute_in_transaction(&statements)
+        .await
+        .expect_err("the transaction must reject the undecodable value");
+    assert!(matches!(
+        error,
+        DriverError::Transaction {
+            statement_index: 1,
+            source,
+        } if matches!(*source, DriverError::Unsupported(_))
+    ));
+    let rows = connection.query("SELECT count(*) FROM values_to_keep").await.unwrap();
+    assert_eq!(rows.rows, vec![vec![Value::Int(0)]]);
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn the_driver_declares_server_side_cancellation() {
     let directory = TempDir::new().expect("temp dir");

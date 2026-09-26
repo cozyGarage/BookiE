@@ -1,12 +1,19 @@
-use std::sync::{Arc, Mutex};
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
+use std::sync::Arc;
 
 use gtk4::gio;
 use gtk4::gio::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::config_io::{atomic_write_json, backup_file_if_exists, xdg_config_path};
+use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
+use super::state_file::StateFile;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg(test)]
+const SETTINGS_SCHEMA: &str = "com.tablepro.linux";
+const SETTINGS_MIGRATION_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Preferences {
     pub default_page_size: u64,
     pub confirm_destructive: bool,
@@ -50,105 +57,148 @@ impl Default for Preferences {
     }
 }
 
-/// Mirrors the cache in `filter_settings.rs` / `column_widths.rs`. Without
-/// it, every caller -- including `operation_control::configured_timeout_secs`,
-/// read on the GTK thread before each query dispatch -- did a synchronous
-/// file read on the main thread for a value that only ever changes from the
-/// Preferences dialog. App-owned and shared explicitly rather than a global,
-/// so tests and multiple windows never fight over one process-wide cache.
-#[derive(Debug, Clone, Default)]
-pub struct PreferencesStore(Arc<Mutex<Option<Preferences>>>);
+/// Preferences are shared explicitly rather than through a global. GSettings
+/// is canonical; the legacy JSON file remains in place as a rollback copy.
+/// JSON is retained as a fallback if the installed schema is unavailable.
+#[derive(Clone)]
+pub struct PreferencesStore(Backend);
+
+#[derive(Clone)]
+enum Backend {
+    GSettings {
+        settings: Rc<gio::Settings>,
+        legacy_path: Option<PathBuf>,
+        migration_error: Option<String>,
+    },
+    Json(Arc<StateFile<Preferences>>),
+}
+
+impl Default for PreferencesStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl PreferencesStore {
     pub fn new() -> Self {
-        Self::default()
+        let legacy_path = xdg_config_path("preferences.json");
+        match open_settings() {
+            Ok(settings) => Self::from_settings_with_legacy(settings, legacy_path),
+            Err(error) => {
+                tracing::warn!(%error, "preferences: GSettings unavailable; using JSON store");
+                Self(Backend::Json(Arc::new(
+                    legacy_path.map(StateFile::load).unwrap_or_else(StateFile::memory),
+                )))
+            }
+        }
     }
 
     pub fn load(&self) -> Preferences {
-        let mut guard = match self.0.lock() {
-            Ok(g) => g,
-            Err(_) => return load_from_disk(),
-        };
-        guard.get_or_insert_with(load_from_disk).clone()
-    }
-
-    pub fn save(&self, prefs: &Preferences) {
-        let Some(path) = xdg_config_path("preferences.json") else {
-            return;
-        };
-        let settings = settings();
-        if let Some(ref settings) = settings
-            && let Err(e) = backup_legacy(settings, &path)
-        {
-            tracing::warn!(path = %path.display(), error = %e, "preferences: backup failed");
-            return;
-        }
-        if let Err(e) = atomic_write_json(&path, prefs) {
-            tracing::warn!(path = %path.display(), error = %e, "preferences: write failed");
-            return;
-        }
-        if let Some(settings) = settings
-            && let Err(e) = save_settings(&settings, prefs)
-        {
-            tracing::warn!(error = %e, "preferences: GSettings write failed");
-        }
-        if let Ok(mut guard) = self.0.lock() {
-            *guard = Some(prefs.clone());
+        match &self.0 {
+            Backend::GSettings { settings, .. } => read_settings(settings),
+            Backend::Json(file) => file.read(Clone::clone).unwrap_or_default(),
         }
     }
 
-    pub fn update(&self, mutate: impl FnOnce(&mut Preferences)) {
-        let mut prefs = self.load();
-        mutate(&mut prefs);
-        self.save(&prefs);
+    pub fn update(&self, mutate: impl FnOnce(&mut Preferences)) -> Result<(), String> {
+        match &self.0 {
+            Backend::GSettings {
+                settings,
+                legacy_path,
+                migration_error,
+            } => {
+                if let Some(error) = migration_error {
+                    return Err(format!("legacy preferences need recovery before editing: {error}"));
+                }
+                let settings = settings.as_ref();
+                let previous = read_settings(settings);
+                let mut updated = previous.clone();
+                mutate(&mut updated);
+                write_settings(settings, &updated)?;
+                gio::Settings::sync();
+                if let Some(path) = legacy_path
+                    && let Err(error) = atomic_write_json(path, &updated)
+                {
+                    if let Err(rollback_error) = write_settings(settings, &previous) {
+                        tracing::error!(%rollback_error, "preferences: failed to roll back GSettings after legacy mirror failure");
+                    }
+                    gio::Settings::sync();
+                    return Err(format!("legacy preferences mirror failed: {error}"));
+                }
+                Ok(())
+            }
+            Backend::Json(file) => file.update(mutate),
+        }
+    }
+
+    pub fn flush(&self) -> Result<(), String> {
+        match &self.0 {
+            Backend::GSettings { .. } => {
+                gio::Settings::sync();
+                Ok(())
+            }
+            Backend::Json(file) => file.flush(),
+        }
+    }
+
+    #[cfg(test)]
+    fn from_settings(settings: gio::Settings, legacy_path: Option<PathBuf>) -> Self {
+        Self(Backend::GSettings {
+            settings: Rc::new(settings),
+            legacy_path,
+            migration_error: None,
+        })
+    }
+
+    fn from_settings_with_legacy(settings: gio::Settings, legacy_path: Option<PathBuf>) -> Self {
+        let migration_error = migrate_json_preferences(&settings, legacy_path.as_deref())
+            .err()
+            .map(|error| {
+                tracing::warn!(%error, "preferences: legacy migration deferred; source retained");
+                error
+            });
+        Self(Backend::GSettings {
+            settings: Rc::new(settings),
+            legacy_path,
+            migration_error,
+        })
     }
 }
 
-fn load_from_disk() -> Preferences {
-    let Some(path) = xdg_config_path("preferences.json") else {
-        return Preferences::default();
-    };
-    let legacy = std::fs::read(&path).ok();
-    let Some(settings) = settings() else {
-        return legacy
-            .as_deref()
-            .and_then(|b| serde_json::from_slice(b).ok())
-            .unwrap_or_default();
-    };
-    if settings.boolean("preferences-migrated") {
-        let current = read_settings(&settings);
-        if let Some(prefs) = legacy
-            .as_deref()
-            .and_then(|b| serde_json::from_slice::<Preferences>(b).ok())
-            && prefs != current
-        {
-            if let Err(e) = save_settings(&settings, &prefs) {
-                tracing::warn!(error = %e, "preferences: rollback changes not synced to GSettings");
-            }
-            return prefs;
-        }
-        return current;
+fn settings_path() -> &'static str {
+    settings_path_for_profile(crate::config::profile())
+}
+
+fn settings_path_for_profile(profile: crate::config::Profile) -> &'static str {
+    if profile == crate::config::Profile::Development {
+        "/com/tablepro/linux/Devel/"
+    } else {
+        "/com/tablepro/linux/"
     }
-    let prefs = match legacy.as_deref() {
-        Some(bytes) => match serde_json::from_slice(bytes) {
-            Ok(prefs) => prefs,
-            Err(e) => {
-                tracing::warn!(error = %e, "preferences: invalid legacy JSON; migration deferred");
-                return Preferences::default();
-            }
-        },
-        None => Preferences::default(),
-    };
-    if let Err(e) = backup_legacy(&settings, &path).and_then(|()| save_settings(&settings, &prefs)) {
-        tracing::warn!(error = %e, "preferences: GSettings migration deferred");
-    }
-    prefs
 }
 
 pub(super) fn settings() -> Option<gio::Settings> {
-    gio::SettingsSchemaSource::default()?
+    open_settings().ok()
+}
+
+fn open_settings() -> Result<gio::Settings, String> {
+    let parent = gio::SettingsSchemaSource::default()
+        .ok_or_else(|| "default GSettings schema source is unavailable".to_string())?;
+    let local_source = Path::new(env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"));
+    let source = if local_source.is_dir() {
+        gio::SettingsSchemaSource::from_directory(local_source, Some(&parent), false)
+            .map_err(|error| error.to_string())?
+    } else {
+        parent.clone()
+    };
+    let schema = source
         .lookup(crate::config::APP_ID, true)
-        .map(|schema| gio::Settings::new_full(&schema, None::<&gio::SettingsBackend>, None))
+        .ok_or_else(|| format!("GSettings schema {} is not installed", crate::config::APP_ID))?;
+    Ok(gio::Settings::new_full(
+        &schema,
+        None::<&gio::SettingsBackend>,
+        Some(settings_path()),
+    ))
 }
 
 fn read_settings(settings: &gio::Settings) -> Preferences {
@@ -162,30 +212,118 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
     }
 }
 
-fn backup_legacy(settings: &gio::Settings, path: &std::path::Path) -> Result<(), String> {
-    if !settings.boolean("preferences-migrated") {
-        backup_file_if_exists(path, &path.with_extension("before-gsettings.json")).map_err(|e| e.to_string())?;
+fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), String> {
+    settings.delay();
+    let writes = [
+        settings.set_uint64("default-page-size", prefs.default_page_size),
+        settings.set_boolean("confirm-destructive", prefs.confirm_destructive),
+        settings.set_uint("editor-font-size", prefs.editor_font_size),
+        settings.set_uint("history-retention-days", prefs.history_retention_days),
+        settings.set_uint("query-timeout-secs", prefs.query_timeout_secs),
+        settings.set_boolean("csv-include-header", prefs.csv_include_header),
+    ];
+    if let Some(error) = writes.into_iter().find_map(Result::err) {
+        settings.revert();
+        return Err(error.to_string());
+    }
+    settings.apply();
+    Ok(())
+}
+
+fn migrate_json_preferences(settings: &gio::Settings, path: Option<&Path>) -> Result<(), String> {
+    let version = settings.uint("migration-version");
+    if version > SETTINGS_MIGRATION_VERSION {
+        return Err(format!("preferences schema version {version} is newer than this build"));
+    }
+    if version == SETTINGS_MIGRATION_VERSION || settings.boolean("preferences-migrated") {
+        sync_rollback_preferences(settings, path)?;
+        return Ok(());
+    }
+    let legacy = match path {
+        Some(path) => match std::fs::symlink_metadata(path) {
+            Ok(metadata) if !metadata.file_type().is_file() => {
+                return Err("legacy preferences path is not a regular file".into());
+            }
+            Ok(_) => {
+                let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+                let preferences = serde_json::from_slice::<Preferences>(&bytes).map_err(|error| error.to_string())?;
+                Some((preferences, bytes, backup_path(path)?))
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.to_string()),
+        },
+        None => None,
+    };
+
+    if let Some((legacy, bytes, backup)) = legacy {
+        preserve_migration_backup(&backup, &bytes)?;
+        write_settings(settings, &legacy)?;
+        gio::Settings::sync();
+        if read_settings(settings) != legacy {
+            return Err("migrated preferences did not verify against GSettings".into());
+        }
+    }
+    settings
+        .set_boolean("preferences-migrated", true)
+        .map_err(|error| error.to_string())?;
+    settings
+        .set_uint("migration-version", SETTINGS_MIGRATION_VERSION)
+        .map_err(|error| error.to_string())?;
+    settings.apply();
+    gio::Settings::sync();
+    if settings.uint("migration-version") != SETTINGS_MIGRATION_VERSION {
+        return Err("GSettings migration marker did not persist".into());
     }
     Ok(())
 }
 
-fn save_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), String> {
-    settings.delay();
-    let result = (|| {
-        settings.set_uint64("default-page-size", prefs.default_page_size)?;
-        settings.set_boolean("confirm-destructive", prefs.confirm_destructive)?;
-        settings.set_uint("editor-font-size", prefs.editor_font_size)?;
-        settings.set_uint("history-retention-days", prefs.history_retention_days)?;
-        settings.set_uint("query-timeout-secs", prefs.query_timeout_secs)?;
-        settings.set_boolean("csv-include-header", prefs.csv_include_header)?;
-        settings.set_boolean("preferences-migrated", true)?;
-        Ok::<(), glib::BoolError>(())
-    })();
-    if let Err(e) = result {
-        settings.revert();
-        return Err(e.to_string());
+fn sync_rollback_preferences(settings: &gio::Settings, path: Option<&Path>) -> Result<(), String> {
+    let Some(path) = path else {
+        return Ok(());
+    };
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            return Err("legacy preferences path is not a regular file".into());
+        }
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
     }
-    settings.apply();
+    let bytes = std::fs::read(path).map_err(|error| error.to_string())?;
+    let legacy: Preferences = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    if read_settings(settings) != legacy {
+        write_settings(settings, &legacy)?;
+        gio::Settings::sync();
+        if read_settings(settings) != legacy {
+            return Err("rollback preferences did not verify against GSettings".into());
+        }
+    }
+    Ok(())
+}
+
+fn backup_path(source: &Path) -> Result<PathBuf, String> {
+    if source.file_name().is_none() {
+        return Err("legacy preferences path has no filename".into());
+    }
+    Ok(source.with_extension("before-gsettings.json"))
+}
+
+fn preserve_migration_backup(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            return Err("preferences rollback backup is not a regular file".into());
+        }
+        Ok(_) => {
+            let existing = std::fs::read(path).map_err(|error| error.to_string())?;
+            if existing != bytes {
+                return Err("preferences rollback backup differs from the migration source".into());
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            atomic_write_bytes(path, bytes).map_err(|error| error.to_string())?;
+        }
+        Err(error) => return Err(error.to_string()),
+    }
     Ok(())
 }
 
@@ -194,10 +332,6 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
 
-    /// Seeds the cache directly rather than calling `save`, so the test
-    /// never touches the real XDG config file: `load` must return exactly
-    /// what's cached instead of re-reading (or falling back to a default
-    /// because it can't read) disk.
     #[test]
     fn migrates_legacy_settings_and_keeps_rollback_copies() {
         if std::env::var_os("BOOKIE_SETTINGS_TEST_CHILD").is_some() {
@@ -212,11 +346,14 @@ mod tests {
             .unwrap();
             let store = PreferencesStore::new();
             assert_eq!(store.load().default_page_size, 321);
-            let backup = path.with_extension("before-gsettings.json");
+            let backup = backup_path(&path).unwrap();
             assert_eq!(std::fs::read(&backup).unwrap(), std::fs::read(&path).unwrap());
             assert_eq!(std::fs::metadata(&backup).unwrap().permissions().mode() & 0o777, 0o600);
-            assert!(settings().unwrap().boolean("preferences-migrated"));
-            store.update(|prefs| prefs.default_page_size = 654);
+            assert_eq!(
+                settings().unwrap().uint("migration-version"),
+                SETTINGS_MIGRATION_VERSION
+            );
+            store.update(|prefs| prefs.default_page_size = 654).unwrap();
             assert_eq!(PreferencesStore::new().load().default_page_size, 654);
             assert_eq!(
                 serde_json::from_slice::<Preferences>(&std::fs::read(&path).unwrap())
@@ -290,14 +427,207 @@ mod tests {
         assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stdout));
     }
 
+    fn make_test_settings(_path: &str) -> (gio::Settings, gio::SettingsBackend) {
+        let source = gio::SettingsSchemaSource::from_directory(
+            env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"),
+            gio::SettingsSchemaSource::default().as_ref(),
+            false,
+        )
+        .unwrap();
+        let schema = source.lookup(SETTINGS_SCHEMA, true).unwrap();
+        let backend = gio::memory_settings_backend_new();
+        let settings = gio::Settings::new_full(&schema, Some(&backend), None);
+        (settings, backend)
+    }
+
     #[test]
-    fn load_reads_the_cache_instead_of_disk_once_populated() {
-        let sentinel = Preferences {
-            default_page_size: 424_242,
+    fn gsettings_updates_are_visible_to_reopened_handles() {
+        let (settings, backend) = make_test_settings("/com/tablepro/linux/test/");
+        let store = PreferencesStore::from_settings(settings, None);
+        store
+            .update(|prefs| {
+                prefs.default_page_size = 424_242;
+                prefs.csv_include_header = false;
+            })
+            .unwrap();
+        store.flush().unwrap();
+
+        let reopened = test_settings_with_backend("/com/tablepro/linux/test/", backend);
+        let reopened = PreferencesStore::from_settings(reopened, None);
+        assert_eq!(reopened.load().default_page_size, 424_242);
+        assert!(!reopened.load().csv_include_header);
+    }
+
+    #[test]
+    fn production_and_development_profiles_use_separate_gsettings_paths() {
+        let production = settings_path_for_profile(crate::config::Profile::Default);
+        let development = settings_path_for_profile(crate::config::Profile::Development);
+        assert_ne!(production, development);
+        assert!(production.starts_with("/com/tablepro/linux/"));
+        assert!(development.starts_with("/com/tablepro/linux/Devel/"));
+    }
+
+    #[test]
+    fn gsettings_keyfile_backend_survives_a_process_restart() {
+        let config = tempfile::tempdir().unwrap();
+        for mode in ["write", "read"] {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "services::preferences::tests::gsettings_keyfile_child",
+                    "--nocapture",
+                ])
+                .env("TABLEPRO_GSETTINGS_CHILD", mode)
+                .env("GSETTINGS_BACKEND", "keyfile")
+                .env("XDG_CONFIG_HOME", config.path())
+                .status()
+                .unwrap();
+            assert!(status.success(), "GSettings {mode} child failed");
+        }
+    }
+
+    #[test]
+    fn gsettings_keyfile_child() {
+        let Ok(mode) = std::env::var("TABLEPRO_GSETTINGS_CHILD") else {
+            return;
+        };
+        assert!(matches!(mode.as_str(), "write" | "read"));
+        let store = PreferencesStore::new();
+        match mode.as_str() {
+            "write" => {
+                store
+                    .update(|prefs| {
+                        prefs.default_page_size = 313_131;
+                        prefs.csv_include_header = false;
+                    })
+                    .unwrap();
+                store.flush().unwrap();
+            }
+            "read" => {
+                let prefs = store.load();
+                assert_eq!(prefs.default_page_size, 313_131);
+                assert!(!prefs.csv_include_header);
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn legacy_preferences_migrate_once_and_source_file_is_a_rollback_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("preferences.json");
+        let original = serde_json::to_vec(&Preferences {
+            default_page_size: 777,
+            editor_font_size: 15,
+            csv_include_header: false,
+            ..Preferences::default()
+        })
+        .unwrap();
+        std::fs::write(&path, &original).unwrap();
+        let (settings, backend) = make_test_settings("/com/tablepro/linux/migration/");
+
+        migrate_json_preferences(&settings, Some(&path)).unwrap();
+
+        let store = PreferencesStore::from_settings(settings.clone(), Some(path.clone()));
+        assert_eq!(store.load().default_page_size, 777);
+        assert_eq!(store.load().editor_font_size, 15);
+        assert!(!store.load().csv_include_header);
+        assert_eq!(settings.uint("migration-version"), SETTINGS_MIGRATION_VERSION);
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(backup_path(&path).unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+
+        store.update(|prefs| prefs.default_page_size = 999).unwrap();
+        store.flush().unwrap();
+        let downgraded_preferences: Preferences = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(downgraded_preferences.default_page_size, 999);
+        assert_eq!(std::fs::read(backup_path(&path).unwrap()).unwrap(), original);
+
+        let reopened = test_settings_with_backend("/com/tablepro/linux/migration/", backend);
+        migrate_json_preferences(&reopened, Some(&path)).unwrap();
+        assert_eq!(read_settings(&reopened).default_page_size, 999);
+    }
+
+    #[test]
+    fn remote_migration_marker_keeps_settings_and_imports_rollback_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("preferences.json");
+        let (settings, _) = make_test_settings("/com/tablepro/linux/remote/");
+        settings.set_boolean("preferences-migrated", true).unwrap();
+        settings.set_uint64("default-page-size", 555).unwrap();
+        migrate_json_preferences(&settings, Some(&path)).unwrap();
+        assert_eq!(read_settings(&settings).default_page_size, 555);
+        let legacy = Preferences {
+            default_page_size: 777,
             ..Preferences::default()
         };
-        let store = PreferencesStore::new();
-        *store.0.lock().unwrap() = Some(sentinel.clone());
-        assert_eq!(store.load().default_page_size, sentinel.default_page_size);
+        atomic_write_json(&path, &legacy).unwrap();
+        migrate_json_preferences(&settings, Some(&path)).unwrap();
+        assert_eq!(read_settings(&settings), legacy);
+        std::fs::write(&path, b"broken json").unwrap();
+        let store = PreferencesStore::from_settings_with_legacy(settings, Some(path.clone()));
+        assert!(store.update(|prefs| prefs.default_page_size = 1).is_err());
+        assert_eq!(std::fs::read(path).unwrap(), b"broken json");
+    }
+
+    #[test]
+    fn malformed_legacy_preferences_are_preserved_and_migration_can_retry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("preferences.json");
+        std::fs::write(&path, b"broken json").unwrap();
+        let (settings, _) = make_test_settings("/com/tablepro/linux/bad-migration/");
+
+        assert!(migrate_json_preferences(&settings, Some(&path)).is_err());
+        assert_eq!(settings.uint("migration-version"), 0);
+        assert_eq!(std::fs::read(&path).unwrap(), b"broken json");
+        let store = PreferencesStore::from_settings_with_legacy(settings.clone(), Some(path.clone()));
+        assert!(store.update(|prefs| prefs.default_page_size = 500).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"broken json");
+        std::fs::write(&path, serde_json::to_vec(&Preferences::default()).unwrap()).unwrap();
+        migrate_json_preferences(&settings, Some(&path)).unwrap();
+        assert_eq!(settings.uint("migration-version"), SETTINGS_MIGRATION_VERSION);
+    }
+
+    #[test]
+    fn a_newer_gsettings_migration_marker_is_not_downgraded() {
+        let (settings, _) = make_test_settings("/com/tablepro/linux/future-version/");
+        settings
+            .set_uint("migration-version", SETTINGS_MIGRATION_VERSION + 1)
+            .unwrap();
+
+        assert!(migrate_json_preferences(&settings, None).is_err());
+        assert_eq!(settings.uint("migration-version"), SETTINGS_MIGRATION_VERSION + 1);
+    }
+
+    #[test]
+    fn failed_legacy_mirror_rolls_back_the_gsettings_update() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent_file = dir.path().join("not-a-directory");
+        std::fs::write(&parent_file, b"block directory creation").unwrap();
+        let path = parent_file.join("preferences.json");
+        let (settings, _) = make_test_settings("/com/tablepro/linux/mirror-failure/");
+        let store = PreferencesStore::from_settings(settings, Some(path));
+
+        assert!(store.update(|prefs| prefs.default_page_size = 500).is_err());
+
+        assert_eq!(store.load().default_page_size, Preferences::default().default_page_size);
+    }
+
+    fn test_settings_with_backend(_path: &str, backend: gio::SettingsBackend) -> gio::Settings {
+        let source = gio::SettingsSchemaSource::from_directory(
+            env!("TABLEPRO_GSETTINGS_SCHEMA_DIR"),
+            gio::SettingsSchemaSource::default().as_ref(),
+            false,
+        )
+        .unwrap();
+        let schema = source.lookup(SETTINGS_SCHEMA, true).unwrap();
+        gio::Settings::new_full(&schema, Some(&backend), None)
     }
 }

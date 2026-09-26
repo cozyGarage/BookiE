@@ -245,7 +245,7 @@ impl Connection for DuckdbConnection {
             let guard = conn
                 .lock()
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
-            let bind = values_to_duck_params(&params);
+            let bind = values_to_duck_params(&params)?;
             let rows_affected = guard
                 .execute(&sql, params_from_iter(bind.iter()))
                 .map_err(map_duck_error)? as u64;
@@ -267,7 +267,16 @@ impl Connection for DuckdbConnection {
                 let result = if params.is_empty() {
                     guard.execute(sql, [])
                 } else {
-                    let bind = values_to_duck_params(params);
+                    let bind = match values_to_duck_params(params) {
+                        Ok(bind) => bind,
+                        Err(error) => {
+                            let _ = guard.execute_batch("ROLLBACK");
+                            return Err(DriverError::Transaction {
+                                statement_index: idx,
+                                source: Box::new(error),
+                            });
+                        }
+                    };
                     guard.execute(sql, params_from_iter(bind.iter()))
                 };
                 match result {
@@ -315,7 +324,7 @@ fn run_query(
         .lock()
         .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
     let mut stmt = guard.prepare(sql).map_err(map_duck_error)?;
-    let bind = values_to_duck_params(params);
+    let bind = values_to_duck_params(params)?;
     let mut rows = if params.is_empty() {
         stmt.query([])
     } else {
@@ -410,7 +419,10 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
         ValueRef::Float(f) => Value::Float(f as f64),
         ValueRef::Double(f) => Value::Float(f),
         ValueRef::Decimal(d) => Value::Text(d.to_string()),
-        ValueRef::Text(t) => Value::Text(String::from_utf8_lossy(t).into_owned()),
+        ValueRef::Text(t) => match std::str::from_utf8(t) {
+            Ok(text) => Value::Text(text.to_owned()),
+            Err(_) => Value::Bytes(t.to_vec()),
+        },
         ValueRef::Blob(b) | ValueRef::Geometry(b) => Value::Bytes(b.to_vec()),
         ValueRef::Date32(d) => Value::Text(format!("date32:{d}")),
         ValueRef::Time64(unit, t) => Value::Text(format!("time64:{unit:?}:{t}")),
@@ -420,28 +432,30 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
     }
 }
 
-fn values_to_duck_params(params: &[Value]) -> Vec<duckdb::types::Value> {
+fn values_to_duck_params(params: &[Value]) -> Result<Vec<duckdb::types::Value>, DriverError> {
     params
         .iter()
-        .map(|p| match p {
-            Value::Null => duckdb::types::Value::Null,
-            Value::Bool(b) => duckdb::types::Value::Boolean(*b),
-            Value::Int(i) => duckdb::types::Value::BigInt(*i),
-            Value::Float(f) => duckdb::types::Value::Double(*f),
-            Value::Text(s) => duckdb::types::Value::Text(s.clone()),
-            Value::Bytes(b) => duckdb::types::Value::Blob(b.clone()),
-            Value::Date(d) => duckdb::types::Value::Text(d.to_string()),
-            Value::Time(t) => duckdb::types::Value::Text(t.to_string()),
-            Value::DateTime(dt) => duckdb::types::Value::Text(dt.to_string()),
-            Value::TimestampTz(ts) => duckdb::types::Value::Text(ts.to_rfc3339()),
-            Value::Decimal(d) => duckdb::types::Value::Text(d.to_string()),
-            Value::Uuid(u) => duckdb::types::Value::Text(u.to_string()),
-            Value::Json(j) => duckdb::types::Value::Text(j.to_string()),
-            // Never produced from user input: the grid marks a cell holding
-            // this variant read-only, so it can only reach here through a
-            // handcrafted MCP write, which the caller's policy layer already
-            // treats as suspect.
-            Value::Undecodable(_) => duckdb::types::Value::Null,
+        .map(|p| {
+            Ok(match p {
+                Value::Null => duckdb::types::Value::Null,
+                Value::Bool(b) => duckdb::types::Value::Boolean(*b),
+                Value::Int(i) => duckdb::types::Value::BigInt(*i),
+                Value::Float(f) => duckdb::types::Value::Double(*f),
+                Value::Text(s) => duckdb::types::Value::Text(s.clone()),
+                Value::Bytes(b) => duckdb::types::Value::Blob(b.clone()),
+                Value::Date(d) => duckdb::types::Value::Text(d.to_string()),
+                Value::Time(t) => duckdb::types::Value::Text(t.to_string()),
+                Value::DateTime(dt) => duckdb::types::Value::Text(dt.to_string()),
+                Value::TimestampTz(ts) => duckdb::types::Value::Text(ts.to_rfc3339()),
+                Value::Decimal(d) => duckdb::types::Value::Text(d.to_string()),
+                Value::Uuid(u) => duckdb::types::Value::Text(u.to_string()),
+                Value::Json(j) => duckdb::types::Value::Text(j.to_string()),
+                Value::Undecodable(_) => {
+                    return Err(DriverError::Unsupported(
+                        "undecodable cell cannot be bound as a parameter".into(),
+                    ));
+                }
+            })
         })
         .collect()
 }
@@ -475,6 +489,14 @@ fn map_duck_error(err: duckdb::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn undecodable_cell_cannot_be_bound_as_null() {
+        assert!(matches!(
+            values_to_duck_params(&[Value::Undecodable("DECIMAL".into())]),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 
     #[test]
     fn structure_metadata_is_not_declared_without_a_fetch() {

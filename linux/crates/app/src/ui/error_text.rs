@@ -10,6 +10,10 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
                 .replace("{expected}", &expected.to_string())
                 .replace("{got}", &got.to_string())
         }
+        BuildSqlError::UnrepresentableValue { column } => {
+            crate::tr!("Column {column} contains a value that cannot be copied into a SQL statement.")
+                .replace("{column}", column)
+        }
         BuildSqlError::StaleColumns => crate::tr!(
             "This table's columns changed after you started editing (for example, in a Structure tab). \
              Reload the page and reapply your changes."

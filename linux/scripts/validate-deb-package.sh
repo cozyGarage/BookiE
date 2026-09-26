@@ -37,6 +37,7 @@ for required in \
   usr/share/applications/com.tablepro.linux.desktop \
   usr/share/metainfo/com.tablepro.linux.metainfo.xml \
   usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \
+  usr/share/glib-2.0/schemas/com.tablepro.linux.gschema.xml \
   usr/share/doc/tablepro/LICENSE.md \
   usr/share/doc/tablepro/policy.example.toml; do
   if [[ ! -e "$stage/$required" ]]; then

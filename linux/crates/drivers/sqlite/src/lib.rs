@@ -246,7 +246,7 @@ impl Connection for SqliteConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let q = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+        let q = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
         let res = q.execute(&self.pool).await.map_err(map_sqlx_error)?;
         Ok(ExecResult {
             rows_affected: res.rows_affected(),
@@ -285,7 +285,16 @@ impl Connection for SqliteConnection {
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
             let sql = sql.as_str();
-            let q = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+            let q = match bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
+                Ok(query) => query,
+                Err(error) => {
+                    let _ = tx.rollback().await;
+                    return Err(DriverError::Transaction {
+                        statement_index: idx,
+                        source: Box::new(error),
+                    });
+                }
+            };
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
@@ -560,8 +569,10 @@ fn rows_into_result(collected: &[SqliteRow], truncated: bool) -> QueryResult {
 fn extract_value(row: &SqliteRow, idx: usize) -> Value {
     // SQLite's non-optional decoders turn NULL into zero/empty values.
     // Inspect the storage value before using the declared column type.
-    if row.try_get_raw(idx).is_ok_and(|value| value.is_null()) {
-        return Value::Null;
+    match row.try_get_raw(idx) {
+        Ok(value) if value.is_null() => return Value::Null,
+        Err(_) => return Value::Undecodable(row.columns()[idx].type_info().name().to_string()),
+        Ok(_) => {}
     }
     let type_name = row.columns()[idx].type_info().name().to_ascii_uppercase();
     match type_name.as_str() {
@@ -614,10 +625,9 @@ fn untyped_value(row: &SqliteRow, idx: usize) -> Value {
     if let Ok(value) = row.try_get::<Option<String>, _>(idx) {
         return value.map_or(Value::Null, Value::Text);
     }
-    row.try_get::<Option<Vec<u8>>, _>(idx)
-        .ok()
-        .flatten()
-        .map_or(Value::Null, Value::Bytes)
+    row.try_get::<Vec<u8>, _>(idx)
+        .map(Value::Bytes)
+        .unwrap_or_else(|_| Value::Undecodable(row.columns()[idx].type_info().name().to_string()))
 }
 
 /// A declared column type is a hint, not a guarantee -- SQLite's type
@@ -633,7 +643,7 @@ fn decode_fallback(row: &SqliteRow, idx: usize) -> Value {
 fn bind_sqlite_params<'q>(
     mut q: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments>,
     params: &'q [Value],
-) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments> {
+) -> Result<sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments>, DriverError> {
     for p in params {
         q = match p {
             Value::Null => q.bind(Option::<&str>::None),
@@ -649,14 +659,14 @@ fn bind_sqlite_params<'q>(
             Value::Decimal(d) => q.bind(d.to_string()),
             Value::Uuid(u) => q.bind(u.to_string()),
             Value::Json(j) => q.bind(j.to_string()),
-            // Never produced from user input: the grid marks a cell holding
-            // this variant read-only, so it can only reach here through a
-            // handcrafted MCP write, which the caller's policy layer already
-            // treats as suspect.
-            Value::Undecodable(_) => q.bind(Option::<&str>::None),
+            Value::Undecodable(_) => {
+                return Err(DriverError::Unsupported(
+                    "undecodable cell cannot be bound as a parameter".into(),
+                ));
+            }
         };
     }
-    q
+    Ok(q)
 }
 
 fn quote_ident(name: &str) -> String {
@@ -675,7 +685,7 @@ where
     if params.is_empty() {
         return stream_into_result(executor, sql, limit).await;
     }
-    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(executor);
     let mut collected: Vec<SqliteRow> = Vec::new();
     let mut truncated = false;
@@ -694,7 +704,7 @@ async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<E
 where
     E: sqlx::Executor<'e, Database = Sqlite>,
 {
-    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params);
+    let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let result = query.execute(executor).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),

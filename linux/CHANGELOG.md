@@ -42,6 +42,10 @@
 
 ### Fixed
 
+- App shutdown now cancels MCP operations and waits for its owned HTTP server before flushing persistence.
+- Preferences migration persists its completion marker across fresh handles, preserves malformed legacy files, and rolls back a settings update if its rollback JSON mirror cannot be written.
+- Repeated CSV headers at the maximum identifier length retain a unique suffix instead of looping during column inference.
+
 - Editing a long text or JSON cell in the grid now starts from its full value instead of the shortened text shown for display, so a small edit no longer truncates the rest of the value.
 - The server activity view shows a binary value as its byte count instead of a label that read like a hexadecimal escape.
 - The structure editor shows a column default as the SQL that defines it, so an empty-string default no longer reads as no default, and a MySQL column edit no longer drops an empty-string default or fails on a text default.
@@ -63,7 +67,8 @@
 - MongoDB accepts `DROP TABLE people` as well as the quoted form, instead of reporting the statement as unsupported.
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
-- A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, a row whose key could not be read is refused with an explanation instead of being changed or deleted silently, and SQL exports write a fixed placeholder comment for such a cell.
+- A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, and a row whose key could not be read is refused instead of being changed or deleted silently.
+- Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export refuses binary, undecodable and non-finite values instead of substituting NULL, while Copy as IN skips undecodable cells.
 
 ### Security
 

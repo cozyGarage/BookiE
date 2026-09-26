@@ -66,6 +66,13 @@ pub fn build_insert_literal(
         if column.is_generated {
             continue;
         }
+        if matches!(value, Value::Bytes(_) | Value::Undecodable(_))
+            || matches!(value, Value::Float(number) if !number.is_finite())
+        {
+            return Err(BuildSqlError::UnrepresentableValue {
+                column: column.name.clone(),
+            });
+        }
         names.push(quote_ident(driver_id, &column.name));
         values.push(render_sql_literal(driver_id, value));
     }
@@ -107,6 +114,19 @@ mod tests {
             is_generated: true,
             comment: None,
             ..column(name)
+        }
+    }
+
+    #[test]
+    fn insert_export_refuses_values_it_cannot_represent() {
+        for value in [
+            Value::Bytes(vec![0, 255]),
+            Value::Undecodable("NUMERIC".into()),
+            Value::Float(f64::NAN),
+        ] {
+            let error = build_insert_literal("postgres", None, "items", &[column("value")], &[value])
+                .expect_err("export must not turn a value into SQL NULL");
+            assert!(matches!(error, BuildSqlError::UnrepresentableValue { column } if column == "value"));
         }
     }
 

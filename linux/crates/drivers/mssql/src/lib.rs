@@ -365,7 +365,16 @@ impl Connection for MssqlConnection {
         exec_simple(&mut client, "BEGIN TRANSACTION").await?;
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
-            let boxes = boxed_params(params);
+            let boxes = match boxed_params(params) {
+                Ok(boxes) => boxes,
+                Err(error) => {
+                    let _ = exec_simple(&mut client, "ROLLBACK").await;
+                    return Err(DriverError::Transaction {
+                        statement_index: idx,
+                        source: Box::new(error),
+                    });
+                }
+            };
             let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
             match client.execute(sql.as_str(), &refs).await {
                 Ok(res) => affected.push(res.total()),
@@ -503,7 +512,7 @@ async fn run_query(
     params: &[Value],
     limit: usize,
 ) -> Result<QueryResult, DriverError> {
-    let boxes = boxed_params(params);
+    let boxes = boxed_params(params)?;
     let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
     let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
     collect_result(stream, limit).await
@@ -547,7 +556,7 @@ async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> 
 }
 
 async fn run_execute(client: &mut MssqlClient, sql: &str, params: &[Value]) -> Result<u64, DriverError> {
-    let boxes = boxed_params(params);
+    let boxes = boxed_params(params)?;
     let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
     let res = client.execute(sql, &refs).await.map_err(map_tiberius_error)?;
     Ok(res.total())
@@ -562,11 +571,11 @@ async fn exec_simple(client: &mut MssqlClient, sql: &str) -> Result<(), DriverEr
     Ok(())
 }
 
-fn boxed_params(params: &[Value]) -> Vec<Box<dyn ToSql>> {
+fn boxed_params(params: &[Value]) -> Result<Vec<Box<dyn ToSql>>, DriverError> {
     params
         .iter()
-        .map(|p| -> Box<dyn ToSql> {
-            match p {
+        .map(|p| -> Result<Box<dyn ToSql>, DriverError> {
+            Ok(match p {
                 // Type NULL as nvarchar: a typed-int NULL breaks COALESCE /
                 // comparisons against string columns (e.g. the introspection
                 // `COALESCE(@P, SCHEMA_NAME())`), while NULL always converts
@@ -585,12 +594,12 @@ fn boxed_params(params: &[Value]) -> Vec<Box<dyn ToSql>> {
                 Value::Uuid(u) => Box::new(*u),
                 // TDS has no JSON type; SQL Server stores JSON as nvarchar.
                 Value::Json(j) => Box::new(serde_json::to_string(j).unwrap_or_default()),
-                // Never produced from user input: the grid marks a cell holding
-                // this variant read-only, so it can only reach here through a
-                // handcrafted MCP write, which the caller's policy layer already
-                // treats as suspect.
-                Value::Undecodable(_) => Box::new(Option::<String>::None),
-            }
+                Value::Undecodable(_) => {
+                    return Err(DriverError::Unsupported(
+                        "undecodable cell cannot be bound as a parameter".into(),
+                    ));
+                }
+            })
         })
         .collect()
 }
@@ -888,6 +897,14 @@ fn map_tiberius_error(err: tiberius::error::Error) -> DriverError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn undecodable_cell_cannot_be_bound_as_null() {
+        assert!(matches!(
+            boxed_params(&[Value::Undecodable("geometry".into())]),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 
     #[test]
     fn structure_metadata_declarations_match_the_connection_impl() {

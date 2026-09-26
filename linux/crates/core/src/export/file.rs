@@ -219,12 +219,37 @@ mod tests {
                 table: "people",
             }),
         };
-        write_result_file(&path, &result(), &export, || false, |_| {}).unwrap();
+        let mut data = result();
+        data.rows[0][0] = Value::Int(1);
+        write_result_file(&path, &data, &export, || false, |_| {}).unwrap();
         let sql = std::fs::read_to_string(&path).unwrap();
         assert!(
             sql.starts_with("INSERT INTO \"public\".\"people\" (\"id\", \"id\", \"id_2\")"),
             "{sql}"
         );
+    }
+
+    #[test]
+    fn a_sql_export_with_binary_data_preserves_the_existing_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("result");
+        std::fs::write(&path, "previous export").unwrap();
+        let options = CsvOptions::default();
+        let export = ResultExport {
+            format: ResultFormat::Sql,
+            csv: &options,
+            sql: Some(SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "people",
+            }),
+        };
+        let error = write_result_file(&path, &result(), &export, || false, |_| {}).unwrap_err();
+        assert!(matches!(
+            error,
+            ExportError::Statement(crate::sql_dialect::BuildSqlError::UnrepresentableValue { .. })
+        ));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "previous export");
     }
 
     #[test]

@@ -4,7 +4,7 @@ Active delivery sequencing and acceptance are now in the approved
 [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
 The capability backlog and historical evidence below remain reference material.
 
-Last updated: 2026-09-17
+Last updated: 2026-09-26
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -17,7 +17,7 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 
 ## Current baseline
 
-- Current fork baseline: `e9bba1f5b`, BookiE 0.1.4. The [30-commit review](linux/docs/baseline-review-2026-09-17.md) governs continuation toward 0.2; older baseline entries below are historical.
+- Current working baseline: `8ae99ad66` from `fork/linux`, plus preserved local work reconciled into `linux` (integration branch `integrate/linux-20260926`), with the BookiE 0.1.x → 0.2 sprint in progress and no release approved. BookiE 0.1.4 at `e9bba1f5b` remains the last named release baseline. The [30-commit review](linux/docs/baseline-review-2026-09-17.md) governs continuation toward 0.2; older baseline entries below are historical.
 
 - Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
 - Active work follows the approved [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.

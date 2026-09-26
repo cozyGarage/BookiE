@@ -41,6 +41,7 @@ pub struct McpBridge {
     /// one taking the same cross-process token-store file lock issue and
     /// revoke need.
     auth_rate_limiter: RateLimiter,
+    shutdown: CancellationToken,
     pub max_rows: u64,
     pub query_timeout_secs: u64,
 }
@@ -70,14 +71,40 @@ impl McpBridge {
     }
 
     pub fn with_limits(provider: Arc<dyn ConnectionProvider>, tokens: Arc<TokenStore>, limits: McpLimits) -> Self {
+        Self::with_limits_and_shutdown(provider, tokens, limits, CancellationToken::new())
+    }
+
+    pub fn with_shutdown_token(
+        provider: Arc<dyn ConnectionProvider>,
+        tokens: Arc<TokenStore>,
+        shutdown: CancellationToken,
+    ) -> Self {
+        Self::with_limits_and_shutdown(provider, tokens, McpLimits::default(), shutdown)
+    }
+
+    fn with_limits_and_shutdown(
+        provider: Arc<dyn ConnectionProvider>,
+        tokens: Arc<TokenStore>,
+        limits: McpLimits,
+        shutdown: CancellationToken,
+    ) -> Self {
         Self {
             provider,
             tokens,
             rate_limiter: RateLimiter::new(limits.requests_per_minute),
             auth_rate_limiter: RateLimiter::new(limits.requests_per_minute),
+            shutdown,
             max_rows: limits.max_rows,
             query_timeout_secs: limits.query_timeout_secs,
         }
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.cancel();
+    }
+
+    fn operation_control(&self) -> OperationControl {
+        operation_control(self.shutdown.child_token(), self.query_timeout_secs)
     }
 
     pub fn tokens(&self) -> &TokenStore {
@@ -106,7 +133,7 @@ impl McpBridge {
     }
 
     pub async fn list_connections(&self, token: &McpToken) -> Result<Vec<SavedConnection>, String> {
-        let control = operation_control(self.query_timeout_secs);
+        let control = self.operation_control();
         authorize_scopes(token.permissions, McpScope::ToolsRead)?;
         self.check_rate(token)?;
         if token.connection_allowlist.is_empty() {
@@ -142,7 +169,7 @@ impl McpBridge {
         token: &McpToken,
         connection_id: Uuid,
     ) -> Result<OperationControl, String> {
-        let control = operation_control(self.query_timeout_secs);
+        let control = self.operation_control();
         authorize_scopes(token.permissions, McpScope::ToolsRead)?;
         self.check_rate(token)?;
         self.ensure_connection_allowed(token, connection_id)?;
@@ -409,7 +436,7 @@ impl McpBridge {
                         .map_err(|error| error.to_string())?
                         .map_err(|error| error.to_string())?;
                     let result = tx.execute_controlled(&sql, &control).await;
-                    let cleanup_control = operation_control_for(PREVIEW_CLEANUP_TIMEOUT);
+                    let cleanup_control = operation_control_for(CancellationToken::new(), PREVIEW_CLEANUP_TIMEOUT);
                     tx.rollback_controlled(&cleanup_control)
                         .await
                         .map_err(|error| format!("preview rollback could not be confirmed: {error}"))?;
@@ -516,12 +543,12 @@ where
     }
 }
 
-fn operation_control(timeout_secs: u64) -> OperationControl {
-    operation_control_for(Duration::from_secs(timeout_secs))
+fn operation_control(cancellation: CancellationToken, timeout_secs: u64) -> OperationControl {
+    operation_control_for(cancellation, Duration::from_secs(timeout_secs))
 }
 
-fn operation_control_for(timeout: Duration) -> OperationControl {
-    OperationControl::new(CancellationToken::new(), Some(Instant::now() + timeout))
+fn operation_control_for(cancellation: CancellationToken, timeout: Duration) -> OperationControl {
+    OperationControl::new(cancellation, Some(Instant::now() + timeout))
 }
 
 fn sql_looks_like_write(sql: &str, driver_id: &str) -> bool {
@@ -551,6 +578,20 @@ mod tests {
         ) -> Result<Arc<dyn tablepro_core::Connection>, String> {
             Err("no connections in this test".into())
         }
+    }
+
+    #[test]
+    fn bridge_shutdown_cancels_every_owned_operation_control() {
+        let dir = tempfile::tempdir().unwrap();
+        let tokens = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+        let shutdown = tokio_util::sync::CancellationToken::new();
+        let bridge = McpBridge::with_shutdown_token(Arc::new(NoProvider), tokens, shutdown);
+        let control = bridge.operation_control();
+
+        bridge.shutdown();
+
+        assert!(control.cancellation_token().is_cancelled());
+        assert!(bridge.operation_control().cancellation_token().is_cancelled());
     }
 
     /// H-adjacent finding: a failed authenticate never resolves to a token

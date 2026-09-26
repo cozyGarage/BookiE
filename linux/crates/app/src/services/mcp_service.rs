@@ -8,6 +8,7 @@ use tablepro_core::Connection;
 use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
 use tablepro_policy::Principal;
 use tablepro_storage::{SavedConnection, load_connections, store_mcp_token};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 use super::database_service::DatabaseService;
@@ -33,7 +34,24 @@ impl ConnectionProvider for AppConnectionProvider {
 }
 
 /// Start the loopback MCP HTTP server.
-pub fn start_background(database: Arc<DatabaseService>) -> Option<Arc<McpBridge>> {
+pub struct RunningMcpServer {
+    pub bridge: Arc<McpBridge>,
+    shutdown: CancellationToken,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+impl RunningMcpServer {
+    pub fn shutdown(mut self) {
+        self.shutdown.cancel();
+        if let Some(thread) = self.thread.take()
+            && thread.join().is_err()
+        {
+            tracing::warn!("MCP server thread panicked during shutdown");
+        }
+    }
+}
+
+pub fn start_background(database: Arc<DatabaseService>) -> Option<RunningMcpServer> {
     if !database.audit_available() {
         tracing::error!("MCP server disabled because the required audit journal is unavailable");
         return None;
@@ -49,28 +67,41 @@ pub fn start_background(database: Arc<DatabaseService>) -> Option<Arc<McpBridge>
             return None;
         }
     };
-    let bridge = Arc::new(McpBridge::new(Arc::new(AppConnectionProvider { database }), tokens));
+    let shutdown = CancellationToken::new();
+    let bridge = Arc::new(McpBridge::with_shutdown_token(
+        Arc::new(AppConnectionProvider { database }),
+        tokens,
+        shutdown.clone(),
+    ));
     let bridge_http = bridge.clone();
     let config = tablepro_mcp::McpServerConfig::default();
+    let server_shutdown = shutdown.clone();
     tracing::info!(host = %config.bind_host, port = config.bind_port, "MCP HTTP server starting");
-    std::thread::Builder::new()
-        .name("tablepro-mcp".into())
-        .spawn(move || {
-            let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
-                Ok(rt) => rt,
-                Err(e) => {
-                    tracing::warn!(error = %e, "MCP runtime unavailable; MCP HTTP server not started");
-                    return;
-                }
-            };
-            rt.block_on(async move {
-                if let Err(e) = tablepro_mcp::serve_streamable_http(bridge_http, config).await {
-                    tracing::warn!(error = %e, "MCP HTTP server stopped");
-                }
-            });
-        })
-        .ok();
-    Some(bridge)
+    let thread = match std::thread::Builder::new().name("tablepro-mcp".into()).spawn(move || {
+        let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+            Ok(rt) => rt,
+            Err(e) => {
+                tracing::warn!(error = %e, "MCP runtime unavailable; MCP HTTP server not started");
+                return;
+            }
+        };
+        rt.block_on(async move {
+            if let Err(e) = tablepro_mcp::serve_streamable_http_until(bridge_http, config, server_shutdown).await {
+                tracing::warn!(error = %e, "MCP HTTP server stopped");
+            }
+        });
+    }) {
+        Ok(thread) => thread,
+        Err(error) => {
+            tracing::warn!(%error, "MCP server thread unavailable");
+            return None;
+        }
+    };
+    Some(RunningMcpServer {
+        bridge,
+        shutdown,
+        thread: Some(thread),
+    })
 }
 
 /// Issue a token, store plaintext in libsecret, return plaintext once.

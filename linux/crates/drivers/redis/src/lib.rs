@@ -426,14 +426,11 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
             rows: vec![vec![Value::Bool(b)]],
             truncated: false,
         },
-        RedisValue::BulkString(bytes) => {
-            let text = String::from_utf8_lossy(&bytes).into_owned();
-            QueryResult {
-                columns: vec![text_col("result")],
-                rows: vec![vec![Value::Text(text)]],
-                truncated: false,
-            }
-        }
+        RedisValue::BulkString(bytes) => QueryResult {
+            columns: vec![text_col("result")],
+            rows: vec![vec![bytes_to_value(bytes)]],
+            truncated: false,
+        },
         RedisValue::Array(items) | RedisValue::Set(items) => {
             let mut rows = Vec::new();
             let mut truncated = false;
@@ -496,10 +493,17 @@ fn redis_scalar(value: RedisValue) -> Value {
         RedisValue::Double(f) => Value::Float(f),
         RedisValue::Boolean(b) => Value::Bool(b),
         RedisValue::SimpleString(s) => Value::Text(s),
-        RedisValue::BulkString(b) => Value::Text(String::from_utf8_lossy(&b).into_owned()),
+        RedisValue::BulkString(b) => bytes_to_value(b),
         RedisValue::Okay => Value::Text("OK".into()),
         RedisValue::VerbatimString { text, .. } => Value::Text(text),
         other => Value::Text(format!("{other:?}")),
+    }
+}
+
+fn bytes_to_value(bytes: Vec<u8>) -> Value {
+    match String::from_utf8(bytes) {
+        Ok(text) => Value::Text(text),
+        Err(error) => Value::Bytes(error.into_bytes()),
     }
 }
 
@@ -798,12 +802,9 @@ mod tests {
     }
 
     #[test]
-    fn redis_value_to_result_replaces_invalid_utf8_binary_instead_of_failing() {
+    fn redis_value_to_result_preserves_invalid_utf8_binary() {
         let result = redis_value_to_result(RedisValue::BulkString(vec![0xFF, 0xFE]));
-        let Value::Text(text) = &result.rows[0][0] else {
-            panic!("expected a text value");
-        };
-        assert!(text.contains('\u{FFFD}'));
+        assert_eq!(result.rows, vec![vec![Value::Bytes(vec![0xFF, 0xFE])]]);
     }
 
     #[test]
@@ -842,14 +843,14 @@ mod tests {
     }
 
     #[test]
-    fn redis_scalar_decodes_binary_as_lossy_text() {
+    fn redis_scalar_preserves_binary_that_is_not_utf8() {
         assert_eq!(
             redis_scalar(RedisValue::BulkString(b"abc".to_vec())),
             Value::Text("abc".into())
         );
         assert_eq!(
             redis_scalar(RedisValue::BulkString(vec![0xFF])),
-            Value::Text("\u{FFFD}".into())
+            Value::Bytes(vec![0xFF])
         );
     }
 }

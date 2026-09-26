@@ -749,6 +749,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_failed_history_migration_rolls_back_its_schema_and_version_change() {
+        let pool = legacy_pool().await;
+        sqlx::query("ALTER TABLE history ADD COLUMN source TEXT NOT NULL DEFAULT 'editor'")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("PRAGMA user_version = 1").execute(&pool).await.unwrap();
+
+        assert!(apply_schema(&pool).await.is_err());
+
+        assert_eq!(user_version(&pool).await.unwrap(), 1);
+        let columns = sqlx::query("PRAGMA table_info(history)")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        assert_eq!(
+            columns
+                .iter()
+                .filter(|row| row.get::<String, _>("name") == "source")
+                .count(),
+            1
+        );
+        let query: String = sqlx::query_scalar("SELECT query FROM history WHERE id = 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(query, "SELECT 1");
+    }
+
+    #[tokio::test]
     async fn an_older_database_gains_the_source_column_and_reads_as_editor() {
         let pool = legacy_pool().await;
 
@@ -757,6 +787,70 @@ mod tests {
         let entries = store_over(pool).search(SearchFilter::default()).await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].source, Source::Editor);
+    }
+
+    #[tokio::test]
+    async fn opening_a_legacy_history_file_migrates_it_and_reopening_keeps_its_data() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history.db");
+        let options = SqliteConnectOptions::new().filename(&path).create_if_missing(true);
+        let legacy = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .expect("legacy file");
+        for statement in BASE_SCHEMA {
+            sqlx::query(*statement).execute(&legacy).await.expect("legacy schema");
+        }
+        sqlx::query(
+            "INSERT INTO history (query, driver_id, connection_id, connection_name, executed_at, success, cancelled) \
+             VALUES ('SELECT 1', 'sqlite', '00000000-0000-0000-0000-000000000000', 'legacy', 1, 1, 0)",
+        )
+        .execute(&legacy)
+        .await
+        .expect("legacy row");
+        legacy.close().await;
+
+        let store = HistoryStore::open(path.clone())
+            .await
+            .expect("migrate legacy history file");
+        let entries = store.search(SearchFilter::default()).await.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].query, "SELECT 1");
+        assert_eq!(entries[0].source, Source::Editor);
+        assert_eq!(user_version(&store.pool).await.unwrap(), MIGRATIONS.len() as i64);
+
+        // A previous package can keep using its explicit legacy column list
+        // and omit `source`; SQLite supplies the migration's editor default.
+        sqlx::query(
+            "INSERT INTO history (query, driver_id, connection_id, connection_name, executed_at, success, cancelled) \
+             VALUES ('SELECT 2', 'sqlite', '00000000-0000-0000-0000-000000000000', 'legacy', 2, 1, 0)",
+        )
+        .execute(&store.pool)
+        .await
+        .expect("legacy package write after migration");
+        let legacy_read: (i64, String) =
+            sqlx::query_as("SELECT id, query FROM history ORDER BY executed_at DESC LIMIT 1")
+                .fetch_one(&store.pool)
+                .await
+                .expect("legacy package explicit-column read");
+        assert_eq!(legacy_read.1, "SELECT 2");
+        drop(store);
+
+        let reopened = HistoryStore::open(path).await.expect("reopen migrated history file");
+        let entries = reopened.search(SearchFilter::default()).await.unwrap();
+        assert_eq!(entries.len(), 2);
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.query == "SELECT 1" && entry.source == Source::Editor)
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.query == "SELECT 2" && entry.source == Source::Editor)
+        );
+        assert_eq!(user_version(&reopened.pool).await.unwrap(), MIGRATIONS.len() as i64);
     }
 
     #[tokio::test]

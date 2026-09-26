@@ -24,7 +24,7 @@ pub fn render_in_clause(driver_id: &str, rows: &[Vec<Value>], column_index: usiz
 }
 
 fn in_clause_literal(driver_id: &str, value: &Value) -> Option<String> {
-    if !supports_sql_literals(driver_id) || matches!(value, Value::Null | Value::Bytes(_)) {
+    if !supports_sql_literals(driver_id) || matches!(value, Value::Null | Value::Bytes(_) | Value::Undecodable(_)) {
         return None;
     }
     if matches!(value, Value::Float(number) if !number.is_finite()) {
@@ -57,13 +57,14 @@ mod tests {
             vec![Value::Bool(true)],
             vec![Value::Null],
             vec![Value::Bytes(vec![0])],
+            vec![Value::Undecodable("NUMERIC".into())],
         ];
 
         assert_eq!(
             render_in_clause("postgres", &rows, 0),
             InClause {
                 sql: "(1, 'O''Reilly', TRUE)".into(),
-                skipped: 2
+                skipped: 3
             }
         );
         assert_eq!(render_in_clause("postgres", &rows, 1), InClause::default());

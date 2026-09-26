@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="com.tablepro.linux" path="/com/tablepro/linux/">
+    <key name="migration-version" type="u"><default>0</default></key>
     <key name="preferences-migrated" type="b"><default>false</default></key>
     <key name="window-migrated" type="b"><default>false</default></key>
     <key name="window-width" type="i"><default>1200</default></key>
@@ -14,6 +15,7 @@
     <key name="csv-include-header" type="b"><default>true</default></key>
   </schema>
   <schema id="com.tablepro.linux.Devel" path="/com/tablepro/linux/Devel/">
+    <key name="migration-version" type="u"><default>0</default></key>
     <key name="preferences-migrated" type="b"><default>false</default></key>
     <key name="window-migrated" type="b"><default>false</default></key>
     <key name="window-width" type="i"><default>1200</default></key>

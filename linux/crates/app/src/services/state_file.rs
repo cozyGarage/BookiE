@@ -22,6 +22,10 @@ struct State<T> {
 }
 
 impl<T: Default + Clone + Serialize + DeserializeOwned + Send + 'static> StateFile<T> {
+    pub(super) fn memory() -> Self {
+        Self::with_writer(T::default(), None, |_| Ok(()))
+    }
+
     pub fn load(path: PathBuf) -> Self {
         let loaded = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| error.to_string()),

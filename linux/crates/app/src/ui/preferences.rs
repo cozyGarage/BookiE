@@ -215,13 +215,15 @@ pub fn present(
                 .get(page_size.selected() as usize)
                 .copied()
                 .unwrap_or(1_000);
-            preferences.update(|prefs| {
+            if let Err(error) = preferences.update(|prefs| {
                 prefs.default_page_size = default_page_size;
                 prefs.confirm_destructive = confirm.is_active();
                 prefs.editor_font_size = font.value() as u32;
                 prefs.history_retention_days = retention.value() as u32;
                 prefs.query_timeout_secs = timeout.value() as u32;
-            });
+            }) {
+                tracing::warn!(%error, "preferences: update rejected");
+            }
         })
     };
     page_size_row.connect_selected_notify({
