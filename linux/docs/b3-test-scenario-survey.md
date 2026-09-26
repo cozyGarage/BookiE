@@ -99,5 +99,9 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   does not prove coverage across every engine.
 - Review DBeaver statement-parser fixtures and the remaining SQLFluff dialect
   corpus selectively for our six SQL engines.
-- Next implementation task: reproduce the B3-1 array distinctions against
-  PostgreSQL, define the lossless representation, then extend consumers.
+- B3-1 implementation follow-up: common scalar arrays now preserve elements,
+  dimensions and lower bounds through SQL export/re-import; see the
+  [array checkpoint](value-contracts.md#postgresql-array-checkpoint). Unsupported
+  element types, automatic array editing and remaining consumers stay open.
+- Next implementation task: temporal boundary cases from B3-2, retaining the
+  same real-server oracle and permanent-regression workflow.

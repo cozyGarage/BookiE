@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- PostgreSQL arrays of common scalar types preserve NULL elements, empty values, nesting, lower bounds and exact numeric digits through query results and SQL exports. Unsupported element types and oversized decoded arrays remain visibly undecodable.
+
 - PostgreSQL numeric results preserve wide integers, long fractions, decimal scale, NaN and infinities. Values beyond the editable decimal range remain exact text instead of appearing undecodable.
 
 - Excel exports preserve integers beyond 15 digits and all exact decimals as text cells, retaining every digit and decimal scale. These cells require explicit numeric conversion for spreadsheet arithmetic.

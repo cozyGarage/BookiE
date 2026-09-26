@@ -14,6 +14,17 @@ use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio_util::sync::CancellationToken;
 
+#[path = "support/array_contract.rs"]
+mod array_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_arrays_preserve_elements_dimensions_and_exports() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    array_contract::assert_array_contract(connection.as_ref()).await;
+}
+
 async fn start_pg() -> (ContainerAsync<Postgres>, ConnectOptions) {
     // Pin to Postgres 16: the introspection query in `fetch_columns`
     // reads `pg_attribute.attgenerated`, which was added in PG 12.
@@ -812,7 +823,7 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
     // aborting the whole result set (or silently becoming NULL): the rest
     // of the row, and other rows in the same result, still come back.
     for sql in [
-        "SELECT ARRAY[1, 2]::int[]",
+        "SELECT ARRAY[int4range(1, 3)]",
         "SELECT 'infinity'::date",
         "SELECT '-infinity'::timestamp",
         "SELECT 'infinity'::timestamptz",
@@ -825,7 +836,7 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
             result.rows[0][0]
         );
     }
-    for sql in ["SELECT ARRAY[1, 2]::int[], 42::int"] {
+    for sql in ["SELECT ARRAY[int4range(1, 3)], 42::int"] {
         let result = conn.query(sql).await.unwrap();
         assert!(matches!(result.rows[0][0], Value::Undecodable(_)));
         assert_eq!(result.rows[0][1], Value::Int(42));

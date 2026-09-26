@@ -143,3 +143,54 @@ working tree based on `28df4581c`; Debian package validation was skipped because
 The all-eight-driver suite also passed at
 `target/quality/20260926T202754372916Z-values/report.json`: all 11 selected
 suites, including both PostgreSQL cases and eight core cases.
+
+## PostgreSQL array checkpoint
+
+Scenario B3-1 follows the DBeaver array distinctions recorded in the
+[external survey](b3-test-scenario-survey.md). The first real-server regression
+failed on an empty int4 array, which returned Undecodable. No external fixture
+or source code was copied.
+
+The driver now decodes binary arrays of bool, int2/int4/int8, oid, text/name/
+varchar/bpchar, float4/float8, numeric, UUID and bytea. Results use PostgreSQL array
+text in Value::Text and retain the original array type in ColumnInfo. Whole-array
+NULL remains Value::Null. Nested braces and explicit bounds preserve dimensions;
+quoted elements distinguish NULL, literal NULL, empty strings and escaped text.
+JSON export retains this text representation, not a flattened JSON array.
+
+The regression compares PostgreSQL array_send bytes after SQL literal re-import,
+explicitly typed parameter binding and execution of generated INSERT exports.
+It also checks session/direct parity, exact column type and JSON string fidelity.
+The corpus includes six dimensions, non-default lower bounds, Unicode, quotes,
+backslashes, newline and SQL-shaped text, numeric scale/wide fractions, signed
+zero, NaN/infinities, empty binary values and integer boundaries.
+
+Unit tests reject truncated/trailing data, invalid dimensions or element lengths,
+OID mismatches, invalid UTF-8 and NULL flags, unsupported element types and
+size/product overflow. Deterministic malformed-input and header-mutation cases
+exercise bounded decoding. Binary-to-text array decoding is capped at 16 MiB; exceeding the
+limit returns the existing visible undecodable marker rather than truncated data.
+
+Limits: enum/domain/composite/range, temporal and JSON/BSON array elements still
+need explicit contracts; arbitrary array editing and the full grid/MCP/import
+acceptance matrix remain open. Binding text in these tests uses an explicit
+PostgreSQL array cast; this does not establish automatic array parameter typing.
+
+Test locations: `crates/drivers/postgres/src/array.rs` and
+`crates/drivers/postgres/tests/support/array_contract.rs`, invoked by the ignored
+`value_contract_arrays_preserve_elements_dimensions_and_exports` integration test.
+The shared value runner selects this test automatically.
+
+Protocol references: [PostgreSQL arrays](https://www.postgresql.org/docs/16/arrays.html)
+and [array_send](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/arrayfuncs.c).
+
+Validation on the working tree based on `7cb2fe3ca`: all 50 PostgreSQL
+unit/integration tests passed. The full local gate passed at
+`target/quality/20260926T204949649377Z-full/report.json`; Debian package validation
+was skipped because `dpkg-deb` is unavailable. The subsequent shared run caught
+an overly literal metadata expectation: SQLx names PostgreSQL bpchar arrays
+`CHAR[]`. After correcting that assertion, all 11 suites passed at
+`target/quality/20260926T205412392759Z-values/report.json`, including all eight
+drivers, GTK and DuckDB. That run reused 744 artifacts, rebuilt one package and
+spent 3.034 seconds compiling. Function/file size guards and whitespace checks
+also passed. Installed desktop acceptance remains a later gate.

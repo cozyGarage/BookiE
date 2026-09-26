@@ -14,6 +14,7 @@ use tablepro_core::{
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
+mod array;
 mod catalog;
 mod decode;
 mod numeric;
@@ -851,6 +852,9 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     let raw = row.try_get_raw(idx).map_err(map_sqlx_error)?;
     if raw.is_null() {
         return Ok(Value::Null);
+    }
+    if matches!(raw.type_info().kind(), sqlx::postgres::PgTypeKind::Array(_)) {
+        return Ok(array::decode(&raw).unwrap_or_else(|| undecodable(idx, type_name)));
     }
     if type_name == "NUMERIC" {
         let value = match raw.format() {

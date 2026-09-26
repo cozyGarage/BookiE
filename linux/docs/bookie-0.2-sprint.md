@@ -254,8 +254,9 @@ editing. B4–B6 acceptance follows B3; their boxes remain open.
 The [external scenario survey](b3-test-scenario-survey.md) pins test sources from
 DBeaver, Beekeeper Studio, pgcli and SQLFluff. Use their scenarios and issue-linked
 regressions to find gaps, reproduce failures locally, and retain permanent tests.
-Next priority is PostgreSQL array preservation, then temporal/nested values and
-consumer parity. Secure transport and authorization scenarios feed B4 acceptance;
+Common PostgreSQL scalar arrays now preserve their elements and dimensions
+through SQL export/re-import. Temporal/nested values, unsupported array element
+types and remaining consumer parity stay next. Secure transport and authorization scenarios feed B4 acceptance;
 the VM remains optional for current B3 work. The survey is an initial sample,
 not evidence that those projects or BookiE pass every scenario.
 
