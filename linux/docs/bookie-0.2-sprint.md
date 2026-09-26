@@ -599,3 +599,44 @@ isolated-test inventory passed. Debian package fixture could not run because
   integration gate passed: PostgreSQL 21, Unix socket 2, MySQL 14, SQL Server
   16, ClickHouse 14, Redis 1. A5 still needs an immutable candidate and soak;
   B1 still needs a real Flatpak build and installed package qualification.
+
+- 2026-09-26 audit review: reviewed and merged an independent audit pass over
+  the column-default fix, the activity-view byte label, the SSH tunnel `relay`
+  refactor, and new duplicate-row/keyed-edit tests. Two problems surfaced in
+  review rather than in the audit itself:
+  - MariaDB 10.2.7+ already reports a column default as the SQL that defines
+    it, and reports a column with no default as the text `NULL` rather than
+    SQL NULL. The MySQL driver's new default handling quoted that text again,
+    so a MariaDB column with no default would have gained the literal default
+    `'NULL'`. Caught against a real MariaDB 11 container before merge; fixed
+    with a server-flavour flag read from `VERSION()` and a regression test
+    that fails without it.
+  - The already-pushed connect-dialog timeout commit left helper functions
+    after the `#[cfg(test)]` module, which fails Clippy's `items_after_test_module`
+    lint on the app crate. `preflight.sh` does not lint the app crate, so this
+    had not been caught. Fixed by moving the tests back to the end of the file.
+  Full verification on the combined tree: preflight, app Clippy and lib tests
+  (369 passed), and the PostgreSQL (23), MySQL (17), SQL Server (19, full
+  suite), and SQLite (16) driver container tests all passed. `cargo deny`, the
+  GTK tiers, ClickHouse/MongoDB, and the release tier were not run.
+- 2026-09-26 long-text/JSON cell edit: reviewing the merged audit for what it
+  missed (rather than just what it added) surfaced a separate, older bug: a
+  grid cell holding text or JSON over 40,000 bytes truncates for display and
+  appends `"… (+N more chars)"`. Double-clicking that cell to edit it seeded
+  the edit widget from that truncated label, not the real value, so any typed
+  change (or the JSON popover's Save) could persist truncated text, and the
+  literal `"… (+N more chars)"` marker if it wasn't deleted first. Opening and
+  closing an edit with no change was already safe. Fixed by carrying each
+  cell's full, untruncated text in a widget-data slot set at bind time and
+  reading it back wherever an edit starts, seeds the JSON popover, or checks
+  for a no-op commit, instead of reading the label. A regression test lives in
+  the grid's isolated-display (`gtk`) tier, since it must render a real
+  `ColumnView` bind cycle; this environment has no `xvfb-run`, so the test is
+  confirmed to compile but not yet confirmed to fail pre-fix and pass
+  post-fix on a real display. See
+  [manual-verification-0.2-features.md](manual-verification-0.2-features.md)
+  for the manual check.
+  Not covered by this fix, tracked separately: `sql_literal.rs` renders any
+  `Value::Bytes` as `/* bytes omitted */ NULL` in SQL export and copied
+  INSERT statements, which is a deliberate, marked, but real loss of binary
+  column data. No test or fix attempted yet.

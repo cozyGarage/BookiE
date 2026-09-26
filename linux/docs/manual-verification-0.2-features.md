@@ -176,6 +176,42 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - [ ] Switching kind quickly never shows the previous kind's rows under the new one.
 - [ ] Closing the window mid-load leaves no error toast behind.
 
+## Grid cell editing: long text and JSON
+
+A text or JSON cell over 40,000 bytes shows a shortened value ending in
+`… (+N more chars)`. Editing used to start from that shortened text; this is
+now fixed (`FULL_EDIT_TEXT_SLOT` in `crates/app/src/ui/grid/display.rs`), but
+has not been rendered on a display. Use a table with a `text` or `json` column
+and insert one row with a value of at least 50,000 characters (for example
+`SELECT repeat('a', 50000)` cast to the column's type, or a JSON array with
+enough elements).
+
+- [ ] The cell shows the shortened text ending in `… (+N more chars)`.
+- [ ] Double-click the cell: the edit field's content is the **full** value,
+      not the shortened one, and does not end in the `more chars` marker.
+- [ ] Press Escape without typing anything: no edit is recorded (check the
+      history dialog or the change-tracker highlight), and reopening the cell
+      still shows the full value.
+- [ ] Click away (focus-out) without typing anything: same as Escape, no edit
+      recorded.
+- [ ] Append one character at the end of the full value and commit (Enter or
+      Tab): reload the row and confirm the saved value is the original text
+      plus that one character, not the shortened text.
+- [ ] For a JSON column, open the cell's JSON popover editor: its content is
+      also the full value, not the shortened one. Save without changing
+      anything, then Save after a small change, and confirm the same two
+      outcomes as above.
+- [ ] Do all of the above once more for a value just under 40,000 bytes (no
+      truncation should ever have applied) to confirm normal editing still
+      works unchanged.
+
+## Server activity view: binary values
+
+- [ ] Open a connection's activity/session view while a query on a `bytea` or
+      `varbinary` column is visible. A binary value shows as `<N bytes>`, not
+      as a value that reads like a hexadecimal escape (for example not
+      `\x10 bytes`).
+
 ## Carried over from the earlier sprint
 
 - [ ] `cell_editor.rs`: in-place cell editing in light and dark. Held since the
@@ -192,3 +228,7 @@ Main menu, then Catalog, on a PostgreSQL connection with a few objects of each k
 - Bundle export and import write **no** audit-journal entries. `AuditEvent` is
   SQL-shaped and hash-chained, so an administrative-event class needs its own ADR
   before that gap can be closed. See `storage.md`.
+- SQL-format export and copied INSERT statements render any binary column value
+  as `/* bytes omitted */ NULL` (`crates/core/src/sql_literal.rs`). This is
+  deliberate and marked in the output, but the binary data is not recoverable
+  from the exported SQL. No fix attempted yet.
