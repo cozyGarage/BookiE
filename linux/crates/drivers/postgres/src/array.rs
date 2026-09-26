@@ -96,11 +96,7 @@ fn append_dimension(
             if length == -1 && allows_null {
                 output.push_str("NULL");
             } else {
-                let length = usize::try_from(length).ok()?;
-                if length > MAX_ARRAY_TEXT_BYTES {
-                    return None;
-                }
-                let bytes = reader.take(length)?;
+                let bytes = read_bounded_element(reader, length)?;
                 append_quoted(output, &element_text(oid, bytes)?)?;
             }
         } else {
@@ -112,6 +108,14 @@ fn append_dimension(
     }
     output.push('}');
     Some(())
+}
+
+fn read_bounded_element<'a>(reader: &mut Reader<'a>, length: i32) -> Option<&'a [u8]> {
+    let length = usize::try_from(length).ok()?;
+    if length > MAX_ARRAY_TEXT_BYTES {
+        return None;
+    }
+    reader.take(length)
 }
 
 fn append_quoted(output: &mut String, text: &str) -> Option<()> {
@@ -298,10 +302,29 @@ mod tests {
 
     #[test]
     fn value_contract_expanded_array_text_has_an_explicit_size_bound() {
+        assert_eq!(MAX_ARRAY_TEXT_BYTES, 16_777_216);
         let mut output = String::new();
         assert!(append_quoted(&mut output, &"x".repeat(MAX_ARRAY_TEXT_BYTES)).is_none());
         assert!(output.is_empty());
         assert!(append_quoted(&mut output, &"\\".repeat(MAX_ARRAY_TEXT_BYTES / 2)).is_none());
         assert!(output.is_empty());
+        assert_eq!(append_quoted(&mut output, &"x".repeat(16_777_214)), Some(()));
+        assert_eq!(output.len(), 16_777_216);
+    }
+
+    #[test]
+    fn value_contract_array_wire_limits_are_checked_before_decoding() {
+        let payload = vec![b'x'; 16_777_217];
+        let mut reader = Reader { remaining: &payload };
+        assert_eq!(read_bounded_element(&mut reader, 16_777_217), None);
+        assert_eq!(reader.remaining.len(), payload.len());
+        assert_eq!(read_bounded_element(&mut reader, 16_777_216).unwrap().len(), 16_777_216);
+        assert_eq!(reader.remaining.len(), 1);
+        assert_eq!(read_bounded_element(&mut reader, -1), None);
+        let bytes = wire(25, &[(2, 1)], &[Some(b"")]);
+        let mut reader = Reader {
+            remaining: &bytes[12..],
+        };
+        assert!(read_dimensions(&mut reader, 1).is_none());
     }
 }

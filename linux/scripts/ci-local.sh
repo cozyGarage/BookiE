@@ -34,6 +34,7 @@ run_full() {
   python3 scripts/tests/test_deb_package.py
   python3 scripts/tests/test_value_contract_runner.py
   python3 scripts/tests/test_mutation_workflow.py
+  python3 scripts/tests/test_ci_workflow.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 
@@ -70,6 +71,7 @@ run_integration() {
     -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
+  bash ./scripts/test-ssh.sh
   echo "Integration checks passed."
 }
 

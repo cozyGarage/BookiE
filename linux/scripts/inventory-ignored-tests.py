@@ -42,7 +42,10 @@ for path in sorted((root / "crates").rglob("*.rs")):
                 raise RuntimeError(f"unmapped GTK test: {name}")
             tier, enable = "GTK", "scripts/test-gtk-widgets.sh"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
-            tier, enable = "Driver", f"Docker plus cargo test -p tablepro-ssh --test {path.stem} -- --include-ignored --test-threads=1"
+            targets = re.findall(r"--test\s+([\w-]+)", (root / "scripts/test-ssh.sh").read_text())
+            if path.stem not in targets:
+                raise RuntimeError(f"unmapped Docker SSH target: {path.stem}")
+            tier, enable = "Driver", "bash scripts/test-ssh.sh (CI integration)"
         elif "docker" in reason.lower():
             engine = path.relative_to(root).parts[2]
             tier, enable = "Driver", f"Docker plus cargo test -p tablepro-driver-{engine} --test integration -- --include-ignored --test-threads=1"

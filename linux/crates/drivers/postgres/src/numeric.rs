@@ -113,18 +113,28 @@ mod tests {
         for (bytes, expected) in [
             (wire(1, 0, 4, &[1, 2, 30]), "10002.0030"),
             (wire(-2, 0x4000, 8, &[12]), "-0.00000012"),
+            (wire(-1, 0, 1, &[1000]), "0.1"),
             (wire(3, 0, 0, &[1]), "1000000000000"),
             (wire(0, 0, 8, &[]), "0.00000000"),
             (wire(0, 0xc000, 0, &[]), "NaN"),
             (wire(0, 0xd000, 0, &[]), "Infinity"),
             (wire(0, 0xf000, 0, &[]), "-Infinity"),
         ] {
-            assert_eq!(decode_binary(&bytes), decode_text(expected), "{expected}");
+            match decode_binary(&bytes) {
+                Some(Value::Decimal(value)) => assert_eq!(value.to_string(), expected),
+                Some(Value::Text(text)) if matches!(expected, "NaN" | "Infinity" | "-Infinity") => {
+                    assert_eq!(text, expected);
+                }
+                other => panic!("{expected}: unexpected decoded value {other:?}"),
+            }
         }
         let value = "0.123456789012345678901234567891";
         assert_eq!(decode_text(value), Some(Value::Text(value.into())));
         let zero = format!("0.{}", "0".repeat(29));
         assert_eq!(decode_text(&zero), Some(Value::Text(zero.clone())));
+        for text in ["001.2300", "-0.00"] {
+            assert_eq!(decode_text(text), Some(Value::Text(text.into())));
+        }
     }
 
     #[test]
@@ -135,6 +145,7 @@ mod tests {
             wire(0, 0, 0x4000, &[1]),
             wire(-1, 0, 1, &[1234]),
             wire(-2, 0, 4, &[1]),
+            wire(0, 0, 0, &[1, 1]),
             wire(0, 0xc000, 0, &[1]),
         ] {
             assert_eq!(decode_binary(&bytes), None, "{bytes:?}");

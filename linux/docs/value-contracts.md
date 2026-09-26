@@ -251,3 +251,54 @@ the mutation summary shell was executed against complete, missing, empty and
 unviable-only fixture reports. Function/file size and whitespace guards passed.
 Hosted mutation/coverage execution and installed desktop acceptance remain
 separate from these local results.
+
+## PostgreSQL era and mutation checkpoint
+
+The BC regression reproduced an export failure: `0001-01-01 BC` became the
+invalid PostgreSQL literal `0000-01-01`. PostgreSQL SQL rendering now uses era
+years and a BC suffix, and removes the ISO leading plus for years above 9999.
+Other dialects and ordinary AD formatting retain their existing contracts.
+Fifteen server cases run in three session time zones, covering BC dates,
+large representable years, microseconds, the PostgreSQL epoch boundary and both
+instants of a repeated DST hour. Direct/session values, type metadata, typed
+bindings, SQL literals and generated INSERTs are compared with server wire bytes.
+The integration test is `value_contract_dates_preserve_eras_large_years_and_instants`;
+its lowest-tier regression is in core's SQL literal tests. Dates outside chrono's
+range, infinities, mixed intervals, temporal arrays and non-SQL consumer/editing
+acceptance remain open.
+
+The [CI audit](ci-audit-2026-09-27.md) found nine survivors in the broader hosted
+PostgreSQL mutation run. New regressions use an independent 16,777,216-byte limit,
+test exact quoted-output and raw-element boundaries, check dimension rejection
+before decoding, reject fractional groups beyond declared scale and preserve
+one-digit fractions and noncanonical numeric text. Bounded element reading is
+now a directly testable helper; the size policy is unchanged. No mutation was
+blanket-excluded.
+
+Local cargo-mutants 27.1.0 evidence, working tree based on `c57ac7715`:
+
+| Scope | Result | Report beneath target/quality |
+| --- | --- | --- |
+| Changed SQL date renderer | 10 caught, 1 unviable, no survivors/timeouts | `20260926-b3-date-mutants/mutants.out/outcomes.json` |
+| Array/numeric functions implicated by hosted survivors | 58 caught, 1 additional unit-only survivor, 3 unviable | `20260927-b3-pg-survivors/mutants.out/outcomes.json` |
+| Numeric type survivor after independent-oracle correction | 1 caught, no survivors/timeouts | `20260927-b3-numeric-type-followup/mutants.out/outcomes.json` |
+
+The additional survivor changed normal numerics from Decimal to Text. The unit
+test reused decode_text as its own expected-value oracle; it now asserts the
+independent value, variant and decimal text. The server contract already covered
+this type distinction. Unviable mutations are compilation failures, not catches.
+Diff-scoped mutation listing required workspace-relative paths and explicit
+`--src-prefix=a/ --dst-prefix=b/` because the local Git mnemonic prefixes produced
+an empty selection. The list was checked before executing the 11 date mutations.
+
+Final local validation for this checkpoint: formatting, Clippy, unit and sandbox
+checks passed at `target/quality/20260926T231119112831Z-full/report.json`.
+All 11 selected value-contract suites passed at
+`target/quality/20260926T231558864082Z-values/report.json`, including all eight
+drivers, GTK, DuckDB, nine core contracts and five PostgreSQL server contracts.
+Compilation reused 707 artifacts and rebuilt 17 affected packages in 39.688s.
+All eight SSH fixture tests and 15 runner/workflow regression tests passed.
+The complete PostgreSQL unit/integration suite passed all 55 tests with ignored
+fixture tests explicitly enabled (`--include-ignored --test-threads=1`).
+Hosted execution, the broader core mutation backlog and installed desktop
+acceptance remain separate gates.

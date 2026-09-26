@@ -13,9 +13,17 @@ class MutationWorkflowTests(unittest.TestCase):
         text = WORKFLOW.read_text()
         mutation = text.split("  coverage:")[0]
         self.assertNotIn("continue-on-error:", mutation)
-        self.assertEqual(mutation.count("if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}"), 5)
+        self.assertIn("fail-fast: false", mutation)
+        self.assertIn("timeout-minutes: 90", mutation)
+        self.assertIn("timeout-minutes: 120", mutation)
+        for shard in range(4):
+            self.assertIn(f"package: tablepro-core, shard: {shard}/4", mutation)
+        for shard in range(2):
+            self.assertIn(f"package: tablepro-policy, shard: {shard}/2", mutation)
+        self.assertIn("name: mutants-${{ matrix.label }}-${{ github.run_id }}", mutation)
         self.assertIn("if-no-files-found: error", mutation)
         self.assertIn("branches: [linux]", mutation)
+        self.assertIn("cancel-in-progress: false", mutation)
         self.assertIn("--lib --test integration value_contract -- --include-ignored", mutation)
 
     def test_missing_mutation_reports_cannot_pass_the_summary(self):
@@ -29,11 +37,11 @@ class MutationWorkflowTests(unittest.TestCase):
             summary = Path(root) / "summary.md"
             def run():
                 return subprocess.run(["bash", "-e", "-o", "pipefail", "-c", script], cwd=root,
-                                      env={"PATH": "/usr/bin:/bin", "GITHUB_STEP_SUMMARY": str(summary)},
+                                      env={"PATH": "/usr/bin:/bin", "GITHUB_STEP_SUMMARY": str(summary), "MUTATION_LABEL": "test"},
                                       capture_output=True, text=True)
             self.assertNotEqual(run().returncode, 0)
             self.assertIn("Measurement unavailable", summary.read_text())
-            for crate in ["core", "policy", "ssh", "driver-redis", "driver-postgres"]:
+            for crate in ["test"]:
                 report = Path(root) / f"mutants-{crate}/mutants.out"
                 report.mkdir(parents=True)
                 for kind in ["caught", "missed", "timeout", "unviable"]:

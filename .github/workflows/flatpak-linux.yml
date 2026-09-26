@@ -1,4 +1,4 @@
-name: Flatpak Linux
+name: Flatpak Linux (packaging only)
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ github.event_name == 'schedule' && 'linux' || github.ref }}
+          ref: ${{ github.sha }}
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@401fe28a8384095fc1531b9d320b292f0ee45adb
         with:
@@ -40,3 +40,7 @@ jobs:
           manifest-path: ${{ matrix.manifest }}
           cache-key: flatpak-builder-${{ matrix.profile }}-${{ github.sha }}
           upload-artifact: true
+      - name: Record packaging scope
+        run: |
+          echo "This workflow builds Flatpak packages. It does not run the regression or mutation suites." >> "$GITHUB_STEP_SUMMARY"
+          echo "Check Build Linux and Linux test quality for the same commit: $GITHUB_SHA." >> "$GITHUB_STEP_SUMMARY"

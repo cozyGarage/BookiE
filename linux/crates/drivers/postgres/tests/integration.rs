@@ -20,6 +20,17 @@ mod array_contract;
 #[path = "support/time_contract.rs"]
 mod time_contract;
 
+#[path = "support/date_contract.rs"]
+mod date_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_dates_preserve_eras_large_years_and_instants() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    date_contract::assert_date_contract(connection.as_ref()).await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_times_preserve_midnight_fraction_and_offset() {

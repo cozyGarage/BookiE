@@ -35,6 +35,8 @@ concurrency:
 
 jobs:
   preflight:
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
     name: Preflight and sandbox tier (no GTK app)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -44,10 +46,12 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
       - name: Record the commit under test
+        id: revision
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -94,7 +98,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -146,7 +150,7 @@ jobs:
     name: Installed GTK safety smoke
     timeout-minutes: 45
     runs-on: ubuntu-24.04
-    needs: fast
+    needs: [preflight, fast]
     container:
       image: debian:testing
       env:
@@ -162,7 +166,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -217,7 +221,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -262,7 +266,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -302,6 +306,8 @@ jobs:
         run: cargo test --test integration -p tablepro-driver-redis -- --include-ignored --test-threads=1
       - name: MongoDB driver integration
         run: cargo test --test integration -p tablepro-driver-mongodb -- --include-ignored --test-threads=1
+      - name: SSH agent and OpenSSH integration
+        run: bash ./scripts/test-ssh.sh
 
   driver-tls:
     name: Driver TLS fixture (docker)
@@ -314,7 +320,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -350,7 +356,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -381,6 +387,7 @@ jobs:
         run: ./scripts/test-postgres-release.sh
 
   duckdb:
+    needs: preflight
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -402,7 +409,7 @@ jobs:
           apt-get install -y --no-install-recommends git ca-certificates
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.ref }}
+          ref: ${{ needs.preflight.outputs.commit }}
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -423,3 +430,25 @@ jobs:
         run: cargo test --locked -p tablepro-driver-duckdb
       - name: Build the GTK application with DuckDB
         run: cargo build --locked -p tablepro-app --features duckdb
+
+  regression-gate:
+    name: Linux regression gate
+    if: always()
+    runs-on: ubuntu-24.04
+    needs:
+      - preflight
+      - fast
+      - gtk-safety
+      - integration
+      - driver-tls
+      - postgres-release
+      - duckdb
+      - current-stable-clippy
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.preflight.outputs.commit || github.sha }}
+      - name: Require every regression job
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: python3 linux/scripts/check-ci-jobs.py

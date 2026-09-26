@@ -1,5 +1,6 @@
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{BuildSqlError, quote_ident};
+use chrono::Datelike;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum LiteralError {
@@ -26,6 +27,11 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
     if !crate::export::supports_sql_literals(driver_id) {
         return Err(LiteralError::Unsupported);
     }
+    if driver_id == "postgres"
+        && let Some(text) = postgres_extended_date(value)
+    {
+        return Ok(quote_literal(driver_id, &text));
+    }
     Ok(match value {
         Value::Null => "NULL".into(),
         Value::Bool(value) if driver_id == "mssql" => u8::from(*value).to_string(),
@@ -45,6 +51,27 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Json(json) => quote_literal(driver_id, &json.to_string()),
         Value::Undecodable(_) => return Err(LiteralError::Undecodable),
     })
+}
+
+fn postgres_extended_date(value: &Value) -> Option<String> {
+    let (date, time, zone) = match value {
+        Value::Date(date) => (*date, None, ""),
+        Value::DateTime(stamp) => (stamp.date(), Some(stamp.time()), ""),
+        Value::TimestampTz(stamp) => (stamp.date_naive(), Some(stamp.time()), "+00:00"),
+        _ => return None,
+    };
+    if (1..=9999).contains(&date.year()) {
+        return None;
+    }
+    let (common_era, year) = date.year_ce();
+    let mut text = format!("{year:04}-{:02}-{:02}", date.month(), date.day());
+    if let Some(time) = time {
+        text.push_str(&format!(" {time}{zone}"));
+    }
+    if !common_era {
+        text.push_str(" BC");
+    }
+    Some(text)
 }
 
 fn binary_literal(driver_id: &str, bytes: &[u8]) -> Result<String, LiteralError> {
@@ -120,6 +147,48 @@ pub fn build_insert_literal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_contract_postgres_dates_preserve_eras_and_extended_years() {
+        for (year, expected) in [
+            (0, "0001-02-03 BC"),
+            (-1, "0002-02-03 BC"),
+            (-4712, "4713-02-03 BC"),
+            (10000, "10000-02-03"),
+            (262000, "262000-02-03"),
+        ] {
+            let date = chrono::NaiveDate::from_ymd_opt(year, 2, 3).unwrap();
+            assert_eq!(
+                render_sql_literal("postgres", &Value::Date(date)).unwrap(),
+                format!("'{expected}'")
+            );
+            let (body, era) = expected
+                .strip_suffix(" BC")
+                .map_or((expected, ""), |body| (body, " BC"));
+            let stamp = date.and_hms_micro_opt(12, 34, 56, 123456).unwrap();
+            assert_eq!(
+                render_sql_literal("postgres", &Value::DateTime(stamp)).unwrap(),
+                format!("'{body} 12:34:56.123456{era}'")
+            );
+            assert_eq!(
+                render_sql_literal("postgres", &Value::TimestampTz(stamp.and_utc())).unwrap(),
+                format!("'{body} 12:34:56.123456+00:00{era}'")
+            );
+            assert_eq!(
+                render_sql_literal("sqlite", &Value::Date(date)).unwrap(),
+                format!("'{}'", date.format("%Y-%m-%d"))
+            );
+        }
+        for year in [1, 2026, 9999] {
+            let date = chrono::NaiveDate::from_ymd_opt(year, 2, 3).unwrap();
+            assert_eq!(postgres_extended_date(&Value::Date(date)), None);
+            assert_eq!(
+                render_sql_literal("postgres", &Value::Date(date)).unwrap(),
+                format!("'{year:04}-02-03'")
+            );
+        }
+        assert_eq!(postgres_extended_date(&Value::Text("0000-02-03".into())), None);
+    }
 
     fn column(name: &str) -> ColumnInfo {
         ColumnInfo {

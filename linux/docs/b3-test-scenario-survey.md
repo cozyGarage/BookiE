@@ -108,3 +108,7 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   BC/large years, infinities, mixed intervals and temporal arrays remain open.
 - Keep mutation testing alongside each decoder change and ensure its selected
   test filter includes malformed-input units as well as server regressions.
+- B3-2 SQL export follow-up: BC dates and years above 9999 have a
+  [server wire round-trip contract](value-contracts.md#postgresql-era-and-mutation-checkpoint),
+  including repeated-hour instants. Values outside chrono's range, infinities,
+  mixed intervals and temporal arrays still need their own acceptance.

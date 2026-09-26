@@ -46,6 +46,8 @@
 
 - PostgreSQL end-of-day times remain 24:00:00 instead of silently becoming midnight, and times with time zones retain their stored offsets and microseconds through queries and SQL exports.
 
+- PostgreSQL SQL exports preserve BC dates and years above 9999 using valid era and year syntax, including fractional timestamps and UTC instants.
+
 - PostgreSQL numeric results preserve wide integers, long fractions, decimal scale, NaN and infinities. Values beyond the editable decimal range remain exact text instead of appearing undecodable.
 
 - Excel exports preserve integers beyond 15 digits and all exact decimals as text cells, retaining every digit and decimal scale. These cells require explicit numeric conversion for spreadsheet arithmetic.

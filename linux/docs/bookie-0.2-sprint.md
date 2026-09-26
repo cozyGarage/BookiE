@@ -269,6 +269,14 @@ Fresh scoped array/time mutation results and remaining temporal cases are in
 [value contracts](value-contracts.md#postgresql-time-checkpoint). This does not
 close B3 or the later B4–B6 acceptance gates.
 
+The following checkpoint fixes PostgreSQL BC/extended-year SQL export syntax
+with permanent unit and real-server round-trip tests. The
+[CI evidence audit](ci-audit-2026-09-27.md) also closes eight orphaned SSH tests,
+adds explicit required-job status checking and records the broader mutation
+findings. PostgreSQL boundary/type assertions now catch those survivors in scoped
+local reruns; core's interrupted mutation run remains a triage backlog. B3 remains
+open for the remaining temporal/nested values and consumer contracts.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight

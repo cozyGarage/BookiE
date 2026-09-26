@@ -26,11 +26,42 @@ permissions:
 
 concurrency:
   group: linux-quality-${{ inputs.ref || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  resolve-ref:
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.revision.outputs.commit }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ inputs.ref || (github.event_name == 'schedule' && 'linux') || github.sha }}
+      - name: Resolve the tested commit once
+        id: revision
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   mutation:
-    name: Mutation testing (core, policy, ssh, redis, postgres)
+    needs: resolve-ref
+    name: Mutation (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {label: core-1, package: tablepro-core, shard: 0/4}
+          - {label: core-2, package: tablepro-core, shard: 1/4}
+          - {label: core-3, package: tablepro-core, shard: 2/4}
+          - {label: core-4, package: tablepro-core, shard: 3/4}
+          - {label: policy-1, package: tablepro-policy, shard: 0/2}
+          - {label: policy-2, package: tablepro-policy, shard: 1/2}
+          - {label: ssh, package: tablepro-ssh, shard: 0/1}
+          - {label: redis, package: tablepro-driver-redis, shard: 0/1}
+          - {label: postgres, package: tablepro-driver-postgres, shard: 0/1}
+    env:
+      MUTATION_LABEL: ${{ matrix.label }}
+      MUTATION_PACKAGE: ${{ matrix.package }}
+      MUTATION_SHARD: ${{ matrix.shard }}
     timeout-minutes: 120
     runs-on: ubuntu-24.04
     defaults:
@@ -39,7 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || 'linux' }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"
@@ -54,44 +85,25 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: linux
-          prefix-key: linux-mutants
+          prefix-key: linux-mutants-${{ matrix.label }}
       - name: Install cargo-mutants
         id: mutation-tool
         run: cargo install cargo-mutants --locked --version ^27
-      - name: Mutate PostgreSQL value decoders
-        id: mutate-postgres
-        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
+      - name: Run mutations
+        id: mutate
+        timeout-minutes: 90
         run: |
-          cargo mutants --package tablepro-driver-postgres --test-tool cargo \
-            --file crates/drivers/postgres/src/array.rs \
-            --file crates/drivers/postgres/src/numeric.rs \
-            --file crates/drivers/postgres/src/temporal.rs \
-            --output mutants-driver-postgres --timeout 60 --no-shuffle \
-            -- --lib --test integration value_contract -- --include-ignored --test-threads=1
-      - name: Mutate tablepro-core
-        id: mutate-core
-        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
-        run: |
-          cargo mutants --package tablepro-core --test-tool cargo \
-            --output mutants-core --timeout 60 --no-shuffle -- --lib
-      - name: Mutate tablepro-policy
-        id: mutate-policy
-        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
-        run: |
-          cargo mutants --package tablepro-policy --test-tool cargo \
-            --output mutants-policy --timeout 60 --no-shuffle -- --lib
-      - name: Mutate tablepro-ssh
-        id: mutate-ssh
-        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
-        run: |
-          cargo mutants --package tablepro-ssh --test-tool cargo \
-            --output mutants-ssh --timeout 60 --no-shuffle -- --lib
-      - name: Mutate tablepro-driver-redis
-        id: mutate-driver-redis
-        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
-        run: |
-          cargo mutants --package tablepro-driver-redis --test-tool cargo \
-            --output mutants-driver-redis --timeout 60 --no-shuffle -- --lib
+          args=(--package "$MUTATION_PACKAGE" --test-tool cargo --shard "$MUTATION_SHARD"
+                --output "mutants-$MUTATION_LABEL" --timeout 60 --build-timeout 900 --no-shuffle)
+          if [[ "$MUTATION_PACKAGE" == tablepro-driver-postgres ]]; then
+            cargo mutants "${args[@]}" \
+              --file crates/drivers/postgres/src/array.rs \
+              --file crates/drivers/postgres/src/numeric.rs \
+              --file crates/drivers/postgres/src/temporal.rs \
+              -- --lib --test integration value_contract -- --include-ignored --test-threads=1
+          else
+            cargo mutants "${args[@]}" -- --lib
+          fi
       - name: Summarise surviving mutants
         if: always()
         run: |
@@ -102,13 +114,9 @@ jobs:
             echo "A surviving mutant is a change to the code that no test noticed."
             echo "Some are equivalent to the original and can never be caught; the"
             echo "rest are behaviour with no test behind it."
-            echo "Core step outcome: ${{ steps.mutate-core.outcome }}"
-            echo "Policy step outcome: ${{ steps.mutate-policy.outcome }}"
-            echo "SSH step outcome: ${{ steps.mutate-ssh.outcome }}"
-            echo "Redis driver step outcome: ${{ steps.mutate-driver-redis.outcome }}"
+            echo "Measurement step outcome: ${{ steps.mutate.outcome }}"
             echo "A failed measurement can mean surviving mutants, timeouts, or infrastructure failure; inspect its logs."
-            echo "PostgreSQL driver step outcome: ${{ steps.mutate-postgres.outcome }}"
-            for crate in core policy ssh driver-redis driver-postgres; do
+            for crate in "$MUTATION_LABEL"; do
               report="mutants-$crate/mutants.out"
               caught="$report/caught.txt"
               missed="$report/missed.txt"
@@ -142,16 +150,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
-          name: mutants-${{ github.run_id }}
-          path: |
-            linux/mutants-core
-            linux/mutants-policy
-            linux/mutants-ssh
-            linux/mutants-driver-redis
-            linux/mutants-driver-postgres
+          name: mutants-${{ matrix.label }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/mutants-${{ matrix.label }}
           if-no-files-found: error
 
   coverage:
+    needs: resolve-ref
     name: Coverage (non-GTK crates)
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -161,7 +165,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.ref || 'linux' }}
+          ref: ${{ needs.resolve-ref.outputs.commit }}
       - name: Record the commit under test
         run: |
           echo "tree under test: $(git rev-parse HEAD)"

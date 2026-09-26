@@ -223,6 +223,11 @@ The Ubuntu 25.10 container provides the GLib version required by the selected li
 
 ## Measuring how good the tests are
 
+The [September CI audit](ci-audit-2026-09-27.md) distinguishes executed tests,
+intentional tier exclusions, omitted SSH fixtures and packaging-only green runs.
+Build Linux's final regression gate rejects failed, cancelled, missing and
+unexpectedly skipped jobs. Docker SSH fixtures run through `bash scripts/test-ssh.sh`.
+
 Test counts alone do not establish whether regressions catch defects. Mutation
 testing checks whether deliberate code changes are detected; coverage shows
 which code executes. Both run through `.github/workflows/linux-quality.yml`
@@ -271,6 +276,12 @@ and reports upload even after failures. Missing report files, zero tested
 mutations and missing artifacts fail visibly. Unviable mutations remain separate
 from caught mutations; surviving mutations and timeouts require investigation,
 not a blanket exclusion. This strict gate may expose older unresolved findings.
+
+Measurements now run in independent jobs with fail-fast disabled, four shards
+for core and two for policy. Each shard uploads its own report after a failed or
+timed-out measurement. The measurement timeout leaves time before the job limit
+for evidence upload. Active quality runs are retained across new pushes. Both
+Build Linux and test-quality jobs share an immutable resolved commit.
 
 The shared value-contract runner checks both process exit and execution evidence:
 every listed test must pass exactly once, with one matching successful summary
