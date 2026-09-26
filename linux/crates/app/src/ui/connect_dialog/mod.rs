@@ -966,6 +966,21 @@ async fn rollback_saved_connection(
     }
 }
 
+fn timeout_rows() -> (adw::SpinRow, adw::SpinRow) {
+    let connect = adw::SpinRow::with_range(0.0, 600.0, 1.0);
+    connect.set_title(&crate::tr!("Connect timeout (seconds)"));
+    connect.set_subtitle(&crate::tr!("0 uses the default of 30 seconds"));
+    let query = adw::SpinRow::with_range(0.0, 86_400.0, 1.0);
+    query.set_title(&crate::tr!("Query timeout (seconds)"));
+    query.set_subtitle(&crate::tr!("0 uses the timeout set in Preferences"));
+    (connect, query)
+}
+
+fn timeout_value(seconds: f64) -> Option<u32> {
+    let whole = seconds.round();
+    (whole >= 1.0).then(|| whole.min(f64::from(u32::MAX)) as u32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -983,19 +998,4 @@ mod tests {
         assert_eq!(auth_mode_for_row(1), AuthMode::Kerberos);
         assert_eq!(auth_mode_for_row(7), AuthMode::Password);
     }
-}
-
-fn timeout_rows() -> (adw::SpinRow, adw::SpinRow) {
-    let connect = adw::SpinRow::with_range(0.0, 600.0, 1.0);
-    connect.set_title(&crate::tr!("Connect timeout (seconds)"));
-    connect.set_subtitle(&crate::tr!("0 uses the default of 30 seconds"));
-    let query = adw::SpinRow::with_range(0.0, 86_400.0, 1.0);
-    query.set_title(&crate::tr!("Query timeout (seconds)"));
-    query.set_subtitle(&crate::tr!("0 uses the timeout set in Preferences"));
-    (connect, query)
-}
-
-fn timeout_value(seconds: f64) -> Option<u32> {
-    let whole = seconds.round();
-    (whole >= 1.0).then(|| whole.min(f64::from(u32::MAX)) as u32)
 }
