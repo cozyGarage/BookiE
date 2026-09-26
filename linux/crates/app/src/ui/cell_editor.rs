@@ -198,14 +198,21 @@ impl CellEditor {
     }
 
     pub fn start_editing(&self) {
+        let seed = self.label_widget().text();
+        self.start_editing_with(&seed);
+    }
+
+    /// Like `start_editing`, but seeds the entry from `seed` instead of
+    /// the label. The label can hold a truncated display string for a
+    /// long value, so a caller holding the untruncated text passes it
+    /// here to avoid editing (and saving) the truncated copy.
+    pub fn start_editing_with(&self, seed: &str) {
         if !self.is_inline_editable() {
             return;
         }
         let stack = self.stack_widget();
         let entry = self.entry_widget();
-        // Mirror the label's text into the entry before showing it
-        // so the user starts editing the value they see.
-        entry.set_text(&self.label_widget().text());
+        entry.set_text(seed);
         stack.set_visible_child_name("edit");
         entry.grab_focus();
         // Select all so the first keystroke replaces — matches the

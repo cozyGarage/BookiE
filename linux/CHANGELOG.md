@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- Editing a long text or JSON cell in the grid now starts from its full value instead of the shortened text shown for display, so a small edit no longer truncates the rest of the value.
 - The server activity view shows a binary value as its byte count instead of a label that read like a hexadecimal escape.
 - The structure editor shows a column default as the SQL that defines it, so an empty-string default no longer reads as no default, and a MySQL column edit no longer drops an empty-string default or fails on a text default.
 - On X11 the app's windows now group under its launcher in docks and task switchers, whichever command started it.

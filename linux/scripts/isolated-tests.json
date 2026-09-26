@@ -14,6 +14,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column::tests::entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value"
     ]
   ],
   "keyring": [

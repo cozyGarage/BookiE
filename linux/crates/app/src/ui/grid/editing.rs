@@ -6,8 +6,8 @@ use sourceview5::prelude::*;
 use super::GridMsg;
 use super::context_menu::{GridMenus, attach_cell_gesture};
 use super::display::{
-    COLUMN_SLOT, EditSnapshot, POPOVER_SLOT, POSITION_SLOT, PREEDIT_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT,
-    editable_null_sentinel,
+    COLUMN_SLOT, EditSnapshot, FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, PREEDIT_SLOT, ROW_KEY_SLOT,
+    SNAPSHOT_SLOT, SUPPRESS_SLOT, editable_null_sentinel,
 };
 use super::types::CellEditorKind;
 use crate::ui::cell_editor::CellEditor;
@@ -18,8 +18,13 @@ pub(super) fn enter_edit_mode(label: &CellEditor) {
     }
     if label.text().as_str() == editable_null_sentinel() {
         label.set_text("");
+        label.start_editing();
+        return;
     }
-    label.start_editing();
+    match FULL_EDIT_TEXT_SLOT.cloned(label) {
+        Some(full) => label.start_editing_with(&full),
+        None => label.start_editing(),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -365,7 +370,10 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
     if let Some(lang) = sourceview5::LanguageManager::default().language("json") {
         buffer.set_language(Some(&lang));
     }
-    buffer.set_text(label.text().as_str());
+    let seed = FULL_EDIT_TEXT_SLOT
+        .cloned(label)
+        .unwrap_or_else(|| label.text().to_string());
+    buffer.set_text(&seed);
 
     let view = sourceview5::View::with_buffer(&buffer);
     view.set_show_line_numbers(true);
@@ -423,6 +431,7 @@ fn show_json_popover(label: &CellEditor, col_index: usize, sender: &relm4::Sende
         let position = POSITION_SLOT.get(&label_for_commit).unwrap_or(0);
         let row_key = ROW_KEY_SLOT.cloned(&label_for_commit).unwrap_or_default();
         label_for_commit.set_text(&text);
+        FULL_EDIT_TEXT_SLOT.set(&label_for_commit, text.clone());
         sender_for_commit
             .send(GridMsg::CellEdited {
                 row_position: position,
@@ -464,7 +473,9 @@ fn install_edit_commit_handler(label: &CellEditor, col_index: usize, sender: rel
     label.connect_editing_notify(move |label| {
         if label.is_editing() {
             let position = POSITION_SLOT.get(label).unwrap_or(0);
-            let original = label.text().to_string();
+            let original = FULL_EDIT_TEXT_SLOT
+                .cloned(label)
+                .unwrap_or_else(|| label.text().to_string());
             let row_key = ROW_KEY_SLOT.cloned(label).unwrap_or_default();
             SNAPSHOT_SLOT.set(
                 label,
@@ -491,6 +502,7 @@ fn commit_cell_edit(label: &CellEditor, col_index: usize, sender: &relm4::Sender
     if new_value == snap.original {
         return;
     }
+    FULL_EDIT_TEXT_SLOT.set(label, new_value.clone());
     sender
         .send(GridMsg::CellEdited {
             row_position: snap.position,

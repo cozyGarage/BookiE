@@ -17,19 +17,19 @@ pub(crate) fn auto_filled_sentinel() -> String {
     crate::tr!("(auto)")
 }
 
-pub fn value_to_display_text(value: &Value) -> String {
+fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
     match value {
         Value::Null => readonly_null_sentinel(),
         Value::Bool(b) => b.to_string(),
         Value::Int(i) => i.to_string(),
         Value::Float(f) => f.to_string(),
-        Value::Text(s) => truncate_for_display(s),
+        Value::Text(s) => cap(s),
         // A NUL byte survives UTF-8 decoding (it's a valid codepoint)
         // but is a strong signal the column really is binary, not
         // text that happens to be stored as bytes -- keep the byte
         // count for that case instead of displaying invisible NULs.
         Value::Bytes(b) => match std::str::from_utf8(b) {
-            Ok(s) if !s.contains('\0') => truncate_for_display(s),
+            Ok(s) if !s.contains('\0') => cap(s),
             _ => format!("<{} bytes>", b.len()),
         },
         Value::Date(d) => d.format("%Y-%m-%d").to_string(),
@@ -38,15 +38,26 @@ pub fn value_to_display_text(value: &Value) -> String {
         Value::TimestampTz(ts) => ts.format("%Y-%m-%d %H:%M:%S%:z").to_string(),
         Value::Decimal(d) => d.to_string(),
         Value::Uuid(u) => u.to_string(),
-        Value::Json(j) => truncate_for_display(&j.to_string()),
+        Value::Json(j) => cap(&j.to_string()),
         Value::Undecodable(type_name) => format!("<undecodable {type_name}>"),
     }
+}
+
+pub fn value_to_display_text(value: &Value) -> String {
+    value_to_text(value, truncate_for_display)
 }
 
 pub fn value_to_edit_text(value: &Value) -> String {
     match value {
         Value::Null => String::new(),
         other => value_to_display_text(other),
+    }
+}
+
+pub(super) fn value_to_full_edit_text(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        other => value_to_text(other, |s| s.to_string()),
     }
 }
 
@@ -140,6 +151,7 @@ pub(super) const COLUMN_SLOT: WidgetSlot<usize> = WidgetSlot::new("tp-column");
 pub(super) const SUPPRESS_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-suppress-toggle");
 pub(super) const POPOVER_SLOT: WidgetSlot<gtk4::Popover> = WidgetSlot::new("tp-popover");
 pub(super) const PREEDIT_SLOT: WidgetSlot<bool> = WidgetSlot::new("tp-preedit-active");
+pub(super) const FULL_EDIT_TEXT_SLOT: WidgetSlot<String> = WidgetSlot::new("tp-full-edit-text");
 
 pub fn focused_cell_identity(widget: &impl IsA<gtk4::Widget>) -> Option<(u32, usize, Vec<Value>)> {
     let root = widget.root()?;

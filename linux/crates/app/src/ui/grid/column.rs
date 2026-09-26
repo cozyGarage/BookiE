@@ -3,7 +3,10 @@ use gtk4::prelude::*;
 use tablepro_core::{ColumnInfo, Value};
 
 use super::context_menu::GridMenus;
-use super::display::{POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind};
+use super::display::{
+    FULL_EDIT_TEXT_SLOT, POPOVER_SLOT, POSITION_SLOT, ROW_KEY_SLOT, SNAPSHOT_SLOT, SUPPRESS_SLOT, cell_text_for_bind,
+    value_to_full_edit_text,
+};
 use super::editing::{setup_bool_cell, setup_editable_cell, setup_readonly_cell};
 use super::presentation::cell_allows_inline_edit;
 pub(super) use super::presentation::column_is_editable as is_cell_editable;
@@ -181,6 +184,11 @@ pub(super) fn build_column(
             label.set_strikethrough(is_pending_delete);
             POSITION_SLOT.set(&label, item.position());
             ROW_KEY_SLOT.set(&label, pk_values.clone());
+            if inline_editable {
+                FULL_EDIT_TEXT_SLOT.set(&label, value_to_full_edit_text(&value));
+            } else {
+                FULL_EDIT_TEXT_SLOT.take(&label);
+            }
         } else if let Ok(checkbox) = child.clone().downcast::<gtk4::CheckButton>() {
             checkbox.set_sensitive(inline_editable);
             SUPPRESS_SLOT.set(&checkbox, true);
@@ -618,6 +626,50 @@ mod tests {
         restored_cell.start_editing();
         assert!(restored_cell.is_editing());
         restored_cell.stop_editing(false);
+
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value() {
+        use gtk4::prelude::*;
+        gtk4::init().unwrap();
+        let columns = vec![col("TEXT", false)];
+        let long = "a".repeat(50_000);
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![vec![Value::Text(long.clone())]],
+            truncated: false,
+        };
+        let (sender, _receiver) = relm4::channel::<GridMsg>();
+        let (view, _selection) = crate::ui::grid::build_column_view(
+            &result,
+            &columns,
+            "notes",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+            None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let editors = wait_for_editors(view.upcast_ref(), 1);
+        let cell = editor_at(&editors, 0);
+        assert!(cell.text().contains("more chars"), "display text should stay truncated");
+
+        super::super::editing::enter_edit_mode(cell);
+        assert!(cell.is_editing());
+        assert_eq!(
+            cell.entry().text().as_str(),
+            long,
+            "editing must seed the untruncated value"
+        );
+        cell.stop_editing(false);
 
         window.close();
     }
