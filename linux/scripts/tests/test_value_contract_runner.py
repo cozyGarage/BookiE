@@ -46,6 +46,37 @@ class ValueRunnerTests(unittest.TestCase):
         message["profile"]["test"] = False
         self.assertIsNone(runner.select_artifact(message, runner.expected_suites()))
 
+    def test_success_requires_every_listed_test_to_pass(self):
+        listed = runner.subprocess.CompletedProcess([], 0, "value_contract_case: test\n", "")
+        for output in ["", "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
+                       "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n",
+                       "test value_contract_other ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"]:
+            def execute(*args, **kwargs):
+                kwargs["stdout"].write(output)
+                return runner.subprocess.CompletedProcess([], 0)
+            with self.subTest(output=output), tempfile.TemporaryDirectory() as root:
+                with patch.object(runner.subprocess, "run") as run:
+                    run.side_effect = lambda *args, **kwargs: listed if "capture_output" in kwargs else execute(*args, **kwargs)
+                    result = runner.run_suite("crates/core/Cargo.toml", "/tmp/fixture", Path(root))
+                self.assertNotEqual(result["exit_code"], 0)
+
+    def test_completed_test_names_and_summary_must_agree(self):
+        output = "test value_contract_case ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out\n"
+        self.assertTrue(runner.completed_tests(output, ["value_contract_case"]))
+        self.assertFalse(runner.completed_tests(output + output, ["value_contract_case"]))
+        self.assertFalse(runner.completed_tests(output, ["value_contract_case", "value_contract_missing"]))
+
+    def test_nonzero_exit_is_never_overridden_by_success_output(self):
+        listed = runner.subprocess.CompletedProcess([], 0, "value_contract_case: test\n", "")
+        def execute(*args, **kwargs):
+            if "capture_output" in kwargs:
+                return listed
+            kwargs["stdout"].write("test value_contract_case ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n")
+            return runner.subprocess.CompletedProcess([], 101)
+        with tempfile.TemporaryDirectory() as root, patch.object(runner.subprocess, "run", side_effect=execute):
+            result = runner.run_suite("crates/core/Cargo.toml", "/tmp/fixture", Path(root))
+            self.assertEqual(result["exit_code"], 101)
+
 
 if __name__ == "__main__":
     unittest.main()

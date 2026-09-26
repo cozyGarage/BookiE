@@ -103,5 +103,8 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   dimensions and lower bounds through SQL export/re-import; see the
   [array checkpoint](value-contracts.md#postgresql-array-checkpoint). Unsupported
   element types, automatic array editing and remaining consumers stay open.
-- Next implementation task: temporal boundary cases from B3-2, retaining the
-  same real-server oracle and permanent-regression workflow.
+- B3-2 follow-up: end-of-day time and timetz offsets now have a
+  [server round-trip contract](value-contracts.md#postgresql-time-checkpoint).
+  BC/large years, infinities, mixed intervals and temporal arrays remain open.
+- Keep mutation testing alongside each decoder change and ensure its selected
+  test filter includes malformed-input units as well as server regressions.

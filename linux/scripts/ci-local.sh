@@ -33,6 +33,7 @@ run_full() {
   python3 scripts/tests/test_arch_candidate.py
   python3 scripts/tests/test_deb_package.py
   python3 scripts/tests/test_value_contract_runner.py
+  python3 scripts/tests/test_mutation_workflow.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 

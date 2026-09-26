@@ -223,11 +223,12 @@ The Ubuntu 25.10 container provides the GLib version required by the selected li
 
 ## Measuring how good the tests are
 
-Counting tests says nothing about whether they would catch a defect. Two
-tools measure that directly. Neither gates a build: they take tens of
-minutes, and a number moving the wrong way is a conversation, not a
-failure. Both run weekly and on demand from
-`.github/workflows/linux-quality.yml`.
+Test counts alone do not establish whether regressions catch defects. Mutation
+testing checks whether deliberate code changes are detected; coverage shows
+which code executes. Both run through `.github/workflows/linux-quality.yml`
+on relevant pushes, weekly and on demand. Failed measurements fail their jobs.
+Coverage has no percentage threshold. Mutation survivors require investigation.
+Repository branch-protection requirements are separate from these job results.
 
 ### Mutation testing
 
@@ -257,6 +258,24 @@ one side of its condition (backslash inside quotes, not outside). Add a
 crate here once it accumulates unit-testable logic worth pinning this way;
 a driver crate whose logic is mostly "call the real client library" is not
 a good target until it grows some.
+
+The 2026-09-26 B3 follow-up adds PostgreSQL numeric, array and time decoders,
+using the `value_contract` unit and real-server regressions. Their malformed-input
+unit tests share that prefix so the mutation filter cannot omit them. Relevant
+pushes to `linux` also trigger the workflow. A scheduled workflow must exist on
+the repository default branch; the fork did not expose this workflow there when
+checked on 2026-09-26, so the schedule alone was not reliable execution evidence.
+
+Mutation steps now fail the job on nonzero exits. Later measurements still run,
+and reports upload even after failures. Missing report files, zero tested
+mutations and missing artifacts fail visibly. Unviable mutations remain separate
+from caught mutations; surviving mutations and timeouts require investigation,
+not a blanket exclusion. This strict gate may expose older unresolved findings.
+
+The shared value-contract runner checks both process exit and execution evidence:
+every listed test must pass exactly once, with one matching successful summary
+and no ignored or failed tests. Its own regressions exercise zero-test, missing
+output, wrong-test, duplicate-output, timeout and nonzero-exit cases.
 
 Read the output carefully. Many surviving mutants are *equivalent* - a
 different program with identical behaviour - and can never be caught. In

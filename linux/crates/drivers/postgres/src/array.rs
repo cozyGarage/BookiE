@@ -236,7 +236,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_array_dimensions_lengths_types_and_elements_are_refused() {
+    fn value_contract_malformed_array_dimensions_lengths_types_and_elements_are_refused() {
         let valid = wire(25, &[(1, 1)], &[Some(b"value")]);
         for length in 0..valid.len() {
             assert_eq!(decode_binary(&valid[..length], 25), None);
@@ -275,7 +275,7 @@ mod tests {
     }
 
     #[test]
-    fn array_header_mutations_and_maximum_depth_are_bounded() {
+    fn value_contract_array_header_mutations_and_maximum_depth_are_bounded() {
         let bytes = wire(25, &[(1, i32::MIN); 6], &[Some(b"value")]);
         assert!(decode_binary(&bytes, 25).is_some());
         for offset in 0..bytes.len() {
@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn expanded_array_text_has_an_explicit_size_bound() {
+    fn value_contract_expanded_array_text_has_an_explicit_size_bound() {
         let mut output = String::new();
         assert!(append_quoted(&mut output, &"x".repeat(MAX_ARRAY_TEXT_BYTES)).is_none());
         assert!(output.is_empty());

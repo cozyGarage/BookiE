@@ -3,6 +3,8 @@ import argparse
 import datetime
 import json
 import os
+import re
+from collections import Counter
 from pathlib import Path
 import subprocess
 import sys
@@ -68,6 +70,13 @@ def compile_suites(command, expected, directory):
     return artifacts, {"exit_code": status, "seconds": round(time.monotonic() - started, 3), "fresh_artifacts": fresh, "rebuilt_packages": sorted(rebuilt)}
 
 
+def completed_tests(output, expected):
+    passed = re.findall(r"^test (.+) \.\.\. ok$", output, re.MULTILINE)
+    summaries = re.findall(r"^test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output, re.MULTILINE)
+    return (Counter(passed) == Counter(expected) and len(summaries) == 1
+            and tuple(map(int, summaries[0][:4])) == (len(expected), 0, 0, 0))
+
+
 def run_suite(manifest, executable, directory):
     name = manifest.removesuffix("/Cargo.toml").replace("/", "-")
     log_path = directory / f"{name}.log"
@@ -76,18 +85,23 @@ def run_suite(manifest, executable, directory):
     except subprocess.TimeoutExpired:
         log_path.write_text("Test listing exceeded 30 seconds.\n")
         return {"tests": 0, "exit_code": 124, "error": "test listing timed out", "log": log_path.name}
-    count = sum(line.endswith(": test") for line in listing.stdout.splitlines())
+    expected = [line.removesuffix(": test") for line in listing.stdout.splitlines() if line.endswith(": test")]
+    count = len(expected)
     if listing.returncode or not count:
         log_path.write_text(listing.stdout + listing.stderr)
         return {"tests": count, "exit_code": listing.returncode or 1, "error": "value contract test missing", "log": log_path.name}
     started = time.monotonic()
     with log_path.open("w") as log:
         try:
-            result = subprocess.run([executable, "value_contract", "--include-ignored", "--test-threads=1"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300)
+            result = subprocess.run([executable, "value_contract", "--include-ignored", "--test-threads=1", "--format=pretty", "--color=never"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300)
             exit_code = result.returncode
         except subprocess.TimeoutExpired:
             log.write("\nValue-contract suite exceeded 300 seconds.\n")
             exit_code = 124
+    if exit_code == 0 and not completed_tests(log_path.read_text(), expected):
+        with log_path.open("a") as log:
+            log.write("\nERROR: execution did not pass every listed test exactly once.\n")
+        exit_code = 1
     return {"tests": count, "exit_code": exit_code, "seconds": round(time.monotonic() - started, 3), "log": log_path.name}
 
 

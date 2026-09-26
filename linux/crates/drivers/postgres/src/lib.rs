@@ -19,6 +19,7 @@ mod catalog;
 mod decode;
 mod numeric;
 mod session;
+mod temporal;
 
 pub struct PgDriver;
 
@@ -864,6 +865,13 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
         return Ok(value.unwrap_or_else(|| undecodable(idx, type_name)));
     }
     if raw.format() == sqlx::postgres::PgValueFormat::Binary {
+        if matches!(type_name, "TIME" | "TIMETZ") {
+            return Ok(raw
+                .as_bytes()
+                .ok()
+                .and_then(|bytes| temporal::decode_time(bytes, type_name == "TIMETZ"))
+                .unwrap_or_else(|| undecodable(idx, type_name)));
+        }
         if matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ") {
             return Ok(raw
                 .as_bytes()

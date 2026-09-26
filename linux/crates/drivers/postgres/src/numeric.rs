@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_numeric_payloads_are_refused_without_rounding_or_panicking() {
+    fn value_contract_malformed_numeric_payloads_are_refused_without_rounding_or_panicking() {
         for bytes in [
             wire(0, 0, 0, &[10_000]),
             wire(0, 1, 0, &[1]),

@@ -17,6 +17,17 @@ use tokio_util::sync::CancellationToken;
 #[path = "support/array_contract.rs"]
 mod array_contract;
 
+#[path = "support/time_contract.rs"]
+mod time_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_times_preserve_midnight_fraction_and_offset() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    time_contract::assert_time_contract(connection.as_ref()).await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_arrays_preserve_elements_dimensions_and_exports() {

@@ -1,13 +1,17 @@
-# Test-quality measurement for the Linux workspace.
-#
-# Deliberately NOT wired to push or pull_request. These jobs measure how
-# good the tests are rather than whether the code is correct, they take
-# tens of minutes, and a number moving in the wrong direction is a
-# discussion rather than a build failure. Run them on a schedule and read
-# the artifacts.
 name: Linux test quality
 
 on:
+  push:
+    branches: [linux]
+    paths:
+      - ".github/workflows/linux-quality.yml"
+      - "linux/crates/drivers/postgres/src/**"
+      - "linux/crates/drivers/postgres/tests/**"
+      - "linux/crates/core/**"
+      - "linux/crates/policy/**"
+      - "linux/crates/ssh/**"
+      - "linux/crates/drivers/redis/**"
+      - "linux/scripts/tests/test_mutation_workflow.py"
   schedule:
     - cron: "41 3 * * 0"
   workflow_dispatch:
@@ -26,7 +30,7 @@ concurrency:
 
 jobs:
   mutation:
-    name: Mutation testing (core, policy, ssh, driver-redis)
+    name: Mutation testing (core, policy, ssh, redis, postgres)
     timeout-minutes: 120
     runs-on: ubuntu-24.04
     defaults:
@@ -52,44 +56,46 @@ jobs:
           workspaces: linux
           prefix-key: linux-mutants
       - name: Install cargo-mutants
+        id: mutation-tool
         run: cargo install cargo-mutants --locked --version ^27
-      # `core` and `policy` are pure logic with no GTK and no driver, so a
-      # surviving mutant there means a behaviour no test pins rather than
-      # an environment the runner lacks. They are also the two crates
-      # whose defects reach SQL and authorization decisions.
+      - name: Mutate PostgreSQL value decoders
+        id: mutate-postgres
+        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
+        run: |
+          cargo mutants --package tablepro-driver-postgres --test-tool cargo \
+            --file crates/drivers/postgres/src/array.rs \
+            --file crates/drivers/postgres/src/numeric.rs \
+            --file crates/drivers/postgres/src/temporal.rs \
+            --output mutants-driver-postgres --timeout 60 --no-shuffle \
+            -- --lib --test integration value_contract -- --include-ignored --test-threads=1
       - name: Mutate tablepro-core
         id: mutate-core
-        continue-on-error: true
+        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
         run: |
           cargo mutants --package tablepro-core --test-tool cargo \
             --output mutants-core --timeout 60 --no-shuffle -- --lib
       - name: Mutate tablepro-policy
         id: mutate-policy
-        continue-on-error: true
+        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
         run: |
           cargo mutants --package tablepro-policy --test-tool cargo \
             --output mutants-policy --timeout 60 --no-shuffle -- --lib
-      # ssh and driver-redis are the two crates a live audit (mutation
-      # testing run by hand, not this job) most recently found real gaps
-      # in: a boundary check whose test couldn't reach the exact edge, and
-      # a parser guard only exercised on one side of its condition. Both
-      # are pure logic with no Docker/GTK dependency, so they belong here
-      # alongside core/policy rather than in the driver-integration tier.
       - name: Mutate tablepro-ssh
         id: mutate-ssh
-        continue-on-error: true
+        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
         run: |
           cargo mutants --package tablepro-ssh --test-tool cargo \
             --output mutants-ssh --timeout 60 --no-shuffle -- --lib
       - name: Mutate tablepro-driver-redis
         id: mutate-driver-redis
-        continue-on-error: true
+        if: ${{ !cancelled() && steps.mutation-tool.outcome == 'success' }}
         run: |
           cargo mutants --package tablepro-driver-redis --test-tool cargo \
             --output mutants-driver-redis --timeout 60 --no-shuffle -- --lib
       - name: Summarise surviving mutants
         if: always()
         run: |
+          missing=0
           {
             echo "### Surviving mutants"
             echo
@@ -101,7 +107,8 @@ jobs:
             echo "SSH step outcome: ${{ steps.mutate-ssh.outcome }}"
             echo "Redis driver step outcome: ${{ steps.mutate-driver-redis.outcome }}"
             echo "A failed measurement can mean surviving mutants, timeouts, or infrastructure failure; inspect its logs."
-            for crate in core policy ssh driver-redis; do
+            echo "PostgreSQL driver step outcome: ${{ steps.mutate-postgres.outcome }}"
+            for crate in core policy ssh driver-redis driver-postgres; do
               report="mutants-$crate/mutants.out"
               caught="$report/caught.txt"
               missed="$report/missed.txt"
@@ -112,7 +119,12 @@ jobs:
               echo
               if [[ ! -f "$caught" || ! -f "$missed" || ! -f "$timeout" || ! -f "$unviable" ]]; then
                 echo "Measurement unavailable: missing report files; inspect the step log."
+                missing=1
                 continue
+              fi
+              if [[ ! -s "$caught" && ! -s "$missed" && ! -s "$timeout" ]]; then
+                echo "Measurement unavailable: no viable mutations were tested."
+                missing=1
               fi
               printf 'caught: %s, missed: %s, timeout: %s, unviable: %s\n' \
                 "$(wc -l <"$caught")" "$(wc -l <"$missed")" \
@@ -125,6 +137,7 @@ jobs:
               fi
             done
           } >>"$GITHUB_STEP_SUMMARY"
+          exit "$missing"
       - name: Upload mutation reports
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
@@ -135,7 +148,8 @@ jobs:
             linux/mutants-policy
             linux/mutants-ssh
             linux/mutants-driver-redis
-          if-no-files-found: warn
+            linux/mutants-driver-postgres
+          if-no-files-found: error
 
   coverage:
     name: Coverage (non-GTK crates)
@@ -196,4 +210,4 @@ jobs:
         with:
           name: coverage-${{ github.run_id }}
           path: linux/lcov.info
-          if-no-files-found: warn
+          if-no-files-found: error

@@ -194,3 +194,60 @@ an overly literal metadata expectation: SQLx names PostgreSQL bpchar arrays
 drivers, GTK and DuckDB. That run reused 744 artifacts, rebuilt one package and
 spent 3.034 seconds compiling. Function/file size guards and whitespace checks
 also passed. Installed desktop acceptance remains a later gate.
+
+## PostgreSQL time checkpoint
+
+B3-2 adopts the temporal-boundary scenarios from the
+[external survey](b3-test-scenario-survey.md). The new server regression first
+failed because `24:00:00` was decoded as midnight: exported wire bytes changed
+from `000000141dd76000` to `0000000000000000`.
+
+Binary time decoding now retains ordinary times as typed values, preserves
+`24:00:00` as exact text, and represents timetz as text with its stored signed
+offset, including seconds. Column metadata retains TIME/TIMETZ. NULL remains
+NULL. Invalid wire lengths, out-of-range times and offsets are refused.
+
+Eleven cases run under UTC, Asia/Kathmandu and America/New_York, covering
+microseconds, end-of-day and both offset extremes. Tests compare time_send or
+timetz_send bytes after SQL literal re-import, explicitly typed bindings and
+generated INSERT exports. Direct/session parity, type metadata and JSON text
+fidelity are asserted. The permanent test is
+`value_contract_times_preserve_midnight_fraction_and_offset`; malformed-wire and
+boundary units live in `crates/drivers/postgres/src/temporal.rs`.
+
+This checkpoint does not establish editing support for text-backed time values,
+temporal arrays, BC/large-year dates, infinities, mixed intervals or every
+grid/MCP/XLSX consumer. Those B3 cases remain open. Protocol references:
+[date/time types](https://www.postgresql.org/docs/16/datatype-datetime.html) and
+[time/timetz send and receive](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/date.c).
+
+Fresh cargo-mutants 27.1.0 evidence, on the working tree based on `6de5351ee`:
+
+| Scope | Result | Report beneath target/quality |
+| --- | --- | --- |
+| Array decode entry, scalar elements and float rendering, 26 generated mutations | 24 caught, 1 survivor, 1 unviable | `20260926-b3-array-mutants/mutants.out/outcomes.json` |
+| Array survivor after including malformed-input unit tests | 1 caught, no survivors/timeouts | `20260926-b3-array-mutants-followup/mutants.out/outcomes.json` |
+| Complete new time decoder, 22 generated mutations | 21 caught, 1 unviable, no survivors/timeouts | `20260926-b3-time-mutants/mutants.out/outcomes.json` |
+
+The array survivor removed the NUL-byte guard. Its existing unit regression was
+omitted by the mutation run's `value_contract` filter; array/numeric malformed
+units now share that prefix. The rerun caught the mutation. Both unviable changes
+attempted to construct a nonexistent default Value and failed compilation; they
+are not test catches. These were scratch-source runs reusing the local target
+directory, with no concurrent Cargo build. The time mutation run used unit tests;
+array runs also used the real-server value contracts. This is scoped evidence,
+not a complete array, numeric, workspace or hosted mutation pass.
+
+Local validation: `target/quality/20260926T210713778702Z-full/report.json`
+passed formatting, Clippy, unit and sandbox checks. Debian package validation
+was skipped because `dpkg-deb` is unavailable. The stricter shared runner passed
+all 11 selected suites at
+`target/quality/20260926T210925595822Z-values/report.json`, including four
+PostgreSQL server contracts and all eight drivers with GTK/DuckDB selected.
+The complete PostgreSQL unit/integration run also passed all 53 tests.
+Ten runner/workflow regression tests passed, including a later refinement that
+rejects a mutation report containing only unviable changes. Workflow YAML parsed;
+the mutation summary shell was executed against complete, missing, empty and
+unviable-only fixture reports. Function/file size and whitespace guards passed.
+Hosted mutation/coverage execution and installed desktop acceptance remain
+separate from these local results.
