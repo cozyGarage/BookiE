@@ -38,7 +38,7 @@ jobs:
     outputs:
       commit: ${{ steps.revision.outputs.commit }}
     name: Preflight and sandbox tier (no GTK app)
-    timeout-minutes: 30
+    timeout-minutes: 45
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -72,11 +72,19 @@ jobs:
           workspaces: linux
           prefix-key: linux-preflight
       - name: Preflight
-        run: ./scripts/preflight.sh
+        run: python3 scripts/run-test-layer.py quick
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   fast:
     name: Fast checks (GTK)
-    timeout-minutes: 30
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: preflight
     # The GNOME 50 baseline requires GTK 4.22, GLib 2.88 and libadwaita 1.9.
@@ -134,21 +142,21 @@ jobs:
           workspaces: linux
           prefix-key: linux-fast-gtk
       - name: Unit tests (build via test)
-        run: ./scripts/ci-local.sh full
+        run: python3 scripts/run-test-layer.py full
       - name: Isolated GTK widget regressions
-        run: bash ./scripts/test-gtk-widgets.sh
-      - name: Install cargo-deny and cargo-audit
-        run: |
-          cargo install cargo-deny --locked
-          cargo install cargo-audit --locked
-      - name: cargo-deny
-        run: cargo deny check
-      - name: cargo-audit
-        run: cargo audit
+        run: python3 scripts/run-test-layer.py widgets
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-fast-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   gtk-safety:
     name: Installed GTK safety smoke
-    timeout-minutes: 45
+    timeout-minutes: 60
     runs-on: ubuntu-24.04
     needs: [preflight, fast]
     container:
@@ -187,18 +195,26 @@ jobs:
           workspaces: linux
           prefix-key: linux-gtk-safety
       - name: Secret Service round-trip
-        run: ./scripts/test-secret-service.sh
+        run: python3 scripts/run-test-layer.py keyring
       - name: GTK installed-flow smoke
         env:
           TABLEPRO_GTK_ARTIFACT_DIR: ${{ github.workspace }}/gtk-artifacts/smoke
-        run: ./scripts/test-gtk-safety.sh
+        run: python3 scripts/run-test-layer.py ui
       - name: Upload GTK diagnostics
         if: always()
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: gtk-safety-${{ github.run_id }}-${{ github.run_attempt }}
           path: gtk-artifacts
-          if-no-files-found: ignore
+          if-no-files-found: error
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-gtk-safety-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   current-stable-clippy:
     name: Current stable Clippy (scheduled)
@@ -292,22 +308,16 @@ jobs:
           prefix-key: linux-integration
       - name: Verify docker is available
         run: docker version
-      - name: Postgres integration tests
-        run: cargo test --test integration -p tablepro-driver-postgres -- --include-ignored --test-threads=1
-      - name: PostgreSQL Unix-socket integration
-        run: ./scripts/test-postgres-socket.sh
-      - name: MySQL integration tests
-        run: cargo test --test integration -p tablepro-driver-mysql -- --include-ignored --test-threads=1
-      - name: MSSQL integration tests
-        run: cargo test --test integration -p tablepro-driver-mssql -- --include-ignored --test-threads=1
-      - name: ClickHouse integration tests
-        run: cargo test --test integration -p tablepro-driver-clickhouse -- --include-ignored --test-threads=1
-      - name: Redis integration tests
-        run: cargo test --test integration -p tablepro-driver-redis -- --include-ignored --test-threads=1
-      - name: MongoDB driver integration
-        run: cargo test --test integration -p tablepro-driver-mongodb -- --include-ignored --test-threads=1
-      - name: SSH agent and OpenSSH integration
-        run: bash ./scripts/test-ssh.sh
+      - name: Driver, socket and SSH integration
+        run: python3 scripts/run-test-layer.py drivers
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-integration-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   driver-tls:
     name: Driver TLS fixture (docker)
@@ -343,7 +353,15 @@ jobs:
       - name: Verify docker is available
         run: docker compose version
       - name: Driver TLS fixture
-        run: ./scripts/test-driver-tls.sh
+        run: python3 scripts/run-test-layer.py tls
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-driver-tls-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   postgres-release:
     name: PostgreSQL release fixture (docker)
@@ -384,7 +402,15 @@ jobs:
       - name: Verify docker is available
         run: docker compose version
       - name: PostgreSQL TLS, SSH, lock, and reconnect fixture
-        run: ./scripts/test-postgres-release.sh
+        run: python3 scripts/run-test-layer.py postgres-release
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: regression-postgres-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: linux/target/quality/*-layers
+          if-no-files-found: error
 
   duckdb:
     needs: preflight

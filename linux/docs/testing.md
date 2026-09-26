@@ -1,11 +1,15 @@
 # Testing
 
+Start with the [validation playbook](validation-playbook.md) for the executable
+layer catalog, local commands, CI ownership, agent handoffs and regression intake.
+The shared runner retains reports and logs and fails on incomplete execution.
+
 ## 0.1.4 executable gates
 
 `scripts/ci-local.sh full` is shared by local development and hosted fast CI.
 It also checks the ignored-test inventory and candidate packaging contracts.
 `scripts/ci-local.sh widgets` executes the registered Rust GTK regressions in
-separate isolated processes. `scripts/test-secret-service.sh` executes all three
+separate isolated processes. `scripts/test-secret-service.sh` executes all seven
 registered keyring/transport tests. Registrations live in
 `scripts/isolated-tests.json`; zero selected tests is a failure.
 
@@ -219,7 +223,7 @@ For ordinary UI changes, test the affected flow manually and include before and 
 
 `.github/workflows/gtk-soak.yml` supplies the independent daily five-attempt soak ledger.
 
-The Ubuntu 25.10 container provides the GLib version required by the selected libadwaita and Relm4 features.
+The Debian testing container provides the GNOME 50 libraries required by the selected features.
 
 ## Measuring how good the tests are
 

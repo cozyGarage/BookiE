@@ -100,13 +100,18 @@ Never change a test to accept incorrect behavior. Fix the implementation or corr
 
 ### Regression tiers
 
+Use [the validation playbook](linux/docs/validation-playbook.md) for layer selection,
+agent handoffs, evidence requirements and scenario intake. Run
+`python3 linux/scripts/run-test-layer.py --list` to discover the shared commands.
+CI wiring and runner failure behavior have their own regression tests.
+
 Every test belongs to exactly one tier, and every tier has one script and one gate.
 
 | Tier | Contents | Script | Gate |
 |---|---|---|---|
 | unit | `--lib --bins` across the workspace | `linux/scripts/preflight.sh` | CI `preflight` and `fast` |
 | sandbox | Integration targets needing no Docker, no database service, and no display | `linux/scripts/test-sandbox.sh` | CI `preflight` |
-| driver | `crates/drivers/*/tests/integration.rs` against a container | none | CI `integration` |
+| driver | `crates/drivers/*/tests/integration.rs` against a container; SSH and socket fixtures | `linux/scripts/ci-local.sh integration` | CI `integration` |
 | driver-tls | `crates/driver-tls-tests` against network servers holding a privately issued certificate | `linux/scripts/test-driver-tls.sh` | CI `driver-tls` |
 | release | `crates/release-tests` against the PostgreSQL fixture | `linux/scripts/test-postgres-release.sh` | CI `postgres-release` |
 | gtk-widgets | `#[ignore]` widget tests needing an isolated display, listed in `linux/scripts/isolated-tests.json` under `gtk` | `linux/scripts/test-gtk-widgets.sh` | CI `fast` |

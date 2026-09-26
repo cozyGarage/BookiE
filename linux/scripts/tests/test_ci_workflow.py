@@ -50,8 +50,8 @@ class CiWorkflowTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         hosted = workflow.split("  integration:\n", 1)[1].split("  driver-tls:\n", 1)[0]
         local = (ROOT / "linux/scripts/ci-local.sh").read_text().split("run_integration() {", 1)[1].split("run_release()", 1)[0]
-        for commands in [hosted, local]:
-            self.assertIn("scripts/test-ssh.sh", commands)
+        self.assertIn("run-test-layer.py drivers", hosted)
+        self.assertIn("scripts/test-ssh.sh", local)
         script = (ROOT / "linux/scripts/test-ssh.sh").read_text()
         for required in ["set -euo pipefail", "--test agent_auth", "--test openssh_session", "--include-ignored", "--test-threads=1"]:
             self.assertIn(required, script)
