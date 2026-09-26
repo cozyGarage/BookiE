@@ -231,6 +231,14 @@ before its fix. `ci-local.sh full` passed with report
 checks were skipped on this host because `dpkg-deb` is absent; packaging is not
 qualified by this value-contract packet.
 
+GTK fixture follow-up: hosted run `36245849080` at `3f73b8c6c` passed every
+executed job except installed GTK smoke. Its CSV scenario expected a 100-row
+page but read the 1,000-row preference default. A private D-Bus reproduction
+confirmed that dconf retained the activation environment while scenarios changed
+config roots. The fixture now uses a persistent keyfile backend per scenario.
+All 19 host Xvfb smoke scenarios passed with the current debug build; hosted
+release-build smoke and candidate Wayland qualification remain separate.
+
 These changes do not close B3. PostgreSQL wide NUMERIC decoding, optional DuckDB
 native temporal/interval/collection values, nested values, and exact values through
 MCP and every export format still need dedicated acceptance. Spreadsheet numeric

@@ -574,6 +574,7 @@ def write_fixture(base, audit_available=True, environment="prod"):
             "XDG_CACHE_HOME": str(cache),
             "XDG_STATE_HOME": str(state),
             "XDG_RUNTIME_DIR": str(runtime),
+            "GSETTINGS_BACKEND": "keyfile",
             "RUST_LOG": "tablepro_app=debug",
         }
     )
