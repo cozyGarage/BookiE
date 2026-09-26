@@ -241,9 +241,9 @@ release-build smoke and candidate Wayland qualification remain separate.
 
 These changes do not close B3. PostgreSQL wide NUMERIC decoding, optional DuckDB
 native temporal/interval/collection values, nested values, and exact values through
-MCP and every export format still need dedicated acceptance. Spreadsheet numeric
-cells currently convert wide integers and decimals to floating point and need an
-exact-value regression and fix. In particular, a
+MCP and every export format still need dedicated acceptance. Spreadsheet
+integer/decimal export now has an exact-value regression and fix; floating-point
+and temporal spreadsheet cells still need dedicated coverage. In particular, a
 visible undecodable marker is safer than NULL but does not satisfy lossless
 NUMERIC support. Rejecting an inexact decimal edit does not add arbitrary-precision
 editing. B4–B6 acceptance follows B3; their boxes remain open.

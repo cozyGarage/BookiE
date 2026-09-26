@@ -35,6 +35,7 @@ not prevent the other compiled suites from running.
 | MongoDB | JSON commands preserve integer, float, text and NULL values through BSON and result decoding |
 | Grid, filter, CSV and named parameter parsers | Integer overflow and decimal rounding are refused; representable boundaries survive parsing |
 | Float input parsers | Numeric overflow to infinity and nonzero underflow to zero are refused |
+| XLSX | Integers beyond 15 digits and all exact decimals are text cells; stored XML verifies each value and cell reference, including decimal scale |
 | JSON and MCP | Non-finite values remain distinct from SQL NULL |
 
 ClickHouse long-value reads are checked with a server-generated value. Oversized
@@ -49,7 +50,7 @@ The new suite supplements those tests.
 
 This is a growing contract, not proof of every database type. PostgreSQL wide
 NUMERIC, native arrays, temporal extremes and intervals, nested BSON values,
-spreadsheet numeric precision and every transport/persistence adapter still need
+spreadsheet floating-point/temporal precision and every transport/persistence adapter still need
 focused cases. Add a reproducer before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
 an unsupported result as NULL.
@@ -100,3 +101,23 @@ steps of 0.50 and 0.33 seconds and no toolchain download.
 
 These runs used the dirty working tree based on `9b7a996ca`; these are local
 implementation results, not qualification of a frozen release candidate.
+
+## XLSX integer and decimal checkpoint
+
+The regression first reproduced `i64::MIN` becoming `-9223372036854776000`
+and a wide decimal becoming `100000000000000000000`. Exports now store
+integers beyond 15 digits and every exact decimal as text. Smaller integers
+remain numeric. Decimal scale survives; arithmetic on these text cells requires
+explicit conversion, which can lose precision in the spreadsheet application.
+The test opens the generated XLSX ZIP and checks cell references against their
+exact shared strings, not just successful file creation. The shared value runner
+picks up both workbook regressions automatically.
+
+Excel documents its [15-digit precision limit](https://support.microsoft.com/en-us/excel/format-numbers-as-text).
+Floating-point, temporal and nested-value spreadsheet contracts remain open.
+
+Validation: 415 core tests, core/workspace Clippy, size guards and `cargo deny
+check` passed. The full local gate passed at
+`target/quality/20260926T195741317332Z-full/report.json` on the working tree
+based on `49981d123`; Debian validation was skipped because `dpkg-deb` is
+unavailable. The XLSX regression failed before the fix.

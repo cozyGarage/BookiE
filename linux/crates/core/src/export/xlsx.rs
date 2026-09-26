@@ -1,6 +1,5 @@
 use std::io::Write;
 
-use rust_decimal::prelude::ToPrimitive;
 use rust_xlsxwriter::{Format, Workbook, Worksheet, XlsxError};
 
 use super::error::ExportError;
@@ -92,12 +91,12 @@ fn write_cell(
     match value {
         Value::Null => Ok(()),
         Value::Bool(value) => sheet.write_boolean(row, column, *value).map(drop),
-        Value::Int(value) => sheet.write_number(row, column, *value as f64).map(drop),
+        Value::Int(value) if value.unsigned_abs() <= 999_999_999_999_999 => {
+            sheet.write_number(row, column, *value as f64).map(drop)
+        }
+        Value::Int(value) => sheet.write_string(row, column, value.to_string()).map(drop),
         Value::Float(value) if value.is_finite() => sheet.write_number(row, column, *value).map(drop),
-        Value::Decimal(value) => match value.to_f64().filter(|number| number.is_finite()) {
-            Some(number) => sheet.write_number(row, column, number).map(drop),
-            None => sheet.write_string(row, column, value.to_string()).map(drop),
-        },
+        Value::Decimal(value) => sheet.write_string(row, column, value.to_string()).map(drop),
         Value::Date(value) => sheet.write_with_format(row, column, value, &formats.date).map(drop),
         Value::Time(value) => sheet.write_with_format(row, column, value, &formats.time).map(drop),
         Value::DateTime(value) => sheet
@@ -117,6 +116,75 @@ fn write_cell(
 mod tests {
     use super::*;
     use crate::export::test_support::column;
+
+    fn workbook_parts(values: &[Value]) -> (String, String) {
+        use std::io::{Cursor, Read};
+
+        let mut writer = XlsxWriter::new(values.len()).unwrap();
+        let mut output = Vec::new();
+        writer.begin(&mut output, &[column("value")]).unwrap();
+        for (index, value) in values.iter().enumerate() {
+            writer
+                .write_row(&mut output, index, std::slice::from_ref(value))
+                .unwrap();
+        }
+        writer.finish(&mut output).unwrap();
+        let mut archive = zip::ZipArchive::new(Cursor::new(output)).unwrap();
+        let mut sheet = String::new();
+        archive
+            .by_name("xl/worksheets/sheet1.xml")
+            .unwrap()
+            .read_to_string(&mut sheet)
+            .unwrap();
+        let mut strings = String::new();
+        archive
+            .by_name("xl/sharedStrings.xml")
+            .unwrap()
+            .read_to_string(&mut strings)
+            .unwrap();
+        (sheet, strings)
+    }
+
+    #[test]
+    fn value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../testdata/value-contract.json"
+        )))
+        .unwrap();
+        let mut values = vec![Value::Int(1_000_000_000_000_000), Value::Int(-1_000_000_000_000_000)];
+        for text in corpus["integers"].as_array().unwrap() {
+            let value: i64 = text.as_str().unwrap().parse().unwrap();
+            if value.unsigned_abs() > 999_999_999_999_999 {
+                values.push(Value::Int(value));
+            }
+        }
+        for text in corpus["decimals"].as_array().unwrap() {
+            values.push(Value::Decimal(text.as_str().unwrap().parse().unwrap()));
+        }
+        let (sheet, strings) = workbook_parts(&values);
+        for (index, value) in values.iter().enumerate() {
+            let row = index + 2;
+            let text = value_to_text(value).unwrap();
+            let string_index = strings
+                .split("<si>")
+                .skip(1)
+                .position(|entry| entry.starts_with(&format!("<t>{text}</t>")))
+                .unwrap();
+            assert!(
+                sheet.contains(&format!("<c r=\"A{row}\" t=\"s\"><v>{string_index}</v></c>")),
+                "{value:?}: {sheet}"
+            );
+        }
+    }
+
+    #[test]
+    fn value_contract_workbook_keeps_small_integers_numeric() {
+        let (sheet, _) = workbook_parts(&[Value::Int(999_999_999_999_999), Value::Int(-7), Value::Int(0)]);
+        assert!(sheet.contains("<c r=\"A2\"><v>999999999999999</v></c>"), "{sheet}");
+        assert!(sheet.contains("<c r=\"A3\"><v>-7</v></c>"), "{sheet}");
+        assert!(sheet.contains("<c r=\"A4\"><v>0</v></c>"), "{sheet}");
+    }
 
     #[test]
     fn a_result_over_the_sheet_limit_is_refused_with_the_limit_in_the_message() {

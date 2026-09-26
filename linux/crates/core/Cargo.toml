@@ -27,6 +27,7 @@ tokio-util.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+zip = { version = "8.3", default-features = false, features = ["deflate"] }
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
 
 [lints]
