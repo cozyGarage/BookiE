@@ -249,6 +249,16 @@ visible undecodable marker is safer than NULL but does not satisfy lossless
 support for the remaining unsupported types. Rejecting an inexact decimal edit does not add arbitrary-precision
 editing. B4–B6 acceptance follows B3; their boxes remain open.
 
+### B3 regression research: 2026-09-26
+
+The [external scenario survey](b3-test-scenario-survey.md) pins test sources from
+DBeaver, Beekeeper Studio, pgcli and SQLFluff. Use their scenarios and issue-linked
+regressions to find gaps, reproduce failures locally, and retain permanent tests.
+Next priority is PostgreSQL array preservation, then temporal/nested values and
+consumer parity. Secure transport and authorization scenarios feed B4 acceptance;
+the VM remains optional for current B3 work. The survey is an initial sample,
+not evidence that those projects or BookiE pass every scenario.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight
