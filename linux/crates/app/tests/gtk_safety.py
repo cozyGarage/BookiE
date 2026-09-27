@@ -1233,6 +1233,20 @@ def committed_editor_ddl_refreshes_sidebar(database, base):
 committed_editor_ddl_refreshes_sidebar.environment = "local"
 
 
+def new_connection_form_keeps_title_and_help_text_visible(_database, _base):
+    invoke(wait_for_node(name="New connection", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Connect to ClickHouse")
+    # Keep the complete help strings visible in the rendered form. The
+    # endpoint row is driver-specific and hidden for the first sorted driver.
+    tls_help = wait_for_node(name="How the client encrypts and verifies the server")
+    wait_for_node(name="Block writes at the policy layer")
+    help_width = tls_help.queryComponent().getExtents(pyatspi.DESKTOP_COORDS).width
+    assert help_width >= 350, f"TLS help text has too little layout width: {help_width}px"
+
+
+new_connection_form_keeps_title_and_help_text_visible.environment = "local"
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: gtk_safety.py /path/to/tablepro-app")
@@ -1242,6 +1256,7 @@ def main():
     scenarios = [
         jump_to_column_keyboard_search,
         committed_editor_ddl_refreshes_sidebar,
+        new_connection_form_keeps_title_and_help_text_visible,
         sql_character_warnings_leave_query_unchanged,
         dismissed_approval_denies,
         approve_once_prompts_again,

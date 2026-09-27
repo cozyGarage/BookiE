@@ -33,6 +33,9 @@ futures.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile.workspace = true
+tablepro-driver-mongodb = { path = "../drivers/mongodb" }
+testcontainers.workspace = true
+testcontainers-modules = { workspace = true, features = ["mongo"] }
 
 [lints]
 workspace = true

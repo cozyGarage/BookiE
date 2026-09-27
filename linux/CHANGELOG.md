@@ -21,6 +21,11 @@
 - A cancelled or timed-out session COMMIT or ROLLBACK is now audited with a cancelled or timed-out outcome instead of a generic failure.
 - A session COMMIT that fails because the database already ended the transaction, such as a deferred foreign key violation, no longer leaves the session's transaction marked open.
 - Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
+- MongoDB nested documents, arrays and uncommon top-level BSON kinds retain their BSON markers as canonical Extended JSON instead of debug text. Nested documents and arrays can be edited in the grid and write back as native BSON; canonical Extended JSON imports reconstruct nested Decimal128, date and binary subtypes. Real-server JSON, CSV and XLSX exports and the MCP browse tool preserve those markers.
+- CSV imports into SQLite INTEGER, REAL and NUMERIC affinity columns pass unparseable values as text, allowing SQLite to store them without rejecting valid mixed storage classes.
+- Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
+- ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.
+- The new-connection dialog centers its selected-driver title in the header and keeps the full title and help text visible.
 
 ## [0.1.5] - 2026-09-27
 
@@ -83,7 +88,7 @@
 - Numeric input in grid edits, filters and CSV imports rejects overflow to infinity and nonzero underflow to zero. Named decimal parameters stay exact, SQLite still compares them as numbers, and automatic parameter typing keeps values as text when they exceed the exact decimal range.
 - SQL copy and export use scientific float literals to avoid tiny values becoming zero or overflowing an engine's decimal parser; ClickHouse decimal literals retain their full precision.
 - Redis commands preserve empty quoted arguments instead of dropping them.
-- DuckDB accepts bound parameters in result queries instead of reporting the operation as unimplemented. Decimal parameters and results stay exact numbers, so arithmetic on a bound decimal is no longer rounded to a whole number. Bound dates, times and timestamps keep their type, so date arithmetic and date functions accept them, while nanosecond timestamps and time zone instants keep their exact value.
+- DuckDB accepts bound parameters in result queries instead of reporting the operation as unimplemented. Decimal parameters and results stay exact numbers, so arithmetic on a bound decimal is no longer rounded to a whole number. DATE and microsecond TIME/TIMESTAMP parameters bind natively. Finer-than-microsecond TIME/TIMESTAMP and all TIMESTAMPTZ parameters remain exact text and may need an explicit cast for expressions.
 - MySQL and ClickHouse decimals retain their exact digits, including values beyond the editable decimal range. Grid edits and filters reject decimals that would need rounding.
 - ClickHouse non-finite numbers remain distinct from NULL, and JSON exports and agent responses retain NaN and infinity as text instead of substituting NULL.
 - SQL Server INSERT exports preserve Unicode text and render booleans as valid numeric literals.
@@ -112,13 +117,15 @@
 - MongoDB accepts `DROP TABLE people` as well as the quoted form, instead of reporting the statement as unsupported.
 - Renaming a column and changing nothing else now saves. On SQLite the whole save was refused, and on MySQL the column definition was restated without its collation, character set or comment.
 - MySQL and SQL Server values that the driver cannot decode now show as undecodable instead of as an empty cell. Such a cell stays read-only, and a row whose key could not be read is refused rather than updated or deleted silently.
-- A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, Duplicate Row leaves it empty, and a row whose key could not be read is refused instead of being changed or deleted silently.
+- A PostgreSQL result with one undecodable value (for example, a NUMERIC too wide to represent) shows that cell as undecodable, logs the column so the cause can be traced, and keeps the rest of the row and result instead of failing the whole query. An undecodable cell stays read-only, and a row whose key could not be read is refused instead of being changed or deleted silently.
 - Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export preserves binary values using exact literals on PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse and DuckDB; unsupported binary exports, undecodable values and non-finite numbers are refused instead of substituting NULL. Copy as IN continues to skip binary and undecodable cells.
 - CSV export and Copy as CSV write empty text as a quoted empty field and NULL as a bare empty field, so the two stay distinct. With quoting set to Always, NULL was also written as a quoted empty field.
 - SQL Server INSERT statements copied or exported from a `datetime` column with milliseconds now run and restore the same value. SQL Server rejected them with a conversion error.
 - ClickHouse decimals keep their declared scale, so 2.50 in a Decimal(10, 2) column no longer shows as 2.5.
 - ClickHouse timestamp parameters keep their fractional seconds. Local timestamps lost every fraction and timezone timestamps were cut to milliseconds.
 - ClickHouse SQL INSERT exports of timezone timestamps now run and keep every fractional digit. ClickHouse rejected them with a parse error.
+- ClickHouse `DateTime64(9)` parameters and SQL exports outside its exact nanosecond range are refused locally instead of reaching an engine range failure or conversion.
+- ClickHouse `DateTime` and `DateTime64` results with named IANA timezones now preserve their instant. Ambiguous or nonexistent local clock values are shown as undecodable rather than guessed.
 - SQL Server `datetimeoffset` values keep their stored instant, original offset and all seven fractional digits in the grid, in edits and in copied or exported INSERT statements. A non-UTC value was shifted by its offset a second time, and every value was converted to UTC.
 - MySQL and MariaDB INSERT statements copied or exported from text or JSON holding a backslash or NUL character now restore the same value when the server runs with `NO_BACKSLASH_ESCAPES`. Each backslash was doubled, or the statement was rejected.
 - MySQL column-comment DDL refuses comments containing backslashes until it can execute with a known session SQL mode, rather than silently storing a different comment.

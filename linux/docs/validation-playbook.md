@@ -14,11 +14,32 @@ RTK should prefix commands with `rtk proxy` so raw diagnostics are retained.
 python3 scripts/run-test-layer.py --list
 python3 scripts/run-test-layer.py harness
 python3 scripts/run-test-layer.py quick
+python3 scripts/run-test-layer.py change-contracts
 python3 scripts/run-test-layer.py security-policy supply-chain
 python3 scripts/run-test-layer.py drivers tls postgres-release
 python3 scripts/run-test-layer.py widgets keyring ui
 python3 scripts/run-test-layer.py values
 ```
+
+The fast Build Linux job runs `change-contracts` before the full GTK/unit layer.
+It compares the checked-out commit with the pull request base or prior push
+commit, runs mapped exact regression tests for changed value-path files, and
+retains a report and per-command logs under `target/quality/`. Locally, check
+uncommitted work against `HEAD`, or compare a branch with its base explicitly:
+
+```bash
+python3 scripts/run-change-contract-tests.py
+python3 scripts/run-change-contract-tests.py --base fork/linux
+```
+
+Changes under `crates/core/src/`, `crates/core/tests/`, `crates/app/src/`,
+`crates/mcp/src/`, and database-driver `src/` paths select focused exact
+regressions where mapped, otherwise the changed package's unit or integration
+tests. Edit `scripts/change-test-map.json` when adding a focused value
+regression. Driver integration-test files stay in the Docker `drivers` layer,
+which executes those server fixtures. The runner fails if Cargo returns success
+without a passing test summary or if an expected exact test does not appear
+exactly once as passed.
 
 Choose the layers affected by the change; the examples are separate invocations,
 not a requirement to repeat overlapping unit suites. The runner executes selected
@@ -62,6 +83,7 @@ incomplete, never passed. Review every step status, not just the final log line.
 | `harness` | Failure handling, workflow wiring, test runner and function-size regressions | Python 3; no Cargo build |
 | `workflow-lint` | Action schemas, expressions and embedded shell | actionlint v1.7.12 and ShellCheck |
 | `packaging-contracts` | Candidate archive and Debian package validator behavior | Git, tar, `dpkg-deb`; no actual install or upgrade |
+| `change-contracts` | Focused regressions or package tests selected from changed core, app, MCP and driver source paths | Rust 1.98; changed driver integration tests remain in the Docker `drivers` layer |
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GNOME 50 development stack; no display automation or DuckDB |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |

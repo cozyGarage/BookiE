@@ -7,6 +7,11 @@ use mongodb::bson::{Bson, Document, doc};
 use mongodb::options::{ClientOptions, Tls, TlsOptions};
 use mongodb::{Client, Database};
 use secrecy::ExposeSecret;
+use sqlparser::ast::{
+    AssignmentTarget, BinaryOperator, Expr, ObjectNamePart, Statement, TableFactor, Value as SqlValue,
+};
+use sqlparser::dialect::GenericDialect;
+use sqlparser::parser::Parser;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
@@ -277,6 +282,17 @@ impl Connection for MongodbConnection {
         if params.is_empty() {
             return self.execute(sql).await;
         }
+        if let Some(update) = parse_keyed_update(sql, params, &self.database_name)? {
+            let result = self
+                .db()
+                .collection::<Document>(&update.collection)
+                .update_one(update.filter, doc! { "$set": update.set })
+                .await
+                .map_err(map_mongo_error)?;
+            return Ok(ExecResult {
+                rows_affected: result.matched_count,
+            });
+        }
         Err(DriverError::Unsupported(
             "MongoDB execute_params does not support bound parameters".into(),
         ))
@@ -321,6 +337,196 @@ impl Connection for MongodbConnection {
     async fn close(self: Box<Self>) -> Result<(), DriverError> {
         Ok(())
     }
+}
+
+struct KeyedUpdate {
+    collection: String,
+    filter: Document,
+    set: Document,
+}
+
+fn parse_keyed_update(sql: &str, params: &[Value], database: &str) -> Result<Option<KeyedUpdate>, DriverError> {
+    let statements = Parser::parse_sql(&GenericDialect {}, sql)
+        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB update: {error}")))?;
+    let [
+        Statement::Update {
+            table,
+            assignments,
+            from,
+            selection: Some(selection),
+            returning: None,
+            or: None,
+        },
+    ] = statements.as_slice()
+    else {
+        return Ok(None);
+    };
+    if from.is_some() || !table.joins.is_empty() {
+        return Ok(None);
+    }
+    let TableFactor::Table {
+        name,
+        alias: None,
+        args: None,
+        ..
+    } = &table.relation
+    else {
+        return Ok(None);
+    };
+    let identifiers = name.0.iter().map(ObjectNamePart::as_ident).collect::<Option<Vec<_>>>();
+    let Some(identifiers) = identifiers else {
+        return Ok(None);
+    };
+    let collection = match identifiers.as_slice() {
+        [collection] => collection.value.clone(),
+        [schema, collection] if schema.value == database => collection.value.clone(),
+        _ => return Ok(None),
+    };
+    if assignments.is_empty() {
+        return Ok(None);
+    }
+
+    let mut parameter_index = 0;
+    let mut set = Document::new();
+    for assignment in assignments {
+        let AssignmentTarget::ColumnName(column) = &assignment.target else {
+            return Ok(None);
+        };
+        let Some(column) = single_identifier(column) else {
+            return Ok(None);
+        };
+        let value = take_placeholder(&assignment.value, params, &mut parameter_index)?;
+        if set.insert(column, value).is_some() {
+            return Ok(None);
+        }
+    }
+    let filter = selector_from_expr(selection, params, &mut parameter_index)?;
+    if parameter_index != params.len() || filter.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(KeyedUpdate {
+        collection,
+        filter,
+        set,
+    }))
+}
+
+fn single_identifier(name: &sqlparser::ast::ObjectName) -> Option<String> {
+    let [ObjectNamePart::Identifier(identifier)] = name.0.as_slice() else {
+        return None;
+    };
+    Some(identifier.value.clone())
+}
+
+fn take_placeholder(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Bson, DriverError> {
+    let Expr::Value(value) = expr else {
+        return Err(DriverError::Unsupported(
+            "MongoDB grid updates require bound values".into(),
+        ));
+    };
+    if !matches!(value.value, SqlValue::Placeholder(_)) {
+        return Err(DriverError::Unsupported(
+            "MongoDB grid updates require bound values".into(),
+        ));
+    }
+    let Some(value) = params.get(*index) else {
+        return Err(DriverError::Unsupported(
+            "MongoDB grid update has too few bound values".into(),
+        ));
+    };
+    *index += 1;
+    value_to_bson(value)
+}
+
+fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
+    match expr {
+        Expr::Nested(inner) => selector_from_expr(inner, params, index),
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::And,
+            right,
+        } => {
+            let mut selector = selector_from_expr(left, params, index)?;
+            let right = selector_from_expr(right, params, index)?;
+            for (key, value) in right {
+                if selector.insert(key, value).is_some() {
+                    return Err(DriverError::Unsupported(
+                        "MongoDB grid update repeats a key condition".into(),
+                    ));
+                }
+            }
+            Ok(selector)
+        }
+        Expr::BinaryOp {
+            left,
+            op: BinaryOperator::Eq,
+            right,
+        } => {
+            let Some(field) = identifier_from_expr(left) else {
+                return Err(DriverError::Unsupported(
+                    "MongoDB grid update has an unsupported key predicate".into(),
+                ));
+            };
+            let value = take_placeholder(right, params, index)?;
+            Ok(doc! { field: value })
+        }
+        Expr::IsNull(inner) => {
+            let Some(field) = identifier_from_expr(inner) else {
+                return Err(DriverError::Unsupported(
+                    "MongoDB grid update has an unsupported NULL key predicate".into(),
+                ));
+            };
+            Ok(doc! { field: Bson::Null })
+        }
+        _ => Err(DriverError::Unsupported(
+            "MongoDB grid update has an unsupported key predicate".into(),
+        )),
+    }
+}
+
+fn identifier_from_expr(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Identifier(identifier) => Some(identifier.value.clone()),
+        Expr::CompoundIdentifier(identifiers) if identifiers.len() == 1 => Some(identifiers[0].value.clone()),
+        _ => None,
+    }
+}
+
+fn value_to_bson(value: &Value) -> Result<Bson, DriverError> {
+    use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};
+
+    let unsupported = || DriverError::Unsupported("MongoDB cannot losslessly bind this grid value".into());
+    Ok(match value {
+        Value::Null => Bson::Null,
+        Value::Bool(value) => Bson::Boolean(*value),
+        Value::Int(value) => Bson::Int64(*value),
+        Value::Float(value) => Bson::Double(*value),
+        Value::Text(value) => Bson::String(value.clone()),
+        Value::Bytes(value) => Bson::Binary(Binary {
+            subtype: BinarySubtype::Generic,
+            bytes: value.clone(),
+        }),
+        Value::Date(value) => {
+            let Some(stamp) = value.and_hms_opt(0, 0, 0) else {
+                return Err(unsupported());
+            };
+            Bson::DateTime(DateTime::from_millis(stamp.and_utc().timestamp_millis()))
+        }
+        Value::Time(value) => Bson::String(value.to_string()),
+        Value::DateTime(value) if value.and_utc().timestamp_subsec_nanos() % 1_000_000 == 0 => {
+            Bson::DateTime(DateTime::from_millis(value.and_utc().timestamp_millis()))
+        }
+        Value::TimestampTz(value) if value.timestamp_subsec_nanos() % 1_000_000 == 0 => {
+            Bson::DateTime(DateTime::from_millis(value.timestamp_millis()))
+        }
+        Value::Decimal(value) => Bson::Decimal128(value.to_string().parse().map_err(|_| unsupported())?),
+        Value::Uuid(value) => Bson::Binary(Binary {
+            subtype: BinarySubtype::Uuid,
+            bytes: value.as_bytes().to_vec(),
+        }),
+        Value::Json(value) => Bson::try_from(value.clone()).map_err(|_| unsupported())?,
+        Value::DateTime(_) | Value::TimestampTz(_) | Value::Undecodable(_) => return Err(unsupported()),
+    })
 }
 
 struct FindQuery {
@@ -438,36 +644,25 @@ fn bson_to_value(b: &Bson) -> Value {
         Bson::Int64(v) => Value::Int(*v),
         Bson::Double(v) => Value::Float(*v),
         Bson::String(v) => Value::Text(v.clone()),
-        Bson::ObjectId(v) => Value::Text(v.to_hex()),
-        Bson::DateTime(v) => Value::Text(v.try_to_rfc3339_string().unwrap_or_else(|_| v.to_string())),
-        Bson::Binary(bin) => Value::Bytes(bin.bytes.clone()),
+        Bson::ObjectId(v) => Value::Json(serde_json::json!({"$oid": v.to_hex()})),
+        Bson::DateTime(v) => v.try_to_rfc3339_string().map_or_else(
+            |_| Value::Json(Bson::DateTime(*v).into_canonical_extjson()),
+            Value::Text,
+        ),
+        Bson::Binary(bin) if bin.subtype == mongodb::bson::spec::BinarySubtype::Generic => {
+            Value::Bytes(bin.bytes.clone())
+        }
+        Bson::Binary(bin) => Value::Json(Bson::Binary(bin.clone()).into_canonical_extjson()),
         Bson::Decimal128(d) => Value::Text(d.to_string()),
-        Bson::Document(d) => Value::Json(document_to_json(d)),
-        Bson::Array(a) => Value::Json(serde_json::Value::Array(a.iter().map(bson_to_json).collect())),
-        other => Value::Text(other.to_string()),
+        // Plain JSON strings cannot retain BSON-only kinds such as Decimal128,
+        // binary subtype, ObjectId or the full BSON date representation.
+        Bson::Document(d) => Value::Json(Bson::Document(d.clone()).into_canonical_extjson()),
+        Bson::Array(a) => Value::Json(Bson::Array(a.clone()).into_canonical_extjson()),
+        // Preserve BSON-only top-level kinds as Extended JSON instead of a
+        // display string that looks editable but cannot be written back as
+        // the original BSON type.
+        other => Value::Json(other.clone().into_canonical_extjson()),
     }
-}
-
-fn bson_to_json(b: &Bson) -> serde_json::Value {
-    match b {
-        Bson::Null => serde_json::Value::Null,
-        Bson::Boolean(v) => serde_json::Value::Bool(*v),
-        Bson::Int32(v) => serde_json::json!(*v),
-        Bson::Int64(v) => serde_json::json!(*v),
-        Bson::Double(v) => serde_json::json!(*v),
-        Bson::String(v) => serde_json::Value::String(v.clone()),
-        Bson::Document(d) => document_to_json(d),
-        Bson::Array(a) => serde_json::Value::Array(a.iter().map(bson_to_json).collect()),
-        other => serde_json::Value::String(other.to_string()),
-    }
-}
-
-fn document_to_json(doc: &Document) -> serde_json::Value {
-    let mut map = serde_json::Map::new();
-    for (k, v) in doc {
-        map.insert(k.clone(), bson_to_json(v));
-    }
-    serde_json::Value::Object(map)
 }
 
 fn bson_type_name(b: &Bson) -> String {
@@ -702,12 +897,40 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
         serde_json::Value::Array(values) => {
             Bson::Array(values.into_iter().map(json_to_bson).collect::<Result<_, _>>()?)
         }
-        serde_json::Value::Object(values) => Bson::Document(
-            values
-                .into_iter()
-                .map(|(key, value)| Ok((key, json_to_bson(value)?)))
-                .collect::<Result<_, String>>()?,
-        ),
+        serde_json::Value::Object(values) => {
+            // Canonical and relaxed Extended JSON objects encode BSON scalar
+            // types. Recognize these before recursively treating the object
+            // as a plain document so exported Mongo results can be re-imported.
+            const EXTJSON_MARKERS: &[&str] = &[
+                "$binary",
+                "$code",
+                "$date",
+                "$dbPointer",
+                "$decimal128",
+                "$maxKey",
+                "$minKey",
+                "$numberDecimal",
+                "$numberDouble",
+                "$numberInt",
+                "$numberLong",
+                "$oid",
+                "$regularExpression",
+                "$scope",
+                "$symbol",
+                "$timestamp",
+                "$undefined",
+            ];
+            if values.keys().any(|key| EXTJSON_MARKERS.contains(&key.as_str())) {
+                Bson::try_from(serde_json::Value::Object(values)).map_err(|error| error.to_string())?
+            } else {
+                Bson::Document(
+                    values
+                        .into_iter()
+                        .map(|(key, value)| Ok((key, json_to_bson(value)?)))
+                        .collect::<Result<_, String>>()?,
+                )
+            }
+        }
     })
 }
 
@@ -1025,6 +1248,158 @@ mod tests {
         );
         assert!(matches!(document.get("wide"), Some(Bson::Decimal128(_))));
         assert!(serde_json_to_document("[]").is_err());
+    }
+
+    #[test]
+    fn canonical_extended_json_import_restores_nested_bson_types() {
+        use mongodb::bson::{Binary, DateTime, Decimal128, doc, oid::ObjectId, spec::BinarySubtype};
+
+        let id = ObjectId::new();
+        let input = serde_json::json!({
+            "_id": {"$oid": id.to_hex()},
+            "nested": {
+                "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+                "when": {"$date": {"$numberLong": "1234567890123"}},
+                "binary": {"$binary": {"base64": "AP9B", "subType": "80"}},
+                "sequence": [{"$numberLong": "7"}],
+            },
+        });
+
+        let document = serde_json_to_document(&input.to_string()).unwrap();
+        let expected_decimal: Decimal128 = "1234567890123456789.123456789012345".parse().unwrap();
+        assert_eq!(
+            document,
+            doc! {
+                "_id": id,
+                "nested": {
+                    "amount": expected_decimal,
+                    "when": DateTime::from_millis(1_234_567_890_123),
+                    "binary": Binary { subtype: BinarySubtype::UserDefined(0x80), bytes: vec![0, 255, 65] },
+                    "sequence": [7_i64],
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn nested_bson_special_values_keep_their_extended_json_types() {
+        use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};
+
+        let document = doc! {
+            "amount": Bson::Decimal128("1234567890123456789.123456789012345".parse().unwrap()),
+            "blob": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] }),
+            "when": Bson::DateTime(DateTime::from_millis(1_234_567_890_123)),
+        };
+
+        assert_eq!(
+            bson_to_value(&Bson::Document(document)),
+            Value::Json(serde_json::json!({
+                "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+                "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
+                "when": {"$date": {"$numberLong": "1234567890123"}},
+            }))
+        );
+        assert_eq!(
+            bson_to_value(&Bson::Array(vec![Bson::Decimal128(
+                "1234567890123456789.123456789012345".parse().unwrap()
+            )])),
+            Value::Json(serde_json::json!([
+                {"$numberDecimal": "1234567890123456789.123456789012345"}
+            ]))
+        );
+    }
+
+    #[test]
+    fn bson_decimal_and_date_extremes_remain_exact_outside_core_ranges() {
+        use mongodb::bson::DateTime;
+
+        for text in ["1E-6176", "9.999999999999999999999999999999999E+6144", "-0.00"] {
+            let decimal = Bson::Decimal128(text.parse().unwrap());
+            assert_eq!(bson_to_value(&decimal), Value::Text(text.into()));
+        }
+
+        for millis in [i64::MIN, i64::MAX] {
+            assert_eq!(
+                bson_to_value(&Bson::DateTime(DateTime::from_millis(millis))),
+                Value::Json(serde_json::json!({"$date": {"$numberLong": millis.to_string()}}))
+            );
+        }
+    }
+
+    #[test]
+    fn non_generic_binary_subtypes_keep_their_extended_json_metadata() {
+        use mongodb::bson::{Binary, spec::BinarySubtype};
+
+        for (subtype, expected) in [
+            (BinarySubtype::Function, "01"),
+            (BinarySubtype::BinaryOld, "02"),
+            (BinarySubtype::UuidOld, "03"),
+            (BinarySubtype::Uuid, "04"),
+            (BinarySubtype::Md5, "05"),
+            (BinarySubtype::Encrypted, "06"),
+            (BinarySubtype::Column, "07"),
+            (BinarySubtype::Sensitive, "08"),
+            (BinarySubtype::Vector, "09"),
+            (BinarySubtype::Reserved(0x0a), "0a"),
+            (BinarySubtype::UserDefined(0x80), "80"),
+        ] {
+            let value = Bson::Binary(Binary {
+                subtype,
+                bytes: vec![0, 255, 65],
+            });
+            assert_eq!(
+                bson_to_value(&value),
+                Value::Json(serde_json::json!({
+                    "$binary": {"base64": "AP9B", "subType": expected}
+                })),
+                "subtype {expected}"
+            );
+        }
+        assert_eq!(
+            bson_to_value(&Bson::Binary(Binary {
+                subtype: BinarySubtype::Generic,
+                bytes: vec![0, 255, 65],
+            })),
+            Value::Bytes(vec![0, 255, 65])
+        );
+    }
+
+    #[test]
+    fn uncommon_top_level_bson_kinds_keep_extended_json_type_markers() {
+        use mongodb::bson::{JavaScriptCodeWithScope, Regex, Timestamp, oid::ObjectId};
+
+        let uncommon = [
+            (Bson::Timestamp(Timestamp { time: 42, increment: 7 }), "$timestamp"),
+            (
+                Bson::RegularExpression(Regex {
+                    pattern: "^tablepro".into(),
+                    options: "i".into(),
+                }),
+                "$regularExpression",
+            ),
+            (Bson::JavaScriptCode("return 1;".into()), "$code"),
+            (
+                Bson::JavaScriptCodeWithScope(JavaScriptCodeWithScope {
+                    code: "return value;".into(),
+                    scope: doc! { "value": 7 },
+                }),
+                "$scope",
+            ),
+            (Bson::Symbol("legacy-symbol".into()), "$symbol"),
+            (Bson::ObjectId(ObjectId::new()), "$oid"),
+            (Bson::Undefined, "$undefined"),
+            (Bson::MinKey, "$minKey"),
+            (Bson::MaxKey, "$maxKey"),
+        ];
+
+        for (bson, marker) in uncommon {
+            let value = bson_to_value(&bson);
+            let Value::Json(json) = value else {
+                panic!("{bson:?} must retain its BSON kind");
+            };
+            assert!(json.to_string().contains(marker), "{bson:?}: {json}");
+            assert_eq!(json, bson.into_canonical_extjson(), "{marker}");
+        }
     }
 
     #[test]

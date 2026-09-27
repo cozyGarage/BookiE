@@ -227,6 +227,17 @@ pub fn row_to_values(
     options: &CsvImportOptions,
     line: usize,
 ) -> Result<Vec<Value>, CsvRowError> {
+    row_to_values_for_driver(row, mapping, columns, options, line, "")
+}
+
+pub(crate) fn row_to_values_for_driver(
+    row: &[String],
+    mapping: &[Option<usize>],
+    columns: &[ColumnInfo],
+    options: &CsvImportOptions,
+    line: usize,
+    driver_id: &str,
+) -> Result<Vec<Value>, CsvRowError> {
     columns
         .iter()
         .zip(mapping)
@@ -234,7 +245,7 @@ pub fn row_to_values(
             let Some(text) = field.and_then(|index| row.get(index)) else {
                 return Ok(Value::Null);
             };
-            value_for(text, column, options).map_err(|reason| CsvRowError {
+            value_for(text, column, options, driver_id).map_err(|reason| CsvRowError {
                 line,
                 column: column.name.clone(),
                 reason,
@@ -243,10 +254,21 @@ pub fn row_to_values(
         .collect()
 }
 
-fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions) -> Result<Value, CellError> {
+fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
     if text != options.null_marker {
-        return parse_cell(text, kind);
+        return match parse_cell(text, kind) {
+            Ok(value) => Ok(value),
+            Err(_)
+                if driver_id == "sqlite"
+                    && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) =>
+            {
+                // SQLite affinity is advisory: a NUMERIC/INTEGER/REAL column
+                // may legally store text when the input is not numeric.
+                Ok(Value::Text(text.to_owned()))
+            }
+            Err(error) => Err(error),
+        };
     }
     // Every export in this app writes NULL as an empty field, but so is an
     // empty string, and for text the empty string is the reading that loses

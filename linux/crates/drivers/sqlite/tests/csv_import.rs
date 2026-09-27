@@ -259,6 +259,59 @@ async fn a_csv_file_loads_into_a_table_that_is_already_there() {
 }
 
 #[tokio::test]
+async fn csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled(
+            "CREATE TABLE flexible (integer_value INTEGER, real_value REAL, numeric_value NUMERIC)",
+            &control(),
+        )
+        .await
+        .expect("create");
+    let columns = vec![
+        column("integer_value", "INTEGER"),
+        column("real_value", "REAL"),
+        column("numeric_value", "NUMERIC"),
+    ];
+    let plan = plan_for(
+        "flexible",
+        &columns,
+        b"integer_value,real_value,numeric_value\nnot numeric,not numeric,not numeric\n42.50,42.50,42.50\n",
+    );
+    let mut scope = begin(&fixture.guard, "flexible", &plan).await;
+    run_batches(&fixture.guard, &mut scope, "flexible", &plan, None)
+        .await
+        .expect("SQLite numeric affinities accept legal text storage values");
+    let committed = fixture
+        .guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .expect("finish");
+
+    assert_eq!(committed, 2);
+    assert_eq!(
+        rows_in(
+            &fixture.guard,
+            "SELECT typeof(integer_value), integer_value, typeof(real_value), real_value, typeof(numeric_value), numeric_value FROM flexible ORDER BY rowid"
+        )
+        .await,
+        vec![
+            vec![
+                Value::Text("text".into()), Value::Text("not numeric".into()),
+                Value::Text("text".into()), Value::Text("not numeric".into()),
+                Value::Text("text".into()), Value::Text("not numeric".into()),
+            ],
+            vec![
+                Value::Text("real".into()), Value::Float(42.5),
+                Value::Text("real".into()), Value::Float(42.5),
+                Value::Text("real".into()), Value::Float(42.5),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn a_row_the_database_refuses_stops_the_import_and_keeps_what_already_committed() {
     let fixture = fixture().await;
     fixture

@@ -17,7 +17,23 @@ impl BrowseTab {
             return;
         };
         let source_cells = source.cells_clone();
-        let values = duplicate_row_values(&self.current_columns, &source_cells);
+        let values = match duplicate_row_values(&self.current_columns, &source_cells) {
+            Ok(values) => values,
+            Err(DuplicateRowError::Undecodable { column }) => {
+                let message = crate::tr!("Cannot duplicate this row because column {name} is undecodable.")
+                    .replace("{name}", &column);
+                let _ = sender.output(BrowseTabOutput::ShowToast(message));
+                return;
+            }
+            Err(DuplicateRowError::CellCountMismatch { expected, actual }) => {
+                let message =
+                    crate::tr!("Cannot duplicate this row because it has {actual} values for {expected} columns.")
+                        .replace("{actual}", &actual.to_string())
+                        .replace("{expected}", &expected.to_string());
+                let _ = sender.output(BrowseTabOutput::ShowToast(message));
+                return;
+            }
+        };
         let key_opt = crate::services::change_tracker::with_tab(self.tab_id, |t| t.track_insert(values.clone()));
         let Some(key) = key_opt else {
             return;
@@ -671,20 +687,34 @@ impl BrowseTab {
 
 /// Build the draft values for a duplicated row. Columns whose value is
 /// owned by the database (primary key, identity / serial, generated) are
-/// blanked, and so is any cell the driver could not decode: carrying an
-/// undecodable value into an INSERT binds it as NULL without the user
-/// ever being able to see or correct it.
-fn duplicate_row_values(columns: &[ColumnInfo], source_cells: &[Value]) -> Vec<Value> {
+/// blanked. A row containing an undecodable cell or whose value count does
+/// not match the columns is refused: carrying it into an INSERT could bind
+/// the unreadable value as NULL without the user seeing or correcting it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DuplicateRowError {
+    CellCountMismatch { expected: usize, actual: usize },
+    Undecodable { column: String },
+}
+
+fn duplicate_row_values(columns: &[ColumnInfo], source_cells: &[Value]) -> Result<Vec<Value>, DuplicateRowError> {
+    if source_cells.len() != columns.len() {
+        return Err(DuplicateRowError::CellCountMismatch {
+            expected: columns.len(),
+            actual: source_cells.len(),
+        });
+    }
     columns
         .iter()
         .enumerate()
         .map(|(i, col)| {
             if col.primary_key || col.is_auto_increment || col.is_generated {
-                return Value::Null;
+                return Ok(Value::Null);
             }
-            match source_cells.get(i) {
-                Some(Value::Undecodable(_)) | None => Value::Null,
-                Some(value) => value.clone(),
+            match &source_cells[i] {
+                Value::Undecodable(_) => Err(DuplicateRowError::Undecodable {
+                    column: col.name.clone(),
+                }),
+                value => Ok(value.clone()),
             }
         })
         .collect()
@@ -713,7 +743,7 @@ fn row_key_matches(columns: &[ColumnInfo], cells: &[Value], expected: &[Value]) 
 
 #[cfg(test)]
 mod row_identity_tests {
-    use super::{duplicate_row_values, row_key_matches};
+    use super::{DuplicateRowError, duplicate_row_values, row_key_matches};
     use tablepro_core::{ColumnInfo, Value};
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
@@ -800,16 +830,32 @@ mod row_identity_tests {
     }
 
     #[test]
-    fn duplicating_a_row_blanks_database_owned_and_undecodable_cells() {
+    fn duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values() {
         let columns = [column("id", true), column("amount", false), column("note", false)];
         let source = [
             Value::Int(7),
-            Value::Undecodable("NUMERIC".into()),
+            Value::Decimal("12.30".parse().unwrap()),
             Value::Text("keep me".into()),
         ];
         assert_eq!(
             duplicate_row_values(&columns, &source),
-            vec![Value::Null, Value::Null, Value::Text("keep me".into())]
+            Ok(vec![
+                Value::Null,
+                Value::Decimal("12.30".parse().unwrap()),
+                Value::Text("keep me".into())
+            ])
+        );
+    }
+
+    #[test]
+    fn duplicating_a_row_refuses_an_undecodable_cell_instead_of_turning_it_into_null() {
+        let columns = [column("id", true), column("amount", false)];
+        let source = [Value::Int(7), Value::Undecodable("NUMERIC".into())];
+        assert_eq!(
+            duplicate_row_values(&columns, &source),
+            Err(DuplicateRowError::Undecodable {
+                column: "amount".into()
+            })
         );
     }
 
@@ -829,7 +875,7 @@ mod row_identity_tests {
             "the value must be long enough for the grid to truncate it"
         );
 
-        let values = duplicate_row_values(&columns, &source);
+        let values = duplicate_row_values(&columns, &source).unwrap();
         assert_eq!(values[1], Value::Text(long_text.clone()));
         assert_eq!(values[2], Value::Bytes(long_utf8_bytes.clone()));
 
@@ -843,12 +889,18 @@ mod row_identity_tests {
     }
 
     #[test]
-    fn duplicating_a_row_pads_missing_source_cells_with_null() {
+    fn duplicating_a_row_refuses_a_source_with_wrong_cell_count() {
         let columns = [column("id", true), column("note", false)];
-        assert_eq!(
-            duplicate_row_values(&columns, &[Value::Int(1)]),
-            vec![Value::Null, Value::Null]
-        );
+        for source in [
+            &[Value::Int(1)][..],
+            &[Value::Int(1), Value::Text("ok".into()), Value::Int(3)][..],
+        ] {
+            let actual = source.len();
+            assert_eq!(
+                duplicate_row_values(&columns, source),
+                Err(DuplicateRowError::CellCountMismatch { expected: 2, actual })
+            );
+        }
     }
 
     #[test]

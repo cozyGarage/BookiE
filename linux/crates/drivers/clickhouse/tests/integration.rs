@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use chrono::Timelike;
 use drivers_clickhouse::ClickhouseDriver;
 use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
 use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, TlsConfig, Value};
@@ -243,6 +244,94 @@ async fn parameterised_types_decode_to_typed_values() {
         result.rows[0][1]
     );
     assert_eq!(result.rows[0][2], Value::Text("tag".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_datetime64_precision_0_through_9_is_exact() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+
+    conn.execute(
+        "CREATE TABLE temporal_precision (
+            id UInt8,
+            seconds DateTime64(0),
+            millis DateTime64(3),
+            micros DateTime64(6),
+            nanos DateTime64(9)
+        ) ENGINE = MergeTree ORDER BY id",
+    )
+    .await
+    .unwrap();
+
+    let stamp = chrono::NaiveDate::from_ymd_opt(2026, 9, 27)
+        .unwrap()
+        .and_hms_nano_opt(12, 34, 56, 123_456_789)
+        .unwrap();
+    let values = [
+        Value::DateTime(stamp),
+        Value::DateTime(stamp.with_nanosecond(123_000_000).unwrap()),
+        Value::DateTime(stamp.with_nanosecond(123_456_000).unwrap()),
+        Value::DateTime(stamp),
+    ];
+    conn.execute_params("INSERT INTO temporal_precision VALUES (1, ?, ?, ?, ?)", &values)
+        .await
+        .unwrap();
+
+    let result = conn
+        .query("SELECT seconds, millis, micros, nanos FROM temporal_precision WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::DateTime(stamp.with_nanosecond(0).unwrap()),
+            values[1].clone(),
+            values[2].clone(),
+            values[3].clone(),
+        ]],
+        "DateTime64 scales 0, 3, 6 and 9 must preserve the representable precision",
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query("SELECT toDateTime64('2026-09-27 12:34:56.123456', 6, 'Asia/Tokyo') AS stamp")
+        .await
+        .unwrap();
+    let instant = chrono::DateTime::parse_from_rfc3339("2026-09-27T03:34:56.123456Z")
+        .unwrap()
+        .to_utc();
+    assert_eq!(
+        result.rows,
+        vec![vec![Value::TimestampTz(instant)]],
+        "DateTime64 timezone metadata must be applied to the displayed local clock",
+    );
+
+    let expected = Value::TimestampTz(instant);
+    let bound = conn
+        .query_params(
+            "SELECT CAST(? AS DateTime64(6, 'Asia/Tokyo'))",
+            std::slice::from_ref(&expected),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        bound.rows,
+        vec![vec![expected.clone()]],
+        "bound timestamp timezone round trip"
+    );
+
+    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
+    let exported = conn
+        .query(&format!("SELECT CAST({literal} AS DateTime64(6, 'Asia/Tokyo'))"))
+        .await
+        .unwrap();
+    assert_eq!(exported.rows, vec![vec![expected]], "SQL literal timezone round trip");
 }
 
 #[tokio::test]
@@ -624,5 +713,29 @@ async fn temporal_sql_exports_keep_fractional_seconds() {
     assert_eq!(
         stored.rows,
         vec![vec![Value::DateTime(local), Value::DateTime(instant)]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn datetime64_nanosecond_values_outside_the_range_are_rejected_before_driver_submission() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    let requested = chrono::NaiveDate::from_ymd_opt(2262, 4, 12)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let server_result = connection
+        .query("SELECT toDateTime64('2262-04-12 00:00:00.000000000', 9)")
+        .await;
+    assert!(matches!(server_result, Err(DriverError::Query { .. })));
+
+    let parameter_result = connection
+        .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(requested)])
+        .await;
+    assert!(matches!(parameter_result, Err(DriverError::Unsupported(_))));
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested)),
+        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
     );
 }

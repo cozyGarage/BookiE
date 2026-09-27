@@ -107,6 +107,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+          fetch-depth: 0
       - name: Record the commit under test
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -141,6 +142,10 @@ jobs:
         with:
           workspaces: linux
           prefix-key: linux-fast-gtk
+      - name: Focused tests for changed B3 value paths
+        env:
+          TABLEPRO_CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: python3 scripts/run-test-layer.py change-contracts
       - name: Unit tests (build via test)
         run: python3 scripts/run-test-layer.py full
       - name: Isolated GTK widget regressions
@@ -151,7 +156,9 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: regression-fast-${{ github.run_id }}-${{ github.run_attempt }}
-          path: linux/target/quality/*-layers
+          path: |
+            linux/target/quality/*-layers
+            linux/target/quality/*-change-contracts
           if-no-files-found: error
 
   gtk-safety:

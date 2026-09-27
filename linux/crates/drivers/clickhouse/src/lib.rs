@@ -1,13 +1,18 @@
 use std::time::Duration;
 
+mod query;
+mod temporal;
 mod tls;
+mod value_literal;
 
 use async_trait::async_trait;
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
+use query::{LineReader, confirms_cancellation, new_query_id, parse_line, request_cancellation, tag_query};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
 use tls::https_connector;
+use value_literal::literal;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
@@ -364,93 +369,6 @@ impl Connection for ClickhouseConnection {
     }
 }
 
-/// Reads a `ROW_FORMAT` response one line at a time so the caller can
-/// stop at `max_rows` without materialising the rest of the result.
-struct LineReader {
-    cursor: clickhouse::query::BytesCursor,
-    buf: Vec<u8>,
-    consumed: usize,
-    eof: bool,
-}
-
-impl LineReader {
-    fn new(cursor: clickhouse::query::BytesCursor) -> Self {
-        Self {
-            cursor,
-            buf: Vec::new(),
-            consumed: 0,
-            eof: false,
-        }
-    }
-
-    async fn next_line(&mut self) -> Result<Option<Vec<u8>>, DriverError> {
-        loop {
-            if let Some(idx) = self.buf[self.consumed..].iter().position(|b| *b == b'\n') {
-                let end = self.consumed + idx;
-                let line = self.buf[self.consumed..end].to_vec();
-                self.consumed = end + 1;
-                return Ok(Some(line));
-            }
-            if self.eof {
-                let rest = self.buf[self.consumed..].to_vec();
-                self.consumed = self.buf.len();
-                return Ok((!rest.is_empty()).then_some(rest));
-            }
-            match self.cursor.next().await.map_err(map_clickhouse_error)? {
-                Some(chunk) => {
-                    self.buf.drain(..self.consumed);
-                    self.consumed = 0;
-                    self.buf.extend_from_slice(&chunk);
-                }
-                None => self.eof = true,
-            }
-        }
-    }
-}
-
-fn parse_line<T: serde::de::DeserializeOwned>(line: &[u8]) -> Result<T, DriverError> {
-    serde_json::from_slice(line).map_err(|e| DriverError::Internal(format!("clickhouse response parse: {e}")))
-}
-
-/// `query_id` is a caller-generated UUID, so `KILL QUERY` can name the
-/// statement later. ClickHouse's HTTP interface accepts it as a request
-/// parameter; the server rejects a duplicate, which is why each call
-/// mints a fresh one.
-fn tag_query(query: clickhouse::query::Query, query_id: Option<&str>) -> clickhouse::query::Query {
-    match query_id {
-        Some(query_id) => query.with_setting("query_id", query_id),
-        None => query,
-    }
-}
-
-fn new_query_id() -> String {
-    uuid::Uuid::new_v4().to_string()
-}
-
-/// ClickHouse has no per-request cancel channel, so the statement is
-/// stopped by `KILL QUERY` naming the id the request was tagged with.
-/// The id is a UUID rendered as hex and dashes, so it cannot carry SQL.
-async fn request_cancellation(client: &clickhouse::Client, query_id: &str) -> Result<(), DriverError> {
-    let sql = format!("KILL QUERY WHERE query_id = '{query_id}'");
-    let mut cursor = client
-        .query(&sql)
-        .fetch_bytes(ROW_FORMAT)
-        .map_err(map_clickhouse_error)?;
-    while cursor.next().await.map_err(map_clickhouse_error)?.is_some() {}
-    Ok(())
-}
-
-/// ClickHouse reports an aborted statement as `QUERY_WAS_CANCELLED`
-/// (code 394). The driver never populates `sqlstate`, so the code has
-/// to be read out of the server's message.
-fn confirms_cancellation(error: &DriverError) -> bool {
-    let DriverError::Query { message, .. } = error else {
-        return false;
-    };
-    let lowered = message.to_lowercase();
-    lowered.contains("code: 394") || lowered.contains("query was cancelled")
-}
-
 async fn fetch_result(
     client: &clickhouse::Client,
     sql: &str,
@@ -474,21 +392,7 @@ async fn fetch_result(
     };
     let types: Vec<String> = parse_line(&types_line)?;
 
-    let columns: Vec<ColumnInfo> = names
-        .into_iter()
-        .zip(types)
-        .map(|(name, data_type)| ColumnInfo {
-            nullable: type_is_nullable(&data_type),
-            name,
-            data_type,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-        })
-        .collect();
+    let columns = response_columns(names, types)?;
 
     let mut rows: Vec<Vec<Value>> = Vec::new();
     let mut truncated = false;
@@ -503,12 +407,7 @@ async fn fetch_result(
             break;
         }
         let raw: Vec<serde_json::Value> = parse_line(&line)?;
-        let mut row = Vec::with_capacity(columns.len());
-        for (i, col) in columns.iter().enumerate() {
-            let cell = raw.get(i).cloned().unwrap_or(serde_json::Value::Null);
-            row.push(json_to_value(cell, &col.data_type));
-        }
-        rows.push(row);
+        rows.push(response_row(raw, &columns)?);
     }
 
     Ok(QueryResult {
@@ -516,6 +415,46 @@ async fn fetch_result(
         rows,
         truncated,
     })
+}
+
+fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<ColumnInfo>, DriverError> {
+    if names.len() != types.len() {
+        return Err(DriverError::Internal(format!(
+            "clickhouse response column name/type count mismatch: {} names, {} types",
+            names.len(),
+            types.len()
+        )));
+    }
+    Ok(names
+        .into_iter()
+        .zip(types)
+        .map(|(name, data_type)| ColumnInfo {
+            nullable: type_is_nullable(&data_type),
+            name,
+            data_type,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        })
+        .collect())
+}
+
+fn response_row(raw: Vec<serde_json::Value>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
+    if raw.len() != columns.len() {
+        return Err(DriverError::Internal(format!(
+            "clickhouse response row width mismatch: {} values, {} columns",
+            raw.len(),
+            columns.len()
+        )));
+    }
+    Ok(columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| json_to_value(raw[index].clone(), &column.data_type))
+        .collect())
 }
 
 fn empty_result() -> QueryResult {
@@ -627,7 +566,7 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .map(Value::Date)
             .unwrap_or_else(|| fallback_text(&raw)),
-        "DateTime" | "DateTime64" => parse_datetime(&raw),
+        "DateTime" | "DateTime64" => temporal::parse_datetime(&raw, type_name),
         "UUID" => raw
             .as_str()
             .and_then(|s| s.parse::<uuid::Uuid>().ok())
@@ -637,21 +576,6 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
         "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => Value::Json(raw),
         _ => fallback_text(&raw),
     }
-}
-
-fn parse_datetime(raw: &serde_json::Value) -> Value {
-    let Some(s) = raw.as_str() else {
-        return fallback_text(raw);
-    };
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-        return Value::TimestampTz(dt.with_timezone(&chrono::Utc));
-    }
-    // `%.f` also matches a whole-second timestamp, so one pattern covers
-    // both `DateTime` and every `DateTime64` precision.
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f") {
-        return Value::DateTime(dt);
-    }
-    Value::Text(s.to_string())
 }
 
 /// A JSON string keeps its own text; anything else keeps its JSON
@@ -831,44 +755,6 @@ fn bind_placeholders(sql: &str, params: &[Value]) -> Result<String, DriverError>
     Ok(out)
 }
 
-fn literal(value: &Value) -> Result<String, DriverError> {
-    let rendered = match value {
-        Value::Null => "NULL".into(),
-        Value::Bool(b) => if *b { "true" } else { "false" }.into(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => {
-            // ClickHouse spells these out; silently substituting NULL
-            // would write a different value than the user typed.
-            if f.is_nan() {
-                "nan".into()
-            } else if f.is_infinite() {
-                if f.is_sign_negative() { "-inf" } else { "inf" }.into()
-            } else {
-                f.to_string()
-            }
-        }
-        Value::Text(s) => format!("'{}'", escape_str(s)),
-        Value::Bytes(b) => format!("unhex('{}')", hex_encode(b)),
-        Value::Date(d) => format!("toDate('{}')", d.format("%Y-%m-%d")),
-        Value::Time(t) => format!("'{}'", t.format("%H:%M:%S%.f")),
-        Value::DateTime(dt) => format!("toDateTime64('{}', 9)", dt.format("%Y-%m-%d %H:%M:%S%.9f")),
-        Value::TimestampTz(ts) => format!("toDateTime64('{}', 9, 'UTC')", ts.format("%Y-%m-%d %H:%M:%S%.9f")),
-        Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
-        Value::Uuid(u) => format!("toUUID('{u}')"),
-        Value::Json(j) => format!("'{}'", escape_str(&j.to_string())),
-        Value::Undecodable(type_name) => {
-            return Err(DriverError::Internal(format!(
-                "cannot write back an undecodable {type_name} value"
-            )));
-        }
-    };
-    Ok(rendered)
-}
-
-fn escape_str(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('\'', "\\'")
-}
-
 /// The `clickhouse` crate treats every `?` in a query template as one of
 /// its own bind markers and `??` as an escaped literal. Statements this
 /// driver sends are already fully rendered, so any `?` left in them is
@@ -877,16 +763,6 @@ fn escape_str(s: &str) -> String {
 /// query as having unbound arguments before it ever reaches the server.
 fn escape_bind_markers(sql: &str) -> String {
     sql.replace('?', "??")
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    const LUT: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push(LUT[(b >> 4) as usize] as char);
-        out.push(LUT[(b & 0xf) as usize] as char);
-    }
-    out
 }
 
 /// ClickHouse error codes that mean the credentials were rejected.
@@ -967,6 +843,37 @@ mod tests {
     }
 
     #[test]
+    fn clickhouse_response_rejects_column_type_count_mismatch() {
+        let result = response_columns(vec!["a".into(), "b".into()], vec!["UInt8".into()]);
+        assert!(matches!(result, Err(DriverError::Internal(_))));
+    }
+
+    #[test]
+    fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
+        let columns = response_columns(vec!["a".into(), "b".into()], vec!["UInt8".into(), "UInt8".into()]).unwrap();
+        for raw in [
+            vec![serde_json::json!(1)],
+            vec![serde_json::json!(1), serde_json::json!(2), serde_json::json!(3)],
+        ] {
+            let result = response_row(raw, &columns);
+            assert!(matches!(result, Err(DriverError::Internal(_))));
+        }
+    }
+
+    #[test]
+    fn clickhouse_response_preserves_explicit_null_cells() {
+        let columns = response_columns(
+            vec!["a".into(), "b".into()],
+            vec!["Nullable(UInt8)".into(), "UInt8".into()],
+        )
+        .unwrap();
+        assert_eq!(
+            response_row(vec![serde_json::Value::Null, serde_json::json!(7)], &columns).unwrap(),
+            vec![Value::Null, Value::Int(7)]
+        );
+    }
+
+    #[test]
     fn the_sorting_key_is_declared_but_foreign_keys_are_not() {
         let d = ClickhouseDriver;
         let source = include_str!("lib.rs");
@@ -988,6 +895,40 @@ mod tests {
     fn qualify_escapes_backticks() {
         assert_eq!(qualify("db", "users"), "`db`.`users`");
         assert_eq!(qualify("db", "a`b"), "`db`.`a``b`");
+    }
+
+    #[test]
+    fn datetime64_parameter_values_outside_the_nine_digit_range_are_refused() {
+        let below = chrono::NaiveDate::from_ymd_opt(1899, 12, 31)
+            .unwrap()
+            .and_hms_nano_opt(23, 59, 59, 999_999_999)
+            .unwrap();
+        let above = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_808)
+            .unwrap();
+        assert!(matches!(
+            literal(&Value::DateTime(below)),
+            Err(DriverError::Unsupported(_))
+        ));
+        assert!(matches!(
+            literal(&Value::TimestampTz(above.and_utc())),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn datetime64_nine_digit_range_edges_remain_representable() {
+        let lower = chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let upper = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_807)
+            .unwrap();
+        assert!(literal(&Value::DateTime(lower)).is_ok());
+        assert!(literal(&Value::TimestampTz(upper.and_utc())).is_ok());
     }
 
     #[test]

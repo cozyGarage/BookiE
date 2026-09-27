@@ -331,6 +331,84 @@ six server drivers together. No existing build artifacts were deleted.
 B3 remains open for the native-type and consumer gaps listed above. B4–B6
 acceptance stays next in sequence.
 
+### B3 review and connection form: 2026-09-27
+
+Rechecked the 0.1.5 fixes against the source, regression suites and sprint
+ledger. The listed driver fixes remain covered. DuckDB nanosecond and
+TIMESTAMPTZ parameters still require explicit casts; MySQL BIT(1) has both an
+isolated grid-edit widget test and a driver update round trip, while a complete
+installed-app-to-MySQL edit acceptance test remains open. MySQL backslash-bearing
+column comments are refused until session-aware DDL exists. ClickHouse values
+outside DateTime64 bounds are refused locally; the live-server contract checks
+the server's overflow behavior.
+
+The new-connection dialog now uses a centered header title that follows driver
+selection and has a wider content area. The installed-app AT-SPI scenario checks
+the full title, help text and minimum available width. The UI and isolated GTK
+widget scenarios passed locally; hosted CI and the remaining B3 acceptance gaps
+remain separate.
+
+A follow-up value-path audit caught two silent shape-loss cases. Duplicating a
+row changed an undecodable cell or missing source value to SQL NULL; the action
+now refuses the draft and reports the affected column or shape mismatch. The
+ClickHouse response reader zipped column names with types and filled missing row
+cells with NULL; it now rejects header and row-width mismatches while preserving
+explicit NULL cells. Regressions were observed failing before the fixes. The
+ClickHouse library tests (32) and app library tests (384 passed, 5 ignored) pass
+afterward. Broader cross-driver consumer parity remains open.
+
+### B3 MongoDB nested BSON preservation: 2026-09-27
+
+A new unit regression reproduced nested BSON type loss: Decimal128, binary and
+date values became ordinary debug strings inside `Value::Json`. Nested documents
+and arrays now use canonical Extended JSON. Top-level Decimal128 extremes remain
+exact text, and BSON dates outside chrono's RFC3339 range use canonical Extended
+JSON with the original millisecond count. Generic binary stays editable as bytes;
+all other BSON binary subtype tags retain canonical subtype metadata. MongoDB 7
+Docker coverage inserts native Decimal128, date, UUID and user-defined binary
+fixtures and reads them through the driver query path. All 24 MongoDB unit tests
+and all eight real-server integration tests passed. Scoped mutation testing
+caught three of four generated mutations, with one unviable whole-function
+replacement and no survivors or timeouts. The real-server contract verifies
+nested Extended JSON through JSON export, and an MCP unit contract verifies the
+value conversion does not flatten it. CSV is parsed back into fields to verify
+that quoting preserves the nested value. The real-server scenario also sends
+its query result through the public XLSX exporter and checks Decimal128, date
+and binary subtype markers in workbook strings. All eight MongoDB integration
+tests, including ignored Docker cases, passed. A second MongoDB 7 scenario uses
+the keyed-update SQL shape for nested document and array cell edits, then checks
+native Decimal128, date, binary subtype and integer values through a direct BSON
+client. MongoDB 7 fixtures now also verify native BSON reconstruction from the
+driver's canonical Extended JSON insert path and preserve nested markers through
+the MCP browse tool. Editing top-level special BSON cells remains open; B3 is
+not closed.
+
+### B3 SQLite dynamic storage classes: 2026-09-27
+
+A file-backed integration scenario checks TEXT, REAL, INTEGER, BLOB and NULL
+values in a declared `NUMERIC` column through bound edits. It compares SQLite's
+`typeof` result with the decoded TablePro value, then exports rows as SQL INSERT
+literals and verifies the same storage classes and values after re-import. All
+21 SQLite integration tests passed. Policy-guarded CSV import now also preserves
+text and numeric values in INTEGER, REAL and NUMERIC affinity columns. Installed
+grid acceptance across affinity transitions remains open.
+
+The policy-guarded SQLite CSV import had a separate failure: strict numeric
+parsing rejected legal text stored in a NUMERIC-affinity column. SQLite imports
+now bind unparseable INTEGER/REAL/NUMERIC fields as text so SQLite can apply its
+own affinity; other drivers remain strict. A real file-backed test verifies
+text and decimal rows through batched, audited import for INTEGER, REAL and
+NUMERIC columns. The reproducer failed before the fix. Installed grid acceptance
+remains open.
+
+### B3 XLSX nested JSON consumer check: 2026-09-27
+
+A core workbook regression verifies that nested canonical Extended JSON keeps
+its Decimal128, binary subtype and millisecond-date markers in an exact XLSX
+text cell. The focused case and all 436 core library tests passed. A separate
+MongoDB 7 test sends a live query result through the public XLSX writer and
+checks BSON markers in the workbook; all eight integration tests passed.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
@@ -848,6 +926,8 @@ Each open finding from the audit was reproduced with a failing test first and th
 - SQL Server `datetimeoffset` keeps its original offset as exact text.
 - MySQL text exports read the same with or without `NO_BACKSLASH_ESCAPES`, and BIT and spatial values decode exactly.
 - ClickHouse keeps decimal scale and fractional seconds in parameters and SQL exports.
+- ClickHouse `DateTime64` results with a named timezone now decode to the correct UTC instant using IANA timezone rules. Ambiguous or nonexistent local clock values are refused as undecodable because the response omits the offset needed to identify an instant. Scales 0, 3, 6 and 9 now have a live fixture round trip.
+- ClickHouse refuses out-of-range `DateTime64(9)` parameters and SQL exports before sending them. On the local ClickHouse 24.8 fixture, the same raw SQL literal returns a `DECIMAL_OVERFLOW` error.
 - DuckDB binds dates, times and microsecond timestamps natively.
 - PostgreSQL `int2vector` and `oidvector` values keep their space-separated form.
 
@@ -860,6 +940,6 @@ The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson h
 Open:
 - DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
 - MySQL column comments containing backslashes are refused with an explicit error because generated DDL cannot preserve them across SQL modes. Session-aware DDL execution is still needed to support those comments safely.
-- ClickHouse DateTime64 values outside 1900–2262 are saturated by the server.
+- ClickHouse DateTime values in DST folds or gaps, or with an unrecognized timezone, remain explicit undecodable results until the wire format carries enough information to identify the instant.
 
 B3 remains open.

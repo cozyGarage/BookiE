@@ -337,4 +337,14 @@ mod tests {
         assert_ne!(json, JsonValue::Null);
         assert_eq!(json, json!({ "undecodable": "NUMERIC" }));
     }
+
+    #[test]
+    fn mongodb_extended_json_types_survive_mcp_value_conversion() {
+        let extended = json!({
+            "amount": {"$numberDecimal": "1E-6176"},
+            "payload": {"$binary": {"base64": "AP9B", "subType": "80"}},
+            "when": {"$date": {"$numberLong": "9223372036854775807"}},
+        });
+        assert_eq!(value_to_json(&tablepro_core::Value::Json(extended.clone())), extended);
+    }
 }

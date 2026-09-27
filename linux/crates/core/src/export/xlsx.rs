@@ -261,6 +261,23 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_workbook_preserves_nested_extended_json_as_exact_text() {
+        let value = Value::Json(serde_json::json!({
+            "decimal": {"$numberDecimal": "9.999999999999999999999999999999999E+6144"},
+            "binary": {"$binary": {"base64": "AQID", "subType": "80"}},
+            "date": {"$date": {"$numberLong": "9223372036854775807"}},
+        }));
+        let expected = value_to_text(&value).unwrap();
+        let (sheet, strings) = workbook_parts(&[value]);
+
+        assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+        assert!(strings.contains(&format!("<t>{expected}</t>")), "{strings}");
+        assert!(strings.contains("$numberDecimal"), "{strings}");
+        assert!(strings.contains("$numberLong"), "{strings}");
+        assert!(strings.contains("\"subType\":\"80\""), "{strings}");
+    }
+
+    #[test]
     fn value_contract_workbook_keeps_small_integers_numeric() {
         let (sheet, _) = workbook_parts(&[Value::Int(999_999_999_999_999), Value::Int(-7), Value::Int(0)]);
         assert!(sheet.contains("<c r=\"A2\"><v>999999999999999</v></c>"), "{sheet}");

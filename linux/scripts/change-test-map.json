@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "scopes": [
+    { "prefix": "crates/core/src/", "package": "tablepro-core", "target": "--lib" },
+    { "prefix": "crates/core/tests/", "package": "tablepro-core", "target": "--tests" },
+    { "prefix": "crates/app/src/", "package": "tablepro-app", "target": "--lib" },
+    { "prefix": "crates/mcp/src/", "package": "tablepro-mcp", "target": "--lib" },
+    {
+      "prefix": "crates/drivers/",
+      "path_contains": "/src/",
+      "package_from_manifest": true,
+      "target": "--lib"
+    }
+  ],
+  "exact_tests": {
+    "crates/app/src/ui/browse_tab/row_ops.rs": {
+      "package": "tablepro-app",
+      "target": "--lib",
+      "tests": [
+        "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values",
+        "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_an_undecodable_cell_instead_of_turning_it_into_null",
+        "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_carries_the_full_long_text_into_the_insert_not_the_display_text",
+        "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_a_source_with_wrong_cell_count"
+      ]
+    },
+    "crates/drivers/clickhouse/src/lib.rs": {
+      "package": "tablepro-driver-clickhouse",
+      "target": "--lib",
+      "tests": [
+        "tests::clickhouse_response_rejects_column_type_count_mismatch",
+        "tests::clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls",
+        "tests::clickhouse_response_preserves_explicit_null_cells"
+      ]
+    }
+  }
+}

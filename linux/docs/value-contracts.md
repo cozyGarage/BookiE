@@ -120,6 +120,15 @@ picks up both workbook regressions automatically.
 Excel documents its [15-digit precision limit](https://support.microsoft.com/en-us/excel/format-numbers-as-text).
 Floating-point, temporal and nested-value spreadsheet contracts remain open.
 
+### XLSX nested Extended JSON consumer check, 2026-09-27
+
+The workbook regression writes a nested value containing Decimal128, binary
+subtype and millisecond-date Extended JSON markers. It inspects the generated
+XLSX shared-string cell and confirms the markers remain in one exact text cell.
+The focused regression and all 436 core library tests passed. This verifies the
+shared XLSX writer boundary; it does not yet run MongoDB values through the
+application's complete query-to-workbook path.
+
 Validation: 415 core tests, core/workspace Clippy, size guards and `cargo deny
 check` passed. The full local gate passed at
 `target/quality/20260926T195741317332Z-full/report.json` on the working tree
@@ -546,4 +555,122 @@ The reproducer ran against MySQL 8 with a permissive `sql_mode`. Before the fix,
 
 The test compares every value with an independent expected value. It then writes the rows back through bound parameters and SQL INSERT export, and the server confirms all six rows match with `<=>`. Scoped cargo-mutants on `crates/drivers/mysql/src/temporal.rs`: 16 mutants, 13 caught, 3 unviable, zero survivors and zero timeouts, using the recipe above with `-- --lib --test integration -- --include-ignored calendar_fields native_time_zero`.
 
-BIT, SET/ENUM and spatial values, session time zones and stricter SQL modes remain open.
+Subsequent B3 coverage verifies BIT(1..64), ENUM/SET labels and spatial bytes;
+bounded BIT edits survive a driver update, while spatial and too-wide BIT values
+remain read-only. Text exports also run with and without `NO_BACKSLASH_ESCAPES`;
+backslash-bearing column comments are explicitly refused. Session time-zone and
+stricter SQL-mode matrices, installed-app-to-MySQL grid acceptance and broader
+consumer parity remain open.
+
+## SQLite dynamic storage-class checkpoint
+
+A new file-backed regression starts a `NUMERIC` column with TEXT, BLOB and NULL
+values, then exercises bound edits that transition through REAL, BLOB, TEXT and
+INTEGER storage classes. The test checks both SQLite's independent `typeof`
+result and TablePro's decoded value. It then exports the edited rows as SQL
+INSERT literals, re-imports into a second `NUMERIC` table and requires the same
+storage classes and values. This closes the driver-level edit/SQL re-import
+case. A policy-guarded CSV import test also covers legal text and numeric values
+in INTEGER, REAL and NUMERIC affinity columns. Installed grid acceptance remains
+open.
+
+The full SQLite integration suite passed all 21 tests. Run locally:
+
+```sh
+cargo test --locked -p tablepro-driver-sqlite --test integration
+```
+
+## MongoDB nested BSON and native boundary checkpoint
+
+A decoder unit regression first failed for nested `Decimal128`, binary and date
+values. The driver converted all three to their debug-display strings, losing the
+Decimal128 type/precision, binary subtype and exact BSON date milliseconds. Generic
+binary values remain `Value::Bytes` for editing. Nested documents/arrays and top-level
+non-generic binary values use canonical MongoDB Extended JSON so BSON special types
+and subtype metadata remain explicit.
+
+The unit regressions check Decimal128's smallest exponent, largest finite value,
+negative zero and scale; every BSON binary subtype, including legacy UUID, encrypted,
+column, sensitive, vector, reserved and user-defined values; and dates at both ends
+of the signed 64-bit millisecond range. A Docker-backed test checks real UUID and
+user-defined subtype values. Top-level Decimal128
+values remain exact text because the shared decimal type cannot represent this
+range. Dates that cannot be rendered as RFC3339 use canonical Extended JSON with
+the exact signed millisecond count. A Docker-backed MongoDB 7 test inserts these
+native BSON values directly, reads them through the driver query path, and checks
+the resulting value/type representation. Uncommon top-level BSON types now use
+canonical Extended JSON instead of display text. Real-server JSON, CSV and XLSX
+consumer checks preserve their markers. A Docker-backed grid edit regression
+updates a nested document and array through the keyed row update path, then
+checks the stored Decimal128, date, binary subtype and integer fields through
+the native BSON client. App parser tests route MongoDB object, array and ObjectId
+columns through JSON parsing. MongoDB 7 integration tests verify canonical
+Extended JSON re-import and MCP browse output preserve nested BSON types.
+Editing top-level special BSON values remains open.
+
+Focused local checks:
+
+```sh
+cargo test --locked -p tablepro-driver-mongodb --lib nested_bson_special_values_keep_their_extended_json_types
+cargo test --locked -p tablepro-driver-mongodb --lib bson_decimal_and_date_extremes_remain_exact_outside_core_ranges
+cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson_special_values_keep_exact_extended_json_types --include-ignored --test-threads=1
+```
+
+Against the old decoder, the regression failed with
+`Decimal128("...")`, `Binary(...)`, and `DateTime("...")` as JSON strings. Full
+MongoDB unit and real-server suites passed (24 unit tests; eight integration
+tests). Scoped mutation evidence at
+`target/quality/20260927-b3-mongodb-native-mutants/mutants.out/outcomes.json`
+records four generated mutations: three caught, one unviable whole-function
+replacement (`Value` has no `Default`), and no survivors or timeouts. The failing
+pre-fix regressions independently demonstrate test sensitivity. The real-server
+test verifies nested Extended JSON through JSON export and parses generated CSV
+back into fields to check that quoting preserves the nested object. It also
+exports the actual query result as XLSX and checks Decimal128, date and binary
+subtype markers in workbook strings. An MCP unit contract confirms BSON
+Extended JSON is passed through without flattening; Mongo-backed MCP browse and
+native BSON re-import checks now run in the integration suite. Editing top-level
+special BSON values and other consumers remain open.
+
+## ClickHouse named temporal timezones, 2026-09-27
+
+A live ClickHouse 24.8 regression showed that `DateTime64(6, 'Asia/Tokyo')`
+returned a Tokyo wall clock that TablePro decoded as a timezone-free timestamp.
+That changed the instant by nine hours. The type metadata contains the IANA zone,
+so the decoder now applies timezone rules and returns the corresponding UTC
+`TimestampTz`, retaining the fractional seconds.
+
+The decoder refuses unknown zones and local times in DST gaps or folds. The
+ClickHouse row format returns a local wall clock without its offset, so those
+values do not identify a unique instant and must not be guessed. Untagged
+`DateTime` and `DateTime64` values remain timezone-free `DateTime` values.
+
+Unit tests cover type wrappers, Tokyo conversion, unknown zones, and New York DST
+gaps/folds. A Docker integration test first failed with `DateTime(12:34...)`
+instead of the expected `TimestampTz(03:34...Z)`, then passed after the fix. It
+also checks that the instant survives a bound parameter and a SQL literal round
+trip. The full ClickHouse integration suite passed all 23 cases. The combined `values`
+layer passed in 113.058 seconds, `full` passed in 100.8 seconds, and the harness
+passed. Reports are in `target/quality/20260927T180959352277Z-layers/`,
+`target/quality/20260927T181245187611Z-layers/`, and
+`target/quality/20260927T181435128973Z-layers/`.
+
+Run the focused checks locally with:
+
+```sh
+cargo test --locked -p tablepro-driver-clickhouse --lib
+cargo test --locked -p tablepro-driver-clickhouse --test integration -- --include-ignored --test-threads=1
+./scripts/run-test-layer.py values
+./scripts/run-test-layer.py full
+```
+
+Scoped Rust mutation evidence for `temporal.rs` is in
+`target/quality/20260927-ch-temporal-mutants-final/mutants.out/outcomes.json`:
+13 caught, 2 unviable, no survivors or timeouts. The initial mutation pass made
+two synthetic wrapper results loop; the progress guard now exits safely and the
+repeat has no timeout. Reproduce with:
+
+```sh
+mkdir -p target/mutation-tmp
+TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-clickhouse --file crates/drivers/clickhouse/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260927-ch-temporal-mutants-final -- --lib
+```
