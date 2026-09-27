@@ -34,6 +34,27 @@ async fn start_mysql() -> (ContainerAsync<Mysql>, ConnectOptions) {
     (container, opts)
 }
 
+async fn start_mariadb() -> (ContainerAsync<GenericImage>, ConnectOptions) {
+    let container = GenericImage::new("mariadb", "11")
+        .with_exposed_port(3306.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
+        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_DATABASE", "test")
+        .start()
+        .await
+        .expect("start mariadb container");
+    let opts = ConnectOptions {
+        host: container.get_host().await.expect("host").to_string(),
+        port: container.get_host_port_ipv4(3306).await.expect("port"),
+        database: "test".into(),
+        username: "root".into(),
+        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        tls: tablepro_core::TlsConfig::disabled(),
+        ..Default::default()
+    };
+    (container, opts)
+}
+
 async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
     MysqlDriver.connect(opts).await.expect("connect")
 }
@@ -601,23 +622,7 @@ async fn a_nullability_change_keeps_no_default_null_empty_and_literal_defaults_a
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_mariadb_default_is_reported_as_its_clause_without_quoting_it_twice() {
-    let container = GenericImage::new("mariadb", "11")
-        .with_exposed_port(3306.tcp())
-        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
-        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
-        .with_env_var("MARIADB_DATABASE", "test")
-        .start()
-        .await
-        .expect("start mariadb container");
-    let opts = ConnectOptions {
-        host: container.get_host().await.expect("host").to_string(),
-        port: container.get_host_port_ipv4(3306).await.expect("port"),
-        database: "test".into(),
-        username: "root".into(),
-        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
-        tls: tablepro_core::TlsConfig::disabled(),
-        ..Default::default()
-    };
+    let (_container, opts) = start_mariadb().await;
     let mut expected = KEPT_DEFAULTS;
     expected[6] = ("stamped", Some("current_timestamp()"));
     assert_defaults_survive_a_nullability_change(connect(opts).await, expected).await;
@@ -952,4 +957,103 @@ async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_expo
             .unwrap();
         assert_eq!(matching.rows, vec![vec![Value::Int(6)]], "{copy}");
     }
+}
+
+const BACKSLASH_SENSITIVE_TEXTS: [&str; 7] = [
+    "a\\b",
+    "\\",
+    "x\\' OR 1=1 -- ",
+    "line\nbreak\\n",
+    "nul\0byte",
+    "\\0 \\Z \\% \\_ \\\\",
+    "plain 'quoted' text",
+];
+
+async fn connect_in_sql_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connection> {
+    let admin = connect(options.clone()).await;
+    admin.execute(&format!("SET GLOBAL sql_mode = '{mode}'")).await.unwrap();
+    admin.close().await.unwrap();
+    let conn = connect(options.clone()).await;
+    let active = conn.query("SELECT @@SESSION.sql_mode").await.unwrap().rows[0][0].clone();
+    let Value::Text(active) = active else {
+        panic!("{active:?}")
+    };
+    assert_eq!(active.contains("NO_BACKSLASH_ESCAPES"), !mode.is_empty(), "{active}");
+    conn
+}
+
+async fn assert_text_exports_survive_sql_mode(options: &ConnectOptions, mode: &str, suffix: usize) {
+    let conn = connect_in_sql_mode(options, mode).await;
+    let (source, copy) = (format!("escaped_source_{suffix}"), format!("escaped_copy_{suffix}"));
+    conn.execute(&format!(
+        "CREATE TABLE {source} (id INT PRIMARY KEY, label TEXT, doc JSON)"
+    ))
+    .await
+    .unwrap();
+    conn.execute(&format!("CREATE TABLE {copy} LIKE {source}"))
+        .await
+        .unwrap();
+    let doc = json!({"k": "a\\b\"c\n\0"});
+    for (id, label) in BACKSLASH_SENSITIVE_TEXTS.iter().enumerate() {
+        conn.execute_params(
+            &format!("INSERT INTO {source} VALUES (?, ?, ?)"),
+            &[
+                Value::Int(id as i64),
+                Value::Text((*label).into()),
+                Value::Json(doc.clone()),
+            ],
+        )
+        .await
+        .unwrap();
+    }
+    let rows = conn
+        .query(&format!("SELECT id, label, doc FROM {source} ORDER BY id"))
+        .await
+        .unwrap()
+        .rows;
+    let labels: Vec<Value> = rows.iter().map(|row| row[1].clone()).collect();
+    let expected: Vec<Value> = BACKSLASH_SENSITIVE_TEXTS
+        .iter()
+        .map(|label| Value::Text((*label).into()))
+        .collect();
+    assert_eq!(labels, expected, "sql_mode '{mode}'");
+    let columns = conn.fetch_columns(None, &copy).await.unwrap();
+    for row in &rows {
+        let statement = tablepro_core::sql_literal::build_insert_literal("mysql", None, &copy, &columns, row).unwrap();
+        conn.execute(&statement)
+            .await
+            .unwrap_or_else(|error| panic!("sql_mode '{mode}': {statement}: {error}"));
+    }
+    let matching = conn
+        .query(&format!(
+            "SELECT COUNT(*) FROM {source} s JOIN {copy} c ON s.id = c.id \
+             AND HEX(s.label) = HEX(c.label) AND HEX(s.doc) = HEX(c.doc)"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        matching.rows,
+        vec![vec![Value::Int(BACKSLASH_SENSITIVE_TEXTS.len() as i64)]],
+        "sql_mode '{mode}'"
+    );
+}
+
+async fn assert_text_exports_survive_both_backslash_modes(options: ConnectOptions) {
+    for (suffix, mode) in ["", "NO_BACKSLASH_ESCAPES"].into_iter().enumerate() {
+        assert_text_exports_survive_sql_mode(&options, mode, suffix).await;
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_text_exports_survive_with_and_without_backslash_escapes() {
+    let (_container, options) = start_mysql().await;
+    assert_text_exports_survive_both_backslash_modes(options).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes() {
+    let (_container, options) = start_mariadb().await;
+    assert_text_exports_survive_both_backslash_modes(options).await;
 }

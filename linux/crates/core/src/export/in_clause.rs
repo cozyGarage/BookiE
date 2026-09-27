@@ -73,9 +73,11 @@ mod tests {
     #[test]
     fn in_clause_uses_dialect_escaping_and_preserves_fractional_time() {
         let rows = vec![vec![Value::Text("x\\' OR 1=1 -- ".into())]];
-        for driver in ["mysql", "clickhouse"] {
-            assert_eq!(render_in_clause(driver, &rows, 0).sql, "('x\\\\'' OR 1=1 -- ')");
-        }
+        assert_eq!(render_in_clause("clickhouse", &rows, 0).sql, "('x\\\\'' OR 1=1 -- ')");
+        assert_eq!(
+            render_in_clause("mysql", &rows, 0).sql,
+            "(_utf8mb4 X'785c27204f5220313d31202d2d20')"
+        );
         assert_eq!(render_in_clause("postgres", &rows, 0).sql, "('x\\'' OR 1=1 -- ')");
         assert!(render_in_clause("redis", &rows, 0).sql.is_empty());
         assert_eq!(render_in_clause("redis", &rows, 0).skipped, 1);

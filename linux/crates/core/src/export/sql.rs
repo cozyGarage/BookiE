@@ -110,7 +110,7 @@ mod tests {
 
         assert_eq!(
             sql,
-            "INSERT INTO `people``; DROP TABLE people; --` (`name``x`) VALUES ('O''Reilly\\\\');\n"
+            "INSERT INTO `people``; DROP TABLE people; --` (`name``x`) VALUES (_utf8mb4 X'4f275265696c6c795c');\n"
         );
     }
 }
