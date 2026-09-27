@@ -54,7 +54,7 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | DuckDB | Scalars, bounded native temporals, date text fallbacks, enum labels; native DATE, microsecond TIME and TIMESTAMP parameters; explicit collection/interval refusal | Exact interval and collection decoders, extended timestamps, native nanosecond and TIMESTAMPTZ parameters (the bundled client binds only microsecond TIMESTAMP, so these stay exact text), nested unsigned wide integers, consumer parity |
 | MySQL | Shared scalar and exact decimal paths, unsigned BIGINT, signed and extended TIME, zero and partial-zero dates, YEAR | BIT, SET/ENUM and spatial values, session time zones and SQL modes beyond permissive dates, consumer parity |
 | SQL Server | Shared scalar and Unicode SQL export paths | Native temporal precision, datetimeoffset original offsets, money and variant families |
-| ClickHouse | Shared scalar, decimal, nonfinite and long-value contracts | Native date/time precision/timezones, decimal scale, inline temporal parameter precision, wider integers and nested values |
+| ClickHouse | Shared scalar, decimal with declared scale, nonfinite and long-value contracts | Native date/time precision/timezones, inline temporal parameter precision, wider integers and nested values |
 | MongoDB | Shared BSON command/result scalar contracts | Decimal128 extremes, nested BSON, native date range and binary subtypes |
 | Redis | Integer/text/NULL protocol contracts | Nested reply shapes and command-specific binary/number semantics; SQL date types are not applicable |
 | SQLite | Shared scalar and binary contracts | Dynamic storage-class/affinity transitions through edit/import/export; fixed-decimal storage is not applicable |

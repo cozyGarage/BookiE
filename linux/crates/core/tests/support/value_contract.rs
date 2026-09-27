@@ -97,6 +97,9 @@ fn assert_value(actual: &Value, expected: &Value, driver: &str, kind: &str) {
         (Value::Float(actual), Value::Float(expected)) => {
             assert_eq!(actual.to_bits(), expected.to_bits(), "{driver} {kind}")
         }
+        (Value::Decimal(actual), Value::Decimal(expected)) => {
+            assert_eq!(actual.to_string(), expected.to_string(), "{driver} {kind} scale")
+        }
         _ => assert_eq!(actual, expected, "{driver} {kind}"),
     }
 }

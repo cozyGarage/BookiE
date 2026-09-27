@@ -459,6 +459,7 @@ async fn fetch_result(
 ) -> Result<QueryResult, DriverError> {
     let cursor = tag_query(client.query(&escape_bind_markers(sql)), query_id)
         .with_setting("output_format_json_quote_denormals", "1")
+        .with_setting("output_format_decimal_trailing_zeros", "1")
         .fetch_bytes(ROW_FORMAT)
         .map_err(map_clickhouse_error)?;
     let mut reader = LineReader::new(cursor);

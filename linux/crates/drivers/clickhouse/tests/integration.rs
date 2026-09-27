@@ -505,7 +505,7 @@ async fn decimal_and_nonfinite_results_are_not_rounded_or_changed_to_null() {
         Value::Decimal(decimal) => decimal.to_string(),
         other => panic!("unexpected decimal: {other:?}"),
     };
-    assert_eq!(row[1], Value::Text(actual));
+    assert_eq!(actual, "12345678901234567890.123456789012345678901234567890");
     assert!(matches!(row[2], Value::Float(number) if number.is_nan()));
     assert!(matches!(row[3], Value::Float(number) if number == f64::INFINITY));
     assert!(matches!(row[4], Value::Float(number) if number == f64::NEG_INFINITY));
@@ -521,4 +521,45 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
     let (_container, options) = start_clickhouse().await;
     let connection = connect(options).await;
     value_contract::assert_scalar_contract(connection.as_ref(), "clickhouse").await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn decimal_results_keep_the_declared_scale_including_trailing_zeroes() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    connection
+        .execute(
+            "CREATE TABLE scaled (id UInt8, price Decimal(10, 2), wide Decimal(38, 10)) ENGINE = MergeTree ORDER BY id",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO scaled VALUES (1, 2.50, 1.5), (2, 0, 0), (3, -1.10, -0.0000000010)")
+        .await
+        .unwrap();
+    let result = connection
+        .query("SELECT price, wide, toDecimal64('3.10', 3) FROM scaled ORDER BY id")
+        .await
+        .unwrap();
+    let rendered: Vec<Vec<String>> = result
+        .rows
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|value| match value {
+                    Value::Decimal(decimal) => decimal.to_string(),
+                    other => panic!("unexpected decimal: {other:?}"),
+                })
+                .collect()
+        })
+        .collect();
+    assert_eq!(
+        rendered,
+        [
+            ["2.50", "1.5000000000", "3.100"],
+            ["0.00", "0.0000000000", "3.100"],
+            ["-1.10", "-0.0000000010", "3.100"],
+        ]
+    );
 }
