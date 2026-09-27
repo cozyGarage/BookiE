@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use futures::TryStreamExt;
 use rust_decimal::Decimal;
 use secrecy::ExposeSecret;
@@ -20,6 +20,7 @@ use tablepro_core::{
 };
 
 mod session;
+mod zoned;
 
 type MssqlClient = Client<Compat<TcpStream>>;
 
@@ -660,13 +661,9 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
         ColumnData::DateTime(_) | ColumnData::SmallDateTime(_) | ColumnData::DateTime2(_) => {
             decoded_temporal(NaiveDateTime::from_sql(cd), Value::DateTime, "datetime")
         }
-        // tiberius's `DateTime<Utc>` conversion subtracts the offset from a
-        // time TDS already stores in UTC, shifting every non-UTC value twice.
-        ColumnData::DateTimeOffset(_) => decoded_temporal(
-            DateTime::<FixedOffset>::from_sql(cd).map(|stamp| stamp.map(|stamp| stamp.with_timezone(&Utc))),
-            Value::TimestampTz,
-            "datetimeoffset",
-        ),
+        ColumnData::DateTimeOffset(stored) => {
+            zoned::datetimeoffset_text(*stored).unwrap_or_else(|| undecodable("datetimeoffset"))
+        }
         ColumnData::Xml(v) => v.as_ref().map(|x| Value::Text(x.to_string())).unwrap_or(Value::Null),
     }
 }

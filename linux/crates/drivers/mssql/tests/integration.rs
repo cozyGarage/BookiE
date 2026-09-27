@@ -786,45 +786,58 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
     assert_eq!(matching.rows, vec![vec![Value::Int(2)]]);
 }
 
+const ZONED_STAMPS: [&str; 5] = [
+    "2024-01-02 03:04:05.1234567 +05:30",
+    "2024-06-30 23:59:59.9999999 -08:00",
+    "2024-12-31 00:00:00.0000001 +14:00",
+    "0001-01-01 00:00:00.0000000 -14:00",
+    "9999-12-31 23:59:59.9999999 +00:00",
+];
+
+async fn zoned_copies_matching(conn: &dyn Connection, copy: &str) -> Value {
+    let sql = format!(
+        "SELECT COUNT(*) FROM zoned_source s JOIN {copy} c ON s.id = c.id AND s.zoned = c.zoned \
+         AND DATEPART(TZOFFSET, s.zoned) = DATEPART(TZOFFSET, c.zoned)"
+    );
+    conn.query(&sql).await.unwrap().rows[0][0].clone()
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn datetimeoffset_values_decode_to_the_stored_instant_and_export_it() {
+async fn value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
     conn.execute("CREATE TABLE zoned_source (id int, zoned datetimeoffset(7))")
         .await
         .unwrap();
-    conn.execute(
-        "INSERT INTO zoned_source VALUES (1, '2024-01-02 03:04:05.1234567 +05:30'), \
-         (2, '0001-01-01 00:00:00 -14:00'), (3, '2024-06-30 12:00:00 +00:00')",
-    )
-    .await
-    .unwrap();
+    for (id, stamp) in ZONED_STAMPS.iter().enumerate() {
+        conn.execute(&format!("INSERT INTO zoned_source VALUES ({id}, '{stamp}')"))
+            .await
+            .unwrap();
+    }
     let rows = conn
         .query("SELECT id, zoned FROM zoned_source ORDER BY id")
         .await
         .unwrap()
         .rows;
-    let instants = [
-        "2024-01-01T21:34:05.1234567Z",
-        "0001-01-01T14:00:00Z",
-        "2024-06-30T12:00:00Z",
-    ];
-    for (row, instant) in rows.iter().zip(instants) {
-        assert_eq!(row[1], Value::TimestampTz(instant.parse().unwrap()), "{row:?}");
+    let decoded: Vec<Value> = rows.iter().map(|row| row[1].clone()).collect();
+    let expected: Vec<Value> = ZONED_STAMPS.iter().map(|stamp| Value::Text((*stamp).into())).collect();
+    assert_eq!(decoded, expected);
+    for copy in ["zoned_bound", "zoned_exported"] {
+        conn.execute(&format!("SELECT * INTO {copy} FROM zoned_source WHERE 1 = 0"))
+            .await
+            .unwrap();
     }
-    conn.execute("SELECT * INTO zoned_exported FROM zoned_source WHERE 1 = 0")
-        .await
-        .unwrap();
     let columns = conn.fetch_columns(None, "zoned_exported").await.unwrap();
     for row in &rows {
+        conn.execute_params("INSERT INTO zoned_bound VALUES (@P1, @P2)", row)
+            .await
+            .unwrap();
         let statement =
             tablepro_core::sql_literal::build_insert_literal("mssql", None, "zoned_exported", &columns, row).unwrap();
         conn.execute(&statement).await.unwrap();
     }
-    let matching = conn
-        .query("SELECT COUNT(*) FROM zoned_source s JOIN zoned_exported c ON s.id = c.id AND s.zoned = c.zoned")
-        .await
-        .unwrap();
-    assert_eq!(matching.rows, vec![vec![Value::Int(3)]]);
+    let total = Value::Int(ZONED_STAMPS.len() as i64);
+    assert_eq!(zoned_copies_matching(conn.as_ref(), "zoned_bound").await, total);
+    assert_eq!(zoned_copies_matching(conn.as_ref(), "zoned_exported").await, total);
 }
