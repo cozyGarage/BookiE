@@ -476,6 +476,41 @@ async fn a_timed_out_write_is_killed_on_the_server_and_reports_a_timeout() {
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_cancelled_session_query_is_killed_on_the_server_and_the_session_stays_usable() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts.clone()).await;
+    let observer = connect(opts).await;
+    create_long_query_source(observer.as_ref()).await;
+
+    let session = connection.open_session().await.expect("open session");
+    let token = tokio_util::sync::CancellationToken::new();
+    let control = OperationControl::new(token.clone(), None);
+    let sql = long_query("tablepro_mysql_session_cancel");
+    let task = tokio::spawn(async move {
+        let mut session = session;
+        let result = session.query_params_controlled(&sql, &[], &control).await;
+        (session, result)
+    });
+
+    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_session_cancel", true).await;
+    token.cancel();
+    let (mut session, result) = task.await.expect("session task");
+    assert!(
+        matches!(result, Err(DriverError::Cancelled)),
+        "unexpected error: {result:?}"
+    );
+    wait_for_tagged_query(observer.as_ref(), "tablepro_mysql_session_cancel", false).await;
+
+    assert!(
+        session.is_usable(),
+        "the session must stay usable after a confirmed cancel"
+    );
+    assert_eq!(session_value(&mut session, "SELECT 1").await, Value::Int(1));
+    session.close().await.expect("close the session");
+}
+
 /// A value ending in a backslash used to break out of the literal that
 /// "Copy row as INSERT" produced, because MySQL treats a backslash as an
 /// escape inside a string. MySQL 8.1 evaluated the unescaped form as the

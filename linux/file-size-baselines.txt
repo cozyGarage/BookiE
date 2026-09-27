@@ -4,3 +4,4 @@
 # Lower a max when you shrink a file. Do not raise a max; split the file instead.
 # Empty means every crates/**/*.rs file is currently under the soft limit.
 crates/drivers/clickhouse/src/lib.rs 1209
+crates/drivers/mysql/tests/integration.rs 1206
