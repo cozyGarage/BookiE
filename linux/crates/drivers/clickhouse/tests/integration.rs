@@ -563,3 +563,44 @@ async fn decimal_results_keep_the_declared_scale_including_trailing_zeroes() {
         ]
     );
 }
+
+fn fractional_stamps() -> (chrono::NaiveDateTime, chrono::NaiveDateTime) {
+    let local = chrono::NaiveDate::from_ymd_opt(2024, 6, 15)
+        .unwrap()
+        .and_hms_nano_opt(8, 30, 0, 123_456_789)
+        .unwrap();
+    let instant = chrono::NaiveDate::from_ymd_opt(1969, 12, 31)
+        .unwrap()
+        .and_hms_micro_opt(23, 59, 59, 654_321)
+        .unwrap();
+    (local, instant)
+}
+
+async fn create_stamp_table(connection: &dyn tablepro_core::Connection) {
+    connection
+        .execute("CREATE TABLE stamps (nanos DateTime64(9), micros DateTime64(6)) ENGINE = MergeTree ORDER BY nanos")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn temporal_parameters_keep_fractional_seconds() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    create_stamp_table(connection.as_ref()).await;
+    let (local, instant) = fractional_stamps();
+    let values = [Value::DateTime(local), Value::TimestampTz(instant.and_utc())];
+    let expected = vec![vec![Value::DateTime(local), Value::DateTime(instant)]];
+    connection
+        .execute_params("INSERT INTO stamps VALUES (?, ?)", &values)
+        .await
+        .unwrap();
+    let stored = connection.query("SELECT nanos, micros FROM stamps").await.unwrap();
+    assert_eq!(stored.rows, expected);
+    let bound = connection
+        .query_params("SELECT CAST(? AS DateTime64(9)), CAST(? AS DateTime64(6))", &values)
+        .await
+        .unwrap();
+    assert_eq!(bound.rows, expected);
+}

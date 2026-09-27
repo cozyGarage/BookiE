@@ -96,6 +96,7 @@
 - SQL Server INSERT statements copied or exported from a `datetime` column with milliseconds now run and restore the same value. SQL Server rejected them with a conversion error.
 - SQL Server `datetimeoffset` values with a non-UTC offset now show the stored instant. They were shifted by their offset a second time in the grid, in exports and in copied INSERT statements.
 - ClickHouse decimals keep their declared scale, so 2.50 in a Decimal(10, 2) column no longer shows as 2.5.
+- ClickHouse timestamp parameters keep their fractional seconds. Local timestamps lost every fraction and timezone timestamps were cut to milliseconds.
 
 ### Security
 
