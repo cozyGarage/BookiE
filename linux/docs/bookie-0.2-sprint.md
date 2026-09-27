@@ -375,8 +375,11 @@ value conversion does not flatten it. CSV is parsed back into fields to verify
 that quoting preserves the nested value. The real-server scenario also sends
 its query result through the public XLSX exporter and checks Decimal128, date
 and binary subtype markers in workbook strings. All eight MongoDB integration
-tests, including ignored Docker cases, passed. Nested editing, Mongo-backed MCP
-round trip, BSON re-import and other consumers remain open; B3 is not closed.
+tests, including ignored Docker cases, passed. A second MongoDB 7 scenario uses
+the keyed-update SQL shape for nested document and array cell edits, then checks
+native Decimal128, date, binary subtype and integer values through a direct BSON
+client. Mongo-backed MCP round trip, BSON re-import and editing top-level special
+BSON cells remain open; B3 is not closed.
 
 ### B3 SQLite dynamic storage classes: 2026-09-27
 

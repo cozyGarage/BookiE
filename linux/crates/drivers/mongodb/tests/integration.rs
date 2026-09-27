@@ -562,3 +562,94 @@ fn xlsx_nested_cell_requires_its_own_date_and_binary_markers() {
         "{dropped_binary_workbook}"
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
+    use mongodb::bson::{Binary, DateTime, Decimal128, doc, oid::ObjectId, spec::BinarySubtype};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let id = ObjectId::new();
+    client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("nested_edits")
+        .insert_one(doc! {
+            "_id": id,
+            "payload": doc! { "before": true },
+            "items": vec![doc! { "before": true }],
+        })
+        .await
+        .expect("seed editable nested document");
+
+    let connection = MongodbDriver
+        .connect(opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.nested_edits.find({})")
+        .await
+        .expect("read before edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let payload_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "payload")
+        .unwrap();
+    assert_eq!(before.columns[payload_index].data_type, "object");
+    let items_index = before.columns.iter().position(|column| column.name == "items").unwrap();
+    assert_eq!(before.columns[items_index].data_type, "array");
+
+    let edited = serde_json::json!({
+        "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+        "when": {"$date": {"$numberLong": "1234567890123"}},
+        "binary": {"$binary": {"base64": "AP9B", "subType": "80"}},
+    });
+    let edited_items = serde_json::json!([{"ordinal": {"$numberLong": "7"}}]);
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "nested_edits",
+        &before.columns,
+        &[
+            (payload_index, Value::Json(edited.clone())),
+            (items_index, Value::Json(edited_items.clone())),
+        ],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build grid row update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply nested grid edit");
+
+    let after = connection
+        .query("db.nested_edits.find({})")
+        .await
+        .expect("read after edit");
+    assert_eq!(after.rows[0][payload_index], Value::Json(edited));
+    assert_eq!(after.rows[0][items_index], Value::Json(edited_items));
+
+    let persisted = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("nested_edits")
+        .find_one(doc! { "_id": id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("document exists");
+    let decimal: Decimal128 = "1234567890123456789.123456789012345".parse().unwrap();
+    assert_eq!(
+        persisted.get_document("payload").unwrap(),
+        &doc! {
+            "amount": decimal,
+            "when": DateTime::from_millis(1_234_567_890_123),
+            "binary": Binary { subtype: BinarySubtype::UserDefined(0x80), bytes: vec![0, 255, 65] },
+        }
+    );
+    assert_eq!(
+        persisted.get_array("items").unwrap(),
+        &vec![mongodb::bson::Bson::Document(doc! { "ordinal": 7_i64 })]
+    );
+}

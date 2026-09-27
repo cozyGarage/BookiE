@@ -105,7 +105,7 @@ pub(super) fn classify_type(dt: &str) -> TypeKind {
     if dt.contains("uuid") {
         return TypeKind::Uuid;
     }
-    if dt.contains("json") {
+    if dt.contains("json") || matches!(dt, "object" | "array" | "objectid") {
         return TypeKind::Json;
     }
     if dt.contains("timestamptz") || dt.contains("with time zone") {
@@ -305,6 +305,9 @@ mod tests {
         assert_eq!(classify_type("tinyint"), TypeKind::Int);
         assert_eq!(classify_type("uuid"), TypeKind::Uuid);
         assert_eq!(classify_type("jsonb"), TypeKind::Json);
+        assert_eq!(classify_type("object"), TypeKind::Json);
+        assert_eq!(classify_type("array"), TypeKind::Json);
+        assert_eq!(classify_type("objectid"), TypeKind::Json);
         assert_eq!(classify_type("timestamptz"), TypeKind::TimestampTz);
         assert_eq!(classify_type("timestamp with time zone"), TypeKind::TimestampTz);
         assert_eq!(classify_type("timestamp without time zone"), TypeKind::DateTime);
@@ -395,6 +398,24 @@ mod tests {
 
         let json = parse_input_for_column(r#"{"a":1}"#, Some(&col("jsonb", false))).unwrap();
         assert!(matches!(json, Value::Json(_)));
+
+        let mongo_object = parse_input_for_column(
+            r#"{"amount":{"$numberDecimal":"12.3400"}}"#,
+            Some(&col("object", false)),
+        )
+        .unwrap();
+        assert_eq!(
+            mongo_object,
+            Value::Json(serde_json::json!({"amount": {"$numberDecimal": "12.3400"}}))
+        );
+        assert_eq!(
+            parse_input_for_column(r#"{"$oid":"507f1f77bcf86cd799439011"}"#, Some(&col("ObjectId", false))).unwrap(),
+            Value::Json(serde_json::json!({"$oid": "507f1f77bcf86cd799439011"}))
+        );
+        assert_eq!(
+            parse_input_for_column(r#"[{"ordinal":{"$numberLong":"7"}}]"#, Some(&col("array", false))).unwrap(),
+            Value::Json(serde_json::json!([{"ordinal": {"$numberLong": "7"}}]))
+        );
 
         let date = parse_input_for_column("2024-01-15", Some(&col("date", false))).unwrap();
         assert!(matches!(date, Value::Date(_)));

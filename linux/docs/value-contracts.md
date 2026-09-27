@@ -600,8 +600,12 @@ the exact signed millisecond count. A Docker-backed MongoDB 7 test inserts these
 native BSON values directly, reads them through the driver query path, and checks
 the resulting value/type representation. Uncommon top-level BSON types now use
 canonical Extended JSON instead of display text. Real-server JSON, CSV and XLSX
-consumer checks preserve their markers. Special BSON edit/write-back, Mongo-backed
-MCP round trip and native BSON re-import remain open.
+consumer checks preserve their markers. A Docker-backed grid edit regression
+updates a nested document and array through the keyed row update path, then
+checks the stored Decimal128, date, binary subtype and integer fields through
+the native BSON client. App parser tests route MongoDB object, array and ObjectId
+columns through JSON parsing. Mongo-backed MCP round trip, native BSON re-import
+and editing top-level special BSON values remain open.
 
 Focused local checks:
 

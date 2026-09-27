@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- MongoDB nested documents, arrays and uncommon top-level BSON kinds retain their BSON markers as canonical Extended JSON instead of debug text. Real-server JSON, CSV and XLSX exports preserve Decimal128, date and binary subtype markers.
+- MongoDB nested documents, arrays and uncommon top-level BSON kinds retain their BSON markers as canonical Extended JSON instead of debug text. Nested documents and arrays can be edited in the grid and write back as native BSON; real-server JSON, CSV and XLSX exports preserve Decimal128, date and binary subtype markers.
 - CSV imports into SQLite INTEGER, REAL and NUMERIC affinity columns pass unparseable values as text, allowing SQLite to store them without rejecting valid mixed storage classes.
 - Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
 - ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.

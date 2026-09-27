@@ -17,6 +17,7 @@ futures.workspace = true
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 secrecy.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]

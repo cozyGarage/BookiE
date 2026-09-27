@@ -6251,6 +6251,7 @@ dependencies = [
  "mongodb",
  "secrecy",
  "serde_json",
+ "sqlparser",
  "tablepro-core",
  "tempfile",
  "testcontainers",
