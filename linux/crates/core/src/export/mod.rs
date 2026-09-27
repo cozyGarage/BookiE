@@ -53,7 +53,7 @@ fn undecodable_marker(type_name: &str) -> String {
     format!("<undecodable {type_name}>")
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 

@@ -60,15 +60,25 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
 }
 
 fn postgres_extended_date(value: &Value) -> Option<String> {
+    let date = match value {
+        Value::Date(date) => *date,
+        Value::DateTime(stamp) => stamp.date(),
+        Value::TimestampTz(stamp) => stamp.date_naive(),
+        _ => return None,
+    };
+    if (1..=9999).contains(&date.year()) {
+        return None;
+    }
+    postgres_temporal_text(value)
+}
+
+pub fn postgres_temporal_text(value: &Value) -> Option<String> {
     let (date, time, zone) = match value {
         Value::Date(date) => (*date, None, ""),
         Value::DateTime(stamp) => (stamp.date(), Some(stamp.time()), ""),
         Value::TimestampTz(stamp) => (stamp.date_naive(), Some(stamp.time()), "+00:00"),
         _ => return None,
     };
-    if (1..=9999).contains(&date.year()) {
-        return None;
-    }
     let (common_era, year) = date.year_ce();
     let mut text = format!("{year:04}-{:02}-{:02}", date.month(), date.day());
     if let Some(time) = time {
@@ -80,22 +90,18 @@ fn postgres_extended_date(value: &Value) -> Option<String> {
     Some(text)
 }
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
-
 fn string_literal(driver_id: &str, text: &str) -> String {
     // MySQL reads a backslash as an escape unless sql_mode has NO_BACKSLASH_ESCAPES, and a
     // generated INSERT cannot know the mode of the server it will run on. A charset-tagged
     // hex literal means the same text in both modes, where any quoted form breaks one of them.
     if driver_id == "mysql" && text.contains(['\\', '\0']) {
-        return format!("_utf8mb4 X'{}'", hex(text.as_bytes()));
+        return format!("_utf8mb4 X'{}'", crate::export::hex_encode(text.as_bytes()));
     }
     quote_literal(driver_id, text)
 }
 
 fn binary_literal(driver_id: &str, bytes: &[u8]) -> Result<String, LiteralError> {
-    let hex = hex(bytes);
+    let hex = crate::export::hex_encode(bytes);
     match driver_id {
         "postgres" => Ok(format!("decode('{hex}', 'hex')")),
         "mysql" | "sqlite" => Ok(format!("X'{hex}'")),

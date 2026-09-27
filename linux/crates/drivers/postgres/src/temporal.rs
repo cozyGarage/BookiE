@@ -1,27 +1,15 @@
-use chrono::{Datelike, NaiveTime};
+use chrono::NaiveTime;
 use tablepro_core::Value;
 
 const MICROS_PER_DAY: i64 = 86_400_000_000;
 const OFFSET_LIMIT: i32 = 57_600;
 
 pub(crate) fn array_text(value: Value) -> Option<String> {
-    let (date, time, zone) = match value {
-        Value::Text(text) => return Some(text),
-        Value::Time(time) => return Some(time.to_string()),
-        Value::Date(date) => (date, None, ""),
-        Value::DateTime(stamp) => (stamp.date(), Some(stamp.time()), ""),
-        Value::TimestampTz(stamp) => (stamp.date_naive(), Some(stamp.time()), "+00:00"),
-        _ => return None,
-    };
-    let (common_era, year) = date.year_ce();
-    let mut text = format!("{year:04}-{:02}-{:02}", date.month(), date.day());
-    if let Some(time) = time {
-        text.push_str(&format!(" {time}{zone}"));
+    match value {
+        Value::Text(text) => Some(text),
+        Value::Time(time) => Some(time.to_string()),
+        other => tablepro_core::sql_literal::postgres_temporal_text(&other),
     }
-    if !common_era {
-        text.push_str(" BC");
-    }
-    Some(text)
 }
 
 pub(crate) fn decode_time(bytes: &[u8], with_zone: bool) -> Option<Value> {
