@@ -296,6 +296,12 @@ The workbook UI corpus also exposed empty strings being silently omitted by the
 XLSX library. Export now refuses this lossy conversion with the data row/column
 and CSV/JSON alternatives; UI and atomic-file regressions cover that refusal.
 
+The next regression checkpoint broadens the shared contract to mixed, repeated
+named bindings through all six SQL drivers. Two installed UI scenarios check
+exact committed values and cancellation/retry; parser, transport option/refusal
+and export write-failure regressions cover adjacent boundaries. Evidence and
+scope are recorded in [value contracts](value-contracts.md). B3 remains open.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight

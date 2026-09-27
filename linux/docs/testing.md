@@ -201,6 +201,14 @@ The suite verifies:
 20. Current-page XLSX export preserves typed SQLite values, nanosecond times/timestamps, BC/year-10000 dates, wide signed integers, infinity, NULL and formula-like Unicode text. Workbook XML proves native versus text cells and the 100-row page boundary; all source rows remain unchanged.
 21. Cancelling the workbook save chooser preserves an existing destination, leaves no temporary export, and leaves all source rows unchanged.
 22. Empty text in workbook results produces a visible error with the row/column and CSV/JSON alternatives. No lossy workbook or temporary export is published, and source rows remain unchanged.
+23. Repeated named parameters insert exact minimum/maximum signed integers and SQL-like Unicode text into two rows, preserving binding order and treating the payload as data.
+24. Cancelling the parameter dialog writes no rows; retrying the same statement uses the replacement values and never executes the cancelled values.
+
+The parameter scenarios live in `crates/app/tests/gtk_parameters.py`; select
+`repeated_parameters_preserve_wide_ids_and_sql_like_text` or
+`cancelled_parameters_never_execute_and_retry_uses_new_values` through
+`TABLEPRO_GTK_SCENARIO` to run one. Registration tests require both in the default
+suite. Each checks committed SQLite rows independently of the visible UI result.
 
 The workbook scenarios live in `crates/app/tests/gtk_workbook.py` and are registered
 in the default suite. Their XML oracle has separate negative tests that reject

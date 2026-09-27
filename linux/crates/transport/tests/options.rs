@@ -205,3 +205,33 @@ async fn an_agent_hop_uses_the_agent_on_either_client_and_needs_no_keyring() {
     };
     assert!(matches!(config.auth, tablepro_ssh::openssh::OpenSshAuth::Agent));
 }
+
+#[tokio::test]
+async fn explicit_tls_modes_override_both_legacy_flags_without_losing_connection_fields() {
+    for mode in [
+        TlsMode::Disabled,
+        TlsMode::Require,
+        TlsMode::VerifyCa,
+        TlsMode::VerifyFull,
+    ] {
+        for legacy in [false, true] {
+            let mut connection = saved(Some(mode), legacy);
+            connection.port = 6543;
+            connection.connect_timeout_secs = Some(17);
+            connection.database = "warehouse 東京".into();
+            connection.username = "reader@example.test".into();
+            connection.tls_root_cert = Some(PathBuf::from("/tmp/corp ca.pem"));
+            let opts = connect_options_for(&connection).await.unwrap();
+            assert_eq!(opts.tls.mode, mode);
+            assert_eq!(opts.tls.root_cert, connection.tls_root_cert);
+            assert_eq!(opts.host, connection.host);
+            assert_eq!(opts.port, 6543);
+            assert_eq!(opts.database, "warehouse 東京");
+            assert_eq!(opts.username, "reader@example.test");
+            assert_eq!(opts.auth_mode, AuthMode::Kerberos);
+            assert_eq!(opts.connect_timeout_secs, Some(17));
+            assert!(opts.service_endpoint.is_none());
+            assert!(opts.forwarded_socket_dir.is_none());
+        }
+    }
+}

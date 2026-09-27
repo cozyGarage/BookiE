@@ -165,6 +165,19 @@ fn parameter_name(rest: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    pub(super) fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
+        let (send, receive) = std::sync::mpsc::sync_channel(1);
+        let sql = sql.to_string();
+        let driver_id = driver_id.to_string();
+        std::thread::spawn(move || {
+            let result = super::extract_named_parameters(&sql, &driver_id);
+            let _ = send.send(result);
+        });
+        receive
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("parameter extraction must terminate")
+    }
+
     #[test]
     fn value_contract_named_parameters_do_not_round_decimals() {
         let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
@@ -351,5 +364,76 @@ mod tests {
             assert_eq!(ParameterKind::from_index(kind.index()), kind);
         }
         assert_eq!(ParameterKind::from_index(99), ParameterKind::Auto);
+    }
+}
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::tests::extract_named_parameters;
+    use super::*;
+
+    #[test]
+    fn value_contract_boolean_parameters_preserve_both_truth_values_and_reject_other_text() {
+        for text in ["true", "t", "1", "yes", " TRUE ", "YeS"] {
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Boolean, text).unwrap(),
+                Value::Bool(true)
+            );
+        }
+        for text in ["false", "f", "0", "no", " FALSE ", "nO"] {
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Boolean, text).unwrap(),
+                Value::Bool(false)
+            );
+        }
+        for text in ["", "null", "2", "-1", "0.0", "truthy"] {
+            assert!(parse_parameter_value(ParameterKind::Boolean, text).is_err(), "{text:?}");
+        }
+    }
+
+    #[test]
+    fn value_contract_explicit_text_keeps_whitespace_and_placeholder_spelling() {
+        for text in [
+            "",
+            " ",
+            "\r\n\t",
+            "NULL",
+            "00012",
+            "-0",
+            "1e3",
+            ":id ? $1 @P1",
+            "x'); DROP TABLE t; --",
+        ] {
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Text, text).unwrap(),
+                Value::Text(text.into())
+            );
+        }
+    }
+
+    #[test]
+    fn value_contract_parameter_lexer_preserves_nested_and_escaped_regions() {
+        for (driver, source, expected) in [
+            (
+                "postgres",
+                "SELECT /* outer :x /* inner :y */ :z */ :a, $tag$:hidden$tag$, :a::text",
+                "SELECT /* outer :x /* inner :y */ :z */ $1, $tag$:hidden$tag$, $2::text",
+            ),
+            (
+                "mysql",
+                "SELECT 'x\\' :hidden', :a, `:column`, :a # :ignored\n",
+                "SELECT 'x\\' :hidden', ?, `:column`, ? # :ignored\n",
+            ),
+            (
+                "mssql",
+                "SELECT [a]]:hidden], N'it''s :hidden', :a, :a",
+                "SELECT [a]]:hidden], N'it''s :hidden', @P1, @P2",
+            ),
+        ] {
+            let parsed = extract_named_parameters(source, driver);
+            assert_eq!(parsed.sql, expected, "{driver}");
+            assert_eq!(parsed.names, ["a"], "{driver}");
+            assert_eq!(parsed.bindings, ["a", "a"], "{driver}");
+        }
     }
 }

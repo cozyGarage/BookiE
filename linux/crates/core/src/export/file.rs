@@ -384,3 +384,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "stream_tests.rs"]
+mod stream_tests;

@@ -32,6 +32,19 @@ class WorkbookOracleTests(unittest.TestCase):
         self.assertTrue(all(item.environment == "local" for item in scenarios))
         self.assertIn("scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))", SOURCE.with_name("gtk_safety.py").read_text())
 
+    def test_parameter_scenarios_are_registered_in_the_default_ui_suite(self):
+        source = SOURCE.with_name("gtk_parameters.py")
+        spec = importlib.util.spec_from_file_location("parameters", source)
+        parameters = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(parameters)
+        scenarios = parameters.scenarios(object())
+        self.assertEqual([item.__name__ for item in scenarios], [
+            "repeated_parameters_preserve_wide_ids_and_sql_like_text",
+            "cancelled_parameters_never_execute_and_retry_uses_new_values",
+        ])
+        self.assertTrue(all(item.environment == "local" for item in scenarios))
+        self.assertIn("scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))", SOURCE.with_name("gtk_safety.py").read_text())
+
     def test_exact_cells_pass(self):
         workbook.assert_workbook(valid_cells())
 

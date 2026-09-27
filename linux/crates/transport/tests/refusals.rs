@@ -213,3 +213,31 @@ async fn an_empty_jump_chain_is_refused_rather_than_treated_as_a_direct_connecti
     .await;
     assert!(format!("{error}").contains("chain"), "{error}");
 }
+
+#[tokio::test]
+async fn every_enabled_tls_mode_is_refused_on_a_local_socket_before_dialing() {
+    for mode in [TlsMode::Require, TlsMode::VerifyCa, TlsMode::VerifyFull] {
+        let mut opts = socket_options();
+        opts.tls.mode = mode;
+        let error = refusal(&FakeDriver::with_local_socket(), opts, None, "TLS must not be ignored").await;
+        assert!(
+            matches!(error, TransportError::LocalSocketWithTls),
+            "{mode:?}: {error:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn missing_and_regular_file_socket_paths_are_refused_before_dialing() {
+    let dir = tempfile::tempdir().unwrap();
+    let regular = dir.path().join("regular");
+    std::fs::write(&regular, "not a socket directory").unwrap();
+    for path in [dir.path().join("missing"), regular] {
+        let opts = ConnectOptions {
+            local_socket_dir: Some(path),
+            ..options()
+        };
+        let error = refusal(&FakeDriver::with_local_socket(), opts, None, "invalid socket directory").await;
+        assert!(matches!(error, TransportError::InvalidLocalSocket(_)), "{error:?}");
+    }
+}

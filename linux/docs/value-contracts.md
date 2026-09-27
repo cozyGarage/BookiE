@@ -30,6 +30,7 @@ not prevent the other compiled suites from running.
 | Path | Assertions |
 | --- | --- |
 | PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse, DuckDB | Bound parameters and generated SQL preserve signed integer limits, values around 2^53, small/large floats, text and NULL |
+| Six SQL drivers, mixed named bindings | Repeated names, signed integer limits, empty text versus NULL, SQL-like Unicode payloads and placeholder-looking text retain type, position and exact content |
 | Fixed-decimal SQL engines | Positive and negative decimals retain their value through binding and generated SQL; SQLite has no fixed-decimal storage contract |
 | Redis | Integer command replies and quoted text arguments retain their values; a missing key differs from empty text |
 | MongoDB | JSON commands preserve integer, float, text and NULL values through BSON and result decoding |
@@ -385,3 +386,59 @@ Final local evidence for this checkpoint:
 These are local X11/AT-SPI and fixture results. Hosted CI, network-database temporal
 UI scenarios, installed Wayland/package acceptance and the remaining B3 type and
 consumer contracts remain separate work.
+
+## Mixed bindings and failure propagation checkpoint, 2026-09-27
+
+The shared SQL contract now passes named parameters through extraction, typed
+input parsing, placeholder generation, driver binding and server decoding in one
+query. Each of PostgreSQL, MySQL, SQL Server, ClickHouse, SQLite and DuckDB checks
+three adversarial payloads across repeated names and mixed types. Expected rows
+are constructed independently of the binding list. Quoted/commented colon names
+must not become parameters. Redis and MongoDB continue their protocol-specific
+contracts rather than receiving synthetic SQL scenarios.
+
+Two installed GTK scenarios check committed rows: repeated parameters preserve
+signed integer limits and SQL-like Unicode data; cancellation writes nothing and
+a retry uses replacement values. Lexer regressions cover nested PostgreSQL
+comments/dollar quotes, MySQL escaped quotes and SQL Server escaped identifiers.
+Explicit text parsing retains whitespace and numeric/placeholder-looking text.
+
+Transport regressions cover all explicit TLS modes against both legacy TLS flags,
+CA paths, connection identity, authentication and timeout propagation. Local
+sockets refuse every enabled TLS mode plus missing/regular-file paths before any
+driver dial. These are deterministic option/refusal tests, not new live TLS or
+SSH acceptance evidence.
+
+Export writer tests simulate three-byte writes, interrupted writes and destination
+I/O failures. All six text formats must finish short writes without byte loss;
+all seven formats, including XLSX, must propagate write failures. These injected
+writer failures do not simulate filesystem exhaustion or a broken network stream.
+
+The first parser mutation run intentionally remains failed at
+`target/quality/20260927-b3-parameter-mutants/mutants.out/outcomes.json`:
+16 caught, one survivor, five timeouts and two unviable mutations. The survivor
+removed the Boolean false arm; a new truth-table regression covers accepted
+true/false spellings and invalid text. Extractor tests now call the parser on a
+worker with a two-second receive deadline, turning nontermination into a test
+failure rather than waiting for cargo-mutants to kill the suite. Production
+parsing is unchanged. Compilation failures are unviable, not caught mutations.
+
+The installed UI run reused the release binary from checkpoint `39198f1` because
+this change only adds tests and documentation. Its SHA-256 is
+`010fbec4d00d9cd391fa982e54ab038ac18a16d43755369c6afc28b31555cd30`.
+
+The corrected run at
+`target/quality/20260927-b3-parameter-mutants-corrected/mutants.out/outcomes.json`
+caught all 22 compilable mutations, with two unviable, no survivors and no timeouts.
+No mutation was excluded. The initial combined full/value/UI/harness run passed at
+`target/quality/20260927T100452073699Z-layers/report.json`; its eight-driver report
+is `target/quality/20260927T100713477391Z-values/report.json`. All 24 installed UI
+scenarios passed with 24 JSON/stderr pairs in
+`target/quality/20260927-b3-parameter-ui/`. Thirty-five Python harness tests passed.
+
+After the Boolean and bounded-parser refinements, the final full/value/harness
+rerun passed at `target/quality/20260927T101253832016Z-layers/report.json`.
+All 11 value suites passed again at
+`target/quality/20260927T101514358887Z-values/report.json`, including 21 core
+contracts. Hosted CI and B4–B6 acceptance remain separate; B3 stays open for the
+remaining native types and consumer parity.

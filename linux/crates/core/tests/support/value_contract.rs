@@ -26,6 +26,7 @@ pub async fn assert_scalar_contract(connection: &dyn Connection, driver: &str) {
     for text in corpus["texts"].as_array().unwrap() {
         assert_scalar(connection, driver, "text", Value::Text(text.as_str().unwrap().into())).await;
     }
+    assert_named_parameter_order(connection, driver).await;
     assert_long_text(connection, driver, corpus["long_text_bytes"].as_u64().unwrap() as usize).await;
     assert_scalar(connection, driver, "integer", Value::Null).await;
     assert_scalar(connection, driver, "text", Value::Null).await;
@@ -122,5 +123,48 @@ fn scalar_type(driver: &str, kind: &str) -> &'static str {
         (_, "text") => "TEXT",
         (_, "decimal") => "DECIMAL(28,8)",
         _ => panic!("unknown value contract kind"),
+    }
+}
+
+async fn assert_named_parameter_order(connection: &dyn Connection, driver: &str) {
+    use tablepro_core::{ParameterKind, extract_named_parameters, parse_parameter_value};
+    let integer = scalar_type(driver, "integer");
+    let text = scalar_type(driver, "text");
+    let source = format!(
+        "SELECT CAST(:large AS {integer}), CAST(:text AS {text}), CAST(:small AS {integer}), \
+         CAST(:text AS {text}), CAST(:empty AS {text}), CAST(:nothing AS {text}), \
+         ':not_a_parameter' /* :also_not_a_parameter */"
+    );
+    let parsed = extract_named_parameters(&source, driver);
+    assert_eq!(parsed.names, ["large", "text", "small", "empty", "nothing"]);
+    assert_eq!(parsed.bindings, ["large", "text", "small", "text", "empty", "nothing"]);
+    for payload in ["x'); SELECT 999; --", "\\' :large ? $1 @P1", "  東京 😀\r\n\t  "] {
+        let expected = vec![
+            Value::Int(i64::MAX),
+            Value::Text(payload.into()),
+            Value::Int(i64::MIN),
+            Value::Text(payload.into()),
+            Value::Text(String::new()),
+            Value::Null,
+            Value::Text(":not_a_parameter".into()),
+        ];
+        let bindings: Vec<_> = parsed
+            .bindings
+            .iter()
+            .map(|name| match name.as_str() {
+                "large" => parse_parameter_value(ParameterKind::Integer, "9223372036854775807").unwrap(),
+                "small" => parse_parameter_value(ParameterKind::Integer, "-9223372036854775808").unwrap(),
+                "text" => parse_parameter_value(ParameterKind::Text, payload).unwrap(),
+                "empty" => parse_parameter_value(ParameterKind::Text, "").unwrap(),
+                "nothing" => parse_parameter_value(ParameterKind::Null, "ignored").unwrap(),
+                _ => panic!("unexpected parameter"),
+            })
+            .collect();
+        let result = connection.query_params(&parsed.sql, &bindings).await.unwrap();
+        assert_eq!(
+            result.rows,
+            vec![expected],
+            "{driver}: mixed repeated bindings {payload:?}"
+        );
     }
 }
