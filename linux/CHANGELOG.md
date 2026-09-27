@@ -99,6 +99,7 @@
 - ClickHouse SQL INSERT exports of timezone timestamps now run and keep every fractional digit. ClickHouse rejected them with a parse error.
 - SQL Server `datetimeoffset` values keep their stored instant, original offset and all seven fractional digits in the grid, in edits and in copied or exported INSERT statements. A non-UTC value was shifted by its offset a second time, and every value was converted to UTC.
 - MySQL and MariaDB INSERT statements copied or exported from text or JSON holding a backslash or NUL character now restore the same value when the server runs with `NO_BACKSLASH_ESCAPES`. Each backslash was doubled, or the statement was rejected.
+- MySQL `BIT` columns show their numeric value and spatial columns show their stored geometry bytes, and copied or exported INSERT statements restore the same value. They were shown as empty or unreadable cells.
 
 ### Security
 

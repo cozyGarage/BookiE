@@ -8,6 +8,7 @@ use sqlx::{Column, Connection as SqlxConnection, Pool, Row, TypeInfo, ValueRef};
 
 use futures::stream::StreamExt;
 
+mod packed;
 mod session;
 mod temporal;
 
@@ -548,6 +549,8 @@ fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> 
             .ok()
             .or_else(|| temporal::calendar_text(row.try_get_raw(idx).ok()?, true)),
         "YEAR" => temporal::year_value(row.try_get_raw(idx).ok()?),
+        "BIT" => packed::bit_value(row.try_get_raw(idx).ok()?),
+        "GEOMETRY" => packed::geometry_value(row.try_get_raw(idx).ok()?),
         "TIMESTAMP" => row
             .try_get::<chrono::DateTime<chrono::Utc>, _>(idx)
             .map(Value::TimestampTz)

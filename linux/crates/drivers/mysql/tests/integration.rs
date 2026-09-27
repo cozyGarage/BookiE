@@ -548,25 +548,19 @@ async fn a_copied_insert_survives_a_value_that_could_escape_its_literal() {
 async fn a_value_the_driver_cannot_decode_is_reported_rather_than_shown_as_null() {
     let (_c, opts) = start_mysql().await;
     let conn = connect(opts).await;
-    conn.execute("CREATE TABLE undecodable (shape GEOMETRY, flags BIT(8), absent INT)")
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled("SET character_set_results = latin1", &[], &control)
         .await
         .unwrap();
-    conn.execute("INSERT INTO undecodable VALUES (ST_GeomFromText('POINT(1 1)'), b'10101010', NULL)")
+    let result = session
+        .query_params_controlled("SELECT 'ünï' AS latin, CAST(NULL AS SIGNED) AS absent", &[], &control)
         .await
         .unwrap();
-
-    let result = conn
-        .query("SELECT shape, flags, absent FROM undecodable")
-        .await
-        .unwrap();
-
     assert_eq!(
         result.rows,
-        vec![vec![
-            Value::Undecodable("GEOMETRY".into()),
-            Value::Undecodable("BIT".into()),
-            Value::Null,
-        ]],
+        vec![vec![Value::Undecodable("VARCHAR".into()), Value::Null]],
         "a value that failed to decode must not be indistinguishable from a stored NULL"
     );
 }
@@ -1056,4 +1050,104 @@ async fn value_contract_text_exports_survive_with_and_without_backslash_escapes(
 async fn value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes() {
     let (_container, options) = start_mariadb().await;
     assert_text_exports_survive_both_backslash_modes(options).await;
+}
+
+const PACKED_DEFINITION: &str = "(id INT PRIMARY KEY, flags BIT(8), wide BIT(64), tiny BIT(1), \
+     mood ENUM('happy', 'it''s ok', 'ünï', ''), perms SET('read', 'write', 'ëx'), shape GEOMETRY, \
+     pin POINT SRID 4326)";
+
+async fn server_bytes(conn: &dyn Connection, sql: &str) -> Vec<Value> {
+    let rows = conn.query(sql).await.unwrap().rows;
+    rows.into_iter()
+        .map(|row| match &row[0] {
+            Value::Null => Value::Null,
+            Value::Text(hex) => Value::Bytes(
+                (0..hex.len())
+                    .step_by(2)
+                    .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).unwrap())
+                    .collect(),
+            ),
+            other => panic!("{other:?}"),
+        })
+        .collect()
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_bit_enum_set_and_geometry_survive_reads_parameters_and_exports() {
+    let (_container, options) = start_mysql().await;
+    let conn = connect(options).await;
+    for table in ["packed_source", "packed_bound", "packed_exported"] {
+        conn.execute(&format!("CREATE TABLE {table} {PACKED_DEFINITION}"))
+            .await
+            .unwrap();
+    }
+    conn.execute(
+        "INSERT INTO packed_source VALUES \
+         (1, b'10101010', 0xFFFFFFFFFFFFFFFF, b'1', 'happy', 'read,ëx', \
+          ST_GeomFromText('POLYGON((0 0, 1 0, 1 1, 0 0))'), ST_GeomFromText('POINT(52.5 13.4)', 4326)), \
+         (2, b'0', 0x8000000000000000, b'0', 'it''s ok', '', \
+          ST_GeomFromText('POINT(-1.5 2.25)', 3857), ST_GeomFromText('POINT(0 0)', 4326)), \
+         (3, b'1', 0x7FFFFFFFFFFFFFFF, NULL, 'ünï', 'write', NULL, NULL), \
+         (4, NULL, 0, NULL, '', 'read,write,ëx', NULL, NULL), \
+         (5, NULL, NULL, NULL, NULL, NULL, NULL, NULL)",
+    )
+    .await
+    .unwrap();
+    let rows = conn
+        .query("SELECT id, flags, wide, tiny, mood, perms, shape, pin FROM packed_source ORDER BY id")
+        .await
+        .unwrap()
+        .rows;
+    let column = |index: usize| rows.iter().map(|row| row[index].clone()).collect::<Vec<_>>();
+    let ints = |values: [Option<i64>; 5]| values.map(|value| value.map_or(Value::Null, Value::Int)).to_vec();
+    assert_eq!(column(1), ints([Some(170), Some(0), Some(1), None, None]));
+    assert_eq!(
+        column(2),
+        vec![
+            Value::Bytes(vec![0xff; 8]),
+            Value::Bytes(vec![0x80, 0, 0, 0, 0, 0, 0, 0]),
+            Value::Int(i64::MAX),
+            Value::Int(0),
+            Value::Null,
+        ]
+    );
+    assert_eq!(column(3), ints([Some(1), Some(0), None, None, None]));
+    let texts = |values: [Option<&str>; 5]| values.map(|value| value.map_or(Value::Null, text)).to_vec();
+    assert_eq!(
+        column(4),
+        texts([Some("happy"), Some("it's ok"), Some("ünï"), Some(""), None])
+    );
+    assert_eq!(
+        column(5),
+        texts([Some("read,ëx"), Some(""), Some("write"), Some("read,write,ëx"), None])
+    );
+    let shapes = server_bytes(conn.as_ref(), "SELECT HEX(shape) FROM packed_source ORDER BY id").await;
+    let pins = server_bytes(conn.as_ref(), "SELECT HEX(pin) FROM packed_source ORDER BY id").await;
+    assert_eq!(column(6), shapes);
+    assert_eq!(column(7), pins);
+
+    let columns = conn.fetch_columns(None, "packed_exported").await.unwrap();
+    for row in &rows {
+        conn.execute_params("INSERT INTO packed_bound VALUES (?, ?, ?, ?, ?, ?, ?, ?)", row)
+            .await
+            .unwrap();
+        let statement =
+            tablepro_core::sql_literal::build_insert_literal("mysql", None, "packed_exported", &columns, row).unwrap();
+        conn.execute(&statement)
+            .await
+            .unwrap_or_else(|error| panic!("{statement}: {error}"));
+    }
+    for copy in ["packed_bound", "packed_exported"] {
+        let matching = conn
+            .query(&format!(
+                "SELECT COUNT(*) FROM packed_source s JOIN {copy} c ON s.id = c.id \
+                 AND s.flags <=> c.flags AND s.wide <=> c.wide AND s.tiny <=> c.tiny \
+                 AND s.mood + 0 <=> c.mood + 0 AND s.perms + 0 <=> c.perms + 0 \
+                 AND HEX(s.shape) <=> HEX(c.shape) AND HEX(s.pin) <=> HEX(c.pin)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(matching.rows, vec![vec![Value::Int(5)]], "{copy}");
+    }
 }
