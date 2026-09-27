@@ -785,3 +785,46 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
         .unwrap();
     assert_eq!(matching.rows, vec![vec![Value::Int(2)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn datetimeoffset_values_decode_to_the_stored_instant_and_export_it() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    conn.execute("CREATE TABLE zoned_source (id int, zoned datetimeoffset(7))")
+        .await
+        .unwrap();
+    conn.execute(
+        "INSERT INTO zoned_source VALUES (1, '2024-01-02 03:04:05.1234567 +05:30'), \
+         (2, '0001-01-01 00:00:00 -14:00'), (3, '2024-06-30 12:00:00 +00:00')",
+    )
+    .await
+    .unwrap();
+    let rows = conn
+        .query("SELECT id, zoned FROM zoned_source ORDER BY id")
+        .await
+        .unwrap()
+        .rows;
+    let instants = [
+        "2024-01-01T21:34:05.1234567Z",
+        "0001-01-01T14:00:00Z",
+        "2024-06-30T12:00:00Z",
+    ];
+    for (row, instant) in rows.iter().zip(instants) {
+        assert_eq!(row[1], Value::TimestampTz(instant.parse().unwrap()), "{row:?}");
+    }
+    conn.execute("SELECT * INTO zoned_exported FROM zoned_source WHERE 1 = 0")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "zoned_exported").await.unwrap();
+    for row in &rows {
+        let statement =
+            tablepro_core::sql_literal::build_insert_literal("mssql", None, "zoned_exported", &columns, row).unwrap();
+        conn.execute(&statement).await.unwrap();
+    }
+    let matching = conn
+        .query("SELECT COUNT(*) FROM zoned_source s JOIN zoned_exported c ON s.id = c.id AND s.zoned = c.zoned")
+        .await
+        .unwrap();
+    assert_eq!(matching.rows, vec![vec![Value::Int(3)]]);
+}

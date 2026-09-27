@@ -93,6 +93,7 @@
 - Redis binary values with invalid UTF-8 retain their original bytes. SQL statement export preserves binary values using exact literals on PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse and DuckDB; unsupported binary exports, undecodable values and non-finite numbers are refused instead of substituting NULL. Copy as IN continues to skip binary and undecodable cells.
 - CSV export and Copy as CSV write empty text as a quoted empty field and NULL as a bare empty field, so the two stay distinct. With quoting set to Always, NULL was also written as a quoted empty field.
 - SQL Server INSERT statements copied or exported from a `datetime` column with milliseconds now run and restore the same value. SQL Server rejected them with a conversion error.
+- SQL Server `datetimeoffset` values with a non-UTC offset now show the stored instant. They were shifted by their offset a second time in the grid, in exports and in copied INSERT statements.
 
 ### Security
 
