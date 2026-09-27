@@ -151,6 +151,34 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_html_nul_text_preserves_destination_and_reports_coordinates() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keep.html");
+        std::fs::write(&path, b"existing HTML").unwrap();
+        let data = QueryResult {
+            columns: vec![column("id"), column("note")],
+            rows: vec![
+                vec![Value::Int(1), Value::Text("valid".into())],
+                vec![Value::Int(2), Value::Text("before\0after".into())],
+            ],
+            truncated: false,
+        };
+        let error = write_result_file(
+            &path,
+            &data,
+            &plain(ResultFormat::Html, &CsvOptions::default()),
+            || false,
+            |_| {},
+        )
+        .unwrap_err();
+        let message = error.to_string();
+        assert!(message.contains("U+0000 at row 2, column 2"), "{message}");
+        assert!(message.contains("JSON"), "{message}");
+        assert_eq!(std::fs::read(&path).unwrap(), b"existing HTML");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
     fn value_contract_xml_illegal_text_preserves_destination_and_reports_coordinates() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("keep.xml");

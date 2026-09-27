@@ -12,18 +12,22 @@ impl ResultWriter for HtmlWriter {
         output.write_all(
             b"<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<title>Exported rows</title>\n</head>\n<body>\n<table>\n<thead>\n<tr>",
         )?;
-        for column in columns {
-            write!(output, "<th>{}</th>", escape_html(&column.name))?;
+        for (index, column) in columns.iter().enumerate() {
+            write!(output, "<th>{}</th>", escape_cell(&column.name, 0, index)?)?;
         }
         output.write_all(b"</tr>\n</thead>\n<tbody>\n")?;
         Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
+    fn write_row(&mut self, output: &mut dyn Write, row_index: usize, row: &[Value]) -> Result<(), ExportError> {
         output.write_all(b"<tr>")?;
-        for value in row {
+        for (index, value) in row.iter().enumerate() {
             match value_to_text(value) {
-                Some(text) => write!(output, "<td>{}</td>", escape_html(&text))?,
+                Some(text) => write!(
+                    output,
+                    "<td>{}</td>",
+                    escape_cell(&text, row_index.saturating_add(1), index)?
+                )?,
                 None => output.write_all(b"<td class=\"null\"></td>")?,
             }
         }
@@ -37,13 +41,26 @@ impl ResultWriter for HtmlWriter {
     }
 }
 
+fn escape_cell(value: &str, row: usize, column: usize) -> Result<String, ExportError> {
+    escape_html(value).map_err(|character| ExportError::HtmlCharacter {
+        row,
+        column: column.saturating_add(1),
+        codepoint: character as u32,
+    })
+}
+
 /// HTML5 named character references. A raw apostrophe or quotation mark is
 /// harmless in element content but ends an attribute value, so both are
-/// escaped here rather than only where an attribute is written.
-fn escape_html(value: &str) -> String {
+/// escaped here rather than only where an attribute is written. An HTML
+/// parser turns every raw CR into LF and drops U+0000 from element content,
+/// and a `&#0;` reference parses as U+FFFD, so CR is written as a numeric
+/// reference and U+0000 cannot be represented.
+fn escape_html(value: &str) -> Result<String, char> {
     let mut escaped = String::with_capacity(value.len());
     for character in value.chars() {
         match character {
+            '\0' => return Err(character),
+            '\r' => escaped.push_str("&#13;"),
             '&' => escaped.push_str("&amp;"),
             '<' => escaped.push_str("&lt;"),
             '>' => escaped.push_str("&gt;"),
@@ -52,7 +69,7 @@ fn escape_html(value: &str) -> String {
             other => escaped.push(other),
         }
     }
-    escaped
+    Ok(escaped)
 }
 
 #[cfg(test)]
@@ -83,6 +100,18 @@ mod tests {
             "{html}"
         );
         assert!(!html.contains("<script>"), "{html}");
+    }
+
+    #[test]
+    fn value_contract_html_preserves_carriage_returns_through_parser_normalization() {
+        let columns = [super::super::test_support::column("a\rb")];
+        let rows = vec![vec![Value::Text("a\rb\r\nc\n\t&#13;".into())]];
+
+        let html = render(&columns, &rows);
+
+        assert!(html.contains("<th>a&#13;b</th>"), "{html}");
+        assert!(html.contains("<td>a&#13;b&#13;\nc\n\t&amp;#13;</td>"), "{html}");
+        assert!(!html.contains('\r'), "{html}");
     }
 
     #[test]

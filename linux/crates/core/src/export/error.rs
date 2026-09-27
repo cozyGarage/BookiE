@@ -26,6 +26,10 @@ pub enum ExportError {
         "XML 1.0 cannot preserve U+{codepoint:04X} at row {row}, column {column}. Export as JSON to keep the original text"
     )]
     XmlCharacter { row: usize, column: usize, codepoint: u32 },
+    #[error(
+        "HTML cannot preserve U+{codepoint:04X} at row {row}, column {column}. Export as JSON to keep the original text"
+    )]
+    HtmlCharacter { row: usize, column: usize, codepoint: u32 },
     #[error("The Excel workbook could not be built")]
     Workbook(#[from] rust_xlsxwriter::XlsxError),
 }
