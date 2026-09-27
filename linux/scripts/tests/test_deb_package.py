@@ -51,7 +51,7 @@ def _stage_package(source: Path, root: Path, *, include_aliases: bool, include_s
     )
     (stage / "DEBIAN/control").write_text(
         "Package: tablepro\n"
-        "Version: 0.1.4-1\n"
+        "Version: 0.1.5-1\n"
         "Section: database\n"
         "Priority: optional\n"
         "Architecture: amd64\n"
@@ -59,7 +59,7 @@ def _stage_package(source: Path, root: Path, *, include_aliases: bool, include_s
         "Description: Native Linux database client\n"
         " BookiE test fixture\n"
     )
-    package = root / "tablepro_0.1.4-1_amd64.deb"
+    package = root / "tablepro_0.1.5-1_amd64.deb"
     subprocess.run(
         ["dpkg-deb", "--root-owner-group", "--build", str(stage), str(package)],
         check=True,

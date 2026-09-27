@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-27
+
 ### Added
 
 - Loaded results can be exported as Markdown, HTML, XML, SQL INSERT statements, or an Excel workbook, alongside CSV and JSON. Statement export is offered only for connections whose engine can express SQL literals, and an Excel export exceeding worksheet limits leaves any existing destination untouched. Workbooks preserve fractional seconds, timezone-bearing timestamps and dates outside 1900–9999 as exact text; ordinary supported dates and whole-second times remain native spreadsheet cells. Empty text is refused with CSV/JSON alternatives instead of being silently collapsed into NULL, preserving any existing destination. XML and HTML preserve carriage returns when parsed. XML refuses unsupported XML 1.0 characters and HTML refuses NUL characters with a row/column error instead of replacing or dropping them.

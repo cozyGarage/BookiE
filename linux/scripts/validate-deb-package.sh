@@ -16,8 +16,8 @@ if ! grep -Eq '^[[:space:]]*Package: tablepro$' <<<"$control"; then
   echo "Debian package name must remain tablepro" >&2
   exit 1
 fi
-if ! grep -Eq '^[[:space:]]*Version: 0\.1\.4-1$' <<<"$control"; then
-  echo "Debian package version must be 0.1.4-1" >&2
+if ! grep -Eq '^[[:space:]]*Version: 0\.1\.5-1$' <<<"$control"; then
+  echo "Debian package version must be 0.1.5-1" >&2
   exit 1
 fi
 

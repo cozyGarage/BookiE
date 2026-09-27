@@ -840,3 +840,25 @@ Open findings from the audit:
 
 B3 remains open.
 
+### B3 driver gaps and version 0.1.5 — September 27
+
+Each open finding from the audit was reproduced with a failing test first and then fixed:
+
+- SQL Server `datetimeoffset` keeps its original offset as exact text.
+- MySQL text exports read the same with or without `NO_BACKSLASH_ESCAPES`, and BIT and spatial values decode exactly.
+- ClickHouse keeps decimal scale and fractional seconds in parameters and SQL exports.
+- DuckDB binds dates, times and microsecond timestamps natively.
+- PostgreSQL `int2vector` and `oidvector` values keep their space-separated form.
+
+The shared contract now requires decimal scale to match.
+
+The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson had declared 0.2.0, so Meson builds reported a different version than packaged builds. No 0.1.5 package or tag has been published.
+
+Open:
+- DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
+- Grid editing of MySQL BIT and spatial cells is untested.
+- MySQL `COMMENT` clauses still depend on backslash escaping.
+- ClickHouse DateTime64 values outside 1900–2262 are saturated by the server.
+
+B3 remains open.
+

@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${DEB_OUT:-$ROOT/packaging/out}"
-VERSION="${DEB_VERSION:-0.1.4-1}"
+VERSION="${DEB_VERSION:-0.1.5-1}"
 ARCH="${DEB_ARCH:-amd64}"
 PKG_NAME="tablepro_${VERSION}_${ARCH}"
 mkdir -p "$OUT"

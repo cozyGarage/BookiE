@@ -127,7 +127,7 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 The current package is BookiE 0.1.4. Download it from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4), or see [the release evidence](docs/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/build-arch-rc.sh
 ```
 
 The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only to verify an already published tag.

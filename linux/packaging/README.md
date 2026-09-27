@@ -15,7 +15,7 @@ systemd unit: stdio agentd is launched on demand by its MCP client.
 After committing and validating the candidate (no published tag required):
 
 ```bash
-TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.4 ./scripts/build-arch-rc.sh
+TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/build-arch-rc.sh
 ```
 
 The helper refuses a dirty tree or a candidate SHA other than `HEAD`. It archives
@@ -45,8 +45,8 @@ The GNOME 50 baseline needs GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceVie
 Use `flatpak/com.tablepro.linux.Devel.json` for an isolated development Flatpak.
 
 ```bash
-DEB_VERSION=0.1.4-1 ./scripts/build-deb.sh
-sudo apt install ./packaging/out/tablepro_0.1.4-1_amd64.deb
+DEB_VERSION=0.1.5-1 ./scripts/build-deb.sh
+sudo apt install ./packaging/out/tablepro_0.1.5-1_amd64.deb
 ```
 
 The package name stays `tablepro`. It installs `/usr/bin/bookie` and

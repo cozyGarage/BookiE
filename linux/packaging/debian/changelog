@@ -1,3 +1,9 @@
+tablepro (0.1.5-1) UNRELEASED; urgency=medium
+
+  * BookiE 0.1.5 with lossless value fixes across the database drivers and exports.
+
+ -- TablePro Contributors <noreply@tablepro.app>  Sun, 27 Sep 2026 16:00:00 +0200
+
 tablepro (0.1.4-1) UNRELEASED; urgency=medium
 
   * BookiE 0.1.4 with bookie launchers, system SQLite, and Rust 1.98.
