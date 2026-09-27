@@ -1,3 +1,9 @@
+#[cfg(test)]
+extern crate self as tablepro_core;
+#[cfg(test)]
+#[path = "../tests/support/parser_contract.rs"]
+mod parser_contract;
+
 mod activity;
 mod catalog;
 mod connection;

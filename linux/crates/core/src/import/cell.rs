@@ -277,39 +277,14 @@ mod tests {
 
     #[test]
     fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
-        let corpus: serde_json::Value = serde_json::from_str(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../testdata/value-contract.json"
-        )))
-        .unwrap();
-        for text in corpus["float_rejected"].as_array().unwrap() {
-            assert!(parse_cell(text.as_str().unwrap(), ColumnKind::Float).is_err(), "{text}");
-        }
-        for (field, kind) in [
-            ("integer_rejected", ColumnKind::Int),
-            ("decimal_rejected", ColumnKind::Decimal),
-        ] {
-            for text in corpus[field].as_array().unwrap() {
-                assert!(parse_cell(text.as_str().unwrap(), kind).is_err(), "{text}");
-            }
-        }
-        for text in corpus["integers"].as_array().unwrap() {
-            let text = text.as_str().unwrap();
-            assert_eq!(
-                parse_cell(text, ColumnKind::Int).unwrap(),
-                Value::Int(text.parse().unwrap())
-            );
-        }
-        for text in corpus["decimals"].as_array().unwrap() {
-            let text = text.as_str().unwrap();
-            assert_eq!(
-                parse_cell(text, ColumnKind::Decimal).unwrap(),
-                Value::Decimal(text.parse().unwrap())
-            );
-        }
-        for text in corpus["texts"].as_array().unwrap() {
-            let text = text.as_str().unwrap();
-            assert_eq!(parse_cell(text, ColumnKind::Text).unwrap(), Value::Text(text.into()));
+        let parse = |kind: ColumnKind| move |text: &str| parse_cell(text, kind).ok();
+        crate::parser_contract::assert_numeric_parsers(
+            parse(ColumnKind::Int),
+            parse(ColumnKind::Decimal),
+            parse(ColumnKind::Float),
+        );
+        for text in crate::parser_contract::corpus_texts("texts") {
+            assert_eq!(parse_cell(&text, ColumnKind::Text).unwrap(), Value::Text(text.clone()));
         }
     }
 
