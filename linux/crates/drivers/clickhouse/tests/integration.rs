@@ -311,6 +311,27 @@ async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
         vec![vec![Value::TimestampTz(instant)]],
         "DateTime64 timezone metadata must be applied to the displayed local clock",
     );
+
+    let expected = Value::TimestampTz(instant);
+    let bound = conn
+        .query_params(
+            "SELECT CAST(? AS DateTime64(6, 'Asia/Tokyo'))",
+            std::slice::from_ref(&expected),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        bound.rows,
+        vec![vec![expected.clone()]],
+        "bound timestamp timezone round trip"
+    );
+
+    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
+    let exported = conn
+        .query(&format!("SELECT CAST({literal} AS DateTime64(6, 'Asia/Tokyo'))"))
+        .await
+        .unwrap();
+    assert_eq!(exported.rows, vec![vec![expected]], "SQL literal timezone round trip");
 }
 
 #[tokio::test]

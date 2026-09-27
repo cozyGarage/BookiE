@@ -563,8 +563,9 @@ values do not identify a unique instant and must not be guessed. Untagged
 
 Unit tests cover type wrappers, Tokyo conversion, unknown zones, and New York DST
 gaps/folds. A Docker integration test first failed with `DateTime(12:34...)`
-instead of the expected `TimestampTz(03:34...Z)`, then passed after the fix. The
-full ClickHouse integration suite passed all 23 cases. The combined `values`
+instead of the expected `TimestampTz(03:34...Z)`, then passed after the fix. It
+also checks that the instant survives a bound parameter and a SQL literal round
+trip. The full ClickHouse integration suite passed all 23 cases. The combined `values`
 layer passed in 113.058 seconds, `full` passed in 100.8 seconds, and the harness
 passed. Reports are in `target/quality/20260927T180959352277Z-layers/`,
 `target/quality/20260927T181245187611Z-layers/`, and
