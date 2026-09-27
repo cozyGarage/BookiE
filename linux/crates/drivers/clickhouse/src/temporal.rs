@@ -38,10 +38,7 @@ pub(super) fn parse_datetime(raw: &serde_json::Value, type_name: &str) -> Value 
 
 fn datetime_timezone(type_name: &str) -> Option<&str> {
     let mut inner = type_name.trim();
-    loop {
-        let Some(unwrapped) = unwrap_type(inner, "LowCardinality").or_else(|| unwrap_type(inner, "Nullable")) else {
-            break;
-        };
+    while let Some(unwrapped) = unwrap_type(inner, "LowCardinality").or_else(|| unwrap_type(inner, "Nullable")) {
         if unwrapped.len() >= inner.len() {
             return None;
         }

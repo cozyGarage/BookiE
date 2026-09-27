@@ -580,12 +580,12 @@ cargo test --locked -p tablepro-driver-clickhouse --test integration -- --includ
 ```
 
 Scoped Rust mutation evidence for `temporal.rs` is in
-`target/quality/20260927-ch-temporal-mutants-followup/mutants.out/outcomes.json`:
+`target/quality/20260927-ch-temporal-mutants-final/mutants.out/outcomes.json`:
 13 caught, 2 unviable, no survivors or timeouts. The initial mutation pass made
 two synthetic wrapper results loop; the progress guard now exits safely and the
 repeat has no timeout. Reproduce with:
 
 ```sh
 mkdir -p target/mutation-tmp
-TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-clickhouse --file crates/drivers/clickhouse/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260927-ch-temporal-mutants-followup -- --lib
+TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-clickhouse --file crates/drivers/clickhouse/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260927-ch-temporal-mutants-final -- --lib
 ```
