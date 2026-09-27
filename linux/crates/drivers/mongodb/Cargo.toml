@@ -21,9 +21,11 @@ tokio.workspace = true
 
 [dev-dependencies]
 csv.workspace = true
+tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo"] }
+zip = { version = "8.3", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

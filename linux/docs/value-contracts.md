@@ -616,10 +616,12 @@ records four generated mutations: three caught, one unviable whole-function
 replacement (`Value` has no `Default`), and no survivors or timeouts. The failing
 pre-fix regressions independently demonstrate test sensitivity. The real-server
 test verifies nested Extended JSON through JSON export and parses generated CSV
-back into fields to check that quoting preserves the nested object. An MCP unit
-contract confirms BSON Extended JSON is passed through without flattening. Nested
-grid editing, XLSX export, Mongo-backed MCP round trip, native BSON re-import and
-other consumers remain open.
+back into fields to check that quoting preserves the nested object. It also
+exports the actual query result as XLSX and checks Decimal128, date and binary
+subtype markers in workbook strings. An MCP unit contract confirms BSON
+Extended JSON is passed through without flattening. Nested grid editing,
+Mongo-backed MCP round trip, native BSON re-import and other consumers remain
+open.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

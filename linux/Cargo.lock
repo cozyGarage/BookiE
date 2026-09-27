@@ -6252,9 +6252,11 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tablepro-core",
+ "tempfile",
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+ "zip 8.6.0",
 ]
 
 [[package]]

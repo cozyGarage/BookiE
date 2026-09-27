@@ -315,4 +315,40 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
         nested_csv, exported[0]["nested"],
         "CSV quoting must preserve nested BSON JSON"
     );
+
+    let directory = tempfile::tempdir().expect("temporary export directory");
+    let workbook_path = directory.path().join("mongo-values.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .expect("export MongoDB result to XLSX");
+    let workbook = std::fs::File::open(workbook_path).expect("open workbook");
+    let mut archive = zip::ZipArchive::new(workbook).expect("open workbook archive");
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive
+            .by_name("xl/sharedStrings.xml")
+            .expect("workbook shared strings"),
+        &mut shared_strings,
+    )
+    .expect("read workbook shared strings");
+    for marker in [
+        "$numberDecimal",
+        "$numberLong",
+        "\"subType\":\"80\"",
+        "\"subType\":\"04\"",
+    ] {
+        assert!(
+            shared_strings.contains(marker),
+            "missing {marker} in XLSX strings: {shared_strings}"
+        );
+    }
 }

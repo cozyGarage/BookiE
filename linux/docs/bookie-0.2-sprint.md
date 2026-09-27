@@ -372,9 +372,11 @@ caught three of four generated mutations, with one unviable whole-function
 replacement and no survivors or timeouts. The real-server contract verifies
 nested Extended JSON through JSON export, and an MCP unit contract verifies the
 value conversion does not flatten it. CSV is parsed back into fields to verify
-that quoting preserves the nested value. Nested editing, XLSX export,
-Mongo-backed MCP round trip, native BSON re-import and other consumers remain
-open; B3 is not closed.
+that quoting preserves the nested value. The real-server scenario also sends
+its query result through the public XLSX exporter and checks Decimal128, date
+and binary subtype markers in workbook strings. All eight MongoDB integration
+tests, including ignored Docker cases, passed. Nested editing, Mongo-backed MCP
+round trip, BSON re-import and other consumers remain open; B3 is not closed.
 
 ### B3 SQLite dynamic storage classes: 2026-09-27
 
