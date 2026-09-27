@@ -97,6 +97,7 @@
 - SQL Server `datetimeoffset` values with a non-UTC offset now show the stored instant. They were shifted by their offset a second time in the grid, in exports and in copied INSERT statements.
 - ClickHouse decimals keep their declared scale, so 2.50 in a Decimal(10, 2) column no longer shows as 2.5.
 - ClickHouse timestamp parameters keep their fractional seconds. Local timestamps lost every fraction and timezone timestamps were cut to milliseconds.
+- ClickHouse SQL INSERT exports of timezone timestamps now run and keep every fractional digit. ClickHouse rejected them with a parse error.
 
 ### Security
 

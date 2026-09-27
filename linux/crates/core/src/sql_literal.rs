@@ -49,6 +49,9 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
             format!("CAST({} AS datetime2)", quote_literal(driver_id, &stamp.to_string()))
         }
         Value::DateTime(stamp) => quote_literal(driver_id, &stamp.to_string()),
+        Value::TimestampTz(stamp) if driver_id == "clickhouse" => {
+            format!("toDateTime64('{}', 9, 'UTC')", stamp.format("%Y-%m-%d %H:%M:%S%.9f"))
+        }
         Value::TimestampTz(stamp) => quote_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => quote_literal(driver_id, &id.to_string()),
         Value::Json(json) => quote_literal(driver_id, &json.to_string()),

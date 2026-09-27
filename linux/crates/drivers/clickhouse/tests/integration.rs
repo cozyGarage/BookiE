@@ -604,3 +604,25 @@ async fn temporal_parameters_keep_fractional_seconds() {
         .unwrap();
     assert_eq!(bound.rows, expected);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn temporal_sql_exports_keep_fractional_seconds() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    create_stamp_table(connection.as_ref()).await;
+    let (local, instant) = fractional_stamps();
+    let literals: Vec<String> = [Value::DateTime(local), Value::TimestampTz(instant.and_utc())]
+        .iter()
+        .map(|value| tablepro_core::sql_literal::render_sql_literal("clickhouse", value).unwrap())
+        .collect();
+    connection
+        .execute(&format!("INSERT INTO stamps VALUES ({}, {})", literals[0], literals[1]))
+        .await
+        .unwrap();
+    let stored = connection.query("SELECT nanos, micros FROM stamps").await.unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![vec![Value::DateTime(local), Value::DateTime(instant)]]
+    );
+}
