@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::import::cell::{CsvRowError, row_to_values};
+use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{BuildSqlError, IdentError, build_insert_from_draft, validate_ident};
@@ -75,7 +75,7 @@ pub fn build_insert_plan(
     }
     let (columns, mapping) = insert_columns(target)?;
     let statement = insert_statement(target, &columns)?;
-    let rows = bind_rows(sheet, &columns, &mapping, options)?;
+    let rows = bind_rows(sheet, &columns, &mapping, options, target.driver_id)?;
     Ok(InsertPlan {
         statement,
         columns,
@@ -134,13 +134,14 @@ fn bind_rows(
     columns: &[ColumnInfo],
     mapping: &[Option<usize>],
     options: &CsvImportOptions,
+    driver_id: &str,
 ) -> Result<Vec<Vec<Value>>, PlanError> {
     let header_offset = usize::from(options.has_header);
     let mut rows = Vec::with_capacity(sheet.rows.len());
     let mut failures = Vec::new();
     let mut total_failures = 0;
     for (index, row) in sheet.rows.iter().enumerate() {
-        match row_to_values(row, mapping, columns, options, index + header_offset + 1) {
+        match row_to_values_for_driver(row, mapping, columns, options, index + header_offset + 1, driver_id) {
             Ok(values) => rows.push(values),
             Err(error) => {
                 total_failures += 1;
@@ -305,6 +306,28 @@ mod tests {
         assert_eq!(total, 2);
         assert_eq!(first[0].line, 3);
         assert!(!first.iter().any(|error| error.to_string().contains("not-a-number")));
+    }
+
+    #[test]
+    fn numeric_affinity_text_fallback_is_sqlite_only() {
+        let columns = vec![column("value", "NUMERIC")];
+        let mapping = vec![Some(0)];
+        let sheet = sheet(&[&["not-a-number"]], &["value"]);
+        let sqlite = ImportTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "flexible",
+            columns: &columns,
+            mapping: &mapping,
+        };
+        let plan = build_insert_plan(&sqlite, &sheet, &CsvImportOptions::default()).expect("SQLite stores text");
+        assert_eq!(plan.rows, vec![vec![Value::Text("not-a-number".to_owned())]]);
+
+        let postgres = target(&columns, &mapping);
+        assert!(matches!(
+            build_insert_plan(&postgres, &sheet, &CsvImportOptions::default()),
+            Err(PlanError::Rows { total: 1, .. })
+        ));
     }
 
     #[test]

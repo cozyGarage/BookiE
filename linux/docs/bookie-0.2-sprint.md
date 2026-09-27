@@ -385,6 +385,14 @@ literals and verifies the same storage classes and values after re-import. All
 21 SQLite integration tests passed. CSV import and installed grid acceptance
 across affinity transitions remain open.
 
+The policy-guarded SQLite CSV import had a separate failure: strict numeric
+parsing rejected legal text stored in a NUMERIC-affinity column. SQLite imports
+now bind unparseable INTEGER/REAL/NUMERIC fields as text so SQLite can apply its
+own affinity; other drivers remain strict. A real file-backed test verifies
+text and decimal rows through batched, audited import. The reproducer failed
+before the fix, and all 40 SQLite driver tests passed. Installed grid acceptance
+remains open.
+
 ### B3 XLSX nested JSON consumer check: 2026-09-27
 
 A core workbook regression verifies that nested canonical Extended JSON keeps

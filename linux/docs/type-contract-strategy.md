@@ -57,7 +57,7 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | ClickHouse | Shared scalar, decimal with declared scale, nonfinite and long-value contracts, `DateTime64` scales 0/3/6/9, named-zone instants decoded through IANA timezone rules, nanosecond temporal parameters and SQL exports, local refusal of out-of-range `DateTime64(9)` parameters and SQL literals | Ambiguous/nonexistent local times remain explicit undecodable values because the wire format omits their offset; broader temporal bounds, wider integers and nested values |
 | MongoDB | Decimal128 extremes remain exact text; BSON dates outside chrono's RFC3339 range and nested documents/arrays use canonical Extended JSON; generic binary remains bytes while other subtypes retain canonical metadata; JSON/CSV exports, MCP conversion and the shared XLSX writer preserve Extended JSON text | Nested grid editing, Mongo-backed XLSX and MCP round trips, BSON re-import, BSON kinds outside the shared value model |
 | Redis | Integer/text/NULL protocol contracts | Nested reply shapes and command-specific binary/number semantics; SQL date types are not applicable |
-| SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits and SQL-literal re-import | CSV import and grid/UI consumer acceptance across storage-class transitions; fixed-decimal storage is not applicable |
+| SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import | Installed grid/UI acceptance across storage-class transitions; fixed-decimal storage is not applicable |
 
 ## Test workflow
 
