@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tablepro_core::{AuthMode, Connection, TlsMode};
 use tablepro_release_tests::Fixture;
-use tablepro_ssh::SshConfig;
+use tablepro_ssh::{SshConfig, SshTunnel};
 use tablepro_transport::establish;
 
 use drivers_postgres::PgDriver;
@@ -114,4 +114,42 @@ async fn a_direct_session_and_a_tunnelled_session_reach_the_same_database() {
         .execute("DROP TABLE agent_transport_probe")
         .await
         .expect("drop the probe table");
+}
+
+#[tokio::test]
+#[ignore = "requires the postgres release fixture"]
+async fn agentd_refuses_an_unknown_host_key_with_an_empty_known_hosts_file() {
+    let fixture = Fixture::from_env();
+    let known_hosts = tablepro_ssh::default_known_hosts_path().expect("a known_hosts path must be resolvable");
+    let backup = known_hosts.with_extension("bak-refuse-test");
+    if known_hosts.exists() {
+        std::fs::rename(&known_hosts, &backup).expect("set aside any already-learned host keys");
+    }
+    assert!(
+        !known_hosts.exists(),
+        "the refusal case must start from an empty known_hosts file"
+    );
+
+    let result = SshTunnel::open(
+        fixture.ssh_config(),
+        fixture.database_hostname.clone(),
+        fixture.database_port,
+        tablepro_ssh::UnknownHostKey::Refuse,
+    )
+    .await;
+
+    let known_hosts_written = known_hosts.exists();
+    if backup.exists() {
+        std::fs::rename(&backup, &known_hosts).expect("restore the known_hosts file for later tests");
+    }
+
+    let error = result.err().expect("an unknown host key must be refused, not learned");
+    assert!(
+        matches!(error, tablepro_ssh::SshError::UnknownHostKey { .. }),
+        "the refused connection must fail with UnknownHostKey, got: {error}"
+    );
+    assert!(
+        !known_hosts_written,
+        "refusing an unknown host key must not write a known_hosts file"
+    );
 }
