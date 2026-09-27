@@ -889,6 +889,8 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
         "SELECT '5874897-12-31'::date",
         "SELECT '280000-01-01'::timestamp",
         "SELECT '280000-01-01 00:00:00+00'::timestamptz",
+        "SELECT '1 2'::int2vector",
+        "SELECT '23 25'::oidvector",
     ] {
         let result = conn.query(sql).await.unwrap_or_else(|e| panic!("{sql}: {e}"));
         assert!(

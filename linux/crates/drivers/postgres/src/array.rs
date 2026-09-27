@@ -3,12 +3,19 @@ use sqlx::postgres::{PgTypeKind, PgValueFormat, PgValueRef};
 use tablepro_core::Value;
 
 const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
+// PostgreSQL sends int2vector and oidvector in array wire format, but their text input accepts only
+// space-separated values, so array text for them could not be imported again.
+const INT2VECTOR_OID: u32 = 22;
+const OIDVECTOR_OID: u32 = 30;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let info = raw.type_info();
     let PgTypeKind::Array(element) = info.kind() else {
         return None;
     };
+    if matches!(info.oid()?.0, INT2VECTOR_OID | OIDVECTOR_OID) {
+        return None;
+    }
     match raw.format() {
         PgValueFormat::Binary => decode_binary(raw.as_bytes().ok()?, element.oid()?.0).map(Value::Text),
         PgValueFormat::Text => raw.as_str().ok().map(|text| Value::Text(text.into())),
