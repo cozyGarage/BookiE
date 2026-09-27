@@ -21,13 +21,12 @@ pub(crate) fn date(days: i32) -> Value {
 }
 
 fn calendar_text(date: NaiveDate) -> String {
-    let year = date.year();
-    let display_year = if year <= 0 { 1 - year } else { year };
+    let (is_ce, year) = date.year_ce();
     format!(
-        "{display_year:04}-{:02}-{:02}{}",
+        "{year:04}-{:02}-{:02}{}",
         date.month(),
         date.day(),
-        if year <= 0 { " (BC)" } else { "" }
+        if is_ce { "" } else { " (BC)" }
     )
 }
 

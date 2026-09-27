@@ -346,25 +346,30 @@ fn run_query(
     let mut raw_rows: Vec<Vec<Value>> = Vec::new();
     let mut truncated = false;
     let mut column_count = 0usize;
+    let mut zoned_columns = Vec::new();
     while let Some(row) = rows.next().map_err(map_duck_error)? {
         if column_count == 0 {
             column_count = row.as_ref().column_count();
+            zoned_columns = (0..column_count)
+                .map(|i| {
+                    matches!(
+                        row.as_ref().column_type(i),
+                        duckdb::arrow::datatypes::DataType::Timestamp(_, Some(_))
+                    )
+                })
+                .collect();
         }
         if raw_rows.len() >= limit {
             truncated = true;
             break;
         }
         raw_rows.push(
-            (0..column_count)
-                .map(|i| {
-                    let value = duck_value_ref_to_value(row.get_ref_unwrap(i));
-                    if let (Value::DateTime(timestamp), duckdb::arrow::datatypes::DataType::Timestamp(_, Some(_))) =
-                        (&value, row.as_ref().column_type(i))
-                    {
-                        Value::TimestampTz(timestamp.and_utc())
-                    } else {
-                        value
-                    }
+            zoned_columns
+                .iter()
+                .enumerate()
+                .map(|(i, zoned)| match duck_value_ref_to_value(row.get_ref_unwrap(i)) {
+                    Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                    value => value,
                 })
                 .collect(),
         );
