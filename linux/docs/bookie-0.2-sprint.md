@@ -369,9 +369,11 @@ Docker coverage inserts native Decimal128, date, UUID and user-defined binary
 fixtures and reads them through the driver query path. All 24 MongoDB unit tests
 and all eight real-server integration tests passed. Scoped mutation testing
 caught three of four generated mutations, with one unviable whole-function
-replacement and no survivors or timeouts. The real-server contract also verifies
-nested Extended JSON through JSON export. Nested editing, CSV/XLSX/MCP parity,
-native BSON re-import and other consumers remain open; B3 is not closed.
+replacement and no survivors or timeouts. The real-server contract verifies
+nested Extended JSON through JSON export, and an MCP unit contract verifies the
+value conversion does not flatten it. Nested editing, CSV/XLSX export,
+Mongo-backed MCP round trip, native BSON re-import and other consumers remain
+open; B3 is not closed.
 
 ## Documentation and boundaries
 
