@@ -330,25 +330,235 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
         |_| {},
     )
     .expect("export MongoDB result to XLSX");
-    let workbook = std::fs::File::open(workbook_path).expect("open workbook");
-    let mut archive = zip::ZipArchive::new(workbook).expect("open workbook archive");
-    let mut shared_strings = String::new();
-    std::io::Read::read_to_string(
-        &mut archive
-            .by_name("xl/sharedStrings.xml")
-            .expect("workbook shared strings"),
-        &mut shared_strings,
-    )
-    .expect("read workbook shared strings");
-    for marker in [
-        "$numberDecimal",
-        "$numberLong",
-        "\"subType\":\"80\"",
-        "\"subType\":\"04\"",
-    ] {
-        assert!(
-            shared_strings.contains(marker),
-            "missing {marker} in XLSX strings: {shared_strings}"
+    let nested_cell = xlsx_shared_cell_text(&workbook_path, nested, 2).expect("read nested XLSX cell");
+    if let Some(marker) = missing_nested_xlsx_marker(&nested_cell) {
+        panic!("nested XLSX cell missing {marker}: {nested_cell}");
+    }
+}
+
+const NESTED_XLSX_DECIMAL: &str = r#""$numberDecimal":"1234567890123456789.123456789012345""#;
+const NESTED_XLSX_DATE: &str = r#""$date":{"$numberLong":"1234567890123"}"#;
+const NESTED_XLSX_BINARY: &str = r#""subType":"00""#;
+
+fn missing_nested_xlsx_marker(cell: &str) -> Option<&'static str> {
+    [NESTED_XLSX_DECIMAL, NESTED_XLSX_DATE, NESTED_XLSX_BINARY]
+        .into_iter()
+        .find(|marker| !cell.contains(marker))
+}
+
+fn excel_column_name(index: usize) -> String {
+    let mut letters = Vec::new();
+    let mut remainder = index;
+    loop {
+        let offset = u8::try_from(remainder % 26).unwrap();
+        letters.push(char::from(b'A' + offset));
+        if remainder < 26 {
+            break;
+        }
+        remainder = remainder / 26 - 1;
+    }
+    letters.iter().rev().collect()
+}
+
+fn unescape_xml(text: &str) -> String {
+    let mut decoded = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(amp) = rest.find('&') {
+        decoded.push_str(&rest[..amp]);
+        let Some(end) = rest[amp..].find(';') else {
+            decoded.push_str(&rest[amp..]);
+            return decoded;
+        };
+        let entity = &rest[amp..=amp + end];
+        decoded.push_str(match entity {
+            "&amp;" => "&",
+            "&lt;" => "<",
+            "&gt;" => ">",
+            "&quot;" => "\"",
+            "&apos;" => "'",
+            _ => entity,
+        });
+        rest = &rest[amp + end + 1..];
+    }
+    decoded.push_str(rest);
+    decoded
+}
+
+fn xml_text_content(entry: &str) -> String {
+    let mut text = String::new();
+    let mut rest = entry;
+    while let Some(start) = rest.find("<t") {
+        let from_tag = &rest[start..];
+        let Some(gt) = from_tag.find('>') else {
+            break;
+        };
+        if from_tag[..gt].ends_with('/') {
+            rest = &from_tag[gt + 1..];
+            continue;
+        }
+        let after = &from_tag[gt + 1..];
+        let Some(close) = after.find("</t>") else {
+            break;
+        };
+        text.push_str(&unescape_xml(&after[..close]));
+        rest = &after[close + 4..];
+    }
+    text
+}
+
+fn worksheet_cell<'a>(sheet: &'a str, reference: &str) -> Option<&'a str> {
+    let token = format!("r=\"{reference}\"");
+    let at = sheet.find(&token)?;
+    let start = sheet[..at].rfind("<c ")?;
+    let end = sheet[at..].find("</c>")? + at + "</c>".len();
+    Some(&sheet[start..end])
+}
+
+fn shared_string_index(element: &str) -> Option<usize> {
+    let start = element.find("<v>")? + "<v>".len();
+    let end = start + element[start..].find("</v>")?;
+    element[start..end].trim().parse().ok()
+}
+
+fn shared_string_at(strings: &str, index: usize) -> Option<String> {
+    let entry = strings.split("<si>").nth(index + 1)?;
+    let end = entry.find("</si>").unwrap_or(entry.len());
+    Some(xml_text_content(&entry[..end]))
+}
+
+fn read_zip_text(path: &std::path::Path, name: &str) -> Result<String, String> {
+    let file = std::fs::File::open(path).map_err(|error| error.to_string())?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|error| error.to_string())?;
+    let mut entry = archive.by_name(name).map_err(|error| format!("{name}: {error}"))?;
+    let mut text = String::new();
+    std::io::Read::read_to_string(&mut entry, &mut text).map_err(|error| error.to_string())?;
+    Ok(text)
+}
+
+fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Result<String, String> {
+    let sheet = read_zip_text(path, "xl/worksheets/sheet1.xml")?;
+    let strings = read_zip_text(path, "xl/sharedStrings.xml")?;
+    let reference = format!("{}{row}", excel_column_name(column));
+    let element = worksheet_cell(&sheet, &reference).ok_or_else(|| format!("missing cell {reference}"))?;
+    if !element.contains("t=\"s\"") {
+        return Err(format!("cell {reference} is not a shared string: {element}"));
+    }
+    let index =
+        shared_string_index(element).ok_or_else(|| format!("cell {reference} has no string index: {element}"))?;
+    shared_string_at(&strings, index).ok_or_else(|| format!("shared string {index} missing"))
+}
+
+fn json_column(name: &str) -> tablepro_core::ColumnInfo {
+    tablepro_core::ColumnInfo {
+        name: name.into(),
+        data_type: "json".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+    }
+}
+
+fn nested_extended_json(include_date: bool, include_binary: bool) -> serde_json::Value {
+    let mut nested = serde_json::Map::new();
+    nested.insert(
+        "amount".into(),
+        serde_json::json!({"$numberDecimal": "1234567890123456789.123456789012345"}),
+    );
+    if include_binary {
+        nested.insert(
+            "blob".into(),
+            serde_json::json!({"$binary": {"base64": "AP9B", "subType": "00"}}),
         );
     }
+    if include_date {
+        nested.insert(
+            "when".into(),
+            serde_json::json!({"$date": {"$numberLong": "1234567890123"}}),
+        );
+    }
+    serde_json::Value::Object(nested)
+}
+
+fn write_nested_xlsx(nested: serde_json::Value) -> (tempfile::TempDir, std::path::PathBuf) {
+    let result = tablepro_core::QueryResult {
+        columns: ["date_max", "uuid_binary", "user_binary", "nested"]
+            .into_iter()
+            .map(json_column)
+            .collect(),
+        rows: vec![vec![
+            Value::Json(serde_json::json!({"$date": {"$numberLong": i64::MAX.to_string()}})),
+            Value::Json(serde_json::json!({"$binary": {"base64": "AAECAwQFBgcICQoLDA0ODw==", "subType": "04"}})),
+            Value::Json(serde_json::json!({"$binary": {"base64": "AP9B", "subType": "80"}})),
+            Value::Json(nested),
+        ]],
+        truncated: false,
+    };
+    let directory = tempfile::tempdir().expect("temporary export directory");
+    let path = directory.path().join("mongo-values.xlsx");
+    tablepro_core::export::write_result_file(
+        &path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .expect("export nested fixture to XLSX");
+    (directory, path)
+}
+
+#[test]
+fn xlsx_nested_cell_requires_its_own_date_and_binary_markers() {
+    let (_full_dir, full_path) = write_nested_xlsx(nested_extended_json(true, true));
+    let nested_cell = xlsx_shared_cell_text(&full_path, 3, 2).expect("nested cell");
+    assert_eq!(missing_nested_xlsx_marker(&nested_cell), None, "{nested_cell}");
+    assert!(!nested_cell.contains(r#""subType":"04""#), "{nested_cell}");
+    assert!(!nested_cell.contains(r#""subType":"80""#), "{nested_cell}");
+    let top_level_date = xlsx_shared_cell_text(&full_path, 0, 2).expect("top-level date cell");
+    assert!(top_level_date.contains("$numberLong"), "{top_level_date}");
+    assert!(!top_level_date.contains("1234567890123"), "{top_level_date}");
+
+    let (_dropped_date_dir, dropped_date_path) = write_nested_xlsx(nested_extended_json(false, true));
+    let dropped_date_cell = xlsx_shared_cell_text(&dropped_date_path, 3, 2).expect("nested cell without date");
+    assert_eq!(missing_nested_xlsx_marker(&dropped_date_cell), Some(NESTED_XLSX_DATE));
+    assert!(dropped_date_cell.contains(NESTED_XLSX_DECIMAL), "{dropped_date_cell}");
+    assert!(dropped_date_cell.contains(NESTED_XLSX_BINARY), "{dropped_date_cell}");
+    let dropped_date_workbook = read_zip_text(&dropped_date_path, "xl/sharedStrings.xml").expect("shared strings");
+    assert!(dropped_date_workbook.contains("$numberLong"), "{dropped_date_workbook}");
+    assert!(
+        dropped_date_workbook.contains(r#""subType":"04""#),
+        "{dropped_date_workbook}"
+    );
+    assert!(
+        dropped_date_workbook.contains(r#""subType":"80""#),
+        "{dropped_date_workbook}"
+    );
+
+    let (_dropped_binary_dir, dropped_binary_path) = write_nested_xlsx(nested_extended_json(true, false));
+    let dropped_binary_cell = xlsx_shared_cell_text(&dropped_binary_path, 3, 2).expect("nested cell without binary");
+    assert_eq!(
+        missing_nested_xlsx_marker(&dropped_binary_cell),
+        Some(NESTED_XLSX_BINARY)
+    );
+    assert!(dropped_binary_cell.contains(NESTED_XLSX_DATE), "{dropped_binary_cell}");
+    let dropped_binary_workbook = read_zip_text(&dropped_binary_path, "xl/sharedStrings.xml").expect("shared strings");
+    assert!(
+        dropped_binary_workbook.contains(r#""subType":"04""#),
+        "{dropped_binary_workbook}"
+    );
+    assert!(
+        dropped_binary_workbook.contains(r#""subType":"80""#),
+        "{dropped_binary_workbook}"
+    );
+    assert!(
+        dropped_binary_workbook.contains("$numberLong"),
+        "{dropped_binary_workbook}"
+    );
 }
