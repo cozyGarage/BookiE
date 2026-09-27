@@ -6,6 +6,10 @@ use tokio_util::sync::CancellationToken;
 pub async fn assert_array_contract(connection: &dyn Connection) {
     let control = OperationControl::new(CancellationToken::new(), None);
     let mut session = connection.open_session().await.unwrap();
+    session
+        .query_params_controlled("SET TIME ZONE 'Asia/Kathmandu'", &[], &control)
+        .await
+        .unwrap();
     for (kind, expression) in [
         ("int4[]", "NULL::int4[]"),
         ("int4[]", "ARRAY[]::int4[]"),
@@ -38,6 +42,31 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
         ),
         ("uuid[]", "ARRAY['12345678-1234-5678-90ab-1234567890ab',NULL]::uuid[]"),
         ("bytea[]", "ARRAY[decode('00ff275c','hex'),decode('','hex'),NULL]"),
+        (
+            "date[]",
+            "ARRAY['0002-12-31 BC','10000-01-01','infinity','-infinity',NULL]::date[]",
+        ),
+        ("time[]", "ARRAY['00:00:00','24:00:00','23:59:59.999999',NULL]::time[]"),
+        (
+            "timetz[]",
+            "ARRAY['00:00:00+15:59:59','24:00:00-15:59:59',NULL]::timetz[]",
+        ),
+        (
+            "timestamp[]",
+            "ARRAY['0001-01-01 00:00:00.000001 BC','10000-01-01 23:59:59.999999','infinity','-infinity',NULL]::timestamp[]",
+        ),
+        (
+            "timestamptz[]",
+            "ARRAY['2024-11-03 01:30:00-04','2024-11-03 01:30:00-05','0001-01-01 12:34:56+00 BC','infinity','-infinity',NULL]::timestamptz[]",
+        ),
+        (
+            "date[]",
+            "'[0:1][-1:0]={{2000-01-01,NULL},{infinity,-infinity}}'::date[]",
+        ),
+        (
+            "interval[]",
+            "ARRAY['-1 month +2 days +0.000001 seconds','+1 month -2 days -0.000001 seconds','-9223372036854.775808 seconds',NULL]::interval[]",
+        ),
     ] {
         let sql = format!("SELECT ({expression}) AS value, encode(array_send({expression}), 'hex') AS wire");
         let result = connection.query(&sql).await.unwrap();
@@ -45,6 +74,15 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
         let session_result = session.query_params_controlled(&sql, &[], &control).await.unwrap();
         assert_eq!(session_result.rows, result.rows, "{kind}: session");
         assert_eq!(session_result.columns[0].data_type, result.columns[0].data_type);
+        let bound = session
+            .query_params_controlled(
+                &format!("SELECT encode(array_send($1::text::{kind}), 'hex')"),
+                &result.rows[0][..1],
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(bound.rows[0][0], result.rows[0][1], "{kind}: non-UTC session import");
     }
 }
 

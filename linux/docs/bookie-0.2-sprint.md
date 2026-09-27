@@ -810,3 +810,7 @@ isolated-test inventory passed. Debian package fixture could not run because
 ### B3 DuckDB native temporal checkpoint — September 27
 
 DuckDB date/time/timestamp and enum results no longer expose implementation debug strings. Native regression cases prove pre-epoch nanoseconds, timezone instants, infinities, end-of-day time, BC/large-year dates, SQL/parameter round trips and JSON precision. Unsupported intervals, collections and calendar ranges are visibly undecodable with write refusal coverage. Full nested/interval decoding, other driver-native gaps and consumer parity remain open; B3 is not complete. Reproduction and validation details are in [value contracts](value-contracts.md#duckdb-native-temporal-and-enum-checkpoint).
+
+### B3 PostgreSQL interval and temporal-array checkpoint — September 27
+
+PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](type-contract-strategy.md) for remaining per-driver targets; B3 remains open and Oracle stays deferred.

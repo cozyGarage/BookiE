@@ -27,6 +27,10 @@ not prevent the other compiled suites from running.
 
 ## Current corpus
 
+The [type-contract strategy](type-contract-strategy.md) defines boundary families,
+proof requirements and remaining driver targets. A passing scalar suite does not
+establish complete native-type support.
+
 | Path | Assertions |
 | --- | --- |
 | PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse, DuckDB | Bound parameters and generated SQL preserve signed integer limits, values around 2^53, small/large floats, text and NULL |
@@ -49,7 +53,7 @@ SQL harness compare bit patterns. Existing driver tests still cover binary
 exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
-This is a growing contract, not proof of every database type. PostgreSQL arbitrary-precision numeric editing, native arrays, temporal extremes and intervals, nested BSON values,
+This is a growing contract, not proof of every database type. PostgreSQL arbitrary-precision numeric editing, remaining array element types, extreme finite calendars and interval consumer parity, nested BSON values,
 spreadsheet floating-point/temporal precision and every transport/persistence adapter still need
 focused cases. Add a reproducer before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -512,3 +516,26 @@ Scoped mutation evidence: `target/quality/20260927-b3-duckdb-temporal-mutants/mu
 mkdir -p target/mutation-tmp
 TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-duckdb --file crates/drivers/duckdb/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/duckdb-temporal-mutants -- --lib --test integration
 ```
+
+## PostgreSQL interval fields, temporal arrays and infinities
+
+The native interval regression first failed when `i64::MIN` microseconds became `-2562047788:00:54.775808`, which PostgreSQL could not parse back. Large hour fields now use an exact decimal-seconds representation. Any negative interval component triggers explicit signs on positive components, avoiding IntervalStyle-dependent reinterpretation. The corpus constructs expected months/days/microseconds wire bytes itself and checks the source fixture before comparing decoder results. It covers 59 boundary/generated cases across postgres, sql_standard, postgres_verbose and iso_8601 styles (236 combinations), pooled/session parity, SQL literals, typed casts of bound text and JSON text.
+
+A second reproducer returned Undecodable for DATE infinity and date arrays. The driver now recognizes PostgreSQL infinity sentinels and decodes date, time, timetz, timestamp, timestamptz and interval array elements. Existing array dimension/lower-bound and size guards remain. Native array_send equality checks cover eras, year 10000, microseconds, end-of-day time, second-resolution offsets, DST-distinct instants, infinities, NULL elements and multidimensional bounds. SQL INSERT and bound parameter re-imports are included; a session in Asia/Kathmandu verifies that timestamp array imports preserve UTC instants.
+
+New unit contracts check temporal element lengths, out-of-range payloads, empty/null arrays, infinity signs, era formatting and interval extremes. Finite dates outside the shared calendar, unsupported element types and broader consumer parity remain open. These changes do not prove complete native-type support for PostgreSQL or the other drivers.
+
+Run `cargo test --locked -p tablepro-driver-postgres --lib value_contract`, then `cargo test --locked -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1` with Docker available. The combined strict value runner discovers all seven PostgreSQL server contracts. Updated fixture declarations are recorded in [ignored tests](ignored-tests.md).
+
+Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](type-contract-strategy.md).
+
+Mutation evidence: `target/quality/20260927-b3-pg-native-mutants/mutants.out/outcomes.json` records 74 selected mutations: 73 caught, one unviable, zero survivors and zero timeouts. This measurement ran value-contract unit tests for interval decoding/formatting, temporal-array dispatch/text and scalar temporal decoding; it was not a full-workspace mutation run. The separate PostgreSQL 16 fixture run supplies real-server evidence. Reproduce from the Linux workspace:
+
+```sh
+mkdir -p target/mutation-tmp
+TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-postgres --file crates/drivers/postgres/src/temporal.rs --file crates/drivers/postgres/src/array.rs --file crates/drivers/postgres/src/decode.rs --re 'decode_interval|format_interval|push_counted|decode_temporal|temporal_element|array_text' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/pg-native-mutants -- --lib value_contract
+```
+
+The first full-gate attempts remain recorded in `20260927T110823517670Z-layers/report.json` (stale ignored-test inventory) and `20260927T110938605682Z-layers/report.json` (file-size guard). Both are under `target/quality/`. The inventory was regenerated and scalar temporal decoding moved into the existing temporal module without raising a guardrail baseline. The subsequent `20260927T111058478564Z-layers/report.json` passed full, values and harness; its value report is `20260927T111306775227Z-values/report.json` with all 11 suites and seven PostgreSQL contracts passing.
+
+Final clean-source validation after mutation testing passed full, values and harness in `target/quality/20260927T111941420743Z-layers/report.json`. All 11 selected value suites passed in `target/quality/20260927T112138445468Z-values/report.json`; compilation reused 745 artifacts, rebuilt zero packages and took 0.592 seconds. Installed UI/Wayland and package acceptance were not rerun for this driver checkpoint.

@@ -142,7 +142,25 @@ fn append_quoted(output: &mut String, text: &str) -> Option<()> {
 fn supported(oid: u32) -> bool {
     matches!(
         oid,
-        16 | 17 | 19 | 20 | 21 | 23 | 25 | 26 | 700 | 701 | 1042 | 1043 | 1700 | 2950
+        16 | 17
+            | 19
+            | 20
+            | 21
+            | 23
+            | 25
+            | 26
+            | 700
+            | 701
+            | 1042
+            | 1043
+            | 1082
+            | 1083
+            | 1114
+            | 1184
+            | 1186
+            | 1266
+            | 1700
+            | 2950
     )
 }
 
@@ -177,8 +195,21 @@ fn element_text(oid: u32, bytes: &[u8]) -> Option<String> {
             _ => return None,
         },
         2950 => uuid::Uuid::from_slice(bytes).ok()?.to_string(),
+        1082 | 1083 | 1114 | 1184 | 1186 | 1266 => temporal_element(oid, bytes)?,
         _ => return None,
     })
+}
+
+fn temporal_element(oid: u32, bytes: &[u8]) -> Option<String> {
+    let value = match oid {
+        1082 => crate::temporal::decode_temporal(bytes, "DATE")?,
+        1083 | 1266 => crate::temporal::decode_time(bytes, oid == 1266)?,
+        1114 => crate::temporal::decode_temporal(bytes, "TIMESTAMP")?,
+        1184 => crate::temporal::decode_temporal(bytes, "TIMESTAMPTZ")?,
+        1186 => return crate::decode::decode_pg_binary_text("INTERVAL", bytes),
+        _ => return None,
+    };
+    crate::temporal::array_text(value)
 }
 
 fn float_text(value: f64) -> String {
@@ -196,6 +227,37 @@ fn float_text(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn value_contract_temporal_array_elements_reject_malformed_payloads() {
+        for (oid, length) in [(1082, 4), (1083, 8), (1114, 8), (1184, 8), (1186, 16), (1266, 12)] {
+            for size in 0..24 {
+                assert_eq!(
+                    temporal_element(oid, &vec![0; size]).is_some(),
+                    size == length,
+                    "{oid}: {size}"
+                );
+            }
+            assert_eq!(decode_binary(&wire(oid, &[], &[]), oid).as_deref(), Some("{}"));
+            assert_eq!(
+                decode_binary(&wire(oid, &[(1, 1)], &[None]), oid).as_deref(),
+                Some("{NULL}")
+            );
+        }
+        assert_eq!(temporal_element(9999, &[]), None);
+        assert_eq!(temporal_element(1083, &(-1_i64).to_be_bytes()), None);
+        assert_eq!(temporal_element(1082, &(i32::MAX - 1).to_be_bytes()), None);
+        assert_eq!(temporal_element(1114, &(i64::MAX - 1).to_be_bytes()), None);
+        assert_eq!(temporal_element(1184, &(i64::MIN + 1).to_be_bytes()), None);
+        for (value, text) in [(i32::MIN, "-infinity"), (i32::MAX, "infinity")] {
+            assert_eq!(temporal_element(1082, &value.to_be_bytes()).as_deref(), Some(text));
+        }
+        for oid in [1114, 1184] {
+            for (value, text) in [(i64::MIN, "-infinity"), (i64::MAX, "infinity")] {
+                assert_eq!(temporal_element(oid, &value.to_be_bytes()).as_deref(), Some(text));
+            }
+        }
+    }
 
     fn wire(oid: u32, dimensions: &[(i32, i32)], elements: &[Option<&[u8]>]) -> Vec<u8> {
         let mut bytes = Vec::new();

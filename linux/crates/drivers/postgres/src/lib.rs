@@ -876,7 +876,7 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
             return Ok(raw
                 .as_bytes()
                 .ok()
-                .and_then(|bytes| decode_temporal(bytes, type_name))
+                .and_then(|bytes| temporal::decode_temporal(bytes, type_name))
                 .unwrap_or_else(|| undecodable(idx, type_name)));
         }
         if let Some(text) = raw
@@ -915,25 +915,6 @@ fn undecodable(idx: usize, type_name: &str) -> Value {
         "postgres column value could not be decoded; showing it as undecodable"
     );
     Value::Undecodable(type_name.to_string())
-}
-
-fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
-    let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)?;
-    if type_name == "DATE" {
-        let days = i32::from_be_bytes(bytes.try_into().ok()?);
-        return epoch
-            .checked_add_signed(chrono::TimeDelta::try_days(i64::from(days))?)
-            .map(Value::Date);
-    }
-    let micros = i64::from_be_bytes(bytes.try_into().ok()?);
-    let time = epoch
-        .and_hms_opt(0, 0, 0)?
-        .checked_add_signed(chrono::TimeDelta::microseconds(micros))?;
-    Some(if type_name == "TIMESTAMPTZ" {
-        Value::TimestampTz(time.and_utc())
-    } else {
-        Value::DateTime(time)
-    })
 }
 
 /// Bind a positional parameter list to a sqlx Postgres query in the

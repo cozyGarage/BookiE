@@ -23,6 +23,46 @@ mod time_contract;
 #[path = "support/date_contract.rs"]
 mod date_contract;
 
+#[path = "support/interval_contract.rs"]
+mod interval_contract;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_intervals_preserve_independent_fields_in_every_style() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    interval_contract::assert_interval_contract(connection.as_ref()).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_temporal_infinities_remain_distinct_from_null() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    for kind in ["date", "timestamp", "timestamptz"] {
+        for input in ["infinity", "-infinity"] {
+            let result = connection
+                .query(&format!("SELECT '{input}'::{kind} AS value"))
+                .await
+                .unwrap();
+            assert_eq!(result.rows, vec![vec![Value::Text(input.into())]]);
+            let value = &result.rows[0][0];
+            let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
+            let restored = connection.query(&format!("SELECT {literal}::{kind}")).await.unwrap();
+            assert_eq!(restored.rows, result.rows);
+            let bound = connection
+                .query_params(&format!("SELECT $1::text::{kind}"), std::slice::from_ref(value))
+                .await
+                .unwrap();
+            assert_eq!(bound.rows, result.rows);
+            assert_eq!(
+                tablepro_core::export::row_to_json(&result.columns, &result.rows[0])["value"],
+                input
+            );
+        }
+    }
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_dates_preserve_eras_large_years_and_instants() {

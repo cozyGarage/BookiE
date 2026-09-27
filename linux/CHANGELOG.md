@@ -44,7 +44,9 @@
 
 - DuckDB dates, times, timestamps and enum labels decode as usable values instead of debug strings. Temporal precision, timezone instants, infinities and end-of-day times survive parameter and SQL round trips; unsupported intervals, collections and calendar ranges remain visibly undecodable and cannot be written back.
 
-- PostgreSQL arrays of common scalar types preserve NULL elements, empty values, nesting, lower bounds and exact numeric digits through query results and SQL exports. Unsupported element types and oversized decoded arrays remain visibly undecodable.
+- PostgreSQL intervals retain independently signed fields under every interval style, and extreme durations use a re-importable seconds representation. Date and timestamp infinities remain distinct from NULL.
+
+- PostgreSQL arrays of common scalar and temporal types preserve NULL elements, empty values, nesting, lower bounds and exact numeric digits through query results and SQL exports. Unsupported element types and oversized decoded arrays remain visibly undecodable.
 
 - PostgreSQL end-of-day times remain 24:00:00 instead of silently becoming midnight, and times with time zones retain their stored offsets and microseconds through queries and SQL exports.
 

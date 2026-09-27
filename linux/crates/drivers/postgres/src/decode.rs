@@ -19,36 +19,47 @@ fn decode_interval(bytes: &[u8]) -> Option<String> {
 }
 
 fn format_interval(months: i32, days: i32, microseconds: i64) -> String {
+    let explicit_sign = months < 0 || days < 0 || microseconds < 0;
     let years = months / 12;
     let months = months % 12;
     let mut parts = Vec::new();
-    push_counted(&mut parts, years, "year", "years");
-    push_counted(&mut parts, months, "mon", "mons");
-    push_counted(&mut parts, days, "day", "days");
+    push_counted(&mut parts, years, "year", "years", explicit_sign);
+    push_counted(&mut parts, months, "mon", "mons", explicit_sign);
+    push_counted(&mut parts, days, "day", "days", explicit_sign);
     if microseconds != 0 || parts.is_empty() {
-        parts.push(format_interval_time(microseconds));
+        parts.push(format_interval_time(microseconds, explicit_sign));
     }
     parts.join(" ")
 }
 
-fn push_counted(parts: &mut Vec<String>, count: i32, singular: &str, plural: &str) {
+fn push_counted(parts: &mut Vec<String>, count: i32, singular: &str, plural: &str, explicit_sign: bool) {
     if count == 0 {
         return;
     }
     let label = if count.unsigned_abs() == 1 { singular } else { plural };
-    parts.push(format!("{count} {label}"));
+    let sign = if explicit_sign && count.is_positive() { "+" } else { "" };
+    parts.push(format!("{sign}{count} {label}"));
 }
 
-fn format_interval_time(microseconds: i64) -> String {
+fn format_interval_time(microseconds: i64, explicit_sign: bool) -> String {
     let negative = microseconds < 0;
     let magnitude = microseconds.unsigned_abs();
     let hours = magnitude / 3_600_000_000;
+    let sign = if negative {
+        "-"
+    } else if explicit_sign {
+        "+"
+    } else {
+        ""
+    };
+    if hours > i32::MAX as u64 {
+        return format!("{sign}{}.{:06} seconds", magnitude / 1_000_000, magnitude % 1_000_000);
+    }
     let remainder = magnitude % 3_600_000_000;
     let minutes = remainder / 60_000_000;
     let remainder = remainder % 60_000_000;
     let seconds = remainder / 1_000_000;
     let micros = remainder % 1_000_000;
-    let sign = if negative { "-" } else { "" };
     if micros == 0 {
         format!("{sign}{hours:02}:{minutes:02}:{seconds:02}")
     } else {
@@ -129,7 +140,27 @@ mod tests {
     }
 
     #[test]
-    fn interval_query_duration_matches_postgres_style() {
+    fn value_contract_interval_extremes_and_mixed_signs_are_unambiguous() {
+        for (months, days, micros, expected) in [
+            (-1, 2, 3, "-1 mon +2 days +00:00:00.000003"),
+            (1, -2, 3, "+1 mon -2 days +00:00:00.000003"),
+            (1, 2, -3, "+1 mon +2 days -00:00:00.000003"),
+            (0, 0, i64::MIN, "-9223372036854.775808 seconds"),
+            (0, 0, i64::MAX, "9223372036854.775807 seconds"),
+            (0, 0, i64::from(i32::MAX) * 3_600_000_000, "2147483647:00:00"),
+        ] {
+            assert_eq!(
+                decode_interval(&interval_bytes(months, days, micros)).as_deref(),
+                Some(expected)
+            );
+        }
+        for length in 0..32 {
+            assert_eq!(decode_interval(&vec![0; length]).is_some(), length == 16);
+        }
+    }
+
+    #[test]
+    fn value_contract_interval_query_duration_matches_postgres_style() {
         assert_eq!(
             decode_pg_binary_text("INTERVAL", &interval_bytes(0, 0, 1_234_567)).as_deref(),
             Some("00:00:01.234567")
