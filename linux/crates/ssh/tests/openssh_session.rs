@@ -285,3 +285,88 @@ async fn openssh_dropping_last_arc_ends_master() {
     }
     assert!(!process_alive(pid));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
+    let network = format!("tablepro-ssh-test-{}", uuid::Uuid::new_v4());
+    let jump = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_network(&network)
+        .with_cmd(["sh", "-c", SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+    let target = GenericImage::new("alpine", "3.22")
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_network(&network)
+        .with_cmd(["sh", "-c", SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+
+    let jump_host = jump.get_host().await.unwrap().to_string();
+    let jump_port = jump.get_host_port_ipv4(2222).await.unwrap();
+    let target_ip = target.get_bridge_ip_address().await.unwrap();
+
+    let temp = tempfile::tempdir().unwrap();
+    let known_hosts = temp.path().join("known_hosts");
+    let config_path = temp.path().join("ssh_config");
+    std::fs::write(
+        &config_path,
+        format!(
+            "Host *\n  UserKnownHostsFile {known_hosts}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent none\n  IdentitiesOnly yes\n  PubkeyAuthentication no\n\nHost target\n  Hostname {target_ip}\n  Port 2222\n  User deploy\n  ProxyJump ops@{jump_host}:{jump_port}\n",
+            known_hosts = known_hosts.display(),
+        ),
+    )
+    .unwrap();
+    let wrapper = temp.path().join("ssh");
+    std::fs::write(
+        &wrapper,
+        format!("#!/bin/sh\nexec ssh -F '{}' \"$@\"\n", config_path.display()),
+    )
+    .unwrap();
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    let base = temp.path().join("run");
+    std::fs::create_dir(&base).unwrap();
+    let context = OpenSshContext {
+        runtime: OpenSshRuntime::acquire(&base).unwrap(),
+        ssh_program: wrapper,
+        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        timeouts: OpenSshTimeouts::default(),
+    };
+
+    let cfg = OpenSshConfig {
+        destination: SshDestination::new("target", None, None).unwrap(),
+        jump_hosts: Vec::new(),
+        auth: password("s3cret"),
+    };
+    let prompter = ScriptedPrompter::new(vec![
+        PromptAnswer::Accept,
+        PromptAnswer::Secret(SecretString::from("s3cret")),
+        PromptAnswer::Accept,
+        PromptAnswer::Secret(SecretString::from("s3cret")),
+    ]);
+    let session = OpenSshSession::connect(&cfg, &context, prompter.clone(), CancellationToken::new())
+        .await
+        .unwrap();
+
+    assert!(session.master_pid().is_some_and(process_alive));
+    let asked = prompter.asked();
+    assert!(
+        asked
+            .iter()
+            .any(|prompt| matches!(prompt, AskpassPrompt::Password { user_host } if user_host.starts_with("ops@"))),
+        "the jump host must be authenticated: {asked:?}"
+    );
+    assert!(
+        asked
+            .iter()
+            .any(|prompt| matches!(prompt, AskpassPrompt::Password { user_host } if user_host.starts_with("deploy@"))),
+        "the final target must also be authenticated, proving the jump reached it: {asked:?}"
+    );
+    session.shutdown().await;
+    assert!(session.is_closed());
+}
