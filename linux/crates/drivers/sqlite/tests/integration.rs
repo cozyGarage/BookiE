@@ -82,6 +82,91 @@ async fn declared_types_preserve_nulls_and_binary_affinity_mismatches() {
 }
 
 #[tokio::test]
+async fn sqlite_numeric_affinity_transitions_survive_bound_edits_and_sql_reimport() {
+    let directory = TempDir::new().expect("temp dir");
+    let connection = connect_file(&directory).await;
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value NUMERIC)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, 'not-a-number'), (2, X'00ff41'), (3, NULL)")
+        .await
+        .unwrap();
+
+    let initial = connection
+        .query("SELECT typeof(value), value FROM flexible ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        initial.rows,
+        vec![
+            vec![Value::Text("text".into()), Value::Text("not-a-number".into())],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![0, 255, 65])],
+            vec![Value::Text("null".into()), Value::Null],
+        ]
+    );
+
+    connection
+        .execute_params(
+            "UPDATE flexible SET value = ? WHERE id = ?",
+            &[Value::Text("42.50".into()), Value::Int(1)],
+        )
+        .await
+        .unwrap();
+    let numeric = connection
+        .query("SELECT typeof(value), value FROM flexible WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(numeric.rows, vec![vec![Value::Text("real".into()), Value::Float(42.5)]]);
+
+    for (id, value) in [
+        (1, Value::Bytes(vec![0, 255, 65])),
+        (2, Value::Text("still-not-a-number".into())),
+        (3, Value::Text("17".into())),
+    ] {
+        connection
+            .execute_params("UPDATE flexible SET value = ? WHERE id = ?", &[value, Value::Int(id)])
+            .await
+            .unwrap();
+    }
+    let expected = vec![
+        vec![Value::Text("blob".into()), Value::Bytes(vec![0, 255, 65])],
+        vec![Value::Text("text".into()), Value::Text("still-not-a-number".into())],
+        vec![Value::Text("integer".into()), Value::Int(17)],
+    ];
+    let edited = connection
+        .query("SELECT typeof(value), value FROM flexible ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(edited.rows, expected);
+
+    connection
+        .execute("CREATE TABLE flexible_copy (id INTEGER PRIMARY KEY, value NUMERIC)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "flexible_copy").await.unwrap();
+    for row in &connection
+        .query("SELECT id, value FROM flexible ORDER BY id")
+        .await
+        .unwrap()
+        .rows
+    {
+        let statement =
+            tablepro_core::sql_literal::build_insert_literal("sqlite", None, "flexible_copy", &columns, row).unwrap();
+        connection.execute(&statement).await.unwrap();
+    }
+    let imported = connection
+        .query("SELECT typeof(value), value FROM flexible_copy ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        imported.rows, expected,
+        "SQL export/re-import must preserve SQLite storage classes"
+    );
+}
+
+#[tokio::test]
 async fn undecodable_parameter_is_rejected_without_writing_null() {
     let directory = TempDir::new().expect("temp dir");
     let connection = connect_file(&directory).await;

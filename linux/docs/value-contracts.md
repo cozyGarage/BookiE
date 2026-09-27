@@ -553,6 +553,22 @@ backslash-bearing column comments are explicitly refused. Session time-zone and
 stricter SQL-mode matrices, installed-app-to-MySQL grid acceptance and broader
 consumer parity remain open.
 
+## SQLite dynamic storage-class checkpoint
+
+A new file-backed regression starts a `NUMERIC` column with TEXT, BLOB and NULL
+values, then exercises bound edits that transition through REAL, BLOB, TEXT and
+INTEGER storage classes. The test checks both SQLite's independent `typeof`
+result and TablePro's decoded value. It then exports the edited rows as SQL
+INSERT literals, re-imports into a second `NUMERIC` table and requires the same
+storage classes and values. This closes the driver-level edit/SQL re-import
+case; CSV import and installed grid acceptance remain open.
+
+The full SQLite integration suite passed all 21 tests. Run locally:
+
+```sh
+cargo test --locked -p tablepro-driver-sqlite --test integration
+```
+
 ## MongoDB nested BSON and native boundary checkpoint
 
 A decoder unit regression first failed for nested `Decimal128`, binary and date

@@ -376,6 +376,15 @@ that quoting preserves the nested value. Nested editing, XLSX export,
 Mongo-backed MCP round trip, native BSON re-import and other consumers remain
 open; B3 is not closed.
 
+### B3 SQLite dynamic storage classes: 2026-09-27
+
+A file-backed integration scenario checks TEXT, REAL, INTEGER, BLOB and NULL
+values in a declared `NUMERIC` column through bound edits. It compares SQLite's
+`typeof` result with the decoded TablePro value, then exports rows as SQL INSERT
+literals and verifies the same storage classes and values after re-import. All
+21 SQLite integration tests passed. CSV import and installed grid acceptance
+across affinity transitions remain open.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
