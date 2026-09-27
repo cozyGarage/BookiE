@@ -12,7 +12,7 @@ use tablepro_ssh::openssh::{
     AskpassPrompt, ForwardRoute, ForwardTarget, LocalEndpoint, OpenSshAuth, OpenSshConfig, OpenSshContext,
     OpenSshError, OpenSshRuntime, OpenSshSession, OpenSshTimeouts, PromptAnswer, Prompter, SshDestination,
 };
-use testcontainers::core::{IntoContainerPort, WaitFor};
+use testcontainers::core::{ExecCommand, IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 use tokio::io::AsyncReadExt;
@@ -25,6 +25,13 @@ const SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
     && adduser -D deploy && echo 'deploy:s3cret' | chpasswd \
     && adduser -D ops && echo 'ops:s3cret' | chpasswd \
     && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=yes -o KbdInteractiveAuthentication=no -o AllowTcpForwarding=yes";
+
+const SSHD_SCRIPT_WITH_AUTHORIZED_KEY: &str = "apk add --no-cache openssh >/dev/null \
+    && ssh-keygen -A >/dev/null \
+    && adduser -D deploy && echo 'deploy:unused' | chpasswd \
+    && mkdir -p /home/deploy/.ssh && printf '%s\\n' \"$AUTHORIZED_KEY\" > /home/deploy/.ssh/authorized_keys \
+    && chown -R deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys \
+    && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o PubkeyAuthentication=yes -o AllowTcpForwarding=yes";
 
 struct Fixture {
     _container: ContainerAsync<GenericImage>,
@@ -369,4 +376,207 @@ async fn openssh_a_proxyjump_line_in_the_ssh_config_reaches_the_target() {
     );
     session.shutdown().await;
     assert!(session.is_closed());
+}
+
+async fn rotate_host_keys(container: &ContainerAsync<GenericImage>) {
+    let mut result = container
+        .exec(ExecCommand::new([
+            "sh",
+            "-c",
+            "rm -f /etc/ssh/ssh_host_* && ssh-keygen -A >/dev/null 2>&1 && kill -HUP 1",
+        ]))
+        .await
+        .unwrap();
+    result.stdout_to_vec().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_a_changed_host_key_is_reported_as_host_key_changed() {
+    let fixture = start().await.unwrap();
+    let (session, _) = connect(
+        &fixture,
+        &config(&fixture, password("s3cret")),
+        vec![PromptAnswer::Accept],
+    )
+    .await;
+    session.unwrap().shutdown().await;
+
+    rotate_host_keys(&fixture._container).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    let (session, _) = connect(&fixture, &config(&fixture, password("s3cret")), Vec::new()).await;
+    assert!(
+        matches!(session, Err(OpenSshError::HostKeyChanged { .. })),
+        "{session:?}"
+    );
+}
+
+struct KeyFixture {
+    _container: ContainerAsync<GenericImage>,
+    _temp: tempfile::TempDir,
+    host: String,
+    port: u16,
+    context: OpenSshContext,
+}
+
+async fn start_with_authorized_key(public_key: &str, agent_socket: Option<&Path>) -> TestResult<KeyFixture> {
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", public_key.trim())
+        .with_cmd(["sh", "-c", SSHD_SCRIPT_WITH_AUTHORIZED_KEY])
+        .start()
+        .await?;
+    let host = container.get_host().await?.to_string();
+    let port = container.get_host_port_ipv4(2222).await?;
+
+    let temp = tempfile::tempdir()?;
+    let known_hosts = temp.path().join("known_hosts");
+    let identity_agent = agent_socket.map_or_else(|| "none".to_owned(), |socket| socket.display().to_string());
+    let config = temp.path().join("ssh_config");
+    std::fs::write(
+        &config,
+        format!(
+            "Host *\n  UserKnownHostsFile {}\n  GlobalKnownHostsFile /dev/null\n  IdentityAgent {}\n  IdentitiesOnly {}\n",
+            known_hosts.display(),
+            identity_agent,
+            if agent_socket.is_some() { "no" } else { "yes" },
+        ),
+    )?;
+    let wrapper = temp.path().join("ssh");
+    std::fs::write(
+        &wrapper,
+        format!("#!/bin/sh\nexec ssh -F '{}' \"$@\"\n", config.display()),
+    )?;
+    std::fs::set_permissions(&wrapper, std::fs::Permissions::from_mode(0o755))?;
+
+    let base = temp.path().join("run");
+    std::fs::create_dir(&base)?;
+    let context = OpenSshContext {
+        runtime: OpenSshRuntime::acquire(&base)?,
+        ssh_program: wrapper,
+        askpass_program: PathBuf::from(env!("CARGO_BIN_EXE_tablepro-askpass")),
+        timeouts: OpenSshTimeouts::default(),
+    };
+    Ok(KeyFixture {
+        _container: container,
+        _temp: temp,
+        host,
+        port,
+        context,
+    })
+}
+
+fn generate_ed25519_key(dir: &Path, passphrase: &str) -> (PathBuf, String) {
+    let key = dir.join("id_ed25519");
+    let generated = std::process::Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", passphrase, "-f"])
+        .arg(&key)
+        .status()
+        .unwrap();
+    assert!(generated.success());
+    let public = std::fs::read_to_string(key.with_extension("pub")).unwrap();
+    (key, public)
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_authenticates_with_an_unencrypted_private_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let (key, public) = generate_ed25519_key(dir.path(), "");
+    let fixture = start_with_authorized_key(&public, None).await.unwrap();
+
+    let cfg = OpenSshConfig {
+        destination: SshDestination::new(&fixture.host, Some(fixture.port), Some("deploy".to_owned())).unwrap(),
+        jump_hosts: Vec::new(),
+        auth: OpenSshAuth::PrivateKey {
+            path: Some(key),
+            passphrase: None,
+        },
+    };
+    let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
+    let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(session.master_pid().is_some_and(process_alive));
+    session.shutdown().await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_authenticates_with_a_passphrase_protected_private_key() {
+    let dir = tempfile::tempdir().unwrap();
+    let (key, public) = generate_ed25519_key(dir.path(), "s3cret-passphrase");
+    let fixture = start_with_authorized_key(&public, None).await.unwrap();
+
+    let cfg = OpenSshConfig {
+        destination: SshDestination::new(&fixture.host, Some(fixture.port), Some("deploy".to_owned())).unwrap(),
+        jump_hosts: Vec::new(),
+        auth: OpenSshAuth::PrivateKey {
+            path: Some(key),
+            passphrase: Some(SecretString::from("s3cret-passphrase")),
+        },
+    };
+    let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
+    let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(session.master_pid().is_some_and(process_alive));
+    session.shutdown().await;
+}
+
+struct SpawnedAgent {
+    pid: String,
+}
+
+impl Drop for SpawnedAgent {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new("kill").arg(&self.pid).status();
+    }
+}
+
+fn start_agent(socket: &Path) -> SpawnedAgent {
+    let output = std::process::Command::new("ssh-agent")
+        .arg("-a")
+        .arg(socket)
+        .arg("-s")
+        .output()
+        .unwrap();
+    let text = String::from_utf8(output.stdout).unwrap();
+    let pid = text
+        .split(';')
+        .find_map(|part| part.trim().strip_prefix("SSH_AGENT_PID="))
+        .expect("ssh-agent printed its pid")
+        .to_string();
+    SpawnedAgent { pid }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn openssh_authenticates_with_a_key_held_by_ssh_agent() {
+    let dir = tempfile::tempdir().unwrap();
+    let (key, public) = generate_ed25519_key(dir.path(), "");
+    let socket = dir.path().join("agent.sock");
+    let agent = start_agent(&socket);
+    let added = std::process::Command::new("ssh-add")
+        .arg(&key)
+        .env("SSH_AUTH_SOCK", &socket)
+        .status()
+        .unwrap();
+    assert!(added.success());
+
+    let fixture = start_with_authorized_key(&public, Some(&socket)).await.unwrap();
+    let cfg = OpenSshConfig {
+        destination: SshDestination::new(&fixture.host, Some(fixture.port), Some("deploy".to_owned())).unwrap(),
+        jump_hosts: Vec::new(),
+        auth: OpenSshAuth::Agent,
+    };
+    let prompter = ScriptedPrompter::new(vec![PromptAnswer::Accept]);
+    let session = OpenSshSession::connect(&cfg, &fixture.context, prompter, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(session.master_pid().is_some_and(process_alive));
+    session.shutdown().await;
+    drop(agent);
 }
