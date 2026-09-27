@@ -218,8 +218,14 @@ fn format_csv_cell(value: &Value, options: &CsvOptions) -> String {
     options.sanitize_formulas &= matches!(value, Value::Text(_));
     let options = &options;
     let Some(mut text) = value_to_text(value) else {
-        return escape_csv_field(if options.null_to_empty { "" } else { "NULL" }, options, false);
+        if options.null_to_empty {
+            return String::new();
+        }
+        return escape_csv_field("NULL", options, false);
     };
+    if text.is_empty() && options.quote != CsvQuote::Never {
+        return quote_field(&text);
+    }
     let had_line_breaks = text.contains(['\n', '\r']);
     if options.line_break_to_space {
         text = text.replace("\r\n", " ").replace(['\r', '\n'], " ");
@@ -296,6 +302,21 @@ mod tests {
         let mut buf = Vec::new();
         write_csv_row(&mut buf, &[Value::Text("=SUM(A1)".into()), Value::Null]).unwrap();
         assert_eq!(String::from_utf8(buf).unwrap(), "=SUM(A1),\n");
+    }
+
+    #[test]
+    fn value_contract_csv_keeps_empty_text_distinct_from_null() {
+        let columns = vec![column("value")];
+        let rows = vec![vec![Value::Null], vec![Value::Text(String::new())]];
+        assert_eq!(render_csv(&columns, &rows, &CsvOptions::default()), "value\n\n\"\"\n");
+        let always = CsvOptions {
+            quote: CsvQuote::Always,
+            ..CsvOptions::default()
+        };
+        assert_eq!(render_csv(&columns, &rows, &always), "\"value\"\n\n\"\"\n");
+        let mut buf = Vec::new();
+        write_csv_row(&mut buf, &[Value::Null, Value::Text(String::new())]).unwrap();
+        assert_eq!(String::from_utf8(buf).unwrap(), ",\"\"\n");
     }
 
     #[test]
