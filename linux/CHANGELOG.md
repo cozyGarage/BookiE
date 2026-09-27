@@ -2,36 +2,6 @@
 
 ## [Unreleased]
 
-### Changed
-
-- The built-in SSH client's unknown-host-key error no longer suggests connecting once with the system `ssh` command, which writes to a different `known_hosts` file than the one this client reads.
-- The built-in SSH client reports plainly when a server accepts only keyboard-interactive authentication, which it does not support, instead of a generic authentication failure.
-- The built-in SSH client now sends keepalives and can report a tunnel as closed once a bastion stops responding, instead of leaving a dead tunnel looking alive until a database driver's own timeout notices.
-
-### Fixed
-
-- Browse shortcuts for Left, Right, and space showed keypad keys, and click shortcuts showed Shift and Ctrl alone.
-- New connection opened on the first driver with port 5432, database postgres, and username postgres.
-- Browse shortcuts for Left, Right, and space showed a blank key.
-- Click shortcuts were labeled Pointer_Button1.
-- Test and Connect sat at opposite ends of the connection header, and a long title ran into the buttons.
-- A ClickHouse connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
-- A MongoDB connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
-- A Redis connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
-- A session whose connection was lost now refuses any further statement instead of dispatching it and letting the resulting error turn off governed writes for every connection.
-- Stopping the MCP agent server while a write was still in progress could tear down the server before that write reached a recorded outcome, leaving its audit entry open. The server now waits at least as long as a write is allowed to run before it finishes shutting down, so an interrupted write is always recorded as cancelled or unknown.
-- A session that loses its connection mid-transaction now has its transaction outcome recorded as uncertain, and the session itself stops accepting statements even if the driver still reports it usable.
-- A session COMMIT with no preceding BEGIN, and a BEGIN sent while a session transaction is already open, are now refused instead of being sent to the database unaudited.
-- A session COMMIT that only succeeded because PostgreSQL had already rolled back an aborted transaction is now audited as rolled back instead of committed.
-- A cancelled or timed-out session COMMIT or ROLLBACK is now audited with a cancelled or timed-out outcome instead of a generic failure.
-- A session COMMIT that fails because the database already ended the transaction, such as a deferred foreign key violation, no longer leaves the session's transaction marked open.
-- Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
-- MongoDB nested documents, arrays and uncommon top-level BSON kinds retain their BSON markers as canonical Extended JSON instead of debug text. Nested documents and arrays plus top-level BSON Timestamp, regex and MinKey cells can be edited in the grid and write back as native BSON; canonical Extended JSON imports reconstruct nested Decimal128, date and binary subtypes. Real-server JSON, CSV and XLSX exports and the MCP browse tool preserve those markers.
-- CSV imports into SQLite INTEGER, REAL and NUMERIC affinity columns pass unparseable values as text, allowing SQLite to store them without rejecting valid mixed storage classes.
-- Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
-- ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.
-- A driver that reports its connection as disconnected now triggers an immediate reconnect attempt instead of waiting up to 30 seconds for the next scheduled connection check.
-
 ## [0.1.5] - 2026-09-27
 
 ### Added
@@ -64,6 +34,9 @@
 
 ### Changed
 
+- The built-in SSH client's unknown-host-key error no longer suggests connecting once with the system `ssh` command, which writes to a different `known_hosts` file than the one this client reads.
+- The built-in SSH client reports plainly when a server accepts only keyboard-interactive authentication, which it does not support, instead of a generic authentication failure.
+- The built-in SSH client now sends keepalives and can report a tunnel as closed once a bastion stops responding, instead of leaving a dead tunnel looking alive until a database driver's own timeout notices.
 - When a saved password can't be read because no keyring is running, the keyring is locked, or its unlock prompt was cancelled, the connection error now says which one and what to do, instead of showing the raw D-Bus error.
 - The keyboard-shortcuts dialog and date editor now use the GNOME 50 APIs.
 - Development builds isolate connections, history, audit, drafts, settings, the policy file, locks, and keyring items from installed builds.
@@ -74,6 +47,27 @@
 
 ### Fixed
 
+- Browse shortcuts for Left, Right, and space showed keypad keys, and click shortcuts showed Shift and Ctrl alone.
+- New connection opened on the first driver with port 5432, database postgres, and username postgres.
+- Browse shortcuts for Left, Right, and space showed a blank key.
+- Click shortcuts were labeled Pointer_Button1.
+- Test and Connect sat at opposite ends of the connection header, and a long title ran into the buttons.
+- A ClickHouse connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
+- A MongoDB connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
+- A Redis connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
+- A session whose connection was lost now refuses any further statement instead of dispatching it and letting the resulting error turn off governed writes for every connection.
+- Stopping the MCP agent server while a write was still in progress could tear down the server before that write reached a recorded outcome, leaving its audit entry open. The server now waits at least as long as a write is allowed to run before it finishes shutting down, so an interrupted write is always recorded as cancelled or unknown.
+- A session that loses its connection mid-transaction now has its transaction outcome recorded as uncertain, and the session itself stops accepting statements even if the driver still reports it usable.
+- A session COMMIT with no preceding BEGIN, and a BEGIN sent while a session transaction is already open, are now refused instead of being sent to the database unaudited.
+- A session COMMIT that only succeeded because PostgreSQL had already rolled back an aborted transaction is now audited as rolled back instead of committed.
+- A cancelled or timed-out session COMMIT or ROLLBACK is now audited with a cancelled or timed-out outcome instead of a generic failure.
+- A session COMMIT that fails because the database already ended the transaction, such as a deferred foreign key violation, no longer leaves the session's transaction marked open.
+- Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
+- MongoDB nested documents, arrays and uncommon top-level BSON kinds retain their BSON markers as canonical Extended JSON instead of debug text. Nested documents and arrays plus top-level BSON Timestamp, regex and MinKey cells can be edited in the grid and write back as native BSON; canonical Extended JSON imports reconstruct nested Decimal128, date and binary subtypes. Real-server JSON, CSV and XLSX exports and the MCP browse tool preserve those markers.
+- CSV imports into SQLite INTEGER, REAL and NUMERIC affinity columns pass unparseable values as text, allowing SQLite to store them without rejecting valid mixed storage classes.
+- Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
+- ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.
+- A driver that reports its connection as disconnected now triggers an immediate reconnect attempt instead of waiting up to 30 seconds for the next scheduled connection check.
 - SQL Server decimals wider than the editable range keep their sign and digits. A negative value no longer shows a minus sign inside its fraction, and a whole number no longer gains a trailing ".0".
 - MySQL zero dates such as 0000-00-00 are shown as their stored text instead of an empty cell. Negative TIME values keep their sign, times outside one day and dates with zero parts are shown exactly instead of as undecodable, and YEAR values appear as numbers. All of them can be written back through edits, parameters and SQL exports.
 - DuckDB dates, times, timestamps and enum labels decode as usable values instead of debug strings. Temporal precision, timezone instants, infinities and end-of-day times survive parameter and SQL round trips; unsupported intervals, collections and calendar ranges remain visibly undecodable and cannot be written back.
