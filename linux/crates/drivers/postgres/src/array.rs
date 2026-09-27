@@ -13,13 +13,34 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let PgTypeKind::Array(element) = info.kind() else {
         return None;
     };
-    if matches!(info.oid()?.0, INT2VECTOR_OID | OIDVECTOR_OID) {
-        return None;
-    }
+    let render = match info.oid()?.0 {
+        INT2VECTOR_OID | OIDVECTOR_OID => decode_vector,
+        _ => decode_binary,
+    };
     match raw.format() {
-        PgValueFormat::Binary => decode_binary(raw.as_bytes().ok()?, element.oid()?.0).map(Value::Text),
+        PgValueFormat::Binary => render(raw.as_bytes().ok()?, element.oid()?.0).map(Value::Text),
         PgValueFormat::Text => raw.as_str().ok().map(|text| Value::Text(text.into())),
     }
+}
+
+fn decode_vector(bytes: &[u8], expected_oid: u32) -> Option<String> {
+    let mut reader = Reader { remaining: bytes };
+    let count = reader.integer()?;
+    let flags = reader.integer()?;
+    let oid = reader.integer()? as u32;
+    if count != 1 || flags != 0 || oid != expected_oid {
+        return None;
+    }
+    let length = usize::try_from(reader.integer()?).ok()?;
+    if reader.integer()? != 0 || length > reader.remaining.len() / 4 {
+        return None;
+    }
+    let mut elements = Vec::with_capacity(length);
+    for _ in 0..length {
+        let length = reader.integer()?;
+        elements.push(element_text(oid, read_bounded_element(&mut reader, length)?)?);
+    }
+    reader.remaining.is_empty().then(|| elements.join(" "))
 }
 
 struct Reader<'a> {
@@ -234,6 +255,31 @@ fn float_text(value: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn words(values: &[u32]) -> Vec<u8> {
+        values.iter().flat_map(|value| value.to_be_bytes()).collect()
+    }
+
+    #[test]
+    fn value_contract_vectors_render_space_separated_elements_and_refuse_other_headers() {
+        let empty = words(&[1, 0, 21, 0, 0]);
+        let pair = [words(&[1, 0, 21, 2, 0, 2]), vec![0, 1], words(&[2]), vec![0x80, 0]].concat();
+        let oids = [words(&[1, 0, 26, 2, 0, 4, 0, 4]), vec![0xff; 4]].concat();
+        assert_eq!(decode_vector(&empty, 21).as_deref(), Some(""));
+        assert_eq!(decode_vector(&pair, 21).as_deref(), Some("1 -32768"));
+        assert_eq!(decode_vector(&oids, 26).as_deref(), Some("0 4294967295"));
+        assert_eq!(decode_vector(&pair, 26), None);
+        for header in [
+            [0, 0, 21, 0, 0],
+            [2, 0, 21, 0, 0],
+            [1, 1, 21, 0, 0],
+            [1, 0, 21, 0, 1],
+            [1, 0, 21, 1, 0],
+        ] {
+            assert_eq!(decode_vector(&words(&header), 21), None, "{header:?}");
+        }
+        assert_eq!(decode_vector(&[empty.clone(), vec![0]].concat(), 21), None);
+    }
 
     #[test]
     fn value_contract_temporal_array_elements_reject_malformed_payloads() {
