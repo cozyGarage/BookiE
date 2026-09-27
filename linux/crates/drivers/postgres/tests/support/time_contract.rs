@@ -38,18 +38,15 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
                 matches!(value, Value::Time(_) | Value::Text(_)),
                 "{zone}: {input}: {value:?}"
             );
-            let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
-            let sql = format!("SELECT encode({kind}_send({literal}::{kind}), 'hex')");
-            let exported = session.query_params_controlled(&sql, &[], &control).await.unwrap();
-            assert_eq!(exported.rows[0][0], result.rows[0][1], "{zone}: {input}: export");
-            assert_insert_export(session.as_mut(), &control, kind, &result).await;
-            let cast = if matches!(value, Value::Text(_)) { "::text" } else { "" };
-            let sql = format!("SELECT encode({kind}_send($1{cast}::{kind}), 'hex')");
-            let bound = session
-                .query_params_controlled(&sql, std::slice::from_ref(value), &control)
-                .await
-                .unwrap();
-            assert_eq!(bound.rows[0][0], result.rows[0][1], "{zone}: {input}: bound");
+            crate::wire_round_trip::assert_wire_round_trip(
+                session.as_mut(),
+                &control,
+                kind,
+                &result.columns[0],
+                &result.rows[0][0],
+                &result.rows[0][1],
+            )
+            .await;
             let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
             let text = match value {
                 Value::Time(time) => time.to_string(),
@@ -64,30 +61,4 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
             .unwrap();
         assert_eq!(nulls.rows[0], vec![Value::Null, Value::Null]);
     }
-}
-
-async fn assert_insert_export(
-    session: &mut dyn tablepro_core::Session,
-    control: &OperationControl,
-    kind: &str,
-    result: &tablepro_core::QueryResult,
-) {
-    for sql in [
-        "DROP TABLE IF EXISTS time_export_target".to_string(),
-        format!("CREATE TEMP TABLE time_export_target (value {kind})"),
-    ] {
-        session.query_params_controlled(&sql, &[], control).await.unwrap();
-    }
-    let insert = tablepro_core::sql_literal::build_insert_literal(
-        "postgres",
-        None,
-        "time_export_target",
-        &result.columns[..1],
-        &result.rows[0][..1],
-    )
-    .unwrap();
-    session.query_params_controlled(&insert, &[], control).await.unwrap();
-    let sql = format!("SELECT encode({kind}_send(value), 'hex') FROM time_export_target");
-    let inserted = session.query_params_controlled(&sql, &[], control).await.unwrap();
-    assert_eq!(inserted.rows[0][0], result.rows[0][1], "{kind}: INSERT export");
 }

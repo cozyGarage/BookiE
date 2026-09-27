@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, Session, Value};
+use tablepro_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 fn cases() -> Vec<(i32, i32, i64)> {
@@ -63,7 +63,15 @@ pub async fn assert_interval_contract(connection: &dyn Connection) {
             assert!(matches!(value, Value::Text(_)), "{style}: {source}: {value:?}");
             assert_eq!(result.columns[0].data_type, "INTERVAL");
             assert_eq!(connection.query(&sql).await.unwrap().rows, result.rows);
-            assert_exports(session.as_mut(), &control, value, &wire, style).await;
+            crate::wire_round_trip::assert_wire_round_trip(
+                session.as_mut(),
+                &control,
+                "interval",
+                &result.columns[0],
+                value,
+                &wire,
+            )
+            .await;
             let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
             assert_eq!(
                 json["value"].as_str(),
@@ -74,26 +82,4 @@ pub async fn assert_interval_contract(connection: &dyn Connection) {
             );
         }
     }
-}
-
-async fn assert_exports(
-    session: &mut dyn Session,
-    control: &OperationControl,
-    value: &Value,
-    expected: &Value,
-    style: &str,
-) {
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
-    let sql = format!("SELECT encode(interval_send({literal}::interval), 'hex')");
-    let exported = session.query_params_controlled(&sql, &[], control).await.unwrap();
-    assert_eq!(&exported.rows[0][0], expected, "literal {style}: {value:?}");
-    let bound = session
-        .query_params_controlled(
-            "SELECT encode(interval_send($1::text::interval), 'hex')",
-            std::slice::from_ref(value),
-            control,
-        )
-        .await
-        .unwrap();
-    assert_eq!(&bound.rows[0][0], expected, "bound {style}: {value:?}");
 }

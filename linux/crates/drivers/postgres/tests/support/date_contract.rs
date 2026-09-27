@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, QueryResult, Session, Value};
+use tablepro_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 pub async fn assert_date_contract(connection: &dyn Connection) {
@@ -45,42 +45,15 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
                 result.rows
             );
             assert_eq!(result.columns[0].data_type, kind.to_ascii_uppercase());
-            assert_exports(session.as_mut(), &control, kind, &result).await;
+            crate::wire_round_trip::assert_wire_round_trip(
+                session.as_mut(),
+                &control,
+                kind,
+                &result.columns[0],
+                &result.rows[0][0],
+                &result.rows[0][1],
+            )
+            .await;
         }
     }
-}
-
-async fn assert_exports(session: &mut dyn Session, control: &OperationControl, kind: &str, result: &QueryResult) {
-    let value = &result.rows[0][0];
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
-    let sql = format!("SELECT encode({kind}_send({literal}::{kind}), 'hex')");
-    let imported = session
-        .query_params_controlled(&sql, &[], control)
-        .await
-        .unwrap_or_else(|error| panic!("{literal}: {error}"));
-    assert_eq!(imported.rows[0][0], result.rows[0][1], "{kind}: literal {literal}");
-    let sql = format!("SELECT encode({kind}_send($1::{kind}), 'hex')");
-    let bound = session
-        .query_params_controlled(&sql, std::slice::from_ref(value), control)
-        .await
-        .unwrap();
-    assert_eq!(bound.rows[0][0], result.rows[0][1], "{kind}: bound {literal}");
-    for sql in [
-        "DROP TABLE IF EXISTS date_export_target".to_string(),
-        format!("CREATE TEMP TABLE date_export_target (value {kind})"),
-    ] {
-        session.query_params_controlled(&sql, &[], control).await.unwrap();
-    }
-    let insert = tablepro_core::sql_literal::build_insert_literal(
-        "postgres",
-        None,
-        "date_export_target",
-        &result.columns[..1],
-        &result.rows[0][..1],
-    )
-    .unwrap();
-    session.query_params_controlled(&insert, &[], control).await.unwrap();
-    let sql = format!("SELECT encode({kind}_send(value), 'hex') FROM date_export_target");
-    let inserted = session.query_params_controlled(&sql, &[], control).await.unwrap();
-    assert_eq!(inserted.rows[0][0], result.rows[0][1], "{kind}: INSERT {literal}");
 }

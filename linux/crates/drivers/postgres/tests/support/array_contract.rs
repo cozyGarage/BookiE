@@ -70,7 +70,16 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
     ] {
         let sql = format!("SELECT ({expression}) AS value, encode(array_send({expression}), 'hex') AS wire");
         let result = connection.query(&sql).await.unwrap();
-        assert_round_trip(connection, kind, &result).await;
+        assert_array_value(kind, &result);
+        crate::wire_round_trip::assert_wire_round_trip(
+            session.as_mut(),
+            &control,
+            kind,
+            &result.columns[0],
+            &result.rows[0][0],
+            &result.rows[0][1],
+        )
+        .await;
         let session_result = session.query_params_controlled(&sql, &[], &control).await.unwrap();
         assert_eq!(session_result.rows, result.rows, "{kind}: session");
         assert_eq!(session_result.columns[0].data_type, result.columns[0].data_type);
@@ -86,7 +95,7 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
     }
 }
 
-async fn assert_round_trip(connection: &dyn Connection, kind: &str, result: &QueryResult) {
+fn assert_array_value(kind: &str, result: &QueryResult) {
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Null | Value::Text(_)), "{kind}: {value:?}");
     let expected_type = if kind == "bpchar[]" {
@@ -95,39 +104,6 @@ async fn assert_round_trip(connection: &dyn Connection, kind: &str, result: &Que
         kind.to_ascii_uppercase()
     };
     assert_eq!(result.columns[0].data_type, expected_type);
-    let expected = &result.rows[0][1];
-    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", value).unwrap();
-    let sql = format!("SELECT encode(array_send({literal}::{kind}), 'hex')");
-    let exported = connection.query(&sql).await.unwrap();
-    assert_eq!(&exported.rows[0][0], expected, "{kind}: exported");
-    let sql = format!("SELECT encode(array_send($1::text::{kind}), 'hex')");
-    let bound = connection
-        .query_params(&sql, std::slice::from_ref(value))
-        .await
-        .unwrap();
-    assert_eq!(&bound.rows[0][0], expected, "{kind}: bound");
-    connection
-        .execute("DROP TABLE IF EXISTS array_export_target")
-        .await
-        .unwrap();
-    connection
-        .execute(&format!("CREATE TABLE array_export_target (value {kind})"))
-        .await
-        .unwrap();
-    let insert = tablepro_core::sql_literal::build_insert_literal(
-        "postgres",
-        None,
-        "array_export_target",
-        &result.columns[..1],
-        std::slice::from_ref(value),
-    )
-    .unwrap();
-    connection.execute(&insert).await.unwrap();
-    let inserted = connection
-        .query("SELECT encode(array_send(value), 'hex') FROM array_export_target")
-        .await
-        .unwrap();
-    assert_eq!(&inserted.rows[0][0], expected, "{kind}: INSERT export");
     let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
     match value {
         Value::Null => assert!(json["value"].is_null()),

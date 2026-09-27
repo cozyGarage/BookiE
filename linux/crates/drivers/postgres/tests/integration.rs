@@ -14,6 +14,9 @@ use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio_util::sync::CancellationToken;
 
+#[path = "support/wire_round_trip.rs"]
+mod wire_round_trip;
+
 #[path = "support/array_contract.rs"]
 mod array_contract;
 
