@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+use chrono::Timelike;
 use drivers_clickhouse::ClickhouseDriver;
 use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
 use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, TlsConfig, Value};
@@ -243,6 +244,54 @@ async fn parameterised_types_decode_to_typed_values() {
         result.rows[0][1]
     );
     assert_eq!(result.rows[0][2], Value::Text("tag".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_datetime64_precision_0_through_9_is_exact() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+
+    conn.execute(
+        "CREATE TABLE temporal_precision (
+            id UInt8,
+            seconds DateTime64(0),
+            millis DateTime64(3),
+            micros DateTime64(6),
+            nanos DateTime64(9)
+        ) ENGINE = MergeTree ORDER BY id",
+    )
+    .await
+    .unwrap();
+
+    let stamp = chrono::NaiveDate::from_ymd_opt(2026, 9, 27)
+        .unwrap()
+        .and_hms_nano_opt(12, 34, 56, 123_456_789)
+        .unwrap();
+    let values = [
+        Value::DateTime(stamp),
+        Value::DateTime(stamp.with_nanosecond(123_000_000).unwrap()),
+        Value::DateTime(stamp.with_nanosecond(123_456_000).unwrap()),
+        Value::DateTime(stamp),
+    ];
+    conn.execute_params("INSERT INTO temporal_precision VALUES (1, ?, ?, ?, ?)", &values)
+        .await
+        .unwrap();
+
+    let result = conn
+        .query("SELECT seconds, millis, micros, nanos FROM temporal_precision WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::DateTime(stamp.with_nanosecond(0).unwrap()),
+            values[1].clone(),
+            values[2].clone(),
+            values[3].clone(),
+        ]],
+        "DateTime64 scales 0, 3, 6 and 9 must preserve the representable precision",
+    );
 }
 
 #[tokio::test]
