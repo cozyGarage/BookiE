@@ -384,6 +384,12 @@ the MCP browse tool. BSON Timestamp, regex and MinKey columns now classify as
 JSON and round-trip through live grid edits as their native BSON kinds. Other
 special BSON types and mixed-type-column edits remain open; B3 is not closed.
 
+The MongoDB 7 query/export/import scenario now also checks a nested Int64 above
+2^53, explicit nested BSON null and Unicode text through driver results, JSON,
+CSV, XLSX and Extended JSON re-import. The MCP browse scenario asserts the same
+values on a real driver connection. Both targeted Docker-backed regressions
+passed on 2026-09-28.
+
 ### B3 SQLite dynamic storage classes: 2026-09-27
 
 A file-backed integration scenario checks TEXT, REAL, INTEGER, BLOB and NULL

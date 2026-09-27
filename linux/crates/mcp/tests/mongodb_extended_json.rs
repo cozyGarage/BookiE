@@ -66,7 +66,7 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
         .expect("connect MongoDB driver");
     connection
         .execute(
-            r#"db.values.insertOne({"_id":"special","nested":{"amount":{"$numberDecimal":"1234567890123456789.123456789012345"},"when":{"$date":{"$numberLong":"1234567890123"}},"binary":{"$binary":{"base64":"AP9B","subType":"80"}}}})"#,
+            r#"db.values.insertOne({"_id":"special","nested":{"amount":{"$numberDecimal":"1234567890123456789.123456789012345"},"when":{"$date":{"$numberLong":"1234567890123"}},"binary":{"$binary":{"base64":"AP9B","subType":"80"}},"large_integer":{"$numberLong":"9007199254740993"},"explicit_null":null,"unicode":"数据库🙂 — café"}})"#,
         )
         .await
         .expect("seed Extended JSON document");
@@ -129,6 +129,9 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
             "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
             "when": {"$date": {"$numberLong": "1234567890123"}},
             "binary": {"$binary": {"base64": "AP9B", "subType": "80"}},
+            "large_integer": {"$numberLong": "9007199254740993"},
+            "explicit_null": null,
+            "unicode": "数据库🙂 — café",
         }),
         "MCP must return the original nested Extended JSON markers"
     );

@@ -606,6 +606,8 @@ checks the stored Decimal128, date, binary subtype and integer fields through
 the native BSON client. App parser tests route MongoDB object, array and ObjectId
 columns through JSON parsing. MongoDB 7 integration tests verify canonical
 Extended JSON re-import and MCP browse output preserve nested BSON types.
+They also check nested Int64 above 2^53, explicit nested null and Unicode across
+driver results, JSON/CSV/XLSX output, import and MCP browse response.
 Top-level Timestamp, regex and MinKey grid edits also round-trip as native BSON;
 remaining special types and mixed-type-column edits remain open.
 
@@ -632,7 +634,9 @@ subtype markers in workbook strings. An MCP unit contract confirms BSON
 Extended JSON is passed through without flattening; Mongo-backed MCP browse and
 native BSON re-import checks now run in the integration suite. Top-level
 Timestamp, regex and MinKey grid edits are covered; remaining special BSON kinds
-and other consumers remain open.
+and mixed-type-column edits remain open. The MongoDB 7 query/export/import and
+MCP browse Docker tests passed with large Int64, null and Unicode values added
+on 2026-09-28.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

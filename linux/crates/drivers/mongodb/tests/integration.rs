@@ -229,6 +229,9 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
                 .unwrap(),
             "blob": Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] },
             "when": DateTime::from_millis(1_234_567_890_123),
+            "large_integer": mongodb::bson::Bson::Int64(9_007_199_254_740_993),
+            "explicit_null": mongodb::bson::Bson::Null,
+            "unicode": "数据库🙂 — café",
         },
     };
     client
@@ -280,6 +283,9 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
             "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
             "when": {"$date": {"$numberLong": "1234567890123"}},
+            "large_integer": {"$numberLong": "9007199254740993"},
+            "explicit_null": null,
+            "unicode": "数据库🙂 — café",
         }))
     );
 
@@ -292,6 +298,9 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
             "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
             "when": {"$date": {"$numberLong": "1234567890123"}},
+            "large_integer": {"$numberLong": "9007199254740993"},
+            "explicit_null": null,
+            "unicode": "数据库🙂 — café",
         }),
         "JSON export must keep BSON extended types nested"
     );
@@ -337,8 +346,11 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             "amount": "1234567890123456789.123456789012345".parse::<Decimal128>().unwrap(),
             "blob": Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] },
             "when": DateTime::from_millis(1_234_567_890_123),
+            "large_integer": mongodb::bson::Bson::Int64(9_007_199_254_740_993),
+            "explicit_null": mongodb::bson::Bson::Null,
+            "unicode": "数据库🙂 — café",
         },
-        "re-import must reconstruct native Decimal128, binary subtype and BSON date"
+        "re-import must reconstruct Decimal128, binary subtype, BSON date and Int64 while keeping null and Unicode"
     );
 
     let directory = tempfile::tempdir().expect("temporary export directory");
@@ -359,6 +371,7 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
     if let Some(marker) = missing_nested_xlsx_marker(&nested_cell) {
         panic!("nested XLSX cell missing {marker}: {nested_cell}");
     }
+    assert_eq!(nested_cell, exported[0]["nested"].to_string());
 }
 
 const NESTED_XLSX_DECIMAL: &str = r#""$numberDecimal":"1234567890123456789.123456789012345""#;
