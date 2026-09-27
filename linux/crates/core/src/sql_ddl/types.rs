@@ -659,6 +659,11 @@ fn inline_comment_clause(driver_id: &str, column: &DraftColumn) -> Result<Option
         return Ok(None);
     }
     if let Some(comment) = comment {
+        if driver_id == "mysql" && comment.contains('\\') {
+            return Err(BuildDdlError::UnsafeComment(
+                "MySQL column comments with backslashes cannot be represented safely for every SQL mode".into(),
+            ));
+        }
         return Ok(Some(format!("COMMENT {}", quote_literal(driver_id, comment))));
     }
     let had_comment = column

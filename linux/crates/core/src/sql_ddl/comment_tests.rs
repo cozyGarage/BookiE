@@ -198,15 +198,23 @@ fn a_quote_in_a_comment_is_doubled_on_every_dialect() {
 }
 
 #[test]
-fn a_trailing_backslash_is_escaped_only_where_it_is_an_escape_character() {
+fn mysql_refuses_backslash_comments_and_other_dialects_preserve_them() {
     let column = draft("label", Some("path\\"));
-    for driver_id in ["mysql", "clickhouse"] {
-        let stmts = build_create_table(driver_id, None, "t", std::slice::from_ref(&column), &[], &[]).unwrap();
-        assert!(
-            stmts.iter().any(|s| s.contains("COMMENT 'path\\\\'")),
-            "{driver_id} must double the backslash: {stmts:?}"
-        );
-    }
+    let mysql = build_create_table("mysql", None, "t", std::slice::from_ref(&column), &[], &[]).unwrap_err();
+    assert!(
+        matches!(&mysql, BuildDdlError::UnsafeComment(message) if message.contains("SQL mode")),
+        "{mysql:?}"
+    );
+    let mysql_alter = build_alter_column("mysql", None, "t", &edited(None, Some("path\\"))).unwrap_err();
+    assert!(
+        matches!(mysql_alter, BuildDdlError::UnsafeComment(_)),
+        "{mysql_alter:?}"
+    );
+    let clickhouse = build_create_table("clickhouse", None, "t", std::slice::from_ref(&column), &[], &[]).unwrap();
+    assert!(
+        clickhouse.iter().any(|s| s.contains("COMMENT 'path\\\\'")),
+        "{clickhouse:?}"
+    );
     let postgres = build_create_table("postgres", None, "t", std::slice::from_ref(&column), &[], &[]).unwrap();
     assert!(postgres.iter().any(|s| s.contains("IS 'path\\'")), "{postgres:?}");
     let mssql = build_create_table("mssql", None, "t", &[column], &[], &[]).unwrap();

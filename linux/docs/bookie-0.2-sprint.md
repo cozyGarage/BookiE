@@ -859,7 +859,7 @@ The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson h
 
 Open:
 - DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
-- MySQL `COMMENT` clauses still depend on backslash escaping.
+- MySQL column comments containing backslashes are refused with an explicit error because generated DDL cannot preserve them across SQL modes. Session-aware DDL execution is still needed to support those comments safely.
 - ClickHouse DateTime64 values outside 1900–2262 are saturated by the server.
 
 B3 remains open.
