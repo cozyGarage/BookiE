@@ -18,19 +18,21 @@ separate agents can take in parallel.
    commit.
 6. Stay inside the lane's files. Tasks in the same lane run in order.
 
-A task marked with a decision number waits for that decision.
+A task that names a decision follows the recorded decision.
 
 ## Decisions
 
-| # | Question | Recommendation |
+Decided on 2026-09-27.
+
+| # | Question | Decision |
 |---|---|---|
-| 1 | The GUI built-in SSH client trusts an unknown host key without asking (`UnknownHostKey::Learn` in `app/src/services/database_service.rs:179` and `connection_monitor.rs:210`). agentd refuses. Should the GUI ask, as the OpenSSH path does? | Ask |
-| 2 | With "Use system OpenSSH" inside Flatpak, the sprint doc says the app falls back to the built-in client, `connections.md` says it fails, and the code does neither. | Hide the toggle in Flatpak, or refuse with a clear message |
-| 3 | One unknown write outcome turns off governed writes for every connection until restart. | Decide per connection or document the current rule |
-| 4 | `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON` and `XA START` are not treated as transaction control. | Refuse on shared connections, track in sessions |
-| 5 | A batch such as `BEGIN; UPDATE ...` without COMMIT is allowed on a shared connection. | Refuse unless each driver resets the connection |
-| 6 | Tunnel setup and host-key refusal write no audit record. | Decide whether B4 needs one |
-| 7 | agentd reuses a cached connection when it cannot verify the SSH key material (`agentd/src/lib.rs:312`). | Refuse, as a weaker fallback |
+| 1 | The GUI built-in SSH client trusts an unknown host key without asking (`UnknownHostKey::Learn` in `app/src/services/database_service.rs:179` and `connection_monitor.rs:210`). agentd refuses. | The GUI asks before trusting a new host key, as the OpenSSH path does. |
+| 2 | With "Use system OpenSSH" inside Flatpak, the sprint doc says the app falls back to the built-in client, `connections.md` says it fails, and the code does neither. | Refuse with a clear message. Both docs describe that behavior. |
+| 3 | One unknown write outcome turns off governed writes for every connection until restart. | Turn off governed writes only for the affected connection, restore them when that connection restarts, and document the rule. |
+| 4 | `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON` and `XA START` are not treated as transaction control. | Refuse them on shared connections. Session handling is unchanged for now. |
+| 5 | A batch such as `BEGIN; UPDATE ...` without COMMIT is allowed on a shared connection. | Refuse unterminated batches on shared connections for now. |
+| 6 | Tunnel setup and host-key refusal write no audit record. | Write audit records for both. |
+| 7 | agentd reuses a cached connection when it cannot verify the SSH key material (`agentd/src/lib.rs:312`). | Refuse it as a weaker fallback. |
 
 ## Lane A: built-in SSH
 
@@ -106,6 +108,7 @@ Files: `crates/app/src/ui/editor/*`, `crates/app/src/ui/app/*`, `crates/app/src/
 | F5 | A retired session turns its toggle off. Needs D3. | unit |
 | F6 | Host-key prompt for built-in SSH. Decision 1. | unit, gtk-widgets |
 | F7 | An isolated GTK test: Session on, BEGIN, "transaction open" label, toggle off shows the dialog. | gtk-widgets |
+| F8 | Governed writes turn off only for the connection with the unknown outcome and return when that connection restarts. Decision 3. Document it in the manual checklist. | unit |
 
 F2, F3 and F5 share editor files and go to one agent in order.
 
@@ -145,5 +148,5 @@ Files: driver `src/lib.rs` and tests for the engines named.
 ## Waves
 
 1. Without decisions: A, B, C1 to C5, D, F1 and F4, G1, G2 and G4, H, and I1, I3 and I4.
-2. After wave 1 or a decision: C6, F2 with F3 and F5, F7, G5, E, F6, G3, I2 and I5.
+2. After wave 1: C6, F2 with F3 and F5, F7, F8, G5, E, F6, G3, I2 and I5. Their decisions are recorded above.
 3. Last: the manual checklist in the VM. Automated tiers do not tick those boxes.
