@@ -806,3 +806,7 @@ isolated-test inventory passed. Debian package fixture could not run because
   unsupported. Copy as IN keeps its existing skip behavior. Full fast checks passed at
   `target/quality/20260926T133550496651Z-full/report.json`. Hosted CI remains
   a separate gate for the resulting pushed commit.
+
+### B3 DuckDB native temporal checkpoint — September 27
+
+DuckDB date/time/timestamp and enum results no longer expose implementation debug strings. Native regression cases prove pre-epoch nanoseconds, timezone instants, infinities, end-of-day time, BC/large-year dates, SQL/parameter round trips and JSON precision. Unsupported intervals, collections and calendar ranges are visibly undecodable with write refusal coverage. Full nested/interval decoding, other driver-native gaps and consumer parity remain open; B3 is not complete. Reproduction and validation details are in [value contracts](value-contracts.md#duckdb-native-temporal-and-enum-checkpoint).

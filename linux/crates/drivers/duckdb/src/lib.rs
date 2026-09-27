@@ -8,6 +8,8 @@ use tablepro_core::{
     QueryResult, TableInfo, Value,
 };
 
+mod temporal;
+
 pub struct DuckdbDriver;
 
 #[async_trait]
@@ -354,7 +356,16 @@ fn run_query(
         }
         raw_rows.push(
             (0..column_count)
-                .map(|i| duck_value_ref_to_value(row.get_ref_unwrap(i)))
+                .map(|i| {
+                    let value = duck_value_ref_to_value(row.get_ref_unwrap(i));
+                    if let (Value::DateTime(timestamp), duckdb::arrow::datatypes::DataType::Timestamp(_, Some(_))) =
+                        (&value, row.as_ref().column_type(i))
+                    {
+                        Value::TimestampTz(timestamp.and_utc())
+                    } else {
+                        value
+                    }
+                })
                 .collect(),
         );
     }
@@ -431,11 +442,14 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
             Err(_) => Value::Bytes(t.to_vec()),
         },
         ValueRef::Blob(b) | ValueRef::Geometry(b) => Value::Bytes(b.to_vec()),
-        ValueRef::Date32(d) => Value::Text(format!("date32:{d}")),
-        ValueRef::Time64(unit, t) => Value::Text(format!("time64:{unit:?}:{t}")),
-        ValueRef::Timestamp(unit, t) => Value::Text(format!("timestamp:{unit:?}:{t}")),
-        ValueRef::Interval { months, days, nanos } => Value::Text(format!("interval:{months}m {days}d {nanos}ns")),
-        other => Value::Text(format!("{other:?}")),
+        ValueRef::Date32(d) => temporal::date(d),
+        ValueRef::Time64(unit, t) => temporal::time(unit, t),
+        ValueRef::Timestamp(unit, t) => temporal::timestamp(unit, t),
+        ValueRef::Enum(..) => v
+            .as_str()
+            .map(|s| Value::Text(s.into()))
+            .unwrap_or_else(|_| Value::Undecodable("ENUM".into())),
+        other => Value::Undecodable(format!("{:?}", other.data_type())),
     }
 }
 

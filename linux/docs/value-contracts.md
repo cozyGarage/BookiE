@@ -482,3 +482,33 @@ All 26 installed release-build UI scenarios passed with 26 JSON/stderr pairs at
 These are X11/AT-SPI and local fixture results. Hosted CI, installed Wayland and
 package acceptance remain separate; B3 stays open for remaining native types
 and consumer parity before B4–B6 acceptance.
+
+## DuckDB native temporal and enum checkpoint
+
+The native decoder previously exposed `date32:-1`, timestamp unit counters, interval descriptions and Arrow collection debug output as ordinary text. The first new live embedded-engine regression failed when SQL re-import tried to parse `date32:-1` as a date.
+
+Dates and times now use shared typed values where representable. Timestamp seconds, milliseconds, microseconds and nanoseconds are split with Euclidean division so negative fractional epochs retain their exact fraction. Arrow timezone metadata selects the UTC instant variant. Enum dictionary labels preserve empty text, literal NULL text, Unicode and SQL NULL. Date infinities, BC dates and years above 9999 use DuckDB-compatible text; 24:00:00 remains distinct from midnight.
+
+The integration corpus checks server-rendered source values against both parameter rebinding and generated SQL literals, plus independent JSON expectations for nanosecond timestamps and microsecond times. It includes nulls for every temporal family. Decoder unit tests cover all four units, negative remainders, end-of-day boundaries and arithmetic overflow.
+
+Intervals, lists, fixed arrays, structs, maps and unions now return `Undecodable`, never debug text masquerading as the original value. Tests require SQL literal and parameter refusal. Full interval/collection decoding remains open, including nested unsigned wide integers and interval carrier limits. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, GTK, MCP or release acceptance.
+
+Run locally:
+
+```sh
+cargo test --locked -p tablepro-driver-duckdb --lib --test integration
+./scripts/test-value-contracts.sh --gtk --duckdb
+```
+
+The strict value runner automatically includes the new integration cases. Native decoder unit cases also run in the optional DuckDB crate test job. Protocol references: [DuckDB timestamps](https://duckdb.org/docs/current/sql/data_types/timestamp) and [interval basis units](https://duckdb.org/docs/current/sql/data_types/interval).
+
+Validation: the DuckDB crate passed 16 tests (12 unit, four integration). Full local checks, all 11 selected value suites and the Python harness passed in `target/quality/20260927T104559674200Z-layers/report.json`; detailed value evidence is `target/quality/20260927T104731515648Z-values/report.json`. The combined value build reused 742 artifacts and rebuilt only the DuckDB package. Installed UI/Wayland and package acceptance were not rerun for this driver-only checkpoint.
+
+Optional-driver Clippy (`cargo clippy --locked -p tablepro-driver-duckdb --all-targets -- -D warnings`) also passed. Its first run selected a separate native build fingerprint and rebuilt the bundled C++ library; this differs from the cached combined value runner above. Reuse a consistent command/feature graph for routine value checks.
+
+Scoped mutation evidence: `target/quality/20260927-b3-duckdb-temporal-mutants/mutants.out/outcomes.json` records all 31 generated mutations in `temporal.rs`: 28 caught, three unviable, zero survivors and zero timeouts. Both the crate unit tests and integration suite ran for each viable mutation; compile failures are not counted as catches. Command:
+
+```sh
+mkdir -p target/mutation-tmp
+TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-duckdb --file crates/drivers/duckdb/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/duckdb-temporal-mutants -- --lib --test integration
+```
