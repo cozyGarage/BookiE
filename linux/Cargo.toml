@@ -76,6 +76,7 @@ libc = "0.2"
 tiberius = { git = "https://github.com/tiberius-rs/tiberius", rev = "c1d2e741ee6fe0935091826d91fb5886b6a4082a" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }
+redis = { path = "vendor/redis" }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

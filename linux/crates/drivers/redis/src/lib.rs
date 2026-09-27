@@ -52,16 +52,11 @@ impl DatabaseDriver for RedisDriver {
             ""
         };
         let url = format!("{scheme}://{auth}{}:{}/{}{suffix}", opts.host, opts.port, db_index);
-        let client = match root_certificate(&opts.tls, verifies)? {
-            Some(root_cert) => Client::build_with_tls(
-                url,
-                TlsCertificates {
-                    client_tls: None,
-                    root_cert: Some(root_cert),
-                },
-            )
-            .map_err(|err| map_redis_connect_error(err, verifies))?,
-            None => Client::open(url).map_err(|err| map_redis_connect_error(err, verifies))?,
+        let client = if opts.tls.mode.encrypts() {
+            Client::build_with_tls(url, tls_certificates_for(&opts, verifies)?)
+                .map_err(|err| map_redis_connect_error(err, verifies))?
+        } else {
+            Client::open(url).map_err(|err| map_redis_connect_error(err, verifies))?
         };
         let manager = match tokio::time::timeout(CONNECT_TIMEOUT, establish_connection_manager(client.clone())).await {
             Ok(result) => result.map_err(|err| map_redis_connect_error(err, verifies))?,
@@ -76,6 +71,17 @@ impl DatabaseDriver for RedisDriver {
 }
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Builds the TLS certificates the client dials with. `verify_host` pins
+/// certificate verification to the database's own hostname rather than
+/// `opts.host`, which can be an SSH tunnel's `127.0.0.1`.
+fn tls_certificates_for(opts: &ConnectOptions, verifies: bool) -> Result<TlsCertificates, DriverError> {
+    Ok(TlsCertificates {
+        client_tls: None,
+        root_cert: root_certificate(&opts.tls, verifies)?,
+        verify_host: verifies.then(|| opts.service_address().0.to_string()),
+    })
+}
 
 /// Read the certificate authority the connection names. Only a verifying mode
 /// consults it, so an encrypt-only session never fails on a path it ignores.
@@ -615,6 +621,61 @@ fn map_redis_connect_error(err: RedisError, verifies_cert: bool) -> DriverError 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn open_session_is_refused() {
+        let client = Client::open("redis://127.0.0.1:6379/0").unwrap();
+        let manager =
+            ConnectionManager::new_lazy_with_config(client.clone(), redis::aio::ConnectionManagerConfig::default())
+                .unwrap();
+        let conn = RedisConnection {
+            conn: Mutex::new(manager),
+            db_count: 16,
+            browse_client: client,
+        };
+
+        match conn.open_session().await {
+            Err(DriverError::Unsupported(_)) => {}
+            Ok(_) => panic!("redis must refuse open_session"),
+            Err(other) => panic!("expected Unsupported, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_tunneled_connection_verifies_tls_against_the_service_hostname() {
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port: 6380,
+            service_endpoint: Some(("cache.internal.example".into(), 6379)),
+            tls: tablepro_core::TlsConfig {
+                mode: tablepro_core::TlsMode::VerifyFull,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let certificates = tls_certificates_for(&opts, true).expect("build TLS certificates");
+
+        assert_eq!(certificates.verify_host.as_deref(), Some("cache.internal.example"));
+    }
+
+    #[test]
+    fn an_encrypt_only_connection_does_not_verify_a_hostname() {
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port: 6380,
+            service_endpoint: Some(("cache.internal.example".into(), 6379)),
+            tls: tablepro_core::TlsConfig {
+                mode: tablepro_core::TlsMode::Require,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let certificates = tls_certificates_for(&opts, false).expect("build TLS certificates");
+
+        assert_eq!(certificates.verify_host, None);
+    }
 
     #[test]
     fn value_contract_empty_quoted_arguments_are_not_dropped() {
