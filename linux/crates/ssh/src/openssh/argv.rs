@@ -96,10 +96,6 @@ fn push_auth(args: &mut Vec<OsString>, auth: &OpenSshAuth) {
             args,
             "PreferredAuthentications=password,keyboard-interactive,publickey".into(),
         ),
-        OpenSshAuth::KeyboardInteractive => push_option(
-            args,
-            "PreferredAuthentications=keyboard-interactive,password,publickey".into(),
-        ),
     }
 }
 
@@ -302,10 +298,6 @@ mod tests {
                     password: SecretString::from("secret"),
                 },
                 Some("PreferredAuthentications=password,keyboard-interactive,publickey"),
-            ),
-            (
-                OpenSshAuth::KeyboardInteractive,
-                Some("PreferredAuthentications=keyboard-interactive,password,publickey"),
             ),
         ];
         for (auth, expected) in cases {

@@ -22,7 +22,6 @@ pub enum OpenSshAuth {
     Password {
         password: SecretString,
     },
-    KeyboardInteractive,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

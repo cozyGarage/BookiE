@@ -38,7 +38,7 @@ impl AskpassBridge {
                 path.as_ref().map(|path| path.to_string_lossy().into_owned()),
                 passphrase.clone(),
             ),
-            OpenSshAuth::Agent | OpenSshAuth::KeyboardInteractive => (None, None, None),
+            OpenSshAuth::Agent => (None, None, None),
         };
         Self {
             owner_uid,
