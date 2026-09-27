@@ -142,6 +142,7 @@ references, tests, and differences. Implementation and release verification diff
 - [ ] **B4 transport/sessions**: network/OpenSSH/session integration in GUI/daemon,
   policy/audit guarded. Dedicated editor sessions, cancellation, transaction ownership,
   terminal outcomes/retirement. No weaker auth/TLS fallback.
+  Open work is split into small tasks on the [B4 task board](b4-task-board.md).
 - [ ] **B5 editor/files**: shared-planner highlighting, existing shortcuts, GTK/GIO
   Open/Save/Save As, dirty prompts/external-change detection. Open creates a tab;
   atomic save rejects stale versions until reload/overwrite/Save As is selected.
