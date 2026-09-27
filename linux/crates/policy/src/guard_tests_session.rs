@@ -372,6 +372,74 @@ async fn a_nested_begin_is_refused() {
 }
 
 #[tokio::test]
+async fn a_denied_statement_inside_a_transaction_does_not_block_the_following_commit() {
+    let h = harness(SessionScript::default(), true);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "DELETE FROM items WHERE id = 1")
+        .await
+        .expect_err("read-only denies the write");
+    run(&mut session, "COMMIT").await.expect("commit still succeeds");
+    assert!(!session.transaction_open());
+
+    let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Committed);
+}
+
+#[tokio::test]
+async fn a_timed_out_statement_inside_a_postgres_transaction_leaves_the_commit_rolled_back() {
+    let h = harness(
+        SessionScript {
+            fail_once_on: Some("UPDATE items SET v = 1 WHERE id = 1"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    assert!(matches!(
+        run(&mut session, "UPDATE items SET v = 1 WHERE id = 1").await,
+        Err(DriverError::TimedOut)
+    ));
+    run(&mut session, "COMMIT")
+        .await
+        .expect("the commit itself is dispatched successfully");
+    assert!(!session.transaction_open());
+
+    let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].terminal_status, AuditTerminalStatus::Succeeded);
+    assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+}
+
+#[tokio::test]
+async fn rollback_and_chain_starts_a_fresh_batch() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect("write");
+    run(&mut session, "ROLLBACK AND CHAIN")
+        .await
+        .expect("rollback and chain");
+    assert!(session.transaction_open());
+
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
+
+    run(&mut session, "ROLLBACK").await.expect("second rollback");
+    assert!(!session.transaction_open());
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 2);
+    assert_ne!(rollbacks[0].batch_id, rollbacks[1].batch_id);
+}
+
+#[tokio::test]
 async fn a_disconnected_commit_writes_an_unknown_terminal_state_and_retires_the_session() {
     let h = harness(
         SessionScript {

@@ -17,6 +17,7 @@ struct OpenBatch {
     id: Uuid,
     wrote: bool,
     uncertain: bool,
+    aborted: bool,
 }
 
 impl OpenBatch {
@@ -25,6 +26,7 @@ impl OpenBatch {
             id: Uuid::new_v4(),
             wrote: false,
             uncertain: false,
+            aborted: false,
         }
     }
 }
@@ -147,6 +149,9 @@ impl PolicySession {
                 | DriverError::Disconnected)
         ) {
             batch.uncertain = true;
+        }
+        if result.is_err() && self.guard.ctx.driver_id == "postgres" {
+            batch.aborted = true;
         }
     }
 
@@ -294,7 +299,8 @@ impl PolicySession {
         if matches!(result, Err(DriverError::Disconnected)) {
             self.retired = true;
         }
-        let (terminal_status, transaction_outcome, error_category, ambiguous) = finish_outcome(kind, &result);
+        let (terminal_status, transaction_outcome, error_category, ambiguous) =
+            finish_outcome(kind, batch.aborted, &result);
         if ambiguous {
             self.guard.ctx.audit_state.disable_governed_writes();
         }
@@ -357,6 +363,7 @@ fn finish_operation(kind: Finish, batch_id: Uuid) -> AuditOperation<'static> {
 
 fn finish_outcome(
     kind: Finish,
+    aborted: bool,
     result: &Result<QueryResult, DriverError>,
 ) -> (
     AuditTerminalStatus,
@@ -367,6 +374,7 @@ fn finish_outcome(
     match result {
         Ok(_) => {
             let outcome = match kind {
+                Finish::Commit if aborted => AuditTransactionOutcome::RolledBack,
                 Finish::Commit => AuditTransactionOutcome::Committed,
                 Finish::Rollback => AuditTransactionOutcome::RolledBack,
             };
