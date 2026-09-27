@@ -591,7 +591,7 @@ fn xlsx_nested_cell_requires_its_own_date_and_binary_markers() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
-    use mongodb::bson::{Binary, DateTime, Decimal128, doc, oid::ObjectId, spec::BinarySubtype};
+    use mongodb::bson::{Binary, DateTime, Decimal128, Regex, Timestamp, doc, oid::ObjectId, spec::BinarySubtype};
 
     let (_container, host, port) = start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
@@ -605,6 +605,9 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
             "_id": id,
             "payload": doc! { "before": true },
             "items": vec![doc! { "before": true }],
+            "cluster_time": Timestamp { time: 41, increment: 7 },
+            "pattern": Regex { pattern: "before".into(), options: "i".into() },
+            "floor": mongodb::bson::Bson::MinKey,
         })
         .await
         .expect("seed editable nested document");
@@ -626,6 +629,20 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
     assert_eq!(before.columns[payload_index].data_type, "object");
     let items_index = before.columns.iter().position(|column| column.name == "items").unwrap();
     assert_eq!(before.columns[items_index].data_type, "array");
+    let timestamp_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "cluster_time")
+        .unwrap();
+    assert_eq!(before.columns[timestamp_index].data_type, "bsonTimestamp");
+    let regex_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "pattern")
+        .unwrap();
+    assert_eq!(before.columns[regex_index].data_type, "regex");
+    let min_key_index = before.columns.iter().position(|column| column.name == "floor").unwrap();
+    assert_eq!(before.columns[min_key_index].data_type, "minkey");
 
     let edited = serde_json::json!({
         "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
@@ -633,6 +650,9 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
         "binary": {"$binary": {"base64": "AP9B", "subType": "80"}},
     });
     let edited_items = serde_json::json!([{"ordinal": {"$numberLong": "7"}}]);
+    let edited_timestamp = serde_json::json!({"$timestamp": {"t": 53, "i": 11}});
+    let edited_regex = serde_json::json!({"$regularExpression": {"pattern": "after", "options": "m"}});
+    let edited_min_key = serde_json::json!({"$minKey": 1});
     let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
@@ -641,6 +661,9 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
         &[
             (payload_index, Value::Json(edited.clone())),
             (items_index, Value::Json(edited_items.clone())),
+            (timestamp_index, Value::Json(edited_timestamp)),
+            (regex_index, Value::Json(edited_regex)),
+            (min_key_index, Value::Json(edited_min_key)),
         ],
         &[before.rows[0][id_index].clone()],
     )
@@ -673,6 +696,21 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
             "binary": Binary { subtype: BinarySubtype::UserDefined(0x80), bytes: vec![0, 255, 65] },
         }
     );
+    assert_eq!(
+        persisted.get("cluster_time"),
+        Some(&mongodb::bson::Bson::Timestamp(Timestamp {
+            time: 53,
+            increment: 11
+        }))
+    );
+    assert_eq!(
+        persisted.get("pattern"),
+        Some(&mongodb::bson::Bson::RegularExpression(Regex {
+            pattern: "after".into(),
+            options: "m".into()
+        }))
+    );
+    assert_eq!(persisted.get("floor"), Some(&mongodb::bson::Bson::MinKey));
     assert_eq!(
         persisted.get_array("items").unwrap(),
         &vec![mongodb::bson::Bson::Document(doc! { "ordinal": 7_i64 })]

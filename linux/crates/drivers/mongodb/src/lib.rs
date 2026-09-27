@@ -679,7 +679,15 @@ fn bson_type_name(b: &Bson) -> String {
         Bson::Document(_) => "object",
         Bson::Array(_) => "array",
         Bson::Decimal128(_) => "decimal",
-        _ => "mixed",
+        Bson::RegularExpression(_) => "regex",
+        Bson::JavaScriptCode(_) => "javascript",
+        Bson::JavaScriptCodeWithScope(_) => "javascriptwithscope",
+        Bson::Timestamp(_) => "bsonTimestamp",
+        Bson::Symbol(_) => "symbol",
+        Bson::Undefined => "undefined",
+        Bson::DbPointer(_) => "dbpointer",
+        Bson::MinKey => "minkey",
+        Bson::MaxKey => "maxkey",
     }
     .into()
 }

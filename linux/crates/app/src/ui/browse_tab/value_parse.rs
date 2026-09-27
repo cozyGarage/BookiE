@@ -105,7 +105,23 @@ pub(super) fn classify_type(dt: &str) -> TypeKind {
     if dt.contains("uuid") {
         return TypeKind::Uuid;
     }
-    if dt.contains("json") || matches!(dt, "object" | "array" | "objectid") {
+    if dt.contains("json")
+        || matches!(
+            dt,
+            "object"
+                | "array"
+                | "objectid"
+                | "bsontimestamp"
+                | "regex"
+                | "javascript"
+                | "javascriptwithscope"
+                | "symbol"
+                | "undefined"
+                | "dbpointer"
+                | "minkey"
+                | "maxkey"
+        )
+    {
         return TypeKind::Json;
     }
     if dt.contains("timestamptz") || dt.contains("with time zone") {
@@ -308,6 +324,19 @@ mod tests {
         assert_eq!(classify_type("object"), TypeKind::Json);
         assert_eq!(classify_type("array"), TypeKind::Json);
         assert_eq!(classify_type("objectid"), TypeKind::Json);
+        for mongo_special in [
+            "bsontimestamp",
+            "regex",
+            "javascript",
+            "javascriptwithscope",
+            "symbol",
+            "undefined",
+            "dbpointer",
+            "minkey",
+            "maxkey",
+        ] {
+            assert_eq!(classify_type(mongo_special), TypeKind::Json, "{mongo_special}");
+        }
         assert_eq!(classify_type("timestamptz"), TypeKind::TimestampTz);
         assert_eq!(classify_type("timestamp with time zone"), TypeKind::TimestampTz);
         assert_eq!(classify_type("timestamp without time zone"), TypeKind::DateTime);
