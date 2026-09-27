@@ -14,6 +14,7 @@
 - A MongoDB connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
 - A Redis connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
 - A session whose connection was lost now refuses any further statement instead of dispatching it and letting the resulting error turn off governed writes for every connection.
+- Stopping the MCP agent server while a write was still in progress could tear down the server before that write reached a recorded outcome, leaving its audit entry open. The server now waits at least as long as a write is allowed to run before it finishes shutting down, so an interrupted write is always recorded as cancelled or unknown.
 - A session that loses its connection mid-transaction now has its transaction outcome recorded as uncertain, and the session itself stops accepting statements even if the driver still reports it usable.
 - A session COMMIT with no preceding BEGIN, and a BEGIN sent while a session transaction is already open, are now refused instead of being sent to the database unaudited.
 - A session COMMIT that only succeeded because PostgreSQL had already rolled back an aborted transaction is now audited as rolled back instead of committed.

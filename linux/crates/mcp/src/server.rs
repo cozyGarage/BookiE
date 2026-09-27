@@ -362,19 +362,30 @@ pub async fn serve_streamable_http(bridge: Arc<McpBridge>, config: McpServerConf
     serve_streamable_http_until(bridge, config, tokio_util::sync::CancellationToken::new()).await
 }
 
+/// Extra time given to the graceful-shutdown race beyond the longest write
+/// this bridge admits, so a write already in flight when shutdown begins
+/// gets to finish its own bounded cancellation and reach a terminal audit
+/// outcome before the runtime hosting it is torn down. A caller that drops
+/// this future's loser branch does not stop an already-spawned request task,
+/// but a caller that also drops the runtime (`tablepro-app`'s dedicated MCP
+/// thread) does, so this deadline must never be shorter than the operation
+/// bound `McpBridge` itself already enforces.
+const SHUTDOWN_TEARDOWN_MARGIN: std::time::Duration = std::time::Duration::from_secs(5);
+
 pub async fn serve_streamable_http_until(
     bridge: Arc<McpBridge>,
     config: McpServerConfig,
     shutdown: tokio_util::sync::CancellationToken,
 ) -> Result<(), String> {
     let addr = loopback_bind_addr(&config.bind_host, config.bind_port)?;
+    let force_deadline_duration = std::time::Duration::from_secs(bridge.query_timeout_secs) + SHUTDOWN_TEARDOWN_MARGIN;
     let app = http_router(bridge);
     let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| e.to_string())?;
     tracing::info!(%addr, "MCP HTTP listening (loopback)");
     let server = axum::serve(listener, app).with_graceful_shutdown(shutdown.clone().cancelled_owned());
     let force_deadline = async move {
         shutdown.cancelled().await;
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(force_deadline_duration).await;
     };
     tokio::select! {
         result = server => result.map_err(|error| error.to_string()),
