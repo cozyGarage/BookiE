@@ -437,7 +437,10 @@ fn bson_to_value(b: &Bson) -> Value {
             |_| Value::Json(Bson::DateTime(*v).into_canonical_extjson()),
             Value::Text,
         ),
-        Bson::Binary(bin) => Value::Bytes(bin.bytes.clone()),
+        Bson::Binary(bin) if bin.subtype == mongodb::bson::spec::BinarySubtype::Generic => {
+            Value::Bytes(bin.bytes.clone())
+        }
+        Bson::Binary(bin) => Value::Json(Bson::Binary(bin.clone()).into_canonical_extjson()),
         Bson::Decimal128(d) => Value::Text(d.to_string()),
         // Plain JSON strings cannot retain BSON-only kinds such as Decimal128,
         // binary subtype, ObjectId or the full BSON date representation.
@@ -985,6 +988,44 @@ mod tests {
                 Value::Json(serde_json::json!({"$date": {"$numberLong": millis.to_string()}}))
             );
         }
+    }
+
+    #[test]
+    fn non_generic_binary_subtypes_keep_their_extended_json_metadata() {
+        use mongodb::bson::{Binary, spec::BinarySubtype};
+
+        for (subtype, expected) in [
+            (BinarySubtype::Function, "01"),
+            (BinarySubtype::BinaryOld, "02"),
+            (BinarySubtype::UuidOld, "03"),
+            (BinarySubtype::Uuid, "04"),
+            (BinarySubtype::Md5, "05"),
+            (BinarySubtype::Encrypted, "06"),
+            (BinarySubtype::Column, "07"),
+            (BinarySubtype::Sensitive, "08"),
+            (BinarySubtype::Vector, "09"),
+            (BinarySubtype::Reserved(0x0a), "0a"),
+            (BinarySubtype::UserDefined(0x80), "80"),
+        ] {
+            let value = Bson::Binary(Binary {
+                subtype,
+                bytes: vec![0, 255, 65],
+            });
+            assert_eq!(
+                bson_to_value(&value),
+                Value::Json(serde_json::json!({
+                    "$binary": {"base64": "AP9B", "subType": expected}
+                })),
+                "subtype {expected}"
+            );
+        }
+        assert_eq!(
+            bson_to_value(&Bson::Binary(Binary {
+                subtype: BinarySubtype::Generic,
+                bytes: vec![0, 255, 65],
+            })),
+            Value::Bytes(vec![0, 255, 65])
+        );
     }
 
     #[test]

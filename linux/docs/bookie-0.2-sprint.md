@@ -363,12 +363,14 @@ A new unit regression reproduced nested BSON type loss: Decimal128, binary and
 date values became ordinary debug strings inside `Value::Json`. Nested documents
 and arrays now use canonical Extended JSON. Top-level Decimal128 extremes remain
 exact text, and BSON dates outside chrono's RFC3339 range use canonical Extended
-JSON with the original millisecond count. MongoDB 7 Docker coverage inserts native
-BSON fixtures and reads them through the driver query path. All 23 MongoDB unit
-tests and all eight real-server integration tests passed. The scoped mutation
-attempt had one unviable whole-function mutant and establishes no mutation score.
-Nested editing, other binary subtypes and consumer/export parity remain open; B3
-is not closed.
+JSON with the original millisecond count. Generic binary stays editable as bytes;
+all other BSON binary subtype tags retain canonical subtype metadata. MongoDB 7
+Docker coverage inserts native Decimal128, date, UUID and user-defined binary
+fixtures and reads them through the driver query path. All 24 MongoDB unit tests
+and all eight real-server integration tests passed. Scoped mutation testing
+caught three of four generated mutations, with one unviable whole-function
+replacement and no survivors or timeouts. Nested editing and consumer/export
+parity remain open; B3 is not closed.
 
 ## Documentation and boundaries
 

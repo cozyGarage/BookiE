@@ -557,19 +557,22 @@ consumer parity remain open.
 
 A decoder unit regression first failed for nested `Decimal128`, binary and date
 values. The driver converted all three to their debug-display strings, losing the
-Decimal128 type/precision, binary subtype and exact BSON date milliseconds. Top-level
-binary values already remained `Value::Bytes`; nested documents and arrays now use
-canonical MongoDB Extended JSON so special BSON types remain explicitly typed.
+Decimal128 type/precision, binary subtype and exact BSON date milliseconds. Generic
+binary values remain `Value::Bytes` for editing. Nested documents/arrays and top-level
+non-generic binary values use canonical MongoDB Extended JSON so BSON special types
+and subtype metadata remain explicit.
 
 The unit regressions check Decimal128's smallest exponent, largest finite value,
-negative zero and scale; bytes containing NUL and `0xff` with the generic subtype;
-and dates at both ends of the signed 64-bit millisecond range. Top-level Decimal128
+negative zero and scale; every BSON binary subtype, including legacy UUID, encrypted,
+column, sensitive, vector, reserved and user-defined values; and dates at both ends
+of the signed 64-bit millisecond range. A Docker-backed test checks real UUID and
+user-defined subtype values. Top-level Decimal128
 values remain exact text because the shared decimal type cannot represent this
 range. Dates that cannot be rendered as RFC3339 use canonical Extended JSON with
 the exact signed millisecond count. A Docker-backed MongoDB 7 test inserts these
 native BSON values directly, reads them through the driver query path, and checks
-the resulting value/type representation. Nested editing, other binary subtypes,
-consumer/export parity and BSON kinds outside the shared value model remain open.
+the resulting value/type representation. Nested editing, consumer/export parity
+and BSON kinds outside the shared value model remain open.
 
 Focused local checks:
 
@@ -581,10 +584,12 @@ cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson
 
 Against the old decoder, the regression failed with
 `Decimal128("...")`, `Binary(...)`, and `DateTime("...")` as JSON strings. Full
-MongoDB unit and real-server suites passed (23 unit tests; eight integration
-tests). The scoped `cargo-mutants` attempt generated one whole-function replacement,
-which was unviable because `Value` has no `Default`; it provides no mutation score for
-this conversion. The failing pre-fix regression is the direct sensitivity evidence.
+MongoDB unit and real-server suites passed (24 unit tests; eight integration
+tests). Scoped mutation evidence at
+`target/quality/20260927-b3-mongodb-native-mutants/mutants.out/outcomes.json`
+records four generated mutations: three caught, one unviable whole-function
+replacement (`Value` has no `Default`), and no survivors or timeouts. The failing
+pre-fix regressions independently demonstrate test sensitivity.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

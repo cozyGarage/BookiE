@@ -221,6 +221,8 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             .unwrap(),
         "date_min": DateTime::from_millis(i64::MIN),
         "date_max": DateTime::from_millis(i64::MAX),
+        "uuid_binary": Binary { subtype: BinarySubtype::Uuid, bytes: (0..16).collect() },
+        "user_binary": Binary { subtype: BinarySubtype::UserDefined(0x80), bytes: vec![0, 255, 65] },
         "nested": {
             "amount": "1234567890123456789.123456789012345"
                 .parse::<Decimal128>()
@@ -259,6 +261,18 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             result.rows[0][column(name)],
             Value::Json(serde_json::json!({"$date": {"$numberLong": millis.to_string()}}))
         );
+    }
+    for (name, expected) in [
+        (
+            "uuid_binary",
+            serde_json::json!({"$binary": {"base64": "AAECAwQFBgcICQoLDA0ODw==", "subType": "04"}}),
+        ),
+        (
+            "user_binary",
+            serde_json::json!({"$binary": {"base64": "AP9B", "subType": "80"}}),
+        ),
+    ] {
+        assert_eq!(result.rows[0][column(name)], Value::Json(expected));
     }
     assert_eq!(
         result.rows[0][nested],
