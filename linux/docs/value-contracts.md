@@ -546,7 +546,45 @@ The reproducer ran against MySQL 8 with a permissive `sql_mode`. Before the fix,
 
 The test compares every value with an independent expected value. It then writes the rows back through bound parameters and SQL INSERT export, and the server confirms all six rows match with `<=>`. Scoped cargo-mutants on `crates/drivers/mysql/src/temporal.rs`: 16 mutants, 13 caught, 3 unviable, zero survivors and zero timeouts, using the recipe above with `-- --lib --test integration -- --include-ignored calendar_fields native_time_zero`.
 
-BIT, SET/ENUM and spatial values, session time zones and stricter SQL modes remain open.
+Subsequent B3 coverage verifies BIT(1..64), ENUM/SET labels and spatial bytes;
+bounded BIT edits survive a driver update, while spatial and too-wide BIT values
+remain read-only. Text exports also run with and without `NO_BACKSLASH_ESCAPES`;
+backslash-bearing column comments are explicitly refused. Session time-zone and
+stricter SQL-mode matrices, installed-app-to-MySQL grid acceptance and broader
+consumer parity remain open.
+
+## MongoDB nested BSON and native boundary checkpoint
+
+A decoder unit regression first failed for nested `Decimal128`, binary and date
+values. The driver converted all three to their debug-display strings, losing the
+Decimal128 type/precision, binary subtype and exact BSON date milliseconds. Top-level
+binary values already remained `Value::Bytes`; nested documents and arrays now use
+canonical MongoDB Extended JSON so special BSON types remain explicitly typed.
+
+The unit regressions check Decimal128's smallest exponent, largest finite value,
+negative zero and scale; bytes containing NUL and `0xff` with the generic subtype;
+and dates at both ends of the signed 64-bit millisecond range. Top-level Decimal128
+values remain exact text because the shared decimal type cannot represent this
+range. Dates that cannot be rendered as RFC3339 use canonical Extended JSON with
+the exact signed millisecond count. A Docker-backed MongoDB 7 test inserts these
+native BSON values directly, reads them through the driver query path, and checks
+the resulting value/type representation. Nested editing, other binary subtypes,
+consumer/export parity and BSON kinds outside the shared value model remain open.
+
+Focused local checks:
+
+```sh
+cargo test --locked -p tablepro-driver-mongodb --lib nested_bson_special_values_keep_their_extended_json_types
+cargo test --locked -p tablepro-driver-mongodb --lib bson_decimal_and_date_extremes_remain_exact_outside_core_ranges
+cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson_special_values_keep_exact_extended_json_types --include-ignored --test-threads=1
+```
+
+Against the old decoder, the regression failed with
+`Decimal128("...")`, `Binary(...)`, and `DateTime("...")` as JSON strings. Full
+MongoDB unit and real-server suites passed (23 unit tests; eight integration
+tests). The scoped `cargo-mutants` attempt generated one whole-function replacement,
+which was unviable because `Value` has no `Default`; it provides no mutation score for
+this conversion. The failing pre-fix regression is the direct sensitivity evidence.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

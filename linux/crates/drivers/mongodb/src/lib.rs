@@ -433,35 +433,18 @@ fn bson_to_value(b: &Bson) -> Value {
         Bson::Double(v) => Value::Float(*v),
         Bson::String(v) => Value::Text(v.clone()),
         Bson::ObjectId(v) => Value::Text(v.to_hex()),
-        Bson::DateTime(v) => Value::Text(v.try_to_rfc3339_string().unwrap_or_else(|_| v.to_string())),
+        Bson::DateTime(v) => v.try_to_rfc3339_string().map_or_else(
+            |_| Value::Json(Bson::DateTime(*v).into_canonical_extjson()),
+            Value::Text,
+        ),
         Bson::Binary(bin) => Value::Bytes(bin.bytes.clone()),
         Bson::Decimal128(d) => Value::Text(d.to_string()),
-        Bson::Document(d) => Value::Json(document_to_json(d)),
-        Bson::Array(a) => Value::Json(serde_json::Value::Array(a.iter().map(bson_to_json).collect())),
+        // Plain JSON strings cannot retain BSON-only kinds such as Decimal128,
+        // binary subtype, ObjectId or the full BSON date representation.
+        Bson::Document(d) => Value::Json(Bson::Document(d.clone()).into_canonical_extjson()),
+        Bson::Array(a) => Value::Json(Bson::Array(a.clone()).into_canonical_extjson()),
         other => Value::Text(other.to_string()),
     }
-}
-
-fn bson_to_json(b: &Bson) -> serde_json::Value {
-    match b {
-        Bson::Null => serde_json::Value::Null,
-        Bson::Boolean(v) => serde_json::Value::Bool(*v),
-        Bson::Int32(v) => serde_json::json!(*v),
-        Bson::Int64(v) => serde_json::json!(*v),
-        Bson::Double(v) => serde_json::json!(*v),
-        Bson::String(v) => serde_json::Value::String(v.clone()),
-        Bson::Document(d) => document_to_json(d),
-        Bson::Array(a) => serde_json::Value::Array(a.iter().map(bson_to_json).collect()),
-        other => serde_json::Value::String(other.to_string()),
-    }
-}
-
-fn document_to_json(doc: &Document) -> serde_json::Value {
-    let mut map = serde_json::Map::new();
-    for (k, v) in doc {
-        map.insert(k.clone(), bson_to_json(v));
-    }
-    serde_json::Value::Object(map)
 }
 
 fn bson_type_name(b: &Bson) -> String {
@@ -957,6 +940,51 @@ mod tests {
         );
         assert!(matches!(document.get("wide"), Some(Bson::Decimal128(_))));
         assert!(serde_json_to_document("[]").is_err());
+    }
+
+    #[test]
+    fn nested_bson_special_values_keep_their_extended_json_types() {
+        use mongodb::bson::{Binary, DateTime, spec::BinarySubtype};
+
+        let document = doc! {
+            "amount": Bson::Decimal128("1234567890123456789.123456789012345".parse().unwrap()),
+            "blob": Bson::Binary(Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] }),
+            "when": Bson::DateTime(DateTime::from_millis(1_234_567_890_123)),
+        };
+
+        assert_eq!(
+            bson_to_value(&Bson::Document(document)),
+            Value::Json(serde_json::json!({
+                "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+                "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
+                "when": {"$date": {"$numberLong": "1234567890123"}},
+            }))
+        );
+        assert_eq!(
+            bson_to_value(&Bson::Array(vec![Bson::Decimal128(
+                "1234567890123456789.123456789012345".parse().unwrap()
+            )])),
+            Value::Json(serde_json::json!([
+                {"$numberDecimal": "1234567890123456789.123456789012345"}
+            ]))
+        );
+    }
+
+    #[test]
+    fn bson_decimal_and_date_extremes_remain_exact_outside_core_ranges() {
+        use mongodb::bson::DateTime;
+
+        for text in ["1E-6176", "9.999999999999999999999999999999999E+6144", "-0.00"] {
+            let decimal = Bson::Decimal128(text.parse().unwrap());
+            assert_eq!(bson_to_value(&decimal), Value::Text(text.into()));
+        }
+
+        for millis in [i64::MIN, i64::MAX] {
+            assert_eq!(
+                bson_to_value(&Bson::DateTime(DateTime::from_millis(millis))),
+                Value::Json(serde_json::json!({"$date": {"$numberLong": millis.to_string()}}))
+            );
+        }
     }
 
     #[test]

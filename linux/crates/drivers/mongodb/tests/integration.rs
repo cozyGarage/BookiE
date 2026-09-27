@@ -203,3 +203,69 @@ async fn value_contract_preserves_numbers_and_text_through_json_commands() {
         assert_eq!(result.rows[0][column], expected);
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn nested_bson_special_values_keep_exact_extended_json_types() {
+    use mongodb::bson::{Binary, DateTime, Decimal128, doc, spec::BinarySubtype};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect direct BSON fixture client");
+    let document = doc! {
+        "_id": "special",
+        "decimal_min": "1E-6176".parse::<Decimal128>().unwrap(),
+        "decimal_max": "9.999999999999999999999999999999999E+6144"
+            .parse::<Decimal128>()
+            .unwrap(),
+        "date_min": DateTime::from_millis(i64::MIN),
+        "date_max": DateTime::from_millis(i64::MAX),
+        "nested": {
+            "amount": "1234567890123456789.123456789012345"
+                .parse::<Decimal128>()
+                .unwrap(),
+            "blob": Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] },
+            "when": DateTime::from_millis(1_234_567_890_123),
+        },
+    };
+    client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("special_values")
+        .insert_one(document)
+        .await
+        .expect("insert exact BSON fixture");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let result = connection
+        .query(r#"db.special_values.find({"_id":"special"})"#)
+        .await
+        .expect("read exact BSON fixture");
+    let nested = result
+        .columns
+        .iter()
+        .position(|column| column.name == "nested")
+        .unwrap();
+    let column = |name: &str| result.columns.iter().position(|column| column.name == name).unwrap();
+    assert_eq!(result.rows.len(), 1);
+    assert_eq!(result.rows[0][column("decimal_min")], Value::Text("1E-6176".into()));
+    assert_eq!(
+        result.rows[0][column("decimal_max")],
+        Value::Text("9.999999999999999999999999999999999E+6144".into())
+    );
+    for millis in [i64::MIN, i64::MAX] {
+        let name = if millis < 0 { "date_min" } else { "date_max" };
+        assert_eq!(
+            result.rows[0][column(name)],
+            Value::Json(serde_json::json!({"$date": {"$numberLong": millis.to_string()}}))
+        );
+    }
+    assert_eq!(
+        result.rows[0][nested],
+        Value::Json(serde_json::json!({
+            "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+            "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
+            "when": {"$date": {"$numberLong": "1234567890123"}},
+        }))
+    );
+}

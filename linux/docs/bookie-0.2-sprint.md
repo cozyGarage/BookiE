@@ -357,6 +357,19 @@ explicit NULL cells. Regressions were observed failing before the fixes. The
 ClickHouse library tests (32) and app library tests (384 passed, 5 ignored) pass
 afterward. Broader cross-driver consumer parity remains open.
 
+### B3 MongoDB nested BSON preservation: 2026-09-27
+
+A new unit regression reproduced nested BSON type loss: Decimal128, binary and
+date values became ordinary debug strings inside `Value::Json`. Nested documents
+and arrays now use canonical Extended JSON. Top-level Decimal128 extremes remain
+exact text, and BSON dates outside chrono's RFC3339 range use canonical Extended
+JSON with the original millisecond count. MongoDB 7 Docker coverage inserts native
+BSON fixtures and reads them through the driver query path. All 23 MongoDB unit
+tests and all eight real-server integration tests passed. The scoped mutation
+attempt had one unviable whole-function mutant and establishes no mutation score.
+Nested editing, other binary subtypes and consumer/export parity remain open; B3
+is not closed.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
