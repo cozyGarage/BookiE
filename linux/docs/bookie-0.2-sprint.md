@@ -302,6 +302,12 @@ exact committed values and cancellation/retry; parser, transport option/refusal
 and export write-failure regressions cover adjacent boundaries. Evidence and
 scope are recorded in [value contracts](value-contracts.md). B3 remains open.
 
+The XML consumer checkpoint reproduces carriage-return normalization through an
+independent parser and silent replacement of unsupported characters. XML now
+preserves CR/CRLF and refuses illegal characters with a row/column diagnostic,
+leaving existing destinations intact. Two default UI scenarios and negative
+oracle tests cover the round trip and visible refusal; this does not close B3.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight

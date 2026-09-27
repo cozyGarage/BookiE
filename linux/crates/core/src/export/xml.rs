@@ -5,8 +5,6 @@ use super::file::ResultWriter;
 use super::value_to_text;
 use crate::query::{ColumnInfo, Value};
 
-const REPLACEMENT: char = '\u{fffd}';
-
 pub(crate) struct XmlWriter {
     elements: Vec<String>,
 }
@@ -24,7 +22,7 @@ impl ResultWriter for XmlWriter {
         Ok(())
     }
 
-    fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
+    fn write_row(&mut self, output: &mut dyn Write, row_index: usize, row: &[Value]) -> Result<(), ExportError> {
         output.write_all(b"  <row>\n")?;
         for (index, value) in row.iter().enumerate() {
             let element = match self.elements.get(index) {
@@ -32,7 +30,14 @@ impl ResultWriter for XmlWriter {
                 None => "column",
             };
             match value_to_text(value) {
-                Some(text) => writeln!(output, "    <{element}>{}</{element}>", escape_xml_text(&text))?,
+                Some(text) => {
+                    let escaped = escape_xml_text(&text).map_err(|character| ExportError::XmlCharacter {
+                        row: row_index.saturating_add(1),
+                        column: index.saturating_add(1),
+                        codepoint: character as u32,
+                    })?;
+                    writeln!(output, "    <{element}>{escaped}</{element}>")?;
+                }
                 None => writeln!(output, "    <{element} null=\"true\"/>")?,
             }
         }
@@ -46,20 +51,17 @@ impl ResultWriter for XmlWriter {
     }
 }
 
-/// XML 1.0 `Char` excludes every control character except tab, line feed
-/// and carriage return, and also excludes U+FFFE and U+FFFF. A parser
-/// rejects the whole document when one appears, even escaped, so an
-/// illegal character is replaced rather than encoded.
 fn is_legal_xml_char(character: char) -> bool {
     matches!(character, '\t' | '\n' | '\r')
         || matches!(character, ' '..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')
 }
 
-fn escape_xml_text(value: &str) -> String {
+fn escape_xml_text(value: &str) -> Result<String, char> {
     let mut escaped = String::with_capacity(value.len());
     for character in value.chars() {
         match character {
-            _ if !is_legal_xml_char(character) => escaped.push(REPLACEMENT),
+            _ if !is_legal_xml_char(character) => return Err(character),
+            '\r' => escaped.push_str("&#13;"),
             '&' => escaped.push_str("&amp;"),
             '<' => escaped.push_str("&lt;"),
             '>' => escaped.push_str("&gt;"),
@@ -68,7 +70,7 @@ fn escape_xml_text(value: &str) -> String {
             other => escaped.push(other),
         }
     }
-    escaped
+    Ok(escaped)
 }
 
 /// XML 1.0 `Name` must start with a letter or `_`, may continue with
@@ -129,6 +131,35 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_xml_preserves_carriage_returns_and_literal_entity_text() {
+        let xml = render(
+            &[column("value")],
+            &[vec![Value::Text("a\rb\r\nc\n\t&#13; 東京".into())]],
+        );
+        assert!(
+            xml.contains("<value>a&#13;b&#13;\nc\n\t&amp;#13; 東京</value>"),
+            "{xml}"
+        );
+        assert!(!xml.contains('\r'), "{xml}");
+    }
+
+    #[test]
+    fn value_contract_xml_keeps_legal_unicode_boundaries_and_empty_text() {
+        let text = "\t\n\u{20}\u{d7ff}\u{e000}\u{fffd}\u{10000}\u{10ffff}";
+        let xml = render(
+            &[column("value")],
+            &[
+                vec![Value::Text(text.into())],
+                vec![Value::Text(String::new())],
+                vec![Value::Null],
+            ],
+        );
+        assert!(xml.contains(&format!("<value>{text}</value>")), "{xml}");
+        assert!(xml.contains("<value></value>"), "{xml}");
+        assert!(xml.contains("<value null=\"true\"/>"), "{xml}");
+    }
+
+    #[test]
     fn a_column_name_that_is_not_a_valid_element_name_is_sanitised() {
         assert_eq!(element_name("2 bad name!"), "_2_bad_name_");
         assert_eq!(element_name(""), "_");
@@ -145,10 +176,9 @@ mod tests {
     }
 
     #[test]
-    fn a_control_character_a_parser_would_reject_is_replaced_not_encoded() {
-        let xml = render(&[column("value")], &[vec![Value::Text("a\u{0}b\u{1b}c\td".into())]]);
-        assert!(xml.contains("a\u{fffd}b\u{fffd}c\td"), "{xml}");
-        assert!(!xml.contains('\u{0}'), "{xml}");
+    fn an_illegal_character_is_refused_instead_of_replaced() {
+        assert_eq!(escape_xml_text("a\0b"), Err('\0'));
+        assert_eq!(escape_xml_text("a\u{1b}b"), Err('\u{1b}'));
     }
 
     #[test]

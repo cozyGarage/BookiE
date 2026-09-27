@@ -442,3 +442,43 @@ All 11 value suites passed again at
 `target/quality/20260927T101514358887Z-values/report.json`, including 21 core
 contracts. Hosted CI and B4–B6 acceptance remain separate; B3 stays open for the
 remaining native types and consumer parity.
+
+## XML text consumer checkpoint, 2026-09-27
+
+Two core regressions failed before the fix: literal carriage returns were not
+protected from parser normalization, and XML-illegal text was silently replaced
+with U+FFFD while export reported success. An installed-app reproducer against
+the previous binary also failed after parsing its real exported file; evidence
+is retained under `target/quality/20260927-b3-xml-before/`.
+
+XML export now writes CR as `&#13;`, preserving standalone CR and CRLF alongside
+LF, tabs, literal entity-looking text and Unicode. Unsupported XML 1.0 characters
+are refused with the code point and one-based data row/column, with a JSON export
+suggestion. Existing destination bytes survive the refusal, including when an
+earlier row has already been written to the temporary file. Tests cover NUL,
+controls, U+FFFE/U+FFFF, legal Unicode range boundaries, NULL and empty text.
+The behavior follows [XML line-ending handling](https://www.w3.org/TR/xml/#sec-line-ends)
+and [legal XML characters](https://www.w3.org/TR/xml/#charsets).
+
+Two default installed-GTK scenarios exercise XML selection and the save chooser,
+then parse the output or require the visible refusal. Four Python tests validate
+the independent oracle and scenario registration, including deliberately
+normalized line endings and an empty-text/NULL corruption. The existing workbook
+scenarios share the named export-format keyboard helper. XML column-name
+sanitization and type annotation are unchanged; this text checkpoint does not
+establish reversible arbitrary column labels or complete typed XML import.
+
+Scoped mutation evidence is
+`target/quality/20260927-b3-xml-mutants/mutants.out/outcomes.json`: 15 caught,
+one unviable, no survivors or timeouts across the row writer, text escaping and
+legal-character predicate. The compilation failure is not counted as a catch.
+The shared value report at `target/quality/20260927T102839954853Z-values/report.json`
+passed all 11 suites, including 24 core contracts and all eight drivers.
+
+Final local full/value/UI/harness report:
+`target/quality/20260927T102554255832Z-layers/report.json`, all layers passed.
+All 26 installed release-build UI scenarios passed with 26 JSON/stderr pairs at
+`target/quality/20260927-b3-xml-ui/`; all 39 Python harness tests passed.
+These are X11/AT-SPI and local fixture results. Hosted CI, installed Wayland and
+package acceptance remain separate; B3 stays open for remaining native types
+and consumer parity before B4–B6 acceptance.

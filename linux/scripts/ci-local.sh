@@ -38,6 +38,7 @@ run_full() {
   python3 scripts/tests/test_validation_layers.py
   python3 scripts/tests/test_ui_evidence.py
   python3 scripts/tests/test_workbook_ui_oracle.py
+  python3 scripts/tests/test_xml_ui_oracle.py
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 

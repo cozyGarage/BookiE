@@ -22,6 +22,10 @@ pub enum ExportError {
         "Workbook export cannot preserve empty text at row {row}, column {column}. Export as CSV or JSON to keep empty text distinct from NULL"
     )]
     WorkbookEmptyText { row: usize, column: usize },
+    #[error(
+        "XML 1.0 cannot preserve U+{codepoint:04X} at row {row}, column {column}. Export as JSON to keep the original text"
+    )]
+    XmlCharacter { row: usize, column: usize, codepoint: u32 },
     #[error("The Excel workbook could not be built")]
     Workbook(#[from] rust_xlsxwriter::XlsxError),
 }

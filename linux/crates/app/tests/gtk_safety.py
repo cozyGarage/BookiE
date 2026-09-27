@@ -15,6 +15,7 @@ from pathlib import Path
 import pyatspi
 import gtk_workbook
 import gtk_parameters
+import gtk_xml
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -721,6 +722,27 @@ def audit_failure_denies(database, _base):
 audit_failure_denies.audit_available = False
 
 
+def choose_export_format(label, keys):
+    invoke_accessible_action("win.export-csv")
+    combo = wait_for_node(name="Format", role=pyatspi.ROLE_COMBO_BOX)
+    for _ in range(20):
+        if combo.getState().contains(pyatspi.STATE_FOCUSED):
+            break
+        press_x11_key("Tab")
+        time.sleep(POLL_SECONDS)
+    else:
+        raise AssertionError(f"export format is not keyboard reachable: {accessible_snapshot()}")
+    press_x11_key("space")
+    wait_for_node(name=label)
+    for key in keys:
+        press_x11_key(key)
+    press_x11_key("Return")
+    wait_within(combo, name=label)
+    wait_for_node(name="CSV options", present=False)
+    invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Export Results", role=FILE_CHOOSER_ROLES)
+
+
 def named_parameter_binds_a_value(database, _base):
     run_sql("INSERT INTO safety_items(id) VALUES (:id)")
     wait_for_node(name=":id")
@@ -1240,6 +1262,7 @@ def main():
     ]
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         scenarios = [scenario for scenario in scenarios if scenario.__name__ == selected]

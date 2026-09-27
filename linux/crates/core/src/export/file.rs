@@ -151,6 +151,37 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_xml_illegal_text_preserves_destination_and_reports_coordinates() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keep.xml");
+        std::fs::write(&path, b"existing XML").unwrap();
+        for character in ['\0', '\u{b}', '\u{c}', '\u{1f}', '\u{fffe}', '\u{ffff}'] {
+            let data = QueryResult {
+                columns: vec![column("id"), column("note")],
+                rows: vec![
+                    vec![Value::Int(1), Value::Text("valid".into())],
+                    vec![Value::Int(2), Value::Text(format!("before{character}after"))],
+                ],
+                truncated: false,
+            };
+            let error = write_result_file(
+                &path,
+                &data,
+                &plain(ResultFormat::Xml, &CsvOptions::default()),
+                || false,
+                |_| {},
+            )
+            .unwrap_err();
+            let message = error.to_string();
+            assert!(message.contains("row 2, column 2"), "{message}");
+            assert!(message.contains(&format!("U+{:04X}", character as u32)), "{message}");
+            assert!(message.contains("JSON"), "{message}");
+            assert_eq!(std::fs::read(&path).unwrap(), b"existing XML");
+            assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        }
+    }
+
+    #[test]
     fn value_contract_workbook_column_limit_failure_preserves_destination() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("keep.xlsx");

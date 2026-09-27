@@ -63,23 +63,7 @@ def seed_workbook(database):
 
 
 def choose_workbook(ui):
-    ui.invoke_accessible_action("win.export-csv")
-    combo = ui.wait_for_node(name="Format", role=ui.pyatspi.ROLE_COMBO_BOX)
-    for _ in range(20):
-        if combo.getState().contains(ui.pyatspi.STATE_FOCUSED):
-            break
-        ui.press_x11_key("Tab")
-        time.sleep(ui.POLL_SECONDS)
-    else:
-        raise AssertionError(f"export format is not keyboard reachable: {ui.accessible_snapshot()}")
-    ui.press_x11_key("space")
-    ui.wait_for_node(name="Excel workbook")
-    ui.press_x11_key("End")
-    ui.press_x11_key("Return")
-    ui.wait_within(combo, name="Excel workbook")
-    ui.wait_for_node(name="CSV options", present=False)
-    ui.invoke(ui.wait_for_node(name="Export…", role=ui.pyatspi.ROLE_PUSH_BUTTON))
-    ui.wait_for_node(name="Export Results", role=ui.FILE_CHOOSER_ROLES)
+    ui.choose_export_format("Excel workbook", ["End"])
 
 
 def database_rows(database):

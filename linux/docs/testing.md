@@ -203,6 +203,15 @@ The suite verifies:
 22. Empty text in workbook results produces a visible error with the row/column and CSV/JSON alternatives. No lossy workbook or temporary export is published, and source rows remain unchanged.
 23. Repeated named parameters insert exact minimum/maximum signed integers and SQL-like Unicode text into two rows, preserving binding order and treating the payload as data.
 24. Cancelling the parameter dialog writes no rows; retrying the same statement uses the replacement values and never executes the cancelled values.
+25. XML export round-trips carriage returns, CRLF, LF, tabs, literal entity-looking text and Unicode through an independent XML parser; NULL remains distinct from empty text.
+26. XML export of NUL-containing text shows the code point and row/column error, publishes no file, leaves no temporary export and does not change source rows.
+
+The XML scenarios live in `crates/app/tests/gtk_xml.py`. Run
+`xml_export_preserves_line_endings_and_null_distinctions` or
+`xml_export_refuses_illegal_text_without_publishing` with `TABLEPRO_GTK_SCENARIO`.
+Their Python oracle tests deliberately normalize carriage returns and collapse
+empty text into NULL, requiring both corruptions to fail. Core tests independently
+check atomic destination preservation for XML-illegal controls and U+FFFE/U+FFFF.
 
 The parameter scenarios live in `crates/app/tests/gtk_parameters.py`; select
 `repeated_parameters_preserve_wide_ids_and_sql_like_text` or
@@ -235,7 +244,7 @@ Each scenario declares its own fixture shape through `environment` and `audit_av
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 
-Buttons and rows are invoked through named AT-SPI actions; there is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, selects the last format, and verifies the selected workbook label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
+Buttons and rows are invoked through named AT-SPI actions; there is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, navigates to the requested format, and verifies its selected label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
 
 On Arch or Omarchy, install the harness dependencies with:
 
