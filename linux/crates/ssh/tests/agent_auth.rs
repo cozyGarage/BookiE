@@ -99,3 +99,65 @@ async fn the_built_in_client_authenticates_with_a_key_held_by_ssh_agent() {
     let tunnel = SshTunnel::open(config(&host, port), "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
     assert!(tunnel.is_ok(), "{:?}", tunnel.err());
 }
+
+#[tokio::test]
+#[ignore = "requires docker, and waits out the keepalive window"]
+async fn a_paused_bastion_is_reported_closed_through_keepalive_instead_of_hanging_forever() {
+    let temp = tempfile::tempdir().unwrap();
+    let key = temp.path().join("id_ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+        .arg(&key)
+        .status()
+        .unwrap();
+    assert!(generated.success());
+    let public = std::fs::read_to_string(key.with_extension("pub")).unwrap();
+
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", public.trim())
+        .with_cmd(["sh", "-c", SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(2222).await.unwrap();
+
+    let socket = temp.path().join("agent.sock");
+    let _agent = start_agent(&socket);
+    // SAFETY: this binary holds a single test, so nothing else reads the
+    // environment while it changes. russh finds the agent through
+    // SSH_AUTH_SOCK, and known_hosts is resolved from XDG_CONFIG_HOME.
+    unsafe {
+        std::env::set_var("SSH_AUTH_SOCK", &socket);
+        std::env::set_var("XDG_CONFIG_HOME", temp.path());
+    }
+    let added = Command::new("ssh-add")
+        .arg(&key)
+        .env("SSH_AUTH_SOCK", &socket)
+        .status()
+        .unwrap();
+    assert!(added.success());
+
+    let tunnel = SshTunnel::open(config(&host, port), "127.0.0.1".into(), 2222, UnknownHostKey::Learn)
+        .await
+        .unwrap();
+    assert!(!tunnel.is_closed(), "a freshly opened tunnel must not report closed");
+
+    container.pause().await.unwrap();
+
+    let detected = tokio::time::timeout(std::time::Duration::from_secs(90), async {
+        while !tunnel.is_closed() {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    })
+    .await;
+    assert!(
+        detected.is_ok(),
+        "a paused (unresponsive) bastion must be detected as closed within the keepalive window \
+         instead of leaving the tunnel looking alive until a database driver times out"
+    );
+
+    container.unpause().await.unwrap();
+}

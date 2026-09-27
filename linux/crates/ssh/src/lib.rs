@@ -106,6 +106,15 @@ pub enum SshError {
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const AUTH_TIMEOUT: Duration = Duration::from_secs(20);
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(15);
+
+fn client_config() -> Config {
+    Config {
+        nodelay: true,
+        keepalive_interval: Some(KEEPALIVE_INTERVAL),
+        ..Default::default()
+    }
+}
 
 fn timeout_error(stage: &'static str, cfg: &SshConfig, limit: Duration) -> SshError {
     SshError::Timeout {
@@ -128,6 +137,7 @@ pub struct SshTunnel {
     local_port: u16,
     socket_dir: Option<LocalSocketDir>,
     cancel: CancellationToken,
+    session: Arc<Handle<ClientHandler>>,
     _task: tokio::task::JoinHandle<()>,
     /// Intermediate hop tunnels (dropped after this forwarder cancels).
     _upstream: Vec<SshTunnel>,
@@ -292,6 +302,14 @@ impl SshTunnel {
     pub fn socket_dir(&self) -> Option<&Path> {
         self.socket_dir.as_ref().map(|dir| dir.path.as_path())
     }
+
+    /// True once the SSH session has ended, through cancellation, a
+    /// remote disconnect, or a keepalive timeout against an unresponsive
+    /// hop. A caller can poll this to reconnect a lost tunnel instead of
+    /// waiting for a database driver's own timeout to notice.
+    pub fn is_closed(&self) -> bool {
+        self.session.is_closed()
+    }
 }
 
 impl Drop for SshTunnel {
@@ -423,12 +441,19 @@ async fn open_single(
     );
 
     let cancel = CancellationToken::new();
-    let task = tokio::spawn(forwarder_loop(listener, session, fwd_host, fwd_port, cancel.clone()));
+    let task = tokio::spawn(forwarder_loop(
+        listener,
+        session.clone(),
+        fwd_host,
+        fwd_port,
+        cancel.clone(),
+    ));
 
     Ok(SshTunnel {
         local_port,
         socket_dir,
         cancel,
+        session,
         _task: task,
         _upstream: Vec::new(),
     })
@@ -509,10 +534,7 @@ async fn connect_and_auth(
         outcome: outcome.clone(),
     };
 
-    let config = Arc::new(Config {
-        nodelay: true,
-        ..Default::default()
-    });
+    let config = Arc::new(client_config());
     let connecting = client::connect(config, (tcp_host, tcp_port), handler);
     let mut session = match tokio::time::timeout(CONNECT_TIMEOUT, connecting).await {
         Ok(Ok(s)) => s,
@@ -784,6 +806,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn client_config_enables_keepalive_so_a_dead_bastion_is_eventually_detected() {
+        let config = client_config();
+        assert_eq!(
+            config.keepalive_interval,
+            Some(KEEPALIVE_INTERVAL),
+            "without a keepalive interval, russh never notices an unresponsive peer and \
+             a dead bastion hangs until the driver's own timeout fires"
+        );
+        assert!(
+            config.keepalive_max > 0,
+            "keepalive_max must stay enabled to bound detection time"
+        );
+    }
 
     #[test]
     fn a_server_offering_only_keyboard_interactive_reports_it_is_unsupported() {

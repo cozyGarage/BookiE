@@ -6,6 +6,7 @@
 
 - The built-in SSH client's unknown-host-key error no longer suggests connecting once with the system `ssh` command, which writes to a different `known_hosts` file than the one this client reads.
 - The built-in SSH client reports plainly when a server accepts only keyboard-interactive authentication, which it does not support, instead of a generic authentication failure.
+- The built-in SSH client now sends keepalives and can report a tunnel as closed once a bastion stops responding, instead of leaving a dead tunnel looking alive until a database driver's own timeout notices.
 
 ### Fixed
 
