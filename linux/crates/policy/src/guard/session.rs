@@ -9,6 +9,7 @@ pub(crate) struct PolicySession {
     guard: PolicyGuard,
     inner: Box<dyn Session>,
     batch: Option<OpenBatch>,
+    retired: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -40,6 +41,7 @@ impl PolicyGuard {
             guard: self.clone(),
             inner,
             batch: None,
+            retired: false,
         })
     }
 }
@@ -52,6 +54,11 @@ impl Session for PolicySession {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
+        if !self.is_usable() {
+            return Err(DriverError::PolicyDenied(
+                "the session was retired after a connection fault and cannot run another statement".into(),
+            ));
+        }
         match transaction_control(sql, &self.guard.ctx.driver_id) {
             Some(TransactionControl::Begin) => self.begin(sql, control).await,
             Some(TransactionControl::Commit { chain }) => self.finish(sql, control, Finish::Commit, chain).await,
@@ -61,7 +68,7 @@ impl Session for PolicySession {
     }
 
     fn is_usable(&self) -> bool {
-        self.inner.is_usable()
+        !self.retired && self.inner.is_usable()
     }
 
     fn transaction_open(&self) -> bool {
@@ -70,7 +77,7 @@ impl Session for PolicySession {
 
     async fn close(mut self: Box<Self>) -> Result<(), DriverError> {
         if let Some(batch) = self.batch {
-            if self.inner.is_usable() && !batch.uncertain {
+            if self.is_usable() && !batch.uncertain {
                 let control = OperationControl::with_timeout(CLOSE_ROLLBACK_TIMEOUT);
                 let _ = self.finish("ROLLBACK", &control, Finish::Rollback, false).await;
             } else if batch.wrote {
@@ -83,11 +90,17 @@ impl Session for PolicySession {
 
 impl PolicySession {
     async fn begin(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        if self.batch.is_some() {
+            return Err(DriverError::PolicyDenied(
+                "a transaction is already open on this session; nested BEGIN is refused".into(),
+            ));
+        }
         let result = self
             .guard
             .caught_write("BEGIN", self.inner.query_params_controlled(sql, &[], control))
             .await;
-        if result.is_ok() && self.batch.is_none() {
+        self.note_disconnect(&result);
+        if result.is_ok() {
             self.batch = Some(OpenBatch::new());
         }
         result
@@ -114,14 +127,24 @@ impl PolicySession {
         result
     }
 
+    fn note_disconnect(&mut self, result: &Result<QueryResult, DriverError>) {
+        if matches!(result, Err(DriverError::Disconnected)) {
+            self.retired = true;
+        }
+    }
+
     fn note_statement(&mut self, writes: bool, result: &Result<QueryResult, DriverError>) {
+        self.note_disconnect(result);
         let Some(batch) = self.batch.as_mut() else {
             return;
         };
         batch.wrote |= writes;
         if matches!(
             result,
-            Err(DriverError::Cancelled | DriverError::TimedOut | DriverError::OperationOutcomeUnknown { .. })
+            Err(DriverError::Cancelled
+                | DriverError::TimedOut
+                | DriverError::OperationOutcomeUnknown { .. }
+                | DriverError::Disconnected)
         ) {
             batch.uncertain = true;
         }
@@ -248,10 +271,9 @@ impl PolicySession {
         chain: bool,
     ) -> Result<QueryResult, DriverError> {
         let Some(batch) = self.batch else {
-            return self
-                .guard
-                .caught_read("SESSION QUERY", self.inner.query_params_controlled(sql, &[], control))
-                .await;
+            return Err(DriverError::PolicyDenied(format!(
+                "{sql} refused because no transaction is open on this session"
+            )));
         };
         if kind == Finish::Commit {
             self.guard.require_governed_write_available()?;
@@ -269,6 +291,9 @@ impl PolicySession {
             .guard
             .caught_write(operation.sql, self.inner.query_params_controlled(sql, &[], control))
             .await;
+        if matches!(result, Err(DriverError::Disconnected)) {
+            self.retired = true;
+        }
         let (terminal_status, transaction_outcome, error_category, ambiguous) = finish_outcome(kind, &result);
         if ambiguous {
             self.guard.ctx.audit_state.disable_governed_writes();

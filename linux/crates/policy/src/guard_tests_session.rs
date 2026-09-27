@@ -5,6 +5,7 @@ struct SessionScript {
     sent: Mutex<Vec<String>>,
     lose_on: Option<&'static str>,
     fail_once_on: Option<&'static str>,
+    disconnect_on: Option<&'static str>,
 }
 
 struct ScriptedSession {
@@ -22,6 +23,9 @@ impl tablepro_core::Session for ScriptedSession {
         _control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
+        if self.script.disconnect_on == Some(sql) {
+            return Err(DriverError::Disconnected);
+        }
         if !self.failed_once && self.script.fail_once_on == Some(sql) {
             self.failed_once = true;
             return Err(DriverError::TimedOut);
@@ -295,4 +299,103 @@ async fn a_session_lost_mid_transaction_after_a_write_records_an_unknown_outcome
         h.script.sent.lock().expect("sent lock").last().map(String::as_str),
         Some("ROLLBACK")
     );
+}
+
+#[tokio::test]
+async fn a_statement_on_a_retired_session_is_refused_before_dispatch() {
+    let h = harness(
+        SessionScript {
+            lose_on: Some("SELECT pg_sleep(60)"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    let _ = run(&mut session, "SELECT pg_sleep(60)").await;
+    assert!(!session.is_usable());
+
+    let error = run(&mut session, "SELECT 1")
+        .await
+        .expect_err("a retired session refuses");
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert_eq!(*h.script.sent.lock().expect("sent lock"), vec!["SELECT pg_sleep(60)"]);
+}
+
+#[tokio::test]
+async fn a_disconnected_error_retires_the_session_even_when_the_driver_reports_it_usable() {
+    let h = harness(
+        SessionScript {
+            disconnect_on: Some("UPDATE items SET v = 1 WHERE id = 1"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    let error = run(&mut session, "UPDATE items SET v = 1 WHERE id = 1")
+        .await
+        .expect_err("disconnected");
+    assert!(matches!(error, DriverError::Disconnected));
+    assert!(!session.is_usable());
+
+    let refused = run(&mut session, "SELECT 1")
+        .await
+        .expect_err("retired session refuses");
+    assert!(matches!(refused, DriverError::PolicyDenied(_)), "{refused:?}");
+
+    session.close().await.expect("close");
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Unknown);
+}
+
+#[tokio::test]
+async fn commit_without_a_preceding_begin_is_refused() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    let error = run(&mut session, "COMMIT").await.expect_err("no transaction is open");
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(h.script.sent.lock().expect("sent lock").is_empty());
+}
+
+#[tokio::test]
+async fn a_nested_begin_is_refused() {
+    let h = harness(SessionScript::default(), false);
+    let mut session = h.guard.open_session().await.expect("open session");
+
+    run(&mut session, "BEGIN").await.expect("begin");
+    let error = run(&mut session, "BEGIN").await.expect_err("nested begin is refused");
+    assert!(matches!(error, DriverError::PolicyDenied(_)), "{error:?}");
+    assert!(session.transaction_open());
+    assert_eq!(*h.script.sent.lock().expect("sent lock"), vec!["BEGIN"]);
+}
+
+#[tokio::test]
+async fn a_disconnected_commit_writes_an_unknown_terminal_state_and_retires_the_session() {
+    let h = harness(
+        SessionScript {
+            disconnect_on: Some("COMMIT"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "INSERT INTO items VALUES (1)").await.expect("write");
+
+    let error = run(&mut session, "COMMIT").await.expect_err("disconnected");
+    assert!(matches!(error, DriverError::Disconnected));
+    assert!(!session.is_usable());
+
+    let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].terminal_status, AuditTerminalStatus::Unknown);
+    assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Unknown);
+    assert!(h.audit_state.governed_writes_disabled());
+
+    session.close().await.expect("close");
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 1);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Unknown);
 }
