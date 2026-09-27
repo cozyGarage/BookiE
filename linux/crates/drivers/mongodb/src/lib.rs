@@ -759,6 +759,22 @@ fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert: bool) -> 
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn open_session_is_refused() {
+        let client_opts = ClientOptions::parse("mongodb://127.0.0.1:27017").await.unwrap();
+        let client = Client::with_options(client_opts).unwrap();
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
+
+        match conn.open_session().await {
+            Err(DriverError::Unsupported(_)) => {}
+            Ok(_) => panic!("mongodb must refuse open_session"),
+            Err(other) => panic!("expected Unsupported, got {other:?}"),
+        }
+    }
+
     #[test]
     fn structure_metadata_is_not_declared_without_a_fetch() {
         let d = MongodbDriver;

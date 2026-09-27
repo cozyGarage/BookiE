@@ -523,6 +523,27 @@ fn map_duck_error(err: duckdb::Error) -> DriverError {
 mod tests {
     use super::*;
 
+    async fn in_memory_connection() -> Box<dyn Connection> {
+        DuckdbDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn open_session_is_refused() {
+        let conn = in_memory_connection().await;
+
+        match conn.open_session().await {
+            Err(DriverError::Unsupported(_)) => {}
+            Ok(_) => panic!("duckdb must refuse open_session"),
+            Err(other) => panic!("expected Unsupported, got {other:?}"),
+        }
+    }
+
     #[tokio::test]
     async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         let conn = DuckdbDriver

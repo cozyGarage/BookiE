@@ -935,6 +935,15 @@ fn map_clickhouse_error(err: clickhouse::error::Error) -> DriverError {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn open_session_is_refused() {
+        let conn = ClickhouseConnection {
+            client: clickhouse::Client::default(),
+            database: "default".into(),
+        };
+        assert!(matches!(conn.open_session().await, Err(DriverError::Unsupported(_))));
+    }
+
     #[test]
     fn decimal_preservation_never_passes_through_float_or_rounds() {
         for text in [
