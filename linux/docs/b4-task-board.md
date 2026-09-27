@@ -124,7 +124,7 @@ Files: `crates/agentd`, `crates/mcp`, `crates/release-tests`.
 | G4 | MCP shutdown during a write records a Cancelled or Unknown audit outcome. | mcp tests | done, `eb3682068`. Force-shutdown deadline now derives from `query_timeout_secs + 5s` instead of a hardcoded 5s. |
 | G5 | agentd through OpenSSH: an unattended decline and a successful connect. | ssh | open |
 
-## Lane H: driver cancellation and refusal — H1-H3 done (2026-09-27), H4 blocked
+## Lane H: driver cancellation and refusal — H1-H4 done (2026-09-27/28)
 
 Files: driver `src/lib.rs` and tests for the engines named.
 
@@ -133,7 +133,7 @@ Files: driver `src/lib.rs` and tests for the engines named.
 | H1 | ClickHouse, DuckDB, MongoDB and Redis refuse `open_session`, one test each. | unit | done, `1059edfb6`. Behavior was already correct; added regression tests only. |
 | H2 | A MySQL session cancel returns Cancelled and leaves the session usable. | driver | done, `2c7321638`. Behavior was already correct; added a real-MySQL regression test. |
 | H3 | DuckDB and MongoDB timeouts return an unknown outcome. | unit | done, `33ed55080`. Behavior was already correct; added regression tests only. |
-| H4 | SQL Server retirement reports to the connection monitor instead of waiting for the next 30 second ping. | unit | blocked: `mssql`'s `retire()` only sets a local flag; nothing in `crates/drivers/mssql` alone can reach the app-level connection monitor. The only existing fast-path hook (`ConnectionFaultSink::connection_became_unusable`) is wired to caught driver panics only (decision 0006). Needs a `crates/policy`/`crates/app` change — broaden that trigger to also fire on `DriverError::Disconnected` — which belongs to Lane D or a follow-up task, not Lane H's file scope. |
+| H4 | SQL Server retirement reports to the connection monitor instead of waiting for the next 30 second ping. | unit | done, `0aef65e82`. `PolicyGuard::caught_read`/`caught_write` (`crates/policy/src/guard/panic_boundary.rs`) now report a `DriverError::Disconnected` result to `ConnectionFaultSink::connection_became_unusable`, the same fast-path hook that already fired on a caught panic. This reaches the app's `Arc<Notify>`-based connection monitor fast path (`crates/app/src/services/connection_monitor.rs`) for any driver, including SQL Server after `retire()`, without a `crates/drivers/mssql` change. |
 
 ## Lane I: packaging and docs
 
