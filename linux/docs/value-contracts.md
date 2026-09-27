@@ -589,7 +589,10 @@ tests). Scoped mutation evidence at
 `target/quality/20260927-b3-mongodb-native-mutants/mutants.out/outcomes.json`
 records four generated mutations: three caught, one unviable whole-function
 replacement (`Value` has no `Default`), and no survivors or timeouts. The failing
-pre-fix regressions independently demonstrate test sensitivity.
+pre-fix regressions independently demonstrate test sensitivity. The real-server
+test also verifies nested Extended JSON through the JSON export consumer. Nested
+grid editing, CSV/XLSX/MCP parity, native BSON re-import and other consumers remain
+open.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

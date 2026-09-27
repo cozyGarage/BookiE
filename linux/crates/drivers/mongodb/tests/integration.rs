@@ -282,4 +282,22 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
             "when": {"$date": {"$numberLong": "1234567890123"}},
         }))
     );
+
+    let exported: serde_json::Value =
+        serde_json::from_str(&tablepro_core::export::render_json(&result.columns, &result.rows))
+            .expect("parse JSON export");
+    assert_eq!(
+        exported[0]["nested"],
+        serde_json::json!({
+            "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+            "blob": {"$binary": {"base64": "AP9B", "subType": "00"}},
+            "when": {"$date": {"$numberLong": "1234567890123"}},
+        }),
+        "JSON export must keep BSON extended types nested"
+    );
+    assert_eq!(
+        exported[0]["uuid_binary"],
+        serde_json::json!({"$binary": {"base64": "AAECAwQFBgcICQoLDA0ODw==", "subType": "04"}}),
+        "JSON export must keep the UUID binary subtype"
+    );
 }
