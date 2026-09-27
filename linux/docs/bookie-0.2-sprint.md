@@ -277,6 +277,14 @@ findings. PostgreSQL boundary/type assertions now catch those survivors in scope
 local reruns; core's interrupted mutation run remains a triage backlog. B3 remains
 open for the remaining temporal/nested values and consumer contracts.
 
+The next consumer checkpoint covers XLSX temporal precision and timezone identity:
+fractional times/timestamps, timezone-bearing timestamps and dates outside Excel's
+1900–9999 native range are written as exact text. Supported dates and whole-second
+times remain numeric cells. Regressions inspect workbook XML rather than only
+checking that a ZIP file was produced. Finite/nonfinite float and NULL contracts
+also cover two hosted mutation survivors. This is scoped spreadsheet evidence;
+remaining driver types, arbitrary-precision editing and B4–B6 stay open.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight

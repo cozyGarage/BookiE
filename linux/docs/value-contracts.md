@@ -302,3 +302,42 @@ The complete PostgreSQL unit/integration suite passed all 55 tests with ignored
 fixture tests explicitly enabled (`--include-ignored --test-threads=1`).
 Hosted execution, the broader core mutation backlog and installed desktop
 acceptance remain separate gates.
+
+## XLSX temporal consumer checkpoint, 2026-09-27
+
+Workbook XML regressions reproduced that temporal values were forced into
+spreadsheet serial cells: fractional seconds were displayed with whole-second
+formats, timezone-bearing timestamps lost their explicit UTC identity, and
+dates outside the native spreadsheet range lacked a text fallback. Exports now
+write fractional Time/DateTime values, every TimestampTz and dates/timestamps
+outside 1900–9999 as exact text using the existing canonical export spelling.
+Supported dates and whole-second values retain native cells. Text timestamps
+include their UTC offset; the two distinct instants in a repeated DST hour stay
+distinct. This intentionally trades spreadsheet date arithmetic for exact text
+when the native cell cannot carry the contract.
+
+Three added unit contracts inspect ZIP worksheet/shared-string XML: temporal
+fallbacks, native boundary dates/whole-second cells, and finite/nonfinite floats
+versus NULL. The temporal test failed before the fix. Eight XLSX unit tests pass.
+This does not establish every IEEE floating-point rounding behavior, arbitrary
+precision editing, temporal arrays or all remaining consumer/driver types.
+
+Cargo-mutants selected 15 mutations in the complete XLSX cell writer. All 15 were
+caught, with no missed, timeout or unviable outcomes. Evidence:
+`target/quality/20260927-b3-xlsx-temporal-mutants/mutants.out/outcomes.json`.
+This includes both finite-float guard survivors from hosted run `36280114335`;
+row/column error-path and other export survivors remain separate triage work.
+
+The shared eight-driver runner passed all 11 suites, including 12 core value
+contracts, at `target/quality/20260927T091952740079Z-values/report.json`.
+All 19 installed release-build UI scenarios passed and wrote successful result
+JSON files under `target/quality/20260927-b3-xlsx-ui/`. The layer report
+`target/quality/20260927T091941354836Z-layers/report.json` intentionally remains
+failed: its initial full gate caught two unnecessary clones in the new tests,
+while the independent value/UI layers passed. The clones were corrected rather
+than suppressing Clippy. Thirty Python harness tests passed, including both
+successful and failed GTK artifact-production regressions.
+The corrected full gate passed at
+`target/quality/20260927T092738833389Z-layers/report.json` (formatting, Clippy,
+workspace unit/binary tests and sandbox regressions). Hosted execution and
+installed Wayland/package acceptance remain separate from these local checks.
