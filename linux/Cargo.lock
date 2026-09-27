@@ -6356,6 +6356,7 @@ dependencies = [
  "tablepro-core",
  "tablepro-driver-clickhouse",
  "tablepro-driver-mongodb",
+ "tablepro-driver-mssql",
  "tablepro-driver-mysql",
  "tablepro-driver-redis",
  "tablepro-transport",

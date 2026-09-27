@@ -5,7 +5,10 @@
 use tablepro_core::{DatabaseDriver, TlsMode};
 use tablepro_driver_tls_tests::DriverTlsFixture;
 
+use drivers_clickhouse::ClickhouseDriver;
 use drivers_mongodb::MongodbDriver;
+use drivers_mssql::MssqlDriver;
+use drivers_mysql::MysqlDriver;
 use drivers_redis::RedisDriver;
 
 #[tokio::test]
@@ -54,6 +57,45 @@ async fn a_verifying_redis_client_will_not_fall_back_to_plaintext() {
     let mut options = fixture.redis_plaintext();
     options.tls.mode = TlsMode::VerifyFull;
     let result = RedisDriver.connect(options).await;
+    assert!(
+        result.is_err(),
+        "a client asked to verify must not silently connect without encryption"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the driver tls fixture"]
+async fn a_verifying_mysql_client_will_not_fall_back_to_plaintext() {
+    let fixture = DriverTlsFixture::from_env();
+    let mut options = fixture.mysql_plaintext();
+    options.tls.mode = TlsMode::VerifyFull;
+    let result = MysqlDriver.connect(options).await;
+    assert!(
+        result.is_err(),
+        "a client asked to verify must not silently connect without encryption"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the driver tls fixture"]
+async fn a_verifying_clickhouse_client_will_not_fall_back_to_plaintext() {
+    let fixture = DriverTlsFixture::from_env();
+    let mut options = fixture.clickhouse_plaintext();
+    options.tls.mode = TlsMode::VerifyFull;
+    let result = ClickhouseDriver.connect(options).await;
+    assert!(
+        result.is_err(),
+        "a client asked to verify must not silently connect without encryption"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires the driver tls fixture"]
+async fn a_verifying_mssql_client_will_not_fall_back_to_plaintext() {
+    let fixture = DriverTlsFixture::from_env();
+    let mut options = fixture.mssql_plaintext();
+    options.tls.mode = TlsMode::VerifyFull;
+    let result = MssqlDriver.connect(options).await;
     assert!(
         result.is_err(),
         "a client asked to verify must not silently connect without encryption"

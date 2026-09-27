@@ -54,7 +54,11 @@ pub struct DriverTlsFixture {
     pub redis_port: u16,
     pub redis_plaintext_port: u16,
     pub mysql_port: u16,
+    pub mysql_plaintext_port: u16,
     pub clickhouse_port: u16,
+    pub clickhouse_plaintext_port: u16,
+    pub mssql_port: u16,
+    pub mssql_plaintext_port: u16,
     pub database: String,
     pub username: String,
     pub password: String,
@@ -80,7 +84,11 @@ impl DriverTlsFixture {
             redis_port: env_port("TABLEPRO_DRIVER_TLS_REDIS_PORT", 6380),
             redis_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_REDIS_PLAINTEXT_PORT", 6381),
             mysql_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PORT", 3307),
+            mysql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PLAINTEXT_PORT", 3308),
             clickhouse_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PORT", 8444),
+            clickhouse_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PLAINTEXT_PORT", 8445),
+            mssql_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PORT", 1434),
+            mssql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PLAINTEXT_PORT", 1435),
             database: env_or("TABLEPRO_DRIVER_TLS_DB", "tablepro"),
             username: env_or("TABLEPRO_DRIVER_TLS_USER", "tablepro"),
             password: env_or("TABLEPRO_DRIVER_TLS_PASSWORD", "tablepro"),
@@ -135,5 +143,21 @@ impl DriverTlsFixture {
 
     pub fn clickhouse(&self, mode: TlsMode, root_cert: Option<PathBuf>) -> ConnectOptions {
         self.options(self.clickhouse_port, mode, root_cert)
+    }
+
+    pub fn mysql_plaintext(&self) -> ConnectOptions {
+        self.options(self.mysql_plaintext_port, TlsMode::Disabled, None)
+    }
+
+    pub fn clickhouse_plaintext(&self) -> ConnectOptions {
+        self.options(self.clickhouse_plaintext_port, TlsMode::Disabled, None)
+    }
+
+    pub fn mssql(&self, mode: TlsMode, root_cert: Option<PathBuf>) -> ConnectOptions {
+        self.options(self.mssql_port, mode, root_cert)
+    }
+
+    pub fn mssql_plaintext(&self) -> ConnectOptions {
+        self.options(self.mssql_plaintext_port, TlsMode::Disabled, None)
     }
 }

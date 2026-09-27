@@ -202,6 +202,101 @@ services:
         aliases:
           - clickhouse.tablepro.test
 
+  mysql-plain:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: tablepro
+      MYSQL_DATABASE: tablepro
+      MYSQL_USER: tablepro
+      MYSQL_PASSWORD: tablepro
+    command: ["mysqld", "--tls-version="]
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - --protocol=socket
+        - -utablepro
+        - -ptablepro
+        - -Dtablepro
+        - -e
+        - "SELECT 1"
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:3308:3306"
+    networks:
+      - fixture
+
+  clickhouse-plain:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    environment:
+      CLICKHOUSE_USER: tablepro
+      CLICKHOUSE_PASSWORD: tablepro
+      CLICKHOUSE_DB: tablepro
+    healthcheck:
+      test:
+        - CMD
+        - clickhouse-client
+        - --user
+        - tablepro
+        - --password
+        - tablepro
+        - --query
+        - "SELECT 1"
+      interval: 3s
+      timeout: 5s
+      retries: 40
+    ports:
+      - "127.0.0.1:8445:8123"
+    networks:
+      - fixture
+
+  mssql:
+    build:
+      context: .
+      dockerfile: mssql/Dockerfile
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+      MSSQL_TLS_CERTIFICATE_FILE: /certs/server.crt
+      MSSQL_TLS_KEY_FILE: /certs/server.key
+      MSSQL_FORCE_ENCRYPTION: "1"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:1434:1433"
+    networks:
+      fixture:
+        aliases:
+          - mssql.tablepro.test
+
+  mssql-plain:
+    build:
+      context: .
+      dockerfile: mssql/Dockerfile
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:1435:1433"
+    networks:
+      - fixture
+
 networks:
   fixture:
     driver: bridge
