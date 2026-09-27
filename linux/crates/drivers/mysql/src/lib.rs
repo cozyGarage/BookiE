@@ -9,6 +9,7 @@ use sqlx::{Column, Connection as SqlxConnection, Pool, Row, TypeInfo, ValueRef};
 use futures::stream::StreamExt;
 
 mod session;
+mod temporal;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
@@ -507,7 +508,7 @@ fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
 fn extract_value(row: &MySqlRow, idx: usize) -> Value {
     let type_name = row.columns()[idx].type_info().name().to_ascii_uppercase();
     match row.try_get_raw(idx) {
-        Ok(raw) if raw.is_null() => Value::Null,
+        Ok(raw) if raw.is_null() => zero_calendar(raw, &type_name).unwrap_or(Value::Null),
         Ok(_) => decode_by_type(row, idx, &type_name).unwrap_or_else(|| undecodable(idx, &type_name)),
         Err(_) => undecodable(idx, &type_name),
     }
@@ -535,9 +536,18 @@ fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> 
         // silently disappearing.
         "DECIMAL" | "NUMERIC" => decode_decimal_exact(row, idx),
         "BOOLEAN" => row.try_get::<bool, _>(idx).map(Value::Bool).ok(),
-        "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date).ok(),
-        "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time).ok(),
-        "DATETIME" => row.try_get::<chrono::NaiveDateTime, _>(idx).map(Value::DateTime).ok(),
+        "DATE" => row
+            .try_get::<chrono::NaiveDate, _>(idx)
+            .map(Value::Date)
+            .ok()
+            .or_else(|| temporal::calendar_text(row.try_get_raw(idx).ok()?, false)),
+        "TIME" => temporal::time_value(row.try_get_raw(idx).ok()?),
+        "DATETIME" => row
+            .try_get::<chrono::NaiveDateTime, _>(idx)
+            .map(Value::DateTime)
+            .ok()
+            .or_else(|| temporal::calendar_text(row.try_get_raw(idx).ok()?, true)),
+        "YEAR" => temporal::year_value(row.try_get_raw(idx).ok()?),
         "TIMESTAMP" => row
             .try_get::<chrono::DateTime<chrono::Utc>, _>(idx)
             .map(Value::TimestampTz)
@@ -547,6 +557,14 @@ fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> 
             row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes).ok()
         }
         _ => row.try_get::<String, _>(idx).map(Value::Text).ok(),
+    }
+}
+
+fn zero_calendar(raw: sqlx::mysql::MySqlValueRef<'_>, type_name: &str) -> Option<Value> {
+    match type_name {
+        "DATE" => temporal::calendar_text(raw, false),
+        "DATETIME" | "TIMESTAMP" => temporal::calendar_text(raw, true),
+        _ => None,
     }
 }
 

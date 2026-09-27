@@ -539,3 +539,11 @@ TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --pac
 The first full-gate attempts remain recorded in `20260927T110823517670Z-layers/report.json` (stale ignored-test inventory) and `20260927T110938605682Z-layers/report.json` (file-size guard). Both are under `target/quality/`. The inventory was regenerated and scalar temporal decoding moved into the existing temporal module without raising a guardrail baseline. The subsequent `20260927T111058478564Z-layers/report.json` passed full, values and harness; its value report is `20260927T111306775227Z-values/report.json` with all 11 suites and seven PostgreSQL contracts passing.
 
 Final clean-source validation after mutation testing passed full, values and harness in `target/quality/20260927T111941420743Z-layers/report.json`. All 11 selected value suites passed in `target/quality/20260927T112138445468Z-values/report.json`; compilation reused 745 artifacts, rebuilt zero packages and took 0.592 seconds. Installed UI/Wayland and package acceptance were not rerun for this driver checkpoint.
+
+## MySQL native TIME, zero-date and YEAR checkpoint
+
+The reproducer ran against MySQL 8 with a permissive `sql_mode`. Before the fix, `-01:00:00` read back as `01:00:00`. Zero DATE, DATETIME and TIMESTAMP values read as NULL, because sqlx reports an all-zero binary value as NULL. TIME outside one day, dates with zero parts and every YEAR value were undecodable. Times of day remain `Time`. Negative or extended times, zero dates and dates with zero parts are now exact text, and YEAR is an integer. sqlx 0.9 also reports the TIME sign inverted, so the driver reads the sign field directly.
+
+The test compares every value with an independent expected value. It then writes the rows back through bound parameters and SQL INSERT export, and the server confirms all six rows match with `<=>`. Scoped cargo-mutants on `crates/drivers/mysql/src/temporal.rs`: 16 mutants, 13 caught, 3 unviable, zero survivors and zero timeouts, using the recipe above with `-- --lib --test integration -- --include-ignored calendar_fields native_time_zero`.
+
+BIT, SET/ENUM and spatial values, session time zones and stricter SQL modes remain open.

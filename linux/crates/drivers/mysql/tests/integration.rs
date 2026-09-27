@@ -836,3 +836,120 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
     let connection = connect(options).await;
     value_contract::assert_scalar_contract(connection.as_ref(), "mysql").await;
 }
+
+async fn connect_with_permissive_dates(options: ConnectOptions) -> Box<dyn Connection> {
+    let admin = connect(options.clone()).await;
+    admin.execute("SET GLOBAL sql_mode = ''").await.unwrap();
+    admin.close().await.unwrap();
+    connect(options).await
+}
+
+fn micros_time(hour: u32, minute: u32, second: u32, micro: u32) -> NaiveTime {
+    NaiveTime::from_hms_micro_opt(hour, minute, second, micro).unwrap()
+}
+
+fn text(value: &str) -> Value {
+    Value::Text(value.into())
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_exports() {
+    let (_container, options) = start_mysql().await;
+    let conn = connect_with_permissive_dates(options).await;
+    let definition = "(id INT PRIMARY KEY, t TIME(6), d DATE, dt DATETIME(6), ts TIMESTAMP(6) NULL, y YEAR)";
+    for table in ["native_source", "native_bound", "native_exported"] {
+        conn.execute(&format!("CREATE TABLE {table} {definition}"))
+            .await
+            .unwrap();
+    }
+    conn.execute(
+        "INSERT INTO native_source VALUES
+         (1, '-01:00:00', '0000-00-00', '0000-00-00 00:00:00', '0000-00-00 00:00:00', 0),
+         (2, '838:59:59', '2024-00-15', '2024-02-00 12:00:00.5', NULL, 2155),
+         (3, '-838:59:59', '9999-12-31', '9999-12-31 23:59:59.999999', '2038-01-19 03:14:07.999999', 1901),
+         (4, '-00:00:01.5', '1000-01-01', '1000-01-01 00:00:00', '1970-01-01 00:00:01', 2024),
+         (5, '24:00:00', NULL, NULL, NULL, NULL),
+         (6, '23:59:59.999999', NULL, NULL, NULL, NULL)",
+    )
+    .await
+    .unwrap();
+
+    let result = conn
+        .query("SELECT id, t, d, dt, ts, y FROM native_source ORDER BY id")
+        .await
+        .unwrap();
+    let date = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
+    let instant = |naive: NaiveDateTime| Utc.from_utc_datetime(&naive);
+    let expected = vec![
+        vec![
+            Value::Int(1),
+            text("-01:00:00"),
+            text("0000-00-00"),
+            text("0000-00-00 00:00:00"),
+            text("0000-00-00 00:00:00"),
+            Value::Int(0),
+        ],
+        vec![
+            Value::Int(2),
+            text("838:59:59"),
+            text("2024-00-15"),
+            text("2024-02-00 12:00:00.500000"),
+            Value::Null,
+            Value::Int(2155),
+        ],
+        vec![
+            Value::Int(3),
+            text("-838:59:59"),
+            Value::Date(date(9999, 12, 31)),
+            Value::DateTime(date(9999, 12, 31).and_time(micros_time(23, 59, 59, 999_999))),
+            Value::TimestampTz(instant(date(2038, 1, 19).and_time(micros_time(3, 14, 7, 999_999)))),
+            Value::Int(1901),
+        ],
+        vec![
+            Value::Int(4),
+            text("-00:00:01.500000"),
+            Value::Date(date(1000, 1, 1)),
+            Value::DateTime(date(1000, 1, 1).and_time(micros_time(0, 0, 0, 0))),
+            Value::TimestampTz(instant(date(1970, 1, 1).and_time(micros_time(0, 0, 1, 0)))),
+            Value::Int(2024),
+        ],
+        vec![
+            Value::Int(5),
+            text("24:00:00"),
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+        ],
+        vec![
+            Value::Int(6),
+            Value::Time(micros_time(23, 59, 59, 999_999)),
+            Value::Null,
+            Value::Null,
+            Value::Null,
+            Value::Null,
+        ],
+    ];
+    assert_eq!(result.rows, expected);
+
+    let columns = conn.fetch_columns(None, "native_exported").await.unwrap();
+    for row in &result.rows {
+        conn.execute_params("INSERT INTO native_bound VALUES (?, ?, ?, ?, ?, ?)", row)
+            .await
+            .unwrap();
+        let statement =
+            tablepro_core::sql_literal::build_insert_literal("mysql", None, "native_exported", &columns, row).unwrap();
+        conn.execute(&statement).await.unwrap();
+    }
+    for copy in ["native_bound", "native_exported"] {
+        let matching = conn
+            .query(&format!(
+                "SELECT COUNT(*) FROM native_source s JOIN {copy} c ON s.id = c.id AND s.t <=> c.t \
+                 AND s.d <=> c.d AND s.dt <=> c.dt AND s.ts <=> c.ts AND s.y <=> c.y"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(matching.rows, vec![vec![Value::Int(6)]], "{copy}");
+    }
+}

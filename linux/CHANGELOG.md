@@ -42,6 +42,7 @@
 
 ### Fixed
 
+- MySQL zero dates such as 0000-00-00 are shown as their stored text instead of an empty cell. Negative TIME values keep their sign, times outside one day and dates with zero parts are shown exactly instead of as undecodable, and YEAR values appear as numbers. All of them can be written back through edits, parameters and SQL exports.
 - DuckDB dates, times, timestamps and enum labels decode as usable values instead of debug strings. Temporal precision, timezone instants, infinities and end-of-day times survive parameter and SQL round trips; unsupported intervals, collections and calendar ranges remain visibly undecodable and cannot be written back.
 
 - PostgreSQL intervals retain independently signed fields under every interval style, and extreme durations use a re-importable seconds representation. Date and timestamp infinities remain distinct from NULL.

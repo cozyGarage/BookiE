@@ -814,3 +814,7 @@ DuckDB date/time/timestamp and enum results no longer expose implementation debu
 ### B3 PostgreSQL interval and temporal-array checkpoint — September 27
 
 PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](type-contract-strategy.md) for remaining per-driver targets; B3 remains open and Oracle stays deferred.
+
+### B3 MySQL native temporal checkpoint — September 27
+
+Zero dates no longer read as NULL, negative TIME values keep their sign, and extended TIME, dates with zero parts and YEAR values are exact instead of undecodable. They survive parameter and SQL export round trips, checked by the server. A SQLite regression from automatic decimal parameters, which were bound as text, is also fixed. Details are in [value contracts](value-contracts.md#mysql-native-time-zero-date-and-year-checkpoint). B3 remains open.
