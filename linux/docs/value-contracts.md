@@ -570,7 +570,9 @@ INTEGER storage classes. The test checks both SQLite's independent `typeof`
 result and TablePro's decoded value. It then exports the edited rows as SQL
 INSERT literals, re-imports into a second `NUMERIC` table and requires the same
 storage classes and values. This closes the driver-level edit/SQL re-import
-case; CSV import and installed grid acceptance remain open.
+case. A policy-guarded CSV import test also covers legal text and numeric values
+in INTEGER, REAL and NUMERIC affinity columns. Installed grid acceptance remains
+open.
 
 The full SQLite integration suite passed all 21 tests. Run locally:
 
@@ -596,8 +598,10 @@ values remain exact text because the shared decimal type cannot represent this
 range. Dates that cannot be rendered as RFC3339 use canonical Extended JSON with
 the exact signed millisecond count. A Docker-backed MongoDB 7 test inserts these
 native BSON values directly, reads them through the driver query path, and checks
-the resulting value/type representation. Nested editing, consumer/export parity
-and BSON kinds outside the shared value model remain open.
+the resulting value/type representation. Uncommon top-level BSON types now use
+canonical Extended JSON instead of display text. Real-server JSON, CSV and XLSX
+consumer checks preserve their markers. Special BSON edit/write-back, Mongo-backed
+MCP round trip and native BSON re-import remain open.
 
 Focused local checks:
 

@@ -384,23 +384,25 @@ A file-backed integration scenario checks TEXT, REAL, INTEGER, BLOB and NULL
 values in a declared `NUMERIC` column through bound edits. It compares SQLite's
 `typeof` result with the decoded TablePro value, then exports rows as SQL INSERT
 literals and verifies the same storage classes and values after re-import. All
-21 SQLite integration tests passed. CSV import and installed grid acceptance
-across affinity transitions remain open.
+21 SQLite integration tests passed. Policy-guarded CSV import now also preserves
+text and numeric values in INTEGER, REAL and NUMERIC affinity columns. Installed
+grid acceptance across affinity transitions remains open.
 
 The policy-guarded SQLite CSV import had a separate failure: strict numeric
 parsing rejected legal text stored in a NUMERIC-affinity column. SQLite imports
 now bind unparseable INTEGER/REAL/NUMERIC fields as text so SQLite can apply its
 own affinity; other drivers remain strict. A real file-backed test verifies
-text and decimal rows through batched, audited import. The reproducer failed
-before the fix, and all 40 SQLite driver tests passed. Installed grid acceptance
+text and decimal rows through batched, audited import for INTEGER, REAL and
+NUMERIC columns. The reproducer failed before the fix. Installed grid acceptance
 remains open.
 
 ### B3 XLSX nested JSON consumer check: 2026-09-27
 
 A core workbook regression verifies that nested canonical Extended JSON keeps
 its Decimal128, binary subtype and millisecond-date markers in an exact XLSX
-text cell. The focused case and all 436 core library tests passed. This covers
-the shared workbook writer; MongoDB query-to-XLSX integration remains open.
+text cell. The focused case and all 436 core library tests passed. A separate
+MongoDB 7 test sends a live query result through the public XLSX writer and
+checks BSON markers in the workbook; all eight integration tests passed.
 
 ## Documentation and boundaries
 

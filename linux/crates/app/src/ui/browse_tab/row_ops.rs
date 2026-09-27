@@ -687,9 +687,9 @@ impl BrowseTab {
 
 /// Build the draft values for a duplicated row. Columns whose value is
 /// owned by the database (primary key, identity / serial, generated) are
-/// blanked, and so is any cell the driver could not decode: carrying an
-/// undecodable value into an INSERT binds it as NULL without the user
-/// ever being able to see or correct it.
+/// blanked. A row containing an undecodable cell or whose value count does
+/// not match the columns is refused: carrying it into an INSERT could bind
+/// the unreadable value as NULL without the user seeing or correcting it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DuplicateRowError {
     CellCountMismatch { expected: usize, actual: usize },

@@ -446,7 +446,10 @@ fn bson_to_value(b: &Bson) -> Value {
         // binary subtype, ObjectId or the full BSON date representation.
         Bson::Document(d) => Value::Json(Bson::Document(d.clone()).into_canonical_extjson()),
         Bson::Array(a) => Value::Json(Bson::Array(a.clone()).into_canonical_extjson()),
-        other => Value::Text(other.to_string()),
+        // Preserve BSON-only top-level kinds as Extended JSON instead of a
+        // display string that looks editable but cannot be written back as
+        // the original BSON type.
+        other => Value::Json(other.clone().into_canonical_extjson()),
     }
 }
 
@@ -1026,6 +1029,43 @@ mod tests {
             })),
             Value::Bytes(vec![0, 255, 65])
         );
+    }
+
+    #[test]
+    fn uncommon_top_level_bson_kinds_keep_extended_json_type_markers() {
+        use mongodb::bson::{JavaScriptCodeWithScope, Regex, Timestamp};
+
+        let uncommon = [
+            (Bson::Timestamp(Timestamp { time: 42, increment: 7 }), "$timestamp"),
+            (
+                Bson::RegularExpression(Regex {
+                    pattern: "^tablepro".into(),
+                    options: "i".into(),
+                }),
+                "$regularExpression",
+            ),
+            (Bson::JavaScriptCode("return 1;".into()), "$code"),
+            (
+                Bson::JavaScriptCodeWithScope(JavaScriptCodeWithScope {
+                    code: "return value;".into(),
+                    scope: doc! { "value": 7 },
+                }),
+                "$scope",
+            ),
+            (Bson::Symbol("legacy-symbol".into()), "$symbol"),
+            (Bson::Undefined, "$undefined"),
+            (Bson::MinKey, "$minKey"),
+            (Bson::MaxKey, "$maxKey"),
+        ];
+
+        for (bson, marker) in uncommon {
+            let value = bson_to_value(&bson);
+            let Value::Json(json) = value else {
+                panic!("{bson:?} must retain its BSON kind");
+            };
+            assert!(json.to_string().contains(marker), "{bson:?}: {json}");
+            assert_eq!(json, bson.into_canonical_extjson(), "{marker}");
+        }
     }
 
     #[test]
