@@ -75,7 +75,9 @@ pub enum SshError {
     },
     #[error(
         "host key for {host}:{port} is not in {known_hosts}, and this connection does not add new keys. \
-         Connect once from BookiE or ssh to confirm fingerprint {fingerprint}"
+         Running ssh will not help: it writes to its own known_hosts file, not this one. Connect once from \
+         BookiE with a setting that trusts new keys, or add the line to {known_hosts} yourself. \
+         Fingerprint: {fingerprint}"
     )]
     UnknownHostKey {
         host: String,
@@ -762,6 +764,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unknown_host_key_error_does_not_advise_running_ssh() {
+        let known_hosts = PathBuf::from("/home/user/.config/tablepro/known_hosts");
+        let error = unknown_host_key("db.example.com", 5432, "fp".to_string(), &known_hosts);
+        let message = error.to_string();
+        assert!(
+            !message.contains("or ssh"),
+            "message should not advise running the system ssh client, which writes a different known_hosts file: {message}"
+        );
+        assert!(
+            message.contains(known_hosts.display().to_string().as_str()),
+            "message should point at this client's own known_hosts path: {message}"
+        );
+    }
 
     #[test]
     fn ssh_auth_password_redacts_in_debug() {
