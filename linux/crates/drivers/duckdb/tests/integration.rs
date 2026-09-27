@@ -151,3 +151,31 @@ async fn value_contract_native_temporal_nulls_and_json_preserve_precision() {
         serde_json::json!([{"stamp": "1969-12-31 23:59:59.999999999", "clock": "23:59:59.123456"}])
     );
 }
+
+#[tokio::test]
+async fn value_contract_decimal_parameters_and_results_stay_exact_numbers() {
+    let connection = native_connection().await;
+    let decimal = |text: &str| Value::Decimal(text.parse().unwrap());
+    for (sql, parameter, expected) in [
+        ("SELECT ? * 2", "2.5", "5.0"),
+        ("SELECT ? + 1", "1000", "1001"),
+        ("SELECT ?", "-0.00000001", "-0.00000001"),
+        (
+            "SELECT ?",
+            "-99999999999999999999.99999999",
+            "-99999999999999999999.99999999",
+        ),
+    ] {
+        let result = connection.query_params(sql, &[decimal(parameter)]).await.unwrap();
+        assert_eq!(result.rows, vec![vec![decimal(expected)]], "{sql} with {parameter}");
+    }
+    let result = connection
+        .query("SELECT 12.340::DECIMAL(10,3), CAST('-1234567890123456789012345678.0123456789' AS DECIMAL(38,10))")
+        .await
+        .unwrap();
+    assert!(matches!(&result.rows[0][0], Value::Decimal(value) if value.to_string() == "12.340"));
+    assert_eq!(
+        result.rows[0][1],
+        Value::Text("-1234567890123456789012345678.0123456789".into())
+    );
+}

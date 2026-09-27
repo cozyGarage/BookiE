@@ -436,7 +436,7 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
         }
         ValueRef::Float(f) => Value::Float(f as f64),
         ValueRef::Double(f) => Value::Float(f),
-        ValueRef::Decimal(d) => Value::Text(d.to_string()),
+        ValueRef::Decimal(d) => rust_decimal_or_text(d),
         ValueRef::Text(t) => match std::str::from_utf8(t) {
             Ok(text) => Value::Text(text.to_owned()),
             Err(_) => Value::Bytes(t.to_vec()),
@@ -451,6 +451,13 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
             .unwrap_or_else(|_| Value::Undecodable("ENUM".into())),
         other => Value::Undecodable(format!("{:?}", other.data_type())),
     }
+}
+
+fn rust_decimal_or_text(decimal: duckdb::types::Decimal) -> Value {
+    decimal
+        .try_into()
+        .map(Value::Decimal)
+        .unwrap_or_else(|_| Value::Text(decimal.to_string()))
 }
 
 fn values_to_duck_params(params: &[Value]) -> Result<Vec<duckdb::types::Value>, DriverError> {
@@ -468,7 +475,7 @@ fn values_to_duck_params(params: &[Value]) -> Result<Vec<duckdb::types::Value>, 
                 Value::Time(t) => duckdb::types::Value::Text(t.to_string()),
                 Value::DateTime(dt) => duckdb::types::Value::Text(dt.to_string()),
                 Value::TimestampTz(ts) => duckdb::types::Value::Text(ts.to_rfc3339()),
-                Value::Decimal(d) => duckdb::types::Value::Text(d.to_string()),
+                Value::Decimal(d) => duckdb::types::Value::Decimal((*d).into()),
                 Value::Uuid(u) => duckdb::types::Value::Text(u.to_string()),
                 Value::Json(j) => duckdb::types::Value::Text(j.to_string()),
                 Value::Undecodable(_) => {

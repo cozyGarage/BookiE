@@ -97,13 +97,6 @@ fn assert_value(actual: &Value, expected: &Value, driver: &str, kind: &str) {
         (Value::Float(actual), Value::Float(expected)) => {
             assert_eq!(actual.to_bits(), expected.to_bits(), "{driver} {kind}")
         }
-        (Value::Text(actual), Value::Decimal(expected)) if driver == "duckdb" => {
-            assert_eq!(
-                actual.parse().map(Value::Decimal).unwrap(),
-                Value::Decimal(*expected),
-                "{driver} {kind}"
-            );
-        }
         _ => assert_eq!(actual, expected, "{driver} {kind}"),
     }
 }
