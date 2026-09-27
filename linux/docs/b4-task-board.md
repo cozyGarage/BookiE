@@ -71,20 +71,20 @@ Files: `crates/drivers/{clickhouse,mongodb,redis,mssql}`, `crates/driver-tls-tes
 | C5 | Add no-plaintext-fallback tests for MySQL, ClickHouse and SQL Server. | driver-tls | done, `cb84d0ec3` |
 | C6 | Prove TLS through SSH for MySQL's socket forward and SQL Server's identity. Needs C4 and a bastion in the fixture. | driver-tls | open, C4 is now available |
 
-## Lane D: policy sessions — D3-D7 done (2026-09-27), D1/D2/D8 need driver-tier follow-up
+## Lane D: policy sessions — D1-D8 done (2026-09-28)
 
 Files: `crates/policy/src/guard/session.rs`, `crates/policy/src/guard_tests_session.rs`. One agent, in order.
 
 | # | Task | Tier | Status |
 |---|---|---|---|
-| D1 | A PostgreSQL COMMIT on an aborted transaction is audited as committed, although the server rolled back. | driver | fixed, `6ae98c0ed`, but only unit-verified with a mocked driver, not against real PostgreSQL. Needs a `crates/policy/tests/` or `crates/drivers/postgres/tests/` reproduction. |
-| D2 | A failed COMMIT keeps a batch open after the engine has already ended the transaction, for example a deferred foreign key failure. | driver | fixed, `29b0a6b02`, same real-Postgres gap as D1. |
+| D1 | A PostgreSQL COMMIT on an aborted transaction is audited as committed, although the server rolled back. | driver | fixed, `6ae98c0ed`; the real-Postgres gap is closed by `01f892ac2`, which confirms it unmodified. |
+| D2 | A failed COMMIT keeps a batch open after the engine has already ended the transaction, for example a deferred foreign key failure. | driver | fixed, `29b0a6b02`; the real-Postgres gap is closed by `01f892ac2`, which confirms it unmodified. |
 | D3 | A statement on a retired session is sent and fails as an ambiguous error, which turns off governed writes. Refuse it before dispatch. | unit | done, `8428263d3` |
 | D4 | A `Disconnected` error retires the session and marks its transaction uncertain. | unit | done, `8428263d3` |
 | D5 | Audit or refuse COMMIT without BEGIN and a nested BEGIN. | unit | done, `8428263d3` |
 | D6 | Cover a denied, cancelled or timed-out statement inside a transaction followed by COMMIT, and ROLLBACK AND CHAIN. | unit | done, `6ae98c0ed` |
 | D7 | Cancelled, timed-out and unknown outcomes on the session path write the required audit state. | unit | done, `29b0a6b02` |
-| D8 | A guarded session on real PostgreSQL: BEGIN, UPDATE and close write an audited ROLLBACK and leave the row unchanged. | driver | covered only by a mocked-driver unit test (`closing_a_session_with_an_open_transaction_rolls_it_back_and_audits_it`); still needs the real-Postgres reproduction. |
+| D8 | A guarded session on real PostgreSQL: BEGIN, UPDATE and close write an audited ROLLBACK and leave the row unchanged. | driver | done; the mocked-driver unit test (`closing_a_session_with_an_open_transaction_rolls_it_back_and_audits_it`) is now backed by a real-Postgres reproduction in `01f892ac2`. |
 
 ## Lane E: policy rules
 
