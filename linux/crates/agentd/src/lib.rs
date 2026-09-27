@@ -333,6 +333,25 @@ impl DaemonProvider {
             self.remove_session(saved.id, &key, &connection)?;
         }
 
+        let connection = self.connect_session(saved).await?;
+        let key = match tablepro_transport::session_material_digest(saved).await {
+            Ok(material) => SessionKey::from_saved(saved, material),
+            Err(_) => key,
+        };
+        self.sessions
+            .lock()
+            .map_err(|_| "session cache unavailable".to_string())?
+            .insert(
+                saved.id,
+                OpenSession {
+                    key,
+                    connection: connection.clone(),
+                },
+            );
+        Ok(connection)
+    }
+
+    async fn connect_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
         let driver = self
             .registry
             .get(&saved.driver_id)
@@ -347,22 +366,10 @@ impl DaemonProvider {
         let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, &self.ssh)
             .await
             .map_err(|e| e.to_string())?;
-        let connection: Arc<dyn Connection> = Arc::new(SessionConnection {
+        Ok(Arc::new(SessionConnection {
             inner: Arc::from(raw),
             _tunnel: tunnel,
-        });
-
-        self.sessions
-            .lock()
-            .map_err(|_| "session cache unavailable".to_string())?
-            .insert(
-                saved.id,
-                OpenSession {
-                    key,
-                    connection: connection.clone(),
-                },
-            );
-        Ok(connection)
+        }))
     }
 
     fn cached_connection(&self, id: Uuid, key: &SessionKey) -> Result<Option<Arc<dyn Connection>>, String> {
@@ -584,6 +591,74 @@ mod tests {
             .expect("inspect cache after material rotation");
         assert!(cached.is_none());
         assert!(provider.sessions.lock().expect("sessions").get(&saved.id).is_none());
+    }
+
+    struct RotatingCaDriver {
+        ca_path: PathBuf,
+        rotated_bytes: &'static [u8],
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for RotatingCaDriver {
+        fn id(&self) -> &'static str {
+            "sqlite"
+        }
+
+        fn display_name(&self) -> &'static str {
+            "Rotating CA test driver"
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            std::fs::write(&self.ca_path, self.rotated_bytes).expect("rotate the ca file mid-connect");
+            SqliteDriver.connect(opts).await
+        }
+    }
+
+    #[tokio::test]
+    async fn a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let ca_path = directory.path().join("ca.pem");
+        std::fs::write(&ca_path, b"material-before-connect").expect("write initial ca material");
+
+        let mut saved = saved_connection();
+        saved.driver_id = "sqlite".into();
+        saved.database = ":memory:".into();
+        saved.tls_root_cert = Some(ca_path.clone());
+        saved.ssh = None;
+
+        let mut registry = DriverRegistry::new();
+        registry.register(Arc::new(RotatingCaDriver {
+            ca_path: ca_path.clone(),
+            rotated_bytes: b"material-after-connect",
+        }));
+        let provider = DaemonProvider::new(
+            Arc::new(registry),
+            Arc::new(PolicyConfig::default()),
+            Arc::new(NullAuditSink),
+            Arc::new(AuditState::new()),
+            Arc::new(DenyApprovalSink),
+        );
+
+        provider
+            .open_session(&saved)
+            .await
+            .expect("open session across rotation");
+
+        let post_connect_material = tablepro_transport::session_material_digest(&saved)
+            .await
+            .expect("digest after the rotation");
+        let current_key = SessionKey::from_saved(&saved, post_connect_material);
+        let sessions = provider.sessions.lock().expect("sessions");
+        let cached = &sessions.get(&saved.id).expect("a session was cached").key;
+        assert!(
+            *cached == current_key,
+            "the cached session key must reflect the material actually used to connect, \
+             not a digest read before the key rotated"
+        );
     }
 
     #[tokio::test]
