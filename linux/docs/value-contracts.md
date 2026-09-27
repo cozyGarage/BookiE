@@ -547,3 +547,45 @@ The reproducer ran against MySQL 8 with a permissive `sql_mode`. Before the fix,
 The test compares every value with an independent expected value. It then writes the rows back through bound parameters and SQL INSERT export, and the server confirms all six rows match with `<=>`. Scoped cargo-mutants on `crates/drivers/mysql/src/temporal.rs`: 16 mutants, 13 caught, 3 unviable, zero survivors and zero timeouts, using the recipe above with `-- --lib --test integration -- --include-ignored calendar_fields native_time_zero`.
 
 BIT, SET/ENUM and spatial values, session time zones and stricter SQL modes remain open.
+
+## ClickHouse named temporal timezones, 2026-09-27
+
+A live ClickHouse 24.8 regression showed that `DateTime64(6, 'Asia/Tokyo')`
+returned a Tokyo wall clock that TablePro decoded as a timezone-free timestamp.
+That changed the instant by nine hours. The type metadata contains the IANA zone,
+so the decoder now applies timezone rules and returns the corresponding UTC
+`TimestampTz`, retaining the fractional seconds.
+
+The decoder refuses unknown zones and local times in DST gaps or folds. The
+ClickHouse row format returns a local wall clock without its offset, so those
+values do not identify a unique instant and must not be guessed. Untagged
+`DateTime` and `DateTime64` values remain timezone-free `DateTime` values.
+
+Unit tests cover type wrappers, Tokyo conversion, unknown zones, and New York DST
+gaps/folds. A Docker integration test first failed with `DateTime(12:34...)`
+instead of the expected `TimestampTz(03:34...Z)`, then passed after the fix. The
+full ClickHouse integration suite passed all 23 cases. The combined `values`
+layer passed in 113.058 seconds, `full` passed in 100.8 seconds, and the harness
+passed. Reports are in `target/quality/20260927T180959352277Z-layers/`,
+`target/quality/20260927T181245187611Z-layers/`, and
+`target/quality/20260927T181435128973Z-layers/`.
+
+Run the focused checks locally with:
+
+```sh
+cargo test --locked -p tablepro-driver-clickhouse --lib
+cargo test --locked -p tablepro-driver-clickhouse --test integration -- --include-ignored --test-threads=1
+./scripts/run-test-layer.py values
+./scripts/run-test-layer.py full
+```
+
+Scoped Rust mutation evidence for `temporal.rs` is in
+`target/quality/20260927-ch-temporal-mutants-followup/mutants.out/outcomes.json`:
+13 caught, 2 unviable, no survivors or timeouts. The initial mutation pass made
+two synthetic wrapper results loop; the progress guard now exits safely and the
+repeat has no timeout. Reproduce with:
+
+```sh
+mkdir -p target/mutation-tmp
+TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-clickhouse --file crates/drivers/clickhouse/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260927-ch-temporal-mutants-followup -- --lib
+```

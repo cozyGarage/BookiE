@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+mod temporal;
 mod tls;
 mod value_literal;
 
@@ -629,7 +630,7 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .map(Value::Date)
             .unwrap_or_else(|| fallback_text(&raw)),
-        "DateTime" | "DateTime64" => parse_datetime(&raw),
+        "DateTime" | "DateTime64" => temporal::parse_datetime(&raw, type_name),
         "UUID" => raw
             .as_str()
             .and_then(|s| s.parse::<uuid::Uuid>().ok())
@@ -639,21 +640,6 @@ fn json_to_value(raw: serde_json::Value, type_name: &str) -> Value {
         "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic" => Value::Json(raw),
         _ => fallback_text(&raw),
     }
-}
-
-fn parse_datetime(raw: &serde_json::Value) -> Value {
-    let Some(s) = raw.as_str() else {
-        return fallback_text(raw);
-    };
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
-        return Value::TimestampTz(dt.with_timezone(&chrono::Utc));
-    }
-    // `%.f` also matches a whole-second timestamp, so one pattern covers
-    // both `DateTime` and every `DateTime64` precision.
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S%.f") {
-        return Value::DateTime(dt);
-    }
-    Value::Text(s.to_string())
 }
 
 /// A JSON string keeps its own text; anything else keeps its JSON

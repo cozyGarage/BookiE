@@ -848,6 +848,7 @@ Each open finding from the audit was reproduced with a failing test first and th
 - SQL Server `datetimeoffset` keeps its original offset as exact text.
 - MySQL text exports read the same with or without `NO_BACKSLASH_ESCAPES`, and BIT and spatial values decode exactly.
 - ClickHouse keeps decimal scale and fractional seconds in parameters and SQL exports.
+- ClickHouse `DateTime64` results with a named timezone now decode to the correct UTC instant using IANA timezone rules. Ambiguous or nonexistent local clock values are refused as undecodable because the response omits the offset needed to identify an instant. Scales 0, 3, 6 and 9 now have a live fixture round trip.
 - ClickHouse refuses out-of-range `DateTime64(9)` parameters and SQL exports before sending them. On the local ClickHouse 24.8 fixture, the same raw SQL literal returns a `DECIMAL_OVERFLOW` error.
 - DuckDB binds dates, times and microsecond timestamps natively.
 - PostgreSQL `int2vector` and `oidvector` values keep their space-separated form.
@@ -861,5 +862,6 @@ The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson h
 Open:
 - DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
 - MySQL column comments containing backslashes are refused with an explicit error because generated DDL cannot preserve them across SQL modes. Session-aware DDL execution is still needed to support those comments safely.
+- ClickHouse DateTime values in DST folds or gaps, or with an unrecognized timezone, remain explicit undecodable results until the wire format carries enough information to identify the instant.
 
 B3 remains open.

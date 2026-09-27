@@ -6213,6 +6213,7 @@ dependencies = [
  "clickhouse",
  "hyper-rustls",
  "hyper-util",
+ "jiff",
  "rust_decimal",
  "rustls",
  "rustls-pki-types",

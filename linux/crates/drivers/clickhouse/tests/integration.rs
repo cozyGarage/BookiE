@@ -296,6 +296,25 @@ async fn value_contract_datetime64_precision_0_through_9_is_exact() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query("SELECT toDateTime64('2026-09-27 12:34:56.123456', 6, 'Asia/Tokyo') AS stamp")
+        .await
+        .unwrap();
+    let instant = chrono::DateTime::parse_from_rfc3339("2026-09-27T03:34:56.123456Z")
+        .unwrap()
+        .to_utc();
+    assert_eq!(
+        result.rows,
+        vec![vec![Value::TimestampTz(instant)]],
+        "DateTime64 timezone metadata must be applied to the displayed local clock",
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_roundtrip_common_types() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
