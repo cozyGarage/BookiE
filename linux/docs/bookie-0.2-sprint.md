@@ -348,6 +348,15 @@ the full title, help text and minimum available width. The UI and isolated GTK
 widget scenarios passed locally; hosted CI and the remaining B3 acceptance gaps
 remain separate.
 
+A follow-up value-path audit caught two silent shape-loss cases. Duplicating a
+row changed an undecodable cell or missing source value to SQL NULL; the action
+now refuses the draft and reports the affected column or shape mismatch. The
+ClickHouse response reader zipped column names with types and filled missing row
+cells with NULL; it now rejects header and row-width mismatches while preserving
+explicit NULL cells. Regressions were observed failing before the fixes. The
+ClickHouse library tests (32) and app library tests (384 passed, 5 ignored) pass
+afterward. Broader cross-driver consumer parity remains open.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while

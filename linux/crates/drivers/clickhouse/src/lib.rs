@@ -477,21 +477,7 @@ async fn fetch_result(
     };
     let types: Vec<String> = parse_line(&types_line)?;
 
-    let columns: Vec<ColumnInfo> = names
-        .into_iter()
-        .zip(types)
-        .map(|(name, data_type)| ColumnInfo {
-            nullable: type_is_nullable(&data_type),
-            name,
-            data_type,
-            primary_key: false,
-            is_auto_increment: false,
-            default_value: None,
-            is_generated: false,
-            comment: None,
-            collation: None,
-        })
-        .collect();
+    let columns = response_columns(names, types)?;
 
     let mut rows: Vec<Vec<Value>> = Vec::new();
     let mut truncated = false;
@@ -506,12 +492,7 @@ async fn fetch_result(
             break;
         }
         let raw: Vec<serde_json::Value> = parse_line(&line)?;
-        let mut row = Vec::with_capacity(columns.len());
-        for (i, col) in columns.iter().enumerate() {
-            let cell = raw.get(i).cloned().unwrap_or(serde_json::Value::Null);
-            row.push(json_to_value(cell, &col.data_type));
-        }
-        rows.push(row);
+        rows.push(response_row(raw, &columns)?);
     }
 
     Ok(QueryResult {
@@ -519,6 +500,46 @@ async fn fetch_result(
         rows,
         truncated,
     })
+}
+
+fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<ColumnInfo>, DriverError> {
+    if names.len() != types.len() {
+        return Err(DriverError::Internal(format!(
+            "clickhouse response column name/type count mismatch: {} names, {} types",
+            names.len(),
+            types.len()
+        )));
+    }
+    Ok(names
+        .into_iter()
+        .zip(types)
+        .map(|(name, data_type)| ColumnInfo {
+            nullable: type_is_nullable(&data_type),
+            name,
+            data_type,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        })
+        .collect())
+}
+
+fn response_row(raw: Vec<serde_json::Value>, columns: &[ColumnInfo]) -> Result<Vec<Value>, DriverError> {
+    if raw.len() != columns.len() {
+        return Err(DriverError::Internal(format!(
+            "clickhouse response row width mismatch: {} values, {} columns",
+            raw.len(),
+            columns.len()
+        )));
+    }
+    Ok(columns
+        .iter()
+        .enumerate()
+        .map(|(index, column)| json_to_value(raw[index].clone(), &column.data_type))
+        .collect())
 }
 
 fn empty_result() -> QueryResult {
@@ -895,6 +916,37 @@ mod tests {
                 assert_eq!(actual, text);
             }
         }
+    }
+
+    #[test]
+    fn clickhouse_response_rejects_column_type_count_mismatch() {
+        let result = response_columns(vec!["a".into(), "b".into()], vec!["UInt8".into()]);
+        assert!(matches!(result, Err(DriverError::Internal(_))));
+    }
+
+    #[test]
+    fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
+        let columns = response_columns(vec!["a".into(), "b".into()], vec!["UInt8".into(), "UInt8".into()]).unwrap();
+        for raw in [
+            vec![serde_json::json!(1)],
+            vec![serde_json::json!(1), serde_json::json!(2), serde_json::json!(3)],
+        ] {
+            let result = response_row(raw, &columns);
+            assert!(matches!(result, Err(DriverError::Internal(_))));
+        }
+    }
+
+    #[test]
+    fn clickhouse_response_preserves_explicit_null_cells() {
+        let columns = response_columns(
+            vec!["a".into(), "b".into()],
+            vec!["Nullable(UInt8)".into(), "UInt8".into()],
+        )
+        .unwrap();
+        assert_eq!(
+            response_row(vec![serde_json::Value::Null, serde_json::json!(7)], &columns).unwrap(),
+            vec![Value::Null, Value::Int(7)]
+        );
     }
 
     #[test]
