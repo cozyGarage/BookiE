@@ -17,6 +17,8 @@
 - A session that loses its connection mid-transaction now has its transaction outcome recorded as uncertain, and the session itself stops accepting statements even if the driver still reports it usable.
 - A session COMMIT with no preceding BEGIN, and a BEGIN sent while a session transaction is already open, are now refused instead of being sent to the database unaudited.
 - A session COMMIT that only succeeded because PostgreSQL had already rolled back an aborted transaction is now audited as rolled back instead of committed.
+- A cancelled or timed-out session COMMIT or ROLLBACK is now audited with a cancelled or timed-out outcome instead of a generic failure.
+- A session COMMIT that fails because the database already ended the transaction, such as a deferred foreign key violation, no longer leaves the session's transaction marked open.
 
 ## [0.1.5] - 2026-09-27
 

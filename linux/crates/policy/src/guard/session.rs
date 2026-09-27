@@ -317,13 +317,14 @@ impl PolicySession {
                 },
             )
             .await;
-        self.batch = if result.is_ok() {
-            chain.then(OpenBatch::new)
-        } else {
-            Some(OpenBatch {
+        let is_retryable = matches!(result, Err(DriverError::Cancelled | DriverError::TimedOut));
+        self.batch = match (&result, kind) {
+            (Ok(_), _) => chain.then(OpenBatch::new),
+            (Err(_), Finish::Commit) if !ambiguous && !is_retryable => None,
+            _ => Some(OpenBatch {
                 uncertain: batch.uncertain || ambiguous,
                 ..batch
-            })
+            }),
         };
         self.guard.handle_write_outcome_failure(audit_result)?;
         pending_write.disarm();
@@ -380,6 +381,18 @@ fn finish_outcome(
             };
             (AuditTerminalStatus::Succeeded, outcome, None, false)
         }
+        Err(DriverError::Cancelled) => (
+            AuditTerminalStatus::Cancelled,
+            AuditTransactionOutcome::Pending,
+            Some(AuditErrorCategory::Cancelled),
+            false,
+        ),
+        Err(DriverError::TimedOut) => (
+            AuditTerminalStatus::TimedOut,
+            AuditTransactionOutcome::Pending,
+            Some(AuditErrorCategory::Timeout),
+            false,
+        ),
         Err(error) if is_ambiguous_post_dispatch(error) => (
             AuditTerminalStatus::Unknown,
             AuditTransactionOutcome::Unknown,

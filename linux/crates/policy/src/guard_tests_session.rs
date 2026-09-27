@@ -6,6 +6,7 @@ struct SessionScript {
     lose_on: Option<&'static str>,
     fail_once_on: Option<&'static str>,
     disconnect_on: Option<&'static str>,
+    query_error_on: Option<&'static str>,
 }
 
 struct ScriptedSession {
@@ -25,6 +26,12 @@ impl tablepro_core::Session for ScriptedSession {
         self.script.sent.lock().expect("sent lock").push(sql.to_string());
         if self.script.disconnect_on == Some(sql) {
             return Err(DriverError::Disconnected);
+        }
+        if self.script.query_error_on == Some(sql) {
+            return Err(DriverError::Query {
+                message: "deferred foreign key constraint violated".into(),
+                sqlstate: Some("23503".into()),
+            });
         }
         if !self.failed_once && self.script.fail_once_on == Some(sql) {
             self.failed_once = true;
@@ -466,4 +473,63 @@ async fn a_disconnected_commit_writes_an_unknown_terminal_state_and_retires_the_
     let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
     assert_eq!(rollbacks.len(), 1);
     assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Unknown);
+}
+
+#[tokio::test]
+async fn a_timed_out_commit_writes_a_timed_out_terminal_state_and_stays_open_for_retry() {
+    let h = harness(
+        SessionScript {
+            fail_once_on: Some("COMMIT"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "INSERT INTO items VALUES (1)").await.expect("write");
+
+    assert!(matches!(run(&mut session, "COMMIT").await, Err(DriverError::TimedOut)));
+    assert!(session.transaction_open());
+    run(&mut session, "COMMIT").await.expect("retry commit");
+    assert!(!session.transaction_open());
+
+    let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 2);
+    assert_eq!(commits[0].terminal_status, AuditTerminalStatus::TimedOut);
+    assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Pending);
+    assert_eq!(commits[1].terminal_status, AuditTerminalStatus::Succeeded);
+    assert_eq!(commits[1].transaction_outcome, AuditTransactionOutcome::Committed);
+}
+
+#[tokio::test]
+async fn a_definite_commit_failure_closes_the_batch_instead_of_leaving_it_open() {
+    let h = harness(
+        SessionScript {
+            query_error_on: Some("COMMIT"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "INSERT INTO items VALUES (1)").await.expect("write");
+
+    let error = run(&mut session, "COMMIT")
+        .await
+        .expect_err("deferred constraint failure");
+    assert!(matches!(error, DriverError::Query { .. }), "{error:?}");
+    assert!(
+        !session.transaction_open(),
+        "the engine already ended the transaction, so the batch must not stay open"
+    );
+
+    let commits = outcomes_of(&h.audit, AuditOperationClass::TransactionCommit);
+    assert_eq!(commits.len(), 1);
+    assert_eq!(commits[0].terminal_status, AuditTerminalStatus::Failed);
+
+    let new_batch_begin = run(&mut session, "BEGIN").await;
+    assert!(
+        new_batch_begin.is_ok(),
+        "a fresh BEGIN must be accepted after the batch closed"
+    );
 }
