@@ -331,6 +331,23 @@ six server drivers together. No existing build artifacts were deleted.
 B3 remains open for the native-type and consumer gaps listed above. B4–B6
 acceptance stays next in sequence.
 
+### B3 review and connection form: 2026-09-27
+
+Rechecked the 0.1.5 fixes against the source, regression suites and sprint
+ledger. The listed driver fixes remain covered. DuckDB nanosecond and
+TIMESTAMPTZ parameters still require explicit casts; MySQL BIT(1) has both an
+isolated grid-edit widget test and a driver update round trip, while a complete
+installed-app-to-MySQL edit acceptance test remains open. MySQL backslash-bearing
+column comments are refused until session-aware DDL exists. ClickHouse values
+outside DateTime64 bounds are refused locally; the live-server contract checks
+the server's overflow behavior.
+
+The new-connection dialog now uses a centered header title that follows driver
+selection and has a wider content area. The installed-app AT-SPI scenario checks
+the full title, help text and minimum available width. The UI and isolated GTK
+widget scenarios passed locally; hosted CI and the remaining B3 acceptance gaps
+remain separate.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while

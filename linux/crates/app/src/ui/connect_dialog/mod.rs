@@ -40,6 +40,7 @@ pub struct ConnectDialog {
     test_button: gtk::Button,
     submit: gtk::Button,
     toast_overlay: adw::ToastOverlay,
+    header_title: adw::WindowTitle,
     form: AuthFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
@@ -129,7 +130,7 @@ impl Component for ConnectDialog {
     view! {
         adw::Dialog {
             set_title: &crate::tr!("Connect"),
-            set_content_width: 480,
+            set_content_width: 560,
             set_content_height: 720,
             connect_closed => ConnectDialogInput::Closed,
 
@@ -140,6 +141,7 @@ impl Component for ConnectDialog {
                 // GNOME Connections / Builder shape; no manual bottom
                 // Box, no pill class on header buttons.
                 add_top_bar = &adw::HeaderBar {
+                    set_title_widget: Some(&model.header_title),
                     pack_start: &model.test_button,
                     pack_end: &model.submit,
                 },
@@ -310,6 +312,15 @@ impl Component for ConnectDialog {
             sender_for_submit.input(ConnectDialogInput::Submit);
         });
 
+        // HeaderBar centers its title between the action buttons. Keeping
+        // the selected driver here makes the dialog title visible and
+        // centered even when the two buttons have different widths.
+        let initial_title = drivers
+            .first()
+            .map(|driver| crate::tr!("Connect to {name}").replace("{name}", &driver.display_name))
+            .unwrap_or_else(|| crate::tr!("Connect"));
+        let header_title = adw::WindowTitle::new(&initial_title, "");
+
         let page = adw::PreferencesPage::new();
         page.add(&connection_group);
         page.add(&auth_group);
@@ -343,6 +354,7 @@ impl Component for ConnectDialog {
             test_button,
             submit,
             toast_overlay,
+            header_title,
             form: AuthFormState::default(),
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
@@ -381,6 +393,8 @@ impl Component for ConnectDialog {
                 }
                 self.refresh_driver_maturity_subtitle();
                 root.set_title(&crate::tr!("Connect to {name}").replace("{name}", &entry.display_name));
+                self.header_title
+                    .set_title(&crate::tr!("Connect to {name}").replace("{name}", &entry.display_name));
                 self.refresh_validity();
             }
 
