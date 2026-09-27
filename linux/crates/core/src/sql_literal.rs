@@ -12,6 +12,21 @@ pub enum LiteralError {
     Unsupported,
 }
 
+/// Whether a timestamp fits ClickHouse `DateTime64(9)` without saturating its
+/// signed nanosecond count. The driver and generated SQL literals both use
+/// precision 9, so values outside this interval cannot round-trip exactly.
+pub fn clickhouse_datetime64_nanos_supported(stamp: chrono::NaiveDateTime) -> bool {
+    let Some(minimum) = chrono::NaiveDate::from_ymd_opt(1900, 1, 1).and_then(|date| date.and_hms_opt(0, 0, 0)) else {
+        return false;
+    };
+    let Some(maximum) =
+        chrono::NaiveDate::from_ymd_opt(2262, 4, 11).and_then(|date| date.and_hms_nano_opt(23, 47, 16, 854_775_807))
+    else {
+        return false;
+    };
+    (minimum..=maximum).contains(&stamp)
+}
+
 /// Render `value` as a SQL literal for `driver_id`.
 ///
 /// Escaping is dialect-specific and getting it wrong is not cosmetic.
@@ -45,10 +60,18 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
         Value::Date(date) => string_literal(driver_id, &date.format("%Y-%m-%d").to_string()),
         Value::Time(time) => string_literal(driver_id, &time.to_string()),
+        Value::DateTime(stamp) if driver_id == "clickhouse" && !clickhouse_datetime64_nanos_supported(*stamp) => {
+            return Err(LiteralError::Unsupported);
+        }
         Value::DateTime(stamp) if driver_id == "mssql" => {
             format!("CAST({} AS datetime2)", string_literal(driver_id, &stamp.to_string()))
         }
         Value::DateTime(stamp) => string_literal(driver_id, &stamp.to_string()),
+        Value::TimestampTz(stamp)
+            if driver_id == "clickhouse" && !clickhouse_datetime64_nanos_supported(stamp.naive_utc()) =>
+        {
+            return Err(LiteralError::Unsupported);
+        }
         Value::TimestampTz(stamp) if driver_id == "clickhouse" => {
             format!("toDateTime64('{}', 9, 'UTC')", stamp.format("%Y-%m-%d %H:%M:%S%.9f"))
         }
@@ -259,6 +282,21 @@ mod tests {
         );
         assert_eq!(render_sql_literal("mssql", &Value::Bool(true)).unwrap(), "1");
         assert_eq!(render_sql_literal("mssql", &Value::Bool(false)).unwrap(), "0");
+    }
+
+    #[test]
+    fn clickhouse_datetime64_exports_refuse_values_outside_its_nanosecond_range() {
+        let below = chrono::NaiveDate::from_ymd_opt(1899, 12, 31)
+            .unwrap()
+            .and_hms_nano_opt(23, 59, 59, 999_999_999)
+            .unwrap();
+        let above = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_808)
+            .unwrap();
+        for value in [Value::DateTime(below), Value::TimestampTz(above.and_utc())] {
+            assert_eq!(render_sql_literal("clickhouse", &value), Err(LiteralError::Unsupported));
+        }
     }
 
     #[test]

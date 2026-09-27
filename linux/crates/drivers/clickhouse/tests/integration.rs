@@ -626,3 +626,27 @@ async fn temporal_sql_exports_keep_fractional_seconds() {
         vec![vec![Value::DateTime(local), Value::DateTime(instant)]]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn datetime64_nanosecond_values_outside_the_range_are_rejected_before_driver_submission() {
+    let (_container, options) = start_clickhouse().await;
+    let connection = connect(options).await;
+    let requested = chrono::NaiveDate::from_ymd_opt(2262, 4, 12)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let server_result = connection
+        .query("SELECT toDateTime64('2262-04-12 00:00:00.000000000', 9)")
+        .await;
+    assert!(matches!(server_result, Err(DriverError::Query { .. })));
+
+    let parameter_result = connection
+        .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(requested)])
+        .await;
+    assert!(matches!(parameter_result, Err(DriverError::Unsupported(_))));
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested)),
+        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
+    );
+}

@@ -1,10 +1,12 @@
 use std::time::Duration;
 
 mod tls;
+mod value_literal;
 
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
 use tls::https_connector;
+use value_literal::literal;
 
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
@@ -831,44 +833,6 @@ fn bind_placeholders(sql: &str, params: &[Value]) -> Result<String, DriverError>
     Ok(out)
 }
 
-fn literal(value: &Value) -> Result<String, DriverError> {
-    let rendered = match value {
-        Value::Null => "NULL".into(),
-        Value::Bool(b) => if *b { "true" } else { "false" }.into(),
-        Value::Int(i) => i.to_string(),
-        Value::Float(f) => {
-            // ClickHouse spells these out; silently substituting NULL
-            // would write a different value than the user typed.
-            if f.is_nan() {
-                "nan".into()
-            } else if f.is_infinite() {
-                if f.is_sign_negative() { "-inf" } else { "inf" }.into()
-            } else {
-                f.to_string()
-            }
-        }
-        Value::Text(s) => format!("'{}'", escape_str(s)),
-        Value::Bytes(b) => format!("unhex('{}')", hex_encode(b)),
-        Value::Date(d) => format!("toDate('{}')", d.format("%Y-%m-%d")),
-        Value::Time(t) => format!("'{}'", t.format("%H:%M:%S%.f")),
-        Value::DateTime(dt) => format!("toDateTime64('{}', 9)", dt.format("%Y-%m-%d %H:%M:%S%.9f")),
-        Value::TimestampTz(ts) => format!("toDateTime64('{}', 9, 'UTC')", ts.format("%Y-%m-%d %H:%M:%S%.9f")),
-        Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
-        Value::Uuid(u) => format!("toUUID('{u}')"),
-        Value::Json(j) => format!("'{}'", escape_str(&j.to_string())),
-        Value::Undecodable(type_name) => {
-            return Err(DriverError::Internal(format!(
-                "cannot write back an undecodable {type_name} value"
-            )));
-        }
-    };
-    Ok(rendered)
-}
-
-fn escape_str(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('\'', "\\'")
-}
-
 /// The `clickhouse` crate treats every `?` in a query template as one of
 /// its own bind markers and `??` as an escaped literal. Statements this
 /// driver sends are already fully rendered, so any `?` left in them is
@@ -877,16 +841,6 @@ fn escape_str(s: &str) -> String {
 /// query as having unbound arguments before it ever reaches the server.
 fn escape_bind_markers(sql: &str) -> String {
     sql.replace('?', "??")
-}
-
-fn hex_encode(bytes: &[u8]) -> String {
-    const LUT: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        out.push(LUT[(b >> 4) as usize] as char);
-        out.push(LUT[(b & 0xf) as usize] as char);
-    }
-    out
 }
 
 /// ClickHouse error codes that mean the credentials were rejected.
@@ -979,6 +933,40 @@ mod tests {
     fn qualify_escapes_backticks() {
         assert_eq!(qualify("db", "users"), "`db`.`users`");
         assert_eq!(qualify("db", "a`b"), "`db`.`a``b`");
+    }
+
+    #[test]
+    fn datetime64_parameter_values_outside_the_nine_digit_range_are_refused() {
+        let below = chrono::NaiveDate::from_ymd_opt(1899, 12, 31)
+            .unwrap()
+            .and_hms_nano_opt(23, 59, 59, 999_999_999)
+            .unwrap();
+        let above = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_808)
+            .unwrap();
+        assert!(matches!(
+            literal(&Value::DateTime(below)),
+            Err(DriverError::Unsupported(_))
+        ));
+        assert!(matches!(
+            literal(&Value::TimestampTz(above.and_utc())),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn datetime64_nine_digit_range_edges_remain_representable() {
+        let lower = chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let upper = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_807)
+            .unwrap();
+        assert!(literal(&Value::DateTime(lower)).is_ok());
+        assert!(literal(&Value::TimestampTz(upper.and_utc())).is_ok());
     }
 
     #[test]
