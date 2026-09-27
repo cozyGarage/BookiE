@@ -620,3 +620,49 @@ async fn an_operation_that_does_not_panic_reports_no_fault() {
 
     assert_eq!(reports.load(Ordering::SeqCst), 0);
 }
+
+fn disconnected_guard(reports: Arc<AtomicUsize>) -> PolicyGuard {
+    PolicyGuard::new(
+        Arc::new(DisconnectedConn),
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    )
+    .with_fault_sink(Arc::new(CountingFaultSink { reports }))
+}
+
+#[tokio::test]
+async fn a_disconnected_read_reports_the_connection_as_unusable_without_a_panic() {
+    let reports = Arc::new(AtomicUsize::new(0));
+    let guard = disconnected_guard(reports.clone());
+
+    let error = guard
+        .list_tables()
+        .await
+        .expect_err("the driver reported it is disconnected");
+
+    assert!(matches!(error, DriverError::Disconnected));
+    assert_eq!(
+        reports.load(Ordering::SeqCst),
+        1,
+        "a Disconnected result must reach the fault sink immediately, not just a caught panic"
+    );
+}
+
+#[tokio::test]
+async fn a_disconnected_write_reports_the_connection_as_unusable_without_a_panic() {
+    let reports = Arc::new(AtomicUsize::new(0));
+    let guard = disconnected_guard(reports.clone());
+
+    guard
+        .execute("INSERT INTO jobs(id) VALUES (1)")
+        .await
+        .expect_err("the driver reported it is disconnected");
+
+    assert_eq!(reports.load(Ordering::SeqCst), 1);
+}

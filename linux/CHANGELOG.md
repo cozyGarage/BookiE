@@ -26,6 +26,7 @@
 - Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
 - ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.
 - The new-connection dialog centers its selected-driver title in the header and keeps the full title and help text visible.
+- A driver that reports its connection as disconnected now triggers an immediate reconnect attempt instead of waiting up to 30 seconds for the next scheduled connection check.
 
 ## [0.1.5] - 2026-09-27
 

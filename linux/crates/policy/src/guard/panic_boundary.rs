@@ -13,7 +13,10 @@ impl PolicyGuard {
         F: Future<Output = Result<T, DriverError>>,
     {
         match AssertUnwindSafe(execute).catch_unwind().await {
-            Ok(result) => result,
+            Ok(result) => {
+                self.report_if_disconnected(operation, &result);
+                result
+            }
             Err(payload) => Err(DriverError::Internal(self.report(operation, &payload))),
         }
     }
@@ -23,10 +26,22 @@ impl PolicyGuard {
         F: Future<Output = Result<T, DriverError>>,
     {
         match AssertUnwindSafe(execute).catch_unwind().await {
-            Ok(result) => result,
+            Ok(result) => {
+                self.report_if_disconnected(operation, &result);
+                result
+            }
             Err(payload) => Err(DriverError::OperationOutcomeUnknown {
                 source: Box::new(DriverError::Internal(self.report(operation, &payload))),
             }),
+        }
+    }
+
+    fn report_if_disconnected<T>(&self, operation: &'static str, result: &Result<T, DriverError>) {
+        if !matches!(result, Err(DriverError::Disconnected)) {
+            return;
+        }
+        if let Some(fault) = &self.fault {
+            fault.connection_became_unusable(operation);
         }
     }
 
