@@ -138,9 +138,16 @@ async fn open_tunnel(
     let socket_name = forwarded_socket_name(driver, opts.tls.mode, remote.1);
     let tunnel = match route {
         SshRoute::Builtin(hops) => Tunnel::Builtin(open_builtin(&hops, &remote, socket_name, environment).await?),
-        SshRoute::OpenSsh(config) => {
-            Tunnel::OpenSsh(route::open_openssh(&config, environment, (&remote.0, remote.1), socket_name).await?)
-        }
+        SshRoute::OpenSsh(config) => Tunnel::OpenSsh(
+            route::open_openssh(
+                &config,
+                environment,
+                (&remote.0, remote.1),
+                socket_name,
+                tokio_util::sync::CancellationToken::new(),
+            )
+            .await?,
+        ),
     };
     match (&tunnel, tunnel.socket_dir()) {
         (_, Some(directory)) => forward_through_socket(opts, remote, directory.to_path_buf()),
