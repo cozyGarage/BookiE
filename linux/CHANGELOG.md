@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Browse shortcuts for Left, Right, and space showed keypad keys, and click shortcuts showed Shift and Ctrl alone.
 - New connection opened on the first driver with port 5432, database postgres, and username postgres.
 - Browse shortcuts for Left, Right, and space showed a blank key.
 - Click shortcuts were labeled Pointer_Button1.

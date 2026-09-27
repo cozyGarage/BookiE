@@ -51,6 +51,8 @@ pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse
 pub use query::{ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, QueryResult, TableInfo, Value};
 pub use registry::DriverRegistry;
 pub use session::Session;
-pub use shortcut_label::{BrowseDrawnShortcuts, browse_drawn_shortcuts};
+pub use shortcut_label::{
+    BrowseDrawnShortcuts, BrowseShortcut, browse_drawn_shortcuts, browse_item_accelerator, browse_visible_key,
+};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;

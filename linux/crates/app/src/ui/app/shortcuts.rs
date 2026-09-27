@@ -147,7 +147,6 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>q", crate::tr!("Quit")),
         ],
     );
-    let drawn = tablepro_core::browse_drawn_shortcuts();
     add_shortcut_section(
         &dialog,
         &crate::tr!("Browse table"),
@@ -157,20 +156,17 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("Escape", crate::tr!("Cancel edit")),
             ("Tab", crate::tr!("Move to next cell (commits if editing)")),
             ("<Shift>Tab", crate::tr!("Move to previous cell (commits if editing)")),
-            (drawn.previous_cell, crate::tr!("Move to previous cell")),
-            (drawn.next_cell, crate::tr!("Move to next cell")),
-            (drawn.toggle_boolean, crate::tr!("Toggle boolean cell")),
+            ("Left", crate::tr!("Move to previous cell")),
+            ("Right", crate::tr!("Move to next cell")),
+            ("space", crate::tr!("Toggle boolean cell")),
             ("<Primary>n", crate::tr!("Insert row")),
             ("Delete", crate::tr!("Delete selected row")),
             ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
             ("<Primary>f", crate::tr!("Filter rows")),
             ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
             ("<Primary>a", crate::tr!("Select all rows")),
-            (
-                drawn.extend_selection,
-                crate::tr!("Extend row selection to clicked row"),
-            ),
-            (drawn.toggle_selection, crate::tr!("Toggle clicked row in selection")),
+            ("Shift-click", crate::tr!("Extend row selection to clicked row")),
+            ("Ctrl-click", crate::tr!("Toggle clicked row in selection")),
             ("Escape", crate::tr!("Clear multi-row selection")),
             ("<Primary>c", crate::tr!("Copy selected rows as TSV")),
             ("Page_Up", crate::tr!("Previous page")),
@@ -214,37 +210,121 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
         &crate::tr!("Dialogs"),
         &[("Escape", crate::tr!("Close dialog"))],
     );
+    install_browse_key_captions(&dialog);
     dialog
 }
 
 fn add_shortcut_section(dialog: &adw::ShortcutsDialog, title: &str, entries: &[(&str, String)]) {
     let section = adw::ShortcutsSection::new(Some(title));
     for (accelerator, title) in entries {
-        let item = adw::ShortcutsItem::new(title, accelerator);
-        let chord = shortcut_chord(accelerator);
-        if !chord.is_empty() {
-            item.set_subtitle(&localized_chord(chord));
+        let item_accelerator = tablepro_core::browse_item_accelerator(accelerator).unwrap_or(accelerator);
+        let item = adw::ShortcutsItem::new(title, item_accelerator);
+        if let Some(visible) = tablepro_core::browse_visible_key(accelerator) {
+            item.set_subtitle(&localized_browse_key(visible));
         }
         section.add(item);
     }
     dialog.add(section);
 }
 
-fn shortcut_chord(accelerator: &str) -> &'static str {
-    let drawn = tablepro_core::browse_drawn_shortcuts();
-    if accelerator == drawn.extend_selection {
-        drawn.extend_selection_chord
-    } else if accelerator == drawn.toggle_selection {
-        drawn.toggle_selection_chord
-    } else {
-        ""
-    }
-}
-
-fn localized_chord(chord: &str) -> String {
-    match chord {
+fn localized_browse_key(key: &str) -> String {
+    match key {
+        "Left" => crate::tr!("Left"),
+        "Right" => crate::tr!("Right"),
+        "space" => crate::tr!("space"),
         "Shift-click" => crate::tr!("Shift-click"),
         "Ctrl-click" => crate::tr!("Ctrl-click"),
         other => other.to_string(),
     }
+}
+
+fn install_browse_key_captions(dialog: &adw::ShortcutsDialog) {
+    present_browse_key_captions(dialog.upcast_ref::<gtk::Widget>());
+    let mapped = dialog.clone();
+    dialog.connect_map(move |_| present_browse_key_captions(mapped.upcast_ref::<gtk::Widget>()));
+    let searched = dialog.clone();
+    if let Some(entry) = find_search_entry(dialog.upcast_ref::<gtk::Widget>()) {
+        entry.connect_search_changed(move |_| {
+            let searched = searched.clone();
+            gtk::glib::idle_add_local_once(move || {
+                present_browse_key_captions(searched.upcast_ref::<gtk::Widget>());
+            });
+        });
+    }
+}
+
+fn present_browse_key_captions(widget: &gtk::Widget) {
+    if widget.has_css_class("shortcut-row") {
+        present_browse_row(widget);
+    }
+    let mut next = widget.first_child();
+    while let Some(child) = next {
+        present_browse_key_captions(&child);
+        next = child.next_sibling();
+    }
+}
+
+fn present_browse_row(row: &gtk::Widget) {
+    let Some((subtitle, caption)) = browse_subtitle(row) else {
+        return;
+    };
+    if write_key_caption(row, &caption) {
+        subtitle.set_visible(false);
+    }
+}
+
+fn browse_subtitle(widget: &gtk::Widget) -> Option<(gtk::Label, String)> {
+    if let Some(label) = widget.downcast_ref::<gtk::Label>()
+        && label.has_css_class("subtitle")
+        && is_browse_key_caption(label.text().as_str())
+    {
+        return Some((label.clone(), label.text().to_string()));
+    }
+    let mut next = widget.first_child();
+    while let Some(child) = next {
+        if let Some(found) = browse_subtitle(&child) {
+            return Some(found);
+        }
+        next = child.next_sibling();
+    }
+    None
+}
+
+fn is_browse_key_caption(text: &str) -> bool {
+    tablepro_core::browse_drawn_shortcuts()
+        .entries()
+        .into_iter()
+        .any(|shortcut| localized_browse_key(shortcut.visible_key) == text)
+}
+
+fn write_key_caption(widget: &gtk::Widget, caption: &str) -> bool {
+    if let Some(shortcut) = widget.downcast_ref::<adw::ShortcutLabel>() {
+        if shortcut.accelerator().is_empty() {
+            shortcut.set_disabled_text(caption);
+            return true;
+        }
+        return false;
+    }
+    let mut next = widget.first_child();
+    while let Some(child) = next {
+        if write_key_caption(&child, caption) {
+            return true;
+        }
+        next = child.next_sibling();
+    }
+    false
+}
+
+fn find_search_entry(widget: &gtk::Widget) -> Option<gtk::SearchEntry> {
+    if let Some(entry) = widget.downcast_ref::<gtk::SearchEntry>() {
+        return Some(entry.clone());
+    }
+    let mut next = widget.first_child();
+    while let Some(child) = next {
+        if let Some(found) = find_search_entry(&child) {
+            return Some(found);
+        }
+        next = child.next_sibling();
+    }
+    None
 }
