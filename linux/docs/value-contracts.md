@@ -120,6 +120,15 @@ picks up both workbook regressions automatically.
 Excel documents its [15-digit precision limit](https://support.microsoft.com/en-us/excel/format-numbers-as-text).
 Floating-point, temporal and nested-value spreadsheet contracts remain open.
 
+### XLSX nested Extended JSON consumer check, 2026-09-27
+
+The workbook regression writes a nested value containing Decimal128, binary
+subtype and millisecond-date Extended JSON markers. It inspects the generated
+XLSX shared-string cell and confirms the markers remain in one exact text cell.
+The focused regression and all 436 core library tests passed. This verifies the
+shared XLSX writer boundary; it does not yet run MongoDB values through the
+application's complete query-to-workbook path.
+
 Validation: 415 core tests, core/workspace Clippy, size guards and `cargo deny
 check` passed. The full local gate passed at
 `target/quality/20260926T195741317332Z-full/report.json` on the working tree

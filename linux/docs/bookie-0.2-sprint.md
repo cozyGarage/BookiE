@@ -385,6 +385,13 @@ literals and verifies the same storage classes and values after re-import. All
 21 SQLite integration tests passed. CSV import and installed grid acceptance
 across affinity transitions remain open.
 
+### B3 XLSX nested JSON consumer check: 2026-09-27
+
+A core workbook regression verifies that nested canonical Extended JSON keeps
+its Decimal128, binary subtype and millisecond-date markers in an exact XLSX
+text cell. The focused case and all 436 core library tests passed. This covers
+the shared workbook writer; MongoDB query-to-XLSX integration remains open.
+
 ## Documentation and boundaries
 
 Link this sprint from PLAN.md/ROADMAP.md and mark the 0.1.1 plan superseded while
