@@ -2,10 +2,12 @@
 
 use std::process::Command;
 
+use secrecy::SecretString;
 use tablepro_ssh::{SshAuth, SshConfig, SshError, SshTunnel, UnknownHostKey};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
-use testcontainers::{GenericImage, ImageExt};
+use testcontainers::{ContainerAsync, GenericImage, ImageExt};
+use tokio::io::AsyncReadExt;
 
 const SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
     && ssh-keygen -A >/dev/null \
@@ -13,6 +15,53 @@ const SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
     && mkdir -p /home/deploy/.ssh && printf '%s\\n' \"$AUTHORIZED_KEY\" > /home/deploy/.ssh/authorized_keys \
     && chown -R deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys \
     && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=no -o AllowTcpForwarding=yes";
+
+const PASSWORD_SSHD_SCRIPT: &str = "apk add --no-cache openssh >/dev/null \
+    && ssh-keygen -A >/dev/null \
+    && adduser -D deploy && echo 'deploy:s3cret' | chpasswd \
+    && mkdir -p /home/deploy/.ssh && printf '%s\\n' \"$AUTHORIZED_KEY\" > /home/deploy/.ssh/authorized_keys \
+    && chown -R deploy /home/deploy/.ssh && chmod 700 /home/deploy/.ssh && chmod 600 /home/deploy/.ssh/authorized_keys \
+    && exec /usr/sbin/sshd -D -e -p 2222 -o PasswordAuthentication=yes -o AllowTcpForwarding=yes";
+
+fn isolate_known_hosts(dir: &std::path::Path) {
+    // SAFETY: each test that calls this runs alone under --test-threads=1
+    // (scripts/test-ssh.sh), so nothing else reads the environment while it changes.
+    unsafe {
+        std::env::set_var("XDG_CONFIG_HOME", dir);
+    }
+}
+
+fn password_config(host: &str, port: u16, password: &str) -> SshConfig {
+    SshConfig {
+        host: host.to_string(),
+        port,
+        username: "deploy".into(),
+        auth: SshAuth::Password {
+            password: SecretString::new(password.to_string().into()),
+        },
+    }
+}
+
+async fn start_password_sshd(authorized_key: &str) -> (ContainerAsync<GenericImage>, String, u16) {
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", authorized_key)
+        .with_cmd(["sh", "-c", PASSWORD_SSHD_SCRIPT])
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(2222).await.unwrap();
+    (container, host, port)
+}
+
+fn unique_suffix() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default()
+}
 
 struct Agent {
     pid: String,
@@ -160,4 +209,192 @@ async fn a_paused_bastion_is_reported_closed_through_keepalive_instead_of_hangin
     );
 
     container.unpause().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn password_authentication_succeeds_with_the_correct_password() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let (_container, host, port) = start_password_sshd("").await;
+
+    let tunnel = SshTunnel::open(
+        password_config(&host, port, "s3cret"),
+        "127.0.0.1".into(),
+        2222,
+        UnknownHostKey::Learn,
+    )
+    .await;
+    assert!(tunnel.is_ok(), "{:?}", tunnel.err());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_wrong_password_is_refused() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let (_container, host, port) = start_password_sshd("").await;
+
+    let result = SshTunnel::open(
+        password_config(&host, port, "not-the-password"),
+        "127.0.0.1".into(),
+        2222,
+        UnknownHostKey::Learn,
+    )
+    .await;
+    assert!(matches!(result, Err(SshError::Auth)), "{:?}", result.err());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_key_not_in_authorized_keys_is_rejected() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let (_container, host, port) = start_password_sshd("").await;
+
+    let key_path = temp.path().join("id_ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+        .arg(&key_path)
+        .status()
+        .unwrap();
+    assert!(generated.success());
+
+    let cfg = SshConfig {
+        host,
+        port,
+        username: "deploy".into(),
+        auth: SshAuth::PrivateKey {
+            path: key_path,
+            passphrase: None,
+        },
+    };
+    let result = SshTunnel::open(cfg, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+    assert!(matches!(result, Err(SshError::Auth)), "{:?}", result.err());
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_encrypted_private_key_authenticates_with_its_passphrase() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+
+    let key_path = temp.path().join("id_ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "correct horse battery staple", "-f"])
+        .arg(&key_path)
+        .status()
+        .unwrap();
+    assert!(generated.success());
+    let public = std::fs::read_to_string(key_path.with_extension("pub")).unwrap();
+
+    let (_container, host, port) = start_password_sshd(public.trim()).await;
+
+    let cfg = SshConfig {
+        host,
+        port,
+        username: "deploy".into(),
+        auth: SshAuth::PrivateKey {
+            path: key_path,
+            passphrase: Some(SecretString::new("correct horse battery staple".to_string().into())),
+        },
+    };
+    let tunnel = SshTunnel::open(cfg, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+    assert!(tunnel.is_ok(), "{:?}", tunnel.err());
+}
+
+async fn start_named_password_sshd(name: &str, network: &str) -> ContainerAsync<GenericImage> {
+    GenericImage::new("alpine", "3.22")
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", "")
+        .with_cmd(["sh", "-c", PASSWORD_SSHD_SCRIPT])
+        .with_network(network)
+        .with_container_name(name)
+        .start()
+        .await
+        .unwrap()
+}
+
+async fn start_first_hop_sshd(name: &str, network: &str) -> (ContainerAsync<GenericImage>, String, u16) {
+    let container = GenericImage::new("alpine", "3.22")
+        .with_exposed_port(2222.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_env_var("AUTHORIZED_KEY", "")
+        .with_cmd(["sh", "-c", PASSWORD_SSHD_SCRIPT])
+        .with_network(network)
+        .with_container_name(name)
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(2222).await.unwrap();
+    (container, host, port)
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_two_hop_chain_reaches_the_final_host() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let unique = unique_suffix();
+    let network = format!("tablepro-ssh-chain-{unique}");
+    let hop0_name = format!("tablepro-ssh-hop0-{unique}");
+    let hop1_name = format!("tablepro-ssh-hop1-{unique}");
+
+    let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
+    let hop1 = start_named_password_sshd(&hop1_name, &network).await;
+
+    let hops = vec![
+        password_config(&hop0_host, hop0_port, "s3cret"),
+        password_config(&hop1_name, 2222, "s3cret"),
+    ];
+
+    let tunnel = SshTunnel::open_chain(&hops, "127.0.0.1".into(), 2222, UnknownHostKey::Learn)
+        .await
+        .unwrap();
+
+    let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", tunnel.local_port()))
+        .await
+        .unwrap();
+    let mut buf = [0u8; 4];
+    stream.read_exact(&mut buf).await.unwrap();
+    assert_eq!(
+        &buf, b"SSH-",
+        "the final hop's own sshd banner must arrive through both hops"
+    );
+
+    drop(hop1);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let unique = unique_suffix();
+    let network = format!("tablepro-ssh-chain-mismatch-{unique}");
+    let hop0_name = format!("tablepro-ssh-hop0-mismatch-{unique}");
+    let hop1_name = format!("tablepro-ssh-hop1-mismatch-{unique}");
+
+    let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
+    let hop1 = start_named_password_sshd(&hop1_name, &network).await;
+
+    let hops = vec![
+        password_config(&hop0_host, hop0_port, "s3cret"),
+        password_config(&hop1_name, 2222, "s3cret"),
+    ];
+
+    let first = SshTunnel::open_chain(&hops, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+    assert!(first.is_ok(), "{:?}", first.err());
+    drop(first);
+
+    hop1.rm().await.unwrap();
+    let _hop1_replacement = start_named_password_sshd(&hop1_name, &network).await;
+
+    let second = SshTunnel::open_chain(&hops, "127.0.0.1".into(), 2222, UnknownHostKey::Learn).await;
+    assert!(
+        matches!(second, Err(SshError::HostKeyMismatch { .. })),
+        "expected HostKeyMismatch for the replaced second hop, got {:?}",
+        second.err()
+    );
 }
