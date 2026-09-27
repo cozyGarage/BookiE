@@ -217,7 +217,8 @@ fn spawn_master(
     master_dir: MasterDir,
     control: PathBuf,
 ) -> Result<Master, OpenSshError> {
-    let mut child = Command::new(&context.ssh_program)
+    let mut command = Command::new(&context.ssh_program);
+    command
         .args(master_args(config, &control, &context.timeouts))
         .env("SSH_ASKPASS", &context.askpass_program)
         .env("SSH_ASKPASS_REQUIRE", "force")
@@ -226,7 +227,12 @@ fn spawn_master(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
+        .kill_on_drop(true);
+    let expected_parent = std::process::id();
+    unsafe {
+        command.pre_exec(move || die_if_parent_is_gone(expected_parent));
+    }
+    let mut child = command
         .spawn()
         .map_err(|error| spawn_failure(&context.ssh_program, &error))?;
     let stderr_tail = Arc::new(Mutex::new(String::new()));
@@ -241,6 +247,16 @@ fn spawn_master(
         stderr_tail,
         stderr_task,
     })
+}
+
+fn die_if_parent_is_gone(expected_parent: u32) -> std::io::Result<()> {
+    if unsafe { libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL, 0, 0, 0) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if unsafe { libc::getppid() } as u32 != expected_parent {
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 pub(crate) struct HandshakeDeadline {
