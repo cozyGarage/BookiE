@@ -300,4 +300,19 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
         serde_json::json!({"$binary": {"base64": "AAECAwQFBgcICQoLDA0ODw==", "subType": "04"}}),
         "JSON export must keep the UUID binary subtype"
     );
+
+    let csv_output = tablepro_core::export::render_csv(
+        &result.columns,
+        &result.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let mut csv_reader = csv::Reader::from_reader(csv_output.as_bytes());
+    let headers = csv_reader.headers().expect("CSV headers").clone();
+    let record = csv_reader.records().next().expect("CSV row").expect("valid CSV row");
+    let nested_index = headers.iter().position(|header| header == "nested").unwrap();
+    let nested_csv: serde_json::Value = serde_json::from_str(&record[nested_index]).expect("nested JSON in CSV");
+    assert_eq!(
+        nested_csv, exported[0]["nested"],
+        "CSV quoting must preserve nested BSON JSON"
+    );
 }

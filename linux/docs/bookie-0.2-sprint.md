@@ -371,7 +371,8 @@ and all eight real-server integration tests passed. Scoped mutation testing
 caught three of four generated mutations, with one unviable whole-function
 replacement and no survivors or timeouts. The real-server contract verifies
 nested Extended JSON through JSON export, and an MCP unit contract verifies the
-value conversion does not flatten it. Nested editing, CSV/XLSX export,
+value conversion does not flatten it. CSV is parsed back into fields to verify
+that quoting preserves the nested value. Nested editing, XLSX export,
 Mongo-backed MCP round trip, native BSON re-import and other consumers remain
 open; B3 is not closed.
 
