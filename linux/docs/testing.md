@@ -171,6 +171,12 @@ Run the installed safety suite with:
 
 The script builds `tablepro-app`, always starts a private runtime directory, isolated D-Bus session and Xvfb display, and drives the real application through PyAT-SPI. Each scenario gets temporary XDG directories and a production or local SQLite saved connection. The runner uses a standalone AT-SPI D-Bus daemon and passes the Xvfb display to D-Bus activation, so it does not reuse desktop accessibility or portal processes. GTK tests exercise the X11/GTK portal path; they do not replace installed Wayland package testing.
 
+When `TABLEPRO_GTK_ARTIFACT_DIR` is set, every scenario writes a JSON result and
+application stderr, including successful scenarios. Failures additionally retain
+the accessibility tree and a screenshot when available. Successful runs therefore
+have uploadable evidence; a missing artifact still fails CI. Python regressions
+exercise both result paths without needing a display.
+
 The suite verifies:
 
 1. Dismissing a production approval leaves SQLite unchanged.

@@ -661,9 +661,10 @@ def run_scenario(binary, scenario):
         failure = error
     finally:
         artifact_dir = None
-        if failure is not None and os.environ.get("TABLEPRO_GTK_ARTIFACT_DIR"):
+        if os.environ.get("TABLEPRO_GTK_ARTIFACT_DIR"):
             artifact_dir = Path(os.environ["TABLEPRO_GTK_ARTIFACT_DIR"])
             artifact_dir.mkdir(parents=True, exist_ok=True)
+        if failure is not None and artifact_dir is not None:
             (artifact_dir / f"{scenario.__name__}-accessibility.txt").write_text(
                 accessible_snapshot(), encoding="utf-8"
             )
@@ -676,6 +677,10 @@ def run_scenario(binary, scenario):
             stderr += stop_application(process)
         if artifact_dir is not None:
             (artifact_dir / f"{scenario.__name__}-stderr.txt").write_text(stderr, encoding="utf-8")
+            (artifact_dir / f"{scenario.__name__}-result.json").write_text(json.dumps({
+                "scenario": scenario.__name__, "status": "passed" if failure is None else "failed",
+                "error": str(failure) if failure is not None else None,
+            }) + "\n", encoding="utf-8")
         shutil.rmtree(base, ignore_errors=True)
     if failure is not None:
         raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure

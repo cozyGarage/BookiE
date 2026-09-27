@@ -51,6 +51,7 @@ python3 scripts/tests/test_value_contract_runner.py
 python3 scripts/tests/test_mutation_workflow.py
 python3 scripts/tests/test_ci_workflow.py
 python3 scripts/tests/test_validation_layers.py
+python3 scripts/tests/test_ui_evidence.py
 "$ROOT/scripts/check-file-size.sh"
 
 echo "==> bounded database operations in the GUI"
