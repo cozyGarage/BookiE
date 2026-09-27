@@ -2,13 +2,12 @@ use std::time::Duration;
 
 mod tls;
 
+use async_trait::async_trait;
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
-use tls::https_connector;
-
-use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use serde::Deserialize;
+use tls::https_connector;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
@@ -58,7 +57,8 @@ impl DatabaseDriver for ClickhouseDriver {
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let scheme = if opts.tls.mode.encrypts() { "https" } else { "http" };
         let url = format!("{scheme}://{}:{}", opts.host, opts.port);
-        let http = HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls)?);
+        let http =
+            HyperClient::builder(TokioExecutor::new()).build(https_connector(&opts.tls, opts.service_address().0)?);
         let mut client = clickhouse::Client::with_http_client(http)
             .with_url(url)
             .with_product_info("tablepro-linux", env!("CARGO_PKG_VERSION"))

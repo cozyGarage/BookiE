@@ -6211,6 +6211,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clickhouse",
+ "http",
  "hyper-rustls",
  "hyper-util",
  "rust_decimal",

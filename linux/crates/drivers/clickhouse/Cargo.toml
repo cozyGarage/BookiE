@@ -29,6 +29,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 chrono.workspace = true
+http = "1"
 secrecy.workspace = true
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
