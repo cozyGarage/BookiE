@@ -316,6 +316,31 @@ async fn nested_bson_special_values_keep_exact_extended_json_types() {
         "CSV quoting must preserve nested BSON JSON"
     );
 
+    let reimported = serde_json::json!({
+        "_id": "reimported",
+        "nested": exported[0]["nested"].clone(),
+    });
+    connection
+        .execute(&format!("db.special_values_copy.insertOne({reimported})"))
+        .await
+        .expect("re-import exported nested Extended JSON");
+    let persisted = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("special_values_copy")
+        .find_one(doc! { "_id": "reimported" })
+        .await
+        .expect("read re-imported document")
+        .expect("re-imported document exists");
+    assert_eq!(
+        persisted.get_document("nested").unwrap(),
+        &doc! {
+            "amount": "1234567890123456789.123456789012345".parse::<Decimal128>().unwrap(),
+            "blob": Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] },
+            "when": DateTime::from_millis(1_234_567_890_123),
+        },
+        "re-import must reconstruct native Decimal128, binary subtype and BSON date"
+    );
+
     let directory = tempfile::tempdir().expect("temporary export directory");
     let workbook_path = directory.path().join("mongo-values.xlsx");
     tablepro_core::export::write_result_file(

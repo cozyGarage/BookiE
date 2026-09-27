@@ -378,8 +378,10 @@ and binary subtype markers in workbook strings. All eight MongoDB integration
 tests, including ignored Docker cases, passed. A second MongoDB 7 scenario uses
 the keyed-update SQL shape for nested document and array cell edits, then checks
 native Decimal128, date, binary subtype and integer values through a direct BSON
-client. Mongo-backed MCP round trip, BSON re-import and editing top-level special
-BSON cells remain open; B3 is not closed.
+client. MongoDB 7 fixtures now also verify native BSON reconstruction from the
+driver's canonical Extended JSON insert path and preserve nested markers through
+the MCP browse tool. Editing top-level special BSON cells remains open; B3 is
+not closed.
 
 ### B3 SQLite dynamic storage classes: 2026-09-27
 

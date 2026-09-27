@@ -891,12 +891,40 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
         serde_json::Value::Array(values) => {
             Bson::Array(values.into_iter().map(json_to_bson).collect::<Result<_, _>>()?)
         }
-        serde_json::Value::Object(values) => Bson::Document(
-            values
-                .into_iter()
-                .map(|(key, value)| Ok((key, json_to_bson(value)?)))
-                .collect::<Result<_, String>>()?,
-        ),
+        serde_json::Value::Object(values) => {
+            // Canonical and relaxed Extended JSON objects encode BSON scalar
+            // types. Recognize these before recursively treating the object
+            // as a plain document so exported Mongo results can be re-imported.
+            const EXTJSON_MARKERS: &[&str] = &[
+                "$binary",
+                "$code",
+                "$date",
+                "$dbPointer",
+                "$decimal128",
+                "$maxKey",
+                "$minKey",
+                "$numberDecimal",
+                "$numberDouble",
+                "$numberInt",
+                "$numberLong",
+                "$oid",
+                "$regularExpression",
+                "$scope",
+                "$symbol",
+                "$timestamp",
+                "$undefined",
+            ];
+            if values.keys().any(|key| EXTJSON_MARKERS.contains(&key.as_str())) {
+                Bson::try_from(serde_json::Value::Object(values)).map_err(|error| error.to_string())?
+            } else {
+                Bson::Document(
+                    values
+                        .into_iter()
+                        .map(|(key, value)| Ok((key, json_to_bson(value)?)))
+                        .collect::<Result<_, String>>()?,
+                )
+            }
+        }
     })
 }
 
@@ -1152,6 +1180,37 @@ mod tests {
         );
         assert!(matches!(document.get("wide"), Some(Bson::Decimal128(_))));
         assert!(serde_json_to_document("[]").is_err());
+    }
+
+    #[test]
+    fn canonical_extended_json_import_restores_nested_bson_types() {
+        use mongodb::bson::{Binary, DateTime, Decimal128, doc, oid::ObjectId, spec::BinarySubtype};
+
+        let id = ObjectId::new();
+        let input = serde_json::json!({
+            "_id": {"$oid": id.to_hex()},
+            "nested": {
+                "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
+                "when": {"$date": {"$numberLong": "1234567890123"}},
+                "binary": {"$binary": {"base64": "AP9B", "subType": "80"}},
+                "sequence": [{"$numberLong": "7"}],
+            },
+        });
+
+        let document = serde_json_to_document(&input.to_string()).unwrap();
+        let expected_decimal: Decimal128 = "1234567890123456789.123456789012345".parse().unwrap();
+        assert_eq!(
+            document,
+            doc! {
+                "_id": id,
+                "nested": {
+                    "amount": expected_decimal,
+                    "when": DateTime::from_millis(1_234_567_890_123),
+                    "binary": Binary { subtype: BinarySubtype::UserDefined(0x80), bytes: vec![0, 255, 65] },
+                    "sequence": [7_i64],
+                },
+            }
+        );
     }
 
     #[test]
