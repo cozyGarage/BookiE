@@ -179,3 +179,165 @@ async fn value_contract_decimal_parameters_and_results_stay_exact_numbers() {
         Value::Text("-1234567890123456789012345678.0123456789".into())
     );
 }
+
+fn naive(text: &str) -> chrono::NaiveDateTime {
+    chrono::NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f").unwrap()
+}
+
+fn bound_temporal_corpus() -> Vec<(Value, &'static str)> {
+    let date = |text: &str| Value::Date(text.parse().unwrap());
+    let time = |text: &str| Value::Time(text.parse().unwrap());
+    vec![
+        (date("2000-02-29"), "DATE '2000-02-29'"),
+        (date("1969-12-31"), "DATE '1969-12-31'"),
+        (date("0001-01-01"), "DATE '0001-01-01'"),
+        (date("9999-12-31"), "DATE '9999-12-31'"),
+        (time("23:59:59.123456"), "TIME '23:59:59.123456'"),
+        (time("00:00:00"), "TIME '00:00:00'"),
+        (
+            Value::DateTime(naive("1969-12-31 23:59:59.999999")),
+            "TIMESTAMP '1969-12-31 23:59:59.999999'",
+        ),
+        (
+            Value::DateTime(naive("0001-01-01 00:00:00")),
+            "TIMESTAMP '0001-01-01 00:00:00'",
+        ),
+        (
+            Value::DateTime(naive("9999-12-31 23:59:59.999999")),
+            "TIMESTAMP '9999-12-31 23:59:59.999999'",
+        ),
+    ]
+}
+
+#[tokio::test]
+async fn value_contract_bound_temporals_are_typed_in_expressions() {
+    let connection = native_connection().await;
+    for (value, literal) in bound_temporal_corpus() {
+        let expressions: &[&str] = match &value {
+            Value::Date(_) => &["? + 1", "? + INTERVAL 1 DAY", "year(?)", "date_trunc('month', ?)"],
+            Value::Time(_) => &["? + INTERVAL 1 SECOND", "hour(?)"],
+            _ => &["? + INTERVAL 1 DAY", "year(?)", "date_trunc('month', ?)", "epoch_us(?)"],
+        };
+        for expression in expressions {
+            let bound = connection
+                .query_params(&format!("SELECT {expression}"), std::slice::from_ref(&value))
+                .await
+                .unwrap_or_else(|error| panic!("{expression} with {value:?}: {error}"));
+            let inline = connection
+                .query(&format!("SELECT {}", expression.replace('?', literal)))
+                .await
+                .unwrap();
+            assert_eq!(bound.rows, inline.rows, "{expression} with {value:?}");
+        }
+        let echoed = connection
+            .query_params("SELECT ?", std::slice::from_ref(&value))
+            .await
+            .unwrap();
+        assert_eq!(echoed.rows, vec![vec![value.clone()]], "SELECT ? with {literal}");
+    }
+}
+
+#[tokio::test]
+async fn value_contract_bound_temporals_insert_and_read_back_exactly() {
+    let connection = native_connection().await;
+    connection.execute("SET TimeZone = 'Asia/Tokyo'").await.unwrap();
+    connection
+        .execute("CREATE TABLE stamps (id INTEGER, d DATE, t TIME, ts TIMESTAMP, ns TIMESTAMP_NS, tz TIMESTAMPTZ)")
+        .await
+        .unwrap();
+    let rows = [
+        (
+            "1969-12-31",
+            "23:59:59.999999",
+            "1969-12-31 23:59:59.999999",
+            "1969-12-31 23:59:59.999999999",
+        ),
+        (
+            "0001-01-01",
+            "00:00:00.000001",
+            "0001-01-01 00:00:00.000001",
+            "1677-09-22 00:00:00.000000001",
+        ),
+        (
+            "9999-12-31",
+            "12:00:00",
+            "9999-12-31 23:59:59.999999",
+            "2262-04-10 23:59:59.999999999",
+        ),
+        (
+            "2026-09-27",
+            "12:34:56.5",
+            "2026-09-27 12:34:56.123456",
+            "2026-09-27 12:34:56.123456",
+        ),
+    ];
+    for (id, (date, time, stamp, nanos)) in rows.iter().enumerate() {
+        let values = vec![
+            Value::Int(id as i64),
+            Value::Date(date.parse().unwrap()),
+            Value::Time(time.parse().unwrap()),
+            Value::DateTime(naive(stamp)),
+            Value::DateTime(naive(nanos)),
+            Value::TimestampTz(naive(stamp).and_utc()),
+        ];
+        connection
+            .execute_params("INSERT INTO stamps VALUES (?, ?, ?, ?, ?, ?)", &values)
+            .await
+            .unwrap();
+        let read = connection
+            .query_params("SELECT * FROM stamps WHERE id = ?", &[Value::Int(id as i64)])
+            .await
+            .unwrap();
+        assert_eq!(read.rows, vec![values], "row {id}");
+    }
+    connection
+        .execute_params(
+            "INSERT INTO stamps (id, d) VALUES (?, ?)",
+            &[
+                Value::Int(9),
+                Value::Date(chrono::NaiveDate::from_ymd_opt(0, 1, 1).unwrap()),
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT d FROM stamps WHERE id = 9")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("0001-01-01 (BC)".into())]]
+    );
+}
+
+#[tokio::test]
+async fn value_contract_bound_timestamptz_keeps_its_instant_in_any_session_zone() {
+    let connection = native_connection().await;
+    for zone in ["UTC", "Asia/Tokyo", "America/Los_Angeles"] {
+        connection.execute(&format!("SET TimeZone = '{zone}'")).await.unwrap();
+        for (text, literal) in [
+            (
+                "2026-09-27T12:34:56.123456+05:30",
+                "TIMESTAMPTZ '2026-09-27 12:34:56.123456+05:30'",
+            ),
+            (
+                "1969-12-31T23:59:59.999999Z",
+                "TIMESTAMPTZ '1969-12-31 23:59:59.999999+00'",
+            ),
+        ] {
+            let value = Value::TimestampTz(chrono::DateTime::parse_from_rfc3339(text).unwrap().to_utc());
+            let bound = connection
+                .query_params(
+                    &format!("SELECT CAST(? AS TIMESTAMPTZ) = {literal}, epoch_us(CAST(? AS TIMESTAMPTZ))"),
+                    &[value.clone(), value.clone()],
+                )
+                .await
+                .unwrap();
+            let inline = connection
+                .query(&format!("SELECT true, epoch_us({literal})"))
+                .await
+                .unwrap();
+            assert_eq!(bound.rows, inline.rows, "{zone}: {text}");
+        }
+    }
+}

@@ -61,7 +61,7 @@
 - Numeric input in grid edits, filters and CSV imports rejects overflow to infinity and nonzero underflow to zero. Named decimal parameters stay exact, SQLite still compares them as numbers, and automatic parameter typing keeps values as text when they exceed the exact decimal range.
 - SQL copy and export use scientific float literals to avoid tiny values becoming zero or overflowing an engine's decimal parser; ClickHouse decimal literals retain their full precision.
 - Redis commands preserve empty quoted arguments instead of dropping them.
-- DuckDB accepts bound parameters in result queries instead of reporting the operation as unimplemented. Decimal parameters and results stay exact numbers, so arithmetic on a bound decimal is no longer rounded to a whole number.
+- DuckDB accepts bound parameters in result queries instead of reporting the operation as unimplemented. Decimal parameters and results stay exact numbers, so arithmetic on a bound decimal is no longer rounded to a whole number. Bound dates, times and timestamps keep their type, so date arithmetic and date functions accept them, while nanosecond timestamps and time zone instants keep their exact value.
 - MySQL and ClickHouse decimals retain their exact digits, including values beyond the editable decimal range. Grid edits and filters reject decimals that would need rounding.
 - ClickHouse non-finite numbers remain distinct from NULL, and JSON exports and agent responses retain NaN and infinity as text instead of substituting NULL.
 - SQL Server INSERT exports preserve Unicode text and render booleans as valid numeric literals.

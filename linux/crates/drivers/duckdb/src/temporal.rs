@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, NaiveDate, NaiveTime};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike};
 use duckdb::types::TimeUnit;
 use tablepro_core::Value;
 
@@ -73,6 +73,30 @@ pub(crate) fn time(unit: TimeUnit, value: i64) -> Value {
         .and_then(|seconds| NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanos))
         .map(Value::Time)
         .unwrap_or_else(|| Value::Undecodable("TIME outside supported clock range".into()))
+}
+
+fn is_whole_micros(nanos: u32) -> bool {
+    nanos < 1_000_000_000 && nanos.is_multiple_of(1_000)
+}
+
+pub(crate) fn date_param(date: NaiveDate) -> duckdb::types::Value {
+    duckdb::types::Value::Date32(date.num_days_from_ce() - 719_163)
+}
+
+pub(crate) fn time_param(time: NaiveTime) -> duckdb::types::Value {
+    if !is_whole_micros(time.nanosecond()) {
+        return duckdb::types::Value::Text(time.to_string());
+    }
+    let micros = i64::from(time.num_seconds_from_midnight()) * 1_000_000 + i64::from(time.nanosecond() / 1_000);
+    duckdb::types::Value::Time64(TimeUnit::Microsecond, micros)
+}
+
+pub(crate) fn timestamp_param(stamp: NaiveDateTime) -> duckdb::types::Value {
+    let stamp = stamp.and_utc();
+    if !is_whole_micros(stamp.timestamp_subsec_nanos()) {
+        return duckdb::types::Value::Text(stamp.naive_utc().to_string());
+    }
+    duckdb::types::Value::Timestamp(TimeUnit::Microsecond, stamp.timestamp_micros())
 }
 
 #[cfg(test)]
