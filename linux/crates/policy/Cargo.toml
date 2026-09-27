@@ -28,8 +28,13 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio-util.workspace = true
 tempfile.workspace = true
+secrecy.workspace = true
+tablepro-driver-postgres = { path = "../drivers/postgres" }
+testcontainers.workspace = true
+testcontainers-modules = { workspace = true, features = ["postgres"] }
 
 [lints]
 workspace = true
