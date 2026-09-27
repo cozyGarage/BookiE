@@ -12,7 +12,9 @@ pub(super) fn column_is_editable(column: &ColumnInfo) -> bool {
 pub(crate) fn cell_allows_inline_edit(column: &ColumnInfo, value: &Value) -> bool {
     column_is_editable(column)
         && value_is_inline_editable(value)
-        && (!is_bool_type(&column.data_type) || matches!(value, Value::Bool(_) | Value::Null))
+        && (!is_bool_type(&column.data_type)
+            || matches!(value, Value::Bool(_) | Value::Null)
+            || (column.data_type.eq_ignore_ascii_case("bit(1)") && matches!(value, Value::Int(0 | 1))))
 }
 
 #[cfg(test)]
@@ -57,6 +59,41 @@ mod tests {
         };
         assert!(cell_allows_inline_edit(&column, &Value::Null));
         assert!(!cell_allows_inline_edit(&column, &Value::Undecodable("NUMERIC".into())));
+    }
+
+    #[test]
+    fn mysql_bit_and_spatial_cells_follow_their_decoded_value_contract() {
+        let bit1 = ColumnInfo {
+            name: "tiny_bits".into(),
+            data_type: "bit(1)".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            is_generated: false,
+            comment: None,
+            default_value: None,
+            collation: None,
+        };
+        assert!(cell_allows_inline_edit(&bit1, &Value::Int(0)));
+        assert!(cell_allows_inline_edit(&bit1, &Value::Int(1)));
+        assert!(!cell_allows_inline_edit(&bit1, &Value::Int(2)));
+
+        let bit8 = ColumnInfo {
+            data_type: "bit(8)".into(),
+            ..bit1.clone()
+        };
+        assert!(cell_allows_inline_edit(&bit8, &Value::Int(170)));
+
+        for data_type in ["geometry", "point", "multipolygon"] {
+            let spatial = ColumnInfo {
+                data_type: data_type.into(),
+                ..bit1.clone()
+            };
+            assert!(!column_is_editable(&spatial), "{data_type}");
+            assert!(!cell_allows_inline_edit(&spatial, &Value::Bytes(vec![1, 2, 3])));
+        }
+        let too_wide = Value::Bytes(vec![0x80, 0, 0, 0, 0, 0, 0, 0]);
+        assert!(!cell_allows_inline_edit(&bit8, &too_wide));
     }
 
     #[test]

@@ -852,13 +852,13 @@ Each open finding from the audit was reproduced with a failing test first and th
 
 The shared contract now requires decimal scale to match.
 
+Grid editing now parses MySQL `BIT(1)` as a boolean and `BIT(2..64)` as bounded nonnegative integers. Values above the shared signed integer range decode as bytes and remain read-only; spatial columns are also read-only because the shared value is their stored binary representation. Parser and grid eligibility tests cover these limits. End-to-end GTK editing against MySQL remains to be accepted in the UI layer.
+
 The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson had declared 0.2.0, so Meson builds reported a different version than packaged builds. No 0.1.5 package or tag has been published.
 
 Open:
 - DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
-- Grid editing of MySQL BIT and spatial cells is untested.
 - MySQL `COMMENT` clauses still depend on backslash escaping.
 - ClickHouse DateTime64 values outside 1900–2262 are saturated by the server.
 
 B3 remains open.
-

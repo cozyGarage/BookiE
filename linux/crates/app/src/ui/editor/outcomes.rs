@@ -290,7 +290,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn a_script_rollback_cannot_silently_commit_the_statements_before_it() {
         let directory = tempfile::tempdir().unwrap();
-        let service = crate::services::database_service::DatabaseService::new();
+        let service = crate::services::database_service::DatabaseService::new_isolated();
         let conn = guarded_sqlite_file(&service, &directory.path().join("script.db")).await;
         let control = crate::services::operation_control::bounded(0);
         conn.execute_controlled("CREATE TABLE t (id int)", &control)

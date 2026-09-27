@@ -108,7 +108,16 @@ struct AuditRuntime {
 
 impl AuditRuntime {
     fn open_default() -> Self {
-        match AuditJournal::open_default() {
+        Self::from_journal(AuditJournal::open_default())
+    }
+
+    #[cfg(test)]
+    fn open_path(path: std::path::PathBuf) -> Self {
+        Self::from_journal(AuditJournal::open_validated(path))
+    }
+
+    fn from_journal(result: Result<AuditJournal, tablepro_storage::StorageError>) -> Self {
+        match result {
             Ok(journal) => {
                 let recovered = journal.recovery().recovered_unresolved_operations();
                 if recovered {
@@ -153,11 +162,28 @@ pub struct DatabaseService {
     audit_state: Arc<AuditState>,
     approval: Mutex<Arc<dyn tablepro_policy::ApprovalSink>>,
     ssh_environment: Mutex<SshEnvironment>,
+    #[cfg(test)]
+    _audit_temp_dir: Option<tempfile::TempDir>,
 }
 
 impl DatabaseService {
     pub fn new() -> Self {
         let audit = AuditRuntime::open_default();
+        Self::with_audit(
+            audit,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_isolated() -> Self {
+        let audit_temp_dir = tempfile::tempdir().expect("temporary audit directory");
+        let audit = AuditRuntime::open_path(audit_temp_dir.path().join("audit.jsonl"));
+        Self::with_audit(audit, Some(audit_temp_dir))
+    }
+
+    fn with_audit(audit: AuditRuntime, #[cfg(test)] audit_temp_dir: Option<tempfile::TempDir>) -> Self {
         let (policy, policy_available) = match load_policy() {
             Ok(policy) => (Arc::new(policy), true),
             Err(error) => {
@@ -177,6 +203,8 @@ impl DatabaseService {
             audit_state: audit.state,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
             ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn)),
+            #[cfg(test)]
+            _audit_temp_dir: audit_temp_dir,
         }
     }
 

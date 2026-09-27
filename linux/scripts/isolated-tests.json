@@ -13,6 +13,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::column::tests::mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"
     ],
     [

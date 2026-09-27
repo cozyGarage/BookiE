@@ -201,6 +201,14 @@ pub(super) fn build_column(
                     checkbox.set_inconsistent(false);
                     checkbox.set_active(false);
                 }
+                Value::Int(1) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
+                    checkbox.set_inconsistent(false);
+                    checkbox.set_active(true);
+                }
+                Value::Int(0) if column_info.data_type.eq_ignore_ascii_case("bit(1)") => {
+                    checkbox.set_inconsistent(false);
+                    checkbox.set_active(false);
+                }
                 Value::Null => {
                     checkbox.set_inconsistent(true);
                     checkbox.set_active(false);
@@ -521,6 +529,73 @@ mod tests {
                 allowed,
                 "blocked values must emit no pending edit"
             );
+        }
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn mysql_bit_one_grid_shows_numeric_values_and_emits_boolean_edits() {
+        use futures::FutureExt;
+        fn checkbox(widget: &gtk4::Widget) -> Option<gtk4::CheckButton> {
+            if let Ok(button) = widget.clone().downcast::<gtk4::CheckButton>() {
+                return Some(button);
+            }
+            let mut child = widget.first_child();
+            while let Some(current) = child {
+                if let Some(button) = checkbox(&current) {
+                    return Some(button);
+                }
+                child = current.next_sibling();
+            }
+            None
+        }
+
+        gtk4::init().unwrap();
+        let columns = vec![col("bit(1)", false)];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![vec![Value::Int(0)]],
+            truncated: false,
+        };
+        let (sender, receiver) = relm4::channel::<GridMsg>();
+        let (view, selection) = crate::ui::grid::build_column_view(
+            &result,
+            &columns,
+            "flags",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+            None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let store = selection.model().unwrap().downcast::<gtk4::gio::ListStore>().unwrap();
+        let context = gtk4::glib::MainContext::default();
+        for (value, active, edit) in [(Value::Int(0), false, "true"), (Value::Int(1), true, "false")] {
+            store.splice(0, 1, &[crate::ui::row_object::RowObject::new(vec![value])]);
+            for _ in 0..50 {
+                for _ in 0..64 {
+                    if !context.iteration(false) {
+                        break;
+                    }
+                }
+                if checkbox(view.upcast_ref()).is_some() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            let button = checkbox(view.upcast_ref()).expect("bound BIT(1) checkbox");
+            assert!(button.is_sensitive());
+            assert!(!button.is_inconsistent());
+            assert_eq!(button.is_active(), active);
+            button.set_active(!active);
+            let event = receiver.recv().now_or_never().flatten();
+            assert!(matches!(event, Some(GridMsg::CellEdited { new_value, .. }) if new_value == edit));
         }
         window.close();
     }

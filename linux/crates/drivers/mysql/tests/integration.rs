@@ -1150,4 +1150,22 @@ async fn value_contract_bit_enum_set_and_geometry_survive_reads_parameters_and_e
             .unwrap();
         assert_eq!(matching.rows, vec![vec![Value::Int(5)]], "{copy}");
     }
+
+    conn.execute("CREATE TABLE packed_edit (id INT PRIMARY KEY, flags BIT(8), tiny BIT(1))")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO packed_edit VALUES (1, b'10101010', b'1')")
+        .await
+        .unwrap();
+    conn.execute_params(
+        "UPDATE packed_edit SET flags = ?, tiny = ? WHERE id = ?",
+        &[Value::Int(85), Value::Bool(false), Value::Int(1)],
+    )
+    .await
+    .unwrap();
+    let edited = conn
+        .query("SELECT flags, tiny FROM packed_edit WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(edited.rows, vec![vec![Value::Int(85), Value::Int(0)]]);
 }

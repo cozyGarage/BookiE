@@ -23,7 +23,7 @@ pub(super) fn classify_editor_kind(data_type: &str) -> CellEditorKind {
 
 pub(super) fn is_bool_type(data_type: &str) -> bool {
     let dt = data_type.to_ascii_lowercase();
-    matches!(dt.as_str(), "bool" | "boolean" | "bit" | "tinyint(1)")
+    matches!(dt.as_str(), "bool" | "boolean" | "bit" | "bit(1)" | "tinyint(1)")
 }
 
 pub(super) fn is_date_type(data_type: &str) -> bool {
@@ -47,7 +47,8 @@ pub(super) fn is_int_type(data_type: &str) -> bool {
             | "serial"
             | "bigserial"
             | "smallserial"
-    ) || dt.starts_with("int(")
+    ) || (dt.starts_with("bit(") && dt != "bit(1)")
+        || dt.starts_with("int(")
         || dt.starts_with("integer(")
         || dt.starts_with("smallint(")
         || dt.starts_with("bigint(")
@@ -66,7 +67,21 @@ pub(super) fn is_json_type(data_type: &str) -> bool {
 
 pub(super) fn is_bytes_type(s: &str) -> bool {
     let lower = s.to_ascii_lowercase();
-    lower.contains("blob") || lower.contains("bytea") || lower == "binary" || lower == "varbinary"
+    lower.contains("blob")
+        || lower.contains("bytea")
+        || lower == "binary"
+        || lower == "varbinary"
+        || matches!(
+            lower.as_str(),
+            "geometry"
+                | "point"
+                | "linestring"
+                | "polygon"
+                | "multipoint"
+                | "multilinestring"
+                | "multipolygon"
+                | "geometrycollection"
+        )
 }
 
 #[cfg(test)]
@@ -84,5 +99,21 @@ mod tests {
         assert!(is_bytes_type("binary"));
         assert!(!is_bytes_type("text"));
         assert!(!is_bytes_type("integer"));
+        for spatial in [
+            "geometry",
+            "point",
+            "linestring",
+            "polygon",
+            "multipoint",
+            "multipolygon",
+        ] {
+            assert!(is_bytes_type(spatial), "{spatial}");
+        }
+    }
+
+    #[test]
+    fn mysql_bit_widths_choose_an_editor_matching_the_value_contract() {
+        assert_eq!(classify_editor_kind("bit(8)"), CellEditorKind::Int);
+        assert_eq!(classify_editor_kind("bit(64)"), CellEditorKind::Int);
     }
 }

@@ -27,6 +27,9 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
     }
     let dt = col.data_type.to_ascii_lowercase();
     let trimmed = text.trim();
+    if let Some(width) = mysql_bit_width(&dt) {
+        return parse_mysql_bit_value(trimmed, width);
+    }
     match classify_type(&dt) {
         TypeKind::Bool => parse_bool_value(trimmed),
         TypeKind::Int => parse_int_value(trimmed),
@@ -40,6 +43,31 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
         TypeKind::Time => parse_time_value(trimmed),
         TypeKind::Text => Ok(Value::Text(text.to_string())),
     }
+}
+
+fn mysql_bit_width(data_type: &str) -> Option<u32> {
+    data_type
+        .strip_prefix("bit(")?
+        .strip_suffix(')')?
+        .parse::<u32>()
+        .ok()
+        .filter(|width| (1..=64).contains(width))
+}
+
+fn parse_mysql_bit_value(text: &str, width: u32) -> Result<Value, String> {
+    if width == 1 {
+        return parse_bool_value(text);
+    }
+    let number = text.parse::<u64>().map_err(|_| crate::tr!("Invalid integer"))?;
+    let maximum = if width == 64 {
+        i64::MAX as u64
+    } else {
+        (1u64 << width) - 1
+    };
+    if number > maximum {
+        return Err(crate::tr!("Integer is outside the supported BIT range"));
+    }
+    Ok(Value::Int(number as i64))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +98,9 @@ pub(super) fn classify_type(dt: &str) -> TypeKind {
     // "Invalid integer".
     if matches!(dt, "bool" | "boolean" | "bit" | "bit(1)" | "tinyint(1)") {
         return TypeKind::Bool;
+    }
+    if dt.starts_with("bit(") {
+        return TypeKind::Int;
     }
     if dt.contains("uuid") {
         return TypeKind::Uuid;
@@ -268,6 +299,9 @@ mod tests {
     #[test]
     fn classify_disambiguates_overlapping_types() {
         assert_eq!(classify_type("tinyint(1)"), TypeKind::Bool);
+        assert_eq!(classify_type("bit(1)"), TypeKind::Bool);
+        assert_eq!(classify_type("bit(8)"), TypeKind::Int);
+        assert_eq!(classify_type("bit(64)"), TypeKind::Int);
         assert_eq!(classify_type("tinyint"), TypeKind::Int);
         assert_eq!(classify_type("uuid"), TypeKind::Uuid);
         assert_eq!(classify_type("jsonb"), TypeKind::Json);
@@ -333,6 +367,25 @@ mod tests {
             parse_input_for_column("0", Some(&col("tinyint(1)", false))).unwrap(),
             Value::Bool(false)
         ));
+        assert_eq!(
+            parse_input_for_column("1", Some(&col("bit(1)", false))).unwrap(),
+            Value::Bool(true)
+        );
+        assert_eq!(
+            parse_input_for_column("0", Some(&col("bit(1)", false))).unwrap(),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            parse_input_for_column("170", Some(&col("bit(8)", false))).unwrap(),
+            Value::Int(170)
+        );
+        assert!(parse_input_for_column("256", Some(&col("bit(8)", false))).is_err());
+        assert!(parse_input_for_column("-1", Some(&col("bit(8)", false))).is_err());
+        assert_eq!(
+            parse_input_for_column("9223372036854775807", Some(&col("bit(64)", false))).unwrap(),
+            Value::Int(i64::MAX)
+        );
+        assert!(parse_input_for_column("9223372036854775808", Some(&col("bit(64)", false))).is_err());
     }
 
     #[test]
