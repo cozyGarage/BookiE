@@ -79,7 +79,14 @@ def execute(step, log_path, cwd=ROOT):
         if missing:
             raise FileNotFoundError(f"required tools unavailable: {', '.join(missing)}")
         with log_path.open("w") as log:
-            process = subprocess.Popen(step["argv"], cwd=cwd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            process = subprocess.Popen(
+                step["argv"],
+                cwd=cwd,
+                env=dict(os.environ, BOOKIE_CI_REPORT_ACTIVE="1"),
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
             result["exit_code"] = process.wait(timeout=step["timeout_seconds"])
         result["status"] = "passed" if result["exit_code"] == 0 else "failed"
         if result["status"] == "passed" and not execution_evidence(step["evidence"], log_path.read_text(errors="replace")):

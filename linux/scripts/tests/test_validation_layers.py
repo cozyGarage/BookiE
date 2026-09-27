@@ -116,7 +116,18 @@ class LayerRunnerTests(unittest.TestCase):
         contracts = (workflows / "linux-ci-contracts.yml").read_text()
         self.assertIn("run-test-layer.py harness", contracts)
         for script in ["preflight.sh", "ci-local.sh"]:
-            self.assertIn("test_validation_layers.py", (ROOT / "scripts" / script).read_text())
+            self.assertIn("scripts/test-harness.sh", (ROOT / "scripts" / script).read_text())
+
+    def test_local_scripts_run_every_script_test(self):
+        harness = (ROOT / "scripts/test-harness.sh").read_text()
+        self.assertIn("unittest discover -s scripts/tests", harness)
+        for path in (ROOT / "scripts/tests").glob("test_*.py"):
+            if "unittest.TestCase" not in path.read_text():
+                self.assertIn(f"scripts/tests/{path.name}", harness)
+
+    def test_layer_steps_own_the_evidence_report(self):
+        step = self.step("import os; raise SystemExit(os.environ.get('BOOKIE_CI_REPORT_ACTIVE') != '1')")
+        self.assertEqual(self.execute(step)["status"], "passed")
 
 
 if __name__ == "__main__":

@@ -29,16 +29,7 @@ case "$CARGO_TARGET_DIR" in
 esac
 
 run_full() {
-  python3 scripts/inventory-ignored-tests.py --check
-  python3 scripts/tests/test_arch_candidate.py
-  python3 scripts/tests/test_deb_package.py
-  python3 scripts/tests/test_value_contract_runner.py
-  python3 scripts/tests/test_mutation_workflow.py
-  python3 scripts/tests/test_ci_workflow.py
-  python3 scripts/tests/test_validation_layers.py
-  python3 scripts/tests/test_ui_evidence.py
-  python3 scripts/tests/test_workbook_ui_oracle.py
-  python3 scripts/tests/test_xml_ui_oracle.py
+  bash scripts/test-harness.sh
   echo "==> file size guardrail"
   "$ROOT/scripts/check-file-size.sh"
 
