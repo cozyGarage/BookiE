@@ -1244,6 +1244,13 @@ pub struct TlsOptions {
     /// If set, the key in `cert_key_file_path` must be encrypted with this password.
     #[cfg(feature = "cert-key-password")]
     pub tls_certificate_key_file_password: Option<Vec<u8>>,
+
+    /// Overrides the hostname used for certificate verification (SNI and the
+    /// hostname check) without changing which address the driver dials. Set
+    /// this when the dial address is a local forwarding endpoint, such as an
+    /// SSH tunnel, but the certificate was issued for the server's real
+    /// hostname.
+    pub verify_hostname: Option<String>,
 }
 
 impl TlsOptions {

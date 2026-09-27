@@ -32,17 +32,22 @@ pub(crate) type TlsStream<T> = tokio_rustls::client::TlsStream<T>;
 #[derive(Clone)]
 pub(crate) struct TlsConfig {
     connector: TlsConnector,
+    verify_hostname: Option<String>,
 }
 
 impl TlsConfig {
     /// Create a new `TlsConfig` from the provided options from the user.
     /// This operation is expensive, so the resultant `TlsConfig` should be cached.
     pub(crate) fn new(options: TlsOptions) -> Result<TlsConfig> {
+        let verify_hostname = options.verify_hostname.clone();
         let mut tls_config = make_rustls_config(options)?;
         tls_config.enable_sni = true;
 
         let connector: TlsConnector = Arc::new(tls_config).into();
-        Ok(TlsConfig { connector })
+        Ok(TlsConfig {
+            connector,
+            verify_hostname,
+        })
     }
 }
 
@@ -51,9 +56,10 @@ pub(crate) async fn tls_connect<T: AsyncRead + AsyncWrite + Unpin>(
     tcp_stream: T,
     cfg: &TlsConfig,
 ) -> Result<TlsStream<T>> {
-    let name = ServerName::try_from(host)
+    let verify_host = cfg.verify_hostname.as_deref().unwrap_or(host);
+    let name = ServerName::try_from(verify_host)
         .map_err(|e| ErrorKind::DnsResolve {
-            message: format!("could not resolve {:?}: {e}", crate::error::Redact(host)),
+            message: format!("could not resolve {:?}: {e}", crate::error::Redact(verify_host)),
         })?
         .to_owned();
 

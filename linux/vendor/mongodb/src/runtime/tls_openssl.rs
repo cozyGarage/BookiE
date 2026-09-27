@@ -81,6 +81,7 @@ fn make_openssl_connector(cfg: TlsOptions) -> Result<SslConnector> {
         allow_invalid_hostnames: _,
         #[cfg(feature = "cert-key-password")]
         tls_certificate_key_file_password,
+        verify_hostname: _,
     } = cfg;
 
     if let Some(true) = allow_invalid_certificates {

@@ -71,7 +71,7 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
     let uri = format!("{scheme}://{auth}{}:{}{db_path}", opts.host, opts.port);
     let mut client_opts = ClientOptions::parse(&uri).await.map_err(map_mongo_error)?;
     client_opts.app_name = Some("TablePro".into());
-    client_opts.tls = Some(tls_for(&opts.tls));
+    client_opts.tls = Some(tls_for(&opts.tls, opts.service_address().0));
     client_opts.connect_timeout = Some(CONNECT_TIMEOUT);
     client_opts.server_selection_timeout = Some(CONNECT_TIMEOUT);
     // Every saved connection names exactly one host. Without this, SDAM
@@ -85,7 +85,12 @@ async fn build_client_options(opts: &ConnectOptions) -> Result<ClientOptions, Dr
 /// Map the shared TLS modes onto what the rustls-backed MongoDB driver can
 /// express. It has no CA-only mode, so `VerifyCa` verifies the hostname too,
 /// which is stricter than requested and never weaker.
-fn tls_for(config: &tablepro_core::TlsConfig) -> Tls {
+///
+/// `service_host` is the database's own hostname, which is what the
+/// certificate was issued for. The dial address can instead be an SSH
+/// tunnel's `127.0.0.1`, so the verifier is pinned to `service_host` rather
+/// than left to derive a name from the dial address.
+fn tls_for(config: &tablepro_core::TlsConfig, service_host: &str) -> Tls {
     use tablepro_core::TlsMode;
     if config.mode == TlsMode::Disabled {
         return Tls::Disabled;
@@ -97,6 +102,7 @@ fn tls_for(config: &tablepro_core::TlsConfig) -> Tls {
     if !config.mode.verifies_cert() {
         options.allow_invalid_certificates = Some(true);
     }
+    options.verify_hostname = Some(service_host.to_string());
     Tls::Enabled(options)
 }
 
@@ -825,6 +831,25 @@ mod tests {
         };
         let client_opts = build_client_options(&opts).await.expect("build client options");
         assert_eq!(client_opts.direct_connection, Some(true));
+    }
+
+    #[tokio::test]
+    async fn a_tunneled_connection_verifies_tls_against_the_service_hostname() {
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port: 54321,
+            service_endpoint: Some(("mongo.internal.example".into(), 27017)),
+            tls: tablepro_core::TlsConfig {
+                mode: tablepro_core::TlsMode::VerifyFull,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let client_opts = build_client_options(&opts).await.expect("build client options");
+        let Some(Tls::Enabled(tls_options)) = client_opts.tls else {
+            panic!("TLS must be enabled when verifying");
+        };
+        assert_eq!(tls_options.verify_hostname.as_deref(), Some("mongo.internal.example"));
     }
 
     #[test]
