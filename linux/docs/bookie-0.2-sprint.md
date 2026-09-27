@@ -818,3 +818,25 @@ PostgreSQL interval tests now compare independent native fields across 59 determ
 ### B3 MySQL native temporal checkpoint — September 27
 
 Zero dates no longer read as NULL, negative TIME values keep their sign, and extended TIME, dates with zero parts and YEAR values are exact instead of undecodable. They survive parameter and SQL export round trips, checked by the server. A SQLite regression from automatic decimal parameters, which were bound as text, is also fixed. Details are in [value contracts](value-contracts.md#mysql-native-time-zero-date-and-year-checkpoint). B3 remains open.
+
+### B3 audit of the September 26–27 commits — September 27
+
+Twenty B3 commits were audited. For each fix, its production change was reverted to confirm that its regression test fails, and sibling paths were checked for the same defect. Every audited fix held. Nine further defects were each reproduced by a failing test first, then fixed:
+
+- SQLite and DuckDB bound automatic decimal parameters as text. SQLite then compared them as text, and DuckDB rounded them.
+- PostgreSQL `int2vector` and `oidvector` values were exported as array text that cannot be imported. They are undecodable again.
+- HTML exports lost carriage returns and silently dropped NUL characters. CSV wrote empty text the same as NULL.
+- SQL Server rejected exported `datetime` literals with fractional seconds, decoded `datetimeoffset` values at the wrong instant, and garbled the sign and digits of wide decimals.
+
+The PostgreSQL interval checkpoint left an older integration test expecting infinities to be undecodable, so the PostgreSQL suite did not pass at `093f68968`. The expectation now uses values that are still undecodable.
+
+Open findings from the audit:
+- DuckDB temporal parameters are bound as text, so date arithmetic on a parameter fails with an error. No value is lost.
+- ClickHouse drops trailing decimal zeros, and the shared contract cannot see scale.
+- ClickHouse inline parameter binding truncates fractional seconds.
+- MySQL literals assume backslash escapes.
+- SQL Server `datetimeoffset` keeps the instant but not the original offset.
+- PostgreSQL `int2vector` could be rendered exactly as space-separated text.
+
+B3 remains open.
+
