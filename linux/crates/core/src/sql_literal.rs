@@ -45,6 +45,9 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
         Value::Date(date) => quote_literal(driver_id, &date.format("%Y-%m-%d").to_string()),
         Value::Time(time) => quote_literal(driver_id, &time.to_string()),
+        Value::DateTime(stamp) if driver_id == "mssql" => {
+            format!("CAST({} AS datetime2)", quote_literal(driver_id, &stamp.to_string()))
+        }
         Value::DateTime(stamp) => quote_literal(driver_id, &stamp.to_string()),
         Value::TimestampTz(stamp) => quote_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => quote_literal(driver_id, &id.to_string()),

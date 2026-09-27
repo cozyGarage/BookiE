@@ -737,3 +737,51 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
     let connection = connect(options).await;
     value_contract::assert_scalar_contract(connection.as_ref(), "mssql").await;
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    conn.execute(
+        "CREATE TABLE temporal_source (id int, legacy datetime, small smalldatetime, precise datetime2(7), \
+         clock time(7), day date)",
+    )
+    .await
+    .unwrap();
+    conn.execute(
+        "INSERT INTO temporal_source VALUES \
+         (1, '2024-01-02 03:04:05.997', '2024-01-02 03:04:00', '2024-01-02 03:04:05.1234567', \
+          '03:04:05.1234567', '0001-01-01'), \
+         (2, '1753-01-01 00:00:00.003', '1900-01-01 00:00:00', '9999-12-31 23:59:59.9999999', \
+          '23:59:59.9999999', '9999-12-31')",
+    )
+    .await
+    .unwrap();
+    conn.execute("SELECT * INTO temporal_exported FROM temporal_source WHERE 1 = 0")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "temporal_exported").await.unwrap();
+    let rows = conn
+        .query("SELECT * FROM temporal_source ORDER BY id")
+        .await
+        .unwrap()
+        .rows;
+    for row in &rows {
+        let statement =
+            tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_exported", &columns, row)
+                .unwrap();
+        conn.execute(&statement)
+            .await
+            .unwrap_or_else(|error| panic!("{statement}: {error}"));
+    }
+    let matching = conn
+        .query(
+            "SELECT COUNT(*) FROM temporal_source s JOIN temporal_exported c ON s.id = c.id \
+             AND s.legacy = c.legacy AND s.small = c.small AND s.precise = c.precise AND s.clock = c.clock \
+             AND s.day = c.day",
+        )
+        .await
+        .unwrap();
+    assert_eq!(matching.rows, vec![vec![Value::Int(2)]]);
+}
