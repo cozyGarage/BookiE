@@ -40,6 +40,14 @@ impl DatabaseDriver for MongodbDriver {
         27017
     }
 
+    fn default_database(&self) -> &'static str {
+        "test"
+    }
+
+    fn default_username(&self) -> &'static str {
+        ""
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let verifies_cert = opts.tls.mode.verifies_cert();
         let client_opts = build_client_options(&opts).await?;
@@ -1049,6 +1057,8 @@ mod tests {
         assert_eq!(d.id(), "mongodb");
         assert_eq!(d.display_name(), "MongoDB");
         assert_eq!(d.default_port(), 27017);
+        assert_eq!(d.default_database(), "test");
+        assert_eq!(d.default_username(), "");
     }
 
     #[test]

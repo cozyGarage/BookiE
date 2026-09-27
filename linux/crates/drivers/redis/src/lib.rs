@@ -31,6 +31,14 @@ impl DatabaseDriver for RedisDriver {
         6379
     }
 
+    fn default_database(&self) -> &'static str {
+        "0"
+    }
+
+    fn default_username(&self) -> &'static str {
+        "default"
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let scheme = match opts.tls.mode {
             tablepro_core::TlsMode::Disabled => "redis",
@@ -723,6 +731,8 @@ mod tests {
         assert_eq!(d.id(), "redis");
         assert_eq!(d.display_name(), "Redis");
         assert_eq!(d.default_port(), 6379);
+        assert_eq!(d.default_database(), "0");
+        assert_eq!(d.default_username(), "default");
     }
 
     #[test]

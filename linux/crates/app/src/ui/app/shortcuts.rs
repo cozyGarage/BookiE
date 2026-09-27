@@ -147,6 +147,7 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>q", crate::tr!("Quit")),
         ],
     );
+    let drawn = tablepro_core::browse_drawn_shortcuts();
     add_shortcut_section(
         &dialog,
         &crate::tr!("Browse table"),
@@ -156,9 +157,9 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("Escape", crate::tr!("Cancel edit")),
             ("Tab", crate::tr!("Move to next cell (commits if editing)")),
             ("<Shift>Tab", crate::tr!("Move to previous cell (commits if editing)")),
-            ("Left", crate::tr!("Move to previous cell")),
-            ("Right", crate::tr!("Move to next cell")),
-            ("space", crate::tr!("Toggle boolean cell")),
+            (drawn.previous_cell, crate::tr!("Move to previous cell")),
+            (drawn.next_cell, crate::tr!("Move to next cell")),
+            (drawn.toggle_boolean, crate::tr!("Toggle boolean cell")),
             ("<Primary>n", crate::tr!("Insert row")),
             ("Delete", crate::tr!("Delete selected row")),
             ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
@@ -166,13 +167,10 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
             ("<Primary>a", crate::tr!("Select all rows")),
             (
-                "<Shift>Pointer_Button1",
+                drawn.extend_selection,
                 crate::tr!("Extend row selection to clicked row"),
             ),
-            (
-                "<Primary>Pointer_Button1",
-                crate::tr!("Toggle clicked row in selection"),
-            ),
+            (drawn.toggle_selection, crate::tr!("Toggle clicked row in selection")),
             ("Escape", crate::tr!("Clear multi-row selection")),
             ("<Primary>c", crate::tr!("Copy selected rows as TSV")),
             ("Page_Up", crate::tr!("Previous page")),
@@ -222,7 +220,31 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
 fn add_shortcut_section(dialog: &adw::ShortcutsDialog, title: &str, entries: &[(&str, String)]) {
     let section = adw::ShortcutsSection::new(Some(title));
     for (accelerator, title) in entries {
-        section.add(adw::ShortcutsItem::new(title, accelerator));
+        let item = adw::ShortcutsItem::new(title, accelerator);
+        let chord = shortcut_chord(accelerator);
+        if !chord.is_empty() {
+            item.set_subtitle(&localized_chord(chord));
+        }
+        section.add(item);
     }
     dialog.add(section);
+}
+
+fn shortcut_chord(accelerator: &str) -> &'static str {
+    let drawn = tablepro_core::browse_drawn_shortcuts();
+    if accelerator == drawn.extend_selection {
+        drawn.extend_selection_chord
+    } else if accelerator == drawn.toggle_selection {
+        drawn.toggle_selection_chord
+    } else {
+        ""
+    }
+}
+
+fn localized_chord(chord: &str) -> String {
+    match chord {
+        "Shift-click" => crate::tr!("Shift-click"),
+        "Ctrl-click" => crate::tr!("Ctrl-click"),
+        other => other.to_string(),
+    }
 }

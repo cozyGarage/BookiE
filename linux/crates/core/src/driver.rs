@@ -31,6 +31,14 @@ pub trait DatabaseDriver: Send + Sync {
     fn display_name(&self) -> &'static str;
     fn default_port(&self) -> u16;
 
+    fn default_database(&self) -> &'static str {
+        ""
+    }
+
+    fn default_username(&self) -> &'static str {
+        ""
+    }
+
     fn maturity(&self) -> DriverMaturity {
         DriverMaturity::Stable
     }
@@ -115,6 +123,28 @@ pub trait DatabaseDriver: Send + Sync {
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError>;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConnectionFormDefaults {
+    pub port: u16,
+    pub database: &'static str,
+    pub username: &'static str,
+}
+
+pub fn connection_form_defaults(driver: &dyn DatabaseDriver) -> ConnectionFormDefaults {
+    ConnectionFormDefaults {
+        port: driver.default_port(),
+        database: driver.default_database(),
+        username: driver.default_username(),
+    }
+}
+
+pub fn initial_connection_form_defaults(drivers: &[&dyn DatabaseDriver]) -> Option<ConnectionFormDefaults> {
+    drivers
+        .iter()
+        .min_by(|left, right| left.display_name().cmp(right.display_name()))
+        .map(|driver| connection_form_defaults(*driver))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +177,76 @@ mod tests {
         assert!(!driver.supports_foreign_key_metadata());
         assert!(!driver.supports_view_metadata());
         assert!(!driver.supports_column_comments());
+        assert_eq!(driver.default_database(), "");
+        assert_eq!(driver.default_username(), "");
+    }
+
+    struct NamedDriver {
+        name: &'static str,
+        port: u16,
+        database: &'static str,
+        username: &'static str,
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for NamedDriver {
+        fn id(&self) -> &'static str {
+            self.name
+        }
+
+        fn display_name(&self) -> &'static str {
+            self.name
+        }
+
+        fn default_port(&self) -> u16 {
+            self.port
+        }
+
+        fn default_database(&self) -> &'static str {
+            self.database
+        }
+
+        fn default_username(&self) -> &'static str {
+            self.username
+        }
+
+        async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            Err(DriverError::Unsupported(self.name.into()))
+        }
+    }
+
+    #[test]
+    fn the_first_sorted_driver_supplies_the_connection_form() {
+        let clickhouse = NamedDriver {
+            name: "ClickHouse",
+            port: 8123,
+            database: "default",
+            username: "default",
+        };
+        let postgres = NamedDriver {
+            name: "PostgreSQL",
+            port: 5432,
+            database: "postgres",
+            username: "postgres",
+        };
+        let drivers: [&dyn DatabaseDriver; 2] = [&postgres, &clickhouse];
+        let mut sorted = drivers;
+        sorted.sort_by(|left, right| left.display_name().cmp(right.display_name()));
+
+        let initial = initial_connection_form_defaults(&drivers).unwrap();
+        assert_eq!(initial, connection_form_defaults(sorted[0]));
+        assert_eq!(initial.port, 8123);
+        assert_eq!(initial.database, "default");
+        assert_eq!(initial.username, "default");
+        assert_ne!(
+            (initial.port, initial.database, initial.username),
+            (5432, "postgres", "postgres")
+        );
+
+        let switched = connection_form_defaults(&postgres);
+        assert_eq!(switched.port, 5432);
+        assert_eq!(switched.database, "postgres");
+        assert_eq!(switched.username, "postgres");
+        assert_ne!(switched, initial);
     }
 }

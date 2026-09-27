@@ -40,6 +40,14 @@ impl DatabaseDriver for MysqlDriver {
         3306
     }
 
+    fn default_database(&self) -> &'static str {
+        "mysql"
+    }
+
+    fn default_username(&self) -> &'static str {
+        "root"
+    }
+
     fn supports_index_metadata(&self) -> bool {
         true
     }
@@ -911,6 +919,8 @@ mod tests {
         assert_eq!(d.id(), "mysql");
         assert_eq!(d.display_name(), "MySQL");
         assert_eq!(d.default_port(), 3306);
+        assert_eq!(d.default_database(), "mysql");
+        assert_eq!(d.default_username(), "root");
     }
 
     #[test]

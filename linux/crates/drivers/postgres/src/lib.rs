@@ -37,6 +37,14 @@ impl DatabaseDriver for PgDriver {
         5432
     }
 
+    fn default_database(&self) -> &'static str {
+        "postgres"
+    }
+
+    fn default_username(&self) -> &'static str {
+        "postgres"
+    }
+
     fn ddl_is_transactional(&self) -> bool {
         true
     }
@@ -1134,6 +1142,8 @@ mod tests {
         let d = PgDriver;
         assert_eq!(d.id(), "postgres");
         assert_eq!(d.default_port(), 5432);
+        assert_eq!(d.default_database(), "postgres");
+        assert_eq!(d.default_username(), "postgres");
     }
 
     #[test]

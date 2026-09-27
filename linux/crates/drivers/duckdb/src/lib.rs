@@ -30,6 +30,14 @@ impl DatabaseDriver for DuckdbDriver {
         0
     }
 
+    fn default_database(&self) -> &'static str {
+        ""
+    }
+
+    fn default_username(&self) -> &'static str {
+        ""
+    }
+
     fn is_file_based(&self) -> bool {
         true
     }
@@ -619,6 +627,8 @@ mod tests {
         assert_eq!(d.display_name(), "DuckDB");
         assert!(d.is_file_based());
         assert_eq!(d.default_port(), 0);
+        assert_eq!(d.default_database(), "");
+        assert_eq!(d.default_username(), "");
     }
 
     #[test]

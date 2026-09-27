@@ -6,7 +6,9 @@ use relm4::{adw, gtk};
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
-use tablepro_core::{AuthMode, ConnectOptions, DriverMaturity, DriverRegistry, Environment, TlsMode};
+use tablepro_core::{
+    AuthMode, ConnectOptions, DriverMaturity, DriverRegistry, Environment, TlsMode, connection_form_defaults,
+};
 use tablepro_storage::{
     SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
 };
@@ -40,7 +42,8 @@ pub struct ConnectDialog {
     test_button: gtk::Button,
     submit: gtk::Button,
     toast_overlay: adw::ToastOverlay,
-    header_title: adw::WindowTitle,
+    header_title: gtk::Label,
+    header_actions: gtk::Box,
     form: AuthFormState,
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
@@ -136,14 +139,10 @@ impl Component for ConnectDialog {
 
             #[wrap(Some)]
             set_child = &adw::ToolbarView {
-                // Action buttons in the headerbar — Test on the start
-                // (secondary), Connect on the end (primary). Matches
-                // GNOME Connections / Builder shape; no manual bottom
-                // Box, no pill class on header buttons.
                 add_top_bar = &adw::HeaderBar {
+                    set_centering_policy: adw::CenteringPolicy::Loose,
                     set_title_widget: Some(&model.header_title),
-                    pack_start: &model.test_button,
-                    pack_end: &model.submit,
+                    pack_end: &model.header_actions,
                 },
 
                 #[wrap(Some)]
@@ -196,7 +195,6 @@ impl Component for ConnectDialog {
         // no parse + fallback dance, no inline-error CSS to maintain.
         let port = adw::SpinRow::with_range(1.0, 65535.0, 1.0);
         port.set_title(&crate::tr!("Port"));
-        port.set_value(5432.0);
         let sender_for_port = sender.clone();
         port.connect_value_notify(move |_| sender_for_port.input(ConnectDialogInput::InputChanged));
         let socket_dir = adw::EntryRow::builder()
@@ -204,14 +202,8 @@ impl Component for ConnectDialog {
             .text("/run/postgresql")
             .build();
         let resolved_socket = adw::ActionRow::builder().title(crate::tr!("Resolved socket")).build();
-        let database = adw::EntryRow::builder()
-            .title(crate::tr!("Database"))
-            .text("postgres")
-            .build();
-        let username = adw::EntryRow::builder()
-            .title(crate::tr!("Username"))
-            .text("postgres")
-            .build();
+        let database = adw::EntryRow::builder().title(crate::tr!("Database")).build();
+        let username = adw::EntryRow::builder().title(crate::tr!("Username")).build();
         let password = adw::PasswordEntryRow::builder().title(crate::tr!("Password")).build();
         let tls_mode = adw::ComboRow::builder()
             .title(crate::tr!("TLS"))
@@ -312,14 +304,20 @@ impl Component for ConnectDialog {
             sender_for_submit.input(ConnectDialogInput::Submit);
         });
 
-        // HeaderBar centers its title between the action buttons. Keeping
-        // the selected driver here makes the dialog title visible and
-        // centered even when the two buttons have different widths.
         let initial_title = drivers
             .first()
             .map(|driver| crate::tr!("Connect to {name}").replace("{name}", &driver.display_name))
             .unwrap_or_else(|| crate::tr!("Connect"));
-        let header_title = adw::WindowTitle::new(&initial_title, "");
+        let header_title = gtk::Label::new(Some(&initial_title));
+        header_title.set_halign(gtk::Align::Fill);
+        header_title.set_valign(gtk::Align::Center);
+        header_title.set_hexpand(true);
+        header_title.set_xalign(0.0);
+        header_title.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        header_title.add_css_class("title");
+        let header_actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        header_actions.append(&test_button);
+        header_actions.append(&submit);
 
         let page = adw::PreferencesPage::new();
         page.add(&connection_group);
@@ -355,21 +353,15 @@ impl Component for ConnectDialog {
             submit,
             toast_overlay,
             header_title,
+            header_actions,
             form: AuthFormState::default(),
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
         };
         let widgets = view_output!();
-
-        if let Some(first) = drivers.first() {
-            if let Some(driver) = model.registry.get(&first.id) {
-                model.apply_driver_form_visibility(driver.as_ref());
-            }
-            root.set_title(&crate::tr!("Connect to {name}").replace("{name}", &first.display_name));
-        }
-        model.refresh_driver_maturity_subtitle();
-        model.refresh_validity();
+        let selected = model.driver_combo.selected();
+        model.apply_selected_driver(selected, &root);
 
         // Make Connect the dialog's default widget so pressing Enter
         // from any AdwEntryRow submits the form. Per HIG, every
@@ -384,18 +376,7 @@ impl Component for ConnectDialog {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
             ConnectDialogInput::DriverChanged(idx) => {
-                let Some(entry) = self.drivers.get(idx as usize).cloned() else {
-                    return;
-                };
-                if let Some(driver) = self.registry.get(&entry.id) {
-                    self.apply_driver_form_visibility(driver.as_ref());
-                    self.port.set_value(driver.default_port() as f64);
-                }
-                self.refresh_driver_maturity_subtitle();
-                root.set_title(&crate::tr!("Connect to {name}").replace("{name}", &entry.display_name));
-                self.header_title
-                    .set_title(&crate::tr!("Connect to {name}").replace("{name}", &entry.display_name));
-                self.refresh_validity();
+                self.apply_selected_driver(idx, root);
             }
 
             ConnectDialogInput::TlsModeChanged => {
@@ -578,6 +559,24 @@ impl Component for ConnectDialog {
 }
 
 impl ConnectDialog {
+    fn apply_selected_driver(&mut self, idx: u32, root: &adw::Dialog) {
+        let Some(entry) = self.drivers.get(idx as usize).cloned() else {
+            return;
+        };
+        if let Some(driver) = self.registry.get(&entry.id) {
+            self.apply_driver_form_visibility(driver.as_ref());
+            let defaults = connection_form_defaults(driver.as_ref());
+            self.port.set_value(defaults.port as f64);
+            self.database.set_text(defaults.database);
+            self.username.set_text(defaults.username);
+        }
+        self.refresh_driver_maturity_subtitle();
+        let title = crate::tr!("Connect to {name}").replace("{name}", &entry.display_name);
+        root.set_title(&title);
+        self.header_title.set_text(&title);
+        self.refresh_validity();
+    }
+
     fn refresh_validity(&self) {
         let database_empty = self.database.text().trim().is_empty();
         toggle_error(&self.database, database_empty);

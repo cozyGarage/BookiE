@@ -51,6 +51,14 @@ impl DatabaseDriver for ClickhouseDriver {
         8123
     }
 
+    fn default_database(&self) -> &'static str {
+        "default"
+    }
+
+    fn default_username(&self) -> &'static str {
+        "default"
+    }
+
     fn reports_rows_affected(&self) -> bool {
         false
     }
@@ -888,6 +896,12 @@ mod tests {
         assert_eq!(d.id(), "clickhouse");
         assert_eq!(d.display_name(), "ClickHouse");
         assert_eq!(d.default_port(), 8123);
+        assert_eq!(d.default_database(), "default");
+        assert_eq!(d.default_username(), "default");
+        assert_ne!(
+            (d.default_port(), d.default_database(), d.default_username()),
+            (5432, "postgres", "postgres")
+        );
         assert!(!d.reports_rows_affected());
     }
 

@@ -62,6 +62,14 @@ impl DatabaseDriver for MssqlDriver {
         1433
     }
 
+    fn default_database(&self) -> &'static str {
+        "master"
+    }
+
+    fn default_username(&self) -> &'static str {
+        "sa"
+    }
+
     fn ddl_is_transactional(&self) -> bool {
         true
     }
@@ -933,6 +941,8 @@ mod tests {
         assert_eq!(d.id(), "mssql");
         assert_eq!(d.display_name(), "SQL Server");
         assert_eq!(d.default_port(), 1433);
+        assert_eq!(d.default_database(), "master");
+        assert_eq!(d.default_username(), "sa");
         assert!(!d.is_file_based());
         assert_eq!(d.supports_integrated_auth(), cfg!(feature = "kerberos"));
     }

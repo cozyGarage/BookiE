@@ -10,6 +10,10 @@
 
 ### Fixed
 
+- New connection opened on the first driver with port 5432, database postgres, and username postgres.
+- Browse shortcuts for Left, Right, and space showed a blank key.
+- Click shortcuts were labeled Pointer_Button1.
+- Test and Connect sat at opposite ends of the connection header, and a long title ran into the buttons.
 - A ClickHouse connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
 - A MongoDB connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
 - A Redis connection with Verify CA or Verify Full through an SSH tunnel checked the certificate against the tunnel's local address instead of the database's own hostname, so both modes always failed. They now verify against the database's hostname.
@@ -25,7 +29,6 @@
 - CSV imports into SQLite INTEGER, REAL and NUMERIC affinity columns pass unparseable values as text, allowing SQLite to store them without rejecting valid mixed storage classes.
 - Duplicate Row refuses rows with undecodable cells or a mismatched cell count instead of inserting a silently substituted NULL.
 - ClickHouse rejects response rows whose value count does not match the column metadata instead of padding or truncating the row.
-- The new-connection dialog centers its selected-driver title in the header and keeps the full title and help text visible.
 - A driver that reports its connection as disconnected now triggers an immediate reconnect attempt instead of waiting up to 30 seconds for the next scheduled connection check.
 
 ## [0.1.5] - 2026-09-27

@@ -19,6 +19,7 @@ mod params;
 mod query;
 mod registry;
 mod session;
+mod shortcut_label;
 pub mod sql_ddl;
 pub mod sql_diagnostics;
 pub mod sql_dialect;
@@ -33,7 +34,9 @@ mod transaction;
 pub use activity::{ActivityQuery, ActivityUnsupported, activity_kinds, activity_sql, parse_session_id};
 pub use catalog::{CATALOG_OBJECT_LIMIT, CatalogObject, CatalogObjectKind};
 pub use connection::{AuthMode, ConnectOptions, Connection, SocketOrigin, Transport};
-pub use driver::{DatabaseDriver, DriverMaturity};
+pub use driver::{
+    ConnectionFormDefaults, DatabaseDriver, DriverMaturity, connection_form_defaults, initial_connection_form_defaults,
+};
 pub use error::DriverError;
 pub use filter::{
     BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where, equality_rule,
@@ -48,5 +51,6 @@ pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse
 pub use query::{ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, QueryResult, TableInfo, Value};
 pub use registry::DriverRegistry;
 pub use session::Session;
+pub use shortcut_label::{BrowseDrawnShortcuts, browse_drawn_shortcuts};
 pub use tls::{Environment, TlsConfig, TlsMode, error_chain_text, looks_like_tls_failure};
 pub use transaction::Transaction;
