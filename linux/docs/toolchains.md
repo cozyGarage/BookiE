@@ -30,7 +30,7 @@ rustup toolchain install stable --profile minimal --component clippy
 rustup default stable
 ```
 
-Inside `linux/`, the repository override selects 1.98 automatically. Use an explicit `+stable` selector for the forward-compatibility check:
+Inside `linux/` and at the repository root, the repository override selects 1.98 automatically. The root `rust-toolchain.toml` links to `linux/rust-toolchain.toml` so `cargo --manifest-path linux/Cargo.toml` from the root uses the same compiler and build cache. Use an explicit `+stable` selector for the forward-compatibility check:
 
 ```bash
 cd linux
@@ -45,3 +45,11 @@ Run `cargo +1.98.0 ...` when you want to make the MSRV choice explicit. Do not c
 If you intentionally keep the `rust` package, `./scripts/preflight.sh` uses the compiler found first on `PATH`; it therefore checks current Arch stable, not the MSRV. Rely on the required GitHub Actions preflight for the 1.98 result, or use a rustup/container environment before declaring an MSRV-sensitive change complete.
 
 The weekly `Current stable Clippy (scheduled)` job is a required signal: fix a new lint in code where practical, and add a narrowly documented lint allowance only when supporting both 1.98 and current stable genuinely requires it.
+
+## Build cache
+
+All scripts share `linux/target`. Keep one compiler per checkout: a command that resolves to a different toolchain rebuilds the whole graph and keeps both copies. Development builds keep line tables for workspace crates and no debug information for dependencies, which keeps `target/debug` near 5 GB instead of growing past 100 GB.
+
+A narrow `cargo test -p <crate>` can resolve a smaller dependency feature set than a workspace build and compiles those dependencies once. Later runs reuse them. Cargo's workspace feature unification is still unstable on 1.98.
+
+After a toolchain upgrade, `cargo clean` removes artifacts that the new compiler cannot reuse.

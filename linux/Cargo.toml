@@ -87,3 +87,9 @@ unreachable = "deny"
 print_stdout = "deny"
 print_stderr = "deny"
 dbg_macro = "deny"
+
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
