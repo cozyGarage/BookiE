@@ -656,7 +656,10 @@ fn bind_sqlite_params<'q>(
             Value::Time(t) => q.bind(*t),
             Value::DateTime(dt) => q.bind(*dt),
             Value::TimestampTz(ts) => q.bind(*ts),
-            Value::Decimal(d) => q.bind(d.to_string()),
+            Value::Decimal(d) => match exact_real(d) {
+                Some(real) => q.bind(real),
+                None => q.bind(d.to_string()),
+            },
             Value::Uuid(u) => q.bind(u.to_string()),
             Value::Json(j) => q.bind(j.to_string()),
             Value::Undecodable(_) => {
@@ -667,6 +670,11 @@ fn bind_sqlite_params<'q>(
         };
     }
     Ok(q)
+}
+
+fn exact_real(decimal: &rust_decimal::Decimal) -> Option<f64> {
+    let digits = decimal.normalize().to_string();
+    digits.parse::<f64>().ok().filter(|real| real.to_string() == digits)
 }
 
 fn quote_ident(name: &str) -> String {

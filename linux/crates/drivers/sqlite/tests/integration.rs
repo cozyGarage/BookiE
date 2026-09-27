@@ -557,3 +557,29 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
     let connection = connect_file(&directory).await;
     value_contract::assert_scalar_contract(connection.as_ref(), "sqlite").await;
 }
+
+#[tokio::test]
+async fn an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digits() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    let cases = [
+        ("2.5", "real", Value::Float(2.5)),
+        ("0.1", "real", Value::Float(0.1)),
+        ("-1e3", "real", Value::Float(-1000.0)),
+        (
+            "1234567890123456789.123456789",
+            "text",
+            Value::Text("1234567890123456789.123456789".into()),
+        ),
+    ];
+    for (input, storage_class, expected) in cases {
+        let parameter = tablepro_core::parse_parameter_value(tablepro_core::ParameterKind::Auto, input).unwrap();
+        let result = connection
+            .query_params("SELECT typeof(?1), ?1, ?1 > 10", &[parameter])
+            .await
+            .unwrap();
+        let row = &result.rows[0];
+        assert_eq!(row[0], Value::Text(storage_class.into()), "{input}");
+        assert_eq!(row[1], expected, "{input}");
+        assert_eq!(row[2], Value::Int(i64::from(storage_class == "text")), "{input}");
+    }
+}

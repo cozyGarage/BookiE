@@ -56,7 +56,7 @@
 
 - Excel exports preserve integers beyond 15 digits and all exact decimals as text cells, retaining every digit and decimal scale. These cells require explicit numeric conversion for spreadsheet arithmetic.
 
-- Numeric input in grid edits, filters and CSV imports rejects overflow to infinity and nonzero underflow to zero. Named decimal parameters stay exact, and automatic parameter typing keeps values as text when they exceed the exact decimal range.
+- Numeric input in grid edits, filters and CSV imports rejects overflow to infinity and nonzero underflow to zero. Named decimal parameters stay exact, SQLite still compares them as numbers, and automatic parameter typing keeps values as text when they exceed the exact decimal range.
 - SQL copy and export use scientific float literals to avoid tiny values becoming zero or overflowing an engine's decimal parser; ClickHouse decimal literals retain their full precision.
 - Redis commands preserve empty quoted arguments instead of dropping them.
 - DuckDB accepts bound parameters in result queries instead of reporting the operation as unimplemented.
