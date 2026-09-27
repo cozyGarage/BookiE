@@ -641,16 +641,16 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
         // that. Decimal::from_i128_with_scale (which tiberius's own
         // Decimal::from_sql calls) panics rather than erroring on an
         // out-of-range value, so the fit has to be checked before
-        // calling it -- a legitimately large value falls back to the
-        // raw tiberius Numeric's own Display instead of crashing or
-        // losing it to Null.
+        // calling it. tiberius's Numeric Display puts a negative sign on
+        // the fraction and appends ".0" at scale 0, so a wider value is
+        // rendered from its mantissa and scale instead.
         ColumnData::Numeric(raw) => match raw {
             Some(numeric) => {
                 let value = numeric.value();
                 if u32::from(numeric.scale()) <= Decimal::MAX_SCALE && value.unsigned_abs() <= MAX_DECIMAL_MANTISSA {
                     Value::Decimal(Decimal::from_i128_with_scale(value, u32::from(numeric.scale())))
                 } else {
-                    Value::Text(numeric.to_string())
+                    Value::Text(numeric_text(value, usize::from(numeric.scale())))
                 }
             }
             None => Value::Null,
@@ -669,6 +669,16 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
         ),
         ColumnData::Xml(v) => v.as_ref().map(|x| Value::Text(x.to_string())).unwrap_or(Value::Null),
     }
+}
+
+fn numeric_text(value: i128, scale: usize) -> String {
+    let sign = if value < 0 { "-" } else { "" };
+    let digits = format!("{:0>width$}", value.unsigned_abs(), width = scale + 1);
+    let (whole, fraction) = digits.split_at(digits.len() - scale);
+    if fraction.is_empty() {
+        return format!("{sign}{whole}");
+    }
+    format!("{sign}{whole}.{fraction}")
 }
 
 /// tiberius decodes a temporal column in two steps: the outer `Result`
@@ -940,13 +950,35 @@ mod tests {
     }
 
     #[test]
-    fn a_numeric_value_past_decimals_range_keeps_its_full_precision_as_text() {
-        // i128::MAX at scale 0 has 39 digits -- past rust_decimal's
-        // ~28-29 digit capacity, but still exactly what tiberius's own
-        // Numeric type holds.
-        let numeric = tiberius::numeric::Numeric::new_with_scale(i128::MAX, 0);
-        let column_data = ColumnData::Numeric(Some(numeric));
-        assert_eq!(column_data_to_value(&column_data), Value::Text(numeric.to_string()));
+    fn value_contract_wide_numeric_text_keeps_sign_scale_and_every_digit() {
+        for (value, scale, expected) in [
+            (i128::MAX, 0, "170141183460469231731687303715884105727"),
+            (-i128::MAX, 0, "-170141183460469231731687303715884105727"),
+            (
+                -123_456_789_012_345_678_901_234_567_891,
+                30,
+                "-0.123456789012345678901234567891",
+            ),
+            (
+                -50_000_000_000_000_000_000_000_000_000,
+                30,
+                "-0.050000000000000000000000000000",
+            ),
+            (
+                -123_456_789_012_345_678_901_234_567_895,
+                1,
+                "-12345678901234567890123456789.5",
+            ),
+            (
+                1_500_000_000_000_000_000_000_000_000_000,
+                30,
+                "1.500000000000000000000000000000",
+            ),
+        ] {
+            let numeric = tiberius::numeric::Numeric::new_with_scale(value, scale);
+            let column_data = ColumnData::Numeric(Some(numeric));
+            assert_eq!(column_data_to_value(&column_data), Value::Text(expected.into()));
+        }
     }
 
     #[test]
