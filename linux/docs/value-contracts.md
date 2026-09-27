@@ -341,3 +341,47 @@ The corrected full gate passed at
 `target/quality/20260927T092738833389Z-layers/report.json` (formatting, Clippy,
 workspace unit/binary tests and sandbox regressions). Hosted execution and
 installed Wayland/package acceptance remain separate from these local checks.
+
+## Workbook UI and failure-boundary checkpoint, 2026-09-27
+
+Three default installed-GTK scenarios exercise keyboard format selection and the
+real save chooser: exact typed SQLite export, save cancellation, and visible
+empty-text refusal. The XML oracle checks wide signed integers, nanosecond
+precision, dates outside 1900–9999, native numeric dates/times, NULL, infinity,
+formula-like Unicode text and the 100-row page boundary. Every scenario compares
+all source rows before and after. Four Python tests cover oracle failures,
+formula rejection and default scenario registration.
+
+The expanded UI corpus found a new defect: rust_xlsxwriter discards empty strings,
+so successful workbook export silently collapsed empty text into missing cells.
+The initial combined report `target/quality/20260927T094125010168Z-layers/report.json`
+therefore remains failed, with full/value layers passed and the UI assertion
+failing on the missing cell. A core regression also failed before correction.
+Workbook export now refuses empty text with its one-based data row/column and
+CSV/JSON alternatives. The dedicated UI scenario requires that visible error,
+no published file and no temporary export. A public core regression separately
+requires existing destination bytes to survive this refusal. This is an explicit
+format limitation, not a claim that XLSX now round-trips empty text.
+
+Coordinate regressions also reproduced accepting column 16,385 in the converter.
+The writer now checks the actual worksheet limits before narrowing coordinates,
+reserves the header row, and saturates diagnostic counts instead of overflowing.
+Public file tests cover column-limit refusal and cancellation after a row has
+been written; both leave existing destination bytes intact and no temporary file.
+
+Final local evidence for this checkpoint:
+
+- `target/quality/20260927T095051662483Z-layers/report.json`: full, values, UI and
+  harness layers all passed; 34 Python harness tests passed.
+- `target/quality/20260927T095333331615Z-values/report.json`: all 11 suites passed,
+  including eight drivers, GTK, DuckDB and 16 core value contracts.
+- `target/quality/20260927-b3-workbook-ui-corrected/`: all 22 installed release
+  scenarios passed, with 22 result JSON files and 22 stderr artifacts.
+- `target/quality/20260927-b3-xlsx-refusal-mutants/mutants.out/outcomes.json`:
+  all 11 selected `write_row`/`cell_column` mutations caught; no missed, timeout or
+  unviable outcomes. This final run includes the empty-text refusal and supersedes
+  the earlier seven-coordinate-mutation run for this checkpoint.
+
+These are local X11/AT-SPI and fixture results. Hosted CI, network-database temporal
+UI scenarios, installed Wayland/package acceptance and the remaining B3 type and
+consumer contracts remain separate work.

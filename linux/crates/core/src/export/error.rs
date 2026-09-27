@@ -18,6 +18,10 @@ pub enum ExportError {
     WorkbookTooLarge { limit: usize, rows: usize },
     #[error("An Excel worksheet holds at most 16384 columns and this result has {columns}")]
     WorkbookColumnLimit { columns: usize },
+    #[error(
+        "Workbook export cannot preserve empty text at row {row}, column {column}. Export as CSV or JSON to keep empty text distinct from NULL"
+    )]
+    WorkbookEmptyText { row: usize, column: usize },
     #[error("The Excel workbook could not be built")]
     Workbook(#[from] rust_xlsxwriter::XlsxError),
 }

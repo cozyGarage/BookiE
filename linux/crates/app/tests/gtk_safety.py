@@ -13,6 +13,7 @@ import time
 from pathlib import Path
 
 import pyatspi
+import gtk_workbook
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -1236,6 +1237,7 @@ def main():
         switched_connection_keeps_workspace_tabs_after_debounce,
         switching_one_window_leaves_the_other_windows_edits,
     ]
+    scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         scenarios = [scenario for scenario in scenarios if scenario.__name__ == selected]

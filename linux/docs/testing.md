@@ -195,12 +195,39 @@ The suite verifies:
 14. Switching one window preserves another window's pending edits.
 15. Current-page JSON export preserves order, Unicode, escaped text, empty text, NULL, and binary values; binary values use `\x`-prefixed hexadecimal, including `\x` for an empty blob.
 16. Graceful quit and a new process restore the last connection and selected editor text without executing it; a subsequent explicit Run writes only to that connection. The saved browse tab also reopens.
+17. Keyboard column search jumps to the selected column.
+18. Committed editor DDL refreshes the sidebar.
+19. SQL character warnings leave the editor query unchanged.
+20. Current-page XLSX export preserves typed SQLite values, nanosecond times/timestamps, BC/year-10000 dates, wide signed integers, infinity, NULL and formula-like Unicode text. Workbook XML proves native versus text cells and the 100-row page boundary; all source rows remain unchanged.
+21. Cancelling the workbook save chooser preserves an existing destination, leaves no temporary export, and leaves all source rows unchanged.
+22. Empty text in workbook results produces a visible error with the row/column and CSV/JSON alternatives. No lossy workbook or temporary export is published, and source rows remain unchanged.
+
+The workbook scenarios live in `crates/app/tests/gtk_workbook.py` and are registered
+in the default suite. Their XML oracle has separate negative tests that reject
+rounded values, wrong types, lost precision, formulas and incorrect page boundaries.
+SQLite supplies typed Date/Time/DateTime for these UI scenarios; typed TimestampTz
+UI coverage against a network server remains separate from the core and PostgreSQL
+contracts. The cancellation UI test stops at the chooser; a core regression also
+cancels after writing a row and checks atomic destination preservation.
+
+To run one scenario using an already-built candidate (without another Cargo build):
+
+```bash
+TABLEPRO_GTK_BINARY=/absolute/path/to/bookie \
+TABLEPRO_GTK_SCENARIO=current_page_workbook_preserves_typed_values \
+TABLEPRO_GTK_ARTIFACT_DIR=/tmp/bookie-workbook-evidence \
+bash scripts/test-gtk-safety.sh
+```
+
+Use `cancelled_workbook_export_preserves_existing_file` for the cancellation case.
+Record the binary's commit/checksum; a prebuilt binary is not evidence for later
+Rust edits. Omit `TABLEPRO_GTK_BINARY` to build the current release profile.
 
 Each scenario declares its own fixture shape through `environment` and `audit_available` attributes, so a scenario can run against a local or production saved connection.
 
 The Open Quickly scenario waits for the filtered result set before invoking its single action; the already-visible favorite is not proof that the debounced row rebuild has completed. It still requires the window to close and usage to be persisted.
 
-Buttons and rows are invoked only through named AT-SPI actions; there is no Return-key fallback that can land in an unrelated dialog. Keyboard events remain only for the shortcuts under test. Each denial assertion requires the row count to hold for a settle window rather than matching once.
+Buttons and rows are invoked through named AT-SPI actions; there is no generic Return-key fallback. Keyboard events exercise shortcuts and the export format combo's navigation. The combo has no AT-SPI click/focus action: its scenario tabs until the named control reports focus, opens its list, selects the last format, and verifies the selected workbook label before exporting. Each denial assertion requires the row count to hold for a settle window rather than matching once.
 
 On Arch or Omarchy, install the harness dependencies with:
 

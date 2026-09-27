@@ -285,6 +285,17 @@ checking that a ZIP file was produced. Finite/nonfinite float and NULL contracts
 also cover two hosted mutation survivors. This is scoped spreadsheet evidence;
 remaining driver types, arbitrary-precision editing and B4–B6 stay open.
 
+The workbook follow-up adds three real UI scenarios for typed-value export,
+save cancellation and explicit empty-text refusal, plus negative tests of the
+workbook XML oracle. It also corrects XLSX coordinate validation to the actual 16,384-column / 1,048,576-row
+sheet limits (one row reserved for headers), including overflow-safe diagnostics.
+Public export regressions preserve existing files on excessive columns and
+mid-write cancellation. Remaining B3 consumers/types and B4–B6 stay open.
+
+The workbook UI corpus also exposed empty strings being silently omitted by the
+XLSX library. Export now refuses this lossy conversion with the data row/column
+and CSV/JSON alternatives; UI and atomic-file regressions cover that refusal.
+
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
 The [value-contract suite](value-contracts.md) uses one corpus across all eight

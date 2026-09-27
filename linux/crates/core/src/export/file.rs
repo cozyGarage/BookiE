@@ -127,6 +127,78 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_workbook_empty_text_is_refused_without_losing_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keep.xlsx");
+        std::fs::write(&path, b"existing workbook").unwrap();
+        let data = QueryResult {
+            columns: vec![column("value")],
+            rows: vec![vec![Value::Null], vec![Value::Text(String::new())]],
+            truncated: false,
+        };
+        let error = write_result_file(
+            &path,
+            &data,
+            &plain(ResultFormat::Xlsx, &CsvOptions::default()),
+            || false,
+            |_| {},
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("empty text at row 2, column 1"), "{error}");
+        assert!(error.to_string().contains("JSON"), "{error}");
+        assert_eq!(std::fs::read(&path).unwrap(), b"existing workbook");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn value_contract_workbook_column_limit_failure_preserves_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keep.xlsx");
+        std::fs::write(&path, b"existing workbook").unwrap();
+        let data = QueryResult {
+            columns: (0..16_385).map(|index| column(&format!("column_{index}"))).collect(),
+            rows: vec![],
+            truncated: false,
+        };
+        let error = write_result_file(
+            &path,
+            &data,
+            &plain(ResultFormat::Xlsx, &CsvOptions::default()),
+            || false,
+            |_| {},
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, ExportError::WorkbookColumnLimit { columns: 16_385 }),
+            "{error:?}"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"existing workbook");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn value_contract_workbook_mid_export_cancellation_preserves_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("keep.xlsx");
+        std::fs::write(&path, b"existing workbook").unwrap();
+        let mut data = result();
+        data.rows.push(data.rows[0].clone());
+        let written = std::cell::Cell::new(0);
+        let error = write_result_file(
+            &path,
+            &data,
+            &plain(ResultFormat::Xlsx, &CsvOptions::default()),
+            || written.get() > 0,
+            |rows| written.set(rows),
+        )
+        .unwrap_err();
+        assert!(error.is_cancelled(), "{error:?}");
+        assert_eq!(written.get(), 1);
+        assert_eq!(std::fs::read(&path).unwrap(), b"existing workbook");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+    }
+
+    #[test]
     fn file_and_clipboard_agree_and_cancellation_preserves_destination() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("result");

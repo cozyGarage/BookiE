@@ -59,12 +59,22 @@ impl ResultWriter for XlsxWriter {
     }
 
     fn write_row(&mut self, _output: &mut dyn Write, index: usize, row: &[Value]) -> Result<(), ExportError> {
-        let target = u32::try_from(index + 1).map_err(|_| ExportError::WorkbookTooLarge {
-            limit: MAX_WORKBOOK_ROWS,
-            rows: index + 1,
-        })?;
+        if index >= MAX_WORKBOOK_ROWS {
+            return Err(ExportError::WorkbookTooLarge {
+                limit: MAX_WORKBOOK_ROWS,
+                rows: index.saturating_add(1),
+            });
+        }
+        let target = (index + 1) as u32;
         for (column, value) in row.iter().enumerate() {
-            write_cell(&mut self.sheet, target, cell_column(column)?, value, &self.formats)?;
+            let cell_column = cell_column(column)?;
+            if matches!(value, Value::Text(text) if text.is_empty()) {
+                return Err(ExportError::WorkbookEmptyText {
+                    row: index + 1,
+                    column: column + 1,
+                });
+            }
+            write_cell(&mut self.sheet, target, cell_column, value, &self.formats)?;
         }
         Ok(())
     }
@@ -79,7 +89,12 @@ impl ResultWriter for XlsxWriter {
 }
 
 fn cell_column(index: usize) -> Result<u16, ExportError> {
-    u16::try_from(index).map_err(|_| ExportError::WorkbookColumnLimit { columns: index + 1 })
+    if index >= 16_384 {
+        return Err(ExportError::WorkbookColumnLimit {
+            columns: index.saturating_add(1),
+        });
+    }
+    Ok(index as u16)
 }
 
 fn write_cell(
@@ -269,6 +284,22 @@ mod tests {
             "{error:?}"
         );
         assert!(error.to_string().contains("1048575"), "{error}");
+    }
+
+    #[test]
+    fn value_contract_workbook_rejects_invalid_cell_coordinates_without_overflow() {
+        assert_eq!(cell_column(16_383).unwrap(), 16_383);
+        for index in [16_384, 65_535, usize::MAX] {
+            assert!(
+                matches!(cell_column(index), Err(ExportError::WorkbookColumnLimit { columns }) if columns == index.saturating_add(1))
+            );
+        }
+        let mut writer = XlsxWriter::new(0).unwrap();
+        writer.write_row(&mut Vec::new(), 1_048_574, &[Value::Int(1)]).unwrap();
+        for index in [1_048_575, usize::MAX] {
+            assert!(matches!(writer.write_row(&mut Vec::new(), index, &[Value::Int(1)]),
+                Err(ExportError::WorkbookTooLarge { limit: 1_048_575, rows }) if rows == index.saturating_add(1)));
+        }
     }
 
     #[test]
