@@ -5,6 +5,7 @@
 ### Changed
 
 - The built-in SSH client's unknown-host-key error no longer suggests connecting once with the system `ssh` command, which writes to a different `known_hosts` file than the one this client reads.
+- The built-in SSH client reports plainly when a server accepts only keyboard-interactive authentication, which it does not support, instead of a generic authentication failure.
 
 ## [0.1.5] - 2026-09-27
 

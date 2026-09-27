@@ -51,6 +51,10 @@ pub enum SshError {
     Connect(String),
     #[error("authentication failed")]
     Auth,
+    #[error(
+        "the server accepts only keyboard-interactive authentication, which this client does not support; use a password or a key instead"
+    )]
+    KeyboardInteractiveUnsupported,
     #[error("SSH jump chain requires at least one hop")]
     EmptyChain,
     #[error("read private key {path}: {source}")]
@@ -567,9 +571,25 @@ async fn connect_and_auth(
     };
 
     if !auth.success() {
-        return Err(SshError::Auth);
+        return Err(auth_failure_error(&auth));
     }
     Ok(session)
+}
+
+fn auth_failure_error(auth: &client::AuthResult) -> SshError {
+    if let client::AuthResult::Failure { remaining_methods, .. } = auth
+        && requires_keyboard_interactive_only(remaining_methods)
+    {
+        return SshError::KeyboardInteractiveUnsupported;
+    }
+    SshError::Auth
+}
+
+fn requires_keyboard_interactive_only(remaining_methods: &russh::MethodSet) -> bool {
+    !remaining_methods.is_empty()
+        && remaining_methods
+            .iter()
+            .all(|method| matches!(method, russh::MethodKind::KeyboardInteractive))
 }
 
 async fn authenticate_with_agent(
@@ -764,6 +784,32 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_server_offering_only_keyboard_interactive_reports_it_is_unsupported() {
+        let remaining = russh::MethodSet::from(&[russh::MethodKind::KeyboardInteractive][..]);
+        let auth = client::AuthResult::Failure {
+            remaining_methods: remaining,
+            partial_success: false,
+        };
+        let error = auth_failure_error(&auth);
+        assert!(
+            matches!(error, SshError::KeyboardInteractiveUnsupported),
+            "expected KeyboardInteractiveUnsupported, got {error:?}"
+        );
+    }
+
+    #[test]
+    fn a_server_still_offering_password_reports_a_plain_auth_failure() {
+        let remaining =
+            russh::MethodSet::from(&[russh::MethodKind::KeyboardInteractive, russh::MethodKind::Password][..]);
+        let auth = client::AuthResult::Failure {
+            remaining_methods: remaining,
+            partial_success: false,
+        };
+        let error = auth_failure_error(&auth);
+        assert!(matches!(error, SshError::Auth), "expected Auth, got {error:?}");
+    }
 
     #[test]
     fn unknown_host_key_error_does_not_advise_running_ssh() {
