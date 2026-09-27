@@ -775,6 +775,33 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn a_timed_out_read_reports_an_unknown_outcome() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { while listener.accept().await.is_ok() {} });
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port,
+            database: "test".into(),
+            ..Default::default()
+        };
+        let client_opts = build_client_options(&opts).await.unwrap();
+        let client = Client::with_options(client_opts).unwrap();
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
+        let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(50));
+
+        let result = conn.list_tables_controlled(&control).await;
+
+        match result {
+            Err(DriverError::OperationOutcomeUnknown { .. }) => {}
+            other => panic!("expected OperationOutcomeUnknown, got {other:?}"),
+        }
+    }
+
     #[test]
     fn structure_metadata_is_not_declared_without_a_fetch() {
         let d = MongodbDriver;

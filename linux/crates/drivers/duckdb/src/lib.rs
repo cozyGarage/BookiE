@@ -545,6 +545,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_timed_out_query_reports_an_unknown_outcome() {
+        let conn = in_memory_connection().await;
+        let control = tablepro_core::OperationControl::with_timeout(std::time::Duration::from_millis(5));
+
+        let result = conn
+            .query_controlled("SELECT count(*) FROM range(100000000) a, range(2) b", &control)
+            .await;
+
+        match result {
+            Err(DriverError::OperationOutcomeUnknown { .. }) => {}
+            other => panic!("expected OperationOutcomeUnknown, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
         let conn = DuckdbDriver
             .connect(ConnectOptions {
