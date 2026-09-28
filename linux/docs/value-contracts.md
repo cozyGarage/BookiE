@@ -1322,6 +1322,19 @@ special BSON kinds and mixed-type export fidelity. The earlier MongoDB 7
 query/export/import and MCP browse Docker tests passed with large Int64, null
 and Unicode values added on 2026-09-28.
 
+A separate homogeneous Decimal128 contract composes the default CSV exporter,
+typed CSV parser, and keyed grid update. The decimal column metadata parses the
+CSV cell as `Value::Decimal`; after the update, a native BSON read confirms the
+field remains `Bson::Decimal128` with the exact original value. This covers a
+typed same-schema round trip and does not preserve BSON identity in generic
+exports or mixed String/Decimal128 columns.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson -- --include-ignored --exact --test-threads=1
+```
+
+The focused MongoDB 7 Docker contract passed.
+
 Focused local results:
 
 ```sh
