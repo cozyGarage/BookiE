@@ -271,6 +271,45 @@ async fn value_contract_inet_and_cidr_preserve_ipv6_prefix_semantics() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_pg_lsn_maximum_preserves_text_and_wire_identity() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             encode(pg_lsn_send(value), 'hex') AS wire_hex, \
+             value = 'FFFFFFFF/FFFFFFFF'::pg_lsn AS server_match \
+             FROM (SELECT 'FFFFFFFF/FFFFFFFF'::pg_lsn AS value) source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Text("FFFFFFFF/FFFFFFFF".into()),
+            Value::Text("pg_lsn".into()),
+            Value::Text("FFFFFFFF/FFFFFFFF".into()),
+            Value::Text("ffffffffffffffff".into()),
+            Value::Bool(true),
+        ]
+    );
+
+    let value = Value::Text("FFFFFFFF/FFFFFFFF".into());
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::pg_lsn::text"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text("FFFFFFFF/FFFFFFFF".into())]]);
+    let bound_result = connection
+        .query_params("SELECT $1::text::pg_lsn::text", &[value])
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text("FFFFFFFF/FFFFFFFF".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

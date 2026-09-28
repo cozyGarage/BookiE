@@ -582,6 +582,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The focused PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL maximum `pg_lsn` consumer parity
+
+The PostgreSQL 16 contract covers `FFFFFFFF/FFFFFFFF`, the maximum unsigned
+64-bit LSN. Server `pg_lsn::text`, `pg_lsn_send` bytes, type metadata and
+equality confirm the exact value; direct result decoding, SQL-literal
+re-import and typed text binding all retain the same uppercase segment text.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_pg_lsn_maximum_preserves_text_and_wire_identity -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL `int4range` explicit refusal
 
 The PostgreSQL 16 contract checks a native `[1,5)` range against the server's
