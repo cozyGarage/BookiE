@@ -12,8 +12,8 @@ every suite. No external source code or fixtures were copied.
 - Finish B3 lossless values and consumer contracts before B4–B6 acceptance.
 - Use upstream tests, issues and fix commits as bug hypotheses. Reproduce locally
   before changing production behavior; keep the reproducer as a permanent regression.
-- Current coverage includes eight-driver scalar contracts, PostgreSQL scalar and
-  temporal arrays, temporal eras/infinities/interval fields, MongoDB nested BSON
+- Current coverage includes eight-driver scalar contracts, PostgreSQL exact
+  BIT/VARBIT text, scalar and temporal arrays, temporal eras/infinities/interval fields, MongoDB nested BSON
   consumers and SQLite NUMERIC-affinity transitions. B3 remains open for uncovered
   type/consumer combinations and installed grid acceptance; see the current status
   table and [value-contract evidence](value-contracts.md).

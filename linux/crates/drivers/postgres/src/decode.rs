@@ -1,11 +1,34 @@
 pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<String> {
     match type_name {
         "INTERVAL" => decode_interval(bytes),
+        "BIT" | "VARBIT" => decode_bit_string(bytes),
         "INET" => decode_inet(bytes, false),
         "CIDR" => decode_inet(bytes, true),
         "PG_LSN" => decode_pg_lsn(bytes),
         _ => None,
     }
+}
+
+fn decode_bit_string(bytes: &[u8]) -> Option<String> {
+    let bit_length = usize::try_from(i32::from_be_bytes(bytes.get(..4)?.try_into().ok()?)).ok()?;
+    let byte_length = bit_length.checked_add(7)? / 8;
+    if bytes.len() != 4 + byte_length {
+        return None;
+    }
+    if bit_length % 8 != 0 && byte_length > 0 {
+        let unused = 8 - bit_length % 8;
+        if bytes[4 + byte_length - 1] & ((1_u8 << unused) - 1) != 0 {
+            return None;
+        }
+    }
+    Some(
+        (0..bit_length)
+            .map(|index| {
+                let mask = 1 << (7 - index % 8);
+                if bytes[4 + index / 8] & mask == 0 { '0' } else { '1' }
+            })
+            .collect(),
+    )
 }
 
 fn decode_interval(bytes: &[u8]) -> Option<String> {
@@ -111,6 +134,18 @@ fn decode_pg_lsn(bytes: &[u8]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bit_strings_keep_leading_zeroes_and_reject_malformed_wire_values() {
+        assert_eq!(
+            decode_bit_string(&[0, 0, 0, 10, 0b0010_1101, 0b1000_0000]).as_deref(),
+            Some("0010110110")
+        );
+        assert_eq!(decode_bit_string(&[0, 0, 0, 0]), Some(String::new()));
+        assert_eq!(decode_bit_string(&[0, 0, 0, 1, 0b1000_0001]), None);
+        assert_eq!(decode_bit_string(&[0, 0, 0, 9, 0b1010_1010]), None);
+        assert_eq!(decode_bit_string(&[0xff, 0xff, 0xff, 0xff]), None);
+    }
 
     #[test]
     fn extreme_intervals_and_malformed_network_values_do_not_panic() {

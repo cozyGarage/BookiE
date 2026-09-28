@@ -520,6 +520,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL `bit varying` exact text consumers
+
+A PostgreSQL 16 contract exposed that the driver returned `Undecodable("VARBIT")`
+for a valid 80-bit value even though PostgreSQL's text, bit count and equality
+oracles agreed. The binary decoder now validates the declared bit count, packed
+byte length and unused low padding bits, then renders every bit in order so
+leading zeroes remain exact. The result, SQL-literal re-import and typed text
+binding all preserve the same 80-bit string.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib bit_strings_keep_leading_zeroes_and_reject_malformed_wire_values
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_varbit_preserves_leading_zero_bits_across_consumers -- --include-ignored --exact --test-threads=1
+```
+
+Both the decoder unit test and PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL `int4range` explicit refusal
 
 The PostgreSQL 16 contract checks a native `[1,5)` range against the server's

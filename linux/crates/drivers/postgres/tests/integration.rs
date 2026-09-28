@@ -144,6 +144,45 @@ async fn value_contract_citext_preserves_label_and_case_insensitive_comparison()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_varbit_preserves_leading_zero_bits_across_consumers() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let bits = "0010110101110001".repeat(5);
+    let result = connection
+        .query(&format!(
+            "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             bit_length(value) AS bit_count, value = B'{bits}'::varbit AS server_match \
+             FROM (SELECT B'{bits}'::varbit AS value) source"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Text(bits.clone()),
+            Value::Text("bit varying".into()),
+            Value::Text(bits.clone()),
+            Value::Int(80),
+            Value::Bool(true),
+        ]
+    );
+
+    let value = Value::Text(bits.clone());
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::varbit::text"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text(bits.clone())]]);
+    let bound_result = connection
+        .query_params("SELECT $1::text::varbit::text", &[value])
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text(bits)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
