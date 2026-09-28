@@ -127,3 +127,6 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
 - ClickHouse Int128/UInt128 now have Docker-backed exact-text contracts for
   query results, text binding, SQL export/re-import and keyed grid edits; other
   wide-integer grid boundaries remain open.
+- PostgreSQL 16 server oracles now cover `int4multirange` text, hull, component
+  count and NULL, but SQLx fails direct projection while resolving `typtype`
+  code `m`; this is an upstream metadata blocker, not a BookiE value refusal.

@@ -681,6 +681,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 The focused PostgreSQL Docker contract passed. This is an explicit refusal
 boundary, not support for PostgreSQL range values.
 
+### PostgreSQL `int4multirange` metadata boundary
+
+PostgreSQL 16 server-side projections independently confirm the native type,
+exact `{[1,3),[5,8)}` text, `[1,8)` range hull, and two component ranges. A
+direct multirange projection currently fails before BookiE receives a value:
+SQLx metadata resolution rejects PostgreSQL's `typtype` code `m`. The contract
+records this upstream decoding blocker; it does not claim a BookiE `Undecodable`
+value or SQL-literal/binding refusal because no `Value` is produced. A separate
+SQL boolean confirms SQL NULL remains null without projecting the multirange.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_int4multirange_metadata_resolution_failure_is_explicit -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed with that metadata error.
+
 ### PostgreSQL composite explicit refusal
 
 A PostgreSQL 16 fixture defines `(id bigint, label text)` and returns a value

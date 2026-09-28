@@ -483,6 +483,38 @@ async fn value_contract_int4range_is_explicitly_unsupported() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_int4multirange_metadata_resolution_failure_is_explicit() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             range_merge(value)::text AS hull, \
+             (SELECT count(*) FROM unnest(value) AS component) AS component_count \
+             FROM (SELECT '{[1,3),[5,8)}'::int4multirange AS value) source",
+        )
+        .await
+        .unwrap();
+    let row = &result.rows[0];
+    assert_eq!(row[0], Value::Text("int4multirange".into()));
+    assert_eq!(row[1], Value::Text("{[1,3),[5,8)}".into()));
+    assert_eq!(row[2], Value::Text("[1,8)".into()));
+    assert_eq!(row[3], Value::Int(2));
+
+    let direct_projection = connection
+        .query("SELECT '{[1,3),[5,8)}'::int4multirange")
+        .await
+        .expect_err("SQLx currently fails resolving PostgreSQL multirange metadata");
+    let error = format!("{direct_projection:?}");
+    assert!(error.contains("typtype"), "{error}");
+    assert!(error.contains("unknown type code 109"), "{error}");
+
+    let null = connection.query("SELECT NULL::int4multirange IS NULL").await.unwrap();
+    assert_eq!(null.rows, vec![vec![Value::Bool(true)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_tstzrange_is_explicitly_unsupported() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
