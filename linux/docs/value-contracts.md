@@ -1134,10 +1134,11 @@ That changed the instant by nine hours. The type metadata contains the IANA zone
 so the decoder now applies timezone rules and returns the corresponding UTC
 `TimestampTz`, retaining the fractional seconds.
 
-The decoder refuses unknown zones and local times in DST gaps or folds. The
-ClickHouse row format returns a local wall clock without its offset, so those
-values do not identify a unique instant and must not be guessed. Untagged
-`DateTime` and `DateTime64` values remain timezone-free `DateTime` values.
+The decoder refuses unknown zones and local wall-clock strings that fall in DST
+gaps or folds. The ClickHouse row format returns a local wall clock without its
+offset, so an ambiguous returned value does not identify a unique instant and
+must not be guessed. Untagged `DateTime` and `DateTime64` values remain
+timezone-free `DateTime` values.
 
 Unit tests cover type wrappers, Tokyo conversion, unknown zones, and New York DST
 gaps/folds. A Docker integration test first failed with `DateTime(12:34...)`
@@ -1158,6 +1159,17 @@ parameter consumers refuse it. The focused test passed against ClickHouse
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_ambiguous_datetime64_local_time_is_refused -- --include-ignored --exact --test-threads=1
+```
+
+A third server check supplies the nonexistent spring-forward local time
+`2024-03-10 02:30:00` to `DateTime64(3, 'America/New_York')`. ClickHouse 24.8
+normalizes it to returned local time `01:30:00.000`; the server epoch oracle is
+`1710052200000` (`2024-03-10T06:30:00Z`). BookiE decodes that normalized,
+unambiguous server result to the exact UTC instant. This tests server behavior
+for the supplied expression; it does not preserve the nonexistent civil input.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nonexistent_datetime64_input_matches_server_normalization -- --include-ignored --exact --test-threads=1
 ```
 
 Run the focused checks locally with:

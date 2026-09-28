@@ -594,6 +594,28 @@ async fn value_contract_ambiguous_datetime64_local_time_is_refused() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_nonexistent_datetime64_input_matches_server_normalization() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query(
+            "SELECT stamp, toString(stamp) AS local_text, toUnixTimestamp64Milli(stamp) AS epoch_ms \
+             FROM (SELECT toDateTime64('2024-03-10 02:30:00', 3, 'America/New_York') AS stamp)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::TimestampTz("2024-03-10T06:30:00Z".parse().unwrap()),
+            Value::Text("2024-03-10 01:30:00.000".into()),
+            Value::Int(1_710_052_200_000),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_roundtrip_common_types() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
