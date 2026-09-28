@@ -1335,6 +1335,25 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --tes
 
 The focused MongoDB 7 Docker contract passed.
 
+### MongoDB negative Decimal128 CSV formula marker
+
+The default CSV exporter prefixes negative text cells with an apostrophe to
+prevent spreadsheet formula execution. Before the fix, typed CSV import tried
+to parse `'-123.45` directly as a decimal and returned `NotANumber`. The core
+importer now removes that marker only when the destination column is Decimal
+and the remaining cell parses as an exact `rust_decimal::Decimal`; ordinary
+text retains the apostrophe. A MongoDB 7 contract exports a native Decimal128,
+parses the default sanitized CSV against the `decimal` column metadata, applies
+the imported value through a keyed grid update, and confirms the native BSON
+value remains exactly Decimal128 `-123.45`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib formula_marker_is_removed_from_negative_decimal_cells_only_for_decimal_columns
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128 -- --include-ignored --exact --test-threads=1
+```
+
+Both the focused core regression and MongoDB 7 Docker contract passed.
+
 Focused local results:
 
 ```sh

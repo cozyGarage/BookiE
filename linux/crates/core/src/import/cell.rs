@@ -265,6 +265,11 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         {
             return Ok(Value::Text(value.to_owned()));
         }
+        if kind == ColumnKind::Decimal
+            && let Some(value) = sanitized_decimal(text)
+        {
+            return Ok(Value::Decimal(value));
+        }
         return match parse_cell(text, kind) {
             Ok(value) => Ok(value),
             Err(_)
@@ -299,6 +304,10 @@ fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a
         return Some(value);
     }
     None
+}
+
+fn sanitized_decimal(text: &str) -> Option<Decimal> {
+    text.strip_prefix('\'')?.parse().ok()
 }
 
 #[cfg(test)]
@@ -406,6 +415,17 @@ mod tests {
                 Value::Text("'-170141183460469231731687303715884105728".into()),
             ]
         );
+    }
+
+    #[test]
+    fn formula_marker_is_removed_from_negative_decimal_cells_only_for_decimal_columns() {
+        let columns = vec![column("amount", "decimal"), column("text", "String")];
+        let row = vec!["'-123.45".to_owned(), "'-123.45".to_owned()];
+        let values = row_to_values(&row, &[Some(0), Some(1)], &columns, &CsvImportOptions::default(), 2)
+            .expect("sanitized decimal is parsed while text keeps its formula marker");
+
+        assert_eq!(values[0], Value::Decimal(Decimal::new(-12345, 2)));
+        assert_eq!(values[1], Value::Text("'-123.45".into()));
     }
 
     #[test]

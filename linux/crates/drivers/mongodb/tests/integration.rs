@@ -297,6 +297,75 @@ async fn decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128() {
+    use mongodb::bson::{Decimal128, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("negative_decimal_csv_round_trip");
+    let decimal = "-123.45".parse::<Decimal128>().unwrap();
+    collection
+        .insert_one(doc! { "_id": "source", "amount": decimal })
+        .await
+        .expect("seed negative Decimal128");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let result = connection
+        .query("db.negative_decimal_csv_round_trip.find({})")
+        .await
+        .expect("read source Decimal128");
+    let id_index = result.columns.iter().position(|column| column.name == "_id").unwrap();
+    let amount_index = result
+        .columns
+        .iter()
+        .position(|column| column.name == "amount")
+        .unwrap();
+    assert_eq!(result.columns[amount_index].data_type, "decimal");
+
+    let csv = tablepro_core::export::render_csv(
+        &result.columns,
+        &result.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    assert!(csv.contains("\"'-123.45\""), "{csv}");
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let import_columns = [result.columns[id_index].clone(), result.columns[amount_index].clone()];
+    let imported =
+        tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &import_columns, &import_options, 2)
+            .expect("valid formula marker is removed for the typed decimal column");
+    assert!(matches!(imported[1], Value::Decimal(_)), "{:?}", imported[1]);
+
+    let mut columns = result.columns.clone();
+    columns[id_index].primary_key = true;
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "negative_decimal_csv_round_trip",
+        &columns,
+        &[(amount_index, imported[1].clone())],
+        &[imported[0].clone()],
+    )
+    .unwrap();
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply typed imported edit");
+
+    let persisted = collection
+        .find_one(doc! { "_id": "source" })
+        .await
+        .expect("read persisted Decimal128")
+        .expect("source document exists");
+    assert_eq!(persisted.get("amount"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn browse_page_types_include_documents_after_the_metadata_sample() {
     use mongodb::bson::{Decimal128, doc};
 
