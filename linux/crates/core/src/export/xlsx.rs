@@ -218,6 +218,10 @@ mod tests {
                 Value::TimestampTz("2024-11-03T06:30:00Z".parse().unwrap()),
                 "2024-11-03T06:30:00+00:00",
             ),
+            (
+                Value::TimestampTz("2026-09-27T12:34:56.123456789+05:30".parse().unwrap()),
+                "2026-09-27T07:04:56.123456789+00:00",
+            ),
         ];
         for (value, expected) in cases {
             let (sheet, strings) = workbook_parts(std::slice::from_ref(&value));

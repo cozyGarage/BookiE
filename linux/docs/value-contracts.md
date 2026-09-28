@@ -863,6 +863,12 @@ include their UTC offset; the two distinct instants in a repeated DST hour stay
 distinct. This intentionally trades spreadsheet date arithmetic for exact text
 when the native cell cannot carry the contract.
 
+A timestamp originating at `+05:30` with nine fractional digits is also checked
+in the XLSX shared string. The emitted canonical UTC text is
+`2026-09-27T07:04:56.123456789+00:00`, preserving the exact instant across the
+offset conversion; the corresponding CSV typed-import contract independently
+checks the same instant.
+
 Three added unit contracts inspect ZIP worksheet/shared-string XML: temporal
 fallbacks, native boundary dates/whole-second cells, and finite/nonfinite floats
 versus NULL. The temporal test failed before the fix. Eight XLSX unit tests pass.
