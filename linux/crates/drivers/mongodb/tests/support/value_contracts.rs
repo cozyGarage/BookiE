@@ -648,3 +648,84 @@ async fn value_contract_javascript_code_grid_edit_preserves_native_bson() {
         Some(&Bson::JavaScriptCode("return after;".into()))
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_db_pointer_grid_edit_preserves_native_bson() {
+    use mongodb::bson::{Bson, doc};
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("dbpointer_edits");
+    let before_pointer = Bson::try_from(serde_json::json!({
+        "$dbPointer": {
+            "$ref": "legacy.before",
+            "$id": { "$oid": "0123456789abcdef01234567" }
+        }
+    }))
+    .expect("construct initial BSON DbPointer");
+    let after_pointer = Bson::try_from(serde_json::json!({
+        "$dbPointer": {
+            "$ref": "legacy.after",
+            "$id": { "$oid": "fedcba987654321001234567" }
+        }
+    }))
+    .expect("construct edited BSON DbPointer");
+    collection
+        .insert_one(doc! { "_id": "source", "value": before_pointer })
+        .await
+        .expect("seed BSON DbPointer");
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let before = connection
+        .query("db.dbpointer_edits.find({})")
+        .await
+        .expect("read before edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_index = before.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(before.columns[value_index].data_type, "dbpointer");
+    assert_eq!(
+        before.rows[0][value_index],
+        Value::Json(
+            Bson::try_from(serde_json::json!({
+                "$dbPointer": {
+                    "$ref": "legacy.before",
+                    "$id": { "$oid": "0123456789abcdef01234567" }
+                }
+            }))
+            .unwrap()
+            .into_canonical_extjson()
+        )
+    );
+
+    let edited_marker = Value::Json(after_pointer.clone().into_canonical_extjson());
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "dbpointer_edits",
+        &before.columns,
+        &[(value_index, edited_marker.clone())],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build DbPointer grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply DbPointer grid edit");
+
+    let after = connection
+        .query("db.dbpointer_edits.find({})")
+        .await
+        .expect("read after edit");
+    assert_eq!(after.rows[0][value_index], edited_marker);
+    let persisted = collection
+        .find_one(doc! { "_id": "source" })
+        .await
+        .expect("read native persisted BSON")
+        .expect("source document exists");
+    assert_eq!(persisted.get("value"), Some(&after_pointer));
+}

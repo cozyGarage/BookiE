@@ -83,11 +83,11 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `7b42666e00b4bf0fb35b5a0258d13aded0543de1` on 2026-09-28; it is an
-inventory, not a fresh run of every suite. The current worktree contains the mixed
-MongoDB BSON export fix, unignored BSON round-trip and seeded-float regressions,
-and their local evidence below; these changes are not part of that commit. A
-passing scalar suite does not establish complete native-type support.
+`linux` commit `c05b1f000b12146b307735b6bb7a6a2749ade2f9` on 2026-09-29; it is an
+inventory, not a fresh run of every suite. The current worktree additionally has
+a MongoDB 7 DbPointer grid-write regression, passed alone and in the complete
+18-test integration suite; it is not part of that commit. A passing scalar suite
+does not establish complete native-type support.
 
 | Path | Assertions |
 | --- | --- |
@@ -1496,14 +1496,14 @@ mixed String/Decimal128 identity through the JSON renderer and CSV exporter. A
 second non-ignored unit case builds metadata from a String sample, merges a later
 Decimal128 page value, and checks that the merged column is `mixed` before that
 value is decoded with its canonical BSON marker.
-Top-level Timestamp, regex, MinKey, MaxKey, JavaScriptCode, JavaScriptCodeWithScope
-and Symbol grid edits also round-trip as native BSON. JavaScriptCode is checked
-separately without scope; the CodeWithScope regression checks both stored code
-and its Int64 scope value; the Symbol regression checks a stored native BSON
-Symbol through the native client. The mixed String/Decimal128 grid case is
-covered as a read-only refusal; exact editing remains unsupported. Other
-top-level BSON kinds outside the named server-backed edits remain open, even
-where codec conversion now has a non-ignored round-trip unit test.
+Top-level Timestamp, regex, MinKey, MaxKey, JavaScriptCode, JavaScriptCodeWithScope,
+Symbol and DbPointer grid edits round-trip as native BSON. JavaScriptCode is
+checked separately without scope; the CodeWithScope regression checks both
+stored code and its Int64 scope value; the Symbol and DbPointer regressions read
+back native BSON values through the MongoDB client. The mixed String/Decimal128
+grid case is covered as a read-only refusal; exact editing remains unsupported.
+Other top-level BSON kinds outside the named server-backed edits remain open,
+even where codec conversion has a non-ignored round-trip unit test.
 
 Focused local checks:
 
@@ -1515,6 +1515,7 @@ rtk cargo test --manifest-path linux/Cargo.toml --locked -p tablepro-driver-mong
 rtk cargo test --manifest-path linux/Cargo.toml --locked -p tablepro-driver-mongodb --lib page_type_conflict_marks_column_mixed_before_decoding_late_values
 cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson_special_values_keep_exact_extended_json_types --include-ignored --test-threads=1
 cargo test --locked -p tablepro-driver-mongodb --test integration a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::value_contract_db_pointer_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
 ```
 
 Against the old decoder, the regression failed with
@@ -1559,7 +1560,7 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --tes
 
 The contract first failed against the old decoder because CSV flattened both
 values to the same text. After the fix, the focused test passed. The full MongoDB
-unit suite passed (31 tests), and the Docker-backed integration suite passed (17
+unit suite passed (31 tests), and the Docker-backed integration suite passed (18
 tests) on the current worktree. These are local results, not CI evidence. The
 earlier MongoDB 7 query/export/import and MCP browse Docker tests passed with
 large Int64, null and Unicode values added on 2026-09-28.
