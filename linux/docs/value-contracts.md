@@ -39,6 +39,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 
 The focused local DuckDB contract passed.
 
+## DuckDB duplicate result column names, 2026-09-28
+
+A local `UNION ALL` result returns two columns with the same alias and two rows.
+The contract asserts that both names remain `duplicate`, values stay in their
+original columns and row order, and the result is not marked truncated. This
+preserves the engine result shape without inventing unique aliases.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration query_preserves_duplicate_column_names_and_row_order -- --exact
+```
+
+The focused local DuckDB contract passed.
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,

@@ -54,6 +54,32 @@ async fn query_with_zero_rows_preserves_column_metadata_and_completeness() {
     );
 }
 
+#[tokio::test]
+async fn query_preserves_duplicate_column_names_and_row_order() {
+    let connection = native_connection().await;
+    let result = connection
+        .query("SELECT 17 AS duplicate, 'second' AS duplicate UNION ALL SELECT 23, 'fourth'")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["duplicate", "duplicate"]
+    );
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(17), Value::Text("second".into())],
+            vec![Value::Int(23), Value::Text("fourth".into())],
+        ]
+    );
+    assert!(!result.truncated);
+}
+
 async fn native_connection() -> Box<dyn Connection> {
     DuckdbDriver
         .connect(ConnectOptions {
