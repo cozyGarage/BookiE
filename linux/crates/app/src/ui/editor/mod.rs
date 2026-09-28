@@ -31,7 +31,7 @@ pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_sch
 use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements, summary_label};
 use schema::{apply_editor_font_size, apply_editor_scheme};
 use sql_text::toggle_line_comment;
-use statement_cursor::{script_statements, statement_at_cursor};
+use statement_cursor::{cursor_byte_offset, script_statements, statement_at_cursor};
 
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
@@ -627,7 +627,7 @@ impl SimpleComponent for SqlEditor {
                 let (start, end) = buffer.bounds();
                 let sql = buffer.text(&start, &end, false).to_string();
                 let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-                let cursor_byte: usize = sql.chars().take(cursor_chars).map(char::len_utf8).sum();
+                let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
                 let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
                 let Some(statement) = statement_at_cursor(&sql, &driver_id, cursor_byte) else {
                     self.status.set_label(&crate::tr!("No statement at cursor"));
@@ -1054,7 +1054,7 @@ fn build_completion_refresh(
         let (start, end) = buffer.bounds();
         let sql = buffer.text(&start, &end, false).to_string();
         let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
-        let cursor_byte: usize = sql.chars().take(cursor_chars).map(char::len_utf8).sum();
+        let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
         let Ok(index) = schema_index.try_borrow() else {
             return;
         };

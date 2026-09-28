@@ -16,6 +16,10 @@ pub fn plan_for(text: &str, grammar: SqlGrammar) -> ScriptPlan {
     ScriptPlan::build(text, grammar, LexicalSettings::default_for(grammar))
 }
 
+pub fn cursor_byte_offset(text: &str, character_offset: usize) -> usize {
+    text.chars().take(character_offset).map(char::len_utf8).sum()
+}
+
 #[derive(Debug, Clone)]
 pub struct PlannedStatements {
     pub statements: Vec<String>,
@@ -94,6 +98,25 @@ mod tests {
         );
         assert!(script_statements("SELECT 1\nGO 2", "mssql").is_err());
         assert!(script_statements("SELECT 'unfinished", "postgres").is_err());
+    }
+
+    #[test]
+    fn gtk_character_offset_after_multibyte_text_selects_the_following_statement() {
+        let sql = "SELECT '東京'; SELECT 2";
+        let expected_byte = sql.find("SELECT 2").unwrap();
+        let character_offset = sql[..expected_byte].chars().count();
+        let cursor_byte = cursor_byte_offset(sql, character_offset);
+
+        assert_eq!(cursor_byte, expected_byte);
+        assert!(cursor_byte > character_offset);
+        assert_eq!(
+            statement_at_cursor(sql, "postgres", character_offset),
+            Some("SELECT '東京'".into())
+        );
+        assert_eq!(
+            statement_at_cursor(sql, "postgres", cursor_byte),
+            Some("SELECT 2".into())
+        );
     }
 
     #[test]

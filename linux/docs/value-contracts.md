@@ -69,6 +69,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-policy --test admini
 
 The test passed. No production defect was exposed.
 
+The editor also converts GTK's character offset to a UTF-8 byte offset before
+asking the planner for a statement. A focused app regression places `東京` in
+the first statement and positions the cursor at the start of the second; it
+asserts the mapped byte offset and that the editor selects `SELECT 2`. The
+conversion was already present inline, so this closes an evidence gap rather
+than correcting a behavior mismatch.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib gtk_character_offset_after_multibyte_text_selects_the_following_statement -- --test-threads=1
+```
+
+The test passed.
+
 Text cases include empty strings, numeric-looking strings, Unicode, apostrophes,
 quotes, backslashes, line breaks and text beyond 256 KiB. Float assertions in the
 SQL harness compare bit patterns. Existing driver tests still cover binary
