@@ -462,6 +462,27 @@ mod tests {
     }
 
     #[test]
+    fn postgres_numeric_array_grid_literal_stays_text_for_the_shared_cast() {
+        let literal =
+            r#"{1234567890123456789012345678901234567890.12345678901234567890,1.2300,NaN,Infinity,-Infinity,NULL}"#;
+        let mut columns = vec![col("id", false), col("numeric[]", false)];
+        columns[0].primary_key = true;
+        let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
+        assert_eq!(parsed, Value::Text(literal.into()));
+        let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            "numeric_array_grid",
+            &columns,
+            &[(1, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert!(sql.contains("$1::text::pg_catalog.numeric[]"));
+        assert_eq!(params[0], Value::Text(literal.into()));
+    }
+
+    #[test]
     fn normalize_single_line_leaves_plain_text_untouched() {
         assert_eq!(normalize_single_line_input("hello world"), "hello world");
     }

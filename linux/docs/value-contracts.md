@@ -295,6 +295,14 @@ unsupported element OIDs, custom/user-defined arrays
 and automatic array parameter typing remain outside the tested support surface.
 B3 remains open.
 
+A separate `numeric[]` grid contract now feeds an exact literal containing a
+wide numeric with 20 fractional digits, a scale-preserving `1.2300`, NaN,
+positive and negative Infinity, and a NULL element through the shared numeric[]
+cast. Its independent server oracle unnests with ordinality, checks NULL
+separately, and compares every element as `numeric::text`. The app
+parser-to-builder unit, PostgreSQL scalar numeric decoder unit, escaped-text
+array unit, and Docker-backed numeric[] grid assertion passed against PostgreSQL.
+
 ## ClickHouse wide integer parser contract, 2026-09-28
 
 ClickHouse `Int128` and `UInt128` values cannot fit `Value::Int`. A local

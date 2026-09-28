@@ -172,6 +172,57 @@ async fn value_contract_array_grid_edit_preserves_array_elements() {
     assert_array_grid_edit(connection.as_ref()).await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_numeric_array_grid_edit_preserves_elements() {
+    const NUMERIC_ARRAY: &str =
+        "{1234567890123456789012345678901234567890.12345678901234567890,1.2300,NaN,Infinity,-Infinity,NULL}";
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TABLE numeric_array_grid_edit (id integer PRIMARY KEY, value numeric[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO numeric_array_grid_edit VALUES (1, ARRAY[0]::numeric[])")
+        .await
+        .unwrap();
+    let mut row = connection.query("SELECT * FROM numeric_array_grid_edit").await.unwrap();
+    let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
+    row.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "numeric_array_grid_edit",
+        &row.columns,
+        &[(value_index, Value::Text(NUMERIC_ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let elements = connection
+        .query("SELECT ordinality, item IS NULL, item::text FROM numeric_array_grid_edit CROSS JOIN LATERAL unnest(numeric_array_grid_edit.value) WITH ORDINALITY AS element(item, ordinality) ORDER BY ordinality")
+        .await
+        .unwrap();
+    assert_eq!(
+        elements.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Bool(false),
+                Value::Text("1234567890123456789012345678901234567890.12345678901234567890".into()),
+            ],
+            vec![Value::Int(2), Value::Bool(false), Value::Text("1.2300".into())],
+            vec![Value::Int(3), Value::Bool(false), Value::Text("NaN".into())],
+            vec![Value::Int(4), Value::Bool(false), Value::Text("Infinity".into())],
+            vec![Value::Int(5), Value::Bool(false), Value::Text("-Infinity".into())],
+            vec![Value::Int(6), Value::Bool(true), Value::Null],
+        ]
+    );
+}
+
 fn assert_array_value(kind: &str, result: &QueryResult) {
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Null | Value::Text(_)), "{kind}: {value:?}");
