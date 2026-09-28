@@ -3,6 +3,189 @@
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
+## Current continuation plan: 2026-09-28
+
+Working branch: **`linux`**. Reviewed tip:
+`85fecbe0b1d86d2deac3c040c63f24712333854a` (source version 0.1.5).
+Target: **0.2.0**, implementation in progress; no release approved by this review.
+The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
+commits in the September 26–28 window and records delivered work and open risks.
+Earlier dated reviews and implementation entries below remain historical evidence.
+This section supersedes their next-task order and desktop-target requirements.
+
+### Priority and desktop scope
+
+1. **B3:** finish the remaining value and consumer contracts, one reproducible case
+   per task. Reuse the existing corpus, engine fixtures and change-contract runner.
+2. **B4:** finish the open transport, policy, daemon and GUI tasks on the
+   [task board](b4-task-board.md). A completed lane does not close the milestone.
+3. **Arch Linux / Omarchy / Hyprland / native Wayland UI:** verify the resulting
+   connection, session, grid and editor workflows, then package/upgrade/rollback.
+   The existing B5/B6 implementations enter through this acceptance pass.
+4. **GNOME desktop on Debian / native Wayland UI and packaging:** the required
+   next phase after the Arch pass. Complete Debian recipe task I1, installed
+   workflows and upgrade/rollback before closing desktop qualification.
+
+GTK/libadwaita and the already integrated GNOME 50 API/library requirements remain
+part of the build on Arch. The GNOME/Debian phase follows Arch in the same plan.
+Keep existing cross-platform Linux CI checks; environment checks scheduled after
+Arch remain pending, not passed. Flatpak compatibility decision I2 remains a bounded B4 task;
+full Flatpak release qualification follows later packaging work. No GNOME/Debian
+VM setup is a prerequisite for current B3/B4 implementation or the Arch UI pass.
+
+### Current milestone status
+
+| Milestone | Status at review tip | Next acceptance |
+| --- | --- | --- |
+| B1 | Platform foundation integrated; source version is 0.1.5 | Installed Arch candidate first, then required Debian/GNOME qualification; full Flatpak qualification remains separate |
+| B2 | Implemented; retain completed code and migration safeguards | Installed Arch upgrade/rollback in B7 |
+| B3 | Substantial eight-driver and export coverage; still open | Remaining native-type targets, exact editing, consumer parity and mutation triage |
+| B4 | A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence | C6, E, F, G3/G5 and active I tasks; A5 monitor follow-up F9 |
+| B5/B6 | Editor files and read-only PostgreSQL catalog implemented | Arch Wayland file-dialog/recovery and catalog stale/restricted-role acceptance |
+| B7 | Open; this review is documentation only | Freeze SHA, affected automated gates, installed Arch then Debian/GNOME acceptance and retry-free soak |
+
+### B3 work packets for Luna
+
+Start with **B3-P1**, then take one bounded case from P2–P5. Split a packet by
+engine/type/consumer before handing it off. Preserve known text fallbacks and
+explicit refusals; do not equate refusal with completed exact support. The
+[type matrix](type-contract-strategy.md) and [value evidence](value-contracts.md)
+carry detailed native-type targets. Do not rebuild completed scalar/BSON/export work.
+
+| Packet | Scope / files to inspect | Deliverable and completion evidence |
+| --- | --- | --- |
+| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, `docs/b3-test-scenario-survey.md`, `docs/value-contracts.md`; inspect corresponding tests | Map each remaining type/consumer to exact support, exact text, refusal or untested. Include September 27–28 MongoDB top-level edits and nested numeric/text cases. Name one smallest uncovered case and its runnable command. Documentation only; no broad feature implementation. |
+| B3-P2: PostgreSQL boundary | `crates/drivers/postgres/{src,tests}`, affected core literal/parser path only | One calendar/array/native-type gap from P1, with an independent native wire/server oracle and a consumer round trip. Record baseline failure or already-covered result; add no type abstraction without a caller. |
+| B3-P3: consumer parity | One format in `crates/core/src/export/`, affected driver test and existing value corpus | One missing empty/NULL, float/subnormal, delimiter/newline, temporal or nested case. Parse output and compare exact value/type; verify destination preservation on refusal. |
+| B3-P4: grid edit / bind | One driver plus `crates/app/src/ui/browse_tab/value_parse.rs` and existing edit/parser tests as needed | One mixed-storage/BSON or exact numeric edit gap. Assert original row identity and native persisted value. Ranges beyond safe support must refuse visibly without a lossy write. |
+| B3-P5: delivery / SQL boundaries | Existing core planner/lexer/parameter tests or one driver's result tests | One comment/CRLF/Unicode/malformed-tail or row-cap/zero-row/mid-stream case. Assert statement identity/order or result completeness and connection state. |
+| B3-P6: mutation triage | Retained quality reports and the tests for one changed decoder/consumer | Classify one survivor/timeout group; add independent assertions for genuine misses and rerun that scope. Missing reports are blocked evidence, not equivalent mutants. |
+
+P2–P5 must also retain the remaining driver targets in the matrix: DuckDB
+interval/collections and high-precision bindings, SQL Server temporal/money/variant,
+ClickHouse bounds/wide/nested values, MySQL session modes, Redis nested/binary
+semantics and MongoDB mixed-type editing. Audit first; do not silently remove
+those targets to mark B3 done. Close B3 only when each in-scope contract has
+explicit evidence and outstanding correctness findings are resolved.
+
+### B4 next order
+
+Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the
+sprint milestone numbers. Keep one owner for shared editor/policy files.
+
+| Order | Tasks | Outcome / dependencies |
+| --- | --- | --- |
+| 1 | E1 then E2; G3 | Refuse implicit/unterminated shared transactions; refuse cached sessions when key material cannot be verified, including after connect. Separate policy and agentd packets. |
+| 2 | F1; F3 then F5 then F2 | Capability-correct Stop; session identity guards; retired toggle; awaited rollback before close/disconnect. One editor owner, sequential commits. D3 is already available. |
+| 3 | F4 and F9 | Retire old editor sessions on reconnect and consume the built-in tunnel closed-state API in the monitor. Coordinate with the editor owner. |
+| 4 | F6; F8 | Confirm built-in host keys on connect/reconnect; isolate unknown-write blocking/recovery by connection. Include denied and allowed paths. Shared trust/audit changes need review before closure. |
+| 5 | C6; G5 | Real MySQL/SQL Server TLS through SSH, and unattended agentd OpenSSH refusal/success. Use existing TLS/SSH fixtures; mocks cannot qualify these tasks. |
+| 6 | I2, I3, I5; then F7 | Explicit Flatpak refusal and accurate docs/tier ownership; transport audit records; isolated Session GTK flow after lifecycle fixes. I4 manual steps were added in this review; runtime checks remain pending. |
+| After Arch | I1 | Required Debian rules recipe and validator askpass fix for the GNOME/Debian phase. |
+
+A, B, D and H regressions stay retained. Their per-task evidence is archived on
+the board. Run affected layers after integration, especially after the September 28
+MongoDB/function refactors; earlier lane passes do not verify the final tree.
+
+### Arch / Omarchy / Wayland UI packets
+
+Use [the manual checklist](manual-verification-0.2-features.md) and the existing
+[Omarchy package guide](omarchy.md). Work on application widgets and resources;
+this plan does not request changes to the user's Hyprland or system configuration.
+
+| Packet | Scope | Acceptance |
+| --- | --- | --- |
+| UI-A1: connections / SSH | Connection dialog/list, driver defaults, TLS/SSH prompts | Defaults match each driver; editing saved values preserves them; narrow dialog title/actions fit; focus/Enter/Escape work; host-key decline writes nothing. Native Wayland, light/dark screenshots. |
+| UI-A2: editor / session | Stop, Session labels/prompts, reconnect, close/disconnect, Open/Save/recovery | Verify B4 F1–F9 applicable paths and B5 file-dialog/dirty-close/restart behavior with database/audit postconditions. No stale session labels or unfinished rollback. |
+| UI-A3: grid / export / catalog | Browse shortcuts, full long-cell and typed edits, import/export, catalog | Correct shortcut glyphs/actions; exact persisted values; error/empty/denied states; restricted-role and stale catalog results; light/dark screenshots. |
+| UI-A4: installed candidate | Arch package, desktop entry, askpass, GSettings, profile isolation | Freeze a clean SHA; install, upgrade and rollback without losing connections, secrets, drafts, history or audit. Record native Wayland backend, scale, monitor layout, versions and package checksum. |
+
+For A1–A3 check keyboard navigation, clipboard, context menus/popovers, dialog
+placement, scrolling, resizing and fractional scaling on the actual Omarchy
+session. Treat Xvfb `widgets`/`ui` as automated regressions, not native Wayland
+acceptance. Screenshots and checkmarks must identify the binary/package SHA and
+actual backend. Record failed, blocked and not-run items explicitly.
+B7 retains 30 consecutive retry-free GTK attempts across at least six runs at one
+candidate SHA, plus installed Arch Wayland acceptance. If qualification targets
+change, record that decision. GNOME/Debian acceptance remains required after Arch.
+
+### Required next phase: GNOME on Debian Wayland
+
+Start when UI-A1–A4 have recorded Arch results. This is sequential work in the
+0.2 continuation plan, not a removed or optional target. Use a clean Debian VM
+with GNOME/Wayland and system libraries that satisfy the current GTK build.
+Record the exact Debian release and library versions rather than assuming that
+an arbitrary stable release meets the GNOME 50 API requirements.
+
+| Packet | Work | Completion evidence |
+| --- | --- | --- |
+| UI-D1: Debian package | Fix B4 I1 in `packaging/debian/rules`; validate askpass, binaries/aliases, desktop/AppStream files, GSettings and resources | Build and inspect a real `.deb` at the recorded SHA; package validators pass and required files are installed |
+| UI-D2: GNOME desktop | Repeat UI-A1–A3 and applicable manual checks under native GNOME Wayland | Light/dark screenshots, keyboard/focus, clipboard, dialogs/file chooser, notifications, keyring and scaling; database/audit postconditions at the installed SHA |
+| UI-D3: migration and rollback | Install, upgrade, restart and rollback using existing migration procedures | Connections, secrets, preferences, drafts, history and audit remain recoverable; profile isolation holds |
+| UI-D4: reconcile qualification | Compare Arch/GNOME results and resolve platform-specific defects | Both environments have explicit pass/fail/blocked results; fixes rerun affected checks on both targets |
+
+B7 closes desktop qualification only after both installed passes and the existing
+candidate gates. If the Debian pass changes source, freeze the resulting SHA
+and rerun affected Arch checks; the earlier package does not certify the new one.
+Publication remains a separate action.
+
+### Immediate execution checkpoints
+
+1. **Inventory:** run B3-P1 against current `linux`; return a type/consumer matrix,
+   completed-case evidence and one smallest untested case. Inspect September 28
+   refactors first so the task uses current module paths. This is a bounded
+   documentation handoff, not another whole-repository audit.
+2. **B3 implementation:** take one P2/P3/P4/P5 case at a time. Reproduce, preserve
+   exact server/file expectations, fix the conversion boundary, and run the
+   affected crate plus selected shared layers. Triage relevant P6 mutation
+   findings alongside the changed logic. Update the evidence ledger per commit.
+3. **B4 implementation:** begin with E1, E2 and G3; continue through the ordered
+   editor, monitor/trust, TLS/daemon and audit tasks above. Give Luna one task ID
+   and explicit file ownership. Review shared security/lifecycle changes before
+   marking the task complete. Do not rerun completed lanes without an affected
+   change or unresolved failure.
+4. **Arch UI:** complete A1, A2 and A3, fixing reproduced layout/interaction bugs;
+   then freeze and package A4. Render each changed surface in light and dark on
+   actual Omarchy Wayland and record database/audit outcomes for safety flows.
+5. **GNOME/Debian:** complete D1–D4 after Arch, then reconcile B7 against the final
+   candidate. Unchecked installed flows and failed/incomplete mutation measurements
+   remain open until resolved with evidence.
+
+For each implementation handoff, request: initial SHA and status, one failing
+reproducer, smallest patch, regression command/results, applicable layer reports,
+remaining gaps and resulting SHA. No new abstraction, dependency or test runner
+is needed just to dispatch these tasks.
+
+### Ready-to-use Luna handoff
+
+Choose **B3-P1** for the first Luna task. Subsequent tasks take one case or one B4
+ID from the tables above, with its file scope and dependencies. Luna's returned
+changes need review for cross-consumer and security effects before marking done.
+
+```text
+Worktree: /home/trung/Projects/tablepro; working branch: linux.
+Read CLAUDE.md, PLAN.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
+(paths under linux/ for docs). Follow the RTK instruction for shell commands.
+Confirm current full HEAD and git status; reviewed baseline was
+85fecbe0b1d86d2deac3c040c63f24712333854a. Record any newer commits or local edits.
+Task: B3-P1 only. Reconcile remaining type/consumer coverage against current code
+and the archived September 26–28 review. Update the three B3 evidence documents.
+Allowed edits: linux/docs/type-contract-strategy.md,
+linux/docs/b3-test-scenario-survey.md, linux/docs/value-contracts.md.
+Return a concrete smallest next case, exact test command, existing evidence SHA,
+and open gaps. Do not claim new runtime passes from inspecting test source.
+No GNOME/Debian VM setup, production-code edits, release, push or publication.
+```
+
+For implementation packets, fill the [validation playbook task template](validation-playbook.md#agent-task-template)
+with the selected ID, allowed paths, initial SHA, narrow reproducer, runner layers
+and fixture ownership. Run the narrow regression first, then applicable `full`,
+`change-contracts`, `values`, `security-policy`, `ssh`, `tls`, `drivers`,
+`postgres-release`, `widgets` or `ui` layers from `linux/`. Existing tiers own the
+tests; no duplicate runners. Record actual commands, before/after results,
+reports, resulting SHA and all skipped/blocked scopes. Documentation packets
+need diff/link checks only. Serialize Cargo and Docker on a shared checkout.
+
 ## Goal and baseline
 
 Continue from the integrated BookiE 0.1.4 baseline toward 0.2.0 with the full upstream Linux foundation,
@@ -98,7 +281,8 @@ ran as five parallel worktree branches and is recorded in `CHANGELOG.md` under
 
 It is not verified. No new GTK surface has been rendered, so
 [manual-verification-0.2-features.md](manual-verification-0.2-features.md) is the gate
-between this and any release candidate. B3 and B4 follow after that.
+between this and any release candidate. Current sequencing is B3, B4, then
+Arch/Omarchy Wayland acceptance, as recorded in the continuation plan above.
 
 ## Ordered packages
 
@@ -160,7 +344,7 @@ adapters; never rewrite audit history. Before preferences/history/workspace form
 changes, create private backups, migrate transactionally/idempotently, retain legacy
 data until durable, and test documented restoration on package rollback.
 
-## Schedule, models and verification
+## Original schedule, models and verification (historical)
 
 September 16–29 checkpoint: A1–A4 and target frozen 0.1.1 candidate, then verification.
 B1 → B2 → B3 → B4; B5/B6 follow prerequisites; B7 last. Allow 6–9 weeks for one
@@ -450,7 +634,8 @@ not reused). A saved connection
 can use the system OpenSSH client (forced host-key checking, per-host secret
 binding, ProxyJump from ssh_config); the GUI prompts through GTK and agentd runs
 unattended. The askpass helper ships in the Arch, Debian and Meson builds; Flatpak
-cannot reach the host ssh and falls back to the built-in client.
+cannot reach the host ssh. B4 decision 2 requires explicit refusal with a
+clear message; implementation and both documentation paths remain task I2.
 
 Deferred beyond 0.2: administration mutations, bulk import/export/backup/restore,
 new engines, all-connection/window restoration, dashboards, built-in AI.

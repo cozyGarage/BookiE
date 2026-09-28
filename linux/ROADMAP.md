@@ -1,7 +1,7 @@
 # BookiE roadmap
 
 Active delivery plan: [BookiE 0.1.x → 0.2 sprint](docs/bookie-0.2-sprint.md),
-approved September 16, refreshed against 0.1.4 on September 17. It supersedes older sequencing below.
+approved September 16, continuation updated September 28 at `85fecbe0b` (source 0.1.5). It supersedes older sequencing below.
 See the [30-commit baseline review](docs/baseline-review-2026-09-17.md) before further convergence work.
 
 Current scope and verification are recorded in the [approved sprint ledger](docs/bookie-0.2-sprint.md). Prior audits retain evidence for their own source trees.
@@ -34,14 +34,15 @@ Status terms:
 | Structure editor | Implemented | Tables, columns, indexes, foreign keys and column comments; expression and partial PostgreSQL indexes are shown read-only; a column collation is kept on PostgreSQL, MySQL and SQL Server alters |
 | Saved connections and libsecret | Implemented | An unavailable, locked or cancelled keyring is reported with a recovery step; the Flatpak and host agentd sharing one keyring is unverified |
 | SSH and jump chains | Integrated | A verifying PostgreSQL connection forwards through a private Unix socket and is release-verified, headlessly as well as in the GUI; jump chains are JSON-only in the current GTK form. An optional system OpenSSH client (forced host-key prompts, per-host secret binding, ProxyJump from ssh_config) is implemented and tested against a real sshd, not release-verified. agentd refuses unknown host keys |
-| TLS modes | Partial | Release-verified on PostgreSQL, including `VerifyFull` through SSH. Release-verified on MySQL, ClickHouse, MongoDB, and Redis through the driver TLS fixture. Mapped but untested on SQL Server; custom certificate authorities are implemented but their real-server verification remains unproven. Saved connections carry a certificate authority. See [docs/connections.md](docs/connections.md) |
+| TLS modes | Partial | Release-verified on PostgreSQL, including `VerifyFull` through SSH. Release-verified on MySQL, ClickHouse, MongoDB, and Redis through the driver TLS fixture. SQL Server verify/wrong-CA/wrong-hostname and no-fallback fixture regressions were added September 27; TLS through SSH remains open (B4 C6), and the current candidate needs fresh evidence. Saved connections carry a certificate authority. See [docs/connections.md](docs/connections.md) |
 | Query history | Implemented | MCP access must be isolated before being re-exposed |
 | Export and import | Implemented | Loaded results export as CSV, JSON, Markdown, HTML, XML, SQL INSERT or Excel; CSV imports into a new or existing table under one scoped approval. Full-table snapshot streaming and Parquet are deferred |
 | Activity and EXPLAIN | Implemented | Administrative classification and numeric session-ID validation are covered |
 | Policy, MCP, and agentd | Integrated | Approval and audit failures deny governed operations; a policy file that cannot be read keeps the last good policy and leaves MCP off; `list_tables` and `describe_table` use the same timeout and identifier checks as the other metadata tools; read-only denial is release-verified against PostgreSQL; the GUI and agentd share one connection transport, release-verified through the fixture bastion |
 | Audit journal | Integrated | Durable intent/outcome records, recovery, private mode, and cross-process locking are locally verified |
 | Internal Arch RC | Implemented | Immutable-commit/checksum recipe exists; install, upgrade, rollback, and Wayland verification remain |
-| Debian, Flatpak, AUR | Scaffolded | Not release targets and not ready for public publication |
+| Debian | Scaffolded | Required installed GNOME/Wayland qualification after Arch; not qualified for publication |
+| Flatpak, AUR | Scaffolded | Not ready for public publication |
 | i18n and accessibility | Infrastructure | English strings/checklist exist; end-user verification is incomplete |
 
 ## Active phases
@@ -166,13 +167,16 @@ Phase 10 is in progress. Slice 10.2 added connection organisation: groups, tags,
 
 ## Next implementation target
 
-The 0.2 feature work in the [approved sprint](docs/bookie-0.2-sprint.md) is
-implemented: editor file workflows, read-only PostgreSQL catalog and types, dedicated
-editor sessions, the system OpenSSH transport, GSettings and history migrations, and
-the narrowed column-collation contract. What remains is qualification: render every
-new surface in [manual-verification-0.2-features.md](docs/manual-verification-0.2-features.md)
-in light and dark, a real Flatpak build, and the release-candidate gates below.
-Existing formatting, run-at-cursor, connection organization and DuckDB flat-file
-opening must not be recreated from historical backlog entries.
+Follow the [September 28 continuation plan](docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28):
+finish **B3 value/consumer contracts**, then **B4 transport, policy and session
+integration**, then verify the UI on **Arch/Omarchy/Hyprland native Wayland**.
+The [117-commit archive](docs/sprint-review-2026-09-28.md) records recent delivery;
+B3/B4 still include implementation gaps, not just qualification.
+
+GNOME desktop on Debian is the required next UI/package phase after Arch. Existing
+GTK/libadwaita library requirements and CI remain. Editor files and read-only
+catalog are implemented and enter the Arch UI checklist; use the sprint's bounded
+Luna packets. Do not recreate existing formatting, run-at-cursor, connection
+organization or DuckDB flat-file opening from historical backlog entries.
 
 RC release remains separate: freeze a candidate, collect 30 consecutive retry-free GTK attempts at that commit, and verify Arch install/upgrade/rollback under Wayland. The passing base-commit smoke job does not supply that ledger.

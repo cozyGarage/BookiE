@@ -5,6 +5,17 @@ on 2026-09-26, including long-cell edit seeding; this does not qualify the full
 installed workflows, layouts or light/dark appearance below. Unchecked items
 remain pending.
 
+Current target (2026-09-28): **Arch Linux / Omarchy / Hyprland, native Wayland**,
+after the B3/B4 continuation tasks. Repeat applicable installed checks on GNOME
+desktop under Debian Wayland immediately after the Arch pass; this phase is required. Use the [active sprint packets](bookie-0.2-sprint.md#arch--omarchy--wayland-ui-packets);
+Xvfb success does not establish native Wayland behavior.
+
+Record the full binary/package SHA, package checksum when installed, GTK backend,
+OS/Hyprland/GTK/libadwaita versions, display scale, light/dark mode, result and
+screenshot paths. Test both normal size and a narrow/resized window, keyboard
+focus, clipboard and popover/dialog placement. Mark blocked and not-run items
+explicitly. No boxes were checked by the September 28 documentation review.
+
 Take light and dark screenshots for each section, per `CLAUDE.md`. Record a result
 beside each item rather than leaving it blank, because a blank line here reads as
 "passed" to the next person.
@@ -46,6 +57,17 @@ icon button in a schema header for Table from CSV.
 - [ ] A file with a bad row partway through stops the import and the message says
       how many rows were written.
 - [ ] Import refuses to start on a read-only connection.
+
+## Connection dialog and browse shortcuts
+
+- [ ] New connection defaults match the selected driver; no PostgreSQL defaults
+      leak into another engine. Switching drivers and editing a saved connection
+      preserves intended custom values.
+- [ ] The current header title and grouped Test/Connect actions fit at narrow
+      width in light and dark; the title does not overlap the actions.
+- [ ] Enter submits the form and Escape dismisses without changing saved data.
+- [ ] Browse shortcuts show the actual Left, Right, Space and pointer modifiers;
+      keyboard and click actions match their labels.
 
 ## Connection list
 
@@ -119,6 +141,14 @@ icon button in a schema header for Table from CSV.
 - [ ] `TABLEPRO_LOG_FORMAT=json ./target/debug/tablepro` writes lines that parse as
       JSON; unset keeps the human format.
 
+## Built-in SSH host keys and tunnel loss
+
+- [ ] A new host shows its fingerprint before trust; decline/cancel writes no key
+      and opens no database connection. Explicit acceptance persists only that key.
+- [ ] A changed key is refused. Reconnect never silently learns an unknown key.
+- [ ] Bastion loss retires affected editor sessions and starts reconnect promptly;
+      a result from the old session cannot replace current state.
+
 ## SSH agent (built-in client)
 
 - [ ] Choose "SSH agent" in the SSH section with a key loaded in ssh-agent: the
@@ -156,6 +186,24 @@ beside the app binary, or an installed package).
       offer it yet and the button turns back off.
 - [ ] The audit journal shows the session's COMMIT or ROLLBACK against the same
       batch as the statements inside it.
+
+## Session failure and shutdown paths (B4 I4)
+
+- [ ] Stop appears only where server cancellation is supported; stopping a session
+      query records the terminal outcome and permits later supported queries.
+- [ ] A session timeout reports its actual cancelled/unknown state in the UI and
+      audit; it does not present an ambiguous write as safely undone.
+- [ ] Failed COMMIT after an aborted PostgreSQL transaction shows rollback; a
+      deferred-constraint failure clears the transaction-open state and retry does
+      not fabricate a second commit.
+- [ ] Window close and Disconnect with an open transaction ask first, honor Cancel,
+      and finish the chosen rollback/commit before teardown; verify persisted rows.
+- [ ] A retired session turns its toggle off; late state messages cannot relabel a
+      replacement session. Automatic reconnect retires the previous tab sessions.
+- [ ] An unknown write outcome blocks only its owning connection; another connection
+      stays usable. Restart/reconnect recovery follows the durable audit rules.
+- [ ] `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON`, `XA START` and an
+      unterminated transaction batch are refused on applicable shared connections.
 
 ## Filter by This Value
 
@@ -231,6 +279,7 @@ enough elements).
   before that gap can be closed. See `storage.md`.
 - SQL-format export and copied INSERT statements now preserve binary values on
   PostgreSQL, MySQL, SQLite, SQL Server and ClickHouse, with real-engine tests
-  for NULL, empty blobs and all 256 byte values. DuckDB binary SQL literals remain
-  unsupported and are explicitly refused. Other lossless-contract requirements
+  for NULL, empty blobs and all 256 byte values. DuckDB binary SQL literals also have a
+  NULL/empty/all-byte round-trip regression in the B3 ledger; installed acceptance
+  is still pending. Other lossless-contract requirements
   remain under B3.

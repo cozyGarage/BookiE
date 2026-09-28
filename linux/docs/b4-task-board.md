@@ -4,6 +4,18 @@ Surveyed on 2026-09-27 at `5fac54059` (source version 0.1.5). This board splits
 the open B4 work in [the 0.2 sprint](bookie-0.2-sprint.md) into small tasks that
 separate agents can take in parallel.
 
+## September 28 continuation
+
+Reviewed at `85fecbe0b`. See the [commit archive](sprint-review-2026-09-28.md)
+and [active order / Luna packets](bookie-0.2-sprint.md#b4-next-order).
+A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence;
+B4 remains open for C6, E, F, G3/G5 and active I tasks. A5's monitor follow-up is F9.
+Existing results apply to their recorded revisions; this review reran no tests.
+
+Current UI target: Arch/Omarchy/Hyprland native Wayland. GNOME desktop and Debian
+installed acceptance, including I1, are the required next phase after Arch. The GTK/libadwaita build stack
+remains. Use one bounded task per Luna handoff and serialize shared editor files.
+
 ## Rules for every task
 
 1. Audit the named behavior and cite the code.
@@ -34,7 +46,7 @@ Decided on 2026-09-27.
 | 6 | Tunnel setup and host-key refusal write no audit record. | Write audit records for both. |
 | 7 | agentd reuses a cached connection when it cannot verify the SSH key material (`agentd/src/lib.rs:312`). | Refuse it as a weaker fallback. |
 
-## Lane A: built-in SSH — done (2026-09-27)
+## Lane A: built-in SSH — implementation delivered; A5 monitor follow-up open
 
 Files: `crates/ssh/src/lib.rs`, `crates/ssh/tests/agent_auth.rs`.
 
@@ -44,7 +56,7 @@ Files: `crates/ssh/src/lib.rs`, `crates/ssh/tests/agent_auth.rs`.
 | A2 | Real-server tests for password, wrong password, rejected key and an encrypted key with passphrase. | ssh | done, `543bed77d` |
 | A3 | A real two-hop chain succeeds, and a changed key on the second hop returns a host-key mismatch. | ssh | done, `543bed77d` |
 | A4 | Keyboard-interactive login is not supported. Return a clear error and test it. | unit | done, `12bd158de` |
-| A5 | Add keepalive and expose tunnel loss, so a dead bastion triggers reconnect instead of driver timeouts. | unit, then release | done, `6fca02c24`. Keepalive and `SshTunnel::is_closed()` land in `crates/ssh`; wiring a reconnect from the transport layer on `is_closed()` is a follow-up outside this lane's file scope. |
+| A5 | Add keepalive and expose tunnel loss, so a dead bastion triggers reconnect instead of driver timeouts. | unit, then release | done, `6fca02c24`. Keepalive and `SshTunnel::is_closed()` land in `crates/ssh`; wiring a reconnect from the transport layer on `is_closed()` remains open as F9. This does not yet prove the complete reconnect behavior in A5. |
 
 ## Lane B: system OpenSSH — done (2026-09-27)
 
@@ -109,6 +121,7 @@ Files: `crates/app/src/ui/editor/*`, `crates/app/src/ui/app/*`, `crates/app/src/
 | F6 | Host-key prompt for built-in SSH. Decision 1. | unit, gtk-widgets |
 | F7 | An isolated GTK test: Session on, BEGIN, "transaction open" label, toggle off shows the dialog. | gtk-widgets |
 | F8 | Governed writes turn off only for the connection with the unknown outcome and return when that connection restarts. Decision 3. Document it in the manual checklist. | unit |
+| F9 | Consume the built-in `SshTunnel::is_closed()` state through transport/connection-monitor ownership, then retire old editor sessions and reconnect. A5 added the API but no consumer. Coordinate with F4; reproduce bastion loss against a real SSH fixture. | unit, ssh/release |
 
 F2, F3 and F5 share editor files and go to one agent in order.
 
@@ -120,7 +133,7 @@ Files: `crates/agentd`, `crates/mcp`, `crates/release-tests`.
 |---|---|---|---|
 | G1 | "agentd refuses unknown host keys" is backed only by a constant assert, and the release test uses `Learn`. Test with an empty `known_hosts`: refused, and no file written. | release | done, `96cd2f8f7` |
 | G2 | Race test for key material rotated between the digest and the connection, pending since the 2026-09-17 baseline review. | unit | done, `256bf0572`. Fixed by recomputing the session-material digest after `establish()` succeeds and caching under that key. |
-| G3 | Reuse of a cached connection with unverifiable key material. Decision 7. | unit | open |
+| G3 | Refuse reuse of a cached connection with unverifiable key material. Cover digest failure before cache lookup and after connect; the latter still retains the old digest. Decision 7. | unit | open |
 | G4 | MCP shutdown during a write records a Cancelled or Unknown audit outcome. | mcp tests | done, `eb3682068`. Force-shutdown deadline now derives from `query_timeout_secs + 5s` instead of a hardcoded 5s. |
 | G5 | agentd through OpenSSH: an unattended decline and a successful connect. | ssh | open |
 
@@ -139,14 +152,20 @@ Files: driver `src/lib.rs` and tests for the engines named.
 
 | # | Task | Tier |
 |---|---|---|
-| I1 | The Debian package does not build or install `tablepro-askpass`. Add it and a validator check. | packaging |
+| I1 | `packaging/debian/rules` does not build/install `tablepro-askpass`, although `scripts/build-deb.sh` already does. Fix the rules recipe and validator check in the required GNOME/Debian phase after Arch. | packaging |
 | I2 | Flatpak OpenSSH behavior, and reconcile `connections.md` with the sprint doc. Decision 2. | unit, docs |
-| I3 | `upstream-sync.md` still says there is no askpass bridge. `test-layers.json` says the drivers layer has SSH fixtures, but no driver integration test uses SSH. | docs |
-| I4 | Add manual checks for Stop in a session, a timeout in a session, failed COMMIT retry, close or Disconnect with an open transaction, a retired session, and governed writes turned off. | docs |
+| I3 | Update the dated no-askpass claim in `upstream-sync.md`; distinguish SSH transport/auth fixtures from per-driver TLS-through-SSH evidence in the tier docs. The drivers layer invokes the SSH runner; this does not prove every driver uses a tunnel. | docs |
+| I4 | Done in the September 28 documentation review: manual checks now cover Stop/timeout, failed COMMIT retry, close/Disconnect, retired sessions and connection-specific write blocking. Runtime boxes remain unchecked. | docs |
 | I5 | Audit record for tunnel setup and host-key refusal. Decision 6. | unit |
 
-## Waves
+## Remaining waves (September 28)
 
-1. Without decisions: A, B, C1 to C5, D, F1 and F4, G1, G2 and G4, H, and I1, I3 and I4.
-2. After wave 1: C6, F2 with F3 and F5, F7, F8, G5, E, F6, G3, I2 and I5. Their decisions are recorded above.
-3. Last: the manual checklist in the VM. Automated tiers do not tick those boxes.
+1. E1/E2 and G3; F1 and F3/F5/F2 in one editor stream. Keep recorded decisions.
+2. F4/F9, F6/F8, C6/G5, then I2/I3/I5 and F7 after the lifecycle work.
+3. Installed manual checks on Arch/Omarchy native Wayland. Automated tiers do not
+   tick these boxes. Then complete the required GNOME desktop on Debian phase,
+   including recipe I1 and installed Debian checks.
+
+Completed lane tasks are archived evidence, not a request to reimplement them.
+Review current callers and record a failure before changing behavior. Preserve
+one regression and the existing tier ownership for every confirmed fix.

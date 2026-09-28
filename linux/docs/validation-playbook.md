@@ -5,6 +5,15 @@ The executable catalog is [test-layers.json](../scripts/test-layers.json).
 [Testing](testing.md) describes fixtures; [the sprint plan](bookie-0.2-sprint.md)
 owns B3 and B4–B6 completion. A green layer certifies only its named scope.
 
+## Current desktop target
+
+The [September 28 continuation](bookie-0.2-sprint.md#current-continuation-plan-2026-09-28)
+orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance.
+GNOME desktop on Debian is the required installed/package phase after Arch;
+current B3/B4 implementation does not require that VM. GNOME 50 in the layer catalog
+names GTK/libadwaita development-library requirements, not a required desktop shell.
+Keep existing automated Linux checks and record unavailable environments as pending.
+
 ## Start here
 
 Run from `linux/`, using the repository's Rust toolchain. Agents configured with
@@ -224,7 +233,10 @@ An unchecked scenario is a backlog item, not an implied capability or a pass.
 B3 requires closed correctness findings and their regressions. B4–B6 additionally
 require the planned installed-package, Wayland, upgrade/rollback and candidate
 soak evidence. Docker supplies deterministic servers and Xvfb supplies automated
-GTK interaction; use the QEMU/KVM VM for actual installed desktop acceptance.
+GTK interaction. Current installed acceptance uses Arch/Omarchy under native
+Wayland, on the host or an Arch VM with Hyprland. GNOME/Debian VM qualification
+is the required next phase after Arch. Xvfb and widget passes cannot certify
+either native Wayland target.
 No workflow here automatically publishes a release or waives an acceptance gate.
 
 ## Initial implementation evidence, 2026-09-27

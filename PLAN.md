@@ -4,7 +4,7 @@ Active delivery sequencing and acceptance are now in the approved
 [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
 The capability backlog and historical evidence below remain reference material.
 
-Last updated: 2026-09-26
+Last updated: 2026-09-28
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -15,9 +15,18 @@ This plan is the source of truth for the Linux application. It separates:
 
 The application is a Linux-only native Rust and GTK product. Database drivers are static workspace crates. Every shipped feature remains available without an account, license key, subscription, paid tier, or remote entitlement check.
 
+## Current continuation
+
+Work on **`linux`**. The [September 28 continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28)
+orders **B3 → B4 → Arch/Omarchy/Hyprland native Wayland UI** and includes bounded
+Luna handoffs. GNOME desktop on Debian is the required next phase after the Arch
+pass, within the same continuation plan.
+The [117-commit archive](linux/docs/sprint-review-2026-09-28.md) records September
+26–28 achievements and limits at `85fecbe0b`. B3/B4 and release qualification remain open.
+
 ## Current baseline
 
-- Current working baseline: `8ae99ad66` from `fork/linux`, plus preserved local work reconciled into `linux` (integration branch `integrate/linux-20260926`), with the BookiE 0.1.x → 0.2 sprint in progress and no release approved. BookiE 0.1.4 at `e9bba1f5b` remains the last named release baseline. The [30-commit review](linux/docs/baseline-review-2026-09-17.md) governs continuation toward 0.2; older baseline entries below are historical.
+- Current reviewed baseline: `85fecbe0b1d86d2deac3c040c63f24712333854a` on `linux`, source version 0.1.5. The [September 28 review](linux/docs/sprint-review-2026-09-28.md) archives the two recent work days and today's follow-ups. The September 26 reconciliation and September 17 baseline remain historical evidence; no 0.2 release is approved.
 
 - Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
 - Active work follows the approved [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.
