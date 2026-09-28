@@ -45,7 +45,7 @@ pub(super) fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
     let mut union: BTreeMap<String, String> = BTreeMap::new();
     for doc in docs {
         for (key, value) in doc {
-            union.entry(key.clone()).or_insert_with(|| bson_type_name(value));
+            observe_bson_type(&mut union, key, value);
         }
     }
     let mut columns = Vec::new();
@@ -76,6 +76,18 @@ pub(super) fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
         });
     }
     columns
+}
+
+pub(super) fn observe_bson_type(union: &mut BTreeMap<String, String>, key: &str, value: &Bson) {
+    let bson_type = bson_type_name(value);
+    union
+        .entry(key.to_owned())
+        .and_modify(|data_type| {
+            if data_type != &bson_type {
+                *data_type = "mixed".into();
+            }
+        })
+        .or_insert(bson_type);
 }
 
 pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Value> {
@@ -225,6 +237,28 @@ mod tests {
     use super::*;
 
     use mongodb::bson::doc;
+
+    #[test]
+    fn mixed_scalar_bson_column_is_marked_and_values_remain_visible() {
+        let decimal = "12345678901234567890.1234567890123"
+            .parse::<mongodb::bson::Decimal128>()
+            .unwrap();
+        let docs = vec![
+            doc! { "value": "12345678901234567890.1234567890123" },
+            doc! { "value": decimal },
+        ];
+        let columns = columns_from_docs(&docs);
+        assert_eq!(columns[0].data_type, "mixed");
+        assert_eq!(
+            docs.iter()
+                .map(|doc| document_to_row(doc, &columns)[0].clone())
+                .collect::<Vec<_>>(),
+            vec![
+                Value::Text("12345678901234567890.1234567890123".into()),
+                Value::Text("12345678901234567890.1234567890123".into()),
+            ]
+        );
+    }
 
     #[test]
     fn arbitrary_precision_json_numbers_remain_bson_numbers() {

@@ -745,10 +745,32 @@ exports the actual query result as XLSX and checks Decimal128, date and binary
 subtype markers in workbook strings. An MCP unit contract confirms BSON
 Extended JSON is passed through without flattening; Mongo-backed MCP browse and
 native BSON re-import checks now run in the integration suite. Top-level
-Timestamp, regex and MinKey grid edits are covered; remaining special BSON kinds
-and mixed-type-column edits remain open. The MongoDB 7 query/export/import and
-MCP browse Docker tests passed with large Int64, null and Unicode values added
-on 2026-09-28.
+Timestamp, regex and MinKey grid edits are covered. Local regressions use a BSON
+String and Decimal128 with identical text: the field is labeled `mixed`, and
+the shared app grid editability gate refuses both values because the result
+model maps each scalar to the same `Value::Text`. The grid still displays the
+exact text. JSON, CSV and XLSX consume that same text value and do not retain
+the BSON-kind distinction. The Docker-backed real-server test passed and
+confirmed storage still contains BSON String and Decimal128 as distinct kinds.
+Metadata is inferred from at most 50 documents, so heterogeneity beyond that
+sample remains open, as do remaining special BSON kinds and mixed-type export
+fidelity. The earlier
+MongoDB 7 query/export/import and MCP browse Docker tests passed with large
+Int64, null and Unicode values added on 2026-09-28.
+
+Focused local results:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --lib mixed_scalar_bson_column_is_marked_and_values_remain_visible
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mixed_bson_columns_are_read_only -- --test-threads=1
+```
+
+Both pass. The real-server contract is
+`mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata`:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata -- --include-ignored --exact --test-threads=1
+```
 
 ## ClickHouse named temporal timezones, 2026-09-27
 

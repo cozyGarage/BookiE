@@ -7,7 +7,7 @@ mod shell;
 mod update;
 
 use async_trait::async_trait;
-use codec::{bson_type_name, columns_from_docs, document_to_row, serde_json_to_document};
+use codec::{columns_from_docs, document_to_row, observe_bson_type, serde_json_to_document};
 use error::{map_mongo_connect_error, map_mongo_error};
 use futures::TryStreamExt;
 use mongodb::bson::{Document, doc};
@@ -169,7 +169,7 @@ impl Connection for MongodbConnection {
         let mut union: BTreeMap<String, String> = BTreeMap::new();
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
             for (key, value) in doc {
-                union.entry(key).or_insert_with(|| bson_type_name(&value));
+                observe_bson_type(&mut union, &key, &value);
             }
         }
         if !union.contains_key("_id") {

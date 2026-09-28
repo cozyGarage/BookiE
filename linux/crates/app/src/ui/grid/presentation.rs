@@ -4,7 +4,11 @@ use super::display::value_is_inline_editable;
 use super::types::{is_bool_type, is_bytes_type};
 
 pub(super) fn column_is_editable(column: &ColumnInfo) -> bool {
-    !column.primary_key && !column.is_generated && !column.is_auto_increment && !is_bytes_type(&column.data_type)
+    !column.primary_key
+        && !column.is_generated
+        && !column.is_auto_increment
+        && !is_bytes_type(&column.data_type)
+        && !column.data_type.eq_ignore_ascii_case("mixed")
 }
 
 /// Declared affinity is not a guarantee about a row's runtime value.
@@ -59,6 +63,23 @@ mod tests {
         };
         assert!(cell_allows_inline_edit(&column, &Value::Null));
         assert!(!cell_allows_inline_edit(&column, &Value::Undecodable("NUMERIC".into())));
+    }
+
+    #[test]
+    fn mixed_bson_columns_are_read_only() {
+        let column = ColumnInfo {
+            name: "value".into(),
+            data_type: "mixed".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            is_generated: false,
+            comment: None,
+            default_value: None,
+            collation: None,
+        };
+        assert!(!cell_allows_inline_edit(&column, &Value::Text("same text".into())));
+        assert!(!column_is_editable(&column));
     }
 
     #[test]

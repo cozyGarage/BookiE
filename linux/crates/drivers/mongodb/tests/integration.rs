@@ -171,6 +171,63 @@ async fn browsing_a_missing_collection_is_empty_rather_than_an_error() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata() {
+    use mongodb::bson::{Decimal128, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("mixed_values");
+    let decimal = "12345678901234567890.1234567890123".parse::<Decimal128>().unwrap();
+    collection
+        .insert_many([
+            doc! { "_id": "text", "value": "12345678901234567890.1234567890123" },
+            doc! { "_id": "decimal", "value": decimal },
+        ])
+        .await
+        .expect("seed mixed native BSON types");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let columns = connection.fetch_columns(None, "mixed_values").await.unwrap();
+    let value_column = columns.iter().find(|column| column.name == "value").unwrap();
+    assert_eq!(value_column.data_type, "mixed");
+
+    let result = connection
+        .query("db.mixed_values.find({})")
+        .await
+        .expect("read mixed BSON values");
+    let value_index = result.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(result.columns[value_index].data_type, "mixed");
+    assert_eq!(result.rows.len(), 2);
+    assert!(
+        result
+            .rows
+            .iter()
+            .all(|row| { row[value_index] == Value::Text("12345678901234567890.1234567890123".into()) })
+    );
+
+    let persisted = collection
+        .find_one(doc! { "_id": "decimal" })
+        .await
+        .expect("read native Decimal128")
+        .expect("decimal fixture exists");
+    assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+    let persisted_text = collection
+        .find_one(doc! { "_id": "text" })
+        .await
+        .expect("read native string")
+        .expect("string fixture exists");
+    assert_eq!(
+        persisted_text.get("value"),
+        Some(&mongodb::bson::Bson::String(decimal.to_string()))
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_preserves_numbers_and_text_through_json_commands() {
     let (_container, host, port) = start_mongo().await;
     let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
