@@ -481,16 +481,23 @@ The signed Int128 minimum and maximum and unsigned UInt128 maximum pass through
 text-valued bound parameters into native Int128/UInt128 columns and return as
 exact `Value::Text`. The result row is written with the shared generated INSERT
 literal, executed into matching native columns, and read back as the exact
-original text. The focused test passed against ClickHouse 24.8.
+original text. The same real-server result now also passes through CSV export
+with formula sanitization disabled, the shared CSV reader and typed import cell
+parser. All three wide integer fields return as the exact original text. The
+import previously failed with `NotAnInteger` because `Int128` names were
+classified as i64; ClickHouse `Int128` and `UInt128` now import as text so no
+digits are lost. Formula-safe CSV export can prefix an apostrophe to negative
+text values; that mode is outside this round-trip contract.
 
 ```sh
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_binding_and_sql_export_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
 ```
 
-The grid contract also covers the four adjacent wide-integer boundaries:
+The CSV round trip covers this wide-integer result path. The grid contract also
+covers the four adjacent wide-integer boundaries:
 Int128 minimum to minimum+1, Int128 maximum to maximum-1, UInt128 zero to one,
-and UInt128 maximum to maximum-1. Export parity through other formats remains
-open.
+and UInt128 maximum to maximum-1. Other export formats and formula-safe CSV
+import parity remain open.
 
 ### ClickHouse Int128 and UInt128 grid edits, 2026-09-28
 

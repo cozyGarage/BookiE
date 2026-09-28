@@ -90,6 +90,9 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     if base.contains("uuid") || base.contains("uniqueidentifier") {
         return ColumnKind::Uuid;
     }
+    if matches!(base.as_str(), "int128" | "uint128") {
+        return ColumnKind::Text;
+    }
     if base.contains("json") {
         return ColumnKind::Json;
     }
@@ -314,6 +317,8 @@ mod tests {
     fn a_catalog_type_name_reads_as_the_value_shape_it_stores() {
         assert_eq!(column_kind("BIGINT"), ColumnKind::Int);
         assert_eq!(column_kind("integer"), ColumnKind::Int);
+        assert_eq!(column_kind("Int128"), ColumnKind::Text);
+        assert_eq!(column_kind("UInt128"), ColumnKind::Text);
         assert_eq!(column_kind("bigserial"), ColumnKind::Int);
         assert_eq!(column_kind("VARCHAR(255)"), ColumnKind::Text);
         assert_eq!(column_kind("numeric(10,2)"), ColumnKind::Decimal);
@@ -327,6 +332,19 @@ mod tests {
         assert_eq!(column_kind("uuid"), ColumnKind::Uuid);
         assert_eq!(column_kind("jsonb"), ColumnKind::Json);
         assert_eq!(column_kind("bytea"), ColumnKind::Bytes);
+    }
+
+    #[test]
+    fn clickhouse_wide_integer_csv_cells_remain_exact_text() {
+        let columns = vec![column("signed", "Int128"), column("unsigned", "UInt128")];
+        let row = vec![
+            "-170141183460469231731687303715884105728".to_owned(),
+            "340282366920938463463374607431768211455".to_owned(),
+        ];
+        let values = row_to_values(&row, &[Some(0), Some(1)], &columns, &CsvImportOptions::default(), 2)
+            .expect("wide integer values remain text");
+
+        assert_eq!(values, row.into_iter().map(Value::Text).collect::<Vec<_>>());
     }
 
     #[test]

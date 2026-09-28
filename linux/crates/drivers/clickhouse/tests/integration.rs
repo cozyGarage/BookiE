@@ -70,6 +70,27 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
         .unwrap();
     assert_eq!(result.rows, vec![values.to_vec()]);
 
+    let csv_options = tablepro_core::export::CsvOptions {
+        sanitize_formulas: false,
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&result.columns, &result.rows, &csv_options);
+    assert_eq!(
+        csv,
+        "signed_min,signed_max,unsigned_max\n-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455\n"
+    );
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let imported = tablepro_core::import::row_to_values(
+        &sheet.rows[0],
+        &[Some(0), Some(1), Some(2)],
+        &result.columns,
+        &import_options,
+        2,
+    )
+    .unwrap();
+    assert_eq!(imported, values);
+
     conn.execute(
         "CREATE TABLE wide_integer_copy (
             signed_min Int128,
