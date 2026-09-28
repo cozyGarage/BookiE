@@ -530,6 +530,43 @@ mod tests {
                 }
             }
         }
+
+        let fraction = format!("{}123", "1234567890".repeat(1638));
+        assert_eq!(fraction.len(), 16_383);
+        let maximum_scale_value = format!("0.{fraction}");
+        connection
+            .execute("CREATE TABLE parser_numeric_max_scale (id integer PRIMARY KEY, amount numeric)")
+            .await
+            .unwrap();
+        connection
+            .execute("INSERT INTO parser_numeric_max_scale VALUES (1, 0)")
+            .await
+            .unwrap();
+        let columns = connection
+            .fetch_columns(None, "parser_numeric_max_scale")
+            .await
+            .unwrap();
+        let amount = columns.iter().position(|column| column.name == "amount").unwrap();
+        let parsed = parse_input_for_driver(&maximum_scale_value, Some(&columns[amount]), "postgres").unwrap();
+        assert_eq!(parsed, Value::Text(maximum_scale_value.clone()));
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            "parser_numeric_max_scale",
+            &columns,
+            &[(amount, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+        let saved = connection
+            .query("SELECT amount::text, scale(amount) FROM parser_numeric_max_scale WHERE id = 1")
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.rows,
+            vec![vec![Value::Text(maximum_scale_value), Value::Int(16_383)]]
+        );
     }
 
     #[test]
