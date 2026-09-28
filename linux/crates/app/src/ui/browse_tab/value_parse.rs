@@ -567,6 +567,41 @@ mod tests {
             saved.rows,
             vec![vec![Value::Text(maximum_scale_value), Value::Int(16_383)]]
         );
+
+        let maximum_integer_value = "9".repeat(131_072);
+        connection
+            .execute("CREATE TABLE parser_numeric_max_integer (id integer PRIMARY KEY, amount numeric)")
+            .await
+            .unwrap();
+        connection
+            .execute("INSERT INTO parser_numeric_max_integer VALUES (1, 0)")
+            .await
+            .unwrap();
+        let columns = connection
+            .fetch_columns(None, "parser_numeric_max_integer")
+            .await
+            .unwrap();
+        let amount = columns.iter().position(|column| column.name == "amount").unwrap();
+        let parsed = parse_input_for_driver(&maximum_integer_value, Some(&columns[amount]), "postgres").unwrap();
+        assert_eq!(parsed, Value::Text(maximum_integer_value.clone()));
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            "parser_numeric_max_integer",
+            &columns,
+            &[(amount, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+        let saved = connection
+            .query("SELECT amount::text, length(amount::text) FROM parser_numeric_max_integer WHERE id = 1")
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.rows,
+            vec![vec![Value::Text(maximum_integer_value), Value::Int(131_072)]]
+        );
     }
 
     #[test]

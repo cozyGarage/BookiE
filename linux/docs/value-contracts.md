@@ -401,12 +401,12 @@ Docker composition test now uses the real app parser output, keyed-update
 builder and PostgreSQL driver against both `NUMERIC(80,40)` and unconstrained
 `numeric`, then compares each saved value to the server's independent
 `numeric::text` output. The unconstrained case uses a 40-digit integer and
-40-digit fraction, outside `rust_decimal` precision. PostgreSQL's absolute
-numeric input limits and other text-backed types remain open. The same app test
-now sends an unconstrained numeric with PostgreSQL's maximum fractional scale,
-16,383 digits, through the parser and keyed-update builder; the server confirms
-both the exact `numeric::text` value and `scale(amount) = 16383`. This closes the
-fractional-scale edge only; the maximum integer-digit bound remains open. See
+40-digit fraction, outside `rust_decimal` precision. The same app test sends an
+unconstrained numeric at PostgreSQL's maximum fractional scale of 16,383 digits
+and at its maximum integer width of 131,072 digits through the parser and keyed-
+update builder. The server confirms exact `numeric::text` values, the fractional
+scale, and the integer text length. Both unconstrained numeric width boundaries
+are covered; other text-backed PostgreSQL types remain open. See
 [PostgreSQL numeric type limits](https://www.postgresql.org/docs/16/datatype-numeric.html).
 
 ```sh
