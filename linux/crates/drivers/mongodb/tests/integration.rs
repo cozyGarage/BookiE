@@ -888,3 +888,63 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         &vec![mongodb::bson::Bson::Document(doc! { "ordinal": 7_i64 })]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_undefined_grid_edit_preserves_native_bson() {
+    use mongodb::bson::{Bson, doc, oid::ObjectId};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let id = ObjectId::new();
+    client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("undefined_edits")
+        .insert_one(doc! { "_id": id, "value": Bson::Undefined })
+        .await
+        .expect("seed BSON Undefined value");
+
+    let connection = MongodbDriver
+        .connect(opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.undefined_edits.find({})")
+        .await
+        .expect("read before edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_index = before.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(before.columns[value_index].data_type, "undefined");
+    let marker = Value::Json(serde_json::json!({ "$undefined": true }));
+    assert_eq!(before.rows[0][value_index], marker);
+
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "undefined_edits",
+        &before.columns,
+        &[(value_index, marker.clone())],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build Undefined grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply Undefined grid edit");
+
+    let after = connection
+        .query("db.undefined_edits.find({})")
+        .await
+        .expect("read after edit");
+    assert_eq!(after.rows[0][value_index], marker);
+    let persisted = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("undefined_edits")
+        .find_one(doc! { "_id": id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("document exists");
+    assert_eq!(persisted.get("value"), Some(&Bson::Undefined));
+}

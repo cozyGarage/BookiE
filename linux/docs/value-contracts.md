@@ -1138,6 +1138,18 @@ Late page sampling is covered by
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration browse_page_types_include_documents_after_the_metadata_sample -- --include-ignored --exact --test-threads=1
 ```
 
+### MongoDB BSON Undefined grid edit
+
+A Docker-backed contract inserts native BSON `Undefined`, verifies the grid
+metadata and canonical `{"$undefined":true}` value, applies the shared keyed
+row update, then reads the row through both BookiE and the native BSON client.
+The persisted value remains `Bson::Undefined`; it does not become null. The
+focused MongoDB 7 test passed.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contract_undefined_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
+```
+
 ## ClickHouse named temporal timezones, 2026-09-27
 
 A live ClickHouse 24.8 regression showed that `DateTime64(6, 'Asia/Tokyo')`
