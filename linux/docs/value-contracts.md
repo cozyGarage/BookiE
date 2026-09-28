@@ -65,6 +65,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 
 The focused local DuckDB contract passed.
 
+## SQL Server multi-result draining, 2026-09-28
+
+The SQL Server batch API represents one `QueryResult`, so the contract records
+the supported behavior: return columns and rows from the first result set,
+drain later sets, and report a server error raised after the first set instead
+of silently returning success. A subsequent query verifies the connection
+remains usable after the late error.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration an_error_raised_after_the_first_result_set_is_reported -- --include-ignored --exact --test-threads=1
+```
+
+The focused SQL Server Docker contract passed.
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,

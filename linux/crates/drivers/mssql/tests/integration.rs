@@ -416,6 +416,13 @@ async fn an_error_raised_after_the_first_result_set_is_reported() {
     let names: Vec<&str> = first.columns.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(names, vec!["a"]);
     assert_eq!(first.rows, vec![vec![Value::Int(1)]]);
+
+    let after_late_error = conn.query("SELECT 3 AS usable").await.unwrap();
+    assert_eq!(
+        after_late_error.rows,
+        vec![vec![Value::Int(3)]],
+        "draining later result sets leaves the connection usable"
+    );
 }
 
 #[tokio::test]
