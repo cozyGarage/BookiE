@@ -91,21 +91,38 @@ pub(super) enum TypeKind {
 /// before bare `timestamp`, and `tinyint(1)` (MySQL bool) must be
 /// matched before generic `tinyint` / `int` patterns.
 pub(super) fn classify_type(dt: &str) -> TypeKind {
-    // Postgres `format_type()` returns "bit(1)" for length-1 BIT
-    // columns (not the bare "bit" the original guard expected).
-    // Both forms classify as Bool so the cell renders as a checkbox
-    // rather than a text editor that rejects "true"/"false" with
-    // "Invalid integer".
-    if matches!(dt, "bool" | "boolean" | "bit" | "bit(1)" | "tinyint(1)") {
-        return TypeKind::Bool;
-    }
-    if dt.starts_with("bit(") {
-        return TypeKind::Int;
+    if let Some(kind) = classify_bool_or_bit(dt) {
+        return kind;
     }
     if dt.contains("uuid") {
         return TypeKind::Uuid;
     }
-    if dt.contains("json")
+    if is_json_like(dt) {
+        return TypeKind::Json;
+    }
+    if let Some(kind) = classify_temporal(dt) {
+        return kind;
+    }
+    classify_numeric(dt).unwrap_or(TypeKind::Text)
+}
+
+// Postgres `format_type()` returns "bit(1)" for length-1 BIT columns
+// (not the bare "bit" the original guard expected). Both forms classify
+// as Bool so the cell renders as a checkbox rather than a text editor
+// that rejects "true"/"false" with "Invalid integer". Wider BIT(n)
+// values are integers.
+fn classify_bool_or_bit(dt: &str) -> Option<TypeKind> {
+    if matches!(dt, "bool" | "boolean" | "bit" | "bit(1)" | "tinyint(1)") {
+        return Some(TypeKind::Bool);
+    }
+    if dt.starts_with("bit(") {
+        return Some(TypeKind::Int);
+    }
+    None
+}
+
+fn is_json_like(dt: &str) -> bool {
+    dt.contains("json")
         || matches!(
             dt,
             "object"
@@ -121,28 +138,39 @@ pub(super) fn classify_type(dt: &str) -> TypeKind {
                 | "minkey"
                 | "maxkey"
         )
-    {
-        return TypeKind::Json;
-    }
+}
+
+fn classify_temporal(dt: &str) -> Option<TypeKind> {
     if dt.contains("timestamptz") || dt.contains("with time zone") {
-        return TypeKind::TimestampTz;
+        return Some(TypeKind::TimestampTz);
     }
     if dt.contains("timestamp") || dt.contains("datetime") {
-        return TypeKind::DateTime;
+        return Some(TypeKind::DateTime);
     }
     if dt == "date" || (dt.starts_with("date") && !dt.contains("datetime") && !dt.contains("time")) {
-        return TypeKind::Date;
+        return Some(TypeKind::Date);
     }
     if dt == "time" || dt.starts_with("time(") || dt == "time without time zone" {
-        return TypeKind::Time;
+        return Some(TypeKind::Time);
     }
+    None
+}
+
+fn classify_numeric(dt: &str) -> Option<TypeKind> {
     if matches!(dt, "decimal" | "numeric" | "money") || dt.starts_with("decimal(") || dt.starts_with("numeric(") {
-        return TypeKind::Decimal;
+        return Some(TypeKind::Decimal);
     }
     if matches!(dt, "float" | "double" | "real" | "double precision") || dt.starts_with("float(") {
-        return TypeKind::Float;
+        return Some(TypeKind::Float);
     }
-    if matches!(
+    if is_integer_type(dt) {
+        return Some(TypeKind::Int);
+    }
+    None
+}
+
+fn is_integer_type(dt: &str) -> bool {
+    matches!(
         dt,
         "int"
             | "int2"
@@ -162,10 +190,6 @@ pub(super) fn classify_type(dt: &str) -> TypeKind {
         || dt.starts_with("bigint(")
         || dt.starts_with("tinyint(")
         || dt.starts_with("mediumint(")
-    {
-        return TypeKind::Int;
-    }
-    TypeKind::Text
 }
 
 pub(super) fn parse_bool_value(text: &str) -> Result<Value, String> {

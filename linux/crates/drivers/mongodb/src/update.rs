@@ -37,23 +37,8 @@ pub(super) fn parse_keyed_update(
     if from.is_some() || !table.joins.is_empty() {
         return Ok(None);
     }
-    let TableFactor::Table {
-        name,
-        alias: None,
-        args: None,
-        ..
-    } = &table.relation
-    else {
+    let Some(collection) = collection_named_by_update(&table.relation, database) else {
         return Ok(None);
-    };
-    let identifiers = name.0.iter().map(ObjectNamePart::as_ident).collect::<Option<Vec<_>>>();
-    let Some(identifiers) = identifiers else {
-        return Ok(None);
-    };
-    let collection = match identifiers.as_slice() {
-        [collection] => collection.value.clone(),
-        [schema, collection] if schema.value == database => collection.value.clone(),
-        _ => return Ok(None),
     };
     if assignments.is_empty() {
         return Ok(None);
@@ -82,6 +67,28 @@ pub(super) fn parse_keyed_update(
         filter,
         set,
     }))
+}
+
+fn collection_named_by_update(relation: &TableFactor, database: &str) -> Option<String> {
+    let TableFactor::Table {
+        name,
+        alias: None,
+        args: None,
+        ..
+    } = relation
+    else {
+        return None;
+    };
+    let identifiers = name
+        .0
+        .iter()
+        .map(ObjectNamePart::as_ident)
+        .collect::<Option<Vec<_>>>()?;
+    match identifiers.as_slice() {
+        [collection] => Some(collection.value.clone()),
+        [schema, collection] if schema.value == database => Some(collection.value.clone()),
+        _ => None,
+    }
 }
 
 fn single_identifier(name: &sqlparser::ast::ObjectName) -> Option<String> {

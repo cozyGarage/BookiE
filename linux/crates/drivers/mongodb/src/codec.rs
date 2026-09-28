@@ -182,41 +182,42 @@ fn json_to_bson(value: serde_json::Value) -> Result<Bson, String> {
         serde_json::Value::Array(values) => {
             Bson::Array(values.into_iter().map(json_to_bson).collect::<Result<_, _>>()?)
         }
-        serde_json::Value::Object(values) => {
-            // Canonical and relaxed Extended JSON objects encode BSON scalar
-            // types. Recognize these before recursively treating the object
-            // as a plain document so exported Mongo results can be re-imported.
-            const EXTJSON_MARKERS: &[&str] = &[
-                "$binary",
-                "$code",
-                "$date",
-                "$dbPointer",
-                "$decimal128",
-                "$maxKey",
-                "$minKey",
-                "$numberDecimal",
-                "$numberDouble",
-                "$numberInt",
-                "$numberLong",
-                "$oid",
-                "$regularExpression",
-                "$scope",
-                "$symbol",
-                "$timestamp",
-                "$undefined",
-            ];
-            if values.keys().any(|key| EXTJSON_MARKERS.contains(&key.as_str())) {
-                Bson::try_from(serde_json::Value::Object(values)).map_err(|error| error.to_string())?
-            } else {
-                Bson::Document(
-                    values
-                        .into_iter()
-                        .map(|(key, value)| Ok((key, json_to_bson(value)?)))
-                        .collect::<Result<_, String>>()?,
-                )
-            }
-        }
+        serde_json::Value::Object(values) => bson_from_json_object(values)?,
     })
+}
+
+// Canonical and relaxed Extended JSON objects encode BSON scalar types.
+// Recognize these before recursively treating the object as a plain document
+// so exported Mongo results can be re-imported.
+fn bson_from_json_object(values: serde_json::Map<String, serde_json::Value>) -> Result<Bson, String> {
+    const EXTJSON_MARKERS: &[&str] = &[
+        "$binary",
+        "$code",
+        "$date",
+        "$dbPointer",
+        "$decimal128",
+        "$maxKey",
+        "$minKey",
+        "$numberDecimal",
+        "$numberDouble",
+        "$numberInt",
+        "$numberLong",
+        "$oid",
+        "$regularExpression",
+        "$scope",
+        "$symbol",
+        "$timestamp",
+        "$undefined",
+    ];
+    if values.keys().any(|key| EXTJSON_MARKERS.contains(&key.as_str())) {
+        return Bson::try_from(serde_json::Value::Object(values)).map_err(|error| error.to_string());
+    }
+    Ok(Bson::Document(
+        values
+            .into_iter()
+            .map(|(key, value)| Ok((key, json_to_bson(value)?)))
+            .collect::<Result<_, String>>()?,
+    ))
 }
 
 #[cfg(test)]
