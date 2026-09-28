@@ -164,7 +164,36 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
         .await
         .unwrap();
     assert_eq!(
-        after.rows,
+        after.rows[1],
+        vec![
+            Value::Int(2),
+            Value::Text("170141183460469231731687303715884105727".into()),
+            Value::Text("0".into()),
+        ]
+    );
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "clickhouse",
+        None,
+        "wide_grid_edits",
+        &columns,
+        &[
+            (
+                signed_index,
+                Value::Text("170141183460469231731687303715884105726".into()),
+            ),
+            (unsigned_index, Value::Text("1".into())),
+        ],
+        &[after.rows[1][id_index].clone()],
+    )
+    .unwrap();
+    conn.execute_in_transaction(&[update]).await.unwrap();
+
+    let final_rows = conn
+        .query("SELECT id, signed_amount, unsigned_amount FROM wide_grid_edits ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        final_rows.rows,
         vec![
             vec![
                 Value::Int(1),
@@ -173,8 +202,8 @@ async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
             ],
             vec![
                 Value::Int(2),
-                Value::Text("170141183460469231731687303715884105727".into()),
-                Value::Text("0".into()),
+                Value::Text("170141183460469231731687303715884105726".into()),
+                Value::Text("1".into()),
             ],
         ]
     );

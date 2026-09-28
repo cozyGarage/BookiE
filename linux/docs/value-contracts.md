@@ -487,13 +487,18 @@ original text. The focused test passed against ClickHouse 24.8.
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_binding_and_sql_export_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
 ```
 
-Other wide-integer grid boundaries and parity through other export formats remain open.
+The grid contract also covers the four adjacent wide-integer boundaries:
+Int128 minimum to minimum+1, Int128 maximum to maximum-1, UInt128 zero to one,
+and UInt128 maximum to maximum-1. Export parity through other formats remains
+open.
 
 ### ClickHouse Int128 and UInt128 grid edits, 2026-09-28
 
-A real-server keyed update changed the signed Int128 minimum and unsigned UInt128
-maximum by one through the same shared builder used by the grid save path. Both
-exact new values were returned, while the other row remained unchanged.
+A real-server keyed update changes both rows through the same shared builder
+used by the grid save path. It moves Int128 minimum to minimum+1 and UInt128
+maximum to maximum-1, then Int128 maximum to maximum-1 and UInt128 zero to one.
+The independent result query compares all four exact text values and verifies
+the non-target row remains unchanged after each edit.
 
 ```sh
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_grid_edits_preserve_exact_values_and_row_identity -- --include-ignored --exact --test-threads=1
