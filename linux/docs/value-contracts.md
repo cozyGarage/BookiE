@@ -613,6 +613,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+The neighboring `json[]` contract uses the same refusal boundary with a native
+JSON array containing an object and JSON `null`. The server reports `json[]`,
+returns exact `array_to_json` text, and independently confirms semantic
+equality after conversion to `jsonb`. The driver returns `Undecodable`; SQL
+literal rendering and parameter binding refuse it. JSON and JSONB array support
+is not claimed.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_json_text_array_is_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The PostgreSQL 16 Docker contract passed.
+
 ## ClickHouse wide integer parser contract, 2026-09-28
 
 ClickHouse `Int128` and `UInt128` values cannot fit `Value::Int`. A local
