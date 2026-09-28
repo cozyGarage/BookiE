@@ -2,13 +2,13 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled 2026-09-29 through commit
-`daf4b7fdc`, including September 26–29 changes.
-The current worktree additionally contains PostgreSQL built-in multirange
-metadata refusal coverage with native server type, text, hull and component
-oracles; these changes are not part of the cited commit.
-The upstream review sampled eight test files in four projects and two issue
-reports; this local update is a source/test inventory, not a fresh execution of
-every suite. No external source code or fixtures were copied.
+`1bfc163d0fc88929a077aacfb11f378ac37d7caf`, including September 26–29 changes.
+The baseline contains Redis RESP3 nested-value/binary contracts, explicit
+PostgreSQL multirange metadata refusal coverage and ClickHouse DateTime64(9)
+server-boundary evidence. The upstream review sampled eight test files in four
+projects and two issue reports; this local update is a source/test inventory, not
+a fresh execution of every suite.
+No external source code or fixtures were copied.
 
 ## Focus to carry forward
 

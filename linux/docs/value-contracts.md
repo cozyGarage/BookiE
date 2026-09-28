@@ -83,10 +83,10 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `5a44a5f11bb7c09048184be9359cd49f9491e81f` on 2026-09-29; it is an
-inventory, not a fresh run of every suite. The current worktree adds Redis RESP3
-nested-value, binary and BigNumber regressions; they are not part of that commit.
-A passing scalar suite does not establish complete native-type support.
+`linux` commit `1bfc163d0fc88929a077aacfb11f378ac37d7caf` on 2026-09-29; it is an
+inventory, not a fresh run of every suite. The strict `values` layer passed at
+this baseline with GTK and DuckDB enabled. A passing layer does not establish
+complete native-type support; remaining targets stay listed in the strategy.
 
 | Path | Assertions |
 | --- | --- |

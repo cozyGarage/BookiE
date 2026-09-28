@@ -1,10 +1,10 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against `linux` at `5a44a5f11bb7c09048184be9359cd49f9491e81f`
-on 2026-09-29. The current worktree adds Redis RESP3 map/binary and nested-value
-contracts, exact BigNumber text, and a map truncation flag contract; these changes
-are not part of that commit. This remains a source/test inventory, not a fresh
-execution of every suite.
+Coverage reconciled against `linux` at
+`1bfc163d0fc88929a077aacfb11f378ac37d7caf` on 2026-09-29. The Redis RESP3
+contracts, PostgreSQL multirange metadata cases and ClickHouse DateTime64(9)
+boundary behavior are part of this baseline. This remains a source/test
+inventory, not a fresh execution of every suite.
 
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.

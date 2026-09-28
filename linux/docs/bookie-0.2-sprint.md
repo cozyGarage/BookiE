@@ -3,13 +3,15 @@
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
-## Current continuation plan: 2026-09-28
+## Current continuation plan: 2026-09-29
 
 Working branch: **`linux`**. Reviewed tip:
-`85fecbe0b1d86d2deac3c040c63f24712333854a` (source version 0.1.5).
+`1bfc163d0fc88929a077aacfb11f378ac37d7caf` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
+The September 29 follow-ups are recorded below and in the linked type/value
+contracts; B3 remains open.
 Earlier dated reviews and implementation entries below remain historical evidence.
 This section supersedes their next-task order and desktop-target requirements.
 
@@ -167,7 +169,7 @@ Worktree: /home/trung/Projects/tablepro; working branch: linux.
 Read CLAUDE.md, PLAN.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
 (paths under linux/ for docs). Follow the RTK instruction for shell commands.
 Confirm current full HEAD and git status; reviewed baseline was
-85fecbe0b1d86d2deac3c040c63f24712333854a. Record any newer commits or local edits.
+1bfc163d0fc88929a077aacfb11f378ac37d7caf. Record any newer commits or local edits.
 Task: B3-P1 only. Reconcile remaining type/consumer coverage against current code
 and the archived September 26–28 review. Update the three B3 evidence documents.
 Allowed edits: linux/docs/type-contract-strategy.md,
