@@ -83,10 +83,10 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `c05b1f000b12146b307735b6bb7a6a2749ade2f9` on 2026-09-29; it is an
+`linux` commit `1bf4fcf419fb3681777b3601ed306e92997a0117` on 2026-09-29; it is an
 inventory, not a fresh run of every suite. The current worktree additionally has
-a MongoDB 7 DbPointer grid-write regression, passed alone and in the complete
-18-test integration suite; it is not part of that commit. A passing scalar suite
+a PostgreSQL range-family refusal regression, passed alone and in the complete
+56-test integration suite; it is not part of that commit. A passing scalar suite
 does not establish complete native-type support.
 
 | Path | Assertions |
@@ -620,6 +620,8 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 ```
 
 The focused PostgreSQL 16 Docker contract passed.
+The full PostgreSQL Docker integration suite passed (56 tests) on the current
+worktree; this is local evidence, not hosted CI evidence.
 
 ### PostgreSQL `bit varying` exact text consumers
 
@@ -759,6 +761,21 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 ```
 
 The focused PostgreSQL Docker contract passed.
+
+### PostgreSQL built-in range family refusal
+
+A PostgreSQL 16 Docker contract checks `daterange`, `numrange`, `tsrange` and
+`int8range`. Each native result is `Undecodable`, while independent server
+oracles verify the type name, canonical `::text`, lower and upper values, and
+endpoint inclusivity. SQL-literal rendering and typed parameter binding refuse
+each result, so these values are not flattened into lossy text. The existing
+`int4range` and `tstzrange` tests retain their more detailed boundary coverage.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contracts::value_contract_builtin_range_families_are_refused_without_losing_native_text -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed.
 
 ### PostgreSQL scalar enum label text projection
 

@@ -523,6 +523,74 @@ async fn value_contract_tstzrange_is_explicitly_unsupported() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_builtin_range_families_are_refused_without_losing_native_text() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let cases = [
+        (
+            "daterange(DATE '2024-01-01', DATE '2024-02-01', '[)')",
+            "daterange",
+            "[2024-01-01,2024-02-01)",
+            "2024-01-01",
+            "2024-02-01",
+            true,
+            false,
+        ),
+        (
+            "numrange(1.25::numeric, 9.75::numeric, '[]')",
+            "numrange",
+            "[1.25,9.75]",
+            "1.25",
+            "9.75",
+            true,
+            true,
+        ),
+        (
+            "tsrange(TIMESTAMP '2024-01-02 03:04:05.123456', TIMESTAMP '2024-01-02 04:05:06.654321', '()')",
+            "tsrange",
+            "(\"2024-01-02 03:04:05.123456\",\"2024-01-02 04:05:06.654321\")",
+            "2024-01-02 03:04:05.123456",
+            "2024-01-02 04:05:06.654321",
+            false,
+            false,
+        ),
+        ("int8range(1, 5, '(]')", "int8range", "[2,6)", "2", "6", true, false),
+    ];
+
+    for (expression, native_type, exact_text, lower, upper, lower_inclusive, upper_inclusive) in cases {
+        let result = connection
+            .query(&format!(
+                "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+                 lower(value)::text AS lower_text, upper(value)::text AS upper_text, \
+                 lower_inc(value) AS lower_inclusive, upper_inc(value) AS upper_inclusive \
+                 FROM (SELECT {expression} AS value) source"
+            ))
+            .await
+            .unwrap();
+        let row = &result.rows[0];
+        assert!(matches!(row[0], Value::Undecodable(_)), "{native_type}: {:?}", row[0]);
+        assert_eq!(row[1], Value::Text(native_type.into()), "{native_type}");
+        assert_eq!(row[2], Value::Text(exact_text.into()), "{native_type}");
+        assert_eq!(row[3], Value::Text(lower.into()), "{native_type}");
+        assert_eq!(row[4], Value::Text(upper.into()), "{native_type}");
+        assert_eq!(row[5], Value::Bool(lower_inclusive), "{native_type}");
+        assert_eq!(row[6], Value::Bool(upper_inclusive), "{native_type}");
+        assert!(
+            tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err(),
+            "{native_type} must not produce a lossy SQL literal"
+        );
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(&row[0]))
+                .await
+                .is_err(),
+            "{native_type} must not be rebound as a lossy parameter"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_composite_result_is_explicitly_unsupported() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
