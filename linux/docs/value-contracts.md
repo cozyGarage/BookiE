@@ -505,8 +505,8 @@ size/product overflow. Deterministic malformed-input and header-mutation cases
 exercise bounded decoding. Binary-to-text array decoding is capped at 16 MiB; exceeding the
 limit returns the existing visible undecodable marker rather than truncated data.
 
-Limits: enum/domain/composite/range and JSON/BSON array elements remain unsupported
-or untested; automatic array editing and the full grid/MCP/import acceptance matrix
+Limits: enum/domain/composite/range and most JSON/BSON array element contracts
+remain unsupported or untested; automatic array editing and the full grid/MCP/import acceptance matrix
 remain open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
@@ -552,6 +552,19 @@ cast. Its independent server oracle unnests with ordinality, checks NULL
 separately, and compares every element as `numeric::text`. The app
 parser-to-builder unit, PostgreSQL scalar numeric decoder unit, escaped-text
 array unit, and Docker-backed numeric[] grid assertion passed against PostgreSQL.
+
+The `jsonb[]` refusal contract checks a native JSONB array containing an object
+and JSON null. PostgreSQL independently reports the `jsonb[]` type, its exact
+`array_to_json(... )::text`, and semantic JSONB equality. BookiE returns an
+`Undecodable` marker and refuses both SQL literal rendering and parameter
+binding. This records a precise unsupported boundary; it does not add JSON-array
+support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_json_array_elements_are_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The PostgreSQL 16 Docker contract passed.
 
 ## ClickHouse wide integer parser contract, 2026-09-28
 

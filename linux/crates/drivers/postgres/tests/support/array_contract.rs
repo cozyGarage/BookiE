@@ -95,6 +95,35 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
     }
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_json_array_elements_are_explicitly_unsupported() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY['{\"a\": 1}'::jsonb, 'null'::jsonb]";
+    let result = connection
+        .query(&format!(
+            "SELECT {expression} AS value, pg_typeof({expression})::text AS array_type, \
+             array_to_json({expression})::text AS json_text, \
+             array_to_json({expression})::jsonb = '[{{\"a\": 1}}, null]'::jsonb AS server_match"
+        ))
+        .await
+        .unwrap();
+
+    let value = &result.rows[0][0];
+    assert!(matches!(value, Value::Undecodable(_)), "{value:?}");
+    assert_eq!(result.rows[0][1], Value::Text("jsonb[]".into()));
+    assert_eq!(result.rows[0][2], Value::Text("[{\"a\": 1},null]".into()));
+    assert_eq!(result.rows[0][3], Value::Bool(true));
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(value))
+            .await
+            .is_err()
+    );
+}
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")
