@@ -343,6 +343,24 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_preserves_decimal_trailing_zeroes() {
+        let mut value_column = column("value");
+        value_column.data_type = "DECIMAL(10,4)".into();
+        let columns = [value_column];
+        let expected: rust_decimal::Decimal = "12.3000".parse().unwrap();
+        let csv = render_csv(&columns, &[vec![Value::Decimal(expected)]], &CsvOptions::default());
+        assert_eq!(csv, "value\n12.3000\n");
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let imported = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+        let Value::Decimal(actual) = imported[0] else {
+            panic!("CSV import did not produce a decimal: {imported:?}");
+        };
+        assert_eq!(actual.to_string(), "12.3000");
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_preserves_negative_zero_bits() {
         let mut value_column = column("value");
         value_column.data_type = "DOUBLE PRECISION".into();

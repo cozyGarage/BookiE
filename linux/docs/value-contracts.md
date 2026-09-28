@@ -69,6 +69,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_con
 
 The focused core test passed.
 
+## CSV decimal scale export/import
+
+A typed `DECIMAL(10,4)` CSV round trip preserves `12.3000` in the emitted
+token and in the imported `Decimal` scale. The assertions compare the text
+representation because numeric equality alone would treat `12.30` and
+`12.3000` as equivalent.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_decimal_trailing_zeroes
+```
+
+The focused core test passed.
+
 ## JSON negative-zero consumer contract
 
 The JSON exporter writes finite negative zero as the numeric token `-0.0`.
