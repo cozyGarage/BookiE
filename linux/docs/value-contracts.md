@@ -1149,6 +1149,17 @@ passed. Reports are in `target/quality/20260927T180959352277Z-layers/`,
 `target/quality/20260927T181245187611Z-layers/`, and
 `target/quality/20260927T181435128973Z-layers/`.
 
+A second Docker regression covers the New York fall-back `DateTime64(3)` local
+time `2024-11-03 01:30:00.000`. The server confirms the exact local text and
+reports an epoch in one of the two valid fold instants. Because the result wire
+text omits which offset was used, BookiE returns `Undecodable`; SQL literal and
+parameter consumers refuse it. The focused test passed against ClickHouse
+24.8.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_ambiguous_datetime64_local_time_is_refused -- --include-ignored --exact --test-threads=1
+```
+
 Run the focused checks locally with:
 
 ```sh

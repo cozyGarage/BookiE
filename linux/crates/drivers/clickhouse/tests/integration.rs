@@ -563,6 +563,37 @@ async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_ambiguous_datetime64_local_time_is_refused() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    let result = conn
+        .query(
+            "SELECT stamp, toString(stamp) AS local_text, toUnixTimestamp64Milli(stamp) AS epoch_ms \
+             FROM (SELECT toDateTime64('2024-11-03 01:30:00', 3, 'America/New_York') AS stamp)",
+        )
+        .await
+        .unwrap();
+
+    let value = &result.rows[0][0];
+    assert!(
+        matches!(value, Value::Undecodable(reason) if reason.contains("ambiguous or nonexistent local time")),
+        "{value:?}"
+    );
+    assert_eq!(result.rows[0][1], Value::Text("2024-11-03 01:30:00.000".into()));
+    assert!(matches!(
+        result.rows[0][2],
+        Value::Int(1_730_611_800_000 | 1_730_615_400_000)
+    ));
+    assert!(tablepro_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
+    assert!(
+        conn.query_params("SELECT ?", std::slice::from_ref(value))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_roundtrip_common_types() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
