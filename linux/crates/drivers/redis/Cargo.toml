@@ -13,7 +13,8 @@ path = "src/lib.rs"
 [dependencies]
 tablepro-core = { path = "../../core" }
 async-trait.workspace = true
-redis = { version = "1.5", default-features = false, features = ["tokio-comp", "connection-manager", "tls-rustls", "tls-rustls-insecure", "tokio-rustls-comp"] }
+redis = { version = "1.5", default-features = false, features = ["num-bigint", "tokio-comp", "connection-manager", "tls-rustls", "tls-rustls-insecure", "tokio-rustls-comp"] }
+serde_json.workspace = true
 secrecy.workspace = true
 tokio.workspace = true
 

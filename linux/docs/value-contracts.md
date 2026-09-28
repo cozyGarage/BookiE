@@ -83,22 +83,51 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `bfe71edabafa162852723e4ffb3b77c71250cd03` on 2026-09-29; it is an inventory, not a fresh run of
-every suite. The current worktree adds a DuckDB sub-microsecond temporal binding
-contract; it is not part of that commit. A passing scalar suite does not establish
-complete native-type support.
+`linux` commit `5a44a5f11bb7c09048184be9359cd49f9491e81f` on 2026-09-29; it is an
+inventory, not a fresh run of every suite. The current worktree adds Redis RESP3
+nested-value, binary and BigNumber regressions; they are not part of that commit.
+A passing scalar suite does not establish complete native-type support.
 
 | Path | Assertions |
 | --- | --- |
 | PostgreSQL, MySQL, SQLite, SQL Server, ClickHouse, DuckDB | Bound parameters and generated SQL preserve signed integer limits, values around 2^53, small/large floats, text and NULL |
 | Six SQL drivers, mixed named bindings | Repeated names, signed integer limits, empty text versus NULL, SQL-like Unicode payloads and placeholder-looking text retain type, position and exact content |
 | Fixed-decimal SQL engines | Positive and negative decimals retain their value through binding and generated SQL; SQLite has no fixed-decimal storage contract |
-| Redis | Integer command replies and quoted text arguments retain their values; a missing key differs from empty text |
+| Redis | Integer command replies and quoted text arguments retain their values; a missing key differs from empty text; RESP3 hash maps preserve binary field values, nested structures use tagged JSON, and BigNumber digits remain exact |
 | MongoDB | JSON commands preserve integer, float, text and NULL values through BSON and result decoding |
 | Grid, filter, CSV and named parameter parsers | Integer overflow and decimal rounding are refused; representable boundaries survive parsing |
 | Float input parsers | Numeric overflow to infinity and nonzero underflow to zero are refused |
 | XLSX | Integers beyond 15 digits and all exact decimals are text cells; stored XML verifies each value and cell reference, including decimal scale |
 | JSON and MCP | Non-finite values and negative zero remain distinct from SQL NULL and positive zero |
+
+### Redis RESP3 nested values and binary replies
+
+Top-level RESP arrays continue to produce one result row per item, and top-level
+maps remain key/value rows. Nested arrays become JSON arrays, while nested maps
+and sets carry `$redisMap` and `$redisSet` markers so their shape is explicit.
+Invalid UTF-8 bulk strings inside nested values use a lowercase hex
+`$redisBytes` marker; direct bulk values remain `Value::Bytes`. BigNumber uses
+exact decimal text as a scalar and a `$redisBigNumber` marker when nested. A
+separate boundary test builds a map one item beyond `MAX_QUERY_ROWS` and checks
+that only the capped rows are returned with `truncated: true`.
+
+The focused unit contract first failed against the previous decoder, which
+returned Rust debug strings such as `array([binary-data(...)])`. The map cap
+contract also caught a false-complete result before its fix. Unit tests also
+check `$redisAttribute` and `$redisPush` markers; these prove conversion, not
+live subscription behavior. All 34 Redis unit tests pass. A Redis 7.4 Docker
+contract switches to RESP3, reads an HGETALL map with text and invalid UTF-8
+values, then reads an XREAD stream response with nested values and binary data.
+All 3 Redis Docker integration tests pass.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-redis --lib redis_nested_replies_keep_structure_and_binary_bytes
+rtk cargo test --locked -p tablepro-driver-redis --test integration value_contract_resp3_hash_map_preserves_binary_fields_and_values -- --include-ignored --exact --test-threads=1
+```
+
+RESP3 push, attribute and stream reply semantics still need live-server
+subscription acceptance; the stream map/array response has real Redis coverage,
+while attribute and push markers currently have unit conversion tests only.
 
 ## CSV negative-zero export/import, 2026-09-28
 

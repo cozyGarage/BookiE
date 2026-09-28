@@ -462,6 +462,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
             }
         }
         RedisValue::Map(pairs) => {
+            let truncated = pairs.len() > MAX_QUERY_ROWS;
             let rows = pairs
                 .into_iter()
                 .take(MAX_QUERY_ROWS)
@@ -470,7 +471,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
             QueryResult {
                 columns: vec![text_col("key"), text_col("value")],
                 rows,
-                truncated: false,
+                truncated,
             }
         }
         RedisValue::VerbatimString { text, .. } => QueryResult {
@@ -480,7 +481,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
         },
         other => QueryResult {
             columns: vec![text_col("result")],
-            rows: vec![vec![Value::Text(format!("{other:?}"))]],
+            rows: vec![vec![redis_scalar(other)]],
             truncated: false,
         },
     }
@@ -510,7 +511,73 @@ fn redis_scalar(value: RedisValue) -> Value {
         RedisValue::BulkString(b) => bytes_to_value(b),
         RedisValue::Okay => Value::Text("OK".into()),
         RedisValue::VerbatimString { text, .. } => Value::Text(text),
-        other => Value::Text(format!("{other:?}")),
+        RedisValue::Array(_)
+        | RedisValue::Map(_)
+        | RedisValue::Set(_)
+        | RedisValue::Attribute { .. }
+        | RedisValue::Push { .. }
+        | RedisValue::ServerError(_) => Value::Json(redis_value_to_json(value)),
+        RedisValue::BigNumber(value) => Value::Text(value.to_string()),
+        _ => Value::Undecodable("unknown Redis reply kind".into()),
+    }
+}
+
+fn redis_value_to_json(value: RedisValue) -> serde_json::Value {
+    match value {
+        RedisValue::Nil => serde_json::Value::Null,
+        RedisValue::Int(value) => serde_json::json!(value),
+        RedisValue::Double(value) => serde_json::Number::from_f64(value)
+            .map(serde_json::Value::Number)
+            .unwrap_or_else(|| serde_json::json!({"$redisDouble": value.to_string()})),
+        RedisValue::Boolean(value) => serde_json::json!(value),
+        RedisValue::SimpleString(value) => serde_json::json!(value),
+        RedisValue::Okay => serde_json::json!("OK"),
+        RedisValue::BulkString(bytes) => bytes_to_json(bytes),
+        RedisValue::Array(items) => serde_json::Value::Array(items.into_iter().map(redis_value_to_json).collect()),
+        RedisValue::Set(items) => serde_json::json!({
+            "$redisSet": items.into_iter().map(redis_value_to_json).collect::<Vec<_>>()
+        }),
+        RedisValue::Map(pairs) => serde_json::json!({
+            "$redisMap": pairs
+                .into_iter()
+                .map(|(key, value)| [redis_value_to_json(key), redis_value_to_json(value)])
+                .collect::<Vec<_>>()
+        }),
+        RedisValue::Attribute { data, attributes } => serde_json::json!({
+            "$redisAttribute": {
+                "data": redis_value_to_json(*data),
+                "attributes": attributes
+                    .into_iter()
+                    .map(|(key, value)| [redis_value_to_json(key), redis_value_to_json(value)])
+                    .collect::<Vec<_>>()
+            }
+        }),
+        RedisValue::VerbatimString { format, text } => serde_json::json!({
+            "$redisVerbatim": {"format": format!("{format:?}"), "text": text}
+        }),
+        RedisValue::BigNumber(value) => serde_json::json!({"$redisBigNumber": value.to_string()}),
+        RedisValue::Push { kind, data } => serde_json::json!({
+            "$redisPush": {
+                "kind": format!("{kind:?}"),
+                "data": data.into_iter().map(redis_value_to_json).collect::<Vec<_>>()
+            }
+        }),
+        RedisValue::ServerError(error) => serde_json::json!({"$redisServerError": error.to_string()}),
+        _ => serde_json::json!({"$redisUnsupportedReply": "unknown RESP value kind"}),
+    }
+}
+
+fn bytes_to_json(bytes: Vec<u8>) -> serde_json::Value {
+    match String::from_utf8(bytes) {
+        Ok(text) => serde_json::json!(text),
+        Err(error) => {
+            let hex = error
+                .into_bytes()
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>();
+            serde_json::json!({"$redisBytes": hex})
+        }
     }
 }
 
@@ -924,6 +991,21 @@ mod tests {
     }
 
     #[test]
+    fn redis_value_to_result_marks_a_truncated_map() {
+        let pairs = (0..=MAX_QUERY_ROWS)
+            .map(|index| {
+                (
+                    RedisValue::SimpleString(index.to_string()),
+                    RedisValue::Int(index as i64),
+                )
+            })
+            .collect();
+        let result = redis_value_to_result(RedisValue::Map(pairs));
+        assert_eq!(result.rows.len(), MAX_QUERY_ROWS);
+        assert!(result.truncated, "a cut-off Redis map must never look complete");
+    }
+
+    #[test]
     fn redis_scalar_maps_nil_and_primitives() {
         assert_eq!(redis_scalar(RedisValue::Nil), Value::Null);
         assert_eq!(redis_scalar(RedisValue::Int(9)), Value::Int(9));
@@ -940,6 +1022,66 @@ mod tests {
         assert_eq!(
             redis_scalar(RedisValue::BulkString(vec![0xFF])),
             Value::Bytes(vec![0xFF])
+        );
+    }
+
+    #[test]
+    fn redis_nested_replies_keep_structure_and_binary_bytes() {
+        let result = redis_value_to_result(RedisValue::Array(vec![
+            RedisValue::Array(vec![RedisValue::BulkString(vec![0xFF, 0x00])]),
+            RedisValue::Map(vec![(RedisValue::SimpleString("score".into()), RedisValue::Int(9))]),
+            RedisValue::Set(vec![RedisValue::SimpleString("member".into())]),
+            RedisValue::Array(vec![RedisValue::BigNumber("18446744073709551616".parse().unwrap())]),
+        ]));
+
+        assert_eq!(
+            result.rows,
+            vec![
+                vec![Value::Json(serde_json::json!([{"$redisBytes": "ff00"}]))],
+                vec![Value::Json(serde_json::json!({"$redisMap": [["score", 9]]}))],
+                vec![Value::Json(serde_json::json!({"$redisSet": ["member"]}))],
+                vec![Value::Json(
+                    serde_json::json!([{"$redisBigNumber": "18446744073709551616"}])
+                )],
+            ]
+        );
+        assert_eq!(
+            redis_scalar(RedisValue::BigNumber("18446744073709551616".parse().unwrap())),
+            Value::Text("18446744073709551616".into())
+        );
+    }
+
+    #[test]
+    fn redis_resp3_attribute_and_push_keep_their_protocol_markers() {
+        let attribute = redis_scalar(RedisValue::Attribute {
+            data: Box::new(RedisValue::SimpleString("payload".into())),
+            attributes: vec![(RedisValue::SimpleString("ttl".into()), RedisValue::Int(3))],
+        });
+        assert_eq!(
+            attribute,
+            Value::Json(serde_json::json!({
+                "$redisAttribute": {
+                    "data": "payload",
+                    "attributes": [["ttl", 3]]
+                }
+            }))
+        );
+
+        let push = redis_scalar(RedisValue::Push {
+            kind: redis::PushKind::Message,
+            data: vec![
+                RedisValue::SimpleString("updates".into()),
+                RedisValue::BulkString(vec![0xFF]),
+            ],
+        });
+        assert_eq!(
+            push,
+            Value::Json(serde_json::json!({
+                "$redisPush": {
+                    "kind": "Message",
+                    "data": ["updates", {"$redisBytes": "ff"}]
+                }
+            }))
         );
     }
 }
