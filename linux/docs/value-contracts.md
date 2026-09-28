@@ -29,7 +29,7 @@ not prevent the other compiled suites from running.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `4fee26519` on 2026-09-28; it is an
+`linux` commit `a90b86041` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -61,7 +61,7 @@ types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
 now have local parser and real-server exact-text result, binding and SQL export/import contracts at signed and unsigned boundaries, plus Int128 and UInt128 grid-edit contracts.
-Installed SQLite grid acceptance, spreadsheet floating-point edges and
+Installed GTK/package SQLite grid acceptance, spreadsheet floating-point edges and
 remaining transport/persistence adapters also need focused cases. Add a reproducer
 before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -677,14 +677,20 @@ result and TablePro's decoded value. It then exports the edited rows as SQL
 INSERT literals, re-imports into a second `NUMERIC` table and requires the same
 storage classes and values. This closes the driver-level edit/SQL re-import
 case. A policy-guarded CSV import test also covers legal text and numeric values
-in INTEGER, REAL and NUMERIC affinity columns. Installed grid acceptance remains
-open.
+in INTEGER, REAL and NUMERIC affinity columns. A focused app contract now sends
+`42.50` through the same column parser and keyed update builder used for grid
+edits, then verifies `typeof(amount) = 'real'` and the returned `42.5` value.
+Installed GTK/package acceptance across the storage-class matrix remains open.
 
 The full SQLite integration suite passed all 21 tests. Run locally:
 
 ```sh
 cargo test --locked -p tablepro-driver-sqlite --test integration
+cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior -- --test-threads=1
 ```
+
+The mapped change-contract gate passed this exact app regression at
+`target/quality/20260928T130321776497Z-change-contracts/report.json`.
 
 ## MongoDB nested BSON and native boundary checkpoint
 

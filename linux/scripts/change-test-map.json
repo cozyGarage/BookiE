@@ -33,6 +33,13 @@
         "ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_a_source_with_wrong_cell_count"
       ]
     },
+    "crates/app/src/ui/browse_tab/value_parse.rs": {
+      "package": "tablepro-app",
+      "target": "--lib",
+      "tests": [
+        "ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior"
+      ]
+    },
     "crates/drivers/clickhouse/src/lib.rs": {
       "package": "tablepro-driver-clickhouse",
       "target": "--lib",

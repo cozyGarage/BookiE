@@ -1,6 +1,6 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against `linux` at `4fee26519`
+Coverage reconciled against `linux` at `a90b86041`
 on 2026-09-28. This is source/test inventory, not a fresh execution of every suite.
 
 A successful query is not evidence that its values survived. The acceptance unit
@@ -60,7 +60,7 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | ClickHouse | Shared scalar, decimal with declared scale, nonfinite and long-value contracts, `DateTime64` scales 0/3/6/9, named-zone instants decoded through IANA timezone rules, nanosecond temporal parameters and SQL exports, local refusal of out-of-range `DateTime64(9)` parameters and SQL literals; Int128 min/max and UInt128 max remain exact text through real-server results, text binding and SQL export/re-import; signed Int128 and unsigned UInt128 grid edits are verified through the keyed update | Other wide-integer grid boundaries; ambiguous/nonexistent local times remain explicit undecodable values because the wire format omits their offset; broader temporal bounds and nested values |
 | MongoDB | Decimal128 extremes remain exact text; BSON dates outside chrono's RFC3339 range, nested documents/arrays and uncommon top-level BSON kinds use canonical Extended JSON; generic binary remains bytes while other subtypes retain canonical metadata; large nested Int64, null, Unicode, nested document/array and top-level BSON Timestamp/regex/MinKey grid edits, canonical Extended JSON inserts, JSON/CSV/XLSX and MCP browse output preserve their contracts | Editing remaining top-level special BSON kinds and mixed-type columns |
 | Redis | Integer/text/NULL protocol contracts | Nested reply shapes and command-specific binary/number semantics; SQL date types are not applicable |
-| SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import | Installed grid/UI acceptance across storage-class transitions; fixed-decimal storage is not applicable |
+| SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import; the app parser plus keyed-update contract verifies `42.50` becomes SQLite REAL `42.5` | Installed GTK/package acceptance across storage-class transitions; fixed-decimal storage is not applicable |
 
 ## Consumer coverage reconciliation, 2026-09-28
 
@@ -70,7 +70,7 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | PostgreSQL array text / grid edit | Array values are `Value::Text`; current generic grid gate allows text cells and the shared update builder binds them as text | The real-server contract first reproduced SQLSTATE 42804 (`integer[]` target, TEXT expression). The shared keyed-update builder now casts allowlisted built-in array text types safely; the regression passed against PostgreSQL. |
 | PostgreSQL wide NUMERIC / grid edit | Builder unit tests prove a `NUMERIC(80,40)` text edit emits a cast through `text` to static `pg_catalog.numeric`; ordinary text columns remain uncast and hostile metadata is rejected. Docker-backed contracts verify exact equality for `NUMERIC(80,40)` and the declared `NUMERIC(1000,1000)` boundary with 1000 fractional digits. | Unconstrained numeric limits, special numerics, and text-backed PostgreSQL types remain open. |
 | MongoDB nested BSON / grid, JSON, CSV, XLSX, MCP | Recent integration cases cover nested and top-level edits plus canonical Extended JSON preservation across these consumers | Remaining special top-level edit kinds and mixed-type columns are open. |
-| SQLite NUMERIC affinity / edit and import | Bound edits and SQL-literal re-import preserve SQLite storage classes; policy-guarded CSV import covers affinity transitions | Installed grid acceptance remains open. |
+| SQLite NUMERIC affinity / parser, keyed grid save and import | The app parses `42.50` as Decimal, materializes the keyed edit, and SQLite stores the NUMERIC-affinity result as REAL `42.5`; driver contracts cover TEXT, BLOB, NULL, REAL and INTEGER transitions plus SQL-literal re-import | Installed GTK/package grid acceptance across the storage-class matrix remains open. |
 | ClickHouse Int128/UInt128 / result, SQL and grid consumers | Local raw-token parser checks plus Docker-backed ClickHouse 24.8 tests prove Int128 signed minimum/maximum and UInt128 maximum remain exact `Value::Text` through results, text binding and generated SQL INSERT/re-import. A keyed grid update changes an Int128 minimum by one and UInt128 maximum by one, while verifying the other row is unchanged. | Other wide-integer grid boundaries and other value-consumer boundaries remain untested. |
 | XLSX / wide numeric, temporal, nested BSON | Wide integers and exact decimals use text cells; temporal values use native cells only when exact, otherwise text; nested BSON markers are retained | Floating-point edge coverage and lossy format limitations remain per the checkpoint entries below. |
 

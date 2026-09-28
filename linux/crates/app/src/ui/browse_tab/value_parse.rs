@@ -279,6 +279,45 @@ mod tests {
     use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column};
     use tablepro_core::{ColumnInfo, Value};
 
+    #[tokio::test]
+    async fn sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let connection = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        connection
+            .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, amount NUMERIC)")
+            .await
+            .unwrap();
+        connection.execute("INSERT INTO flexible VALUES (1, 0)").await.unwrap();
+
+        let columns = connection.fetch_columns(None, "flexible").await.unwrap();
+        let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
+        let edit = parse_input_for_column("42.50", Some(&columns[amount_index])).unwrap();
+        assert_eq!(edit, Value::Decimal("42.50".parse().unwrap()));
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "sqlite",
+            None,
+            "flexible",
+            &columns,
+            &[(amount_index, edit)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        connection.execute_in_transaction(&[update]).await.unwrap();
+
+        let saved = connection
+            .query("SELECT typeof(amount), amount FROM flexible WHERE id = 1")
+            .await
+            .unwrap();
+        assert_eq!(saved.rows, vec![vec![Value::Text("real".into()), Value::Float(42.5)]]);
+    }
+
     #[test]
     fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
         super::parser_contract::assert_numeric_parsers(
