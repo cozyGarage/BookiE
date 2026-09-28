@@ -91,6 +91,26 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     .unwrap();
     assert_eq!(imported, values);
 
+    let safe_csv = tablepro_core::export::render_csv(
+        &result.columns,
+        &result.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    assert_eq!(
+        safe_csv,
+        "signed_min,signed_max,unsigned_max\n\"'-170141183460469231731687303715884105728\",170141183460469231731687303715884105727,340282366920938463463374607431768211455\n"
+    );
+    let safe_sheet = tablepro_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
+    let safe_imported = tablepro_core::import::row_to_values(
+        &safe_sheet.rows[0],
+        &[Some(0), Some(1), Some(2)],
+        &result.columns,
+        &import_options,
+        2,
+    )
+    .unwrap();
+    assert_eq!(safe_imported, values);
+
     conn.execute(
         "CREATE TABLE wide_integer_copy (
             signed_min Int128,
@@ -115,6 +135,24 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
         .await
         .unwrap();
     assert_eq!(reimported.rows, vec![values.to_vec()]);
+
+    conn.execute(
+        "CREATE TABLE wide_integer_csv_copy (
+            signed_min Int128,
+            signed_max Int128,
+            unsigned_max UInt128
+        ) ENGINE = MergeTree ORDER BY tuple()",
+    )
+    .await
+    .unwrap();
+    conn.execute_params("INSERT INTO wide_integer_csv_copy VALUES (?, ?, ?)", &safe_imported)
+        .await
+        .unwrap();
+    let csv_roundtrip = conn
+        .query("SELECT signed_min, signed_max, unsigned_max FROM wide_integer_csv_copy")
+        .await
+        .unwrap();
+    assert_eq!(csv_roundtrip.rows, vec![values.to_vec()]);
 }
 
 #[tokio::test]

@@ -8,7 +8,7 @@
 
 ### Fixed
 
-- CSV imports preserve ClickHouse `Int128` and `UInt128` values as exact text instead of rejecting values outside i64.
+- CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
 - MongoDB browse pages mark BSON fields as mixed when values on the page differ from the metadata sample, keeping lossy mixed-type cells read-only.
 

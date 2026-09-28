@@ -481,23 +481,29 @@ The signed Int128 minimum and maximum and unsigned UInt128 maximum pass through
 text-valued bound parameters into native Int128/UInt128 columns and return as
 exact `Value::Text`. The result row is written with the shared generated INSERT
 literal, executed into matching native columns, and read back as the exact
-original text. The same real-server result now also passes through CSV export
-with formula sanitization disabled, the shared CSV reader and typed import cell
-parser. All three wide integer fields return as the exact original text. The
-import previously failed with `NotAnInteger` because `Int128` names were
-classified as i64; ClickHouse `Int128` and `UInt128` now import as text so no
-digits are lost. Formula-safe CSV export can prefix an apostrophe to negative
-text values; that mode is outside this round-trip contract.
+original text. The same real-server result passes through CSV export, the shared
+CSV reader and typed import cell parser both with formula sanitization disabled
+and with default formula sanitization. The default-mode import is bound into a
+second native Int128/UInt128 table and read back from ClickHouse to verify the
+stored digits. Default export prefixes the negative
+Int128 with an apostrophe; import removes that marker only when the column type
+is exactly Int128 or UInt128 and the remaining signed digits fit that type.
+Ordinary text, invalid values, unsigned negatives and overflow retain the
+apostrophe. This preserves formula protection for other text columns while the
+three wide integer fields re-import as their exact original text. The first
+import attempt exposed two issues: `Int128` was classified as i64, then the
+formula-safe apostrophe remained in text-backed wide integers. Both import paths
+are now covered.
 
 ```sh
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_binding_and_sql_export_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
 ```
 
-The CSV round trip covers this wide-integer result path. The grid contract also
-covers the four adjacent wide-integer boundaries:
+The CSV round trip covers this wide-integer result path with formula
+sanitization both disabled and enabled. The grid contract also covers the four
+adjacent wide-integer boundaries:
 Int128 minimum to minimum+1, Int128 maximum to maximum-1, UInt128 zero to one,
-and UInt128 maximum to maximum-1. Other export formats and formula-safe CSV
-import parity remain open.
+and UInt128 maximum to maximum-1. Other export formats remain open.
 
 ### ClickHouse Int128 and UInt128 grid edits, 2026-09-28
 

@@ -260,6 +260,11 @@ pub(crate) fn row_to_values_for_driver(
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
     if text != options.null_marker {
+        if kind == ColumnKind::Text
+            && let Some(value) = sanitized_wide_integer_text(text, &column.data_type)
+        {
+            return Ok(Value::Text(value.to_owned()));
+        }
         return match parse_cell(text, kind) {
             Ok(value) => Ok(value),
             Err(_)
@@ -280,6 +285,20 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         return Ok(Value::Text(String::new()));
     }
     Ok(Value::Null)
+}
+
+fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
+    let value = text.strip_prefix('\'')?;
+    if !value.starts_with(['+', '-']) {
+        return None;
+    }
+    if data_type.trim().eq_ignore_ascii_case("Int128") && value.parse::<i128>().is_ok() {
+        return Some(value);
+    }
+    if data_type.trim().eq_ignore_ascii_case("UInt128") && value.parse::<u128>().is_ok() {
+        return Some(value);
+    }
+    None
 }
 
 #[cfg(test)]
@@ -345,6 +364,48 @@ mod tests {
             .expect("wide integer values remain text");
 
         assert_eq!(values, row.into_iter().map(Value::Text).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn formula_marker_is_removed_only_from_valid_signed_wide_integer_cells() {
+        let columns = vec![
+            column("signed", "Int128"),
+            column("unsigned", "UInt128"),
+            column("invalid_unsigned", "UInt128"),
+            column("overflow", "Int128"),
+            column("invalid_signed", "Int128"),
+            column("text", "String"),
+        ];
+        let signed_min = "-170141183460469231731687303715884105728";
+        let unsigned_max = "340282366920938463463374607431768211455";
+        let row = vec![
+            format!("'{signed_min}"),
+            format!("'+{unsigned_max}"),
+            "'-1".into(),
+            "'170141183460469231731687303715884105728".into(),
+            "'-not-an-integer".into(),
+            "'-170141183460469231731687303715884105728".into(),
+        ];
+        let values = row_to_values(
+            &row,
+            &[Some(0), Some(1), Some(2), Some(3), Some(4), Some(5)],
+            &columns,
+            &CsvImportOptions::default(),
+            2,
+        )
+        .expect("valid wide integer formula prefixes are restored");
+
+        assert_eq!(
+            values,
+            vec![
+                Value::Text(signed_min.into()),
+                Value::Text(format!("+{unsigned_max}")),
+                Value::Text("'-1".into()),
+                Value::Text("'170141183460469231731687303715884105728".into()),
+                Value::Text("'-not-an-integer".into()),
+                Value::Text("'-170141183460469231731687303715884105728".into()),
+            ]
+        );
     }
 
     #[test]
