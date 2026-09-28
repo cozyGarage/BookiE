@@ -712,7 +712,7 @@ fn xlsx_nested_cell_requires_its_own_date_and_binary_markers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
+async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson() {
     use mongodb::bson::{Binary, DateTime, Decimal128, Regex, Timestamp, doc, oid::ObjectId, spec::BinarySubtype};
 
     let (_container, host, port) = start_mongo().await;
@@ -730,6 +730,7 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
             "cluster_time": Timestamp { time: 41, increment: 7 },
             "pattern": Regex { pattern: "before".into(), options: "i".into() },
             "floor": mongodb::bson::Bson::MinKey,
+            "ceiling": mongodb::bson::Bson::MaxKey,
         })
         .await
         .expect("seed editable nested document");
@@ -765,6 +766,12 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
     assert_eq!(before.columns[regex_index].data_type, "regex");
     let min_key_index = before.columns.iter().position(|column| column.name == "floor").unwrap();
     assert_eq!(before.columns[min_key_index].data_type, "minkey");
+    let max_key_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "ceiling")
+        .unwrap();
+    assert_eq!(before.columns[max_key_index].data_type, "maxkey");
 
     let edited = serde_json::json!({
         "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
@@ -775,6 +782,7 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
     let edited_timestamp = serde_json::json!({"$timestamp": {"t": 53, "i": 11}});
     let edited_regex = serde_json::json!({"$regularExpression": {"pattern": "after", "options": "m"}});
     let edited_min_key = serde_json::json!({"$minKey": 1});
+    let edited_max_key = serde_json::json!({"$maxKey": 1});
     let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
@@ -786,6 +794,7 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
             (timestamp_index, Value::Json(edited_timestamp)),
             (regex_index, Value::Json(edited_regex)),
             (min_key_index, Value::Json(edited_min_key)),
+            (max_key_index, Value::Json(edited_max_key)),
         ],
         &[before.rows[0][id_index].clone()],
     )
@@ -833,6 +842,7 @@ async fn a_nested_grid_cell_edit_writes_extended_json_back_as_native_bson() {
         }))
     );
     assert_eq!(persisted.get("floor"), Some(&mongodb::bson::Bson::MinKey));
+    assert_eq!(persisted.get("ceiling"), Some(&mongodb::bson::Bson::MaxKey));
     assert_eq!(
         persisted.get_array("items").unwrap(),
         &vec![mongodb::bson::Bson::Document(doc! { "ordinal": 7_i64 })]

@@ -927,8 +927,8 @@ columns through JSON parsing. MongoDB 7 integration tests verify canonical
 Extended JSON re-import and MCP browse output preserve nested BSON types.
 They also check nested Int64 above 2^53, explicit nested null and Unicode across
 driver results, JSON/CSV/XLSX output, import and MCP browse response.
-Top-level Timestamp, regex and MinKey grid edits also round-trip as native BSON;
-remaining special types and mixed-type-column edits remain open.
+Top-level Timestamp, regex, MinKey and MaxKey grid edits also round-trip as
+native BSON. Remaining special types and mixed-type-column edits remain open.
 
 Focused local checks:
 
@@ -936,6 +936,7 @@ Focused local checks:
 cargo test --locked -p tablepro-driver-mongodb --lib nested_bson_special_values_keep_their_extended_json_types
 cargo test --locked -p tablepro-driver-mongodb --lib bson_decimal_and_date_extremes_remain_exact_outside_core_ranges
 cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson_special_values_keep_exact_extended_json_types --include-ignored --test-threads=1
+cargo test --locked -p tablepro-driver-mongodb --test integration a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson -- --include-ignored --exact --test-threads=1
 ```
 
 Against the old decoder, the regression failed with
@@ -952,7 +953,8 @@ exports the actual query result as XLSX and checks Decimal128, date and binary
 subtype markers in workbook strings. An MCP unit contract confirms BSON
 Extended JSON is passed through without flattening; Mongo-backed MCP browse and
 native BSON re-import checks now run in the integration suite. Top-level
-Timestamp, regex and MinKey grid edits are covered. Local regressions use a BSON
+Timestamp, regex, MinKey and MaxKey grid edits are covered, including a Docker
+assertion that the edited MaxKey remains native BSON. Local regressions use a BSON
 String and Decimal128 with identical text: the field is labeled `mixed`, and
 the shared app grid editability gate refuses both values because the result
 model maps each scalar to the same `Value::Text`. The grid still displays the
