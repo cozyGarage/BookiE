@@ -268,6 +268,29 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_workbook_float_preserves_subnormal_and_adjacent_value_bits() {
+        let values = [f64::from_bits(1), f64::from_bits(0x3ff0_0000_0000_0001)];
+        let (sheet, _) = workbook_parts(&values.map(Value::Float));
+
+        for (row, expected) in values.into_iter().enumerate() {
+            let cell_ref = format!("A{}", row + 2);
+            let cell = sheet
+                .split(&format!("<c r=\"{cell_ref}\""))
+                .nth(1)
+                .unwrap_or_else(|| panic!("missing {cell_ref}: {sheet}"));
+            let token = cell
+                .split_once("<v>")
+                .and_then(|(_, value)| value.split_once("</v>"))
+                .map(|(value, _)| value)
+                .unwrap_or_else(|| panic!("missing numeric token for {cell_ref}: {sheet}"));
+            let actual = token
+                .parse::<f64>()
+                .unwrap_or_else(|error| panic!("invalid {cell_ref} token {token:?}: {error}"));
+            assert_eq!(actual.to_bits(), expected.to_bits(), "{cell_ref}: {token}");
+        }
+    }
+
+    #[test]
     fn value_contract_workbook_preserves_nested_extended_json_as_exact_text() {
         let value = Value::Json(serde_json::json!({
             "decimal": {"$numberDecimal": "9.999999999999999999999999999999999E+6144"},

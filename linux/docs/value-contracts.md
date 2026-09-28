@@ -229,14 +229,18 @@ Spreadsheet import and spreadsheet-application re-import contracts remain open.
 The XLSX writer stores finite floats as numeric cells. A focused workbook
 regression checks the generated worksheet XML directly and confirms that
 negative zero is serialized as the numeric token `-0`, not positive `0` or a
-string. BookiE has no XLSX import path, so this establishes the exported file
-representation only, not later spreadsheet-application round-trip behavior.
+string. Another regression parses the worksheet's numeric token for the smallest
+positive subnormal and the representable value immediately above `1.0`, then
+compares the recovered `f64` bits with independent expected values. All three
+focused float workbook tests pass. BookiE has no XLSX import path, so these
+contracts establish exported numeric tokens and their IEEE-754 parse-back, not
+later spreadsheet-application round-trip behavior.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_workbook_float_negative_zero_keeps_its_signed_numeric_token
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_workbook_float
 ```
 
-The test passed. No production mismatch was found.
+No production mismatch was found.
 
 ### XLSX nested Extended JSON consumer check, 2026-09-27
 
