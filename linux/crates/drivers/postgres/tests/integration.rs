@@ -74,6 +74,37 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_postgres_money_is_refused_with_exact_server_oracle() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT amount, pg_typeof(amount)::text AS native_type, \
+             amount::numeric::text AS exact_value, \
+             amount::numeric = 12345.67::numeric AS server_match \
+             FROM (SELECT 12345.67::numeric::money AS amount) source",
+        )
+        .await
+        .unwrap();
+
+    assert!(matches!(result.rows[0][0], Value::Undecodable(_)));
+    assert_eq!(result.rows[0][1], Value::Text("money".into()));
+    assert_eq!(result.rows[0][2], Value::Text("12345.67".into()));
+    assert_eq!(result.rows[0][3], Value::Bool(true));
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(&result.rows[0][0]))
+            .await
+            .is_err()
+    );
+
+    let null = connection.query("SELECT NULL::money").await.unwrap();
+    assert_eq!(null.rows, vec![vec![Value::Null]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_dates_preserve_eras_large_years_and_instants() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

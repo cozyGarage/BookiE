@@ -474,6 +474,20 @@ The text-projection and consumer round-trip contract passed against PostgreSQL
 16. The direct enum projection attempt failed before assertions in SQLx metadata
 resolution and is recorded as an open boundary, not a passing result contract.
 
+### PostgreSQL money safe refusal
+
+A PostgreSQL 16 contract returns a native `money` value with a separate exact
+`money::numeric::text` oracle and server equality check. The driver reports
+non-NULL money as `Undecodable`, SQL-literal and parameter consumers refuse the
+marker, and SQL NULL remains `Value::Null`. This is an explicit safety boundary,
+not exact money support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_postgres_money_is_refused_with_exact_server_oracle -- --include-ignored --exact --test-threads=1
+```
+
+The PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
 
 The shared keyed-update builder's final focused mutation report selected 16
