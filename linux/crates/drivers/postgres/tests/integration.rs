@@ -105,6 +105,45 @@ async fn value_contract_postgres_money_is_refused_with_exact_server_oracle() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_citext_preserves_label_and_case_insensitive_comparison() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE EXTENSION citext").await.unwrap();
+    let original = "MixedCase@example.test";
+    let result = connection
+        .query(&format!(
+            "SELECT value, value::text AS exact_text, \
+             value = 'mixedcase@example.test'::citext AS case_insensitive_match \
+             FROM (SELECT '{original}'::citext AS value) source"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text(original.into()),
+            Value::Text(original.into()),
+            Value::Bool(true),
+        ]]
+    );
+
+    let value = Value::Text(original.into());
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::citext::text"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text(original.into())]]);
+
+    let bound_result = connection
+        .query_params("SELECT $1::citext::text", &[value])
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text(original.into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_dates_preserve_eras_large_years_and_instants() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

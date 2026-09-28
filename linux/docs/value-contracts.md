@@ -502,6 +502,21 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL `citext` text consumer contract
+
+The PostgreSQL 16 fixture creates the `citext` extension and checks that a
+mixed-case address remains byte-for-byte text through result decoding, SQL
+literal re-import and a typed parameter. A separate comparison against the
+lowercase spelling confirms PostgreSQL still applies `citext`'s
+case-insensitive comparison semantics. This establishes the label's text
+fidelity without claiming that `citext` semantics are represented by `Value`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_citext_preserves_label_and_case_insensitive_comparison -- --include-ignored --exact --test-threads=1
+```
+
+The focused Docker contract passed.
+
 ### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
 
 The shared keyed-update builder's final focused mutation report selected 16
