@@ -351,13 +351,23 @@ mod tests {
             })
             .await
             .unwrap();
+        let control = crate::services::operation_control::bounded(0);
         connection
-            .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, amount NUMERIC)")
+            .execute_controlled(
+                "CREATE TABLE flexible (id INTEGER PRIMARY KEY, amount NUMERIC)",
+                &control,
+            )
             .await
             .unwrap();
-        connection.execute("INSERT INTO flexible VALUES (1, 0)").await.unwrap();
+        connection
+            .execute_controlled("INSERT INTO flexible VALUES (1, 0)", &control)
+            .await
+            .unwrap();
 
-        let columns = connection.fetch_columns(None, "flexible").await.unwrap();
+        let columns = connection
+            .fetch_columns_controlled(None, "flexible", &control)
+            .await
+            .unwrap();
         let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
         let edit = parse_input_for_column("42.50", Some(&columns[amount_index])).unwrap();
         assert_eq!(edit, Value::Decimal("42.50".parse().unwrap()));
@@ -370,10 +380,13 @@ mod tests {
             &[Value::Int(1)],
         )
         .unwrap();
-        connection.execute_in_transaction(&[update]).await.unwrap();
+        connection
+            .execute_in_transaction_controlled(&[update], &control)
+            .await
+            .unwrap();
 
         let saved = connection
-            .query("SELECT typeof(amount), amount FROM flexible WHERE id = 1")
+            .query_controlled("SELECT typeof(amount), amount FROM flexible WHERE id = 1", &control)
             .await
             .unwrap();
         assert_eq!(saved.rows, vec![vec![Value::Text("real".into()), Value::Float(42.5)]]);
@@ -465,21 +478,26 @@ mod tests {
             ..Default::default()
         };
         let connection = drivers_postgres::PgDriver.connect(options).await.unwrap();
+        let control = crate::services::operation_control::bounded(0);
         for (table, data_type) in [
             ("parser_numeric", "numeric(80, 40)"),
             ("parser_unconstrained_numeric", "numeric"),
         ] {
             connection
-                .execute(&format!(
-                    "CREATE TABLE {table} (id integer PRIMARY KEY, amount {data_type})"
-                ))
+                .execute_controlled(
+                    &format!("CREATE TABLE {table} (id integer PRIMARY KEY, amount {data_type})"),
+                    &control,
+                )
                 .await
                 .unwrap();
             connection
-                .execute(&format!("INSERT INTO {table} VALUES (1, 0)"))
+                .execute_controlled(&format!("INSERT INTO {table} VALUES (1, 0)"), &control)
                 .await
                 .unwrap();
-            let columns = connection.fetch_columns(None, table).await.unwrap();
+            let columns = connection
+                .fetch_columns_controlled(None, table, &control)
+                .await
+                .unwrap();
             let amount = columns.iter().position(|column| column.name == "amount").unwrap();
             let id = columns.iter().position(|column| column.name == "id").unwrap();
             assert!(columns[id].primary_key);
@@ -497,10 +515,16 @@ mod tests {
                 &[Value::Int(1)],
             )
             .unwrap();
-            assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+            assert_eq!(
+                connection
+                    .execute_in_transaction_controlled(&[update], &control)
+                    .await
+                    .unwrap(),
+                vec![1]
+            );
 
             let saved = connection
-                .query(&format!("SELECT amount::text FROM {table} WHERE id = 1"))
+                .query_controlled(&format!("SELECT amount::text FROM {table} WHERE id = 1"), &control)
                 .await
                 .unwrap();
             assert_eq!(saved.rows, vec![vec![Value::Text(VALUE.into())]], "{data_type}");
@@ -518,9 +542,18 @@ mod tests {
                         &[Value::Int(1)],
                     )
                     .unwrap();
-                    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+                    assert_eq!(
+                        connection
+                            .execute_in_transaction_controlled(&[update], &control)
+                            .await
+                            .unwrap(),
+                        vec![1]
+                    );
                     let saved = connection
-                        .query(&format!("SELECT amount, amount::text FROM {table} WHERE id = 1"))
+                        .query_controlled(
+                            &format!("SELECT amount, amount::text FROM {table} WHERE id = 1"),
+                            &control,
+                        )
                         .await
                         .unwrap();
                     assert_eq!(
@@ -535,15 +568,18 @@ mod tests {
         assert_eq!(fraction.len(), 16_383);
         let maximum_scale_value = format!("0.{fraction}");
         connection
-            .execute("CREATE TABLE parser_numeric_max_scale (id integer PRIMARY KEY, amount numeric)")
+            .execute_controlled(
+                "CREATE TABLE parser_numeric_max_scale (id integer PRIMARY KEY, amount numeric)",
+                &control,
+            )
             .await
             .unwrap();
         connection
-            .execute("INSERT INTO parser_numeric_max_scale VALUES (1, 0)")
+            .execute_controlled("INSERT INTO parser_numeric_max_scale VALUES (1, 0)", &control)
             .await
             .unwrap();
         let columns = connection
-            .fetch_columns(None, "parser_numeric_max_scale")
+            .fetch_columns_controlled(None, "parser_numeric_max_scale", &control)
             .await
             .unwrap();
         let amount = columns.iter().position(|column| column.name == "amount").unwrap();
@@ -558,9 +594,18 @@ mod tests {
             &[Value::Int(1)],
         )
         .unwrap();
-        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+        assert_eq!(
+            connection
+                .execute_in_transaction_controlled(&[update], &control)
+                .await
+                .unwrap(),
+            vec![1]
+        );
         let saved = connection
-            .query("SELECT amount::text, scale(amount) FROM parser_numeric_max_scale WHERE id = 1")
+            .query_controlled(
+                "SELECT amount::text, scale(amount) FROM parser_numeric_max_scale WHERE id = 1",
+                &control,
+            )
             .await
             .unwrap();
         assert_eq!(
@@ -570,15 +615,18 @@ mod tests {
 
         let maximum_integer_value = "9".repeat(131_072);
         connection
-            .execute("CREATE TABLE parser_numeric_max_integer (id integer PRIMARY KEY, amount numeric)")
+            .execute_controlled(
+                "CREATE TABLE parser_numeric_max_integer (id integer PRIMARY KEY, amount numeric)",
+                &control,
+            )
             .await
             .unwrap();
         connection
-            .execute("INSERT INTO parser_numeric_max_integer VALUES (1, 0)")
+            .execute_controlled("INSERT INTO parser_numeric_max_integer VALUES (1, 0)", &control)
             .await
             .unwrap();
         let columns = connection
-            .fetch_columns(None, "parser_numeric_max_integer")
+            .fetch_columns_controlled(None, "parser_numeric_max_integer", &control)
             .await
             .unwrap();
         let amount = columns.iter().position(|column| column.name == "amount").unwrap();
@@ -593,9 +641,18 @@ mod tests {
             &[Value::Int(1)],
         )
         .unwrap();
-        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+        assert_eq!(
+            connection
+                .execute_in_transaction_controlled(&[update], &control)
+                .await
+                .unwrap(),
+            vec![1]
+        );
         let saved = connection
-            .query("SELECT amount::text, length(amount::text) FROM parser_numeric_max_integer WHERE id = 1")
+            .query_controlled(
+                "SELECT amount::text, length(amount::text) FROM parser_numeric_max_integer WHERE id = 1",
+                &control,
+            )
             .await
             .unwrap();
         assert_eq!(
