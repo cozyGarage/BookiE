@@ -314,10 +314,13 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 A Docker regression first reproduced SQL Server `money` as
 `Float(123456789012345.67)` even though an independent server-side decimal text
 cast returned `123456789012345.6789`. `smallmoney` also travels through the
-TDS client's floating-point representation. Both native money types now return
-an `Undecodable("money")` marker for non-NULL values, while NULL remains NULL;
-the result's separate decimal text oracles preserve the server's exact values.
-This is a safe refusal, not exact `money` editing or binding support.
+TDS client's floating-point representation. Non-NULL `ColumnType::Money` returns
+`Undecodable("money")`, and `ColumnType::Money4` returns `Undecodable("smallmoney")`.
+Nullable `smallmoney` is `ColumnType::Money` because pinned Tiberius maps every
+`VarLenType::Money` to `Money`, so that path returns `Undecodable("money")`.
+NULL remains NULL. The result's separate decimal text oracles preserve the
+server's exact values. This is a safe refusal, not exact `money` editing or
+binding support.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --lib money_columns_refuse_float_decoding_but_preserve_null

@@ -1,8 +1,10 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Notify;
 
 use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
@@ -277,6 +279,10 @@ pub trait Connection: Send + Sync {
     fn supports_server_cancellation(&self) -> bool {
         false
     }
+    /// Receives the `Notify` the connection monitor already waits on.
+    /// A driver that retires its connection without returning
+    /// [`DriverError::Disconnected`] wakes that same sink from the retirement.
+    fn attach_fault_notify(&self, _notify: Arc<Notify>) {}
     async fn ping(&self) -> Result<(), DriverError>;
     async fn close(self: Box<Self>) -> Result<(), DriverError>;
 }

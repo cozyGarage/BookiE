@@ -31,7 +31,7 @@ pub(super) async fn run(
         };
 
         if faulted {
-            if reconnect_loop(&inner, &params, &cancel).await.is_err() {
+            if reconnect_loop(&inner, &params, &cancel, &fault).await.is_err() {
                 return;
             }
             continue;
@@ -44,7 +44,7 @@ pub(super) async fn run(
 
         if let Err(e) = conn.ping().await {
             tracing::warn!(error = %e, "connection ping failed; starting reconnect");
-            if reconnect_loop(&inner, &params, &cancel).await.is_err() {
+            if reconnect_loop(&inner, &params, &cancel, &fault).await.is_err() {
                 return;
             }
         }
@@ -59,6 +59,7 @@ async fn reconnect_loop(
     inner: &Arc<Mutex<EntryInner>>,
     params: &ReconnectParams,
     cancel: &CancellationToken,
+    fault: &Arc<Notify>,
 ) -> Result<(), ()> {
     let mut delay = BACKOFF_INITIAL;
     let mut attempt: u32 = 1;
@@ -71,7 +72,7 @@ async fn reconnect_loop(
 
         match try_reconnect(params).await {
             Ok((conn, tunnel)) => {
-                swap_connection(inner, conn, tunnel);
+                swap_connection(inner, conn, tunnel, fault);
                 set_health(inner, ConnectionHealth::Healthy);
                 tracing::info!(attempt, "reconnect succeeded");
                 return Ok(());
@@ -100,7 +101,13 @@ async fn try_reconnect(params: &ReconnectParams) -> Result<(Box<dyn Connection>,
     .await
 }
 
-fn swap_connection(inner: &Arc<Mutex<EntryInner>>, conn: Box<dyn Connection>, tunnel: Option<Tunnel>) {
+fn swap_connection(
+    inner: &Arc<Mutex<EntryInner>>,
+    conn: Box<dyn Connection>,
+    tunnel: Option<Tunnel>,
+    fault: &Arc<Notify>,
+) {
+    conn.attach_fault_notify(Arc::clone(fault));
     let arc: Arc<dyn Connection> = Arc::from(conn);
     if let Ok(mut g) = inner.lock() {
         g.connection = arc;

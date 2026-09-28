@@ -279,6 +279,8 @@ impl DatabaseService {
         if connections.contains_key(&id) {
             return false;
         }
+        let fault = Arc::new(Notify::new());
+        connection.attach_fault_notify(Arc::clone(&fault));
         let arc: Arc<dyn Connection> = Arc::from(connection);
         let environment = metadata.environment;
         let inner = Arc::new(Mutex::new(EntryInner {
@@ -287,7 +289,6 @@ impl DatabaseService {
             health: ConnectionHealth::Healthy,
         }));
         let cancel = CancellationToken::new();
-        let fault = Arc::new(Notify::new());
         let monitor = tokio::spawn(connection_monitor::run(
             inner.clone(),
             params,

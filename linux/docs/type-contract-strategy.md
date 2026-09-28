@@ -1,6 +1,6 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against `linux` at `a90b86041`
+Coverage reconciled against `linux` at `f142d3fea520964424143ec7401c157a65469188`
 on 2026-09-28. This is source/test inventory, not a fresh execution of every suite.
 
 A successful query is not evidence that its values survived. The acceptance unit

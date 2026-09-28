@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_trait::async_trait;
@@ -9,7 +10,7 @@ use tiberius::{
     AuthMethod, Client, Column, ColumnData, ColumnType, Config, EncryptionLevel, FromSql, QueryItem, ToSql,
 };
 use tokio::net::TcpStream;
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::{MappedMutexGuard, Mutex, Notify};
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 use tablepro_core::sql_dialect::build_order_and_pagination;
@@ -23,6 +24,12 @@ mod session;
 mod zoned;
 
 type MssqlClient = Client<Compat<TcpStream>>;
+
+enum StoredClient {
+    Live(MssqlClient),
+    #[cfg(test)]
+    Absent,
+}
 
 /// Matches the `acquire_timeout` the sqlx-backed drivers give their
 /// pools, so a dead host fails at the same speed on every engine.
@@ -178,17 +185,29 @@ async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
 }
 
 struct MssqlConnection {
-    client: Mutex<MssqlClient>,
+    client: Mutex<StoredClient>,
     usable: AtomicBool,
+    fault: std::sync::Mutex<Option<Arc<Notify>>>,
     session_options: ConnectOptions,
 }
 
 impl MssqlConnection {
     fn new(client: MssqlClient, session_options: ConnectOptions) -> Self {
         Self {
-            client: Mutex::new(client),
+            client: Mutex::new(StoredClient::Live(client)),
             usable: AtomicBool::new(true),
+            fault: std::sync::Mutex::new(None),
             session_options,
+        }
+    }
+
+    #[cfg(test)]
+    fn unconnected() -> Self {
+        Self {
+            client: Mutex::new(StoredClient::Absent),
+            usable: AtomicBool::new(true),
+            fault: std::sync::Mutex::new(None),
+            session_options: ConnectOptions::default(),
         }
     }
 
@@ -197,11 +216,19 @@ impl MssqlConnection {
     /// client whose token stream was left half-read, and the client sits
     /// behind a mutex, so a single abandoned statement would otherwise
     /// block every later operation on this connection forever.
-    async fn client(&self) -> Result<MutexGuard<'_, MssqlClient>, DriverError> {
+    async fn client(&self) -> Result<MappedMutexGuard<'_, MssqlClient>, DriverError> {
         if !self.usable.load(Ordering::Acquire) {
             return Err(DriverError::Disconnected);
         }
-        Ok(self.client.lock().await)
+        let guard = self.client.lock().await;
+        match tokio::sync::MutexGuard::try_map(guard, |stored| match stored {
+            StoredClient::Live(client) => Some(client),
+            #[cfg(test)]
+            StoredClient::Absent => None,
+        }) {
+            Ok(client) => Ok(client),
+            Err(_guard) => Err(DriverError::Disconnected),
+        }
     }
 
     /// Runs `operation` under the caller's cancellation and deadline.
@@ -220,12 +247,20 @@ impl MssqlConnection {
 
     async fn retire(&self) -> Result<(), DriverError> {
         self.usable.store(false, Ordering::Release);
+        let guard = self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(fault) = guard.as_ref() {
+            fault.notify_one();
+        }
         Ok(())
     }
 }
 
 #[async_trait]
 impl Connection for MssqlConnection {
+    fn attach_fault_notify(&self, notify: Arc<Notify>) {
+        *self.fault.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(notify);
+    }
+
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
         session::open(&self.session_options).await
     }
@@ -511,7 +546,11 @@ impl Connection for MssqlConnection {
         if !self.usable.load(Ordering::Acquire) {
             return Ok(());
         }
-        self.client.into_inner().close().await.map_err(map_tiberius_error)
+        match self.client.into_inner() {
+            StoredClient::Live(client) => client.close().await.map_err(map_tiberius_error),
+            #[cfg(test)]
+            StoredClient::Absent => Ok(()),
+        }
     }
 }
 
@@ -1231,5 +1270,40 @@ mod tests {
             column_data_to_value_for_type(&ColumnData::F32(None), ColumnType::Money4),
             Value::Null
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn retire_wakes_the_fault_sink_and_leaves_the_outcome_unknown() {
+        let fault = Arc::new(Notify::new());
+        let connection = MssqlConnection::unconnected();
+        connection.attach_fault_notify(Arc::clone(&fault));
+
+        let notified = fault.notified();
+        tokio::pin!(notified);
+        assert!(!notified.as_mut().enable(), "the sink must be idle until retire");
+
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
+        let result = connection
+            .run_abandonable(
+                async {
+                    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    Err::<(), DriverError>(DriverError::Disconnected)
+                },
+                &control,
+            )
+            .await;
+
+        assert!(
+            matches!(
+                result,
+                Err(DriverError::OperationOutcomeUnknown { source })
+                    if matches!(source.as_ref(), DriverError::Disconnected)
+            ),
+            "an in-flight call must stay unknown when cancellation is not confirmed"
+        );
+        assert!(!connection.usable.load(Ordering::Acquire));
+
+        let woke = tokio::time::timeout(std::time::Duration::from_millis(1), notified).await;
+        assert!(woke.is_ok(), "retire must wake the fault sink");
     }
 }
