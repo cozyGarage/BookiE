@@ -218,6 +218,43 @@ async fn value_contract_int4range_is_explicitly_unsupported() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_tstzrange_is_explicitly_unsupported() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("SET TIME ZONE 'UTC'").await.unwrap();
+    let result = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             lower(value)::text AS lower_text, upper(value)::text AS upper_text, \
+             lower_inc(value) AS lower_inclusive, upper_inc(value) AS upper_inclusive \
+             FROM (SELECT tstzrange(\
+               '2024-01-02 03:04:05.123456+02', \
+               '2024-01-02 04:05:06.654321+02', '[)') AS value) source",
+        )
+        .await
+        .unwrap();
+    let row = &result.rows[0];
+    assert!(matches!(row[0], Value::Undecodable(_)), "{:?}", row[0]);
+    assert_eq!(row[1], Value::Text("tstzrange".into()));
+    assert_eq!(
+        row[2],
+        Value::Text("[\"2024-01-02 01:04:05.123456+00\",\"2024-01-02 02:05:06.654321+00\")".into())
+    );
+    assert_eq!(row[3], Value::Text("2024-01-02 01:04:05.123456+00".into()));
+    assert_eq!(row[4], Value::Text("2024-01-02 02:05:06.654321+00".into()));
+    assert_eq!(row[5], Value::Bool(true));
+    assert_eq!(row[6], Value::Bool(false));
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(&row[0]))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_composite_result_is_explicitly_unsupported() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

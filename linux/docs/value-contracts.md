@@ -549,6 +549,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 The focused PostgreSQL Docker contract passed. This does not add composite
 support.
 
+### PostgreSQL temporal range explicit refusal
+
+The PostgreSQL 16 contract returns a `tstzrange` spanning two fractional-second
+instants supplied at `+02`, with UTC fixed for independent text oracles. The
+driver marks the range `Undecodable`; server `tstzrange::text`, lower/upper
+`timestamptz::text`, type name, and endpoint-inclusion functions confirm the
+stored bounds and `[)` semantics. SQL-literal rendering and parameter binding
+refuse the result. This adds one temporal range refusal boundary and does not
+add PostgreSQL range support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_tstzrange_is_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL Docker contract passed.
+
 ### PostgreSQL scalar enum label text projection
 
 A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For
