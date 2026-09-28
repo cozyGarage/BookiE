@@ -736,6 +736,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
                 code: "return before;".into(),
                 scope: doc! { "value": 1_i64 },
             },
+            "symbol": mongodb::bson::Bson::Symbol("before".into()),
             "floor": mongodb::bson::Bson::MinKey,
             "ceiling": mongodb::bson::Bson::MaxKey,
         })
@@ -777,6 +778,12 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         .position(|column| column.name == "script")
         .unwrap();
     assert_eq!(before.columns[script_index].data_type, "javascriptwithscope");
+    let symbol_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "symbol")
+        .unwrap();
+    assert_eq!(before.columns[symbol_index].data_type, "symbol");
     let min_key_index = before.columns.iter().position(|column| column.name == "floor").unwrap();
     assert_eq!(before.columns[min_key_index].data_type, "minkey");
     let max_key_index = before
@@ -798,6 +805,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         "$code": "return after;",
         "$scope": {"value": {"$numberLong": "9"}},
     });
+    let edited_symbol = serde_json::json!({"$symbol": "after"});
     let edited_min_key = serde_json::json!({"$minKey": 1});
     let edited_max_key = serde_json::json!({"$maxKey": 1});
     let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
@@ -811,6 +819,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             (timestamp_index, Value::Json(edited_timestamp)),
             (regex_index, Value::Json(edited_regex)),
             (script_index, Value::Json(edited_script.clone())),
+            (symbol_index, Value::Json(edited_symbol.clone())),
             (min_key_index, Value::Json(edited_min_key)),
             (max_key_index, Value::Json(edited_max_key)),
         ],
@@ -829,6 +838,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     assert_eq!(after.rows[0][payload_index], Value::Json(edited));
     assert_eq!(after.rows[0][items_index], Value::Json(edited_items));
     assert_eq!(after.rows[0][script_index], Value::Json(edited_script));
+    assert_eq!(after.rows[0][symbol_index], Value::Json(edited_symbol));
 
     let persisted = client
         .database("appdb")
@@ -866,6 +876,10 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             code: "return after;".into(),
             scope: doc! { "value": 9_i64 },
         }))
+    );
+    assert_eq!(
+        persisted.get("symbol"),
+        Some(&mongodb::bson::Bson::Symbol("after".into()))
     );
     assert_eq!(persisted.get("floor"), Some(&mongodb::bson::Bson::MinKey));
     assert_eq!(persisted.get("ceiling"), Some(&mongodb::bson::Bson::MaxKey));
