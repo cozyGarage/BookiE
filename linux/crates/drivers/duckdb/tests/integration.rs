@@ -164,6 +164,47 @@ async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
 }
 
 #[tokio::test]
+async fn value_contract_submicro_temporals_bind_as_exact_text() {
+    let connection = native_connection().await;
+    let time = chrono::NaiveTime::from_hms_nano_opt(12, 34, 56, 123_456_789).unwrap();
+    let timestamp =
+        chrono::NaiveDateTime::parse_from_str("1969-12-31 23:59:59.123456789", "%Y-%m-%d %H:%M:%S%.f").unwrap();
+    let timestamp_tz = chrono::DateTime::parse_from_rfc3339("2026-09-27T12:34:56.123456789+05:30")
+        .unwrap()
+        .to_utc();
+    let values = [
+        Value::Time(time),
+        Value::DateTime(timestamp),
+        Value::TimestampTz(timestamp_tz),
+    ];
+
+    let types = connection
+        .query_params("SELECT typeof(?), typeof(?), typeof(?)", &values)
+        .await
+        .unwrap();
+    assert_eq!(
+        types.rows,
+        vec![vec![
+            Value::Text("VARCHAR".into()),
+            Value::Text("VARCHAR".into()),
+            Value::Text("VARCHAR".into()),
+        ]],
+        "these values exceed DuckDB's lossless bound temporal precision"
+    );
+
+    let echoed = connection.query_params("SELECT ?, ?, ?", &values).await.unwrap();
+    assert_eq!(
+        echoed.rows,
+        vec![vec![
+            Value::Text("12:34:56.123456789".into()),
+            Value::Text("1969-12-31 23:59:59.123456789".into()),
+            Value::Text("2026-09-27T07:04:56.123456789+00:00".into()),
+        ]],
+        "submicro parameters must retain every digit and the UTC instant"
+    );
+}
+
+#[tokio::test]
 async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
     let connection = native_connection().await;
     connection

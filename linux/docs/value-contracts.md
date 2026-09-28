@@ -83,11 +83,10 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `1bf4fcf419fb3681777b3601ed306e92997a0117` on 2026-09-29; it is an
-inventory, not a fresh run of every suite. The current worktree additionally has
-a PostgreSQL range-family refusal regression, passed alone and in the complete
-56-test integration suite; it is not part of that commit. A passing scalar suite
-does not establish complete native-type support.
+`linux` commit `bfe71edabafa162852723e4ffb3b77c71250cd03` on 2026-09-29; it is an inventory, not a fresh run of
+every suite. The current worktree adds a DuckDB sub-microsecond temporal binding
+contract; it is not part of that commit. A passing scalar suite does not establish
+complete native-type support.
 
 | Path | Assertions |
 | --- | --- |
@@ -1380,6 +1379,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 ```
 
 The local embedded-engine contract passed.
+
+Sub-microsecond TIME and TIMESTAMP values, plus every `TimestampTz`, are sent
+through DuckDB parameters as exact VARCHAR values because the bundled client has
+no lossless native bind type for these cases. An unignored integration contract
+checks `typeof(?)` and exact echoed text for a nanosecond TIME, a pre-epoch
+nanosecond TIMESTAMP, and a nine-digit offset-origin TIMESTAMPTZ. It confirms
+transport preservation and the UTC instant, not native typed binding; callers
+must cast explicitly when using these text parameters in typed expressions.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_submicro_temporals_bind_as_exact_text -- --exact --test-threads=1
+```
+
+The focused test and the full DuckDB integration suite passed (15 tests).
 
 ### DuckDB scalar HUGEINT consumer parity
 
