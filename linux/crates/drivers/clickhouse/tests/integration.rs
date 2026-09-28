@@ -98,6 +98,72 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn wide_integer_grid_edit_preserves_exact_value_and_row_identity() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE wide_grid_edits (
+            id UInt64,
+            amount Int128
+        ) ENGINE = MergeTree ORDER BY id",
+    )
+    .await
+    .unwrap();
+    conn.execute_params(
+        "INSERT INTO wide_grid_edits VALUES (?, ?), (?, ?)",
+        &[
+            Value::Int(1),
+            Value::Text("-170141183460469231731687303715884105728".into()),
+            Value::Int(2),
+            Value::Text("170141183460469231731687303715884105727".into()),
+        ],
+    )
+    .await
+    .unwrap();
+
+    let columns = conn.fetch_columns(None, "wide_grid_edits").await.unwrap();
+    let result = conn
+        .query("SELECT id, amount FROM wide_grid_edits ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+    let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
+    assert!(columns[id_index].primary_key);
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "clickhouse",
+        None,
+        "wide_grid_edits",
+        &columns,
+        &[(
+            amount_index,
+            Value::Text("-170141183460469231731687303715884105727".into()),
+        )],
+        &[result.rows[0][id_index].clone()],
+    )
+    .unwrap();
+    conn.execute_in_transaction(&[update]).await.unwrap();
+
+    let after = conn
+        .query("SELECT id, amount FROM wide_grid_edits ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        after.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("-170141183460469231731687303715884105727".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("170141183460469231731687303715884105727".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn copied_in_clause_keeps_backslash_payload_as_data() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;

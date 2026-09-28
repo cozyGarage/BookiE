@@ -2,7 +2,7 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled 2026-09-28 through commit
-`51d741640`, including commits from September 26–28.
+`cbf6292e6`, including commits from September 26–28.
 The upstream review sampled eight test files in four projects and two issue
 reports; this local update is a source/test inventory, not a fresh execution of
 every suite. No external source code or fixtures were copied.
@@ -67,7 +67,7 @@ Inventory status below comes from current local code/tests, not new executions.
 | B3-1 | PostgreSQL arrays | Scalar and temporal arrays preserve elements, NULL, dimensions and lower bounds as exact text; SQL INSERT, typed text input, JSON output and server wire equality have real-server contracts. Unsupported element OIDs are refused. | A real-server grid edit reproduced SQLSTATE 42804 because the shared update builder bound array text as TEXT. A safe built-in type cast now makes the integer[] write-back pass with NULL preserved. JSON array elements and automatic parameter typing remain unsupported/unverified. |
 | B3-2 | Temporal boundaries | End-of-day time, timetz offsets, BC/extended-year SQL literals, infinities, mixed interval fields and temporal arrays have server-backed contracts. | Finite dates/timestamps outside the shared chrono range and full non-SQL consumer/edit parity. |
 | B3-3 | Nested JSON/BSON | MongoDB nested documents/arrays and uncommon top-level BSON kinds preserve special markers; Decimal128 extrema/date bounds and binary subtype tags have exact regressions, with server checks for UUID/user-defined binaries, large nested Int64, explicit null, Unicode, JSON/CSV/XLSX, grid edits, canonical Extended JSON re-import and MCP browse output. | Editing remaining top-level special BSON kinds and mixed-type columns. Keep SQL NULL distinct from JSON null. |
-| B3-4 | Export/import consumers | SQL binary, SQLite NUMERIC-affinity storage-class re-import and policy-guarded CSV import, XLSX integers/decimals/temporal fallbacks, nested BSON markers, finite/nonfinite floats, XML text and CSV quoting have regressions; full format equivalence is unproven. XLSX explicitly refuses empty text. ClickHouse wide integer SQL export/re-import now has an exact server contract. | Installed grid acceptance, wide ClickHouse integer grid edit parity, remaining floating-point edges and cross-format temporal parity. Parse generated files and re-import into typed columns where supported. Document lossy format contracts. |
+| B3-4 | Export/import consumers | SQL binary, SQLite NUMERIC-affinity storage-class re-import and policy-guarded CSV import, XLSX integers/decimals/temporal fallbacks, nested BSON markers, finite/nonfinite floats, XML text and CSV quoting have regressions; full format equivalence is unproven. XLSX explicitly refuses empty text. ClickHouse wide integer SQL export/re-import and signed Int128 grid edit now have exact server contracts. | Installed grid acceptance, UInt128 grid editing, remaining floating-point edges and cross-format temporal parity. Parse generated files and re-import into typed columns where supported. Document lossy format contracts. |
 | B3-5 | Lexer/parser consumer agreement | sql_lex covers quoting, dollar bodies, nested comments and cursor boundaries. | Issue-shaped leading/trailing comments, CRLF, multibyte cursor offsets, malformed tails and dialect delimiters through planner, parameters, formatter and policy. Assert executable statement identity/order. |
 | B3/B4 | Result delivery and session state | The shared value path rejects incomplete rows instead of inventing NULL cells; driver cancellation and session tests also exist. A uniform delivery matrix is not established. | Zero-row metadata, duplicate column names, row-cap boundaries, multiple results, mid-stream failure/cancel and late results. Assert row order/count, completeness status and connection state. |
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
@@ -119,4 +119,5 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   including repeated-hour instants. Values outside chrono's range, infinities,
   mixed intervals and temporal arrays still need their own acceptance.
 - ClickHouse Int128/UInt128 now have Docker-backed exact-text contracts for
-  query results, text binding and SQL export/re-import; grid editing remains open.
+  query results, text binding and SQL export/re-import; a signed Int128 grid
+  edit is also verified, while UInt128 grid editing remains open.

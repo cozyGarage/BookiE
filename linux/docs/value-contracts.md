@@ -29,7 +29,7 @@ not prevent the other compiled suites from running.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `51d741640` on 2026-09-28; it is an
+`linux` commit `cbf6292e6` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -60,8 +60,8 @@ arbitrary-precision numeric edit boundaries, JSON and other unsupported array el
 types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
-now have local parser and real-server exact-text result, binding and SQL export/import contracts at signed and unsigned boundaries;
-grid editing remains untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
+now have local parser and real-server exact-text result, binding and SQL export/import contracts at signed and unsigned boundaries, plus a signed Int128 grid-edit contract.
+Installed SQLite grid acceptance, spreadsheet floating-point edges and
 remaining transport/persistence adapters also need focused cases. Add a reproducer
 before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -284,8 +284,18 @@ original text. The focused test passed against ClickHouse 24.8.
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_binding_and_sql_export_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
 ```
 
-Grid editing these wide values and parity through other export formats remain
-open.
+UInt128 grid editing and parity through other export formats remain open.
+
+### ClickHouse signed Int128 grid edit, 2026-09-28
+
+A real-server keyed update changed the signed Int128 minimum by one through the
+same shared builder used by the grid save path. The exact new value was returned,
+and a second row at the signed maximum remained unchanged. This covers signed
+Int128 editing; UInt128 grid editing remains open.
+
+```sh
+cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_grid_edit_preserves_exact_value_and_row_identity -- --include-ignored --exact --test-threads=1
+```
 
 Validation on the working tree based on `7cb2fe3ca`: all 50 PostgreSQL
 unit/integration tests passed. The full local gate passed at
