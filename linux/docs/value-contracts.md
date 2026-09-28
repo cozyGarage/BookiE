@@ -45,6 +45,18 @@ complete native-type support.
 | XLSX | Integers beyond 15 digits and all exact decimals are text cells; stored XML verifies each value and cell reference, including decimal scale |
 | JSON and MCP | Non-finite values remain distinct from SQL NULL |
 
+## CSV negative-zero export/import, 2026-09-28
+
+A focused core contract exports IEEE-754 negative zero as CSV, reads the result
+back through the delimited-file reader and typed `DOUBLE PRECISION` cell parser,
+then compares the imported float's bit pattern with the submitted value. The
+independent `to_bits()` oracle distinguishes negative zero from positive zero.
+The test passed; no production mismatch was found.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_negative_zero_bits
+```
+
 ClickHouse long-value reads are checked with a server-generated value. Oversized
 inline SQL is required to return its explicit query-size error; the fixture does
 not raise that server limit or accept a truncated success.
