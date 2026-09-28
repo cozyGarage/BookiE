@@ -43,6 +43,44 @@ async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn wide_integer_results_preserve_exact_server_values() {
+    let (_container, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    conn.execute(
+        "CREATE TABLE wide_integers (
+            signed_min Int128,
+            signed_max Int128,
+            unsigned_max UInt128
+        ) ENGINE = MergeTree ORDER BY tuple()",
+    )
+    .await
+    .unwrap();
+    conn.execute(
+        "INSERT INTO wide_integers VALUES (
+            -170141183460469231731687303715884105728,
+            170141183460469231731687303715884105727,
+            340282366920938463463374607431768211455
+        )",
+    )
+    .await
+    .unwrap();
+
+    let result = conn
+        .query("SELECT signed_min, signed_max, unsigned_max FROM wide_integers")
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("-170141183460469231731687303715884105728".into()),
+            Value::Text("170141183460469231731687303715884105727".into()),
+            Value::Text("340282366920938463463374607431768211455".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn copied_in_clause_keeps_backslash_payload_as_data() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;

@@ -29,7 +29,7 @@ not prevent the other compiled suites from running.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `dd8959252822fc1dcf7cc9c88e6709d55ae149a3` on 2026-09-28; it is an
+`linux` commit `19aa3be7d` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -55,13 +55,13 @@ SQL harness compare bit patterns. Existing driver tests still cover binary
 exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
-This is a growing contract, not proof of every database type. PostgreSQL
-other arbitrary-precision numeric edit boundaries, JSON and other unsupported array element
+This is a growing contract, not proof of every database type. PostgreSQL's other
+arbitrary-precision numeric edit boundaries, JSON and other unsupported array element
 types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
-now have a local exact-text parser contract at signed and unsigned boundaries;
-real-server and consumer parity remain untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
+now have local parser and real-server exact-text result contracts at signed and unsigned boundaries;
+consumer parity remains untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
 remaining transport/persistence adapters also need focused cases. Add a reproducer
 before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -258,8 +258,8 @@ ClickHouse `Int128` and `UInt128` values cannot fit `Value::Int`. A local
 regression feeds the unquoted JSON integer tokens for signed minimum, signed
 maximum and unsigned maximum through the same `parse_line` and `response_row`
 functions used by the driver. All three remain exact `Value::Text`. This verifies
-the parser boundary with `serde_json`'s `arbitrary_precision` feature enabled; it
-does not establish real-server output, binding, export, editing or re-import.
+the parser boundary with `serde_json`'s `arbitrary_precision` feature enabled.
+The real-server query contract below separately checks native result decoding.
 
 The focused unit command passed, and the mapped change-contract gate passed all
 four ClickHouse response regressions. Its report is
@@ -271,6 +271,20 @@ cargo test --locked -p tablepro-driver-clickhouse --lib clickhouse_json_row_pres
 
 Protocol references: [PostgreSQL arrays](https://www.postgresql.org/docs/16/arrays.html)
 and [array_send](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/arrayfuncs.c).
+
+### ClickHouse real-server wide integer results, 2026-09-28
+
+A Docker-backed ClickHouse 24.8 contract inserted the signed Int128 minimum and
+maximum and unsigned UInt128 maximum into native columns, queried them through the
+driver, and compared complete result rows with exact decimal text. All three
+values returned as `Value::Text` without rounding. Binding, SQL export, grid edit
+and re-import parity remain open.
+
+Validation passed:
+
+```sh
+cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_results_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
+```
 
 Validation on the working tree based on `7cb2fe3ca`: all 50 PostgreSQL
 unit/integration tests passed. The full local gate passed at
