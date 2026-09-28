@@ -551,6 +551,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 Both the decoder unit test and PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL `macaddr` exact text consumers
+
+A live PostgreSQL probe showed that the six-byte `macaddr` binary value was
+returned as `Undecodable("MACADDR")` even though its server text and
+`macaddr_send` wire bytes were exact. The driver now renders the six octets as
+PostgreSQL's lowercase colon-separated text and rejects malformed byte counts.
+The result, SQL-literal re-import and typed text binding preserve
+`08:00:2b:01:02:03`; this contract covers `macaddr`, not `macaddr8`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib macaddr_requires_six_bytes_and_uses_postgres_lowercase_text
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_macaddr_preserves_exact_text_across_consumers -- --include-ignored --exact --test-threads=1
+```
+
+Both focused checks passed against the unit decoder and PostgreSQL 16 Docker
+fixture.
+
 ### PostgreSQL `int4range` explicit refusal
 
 The PostgreSQL 16 contract checks a native `[1,5)` range against the server's

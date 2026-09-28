@@ -183,6 +183,43 @@ async fn value_contract_varbit_preserves_leading_zero_bits_across_consumers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_macaddr_preserves_exact_text_across_consumers() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             encode(macaddr_send(value), 'hex') AS wire_hex \
+             FROM (SELECT '08:00:2b:01:02:03'::macaddr AS value) source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Text("08:00:2b:01:02:03".into()),
+            Value::Text("macaddr".into()),
+            Value::Text("08:00:2b:01:02:03".into()),
+            Value::Text("08002b010203".into()),
+        ]
+    );
+
+    let value = Value::Text("08:00:2b:01:02:03".into());
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::macaddr::text"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text("08:00:2b:01:02:03".into())]]);
+    let bound_result = connection
+        .query_params("SELECT $1::text::macaddr::text", &[value])
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text("08:00:2b:01:02:03".into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
