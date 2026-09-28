@@ -46,13 +46,61 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
 }
 
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
-    if driver_id == "postgres"
-        && col.is_some_and(|column| classify_type(&column.data_type.to_ascii_lowercase()) == TypeKind::Decimal)
-        && matches!(text.trim(), "NaN" | "Infinity" | "-Infinity")
-    {
-        return Ok(Value::Text(text.trim().into()));
+    let trimmed = text.trim();
+    if driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type)) {
+        if matches!(trimmed, "NaN" | "Infinity" | "-Infinity") {
+            return Ok(Value::Text(trimmed.into()));
+        }
+        return match parse_decimal_value(trimmed) {
+            Ok(value) => Ok(value),
+            Err(_) if is_postgres_numeric_literal(trimmed) => Ok(Value::Text(trimmed.into())),
+            Err(error) => Err(error),
+        };
     }
     parse_input_for_column(text, col)
+}
+
+fn is_postgres_numeric_type(data_type: &str) -> bool {
+    let data_type = data_type.trim().to_ascii_lowercase();
+    matches!(data_type.as_str(), "numeric" | "decimal")
+        || data_type.starts_with("numeric(")
+        || data_type.starts_with("decimal(")
+}
+
+fn is_postgres_numeric_literal(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut cursor = usize::from(bytes.first().is_some_and(|byte| matches!(*byte, b'+' | b'-')));
+    let integer_start = cursor;
+    while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+        cursor += 1;
+    }
+    let has_integer = cursor > integer_start;
+    let mut has_fraction = false;
+    if bytes.get(cursor) == Some(&b'.') {
+        cursor += 1;
+        let fraction_start = cursor;
+        while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+            cursor += 1;
+        }
+        has_fraction = cursor > fraction_start;
+    }
+    if !has_integer && !has_fraction {
+        return false;
+    }
+    if matches!(bytes.get(cursor), Some(b'e' | b'E')) {
+        cursor += 1;
+        if matches!(bytes.get(cursor), Some(b'+' | b'-')) {
+            cursor += 1;
+        }
+        let exponent_start = cursor;
+        while bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+            cursor += 1;
+        }
+        if cursor == exponent_start {
+            return false;
+        }
+    }
+    cursor == bytes.len()
 }
 
 fn mysql_bit_width(data_type: &str) -> Option<u32> {
@@ -286,7 +334,10 @@ mod parser_contract;
 
 #[cfg(test)]
 mod tests {
-    use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column, parse_input_for_driver};
+    use super::{
+        TypeKind, classify_type, normalize_single_line_input, parse_decimal_value, parse_input_for_column,
+        parse_input_for_driver,
+    };
     use tablepro_core::{ColumnInfo, Value};
 
     #[tokio::test]
@@ -357,6 +408,37 @@ mod tests {
             parse_input_for_driver("12.50", Some(&column), "postgres"),
             Ok(Value::Decimal("12.50".parse().unwrap()))
         );
+    }
+
+    #[test]
+    fn postgres_wide_numeric_edits_stay_exact_text_when_decimal_cannot_represent_them() {
+        let column = col("numeric(80,40)", false);
+        let wide = "1234567890123456789012345678901234567890.1234567890123456789012345678901234567890";
+        assert!(parse_decimal_value(wide).is_err());
+        let parsed = parse_input_for_driver(wide, Some(&column), "postgres").unwrap();
+        assert_eq!(parsed, Value::Text(wide.into()));
+        let mut columns = vec![col("id", false), column.clone()];
+        columns[0].primary_key = true;
+        let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            "wide_numeric",
+            &columns,
+            &[(1, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert!(sql.contains("$1::text::pg_catalog.numeric"));
+        assert_eq!(params[0], Value::Text(wide.into()));
+        let max_precision = format!("0.{}", "1234567890".repeat(100));
+        assert!(parse_decimal_value(&max_precision).is_err());
+        assert_eq!(
+            parse_input_for_driver(&max_precision, Some(&col("numeric(1000,1000)", false)), "postgres"),
+            Ok(Value::Text(max_precision.clone()))
+        );
+        assert!(parse_input_for_driver(wide, Some(&column), "mysql").is_err());
+        assert!(parse_input_for_driver("1; DROP TABLE t", Some(&column), "postgres").is_err());
+        assert!(parse_input_for_driver(wide, Some(&col("money", false)), "postgres").is_err());
     }
 
     #[test]

@@ -198,7 +198,18 @@ also passed against PostgreSQL, comparing the saved value to the server's
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value -- --include-ignored --exact --test-threads=1
 ```
 
-Unconstrained numeric limits and other text-backed PostgreSQL types remain open.
+An app-parser regression then reproduced that the same `NUMERIC(80,40)` and
+`NUMERIC(1000,1000)` inputs failed as `Invalid decimal` before reaching the grid
+update builder. The PostgreSQL-only parser now retains a grammar-checked numeric
+literal as exact text when `rust_decimal` cannot represent it; representable
+values still use `Value::Decimal`. Its `NUMERIC(80,40)` case passes the parsed
+value through the keyed-update builder and verifies the static
+`$1::text::pg_catalog.numeric` cast. It rejects malformed input, and MySQL's
+wide-numeric parser behavior is unchanged. Local app tests pass. PostgreSQL's
+existing server contracts compare the same wide values with `numeric::text`,
+but this turn did not rerun those Docker tests with parser-produced values, so a
+fresh parser-to-server acceptance run remains open. Unconstrained numeric
+limits and other text-backed PostgreSQL types also remain open.
 
 ### PostgreSQL NUMERIC special-value grid edit
 
