@@ -957,7 +957,13 @@ Dates and times now use shared typed values where representable. Timestamp secon
 
 The integration corpus checks server-rendered source values against both parameter rebinding and generated SQL literals, plus independent JSON expectations for nanosecond timestamps and microsecond times. It includes nulls for every temporal family. Decoder unit tests cover all four units, negative remainders, end-of-day boundaries and arithmetic overflow.
 
-Intervals, lists, fixed arrays, structs, maps and unions now return `Undecodable`, never debug text masquerading as the original value. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; the result is explicitly undecodable, and SQL literal and parameter consumers refuse it. Full interval/collection decoding remains open, including other nested unsigned values and interval carrier limits. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, GTK, MCP or release acceptance.
+Intervals, lists, fixed arrays, structs, maps and unions now return `Undecodable`, never debug text masquerading as the original value. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; the result is explicitly undecodable, and SQL literal and parameter consumers refuse it. A mixed `INTERVAL '1 month 2 days 3 microseconds'` case separately checks DuckDB's exact `VARCHAR` rendering while requiring `Undecodable` and SQL-literal/parameter refusal. Full interval/collection decoding remains open, including other nested unsigned values and interval carrier limits. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, GTK, MCP or release acceptance.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_interval_components_refuse_lossy_consumers
+```
+
+The local embedded-engine contract passed.
 
 Run locally:
 
