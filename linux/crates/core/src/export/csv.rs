@@ -355,6 +355,21 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_preserves_timestamptz_nanoseconds() {
+        let mut value_column = column("value");
+        value_column.data_type = "TIMESTAMP WITH TIME ZONE".into();
+        let columns = [value_column];
+        let expected: Value = Value::TimestampTz("2026-09-27T12:34:56.123456789+05:30".parse().unwrap());
+        let csv = render_csv(&columns, &[vec![expected.clone()]], &CsvOptions::default());
+        assert_eq!(csv, "value\n2026-09-27T07:04:56.123456789+00:00\n");
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+        assert_eq!(values, vec![expected]);
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null() {
         let mut value_column = column("value");
         value_column.data_type = "DOUBLE PRECISION".into();

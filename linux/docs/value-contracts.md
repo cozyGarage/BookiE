@@ -76,6 +76,16 @@ remain open.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_smallest_subnormal_bits
 ```
 
+A typed `TIMESTAMP WITH TIME ZONE` CSV contract starts with a timestamp at
+`+05:30` and nine fractional digits. Default export normalizes it to the exact
+UTC token, and typed import reproduces the identical UTC instant. This closes
+one nanosecond/timezone consumer cell; broader cross-format temporal parity
+remains open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_timestamptz_nanoseconds
+```
+
 ClickHouse long-value reads are checked with a server-generated value. Oversized
 inline SQL is required to return its explicit query-size error; the fixture does
 not raise that server limit or accept a truncated success.
