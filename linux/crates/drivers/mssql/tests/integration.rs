@@ -767,6 +767,22 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
         .await
         .unwrap()
         .rows;
+    let precise = conn
+        .query(
+            "SELECT precise, CONVERT(varchar(27), precise, 126) AS native_text \
+             FROM temporal_source WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        precise.rows[0][0],
+        Value::DateTime(
+            NaiveDate::from_ymd_opt(2024, 1, 2)
+                .unwrap()
+                .and_time(NaiveTime::from_hms_nano_opt(3, 4, 5, 123_456_700).unwrap())
+        )
+    );
+    assert_eq!(precise.rows[0][1], Value::Text("2024-01-02T03:04:05.1234567".into()));
     for row in &rows {
         let statement =
             tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_exported", &columns, row)

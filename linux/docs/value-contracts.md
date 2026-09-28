@@ -125,6 +125,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_b
 
 The test passed. No production defect was exposed.
 
+## SQL Server `datetime2(7)` 100-nanosecond result precision
+
+The existing temporal export fixture now checks its `datetime2(7)` result
+directly: `2024-01-02 03:04:05.1234567` decodes to a `NaiveDateTime` with
+`123456700` nanoseconds, matching the independent server text from
+`CONVERT(varchar(27), precise, 126)`. The same fixture exports its temporal rows
+as SQL literals and confirms source/export equality on the server. This verifies
+the seventh fractional digit through decoding and SQL export; it does not claim
+coverage for all SQL Server temporal edge cases.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration temporal_sql_exports_round_trip_legacy_and_high_precision_columns -- --include-ignored --exact --test-threads=1
+```
+
+The Docker-backed test passed; no production mismatch was found.
+
 ## MySQL DELIMITER consumer agreement, 2026-09-28
 
 An app regression uses `DELIMITER $$` around a stored procedure, resets the
