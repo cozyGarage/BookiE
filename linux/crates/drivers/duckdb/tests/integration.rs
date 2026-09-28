@@ -97,6 +97,34 @@ async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
             Value::Null
         ]]
     );
+    for label in ["", "NULL", "東京"] {
+        let value = Value::Text(label.into());
+        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
+        let literal_result = connection
+            .query(&format!("SELECT typeof({literal}::mood), {literal}::mood::VARCHAR"))
+            .await
+            .unwrap();
+        assert!(
+            matches!(&literal_result.rows[0][0], Value::Text(native_type) if native_type.starts_with("ENUM")),
+            "{:?}",
+            literal_result.rows
+        );
+        assert_eq!(literal_result.rows[0][1], Value::Text(label.into()));
+
+        let bound_result = connection
+            .query_params(
+                "SELECT typeof(CAST(? AS mood)), CAST(? AS mood)::VARCHAR",
+                &[value.clone(), value],
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(&bound_result.rows[0][0], Value::Text(native_type) if native_type.starts_with("ENUM")),
+            "{:?}",
+            bound_result.rows
+        );
+        assert_eq!(bound_result.rows[0][1], Value::Text(label.into()));
+    }
     for expression in [
         "INTERVAL '2 months -3 days 1 microsecond'",
         "[1, NULL, 3]",
