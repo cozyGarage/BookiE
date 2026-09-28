@@ -3,10 +3,14 @@ use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions};
 use sqlx::pool::PoolConnection;
 use sqlx::{Connection as SqlxConnection, Pool};
 use tablepro_core::{
-    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, Value, check_pre_dispatch, run_server_cancellable,
+    DriverError, MAX_QUERY_ROWS, OperationControl, QueryResult, Value, check_pre_dispatch, run_controlled_setup,
+    run_server_cancellable,
 };
 
-use crate::{confirms_cancellation, connection_id, map_sqlx_error, params_into_result, request_cancellation};
+use crate::{
+    confirms_cancellation, connection_id, map_sqlx_error, params_into_result, refuse_non_utc_timestamps,
+    request_cancellation, set_utc_timezone, timezone_is_utc,
+};
 
 const SESSION_SETUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
@@ -30,6 +34,10 @@ pub(crate) async fn open(
         .map_err(|_| DriverError::TimedOut)?
         .map_err(map_sqlx_error)?;
     connection.close_on_drop();
+    tokio::time::timeout(SESSION_SETUP_TIMEOUT, set_utc_timezone(&mut connection))
+        .await
+        .map_err(|_| DriverError::TimedOut)?
+        .map_err(map_sqlx_error)?;
     let connection_id = tokio::time::timeout(SESSION_SETUP_TIMEOUT, connection_id(&mut connection))
         .await
         .map_err(|_| DriverError::TimedOut)??;
@@ -54,6 +62,13 @@ impl tablepro_core::Session for MysqlSession {
             .connection
             .take()
             .ok_or_else(|| DriverError::Internal("the session's connection was lost".into()))?;
+        let timestamp_is_utc = match run_controlled_setup(timezone_is_utc(&mut *connection), control).await {
+            Ok(Ok(timestamp_is_utc)) => timestamp_is_utc,
+            Ok(Err(error)) | Err(error) => {
+                self.connection = Some(connection);
+                return Err(error);
+            }
+        };
         let mut result = run_server_cancellable(
             params_into_result(&mut *connection, sql, params, MAX_QUERY_ROWS),
             request_cancellation(&self.cancellation_pool, self.connection_id),
@@ -69,6 +84,11 @@ impl tablepro_core::Session for MysqlSession {
                 control,
             )
             .await;
+        }
+        if !timestamp_is_utc {
+            if let Ok(result) = &mut result {
+                refuse_non_utc_timestamps(result);
+            }
         }
         if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
             let _ = connection.detach().close_hard().await;

@@ -11,6 +11,7 @@
 - CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
 - MongoDB browse pages mark BSON fields as mixed when values on the page differ from the metadata sample, keeping lossy mixed-type cells read-only.
+- MySQL pooled connections use UTC for `TIMESTAMP` decoding; dedicated sessions refuse non-UTC `TIMESTAMP` values instead of presenting a wrong instant.
 
 ## [0.1.5] - 2026-09-27
 

@@ -67,6 +67,13 @@ impl DatabaseDriver for MysqlDriver {
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
             .acquire_timeout(Duration::from_secs(5))
+            .after_connect(|connection, _| Box::pin(set_utc_timezone(connection)))
+            .before_acquire(|connection, _| {
+                Box::pin(async move {
+                    set_utc_timezone(connection).await?;
+                    Ok(true)
+                })
+            })
             .connect_with(mysql_opts)
             .await
             .map_err(map_sqlx_error)?;
@@ -394,6 +401,7 @@ impl tablepro_core::Transaction for MysqlTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let timestamp_is_utc = timezone_is_utc(&mut **tx).await?;
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut **tx)
             .await
@@ -424,11 +432,15 @@ impl tablepro_core::Transaction for MysqlTransaction {
             .iter()
             .map(|r| (0..columns.len()).map(|i| extract_value(r, i)).collect())
             .collect();
-        Ok(QueryResult {
+        let mut result = QueryResult {
             columns,
             rows: data,
             truncated: false,
-        })
+        };
+        if !timestamp_is_utc {
+            refuse_non_utc_timestamps(&mut result);
+        }
+        Ok(result)
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
@@ -478,6 +490,34 @@ where
         collected.push(row);
     }
     Ok(rows_into_result(&collected, truncated))
+}
+
+async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
+    sqlx::query("SET time_zone = '+00:00'").execute(connection).await?;
+    Ok(())
+}
+
+async fn timezone_is_utc<'e, E>(executor: E) -> Result<bool, DriverError>
+where
+    E: sqlx::Executor<'e, Database = MySql>,
+{
+    let timezone: String = sqlx::query_scalar("SELECT @@session.time_zone")
+        .fetch_one(executor)
+        .await
+        .map_err(map_sqlx_error)?;
+    Ok(timezone == "+00:00")
+}
+
+fn refuse_non_utc_timestamps(result: &mut QueryResult) {
+    for (column_index, column) in result.columns.iter().enumerate() {
+        if column.data_type.eq_ignore_ascii_case("TIMESTAMP") {
+            for row in &mut result.rows {
+                if !matches!(row.get(column_index), Some(Value::Null)) {
+                    row[column_index] = Value::Undecodable("TIMESTAMP (session time zone is not UTC)".into());
+                }
+            }
+        }
+    }
 }
 
 fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {

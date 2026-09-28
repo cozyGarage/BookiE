@@ -1090,6 +1090,8 @@ PostgreSQL interval tests now compare independent native fields across 59 determ
 
 Zero dates no longer read as NULL, negative TIME values keep their sign, and extended TIME, dates with zero parts and YEAR values are exact instead of undecodable. They survive parameter and SQL export round trips, checked by the server. A SQLite regression from automatic decimal parameters, which were bound as text, is also fixed. Details are in [value contracts](value-contracts.md#mysql-native-time-zero-date-and-year-checkpoint). B3 remains open.
 
+The MySQL `TIMESTAMP` session-zone contract is now explicit: pooled connections reset to UTC on checkout, while a dedicated session with a non-UTC zone returns non-NULL `TIMESTAMP` values as undecodable. A Docker regression checks the session-local text and independent epoch value, then verifies the pool reset and the existing UTC temporal round trip. See the [value contract](value-contracts.md#mysql-native-time-zero-date-and-year-checkpoint). Broader SQL-mode, UI and consumer coverage remain open; B3 is not complete.
+
 ### B3 audit of the September 26–27 commits — September 27
 
 Twenty B3 commits were audited. For each fix, its production change was reverted to confirm that its regression test fails, and sibling paths were checked for the same defect. Every audited fix held. Nine further defects were each reproduced by a failing test first, then fixed:
