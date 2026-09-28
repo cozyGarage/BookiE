@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, OperationControl, Value};
+use tablepro_core::{Connection, DriverError, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
 pub async fn assert_date_contract(connection: &dyn Connection) {
@@ -56,4 +56,21 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
             .await;
         }
     }
+
+    let sql = "SELECT '1000000-01-01'::date AS value, '1000000-01-01'::date::text AS server_text, encode(date_send('1000000-01-01'::date), 'hex') AS server_wire";
+    let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
+    assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
+    assert_eq!(result.rows[0][0], Value::Undecodable("DATE".into()));
+    assert_eq!(result.rows[0][1], Value::Text("1000000-01-01".into()));
+    assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
+        Err(tablepro_core::sql_literal::LiteralError::Undecodable)
+    );
+    assert!(matches!(
+        connection
+            .query_params("SELECT $1::date", std::slice::from_ref(&result.rows[0][0]))
+            .await,
+        Err(DriverError::Unsupported(_))
+    ));
 }

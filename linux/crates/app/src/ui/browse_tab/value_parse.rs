@@ -772,6 +772,7 @@ mod tests {
         assert!(parse_input_for_column("not-a-uuid", Some(&col("uuid", false))).is_err());
         assert!(parse_input_for_column("{not json", Some(&col("jsonb", false))).is_err());
         assert!(parse_input_for_column("2024/01/15", Some(&col("date", false))).is_err());
+        assert!(parse_input_for_column("1000000-01-01", Some(&col("date", false))).is_err());
         assert!(parse_input_for_column("13:00:99", Some(&col("time", false))).is_err());
         assert!(parse_input_for_column("not-a-date", Some(&col("timestamp", false))).is_err());
         assert!(parse_input_for_column("maybe", Some(&col("boolean", false))).is_err());
