@@ -150,4 +150,27 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn malformed_tail_is_not_accepted_as_a_valid_script_prefix() {
+        let sql = "SELECT :safe; SELECT 'unfinished :tail";
+        let grammar = SqlGrammar::PostgreSql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(!plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        assert!(script_statements(sql, "postgres").is_err());
+
+        let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+        assert_eq!(parameters.names, ["safe"]);
+        assert!(parameters.sql.ends_with("SELECT 'unfinished :tail"));
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.ends_with("SELECT 'unfinished :tail"));
+        assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
+
+        let facts = tablepro_policy::classify(sql, "postgres");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+    }
 }

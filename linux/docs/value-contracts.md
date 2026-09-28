@@ -82,6 +82,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib gtk_charac
 
 The test passed.
 
+A second app regression passes `SELECT :safe; SELECT 'unfinished :tail` through
+the planner, execution splitter, parameter extractor, formatter and policy. The
+planner reports an unterminated quote; the app rejects the entire script rather
+than returning its valid prefix. Parameter extraction converts only `:safe`
+and leaves the malformed suffix intact, the formatter retains that suffix, and
+policy classifies the whole input as unparseable and write-capable. This closes
+the malformed-tail contract for PostgreSQL only.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib malformed_tail_is_not_accepted_as_a_valid_script_prefix -- --test-threads=1
+```
+
+The test passed. No production defect was exposed.
+
 Text cases include empty strings, numeric-looking strings, Unicode, apostrophes,
 quotes, backslashes, line breaks and text beyond 256 KiB. Float assertions in the
 SQL harness compare bit patterns. Existing driver tests still cover binary
