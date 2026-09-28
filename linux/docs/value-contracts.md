@@ -25,6 +25,20 @@ failure or five-minute fixture timeout makes the command fail. Every selected su
 report is under `target/quality/*-values/report.json`. Failures in one engine do
 not prevent the other compiled suites from running.
 
+## DuckDB zero-row result metadata, 2026-09-28
+
+A local DuckDB query selects a `HUGEINT` and `VARCHAR` under `WHERE false`.
+The result has no rows and is not truncated, but keeps the ordered aliases and
+Arrow-backed metadata (`Decimal128(38, 0)` and `Utf8`). A second query checks
+DuckDB's native `typeof` values are `HUGEINT` and `VARCHAR`, so driver metadata
+is recorded separately from engine type names.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration query_with_zero_rows_preserves_column_metadata_and_completeness -- --exact
+```
+
+The focused local DuckDB contract passed.
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,

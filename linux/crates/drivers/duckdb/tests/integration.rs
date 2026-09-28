@@ -18,6 +18,42 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
     value_contract::assert_scalar_contract(connection.as_ref(), "duckdb").await;
 }
 
+#[tokio::test]
+async fn query_with_zero_rows_preserves_column_metadata_and_completeness() {
+    let connection = native_connection().await;
+    let result = connection
+        .query("SELECT 42::HUGEINT AS amount, 'payload'::VARCHAR AS label WHERE false")
+        .await
+        .unwrap();
+
+    assert!(result.rows.is_empty());
+    assert!(!result.truncated);
+    assert_eq!(
+        result
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["amount", "label"]
+    );
+    assert_eq!(
+        result
+            .columns
+            .iter()
+            .map(|column| column.data_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Decimal128(38, 0)", "Utf8"]
+    );
+    let native_types = connection
+        .query("SELECT typeof(42::HUGEINT), typeof('payload'::VARCHAR)")
+        .await
+        .unwrap();
+    assert_eq!(
+        native_types.rows,
+        vec![vec![Value::Text("HUGEINT".into()), Value::Text("VARCHAR".into())]]
+    );
+}
+
 async fn native_connection() -> Box<dyn Connection> {
     DuckdbDriver
         .connect(ConnectOptions {
