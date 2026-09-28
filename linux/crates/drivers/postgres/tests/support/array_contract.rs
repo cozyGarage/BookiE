@@ -121,6 +121,47 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         .await
         .unwrap();
     assert_eq!(updated.rows, vec![vec![Value::Bool(true)]]);
+
+    const TEXT_ARRAY: &str = r#"{"plain",NULL,"quote \" slash \\, comma"}"#;
+    connection
+        .execute("CREATE TABLE text_array_grid_edit (id integer PRIMARY KEY, value text[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO text_array_grid_edit VALUES (1, ARRAY['before']::text[])")
+        .await
+        .unwrap();
+    let mut row = connection.query("SELECT * FROM text_array_grid_edit").await.unwrap();
+    let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
+    row.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "text_array_grid_edit",
+        &row.columns,
+        &[(value_index, Value::Text(TEXT_ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let elements = connection
+        .query("SELECT ordinality, item IS NULL, item FROM text_array_grid_edit CROSS JOIN LATERAL unnest(text_array_grid_edit.value) WITH ORDINALITY AS element(item, ordinality) ORDER BY ordinality")
+        .await
+        .unwrap();
+    assert_eq!(
+        elements.rows,
+        vec![
+            vec![Value::Int(1), Value::Bool(false), Value::Text("plain".into())],
+            vec![Value::Int(2), Value::Bool(true), Value::Null],
+            vec![
+                Value::Int(3),
+                Value::Bool(false),
+                Value::Text("quote \" slash \\, comma".into()),
+            ],
+        ]
+    );
 }
 
 #[tokio::test]

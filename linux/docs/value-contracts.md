@@ -283,9 +283,17 @@ cargo test --locked -p tablepro-core --lib postgres_array_update
 cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
 ```
 
-Exact grid editing is verified for this built-in integer-array path. JSON and other
-unsupported element OIDs, custom/user-defined arrays and automatic array parameter
-typing remain outside the tested support surface. B3 remains open.
+The expanded server test adds a `text[]` edit through the unchanged app text
+parser and shared `text` to `pg_catalog.text[]` cast. Its value includes NULL and an
+element containing a quote, backslash and comma. An independent `unnest` query
+with ordinality checks each element and a separate NULL flag. The app
+parser-to-builder unit, focused core cast test, and expanded integration test
+passed against PostgreSQL.
+
+Exact grid editing is server-verified for `integer[]` and `text[]`. JSON and other
+unsupported element OIDs, custom/user-defined arrays
+and automatic array parameter typing remain outside the tested support surface.
+B3 remains open.
 
 ## ClickHouse wide integer parser contract, 2026-09-28
 
