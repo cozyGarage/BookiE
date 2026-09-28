@@ -150,6 +150,45 @@ async fn value_contract_nested_uhugeint_refuses_lossy_consumers() {
 }
 
 #[tokio::test]
+async fn value_contract_scalar_hugeints_preserve_exact_text_across_consumers() {
+    let connection = native_connection().await;
+    for (kind, text) in [
+        ("HUGEINT", "-170141183460469231731687303715884105728"),
+        ("HUGEINT", "170141183460469231731687303715884105727"),
+        ("UHUGEINT", "340282366920938463463374607431768211455"),
+    ] {
+        let result = connection
+            .query(&format!(
+                "SELECT value, typeof(value) AS native_type, value::VARCHAR AS exact_text \
+                 FROM (SELECT CAST('{text}' AS {kind}) AS value) source"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            result.rows,
+            vec![vec![
+                Value::Text(text.into()),
+                Value::Text(kind.into()),
+                Value::Text(text.into()),
+            ]]
+        );
+
+        let value = Value::Text(text.into());
+        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &value).unwrap();
+        let literal_result = connection
+            .query(&format!("SELECT {literal}::{kind}::VARCHAR"))
+            .await
+            .unwrap();
+        assert_eq!(literal_result.rows, vec![vec![Value::Text(text.into())]]);
+        let bound_result = connection
+            .query_params(&format!("SELECT CAST(? AS {kind})::VARCHAR"), &[value])
+            .await
+            .unwrap();
+        assert_eq!(bound_result.rows, vec![vec![Value::Text(text.into())]]);
+    }
+}
+
+#[tokio::test]
 async fn value_contract_interval_components_refuse_lossy_consumers() {
     let connection = native_connection().await;
     let result = connection

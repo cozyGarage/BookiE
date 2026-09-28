@@ -1239,6 +1239,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 
 The local embedded-engine contract passed.
 
+### DuckDB scalar HUGEINT consumer parity
+
+The embedded DuckDB contract checks signed `HUGEINT` minimum/maximum and
+`UHUGEINT` maximum. Native `typeof` and `VARCHAR` projections confirm exact
+decimal digits; result decoding, SQL-literal re-import and text-bound casts
+preserve the same values. These scalar contracts are separate from the
+explicitly undecodable nested `UHUGEINT[]` case.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_scalar_hugeints_preserve_exact_text_across_consumers -- --exact --test-threads=1
+```
+
+The focused embedded DuckDB test passed.
+
 Run locally:
 
 ```sh
