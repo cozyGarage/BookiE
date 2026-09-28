@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use tablepro_core::Environment;
+use tablepro_core::sql_syntax::SqlGrammar;
+use tablepro_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
 use tablepro_policy::{Decision, PolicyConfig, Principal, StatementClass, classify, evaluate};
 
 fn agent() -> Principal {
@@ -99,6 +101,57 @@ fn corrected_lexer_keeps_reads_intact_and_following_mutations_denied() {
             None,
         );
         assert!(matches!(decision, Decision::Deny { .. }));
+    }
+}
+
+#[test]
+fn postgres_script_consumers_agree_across_crlf_comments_and_formatting() {
+    let source = "-- lead :ignored ;\r\nSELECT :shown AS payload /* :hidden ; */, 'semi; :literal' AS quoted;\r\n-- between :ignored2 ;\r\nUPDATE items SET name = :name WHERE id = :id -- tail :ignored3 ;\r\n-- final :ignored4 ;\r\n";
+    let grammar = SqlGrammar::PostgreSql;
+    let settings = LexicalSettings::default_for(grammar);
+    let original = ScriptPlan::build(source, grammar, settings);
+
+    assert!(original.diagnostics().is_empty(), "{:?}", original.diagnostics());
+    assert_eq!(original.statements().len(), 2);
+    let original_statements = original
+        .statements()
+        .iter()
+        .map(|statement| statement.text(source))
+        .collect::<Vec<_>>();
+    let expected_names = [vec!["shown"], vec!["name", "id"]];
+    let expected_classes = [StatementClass::Select, StatementClass::Update];
+    for (index, statement) in original_statements.iter().enumerate() {
+        let parameters = tablepro_core::extract_named_parameters(statement, "postgres");
+        assert_eq!(parameters.names, expected_names[index]);
+        assert_eq!(classify(&parameters.sql, "postgres").class, expected_classes[index]);
+    }
+
+    let formatted = tablepro_core::sql_format::format_script(source, grammar, settings);
+    for comment in [
+        "-- lead :ignored ;",
+        "/* :hidden ; */",
+        "-- between :ignored2 ;",
+        "-- tail :ignored3 ;",
+        "-- final :ignored4 ;",
+    ] {
+        assert!(
+            formatted.contains(comment),
+            "formatter changed comment {comment:?}: {formatted}"
+        );
+    }
+    let reformatted = ScriptPlan::build(&formatted, grammar, settings);
+    assert!(reformatted.diagnostics().is_empty(), "{:?}", reformatted.diagnostics());
+    assert_eq!(reformatted.statements().len(), 2);
+    for (index, statement) in reformatted.statements().iter().enumerate() {
+        let sql = statement.text(&formatted);
+        let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+        assert_eq!(parameters.names, expected_names[index]);
+        let facts = classify(&parameters.sql, "postgres");
+        assert_eq!(facts.class, expected_classes[index]);
+        if expected_classes[index] == StatementClass::Update {
+            assert_eq!(facts.tables, ["items"]);
+            assert!(facts.has_where);
+        }
     }
 }
 

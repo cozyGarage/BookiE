@@ -49,6 +49,26 @@ ClickHouse long-value reads are checked with a server-generated value. Oversized
 inline SQL is required to return its explicit query-size error; the fixture does
 not raise that server limit or accept a truncated success.
 
+## PostgreSQL script consumer agreement, 2026-09-28
+
+A local policy integration contract uses CRLF line endings and issue-shaped
+comments before, between, inside and after two statements. The comments and a
+quoted literal contain semicolons and placeholder-shaped text. The planner must
+return exactly the SELECT then UPDATE; parameter extraction must retain only
+`shown`, then `name` and `id`; formatting must preserve comment text and leave
+the same executable statements in order. Policy classification must still see
+SELECT then UPDATE, including the UPDATE target and WHERE clause. This verifies
+consumer agreement for this PostgreSQL boundary without a live database; it
+does not close the remaining malformed-tail, cursor-offset or dialect matrix.
+
+Focused result:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-policy --test administrative_dialects postgres_script_consumers_agree_across_crlf_comments_and_formatting -- --exact
+```
+
+The test passed. No production defect was exposed.
+
 Text cases include empty strings, numeric-looking strings, Unicode, apostrophes,
 quotes, backslashes, line breaks and text beyond 256 KiB. Float assertions in the
 SQL harness compare bit patterns. Existing driver tests still cover binary
