@@ -317,12 +317,14 @@ value through the keyed-update builder and verifies the static
 `$1::text::pg_catalog.numeric` cast. It rejects malformed input, and MySQL's
 wide-numeric parser behavior is unchanged. Local app tests pass. PostgreSQL's
 Docker composition test now uses the real app parser output, keyed-update
-builder and PostgreSQL driver against `NUMERIC(80,40)`, then compares the saved
-value to the server's independent `numeric::text` output. Unconstrained numeric
-limits and other text-backed PostgreSQL types remain open.
+builder and PostgreSQL driver against both `NUMERIC(80,40)` and unconstrained
+`numeric`, then compares each saved value to the server's independent
+`numeric::text` output. The unconstrained case uses a 40-digit integer and
+40-digit fraction, outside `rust_decimal` precision. PostgreSQL's absolute
+numeric input limits and other text-backed types remain open.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_wide_numeric_parser_output_round_trips_through_server -- --include-ignored --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_numeric_parser_outputs_round_trip_through_server -- --include-ignored --test-threads=1
 ```
 
 The test passed against the PostgreSQL 16 Docker fixture.

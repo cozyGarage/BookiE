@@ -448,7 +448,7 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires docker"]
-    async fn postgres_wide_numeric_parser_output_round_trips_through_server() {
+    async fn postgres_numeric_parser_outputs_round_trip_through_server() {
         use tablepro_core::{ConnectOptions, Connection, DatabaseDriver};
         use testcontainers::ImageExt;
         use testcontainers::runners::AsyncRunner;
@@ -465,37 +465,46 @@ mod tests {
             ..Default::default()
         };
         let connection = drivers_postgres::PgDriver.connect(options).await.unwrap();
-        connection
-            .execute("CREATE TABLE parser_numeric (id integer PRIMARY KEY, amount numeric(80, 40))")
-            .await
+        for (table, data_type) in [
+            ("parser_numeric", "numeric(80, 40)"),
+            ("parser_unconstrained_numeric", "numeric"),
+        ] {
+            connection
+                .execute(&format!(
+                    "CREATE TABLE {table} (id integer PRIMARY KEY, amount {data_type})"
+                ))
+                .await
+                .unwrap();
+            connection
+                .execute(&format!("INSERT INTO {table} VALUES (1, 0)"))
+                .await
+                .unwrap();
+            let columns = connection.fetch_columns(None, table).await.unwrap();
+            let amount = columns.iter().position(|column| column.name == "amount").unwrap();
+            let id = columns.iter().position(|column| column.name == "id").unwrap();
+            assert!(columns[id].primary_key);
+            if data_type == "numeric" {
+                assert_eq!(columns[amount].data_type, "numeric");
+            }
+            let parsed = parse_input_for_driver(VALUE, Some(&columns[amount]), "postgres").unwrap();
+            assert_eq!(parsed, Value::Text(VALUE.into()));
+            let update = tablepro_core::sql_dialect::build_keyed_update(
+                "postgres",
+                None,
+                table,
+                &columns,
+                &[(amount, parsed)],
+                &[Value::Int(1)],
+            )
             .unwrap();
-        connection
-            .execute("INSERT INTO parser_numeric VALUES (1, 0)")
-            .await
-            .unwrap();
+            assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
 
-        let columns = connection.fetch_columns(None, "parser_numeric").await.unwrap();
-        let amount = columns.iter().position(|column| column.name == "amount").unwrap();
-        let id = columns.iter().position(|column| column.name == "id").unwrap();
-        assert!(columns[id].primary_key);
-        let parsed = parse_input_for_driver(VALUE, Some(&columns[amount]), "postgres").unwrap();
-        assert_eq!(parsed, Value::Text(VALUE.into()));
-        let update = tablepro_core::sql_dialect::build_keyed_update(
-            "postgres",
-            None,
-            "parser_numeric",
-            &columns,
-            &[(amount, parsed)],
-            &[Value::Int(1)],
-        )
-        .unwrap();
-        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
-
-        let saved = connection
-            .query("SELECT amount::text FROM parser_numeric WHERE id = 1")
-            .await
-            .unwrap();
-        assert_eq!(saved.rows, vec![vec![Value::Text(VALUE.into())]]);
+            let saved = connection
+                .query(&format!("SELECT amount::text FROM {table} WHERE id = 1"))
+                .await
+                .unwrap();
+            assert_eq!(saved.rows, vec![vec![Value::Text(VALUE.into())]], "{data_type}");
+        }
     }
 
     #[test]
