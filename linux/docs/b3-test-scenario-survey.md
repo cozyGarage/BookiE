@@ -114,6 +114,10 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   temporal eras, infinities, mixed intervals and temporal arrays are also covered.
 - Keep mutation testing alongside each decoder change and ensure its selected
   test filter includes malformed-input units as well as server regressions.
+- DuckDB collection follow-up: a nested `UHUGEINT[]` result has a native type and
+  exact-value oracle; unsupported decode, SQL literal and parameter consumers
+  refuse it instead of narrowing the unsigned value. Other nested collection
+  types and interval carrier limits remain open.
 - B3-2 SQL export follow-up: BC dates and years above 9999 have a
   [server wire round-trip contract](value-contracts.md#postgresql-era-and-mutation-checkpoint),
   including repeated-hour instants. Values outside chrono's range, infinities,
