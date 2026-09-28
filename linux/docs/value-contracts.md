@@ -1785,3 +1785,26 @@ repeat has no timeout. Reproduce with:
 mkdir -p target/mutation-tmp
 TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-clickhouse --file crates/drivers/clickhouse/src/temporal.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260927-ch-temporal-mutants-final -- --lib
 ```
+
+## ClickHouse `DateTime64(9)` server boundary behavior, 2026-09-29
+
+The Docker contract checks the legal lower endpoint (`1900-01-01`) and upper
+endpoint (`2262-04-11 23:47:16.854775807`) against independent
+`toUnixTimestamp64Nano` results, including `i64::MAX` at the upper endpoint.
+It also records asymmetric server behavior just outside the range. ClickHouse
+24.8 accepts `1899-12-31 23:59:59.999999999` but clamps its year to 1900,
+returning `1900-01-01 23:59:59.999999999`; the server epoch confirms the
+transformed value. The first tested value above the upper endpoint instead
+returns a query error.
+
+BookiE refuses both out-of-range values as parameters and SQL literals before
+submission. A caller's raw SQL can still invoke ClickHouse's own lower-bound
+clamp; the driver cannot recover the original input from the server's valid
+result. The test preserves that server behavior explicitly so it cannot be
+mistaken for a lossless round trip.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal -- --include-ignored --exact --test-threads=1
+```
+
+The focused ClickHouse 24.8 Docker contract passed.

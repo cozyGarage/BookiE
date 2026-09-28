@@ -523,8 +523,8 @@ TIMESTAMPTZ parameters still require explicit casts; MySQL BIT(1) has both an
 isolated grid-edit widget test and a driver update round trip, while a complete
 installed-app-to-MySQL edit acceptance test remains open. MySQL backslash-bearing
 column comments are refused until session-aware DDL exists. ClickHouse values
-outside DateTime64 bounds are refused locally; the live-server contract checks
-the server's overflow behavior.
+outside DateTime64 bounds are refused locally; the live-server contract pins the
+server's lower-year clamp and upper-range error behavior.
 
 The new-connection dialog now uses a centered header title that follows driver
 selection and has a wider content area. The installed-app AT-SPI scenario checks
@@ -1149,5 +1149,18 @@ checked separately. A wrong expected `tsmultirange` canonical string was
 caught by the initial run and corrected against the real PostgreSQL 16 result.
 All six built-in multirange families now have explicit coverage; direct decoding
 remains open because SQLx fails before a value reaches BookiE.
+
+B3 remains open.
+
+### ClickHouse `DateTime64(9)` bounds — September 29
+
+The focused ClickHouse 24.8 contract now proves both legal nanosecond endpoints
+against exact server epochs. It found asymmetric behavior outside the range:
+the lower neighbor is accepted with its year clamped to 1900 while its clock and
+fraction remain, and the upper neighbor returns a query error. BookiE continues
+to refuse either out-of-range value through bound-parameter and SQL-literal
+paths. Raw user SQL can still invoke the server's lower clamp, and the test
+records the transformed result so it is not represented as lossless input
+handling.
 
 B3 remains open.

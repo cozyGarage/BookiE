@@ -998,24 +998,91 @@ async fn temporal_sql_exports_keep_fractional_seconds() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn datetime64_nanosecond_values_outside_the_range_are_rejected_before_driver_submission() {
+async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
     let (_container, options) = start_clickhouse().await;
     let connection = connect(options).await;
+    let endpoints = connection
+        .query(
+            "WITH toDateTime64('1900-01-01 00:00:00.000000000', 9) AS lower_bound, \
+                  toDateTime64('2262-04-11 23:47:16.854775807', 9) AS upper_bound \
+             SELECT lower_bound, toUnixTimestamp64Nano(lower_bound), \
+                    upper_bound, toUnixTimestamp64Nano(upper_bound)",
+        )
+        .await
+        .expect("DateTime64(9) legal endpoints");
+    assert_eq!(
+        endpoints.rows,
+        vec![vec![
+            Value::DateTime(
+                chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
+            ),
+            Value::Int(-2_208_988_800_000_000_000),
+            Value::DateTime(
+                chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+                    .unwrap()
+                    .and_hms_nano_opt(23, 47, 16, 854_775_807)
+                    .unwrap(),
+            ),
+            Value::Int(i64::MAX),
+        ]],
+        "legal endpoints must retain the exact nanosecond server epoch"
+    );
+
+    let below = chrono::NaiveDate::from_ymd_opt(1899, 12, 31)
+        .unwrap()
+        .and_hms_nano_opt(23, 59, 59, 999_999_999)
+        .unwrap();
     let requested = chrono::NaiveDate::from_ymd_opt(2262, 4, 12)
         .unwrap()
         .and_hms_opt(0, 0, 0)
         .unwrap();
-    let server_result = connection
+    let clamped = connection
+        .query(
+            "SELECT toDateTime64('1899-12-31 23:59:59.999999999', 9), \
+             toUnixTimestamp64Nano(toDateTime64('1899-12-31 23:59:59.999999999', 9))",
+        )
+        .await
+        .expect("ClickHouse accepts and clamps a pre-1900 DateTime64(9) literal");
+    assert_eq!(
+        clamped.rows,
+        vec![vec![
+            Value::DateTime(
+                chrono::NaiveDate::from_ymd_opt(1900, 1, 1)
+                    .unwrap()
+                    .and_hms_nano_opt(23, 59, 59, 999_999_999)
+                    .unwrap(),
+            ),
+            Value::Int(-2_208_902_400_000_000_001),
+        ]],
+        "ClickHouse 24.8 clamps the year to 1900 while retaining the clock and fraction"
+    );
+
+    let above = connection
         .query("SELECT toDateTime64('2262-04-12 00:00:00.000000000', 9)")
         .await;
-    assert!(matches!(server_result, Err(DriverError::Query { .. })));
-
-    let parameter_result = connection
-        .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(requested)])
-        .await;
-    assert!(matches!(parameter_result, Err(DriverError::Unsupported(_))));
-    assert_eq!(
-        tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested)),
-        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
+    assert!(
+        matches!(above, Err(DriverError::Query { .. })),
+        "ClickHouse 24.8 rejects the first nanosecond date beyond the upper bound"
     );
+
+    for (date, sql) in [
+        (below, "1899-12-31 23:59:59.999999999"),
+        (requested, "2262-04-12 00:00:00.000000000"),
+    ] {
+        let parameter_result = connection
+            .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(date)])
+            .await;
+        assert!(
+            matches!(parameter_result, Err(DriverError::Unsupported(_))),
+            "driver must reject out-of-range parameter {sql}"
+        );
+        assert_eq!(
+            tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(date)),
+            Err(tablepro_core::sql_literal::LiteralError::Unsupported),
+            "literal renderer must reject out-of-range value {sql}"
+        );
+    }
 }
