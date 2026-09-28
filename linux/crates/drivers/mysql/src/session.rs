@@ -85,10 +85,8 @@ impl tablepro_core::Session for MysqlSession {
             )
             .await;
         }
-        if !timestamp_is_utc {
-            if let Ok(result) = &mut result {
-                refuse_non_utc_timestamps(result);
-            }
+        if !timestamp_is_utc && let Ok(result) = &mut result {
+            refuse_non_utc_timestamps(result);
         }
         if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
             let _ = connection.detach().close_hard().await;
