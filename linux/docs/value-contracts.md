@@ -214,6 +214,17 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 Both focused tests passed; the integration reproducer fails before the refusal fix.
 
+### SQL Server `sql_variant` result blocker
+
+A Docker probe selected a `sql_variant` containing `bigint` value
+`9007199254740993`, alongside `SQL_VARIANT_PROPERTY(..., 'BaseType')` and an
+exact `CONVERT(varchar(40), ...)` oracle. The request panicked before the driver
+could decode or refuse the result: the pinned Tiberius TDS metadata parser has
+an unimplemented `SSVariant` branch. The probe is not retained as a passing
+regression because running this query crashes the client; `sql_variant` remains
+an open driver/dependency defect. A future fix must make metadata decoding safe,
+then assert the bigint identity and server text without passing through a float.
+
 ## MySQL DELIMITER consumer agreement, 2026-09-28
 
 An app regression uses `DELIMITER $$` around a stored procedure, resets the
