@@ -357,6 +357,18 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mysql_deli
 
 The test passed. No production defect was exposed.
 
+A second app regression uses the alternate `//` delimiter around a routine with
+both semicolons and placeholder-shaped text inside a quoted string. Planning,
+editor splitting, formatting and parameter extraction preserve the routine and
+trailing SELECT, while only `after` is extracted as a parameter. This covers
+`$$` and `//`; other delimiter forms remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mysql_slash_delimiter_is_preserved_across_planner_editor_and_parameters -- --test-threads=1
+```
+
+The focused app regression passed.
+
 Text cases include empty strings, numeric-looking strings, Unicode, apostrophes,
 quotes, backslashes, line breaks and text beyond 256 KiB. Float assertions in the
 SQL harness compare bit patterns. Existing driver tests still cover binary
