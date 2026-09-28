@@ -73,4 +73,21 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
             .await,
         Err(DriverError::Unsupported(_))
     ));
+
+    let sql = "SELECT TIMESTAMP '294276-12-31 23:59:59.999999' AS value, TIMESTAMP '294276-12-31 23:59:59.999999'::text AS server_text, encode(timestamp_send(TIMESTAMP '294276-12-31 23:59:59.999999'), 'hex') AS server_wire";
+    let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
+    assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
+    assert_eq!(result.rows[0][0], Value::Undecodable("TIMESTAMP".into()));
+    assert_eq!(result.rows[0][1], Value::Text("294276-12-31 23:59:59.999999".into()));
+    assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
+        Err(tablepro_core::sql_literal::LiteralError::Undecodable)
+    );
+    assert!(matches!(
+        connection
+            .query_params("SELECT $1::timestamp", std::slice::from_ref(&result.rows[0][0]))
+            .await,
+        Err(DriverError::Unsupported(_))
+    ));
 }
