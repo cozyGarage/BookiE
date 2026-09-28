@@ -1086,3 +1086,67 @@ async fn value_contract_undefined_grid_edit_preserves_native_bson() {
         .expect("document exists");
     assert_eq!(persisted.get("value"), Some(&Bson::Undefined));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_javascript_code_grid_edit_preserves_native_bson() {
+    use mongodb::bson::{Bson, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("javascript_edits");
+    collection
+        .insert_one(doc! {
+            "_id": "source",
+            "value": Bson::JavaScriptCode("return before;".into()),
+        })
+        .await
+        .expect("seed BSON JavaScript code");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let before = connection
+        .query("db.javascript_edits.find({})")
+        .await
+        .expect("read before edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_index = before.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(before.columns[value_index].data_type, "javascript");
+    let marker = Value::Json(serde_json::json!({ "$code": "return after;" }));
+    assert_eq!(
+        before.rows[0][value_index],
+        Value::Json(serde_json::json!({ "$code": "return before;" }))
+    );
+
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "javascript_edits",
+        &before.columns,
+        &[(value_index, marker.clone())],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build JavaScript code grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply JavaScript code grid edit");
+
+    let after = connection
+        .query("db.javascript_edits.find({})")
+        .await
+        .expect("read after edit");
+    assert_eq!(after.rows[0][value_index], marker);
+    let persisted = collection
+        .find_one(doc! { "_id": "source" })
+        .await
+        .expect("read native persisted BSON")
+        .expect("source document exists");
+    assert_eq!(
+        persisted.get("value"),
+        Some(&Bson::JavaScriptCode("return after;".into()))
+    );
+}

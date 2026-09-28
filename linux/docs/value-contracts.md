@@ -1349,11 +1349,12 @@ columns through JSON parsing. MongoDB 7 integration tests verify canonical
 Extended JSON re-import and MCP browse output preserve nested BSON types.
 They also check nested Int64 above 2^53, explicit nested null and Unicode across
 driver results, JSON/CSV/XLSX output, import and MCP browse response.
-Top-level Timestamp, regex, MinKey, MaxKey, JavaScriptCodeWithScope and Symbol
-grid edits also round-trip as native BSON. The CodeWithScope regression checks
-both the stored code and its Int64 scope value; the Symbol regression checks a
-stored native BSON Symbol through the native client. Other special types and
-mixed-type-column edits remain open.
+Top-level Timestamp, regex, MinKey, MaxKey, JavaScriptCode, JavaScriptCodeWithScope
+and Symbol grid edits also round-trip as native BSON. JavaScriptCode is checked
+separately without scope; the CodeWithScope regression checks both stored code
+and its Int64 scope value; the Symbol regression checks a stored native BSON
+Symbol through the native client. Other special types and mixed-type-column
+edits remain open.
 
 Focused local checks:
 
@@ -1461,6 +1462,20 @@ focused MongoDB 7 test passed.
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contract_undefined_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
 ```
+
+### MongoDB JavaScriptCode grid edit
+
+A BSON JavaScriptCode value is shown in the grid as its canonical `$code`
+marker, edited through the shared keyed row update, and checked after reload.
+The native MongoDB client confirms that the stored value remains
+`Bson::JavaScriptCode` with the edited code string, rather than an ordinary
+BSON string.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contract_javascript_code_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
+```
+
+The focused MongoDB 7 Docker contract passed.
 
 ## ClickHouse named temporal timezones, 2026-09-27
 
