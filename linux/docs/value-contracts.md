@@ -507,6 +507,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL `int4range` explicit refusal
+
+The PostgreSQL 16 contract checks a native `[1,5)` range against the server's
+exact `int4range::text`, lower/upper bounds, and endpoint-inclusion functions.
+The driver returns `Undecodable`; SQL-literal rendering and parameter binding
+refuse that value rather than flattening range semantics into text.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_int4range_is_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL Docker contract passed. This is an explicit refusal
+boundary, not support for PostgreSQL range values.
+
 ### PostgreSQL scalar enum label text projection
 
 A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For

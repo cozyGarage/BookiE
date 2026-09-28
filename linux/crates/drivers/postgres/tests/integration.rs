@@ -187,6 +187,37 @@ async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_int4range_is_explicitly_unsupported() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+             lower(value) AS lower_bound, upper(value) AS upper_bound, \
+             lower_inc(value) AS lower_inclusive, upper_inc(value) AS upper_inclusive \
+             FROM (SELECT int4range(1, 5, '[)') AS value) source",
+        )
+        .await
+        .unwrap();
+    let row = &result.rows[0];
+    assert!(matches!(row[0], Value::Undecodable(_)), "{:?}", row[0]);
+    assert_eq!(row[1], Value::Text("int4range".into()));
+    assert_eq!(row[2], Value::Text("[1,5)".into()));
+    assert_eq!(row[3], Value::Int(1));
+    assert_eq!(row[4], Value::Int(5));
+    assert_eq!(row[5], Value::Bool(true));
+    assert_eq!(row[6], Value::Bool(false));
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &row[0]).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(&row[0]))
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_dates_preserve_eras_large_years_and_instants() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
