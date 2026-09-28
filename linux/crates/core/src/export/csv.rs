@@ -338,6 +338,23 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_preserves_smallest_subnormal_bits() {
+        let mut value_column = column("value");
+        value_column.data_type = "DOUBLE PRECISION".into();
+        let columns = [value_column];
+        let expected = f64::from_bits(1);
+        let csv = render_csv(&columns, &[vec![Value::Float(expected)]], &CsvOptions::default());
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+        let Value::Float(actual) = values[0] else {
+            panic!("CSV import did not produce a float: {values:?}");
+        };
+        assert_eq!(actual.to_bits(), expected.to_bits());
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null() {
         let mut value_column = column("value");
         value_column.data_type = "DOUBLE PRECISION".into();

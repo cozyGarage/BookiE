@@ -66,6 +66,16 @@ The regression passed; no production mismatch was found.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null
 ```
 
+The default CSV export and typed `DOUBLE PRECISION` import also preserve the
+smallest positive subnormal (`f64::from_bits(1)`) exactly. The importer result is
+compared by IEEE-754 bits; the focused regression passes with no production
+mismatch. Other finite float bit patterns and spreadsheet-application import
+remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_smallest_subnormal_bits
+```
+
 ClickHouse long-value reads are checked with a server-generated value. Oversized
 inline SQL is required to return its explicit query-size error; the fixture does
 not raise that server limit or accept a truncated success.
