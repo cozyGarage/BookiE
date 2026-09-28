@@ -153,6 +153,40 @@ async fn value_contract_json_text_array_is_explicitly_unsupported() {
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_projection_is_rejected() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TYPE value_contract_array_enum AS ENUM ('NULL', '東京', 'o''brien')")
+        .await
+        .unwrap();
+    let expression = "ARRAY['NULL'::value_contract_array_enum, \
+        '東京'::value_contract_array_enum, \
+        'o''brien'::value_contract_array_enum, NULL]";
+    let result = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text AS array_type, value::text AS exact_text, \
+             array_to_json(value)::jsonb = \
+               '[\"NULL\",\"東京\",\"o''brien\",null]'::jsonb AS server_match \
+             FROM (SELECT {expression} AS value) source"
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(result.rows[0][0], Value::Text("value_contract_array_enum[]".into()));
+    assert_eq!(result.rows[0][1], Value::Text(r#"{"NULL",東京,o'brien,NULL}"#.into()));
+    assert_eq!(result.rows[0][2], Value::Bool(true));
+    let direct_projection = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .expect_err("SQLx currently fails decoding custom enum-array metadata");
+    let error = format!("{direct_projection:?}");
+    assert!(error.contains("enum_labels"), "{error}");
+    assert!(error.contains("unexpected null"), "{error}");
+}
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")

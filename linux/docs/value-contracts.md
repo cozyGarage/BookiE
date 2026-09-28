@@ -584,6 +584,23 @@ The text-projection and consumer round-trip contract passed against PostgreSQL
 16. The direct enum projection attempt failed before assertions in SQLx metadata
 resolution and is recorded as an open boundary, not a passing result contract.
 
+### PostgreSQL custom enum array metadata boundary
+
+A PostgreSQL 16 fixture defines enum labels `NULL`, `東京`, and `o'brien`, then
+builds an array containing all three labels plus SQL NULL. Server-side scalar
+projections confirm the exact native array type, PostgreSQL array text, and
+JSON semantics. Selecting the enum array itself fails during SQLx metadata
+resolution (`enum_labels`: unexpected NULL); it does not produce a BookiE
+`Undecodable` value. This records an open decoder/dependency boundary rather
+than claiming unsupported-value handling.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_projection_is_rejected -- --include-ignored --exact --test-threads=1
+```
+
+The PostgreSQL 16 contract passed: independent server projections succeeded,
+and direct enum-array projection returned the expected metadata error.
+
 ### PostgreSQL money safe refusal
 
 A PostgreSQL 16 contract returns a native `money` value with a separate exact
