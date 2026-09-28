@@ -534,6 +534,21 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 The focused PostgreSQL Docker contract passed. This is an explicit refusal
 boundary, not support for PostgreSQL range values.
 
+### PostgreSQL composite explicit refusal
+
+A PostgreSQL 16 fixture defines `(id bigint, label text)` and returns a value
+containing `9007199254740993` and `東京`. PostgreSQL's `row_to_json`, type name,
+and individual field expressions provide exact independent oracles. The
+composite result is `Undecodable`; SQL-literal rendering and parameter binding
+refuse it instead of flattening its structure.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_composite_result_is_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL Docker contract passed. This does not add composite
+support.
+
 ### PostgreSQL scalar enum label text projection
 
 A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For
