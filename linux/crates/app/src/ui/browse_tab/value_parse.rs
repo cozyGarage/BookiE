@@ -504,6 +504,31 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(saved.rows, vec![vec![Value::Text(VALUE.into())]], "{data_type}");
+
+            if data_type == "numeric" {
+                for special in ["NaN", "Infinity", "-Infinity"] {
+                    let parsed = parse_input_for_driver(special, Some(&columns[amount]), "postgres").unwrap();
+                    assert_eq!(parsed, Value::Text(special.into()));
+                    let update = tablepro_core::sql_dialect::build_keyed_update(
+                        "postgres",
+                        None,
+                        table,
+                        &columns,
+                        &[(amount, parsed)],
+                        &[Value::Int(1)],
+                    )
+                    .unwrap();
+                    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+                    let saved = connection
+                        .query(&format!("SELECT amount, amount::text FROM {table} WHERE id = 1"))
+                        .await
+                        .unwrap();
+                    assert_eq!(
+                        saved.rows,
+                        vec![vec![Value::Text(special.into()), Value::Text(special.into())]]
+                    );
+                }
+            }
         }
     }
 

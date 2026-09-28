@@ -366,14 +366,19 @@ PostgreSQL driver and decimal/numeric columns. The existing keyed-update builder
 binds the text through `text` to the static `pg_catalog.numeric` target. The app
 parser regression and PostgreSQL 16 integration case pass. The integration updates
 one numeric column with each value and compares both decoded results and stored
-values with the server's independent `amount::text` oracle.
+values with the server's independent `amount::text` oracle. The app parser to
+PostgreSQL composition test also parses each special spelling, applies the
+keyed grid update, then compares the decoded value and `amount::text` result.
 
 Focused checks:
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_numeric_specials_remain_exact_text_only_for_postgres -- --test-threads=1
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text -- --include-ignored --exact --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_numeric_parser_outputs_round_trip_through_server -- --include-ignored --test-threads=1
 ```
+
+The composed parser-to-server test passed against the PostgreSQL 16 Docker fixture.
 
 ## PostgreSQL array checkpoint
 
