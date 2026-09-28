@@ -301,6 +301,7 @@ pub fn build_keyed_update(
             let placeholder = placeholder_for(driver_id, params.len());
             let value_sql = if driver_id == "postgres" && matches!(new_value, Value::Text(_)) {
                 postgres_array_cast_type(&columns[*col_idx].data_type)
+                    .or_else(|| postgres_numeric_cast_type(&columns[*col_idx].data_type))
                     .map(|array_type| format!("{placeholder}::text::{array_type}"))
                     .unwrap_or(placeholder)
             } else {
@@ -356,6 +357,27 @@ fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> {
         "interval" => "pg_catalog.interval[]",
         _ => return None,
     })
+}
+
+fn postgres_numeric_cast_type(data_type: &str) -> Option<&'static str> {
+    if data_type.len() > 64 {
+        return None;
+    }
+    let lowered = data_type.trim().to_ascii_lowercase();
+    let (base, modifier) = match lowered.split_once('(') {
+        Some((base, modifier)) => (base.trim(), Some(modifier.strip_suffix(')')?)),
+        None => (lowered.as_str(), None),
+    };
+    if !matches!(base, "numeric" | "decimal") {
+        return None;
+    }
+    if let Some(modifier) = modifier {
+        let values: Vec<_> = modifier.split(',').map(str::trim).collect();
+        if !matches!(values.len(), 1 | 2) || values.iter().any(|value| value.parse::<i32>().is_err()) {
+            return None;
+        }
+    }
+    Some("pg_catalog.numeric")
 }
 
 pub fn build_keyed_delete(
@@ -907,6 +929,58 @@ mod tests {
         );
         assert_eq!(postgres_array_cast_type("integer[]; DROP TABLE t"), None);
         assert_eq!(postgres_array_cast_type("custom_type[]"), None);
+    }
+
+    #[test]
+    fn postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type() {
+        let mut columns = [col("id", true), col("amount", false)];
+        columns[1].data_type = "numeric(80, 40)".into();
+        let (sql, params) = build_keyed_update(
+            "postgres",
+            None,
+            "ledger",
+            &columns,
+            &[(1, Value::Text("1234567890123456789012345678901234567890.1".into()))],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+
+        assert_eq!(
+            sql,
+            r#"UPDATE "ledger" SET "amount" = $1::text::pg_catalog.numeric WHERE "id" = $2"#
+        );
+        assert_eq!(
+            params,
+            vec![
+                Value::Text("1234567890123456789012345678901234567890.1".into()),
+                Value::Int(7)
+            ]
+        );
+    }
+
+    #[test]
+    fn postgres_numeric_cast_does_not_interpolate_untrusted_metadata() {
+        assert_eq!(
+            postgres_numeric_cast_type("NUMERIC(80, 40)"),
+            Some("pg_catalog.numeric")
+        );
+        assert_eq!(postgres_numeric_cast_type("decimal(10)"), Some("pg_catalog.numeric"));
+        for type_name in ["text", "numeric(80, 40); DROP TABLE t", "numeric(,)"] {
+            assert_eq!(postgres_numeric_cast_type(type_name), None, "{type_name}");
+        }
+
+        let mut columns = [col("id", true), col("amount", false)];
+        columns[1].data_type = "text".into();
+        let (sql, _) = build_keyed_update(
+            "postgres",
+            None,
+            "ledger",
+            &columns,
+            &[(1, Value::Text("x".into()))],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert_eq!(sql, r#"UPDATE "ledger" SET "amount" = $1 WHERE "id" = $2"#);
     }
 
     #[test]

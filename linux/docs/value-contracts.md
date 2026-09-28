@@ -28,8 +28,8 @@ not prevent the other compiled suites from running.
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
-proof requirements and remaining driver targets. This status was reconciled against
-`linux` at `66e8e6fe98d0e543a24851ad62985e657f05773a` on 2026-09-28; it is an
+proof requirements and remaining driver targets. This status was reconciled through
+`linux` commit `dd8959252822fc1dcf7cc9c88e6709d55ae149a3` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -56,7 +56,7 @@ exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
 This is a growing contract, not proof of every database type. PostgreSQL
-arbitrary-precision numeric editing, JSON and other unsupported array element
+other arbitrary-precision numeric edit boundaries, JSON and other unsupported array element
 types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
@@ -165,6 +165,33 @@ working tree based on `28df4581c`; Debian package validation was skipped because
 The all-eight-driver suite also passed at
 `target/quality/20260926T202754372916Z-values/report.json`: all 11 selected
 suites, including both PostgreSQL cases and eight core cases.
+
+## PostgreSQL wide NUMERIC grid edit
+
+The keyed-update builder binds a text-backed PostgreSQL `NUMERIC` edit through
+`text` to the fixed `pg_catalog.numeric` type. Its unit contract covers a
+`NUMERIC(80,40)` value with 40 integer digits and 40 fractional digits, beyond the
+shared Decimal representation. Type metadata is matched against a numeric-only
+grammar and never copied into SQL; ordinary text columns keep their existing
+placeholder. The real-server contract compares the saved value with PostgreSQL's
+own `numeric::text` output and passed against the Docker PostgreSQL fixture.
+
+The focused core tests passed:
+
+```sh
+cargo test --locked -p tablepro-core --lib postgres_numeric -- --test-threads=1
+cargo test --locked -p tablepro-core --lib postgres_wide_numeric -- --test-threads=1
+```
+
+The mapped change-contract gate also passed its four keyed-update regressions at
+`target/quality/20260928T121821319834Z-change-contracts/report.json`.
+
+The server test is discoverable as
+`wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value`.
+The first run exposed two fixture mismatches: the temporary table was invisible to
+pooled connections, and browse primary-key metadata was absent. After fixing those,
+the server equality assertion passed. Broader precision/scale limits, special
+numerics, and other text-backed PostgreSQL types remain open.
 
 ## PostgreSQL array checkpoint
 

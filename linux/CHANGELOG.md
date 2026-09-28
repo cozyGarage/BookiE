@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
+
 ### Fixed
 
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.

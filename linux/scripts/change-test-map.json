@@ -18,7 +18,9 @@
       "target": "--lib",
       "tests": [
         "sql_dialect::tests::postgres_text_array_updates_cast_through_text_to_a_builtin_array_type",
-        "sql_dialect::tests::postgres_array_update_casts_allowlist_type_metadata"
+        "sql_dialect::tests::postgres_array_update_casts_allowlist_type_metadata",
+        "sql_dialect::tests::postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type",
+        "sql_dialect::tests::postgres_numeric_cast_does_not_interpolate_untrusted_metadata"
       ]
     },
     "crates/app/src/ui/browse_tab/row_ops.rs": {

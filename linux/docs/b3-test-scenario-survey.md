@@ -1,8 +1,8 @@
 # B3 external test-scenario survey
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
-The local B3 status was reconciled 2026-09-28 against `linux` at
-`66e8e6fe98d0e543a24851ad62985e657f05773a`, including commits from September 26–28.
+The local B3 status was reconciled 2026-09-28 through commit
+`dd8959252822fc1dcf7cc9c88e6709d55ae149a3`, including commits from September 26–28.
 The upstream review sampled eight test files in four projects and two issue
 reports; this local update is a source/test inventory, not a fresh execution of
 every suite. No external source code or fixtures were copied.

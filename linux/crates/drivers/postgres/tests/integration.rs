@@ -29,6 +29,9 @@ mod time_contract;
 #[path = "support/date_contract.rs"]
 mod date_contract;
 
+#[path = "support/wide_numeric_contract.rs"]
+mod wide_numeric_contract;
+
 #[path = "support/interval_contract.rs"]
 mod interval_contract;
 
