@@ -520,6 +520,21 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL JSONB domain and JSON null
+
+A custom domain over `jsonb` preserves JSON null as `Value::Json(Null)` while a
+SQL NULL of the same domain remains `Value::Null`. PostgreSQL independently
+confirms the domain type, `jsonb_typeof`, and `IS NULL` results. SQL-literal
+re-import and a typed JSON binding retain JSON null; a typed SQL NULL binding
+remains SQL NULL. This closes one JSON-domain value/consumer cell without
+claiming broad nonnumeric-domain coverage.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_jsonb_domain_keeps_json_null_distinct_from_sql_null -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL `bit varying` exact text consumers
 
 A PostgreSQL 16 contract exposed that the driver returned `Undecodable("VARBIT")`

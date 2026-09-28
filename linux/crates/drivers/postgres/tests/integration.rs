@@ -226,6 +226,62 @@ async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_jsonb_domain_keeps_json_null_distinct_from_sql_null() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE DOMAIN value_contract_jsonb_domain AS jsonb")
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT 'null'::value_contract_jsonb_domain AS json_value, \
+             NULL::value_contract_jsonb_domain AS sql_null, \
+             pg_typeof('null'::value_contract_jsonb_domain)::text AS domain_type, \
+             jsonb_typeof('null'::value_contract_jsonb_domain::jsonb) AS json_kind, \
+             ('null'::value_contract_jsonb_domain) IS NULL AS json_is_sql_null, \
+             (NULL::value_contract_jsonb_domain) IS NULL AS sql_is_null",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows[0],
+        vec![
+            Value::Json(serde_json::Value::Null),
+            Value::Null,
+            Value::Text("value_contract_jsonb_domain".into()),
+            Value::Text("null".into()),
+            Value::Bool(false),
+            Value::Bool(true),
+        ]
+    );
+
+    let json_null = Value::Json(serde_json::Value::Null);
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &json_null).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::value_contract_jsonb_domain::jsonb"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Json(serde_json::Value::Null)]]);
+
+    let bound_json = connection
+        .query_params(
+            "SELECT $1::value_contract_jsonb_domain::jsonb",
+            std::slice::from_ref(&json_null),
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound_json.rows, vec![vec![Value::Json(serde_json::Value::Null)]]);
+    let bound_sql_null = connection
+        .query_params("SELECT $1::value_contract_jsonb_domain", &[Value::Null])
+        .await
+        .unwrap();
+    assert_eq!(bound_sql_null.rows, vec![vec![Value::Null]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_int4range_is_explicitly_unsupported() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
