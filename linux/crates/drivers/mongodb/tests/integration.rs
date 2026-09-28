@@ -228,6 +228,58 @@ async fn mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_m
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn browse_page_types_include_documents_after_the_metadata_sample() {
+    use mongodb::bson::{Decimal128, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("late_mixed_values");
+    let decimal_text = "12345678901234567890.1234567890123";
+    let decimal = decimal_text.parse::<Decimal128>().unwrap();
+    let mut docs = (0..50)
+        .map(|index| doc! { "_id": index, "value": decimal_text })
+        .collect::<Vec<_>>();
+    docs.push(doc! { "_id": 50, "value": decimal });
+    collection
+        .insert_many(docs)
+        .await
+        .expect("seed metadata sample and page");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let page = connection.fetch_rows(None, "late_mixed_values", 50, 1).await.unwrap();
+    let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.rows[0][id_index], Value::Int(50));
+    assert_eq!(page.columns[value_index].data_type, "mixed");
+    assert_eq!(page.rows[0][value_index], Value::Text(decimal_text.into()));
+
+    let query_page = connection
+        .query("db.late_mixed_values.find({}).skip(50).limit(1)")
+        .await
+        .unwrap();
+    let query_value_index = query_page
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    assert_eq!(query_page.columns[query_value_index].data_type, "mixed");
+    assert_eq!(query_page.rows[0][query_value_index], Value::Text(decimal_text.into()));
+
+    let persisted = collection
+        .find_one(doc! { "_id": 50 })
+        .await
+        .expect("read late native value")
+        .expect("late page document exists");
+    assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_preserves_numbers_and_text_through_json_commands() {
     let (_container, host, port) = start_mongo().await;
     let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();

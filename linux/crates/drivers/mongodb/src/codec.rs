@@ -78,6 +78,18 @@ pub(super) fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
     columns
 }
 
+pub(super) fn merge_page_types(columns: &mut Vec<ColumnInfo>, docs: &[Document]) {
+    for page_column in columns_from_docs(docs) {
+        if let Some(column) = columns.iter_mut().find(|column| column.name == page_column.name) {
+            if column.data_type != page_column.data_type {
+                column.data_type = "mixed".into();
+            }
+        } else {
+            columns.push(page_column);
+        }
+    }
+}
+
 pub(super) fn observe_bson_type(union: &mut BTreeMap<String, String>, key: &str, value: &Bson) {
     let bson_type = bson_type_name(value);
     union

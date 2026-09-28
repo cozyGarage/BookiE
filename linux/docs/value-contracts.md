@@ -934,11 +934,15 @@ model maps each scalar to the same `Value::Text`. The grid still displays the
 exact text. JSON, CSV and XLSX consume that same text value and do not retain
 the BSON-kind distinction. The Docker-backed real-server test passed and
 confirmed storage still contains BSON String and Decimal128 as distinct kinds.
-Metadata is inferred from at most 50 documents, so heterogeneity beyond that
-sample remains open, as do remaining special BSON kinds and mixed-type export
-fidelity. The earlier
-MongoDB 7 query/export/import and MCP browse Docker tests passed with large
-Int64, null and Unicode values added on 2026-09-28.
+Browse and `find` metadata starts from a 50-document sample, then incorporates
+the bounded documents actually returned on the page. A Docker regression puts
+Decimal128 at offset 50 after 50 String values and verifies the returned page's
+column is `mixed` while both BSON values still display as the same exact text.
+The shared grid gate keeps that mixed column read-only. Heterogeneity outside
+both the sample and the returned page remains undetected, as do remaining
+special BSON kinds and mixed-type export fidelity. The earlier MongoDB 7
+query/export/import and MCP browse Docker tests passed with large Int64, null
+and Unicode values added on 2026-09-28.
 
 Focused local results:
 
@@ -952,6 +956,13 @@ Both pass. The real-server contract is
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata -- --include-ignored --exact --test-threads=1
+```
+
+Late page sampling is covered by
+`browse_page_types_include_documents_after_the_metadata_sample`:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration browse_page_types_include_documents_after_the_metadata_sample -- --include-ignored --exact --test-threads=1
 ```
 
 ## ClickHouse named temporal timezones, 2026-09-27

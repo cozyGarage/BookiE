@@ -7,7 +7,7 @@ mod shell;
 mod update;
 
 use async_trait::async_trait;
-use codec::{columns_from_docs, document_to_row, observe_bson_type, serde_json_to_document};
+use codec::{columns_from_docs, document_to_row, merge_page_types, observe_bson_type, serde_json_to_document};
 use error::{map_mongo_connect_error, map_mongo_error};
 use futures::TryStreamExt;
 use mongodb::bson::{Document, doc};
@@ -212,7 +212,7 @@ impl Connection for MongodbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let columns = self.fetch_columns(None, table).await?;
+        let mut columns = self.fetch_columns(None, table).await?;
         let coll = self.db().collection::<Document>(table);
         let mut cursor = coll
             .find(doc! {})
@@ -220,10 +220,12 @@ impl Connection for MongodbConnection {
             .limit(limit as i64)
             .await
             .map_err(map_mongo_error)?;
-        let mut rows = Vec::new();
+        let mut docs = Vec::new();
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            rows.push(document_to_row(&doc, &columns));
+            docs.push(doc);
         }
+        merge_page_types(&mut columns, &docs);
+        let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,
             rows,
@@ -367,7 +369,7 @@ impl Connection for MongodbConnection {
 
 impl MongodbConnection {
     async fn run_find(&self, q: FindQuery) -> Result<QueryResult, DriverError> {
-        let columns = self.fetch_columns(None, &q.collection).await?;
+        let mut columns = self.fetch_columns(None, &q.collection).await?;
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll
             .find(q.filter)
@@ -375,15 +377,17 @@ impl MongodbConnection {
             .limit(q.limit)
             .await
             .map_err(map_mongo_error)?;
-        let mut rows = Vec::new();
+        let mut docs = Vec::new();
         let mut truncated = false;
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            if rows.len() >= MAX_QUERY_ROWS {
+            if docs.len() >= MAX_QUERY_ROWS {
                 truncated = true;
                 break;
             }
-            rows.push(document_to_row(&doc, &columns));
+            docs.push(doc);
         }
+        merge_page_types(&mut columns, &docs);
+        let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,
             rows,
