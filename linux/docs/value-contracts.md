@@ -69,11 +69,16 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_con
 The default CSV export and typed `DOUBLE PRECISION` import also preserve the
 smallest positive subnormal (`f64::from_bits(1)`) exactly. The importer result is
 compared by IEEE-754 bits; the focused regression passes with no production
-mismatch. Other finite float bit patterns and spreadsheet-application import
-remain open.
+mismatch. The largest finite `f64` also survives the default CSV export and
+typed import with its exact bit pattern. Other finite float bit patterns and
+spreadsheet-application import remain open.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_smallest_subnormal_bits
+```
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_largest_finite_float_bits
 ```
 
 A typed `TIMESTAMP WITH TIME ZONE` CSV contract starts with a timestamp at
