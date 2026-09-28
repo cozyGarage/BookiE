@@ -338,6 +338,35 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null() {
+        let mut value_column = column("value");
+        value_column.data_type = "DOUBLE PRECISION".into();
+        let columns = [value_column, column("row_tag")];
+        let rows = [
+            vec![Value::Float(f64::NAN), Value::Text("nan".into())],
+            vec![Value::Float(f64::INFINITY), Value::Text("pos".into())],
+            vec![Value::Null, Value::Text("null".into())],
+            vec![Value::Float(f64::NEG_INFINITY), Value::Text("neg".into())],
+        ];
+        let csv = render_csv(&columns, &rows, &CsvOptions::default());
+        assert_eq!(csv, "value,row_tag\nNaN,nan\ninf,pos\n,null\n-inf,neg\n");
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let imported: Vec<Value> = sheet
+            .rows
+            .iter()
+            .map(|row| {
+                crate::import::row_to_values(row, &[Some(0), Some(1)], &columns, &options, 2).unwrap()[0].clone()
+            })
+            .collect();
+        assert!(matches!(imported[0], Value::Float(value) if value.is_nan()));
+        assert_eq!(imported[1], Value::Float(f64::INFINITY));
+        assert_eq!(imported[2], Value::Null);
+        assert_eq!(imported[3], Value::Float(f64::NEG_INFINITY));
+    }
+
+    #[test]
     fn csv_renderer_applies_export_options_without_losing_cell_content() {
         let columns = vec![column("formula"), column("amount")];
         let rows = vec![vec![

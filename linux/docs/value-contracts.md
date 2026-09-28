@@ -57,6 +57,15 @@ The test passed; no production mismatch was found.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_negative_zero_bits
 ```
 
+A second typed CSV contract carries `NaN`, positive infinity, negative infinity
+and NULL through default CSV export and `DOUBLE PRECISION` import. It checks the
+exact emitted tokens, the imported NaN/infinity classifications and NULL variant.
+The regression passed; no production mismatch was found.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null
+```
+
 ClickHouse long-value reads are checked with a server-generated value. Oversized
 inline SQL is required to return its explicit query-size error; the fixture does
 not raise that server limit or accept a truncated success.
