@@ -43,7 +43,7 @@ async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn wide_integer_results_preserve_exact_server_values() {
+async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
     conn.execute(
@@ -55,28 +55,45 @@ async fn wide_integer_results_preserve_exact_server_values() {
     )
     .await
     .unwrap();
-    conn.execute(
-        "INSERT INTO wide_integers VALUES (
-            -170141183460469231731687303715884105728,
-            170141183460469231731687303715884105727,
-            340282366920938463463374607431768211455
-        )",
-    )
-    .await
-    .unwrap();
+    let values = [
+        Value::Text("-170141183460469231731687303715884105728".into()),
+        Value::Text("170141183460469231731687303715884105727".into()),
+        Value::Text("340282366920938463463374607431768211455".into()),
+    ];
+    conn.execute_params("INSERT INTO wide_integers VALUES (?, ?, ?)", &values)
+        .await
+        .unwrap();
 
     let result = conn
         .query("SELECT signed_min, signed_max, unsigned_max FROM wide_integers")
         .await
         .unwrap();
-    assert_eq!(
-        result.rows,
-        vec![vec![
-            Value::Text("-170141183460469231731687303715884105728".into()),
-            Value::Text("170141183460469231731687303715884105727".into()),
-            Value::Text("340282366920938463463374607431768211455".into()),
-        ]]
-    );
+    assert_eq!(result.rows, vec![values.to_vec()]);
+
+    conn.execute(
+        "CREATE TABLE wide_integer_copy (
+            signed_min Int128,
+            signed_max Int128,
+            unsigned_max UInt128
+        ) ENGINE = MergeTree ORDER BY tuple()",
+    )
+    .await
+    .unwrap();
+    let export = tablepro_core::sql_literal::build_insert_literal(
+        "clickhouse",
+        None,
+        "wide_integer_copy",
+        &result.columns,
+        &result.rows[0],
+    )
+    .unwrap();
+    conn.execute(&export).await.unwrap();
+
+    let reimported = conn
+        .query("SELECT signed_min, signed_max, unsigned_max FROM wide_integer_copy")
+        .await
+        .unwrap();
+    assert_eq!(reimported.rows, vec![values.to_vec()]);
 }
 
 #[tokio::test]

@@ -29,7 +29,7 @@ not prevent the other compiled suites from running.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `19aa3be7d` on 2026-09-28; it is an
+`linux` commit `51d741640` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -60,8 +60,8 @@ arbitrary-precision numeric edit boundaries, JSON and other unsupported array el
 types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
-now have local parser and real-server exact-text result contracts at signed and unsigned boundaries;
-consumer parity remains untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
+now have local parser and real-server exact-text result, binding and SQL export/import contracts at signed and unsigned boundaries;
+grid editing remains untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
 remaining transport/persistence adapters also need focused cases. Add a reproducer
 before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
@@ -272,19 +272,20 @@ cargo test --locked -p tablepro-driver-clickhouse --lib clickhouse_json_row_pres
 Protocol references: [PostgreSQL arrays](https://www.postgresql.org/docs/16/arrays.html)
 and [array_send](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/arrayfuncs.c).
 
-### ClickHouse real-server wide integer results, 2026-09-28
+### ClickHouse wide integer result, binding and SQL re-import, 2026-09-28
 
-A Docker-backed ClickHouse 24.8 contract inserted the signed Int128 minimum and
-maximum and unsigned UInt128 maximum into native columns, queried them through the
-driver, and compared complete result rows with exact decimal text. All three
-values returned as `Value::Text` without rounding. Binding, SQL export, grid edit
-and re-import parity remain open.
-
-Validation passed:
+The signed Int128 minimum and maximum and unsigned UInt128 maximum pass through
+text-valued bound parameters into native Int128/UInt128 columns and return as
+exact `Value::Text`. The result row is written with the shared generated INSERT
+literal, executed into matching native columns, and read back as the exact
+original text. The focused test passed against ClickHouse 24.8.
 
 ```sh
-cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_results_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
+cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration wide_integer_binding_and_sql_export_preserve_exact_server_values -- --include-ignored --exact --test-threads=1
 ```
+
+Grid editing these wide values and parity through other export formats remain
+open.
 
 Validation on the working tree based on `7cb2fe3ca`: all 50 PostgreSQL
 unit/integration tests passed. The full local gate passed at
