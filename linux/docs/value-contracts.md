@@ -568,6 +568,24 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 Both focused checks passed against the unit decoder and PostgreSQL 16 Docker
 fixture.
 
+### PostgreSQL `macaddr8` exact text consumers
+
+The first PostgreSQL 16 Docker run confirmed the result consumer returned
+`Undecodable("MACADDR8")` while `pg_typeof`, `::text`, and `macaddr8_send`
+independently agreed on the eight-byte EUI-64 value. The binary decoder now
+renders exactly eight octets in PostgreSQL's lowercase colon-separated form
+and rejects malformed wire lengths. Result decoding, SQL-literal re-import,
+and typed text binding preserve `08:00:2b:ff:fe:01:02:03`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib macaddr8_requires_eight_bytes_and_uses_postgres_lowercase_text
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_macaddr8_preserves_eui64_text_across_consumers -- --include-ignored --exact --test-threads=1
+```
+
+The unit decoder and PostgreSQL 16 Docker contract passed. The baseline Docker
+run reproduced the undecodable result while PostgreSQL's native type, exact
+text, and eight-byte wire oracle agreed.
+
 ### PostgreSQL `inet` and `cidr` consumer parity
 
 A focused PostgreSQL 16 contract distinguishes an IPv6 `inet` host address with

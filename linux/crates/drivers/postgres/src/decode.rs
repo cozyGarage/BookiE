@@ -3,6 +3,7 @@ pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<Str
         "INTERVAL" => decode_interval(bytes),
         "BIT" | "VARBIT" => decode_bit_string(bytes),
         "MACADDR" => decode_macaddr(bytes),
+        "MACADDR8" => decode_macaddr8(bytes),
         "INET" => decode_inet(bytes, false),
         "CIDR" => decode_inet(bytes, true),
         "PG_LSN" => decode_pg_lsn(bytes),
@@ -15,6 +16,15 @@ fn decode_macaddr(bytes: &[u8]) -> Option<String> {
         return None;
     };
     Some(format!("{a:02x}:{b:02x}:{c:02x}:{d:02x}:{e:02x}:{f:02x}"))
+}
+
+fn decode_macaddr8(bytes: &[u8]) -> Option<String> {
+    let [a, b, c, d, e, f, g, h] = bytes else {
+        return None;
+    };
+    Some(format!(
+        "{a:02x}:{b:02x}:{c:02x}:{d:02x}:{e:02x}:{f:02x}:{g:02x}:{h:02x}"
+    ))
 }
 
 fn decode_bit_string(bytes: &[u8]) -> Option<String> {
@@ -163,6 +173,19 @@ mod tests {
         );
         assert_eq!(decode_macaddr(&[0x08, 0x00, 0x2b, 0x01, 0x02]), None);
         assert_eq!(decode_macaddr(&[0x08, 0x00, 0x2b, 0x01, 0x02, 0x03, 0x04]), None);
+    }
+
+    #[test]
+    fn macaddr8_requires_eight_bytes_and_uses_postgres_lowercase_text() {
+        assert_eq!(
+            decode_macaddr8(&[0x08, 0x00, 0x2b, 0xff, 0xfe, 0x01, 0x02, 0x03]).as_deref(),
+            Some("08:00:2b:ff:fe:01:02:03")
+        );
+        assert_eq!(decode_macaddr8(&[0x08, 0x00, 0x2b, 0xff, 0xfe, 0x01, 0x02]), None);
+        assert_eq!(
+            decode_macaddr8(&[0x08, 0x00, 0x2b, 0xff, 0xfe, 0x01, 0x02, 0x03, 0x04]),
+            None
+        );
     }
 
     #[test]
