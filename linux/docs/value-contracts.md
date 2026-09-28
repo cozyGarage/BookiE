@@ -316,10 +316,16 @@ values still use `Value::Decimal`. Its `NUMERIC(80,40)` case passes the parsed
 value through the keyed-update builder and verifies the static
 `$1::text::pg_catalog.numeric` cast. It rejects malformed input, and MySQL's
 wide-numeric parser behavior is unchanged. Local app tests pass. PostgreSQL's
-existing server contracts compare the same wide values with `numeric::text`,
-but this turn did not rerun those Docker tests with parser-produced values, so a
-fresh parser-to-server acceptance run remains open. Unconstrained numeric
-limits and other text-backed PostgreSQL types also remain open.
+Docker composition test now uses the real app parser output, keyed-update
+builder and PostgreSQL driver against `NUMERIC(80,40)`, then compares the saved
+value to the server's independent `numeric::text` output. Unconstrained numeric
+limits and other text-backed PostgreSQL types remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_wide_numeric_parser_output_round_trips_through_server -- --include-ignored --test-threads=1
+```
+
+The test passed against the PostgreSQL 16 Docker fixture.
 
 ### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
 

@@ -6172,6 +6172,8 @@ dependencies = [
  "tablepro-storage",
  "tablepro-transport",
  "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
