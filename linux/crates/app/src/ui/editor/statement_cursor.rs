@@ -213,4 +213,57 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn mysql_delimiter_directives_agree_across_script_consumers() {
+        let sql = "DELIMITER $$ -- :directive\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside; :literal'; END$$\r\nDELIMITER ; -- :reset\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+
+        let extracted = tablepro_core::extract_named_parameters(sql, "mysql");
+        assert_eq!(extracted.names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("DELIMITER $$ -- :directive"));
+        assert!(formatted.contains("DELIMITER ; -- :reset"));
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        assert_eq!(reformatted.statements().len(), 2);
+        assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
+
+        let facts = reformatted
+            .statements()
+            .iter()
+            .map(|statement| {
+                let parameters = tablepro_core::extract_named_parameters(statement.text(&formatted), "mysql");
+                tablepro_policy::classify(&parameters.sql, "mysql")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(facts[0].class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts[0].writes);
+        assert_eq!(facts[1].class, tablepro_policy::StatementClass::Select);
+        let decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::Agent {
+                token: "test".into(),
+                client: None,
+                model: None,
+            },
+            tablepro_core::Environment::Local,
+            &facts[0],
+            false,
+            &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+            None,
+        );
+        assert!(matches!(
+            decision,
+            tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        ));
+    }
 }

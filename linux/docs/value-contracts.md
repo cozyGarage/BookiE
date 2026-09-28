@@ -105,10 +105,30 @@ statements and `ContinueNextBatch`; the formatter preserves both separators and
 comments; named-parameter extraction returns only `read`, `name`, `id` and
 `last`; policy classification keeps SELECT/UPDATE/SELECT order and the UPDATE
 WHERE fact. The contract uses the shared lexer and formatter without a live
-SQL Server. Repeated `GO` counts and MySQL `DELIMITER` remain open.
+SQL Server. Repeated `GO` counts and non-default MySQL delimiter forms remain open.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments -- --test-threads=1
+```
+
+The test passed. No production defect was exposed.
+
+## MySQL DELIMITER consumer agreement, 2026-09-28
+
+An app regression uses `DELIMITER $$` around a stored procedure, resets the
+delimiter to `;`, then runs a parameterized SELECT. The planner and editor
+splitter return the procedure followed by the SELECT and omit client directives
+from executable SQL. Formatting retains both directives. Parameter extraction
+ignores placeholder-shaped text in directive comments and in the procedure's
+quoted literal, retaining only `after` from the SELECT. The policy parser marks
+the procedure statement unparseable and write-capable, then classifies the
+following query as SELECT; agent policy denies the unparseable procedure. This
+verifies client-side delimiter handling, not that stored-procedure definitions
+are executable through BookiE. Human handling of unparseable SQL remains
+policy-config dependent.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mysql_delimiter_directives_agree_across_script_consumers -- --test-threads=1
 ```
 
 The test passed. No production defect was exposed.
