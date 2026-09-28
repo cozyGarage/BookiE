@@ -59,7 +59,7 @@ return exactly the SELECT then UPDATE; parameter extraction must retain only
 the same executable statements in order. Policy classification must still see
 SELECT then UPDATE, including the UPDATE target and WHERE clause. This verifies
 consumer agreement for this PostgreSQL boundary without a live database; it
-does not close the remaining malformed-tail, cursor-offset or dialect matrix.
+does not close the other dialects or delimiter edge cases.
 
 Focused result:
 
@@ -92,6 +92,23 @@ the malformed-tail contract for PostgreSQL only.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib malformed_tail_is_not_accepted_as_a_valid_script_prefix -- --test-threads=1
+```
+
+The test passed. No production defect was exposed.
+
+## SQL Server GO consumer agreement, 2026-09-28
+
+An app regression sends three statements through a SQL Server script with two
+`GO` batch separators. Placeholder-shaped text and semicolons in each `GO`
+comment must not become parameters. The planner and app splitter retain three
+statements and `ContinueNextBatch`; the formatter preserves both separators and
+comments; named-parameter extraction returns only `read`, `name`, `id` and
+`last`; policy classification keeps SELECT/UPDATE/SELECT order and the UPDATE
+WHERE fact. The contract uses the shared lexer and formatter without a live
+SQL Server. Repeated `GO` counts and MySQL `DELIMITER` remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments -- --test-threads=1
 ```
 
 The test passed. No production defect was exposed.

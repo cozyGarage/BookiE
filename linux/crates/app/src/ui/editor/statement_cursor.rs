@@ -173,4 +173,44 @@ mod tests {
         assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
         assert!(facts.writes);
     }
+
+    #[test]
+    fn mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments() {
+        let sql = "SELECT :read AS value\r\nGO -- :go_comment ;\r\nUPDATE dbo.items SET name = :name WHERE id = :id\r\nGO -- :next_comment ;\r\nSELECT :last AS value";
+        let grammar = SqlGrammar::MsSql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 3);
+        assert_eq!(plan.batches().len(), 3);
+        assert_eq!(plan.batch_error_policy(), BatchErrorPolicy::ContinueNextBatch);
+
+        let extracted = tablepro_core::extract_named_parameters(sql, "mssql");
+        assert_eq!(extracted.names, ["read", "name", "id", "last"]);
+        let planned = script_statements(sql, "mssql").unwrap();
+        assert_eq!(planned.statements.len(), 3);
+        assert_eq!(planned.error_policy, BatchErrorPolicy::ContinueNextBatch);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("GO -- :go_comment ;"));
+        assert!(formatted.contains("GO -- :next_comment ;"));
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        assert_eq!(reformatted.statements().len(), 3);
+
+        let expected_classes = [
+            tablepro_policy::StatementClass::Select,
+            tablepro_policy::StatementClass::Update,
+            tablepro_policy::StatementClass::Select,
+        ];
+        for (index, statement) in reformatted.statements().iter().enumerate() {
+            let sql = statement.text(&formatted);
+            let parameters = tablepro_core::extract_named_parameters(sql, "mssql");
+            let facts = tablepro_policy::classify(&parameters.sql, "mssql");
+            assert_eq!(facts.class, expected_classes[index]);
+            if expected_classes[index] == tablepro_policy::StatementClass::Update {
+                assert!(facts.has_where);
+            }
+        }
+    }
 }
