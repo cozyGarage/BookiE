@@ -128,6 +128,19 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_json_keeps_negative_zero_distinct_from_positive_zero_and_null() {
+        let columns = vec![column("value")];
+        let rows = vec![vec![Value::Float(-0.0)], vec![Value::Float(0.0)], vec![Value::Null]];
+        let text = render_json(&columns, &rows);
+        assert!(text.contains("\"value\": -0.0"), "{text}");
+        let output: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let values = output.as_array().unwrap();
+        assert_eq!(values[0]["value"].as_f64().unwrap().to_bits(), (-0.0f64).to_bits());
+        assert_eq!(values[1]["value"].as_f64().unwrap().to_bits(), 0.0f64.to_bits());
+        assert!(values[2]["value"].is_null());
+    }
+
+    #[test]
     fn json_renderer_keeps_value_types_duplicate_columns_and_missing_cells() {
         let columns = vec![column("id"), column("id"), column("id_2"), column("payload")];
         let rows = vec![

@@ -43,7 +43,7 @@ complete native-type support.
 | Grid, filter, CSV and named parameter parsers | Integer overflow and decimal rounding are refused; representable boundaries survive parsing |
 | Float input parsers | Numeric overflow to infinity and nonzero underflow to zero are refused |
 | XLSX | Integers beyond 15 digits and all exact decimals are text cells; stored XML verifies each value and cell reference, including decimal scale |
-| JSON and MCP | Non-finite values remain distinct from SQL NULL |
+| JSON and MCP | Non-finite values and negative zero remain distinct from SQL NULL and positive zero |
 
 ## CSV negative-zero export/import, 2026-09-28
 
@@ -56,6 +56,20 @@ The test passed; no production mismatch was found.
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_negative_zero_bits
 ```
+
+## JSON negative-zero consumer contract
+
+The JSON exporter writes finite negative zero as the numeric token `-0.0`.
+Parsing the exported document recovers the original IEEE-754 negative-zero
+bits, while positive zero remains positive and SQL NULL remains JSON null.
+This is a JSON writer and parser contract; it does not establish all JSON
+number bit patterns.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_json_keeps_negative_zero_distinct_from_positive_zero_and_null
+```
+
+The focused core test passed.
 
 A second typed CSV contract carries `NaN`, positive infinity, negative infinity
 and NULL through default CSV export and `DOUBLE PRECISION` import. It checks the
