@@ -215,6 +215,29 @@ mod tests {
     }
 
     #[test]
+    fn mssql_go_repetition_is_preserved_and_refused_by_script_execution() {
+        let sql = "SELECT :id AS value\nGO 2 -- :repeat_comment";
+        let grammar = SqlGrammar::MsSql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.batches().len(), 1);
+        assert_eq!(plan.batches()[0].repeat.get(), 2);
+        assert!(script_statements(sql, "mssql").is_err());
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("GO 2 -- :repeat_comment"), "{formatted}");
+        let reformatted = plan_for(&formatted, grammar);
+        assert_eq!(reformatted.batches()[0].repeat.get(), 2);
+
+        let parameters = tablepro_core::extract_named_parameters(&formatted, "mssql");
+        assert_eq!(parameters.names, ["id"]);
+        let facts = tablepro_policy::classify(&parameters.sql, "mssql");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+    }
+
+    #[test]
     fn mysql_delimiter_directives_agree_across_script_consumers() {
         let sql = "DELIMITER $$ -- :directive\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside; :literal'; END$$\r\nDELIMITER ; -- :reset\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;

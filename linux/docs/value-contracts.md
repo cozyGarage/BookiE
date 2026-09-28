@@ -126,13 +126,28 @@ statements and `ContinueNextBatch`; the formatter preserves both separators and
 comments; named-parameter extraction returns only `read`, `name`, `id` and
 `last`; policy classification keeps SELECT/UPDATE/SELECT order and the UPDATE
 WHERE fact. The contract uses the shared lexer and formatter without a live
-SQL Server. Repeated `GO` counts and non-default MySQL delimiter forms remain open.
+SQL Server. Non-default MySQL delimiter forms remain open.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments -- --test-threads=1
 ```
 
 The test passed. No production defect was exposed.
+
+## SQL Server repeated GO count refusal, 2026-09-28
+
+The app contract feeds `GO 2` through the SQL Server script consumers. The plan
+retains the repeat count, but execution planning refuses to run it instead of
+silently running the batch once. Formatting keeps the directive and its comment;
+parameter extraction returns only the SQL parameter, and policy classifies the
+full repeated script as unparseable and write-capable. This proves safe refusal,
+not repeated-batch execution support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_repetition_is_preserved_and_refused_by_script_execution
+```
+
+The test passed; no production defect was found.
 
 ## SQL Server `datetime2(7)` 100-nanosecond result precision
 
