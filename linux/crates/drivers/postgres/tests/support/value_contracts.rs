@@ -486,6 +486,80 @@ async fn value_contract_int4multirange_metadata_resolution_failure_is_explicit()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_remaining_builtin_multiranges_fail_explicitly_with_native_oracles() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let cases = [
+        (
+            "'{[1,3),[5,8)}'::int8multirange",
+            "int8multirange",
+            "{[1,3),[5,8)}",
+            "[1,8)",
+        ),
+        (
+            "'{[1.25,3.5),[5,8)}'::nummultirange",
+            "nummultirange",
+            "{[1.25,3.5),[5,8)}",
+            "[1.25,8)",
+        ),
+        (
+            "'{[2024-01-01,2024-02-01),[2024-03-01,2024-04-01)}'::datemultirange",
+            "datemultirange",
+            "{[2024-01-01,2024-02-01),[2024-03-01,2024-04-01)}",
+            "[2024-01-01,2024-04-01)",
+        ),
+        (
+            "'{[\"2024-01-01 00:00:00\",\"2024-02-01 00:00:00\"),[\"2024-03-01 00:00:00\",\"2024-04-01 00:00:00\")}'::tsmultirange",
+            "tsmultirange",
+            "{[\"2024-01-01 00:00:00\",\"2024-02-01 00:00:00\"),[\"2024-03-01 00:00:00\",\"2024-04-01 00:00:00\")}",
+            "[\"2024-01-01 00:00:00\",\"2024-04-01 00:00:00\")",
+        ),
+        (
+            "'{[\"2024-01-01 00:00:00+00\",\"2024-02-01 00:00:00+00\"),[\"2024-03-01 00:00:00+00\",\"2024-04-01 00:00:00+00\")}'::tstzmultirange",
+            "tstzmultirange",
+            "{[\"2024-01-01 00:00:00+00\",\"2024-02-01 00:00:00+00\"),[\"2024-03-01 00:00:00+00\",\"2024-04-01 00:00:00+00\")}",
+            "[\"2024-01-01 00:00:00+00\",\"2024-04-01 00:00:00+00\")",
+        ),
+    ];
+
+    for (expression, expected_type, expected_text, expected_hull) in cases {
+        let oracle = connection
+            .query(&format!(
+                "SELECT pg_typeof(value)::text, value::text, range_merge(value)::text, \
+                 (SELECT count(*) FROM unnest(value) AS component)::bigint \
+                 FROM (SELECT {expression} AS value) source"
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("native multirange oracle for {expected_type}: {error:?}"));
+        assert_eq!(
+            oracle.rows[0],
+            vec![
+                Value::Text(expected_type.into()),
+                Value::Text(expected_text.into()),
+                Value::Text(expected_hull.into()),
+                Value::Int(2),
+            ],
+            "independent PostgreSQL oracle for {expected_type}"
+        );
+
+        let error = connection
+            .query(&format!("SELECT {expression}"))
+            .await
+            .expect_err("unsupported multirange projection must fail, never flatten silently");
+        let error = format!("{error:?}");
+        assert!(error.contains("typtype"), "{expected_type}: {error}");
+        assert!(error.contains("unknown type code 109"), "{expected_type}: {error}");
+
+        let null = connection
+            .query(&format!("SELECT NULL::{expected_type} IS NULL"))
+            .await
+            .unwrap_or_else(|error| panic!("SQL NULL oracle for {expected_type}: {error:?}"));
+        assert_eq!(null.rows, vec![vec![Value::Bool(true)]], "{expected_type}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_tstzrange_is_explicitly_unsupported() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

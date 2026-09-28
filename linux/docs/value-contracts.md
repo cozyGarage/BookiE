@@ -759,6 +759,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The focused PostgreSQL 16 Docker contract passed with that metadata error.
 
+The companion contract now covers the five remaining built-in multirange types:
+`int8multirange`, `nummultirange`, `datemultirange`, `tsmultirange` and
+`tstzmultirange`. PostgreSQL independently returns each type name, canonical
+text, merged hull and component count. SQLx rejects direct projection of every
+type with the same unsupported `typtype` metadata error, and a separate
+`IS NULL` check confirms SQL NULL remains observable. Together with the
+`int4multirange` contract, the suite now records the limit for all six built-in
+multirange types without claiming support or replacing native server oracles
+with client formatting.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_remaining_builtin_multiranges_fail_explicitly_with_native_oracles -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed. Direct support remains open
+until SQLx can resolve PostgreSQL multirange metadata safely.
+
 ### PostgreSQL composite explicit refusal
 
 A PostgreSQL 16 fixture defines `(id bigint, label text)` and returns a value

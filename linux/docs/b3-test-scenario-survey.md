@@ -2,10 +2,10 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled 2026-09-29 through commit
-`5a44a5f11bb7c09048184be9359cd49f9491e81f`, including September 26–29 changes.
-The current worktree additionally contains a Redis RESP3 nested-value and binary
-contract plus a non-silent map row-cap regression, passed with 34 unit tests and
-all 3 Docker integration tests; these changes are not part of the cited commit.
+`daf4b7fdc`, including September 26–29 changes.
+The current worktree additionally contains PostgreSQL built-in multirange
+metadata refusal coverage with native server type, text, hull and component
+oracles; these changes are not part of the cited commit.
 The upstream review sampled eight test files in four projects and two issue
 reports; this local update is a source/test inventory, not a fresh execution of
 every suite. No external source code or fixtures were copied.

@@ -1137,3 +1137,17 @@ Open:
 - ClickHouse DateTime values in DST folds or gaps, or with an unrecognized timezone, remain explicit undecodable results until the wire format carries enough information to identify the instant.
 
 B3 remains open.
+
+### PostgreSQL built-in multirange coverage — September 29
+
+The existing `int4multirange` metadata blocker now has sibling regressions for
+`int8multirange`, `nummultirange`, `datemultirange`, `tsmultirange` and
+`tstzmultirange`. Each test case first asks PostgreSQL for independent type,
+canonical text, hull and component-count oracles, then asserts that a direct
+projection fails with SQLx's unsupported `typtype` metadata error. SQL NULL is
+checked separately. A wrong expected `tsmultirange` canonical string was
+caught by the initial run and corrected against the real PostgreSQL 16 result.
+All six built-in multirange families now have explicit coverage; direct decoding
+remains open because SQLx fails before a value reaches BookiE.
+
+B3 remains open.
