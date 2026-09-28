@@ -5,10 +5,59 @@ import re
 import json
 import io
 import sys
+import tomllib
 from collections import Counter
 
 root = Path(__file__).resolve().parents[1]
 registry = json.loads((root / "scripts/isolated-tests.json").read_text())
+
+
+def workspace_packages():
+    manifest = tomllib.loads((root / "Cargo.toml").read_text())
+    packages = {}
+    for member in manifest["workspace"]["members"]:
+        crate_dir = (root / member).resolve()
+        name = tomllib.loads((crate_dir / "Cargo.toml").read_text())["package"]["name"]
+        packages[crate_dir] = name
+    return packages
+
+
+def package_owning(path, packages):
+    current = path.resolve().parent
+    while current != current.parent:
+        name = packages.get(current)
+        if name:
+            return name
+        if current == root:
+            break
+        current = current.parent
+    raise RuntimeError(f"no workspace package owns {path}")
+
+
+def docker_activation(path, name, packages):
+    package = package_owning(path, packages)
+    relative = path.relative_to(root)
+    if relative.parts[-2] == "tests":
+        selector = f"--test {path.stem}"
+    elif "src" in relative.parts:
+        selector = f"--lib {name}"
+    else:
+        tests_dir = path.parent
+        while tests_dir.name != "tests":
+            tests_dir = tests_dir.parent
+            if tests_dir == root:
+                raise RuntimeError(f"docker ignored test is outside src and tests: {relative}")
+        integration = tests_dir / "integration.rs"
+        if not integration.is_file() or f"mod {path.stem};" not in integration.read_text():
+            raise RuntimeError(f"docker ignored test is not an integration module: {relative}")
+        selector = "--test integration"
+    return (
+        f"Docker plus cargo test -p {package} {selector} "
+        "-- --include-ignored --test-threads=1"
+    )
+
+
+packages = workspace_packages()
 mapped = {entry[2].split("::")[-1] for entries in registry.values() for entry in entries}
 output = io.StringIO()
 original_stdout = sys.stdout
@@ -47,8 +96,7 @@ for path in sorted((root / "crates").rglob("*.rs")):
                 raise RuntimeError(f"unmapped Docker SSH target: {path.stem}")
             tier, enable = "Driver", "bash scripts/test-ssh.sh (CI integration)"
         elif "docker" in reason.lower():
-            engine = path.relative_to(root).parts[2]
-            tier, enable = "Driver", f"Docker plus cargo test -p tablepro-driver-{engine} --test integration -- --include-ignored --test-threads=1"
+            tier, enable = "Driver", docker_activation(path, name, packages)
         else:
             raise RuntimeError(f"unmapped ignored test: {relative}: {name}")
         rows.append((relative, name, tier, reason, enable))
