@@ -202,6 +202,20 @@ mismatch; broader legacy temporal boundaries remain open.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration value_contract_smalldatetime_rounding_matches_server_text -- --include-ignored --exact --test-threads=1
 ```
 
+### SQL Server legacy `datetime` tick boundaries
+
+A SQL Server Docker contract checks legacy `datetime`
+rounding around its 1/300-second tick boundaries (`.001`, `.002`, `.004`,
+`.005`, `.008`). The decoded nanoseconds and SQL Server's independent
+millisecond text agree on the rounded values. The `2/300` tick maps to
+6,666,666 nanoseconds in chrono, one nanosecond below the rational instant;
+this is the current `NaiveDateTime` representation ceiling and remains an
+explicit exactness limitation. The test passed without a production change.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration value_contract_legacy_datetime_rounding_matches_server_milliseconds -- --include-ignored --exact --test-threads=1
+```
+
 ## SQL Server money float-decoding refusal
 
 A Docker regression first reproduced SQL Server `money` as
