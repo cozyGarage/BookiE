@@ -29,7 +29,7 @@ not prevent the other compiled suites from running.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `cbf6292e6` on 2026-09-28; it is an
+`linux` commit `e8dc2840f` on 2026-09-28; it is an
 inventory, not a fresh run of every suite. A passing scalar suite does not establish
 complete native-type support.
 
@@ -56,7 +56,7 @@ exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
 This is a growing contract, not proof of every database type. PostgreSQL's other
-arbitrary-precision numeric edit boundaries, JSON and other unsupported array element
+unconstrained numeric edit boundaries and special numerics, JSON and other unsupported array element
 types, array grid write-back beyond the verified built-in `integer[]` case,
 finite calendars beyond the shared range, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
@@ -190,8 +190,16 @@ The server test is discoverable as
 `wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value`.
 The first run exposed two fixture mismatches: the temporary table was invisible to
 pooled connections, and browse primary-key metadata was absent. After fixing those,
-the server equality assertion passed. Broader precision/scale limits, special
-numerics, and other text-backed PostgreSQL types remain open.
+the server equality assertion passed. The `NUMERIC(1000,1000)` boundary contract
+also passed against PostgreSQL, comparing the saved value to the server's
+`numeric::text` output after a keyed grid update:
+
+```sh
+cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value -- --include-ignored --exact --test-threads=1
+```
+
+Unconstrained numeric limits, special numerics, and other text-backed PostgreSQL
+types remain open.
 
 ## PostgreSQL array checkpoint
 
