@@ -57,6 +57,18 @@ The test passed; no production mismatch was found.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_negative_zero_bits
 ```
 
+## CSV signed integer boundary export/import
+
+The typed `BIGINT` CSV round trip covers `i64::MIN`, `i64::MAX`, and
+`9007199254740993` (one above the exact-integer limit of binary64). It checks
+both the emitted decimal digits and the exact imported `Value::Int` values.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_signed_integer_boundaries
+```
+
+The focused core test passed.
+
 ## JSON negative-zero consumer contract
 
 The JSON exporter writes finite negative zero as the numeric token `-0.0`.

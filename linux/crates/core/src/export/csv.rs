@@ -320,6 +320,29 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_round_trip_preserves_signed_integer_boundaries() {
+        let mut value_column = column("value");
+        value_column.data_type = "BIGINT".into();
+        let columns = [value_column];
+        let expected = [i64::MIN, 9_007_199_254_740_993, i64::MAX];
+        let rows: Vec<Vec<Value>> = expected.iter().map(|value| vec![Value::Int(*value)]).collect();
+        let csv = render_csv(&columns, &rows, &CsvOptions::default());
+        assert_eq!(
+            csv,
+            "value\n-9223372036854775808\n9007199254740993\n9223372036854775807\n"
+        );
+
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let imported: Vec<Value> = sheet
+            .rows
+            .iter()
+            .map(|row| crate::import::row_to_values(row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
+            .collect();
+        assert_eq!(imported, expected.into_iter().map(Value::Int).collect::<Vec<_>>());
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_preserves_negative_zero_bits() {
         let mut value_column = column("value");
         value_column.data_type = "DOUBLE PRECISION".into();
