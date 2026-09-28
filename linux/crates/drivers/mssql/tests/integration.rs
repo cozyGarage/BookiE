@@ -804,6 +804,41 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_smalldatetime_rounding_matches_server_text() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    let result = conn
+        .query(
+            "SELECT CAST('2024-01-02T03:04:29.998' AS smalldatetime) AS below, \
+             CONVERT(varchar(19), CAST('2024-01-02T03:04:29.998' AS smalldatetime), 126) AS below_text, \
+             CAST('2024-01-02T03:04:29.999' AS smalldatetime) AS above, \
+             CONVERT(varchar(19), CAST('2024-01-02T03:04:29.999' AS smalldatetime), 126) AS above_text",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::DateTime(
+                NaiveDate::from_ymd_opt(2024, 1, 2)
+                    .unwrap()
+                    .and_hms_opt(3, 4, 0)
+                    .unwrap()
+            ),
+            Value::Text("2024-01-02T03:04:00".into()),
+            Value::DateTime(
+                NaiveDate::from_ymd_opt(2024, 1, 2)
+                    .unwrap()
+                    .and_hms_opt(3, 5, 0)
+                    .unwrap()
+            ),
+            Value::Text("2024-01-02T03:05:00".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn money_types_refuse_values_decoded_through_binary_float() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;

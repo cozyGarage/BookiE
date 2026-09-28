@@ -185,6 +185,18 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 The Docker-backed test passed; no production mismatch was found.
 
+### SQL Server `smalldatetime` rounding threshold
+
+A focused server test checks values at the `smalldatetime` second-rounding
+boundary. `03:04:29.998` decodes and renders as `03:04:00`; `03:04:29.999`
+rounds to `03:05:00`. Each decoded `DateTime` is checked beside SQL Server's
+independent style-126 text value. The Docker test passed with no production
+mismatch; broader legacy temporal boundaries remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration value_contract_smalldatetime_rounding_matches_server_text -- --include-ignored --exact --test-threads=1
+```
+
 ## SQL Server money float-decoding refusal
 
 A Docker regression first reproduced SQL Server `money` as
