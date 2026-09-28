@@ -568,6 +568,20 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 Both focused checks passed against the unit decoder and PostgreSQL 16 Docker
 fixture.
 
+### PostgreSQL `inet` and `cidr` consumer parity
+
+A focused PostgreSQL 16 contract distinguishes an IPv6 `inet` host address with
+a `/64` mask from the corresponding canonical `cidr` network. Independent
+`host`, `network`, `masklen`, `pg_typeof`, and `::text` results confirm the
+address-versus-network semantics. Both values survive SQL-literal re-import
+and typed text binding with their exact prefixes.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_inet_and_cidr_preserve_ipv6_prefix_semantics -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL `int4range` explicit refusal
 
 The PostgreSQL 16 contract checks a native `[1,5)` range against the server's

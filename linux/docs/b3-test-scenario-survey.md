@@ -13,7 +13,8 @@ every suite. No external source code or fixtures were copied.
 - Use upstream tests, issues and fix commits as bug hypotheses. Reproduce locally
   before changing production behavior; keep the reproducer as a permanent regression.
 - Current coverage includes eight-driver scalar contracts, PostgreSQL exact
-  BIT/VARBIT and MACADDR text, scalar and temporal arrays, temporal eras/infinities/interval fields, MongoDB nested BSON
+  BIT/VARBIT and MACADDR text, IPv6 inet/cidr consumer parity, scalar and temporal arrays,
+  temporal eras/infinities/interval fields, MongoDB nested BSON
   consumers and SQLite NUMERIC-affinity transitions. B3 remains open for uncovered
   type/consumer combinations and installed grid acceptance; see the current status
   table and [value-contract evidence](value-contracts.md).

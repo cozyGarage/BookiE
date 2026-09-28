@@ -220,6 +220,57 @@ async fn value_contract_macaddr_preserves_exact_text_across_consumers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_inet_and_cidr_preserve_ipv6_prefix_semantics() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    for (kind, source, expected, host, network) in [
+        (
+            "inet",
+            "2001:db8::1/64",
+            "2001:db8::1/64",
+            "2001:db8::1",
+            "2001:db8::/64",
+        ),
+        ("cidr", "2001:db8::/64", "2001:db8::/64", "2001:db8::", "2001:db8::/64"),
+    ] {
+        let result = connection
+            .query(&format!(
+                "SELECT value, pg_typeof(value)::text AS native_type, value::text AS exact_text, \
+                 host(value::inet) AS host_address, network(value::inet)::text AS network_text, \
+                 masklen(value::inet) AS prefix_length \
+                 FROM (SELECT '{source}'::{kind} AS value) source"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            result.rows,
+            vec![vec![
+                Value::Text(expected.into()),
+                Value::Text(kind.into()),
+                Value::Text(expected.into()),
+                Value::Text(host.into()),
+                Value::Text(network.into()),
+                Value::Int(64),
+            ]]
+        );
+
+        let value = Value::Text(expected.into());
+        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+        let literal_result = connection
+            .query(&format!("SELECT {literal}::{kind}::text"))
+            .await
+            .unwrap();
+        assert_eq!(literal_result.rows, vec![vec![Value::Text(expected.into())]]);
+        let bound_result = connection
+            .query_params(&format!("SELECT $1::text::{kind}::text"), &[value])
+            .await
+            .unwrap();
+        assert_eq!(bound_result.rows, vec![vec![Value::Text(expected.into())]]);
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
