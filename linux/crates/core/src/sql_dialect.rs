@@ -959,6 +959,25 @@ mod tests {
     }
 
     #[test]
+    fn postgres_typed_numeric_updates_keep_the_native_placeholder() {
+        let mut columns = [col("id", true), col("amount", false)];
+        columns[1].data_type = "numeric(80, 40)".into();
+        let value = Value::Decimal("12.50".parse().unwrap());
+        let (sql, params) = build_keyed_update(
+            "postgres",
+            None,
+            "ledger",
+            &columns,
+            &[(1, value.clone())],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+
+        assert_eq!(sql, r#"UPDATE "ledger" SET "amount" = $1 WHERE "id" = $2"#);
+        assert_eq!(params, vec![value, Value::Int(7)]);
+    }
+
+    #[test]
     fn postgres_numeric_cast_does_not_interpolate_untrusted_metadata() {
         assert_eq!(
             postgres_numeric_cast_type("NUMERIC(80, 40)"),
@@ -968,6 +987,12 @@ mod tests {
         for type_name in ["text", "numeric(80, 40); DROP TABLE t", "numeric(,)"] {
             assert_eq!(postgres_numeric_cast_type(type_name), None, "{type_name}");
         }
+        let at_limit = format!("numeric({}1,2)", " ".repeat(64 - "numeric(1,2)".len()));
+        assert_eq!(at_limit.len(), 64);
+        assert_eq!(postgres_numeric_cast_type(&at_limit), Some("pg_catalog.numeric"));
+        let over_limit = format!("numeric({}1,2)", " ".repeat(53));
+        assert_eq!(over_limit.len(), 65);
+        assert_eq!(postgres_numeric_cast_type(&over_limit), None);
 
         let mut columns = [col("id", true), col("amount", false)];
         columns[1].data_type = "text".into();

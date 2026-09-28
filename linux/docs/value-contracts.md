@@ -321,6 +321,35 @@ but this turn did not rerun those Docker tests with parser-produced values, so a
 fresh parser-to-server acceptance run remains open. Unconstrained numeric
 limits and other text-backed PostgreSQL types also remain open.
 
+### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
+
+The shared keyed-update builder's final focused mutation report selected 16
+mutations: 14 were caught, two were unviable compilation changes, and none
+survived or timed out. A surviving `&& -> ||` mutation had shown that a typed
+`Value::Decimal` could incorrectly receive the text cast. The new unit regression
+requires typed numeric binds to keep `$1` and their native decimal parameter;
+the same core suite also checks safe metadata handling at and beyond the 64-byte
+allowlist input limit.
+
+The app-parser check adds malformed-literal refusals to the wide numeric parser
+contract. Its final `--iterate` report covers the 18 remaining mutations: seven
+were caught, nine survived, and two cursor-increment mutations timed out. The
+remaining survivors are in `is_postgres_numeric_literal` (cursor comparison,
+fraction/exponent grammar, and cursor advancement); they are recorded as open
+parser-test coverage, not as confirmed production defects. The timeout mutants
+replace cursor increments with multiplication and can stall the scanner. No
+source behavior was changed in response to these parser survivors.
+
+```sh
+rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/sql_dialect.rs --re 'build_keyed_update|postgres_numeric_cast_type' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260928-pg-keyed-update-cast-final -- --lib
+rtk cargo mutants --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_input_for_driver|is_postgres_numeric_type|is_postgres_numeric_literal' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260928-pg-numeric-parser-mutants -- --lib postgres_
+```
+
+Reports: `target/quality/20260928-pg-keyed-update-cast-final/mutants.out/outcomes.json`
+and `target/quality/20260928-pg-numeric-parser-mutants/mutants.out/outcomes.json`.
+The app parser unit regression passed. The PostgreSQL Docker acceptance contracts
+remain a separate server-side check.
+
 ### PostgreSQL NUMERIC special-value grid edit
 
 The app's regular decimal parser rejects `NaN`, `Infinity`, and `-Infinity`.

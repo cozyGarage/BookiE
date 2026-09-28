@@ -437,7 +437,12 @@ mod tests {
             Ok(Value::Text(max_precision.clone()))
         );
         assert!(parse_input_for_driver(wide, Some(&column), "mysql").is_err());
-        assert!(parse_input_for_driver("1; DROP TABLE t", Some(&column), "postgres").is_err());
+        for malformed in ["", ".", "+", "--1", "1e", "1e+", "1.2.3", "1x", "1; DROP TABLE t"] {
+            assert!(
+                parse_input_for_driver(malformed, Some(&column), "postgres").is_err(),
+                "accepted malformed PostgreSQL numeric literal {malformed:?}"
+            );
+        }
         assert!(parse_input_for_driver(wide, Some(&col("money", false)), "postgres").is_err());
     }
 
