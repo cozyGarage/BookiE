@@ -713,7 +713,10 @@ fn xlsx_nested_cell_requires_its_own_date_and_binary_markers() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson() {
-    use mongodb::bson::{Binary, DateTime, Decimal128, Regex, Timestamp, doc, oid::ObjectId, spec::BinarySubtype};
+    use mongodb::bson::{
+        Binary, DateTime, Decimal128, JavaScriptCodeWithScope, Regex, Timestamp, doc, oid::ObjectId,
+        spec::BinarySubtype,
+    };
 
     let (_container, host, port) = start_mongo().await;
     let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
@@ -729,6 +732,10 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             "items": vec![doc! { "before": true }],
             "cluster_time": Timestamp { time: 41, increment: 7 },
             "pattern": Regex { pattern: "before".into(), options: "i".into() },
+            "script": JavaScriptCodeWithScope {
+                code: "return before;".into(),
+                scope: doc! { "value": 1_i64 },
+            },
             "floor": mongodb::bson::Bson::MinKey,
             "ceiling": mongodb::bson::Bson::MaxKey,
         })
@@ -764,6 +771,12 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         .position(|column| column.name == "pattern")
         .unwrap();
     assert_eq!(before.columns[regex_index].data_type, "regex");
+    let script_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "script")
+        .unwrap();
+    assert_eq!(before.columns[script_index].data_type, "javascriptwithscope");
     let min_key_index = before.columns.iter().position(|column| column.name == "floor").unwrap();
     assert_eq!(before.columns[min_key_index].data_type, "minkey");
     let max_key_index = before
@@ -781,6 +794,10 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     let edited_items = serde_json::json!([{"ordinal": {"$numberLong": "7"}}]);
     let edited_timestamp = serde_json::json!({"$timestamp": {"t": 53, "i": 11}});
     let edited_regex = serde_json::json!({"$regularExpression": {"pattern": "after", "options": "m"}});
+    let edited_script = serde_json::json!({
+        "$code": "return after;",
+        "$scope": {"value": {"$numberLong": "9"}},
+    });
     let edited_min_key = serde_json::json!({"$minKey": 1});
     let edited_max_key = serde_json::json!({"$maxKey": 1});
     let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
@@ -793,6 +810,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             (items_index, Value::Json(edited_items.clone())),
             (timestamp_index, Value::Json(edited_timestamp)),
             (regex_index, Value::Json(edited_regex)),
+            (script_index, Value::Json(edited_script.clone())),
             (min_key_index, Value::Json(edited_min_key)),
             (max_key_index, Value::Json(edited_max_key)),
         ],
@@ -810,6 +828,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         .expect("read after edit");
     assert_eq!(after.rows[0][payload_index], Value::Json(edited));
     assert_eq!(after.rows[0][items_index], Value::Json(edited_items));
+    assert_eq!(after.rows[0][script_index], Value::Json(edited_script));
 
     let persisted = client
         .database("appdb")
@@ -839,6 +858,13 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         Some(&mongodb::bson::Bson::RegularExpression(Regex {
             pattern: "after".into(),
             options: "m".into()
+        }))
+    );
+    assert_eq!(
+        persisted.get("script"),
+        Some(&mongodb::bson::Bson::JavaScriptCodeWithScope(JavaScriptCodeWithScope {
+            code: "return after;".into(),
+            scope: doc! { "value": 9_i64 },
         }))
     );
     assert_eq!(persisted.get("floor"), Some(&mongodb::bson::Bson::MinKey));

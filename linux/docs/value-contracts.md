@@ -933,8 +933,10 @@ columns through JSON parsing. MongoDB 7 integration tests verify canonical
 Extended JSON re-import and MCP browse output preserve nested BSON types.
 They also check nested Int64 above 2^53, explicit nested null and Unicode across
 driver results, JSON/CSV/XLSX output, import and MCP browse response.
-Top-level Timestamp, regex, MinKey and MaxKey grid edits also round-trip as
-native BSON. Remaining special types and mixed-type-column edits remain open.
+Top-level Timestamp, regex, MinKey, MaxKey and JavaScriptCodeWithScope grid edits
+also round-trip as native BSON. The CodeWithScope regression checks both the
+stored code and its Int64 scope value through the native BSON client. Other
+special types and mixed-type-column edits remain open.
 
 Focused local checks:
 
@@ -959,8 +961,9 @@ exports the actual query result as XLSX and checks Decimal128, date and binary
 subtype markers in workbook strings. An MCP unit contract confirms BSON
 Extended JSON is passed through without flattening; Mongo-backed MCP browse and
 native BSON re-import checks now run in the integration suite. Top-level
-Timestamp, regex, MinKey and MaxKey grid edits are covered, including a Docker
-assertion that the edited MaxKey remains native BSON. Local regressions use a BSON
+Timestamp, regex, MinKey, MaxKey and JavaScriptCodeWithScope grid edits are
+covered; the Docker assertion checks CodeWithScope code and scope fields as
+native BSON. Local regressions use a BSON
 String and Decimal128 with identical text: the field is labeled `mixed`, and
 the shared app grid editability gate refuses both values because the result
 model maps each scalar to the same `Value::Text`. The grid still displays the
