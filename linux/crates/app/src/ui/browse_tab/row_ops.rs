@@ -283,7 +283,7 @@ impl BrowseTab {
             _ => normalize_single_line_input(&new_value),
         };
         let col = self.current_columns.get(col_index);
-        let new = match parse_input_for_column(&normalized, col) {
+        let new = match parse_input_for_driver(&normalized, col, &self.driver_id) {
             Ok(v) => v,
             Err(message) => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));

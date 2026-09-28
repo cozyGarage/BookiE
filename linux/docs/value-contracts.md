@@ -198,8 +198,24 @@ also passed against PostgreSQL, comparing the saved value to the server's
 cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value -- --include-ignored --exact --test-threads=1
 ```
 
-Unconstrained numeric limits, special numerics, and other text-backed PostgreSQL
-types remain open.
+Unconstrained numeric limits and other text-backed PostgreSQL types remain open.
+
+### PostgreSQL NUMERIC special-value grid edit
+
+The app's regular decimal parser rejects `NaN`, `Infinity`, and `-Infinity`.
+Inline editing now keeps those three spellings as `Value::Text` only for the
+PostgreSQL driver and decimal/numeric columns. The existing keyed-update builder
+binds the text through `text` to the static `pg_catalog.numeric` target. The app
+parser regression and PostgreSQL 16 integration case pass. The integration updates
+one numeric column with each value and compares both decoded results and stored
+values with the server's independent `amount::text` oracle.
+
+Focused checks:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_numeric_specials_remain_exact_text_only_for_postgres -- --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text -- --include-ignored --exact --test-threads=1
+```
 
 ## PostgreSQL array checkpoint
 

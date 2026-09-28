@@ -45,6 +45,16 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
     }
 }
 
+pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
+    if driver_id == "postgres"
+        && col.is_some_and(|column| classify_type(&column.data_type.to_ascii_lowercase()) == TypeKind::Decimal)
+        && matches!(text.trim(), "NaN" | "Infinity" | "-Infinity")
+    {
+        return Ok(Value::Text(text.trim().into()));
+    }
+    parse_input_for_column(text, col)
+}
+
 fn mysql_bit_width(data_type: &str) -> Option<u32> {
     data_type
         .strip_prefix("bit(")?
@@ -276,7 +286,7 @@ mod parser_contract;
 
 #[cfg(test)]
 mod tests {
-    use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column};
+    use super::{TypeKind, classify_type, normalize_single_line_input, parse_input_for_column, parse_input_for_driver};
     use tablepro_core::{ColumnInfo, Value};
 
     #[tokio::test]
@@ -331,6 +341,22 @@ mod tests {
     fn decimal_preservation_rejects_an_edit_that_would_round() {
         assert!(super::parse_decimal_value("0.123456789012345678901234567891").is_err());
         assert!(super::parse_decimal_value("12.3400").is_ok());
+    }
+
+    #[test]
+    fn postgres_numeric_specials_remain_exact_text_only_for_postgres() {
+        let column = col("numeric", false);
+        for input in ["NaN", "Infinity", "-Infinity"] {
+            assert_eq!(
+                parse_input_for_driver(input, Some(&column), "postgres"),
+                Ok(Value::Text(input.into()))
+            );
+            assert!(parse_input_for_driver(input, Some(&column), "mysql").is_err());
+        }
+        assert_eq!(
+            parse_input_for_driver("12.50", Some(&column), "postgres"),
+            Ok(Value::Decimal("12.50".parse().unwrap()))
+        );
     }
 
     #[test]
