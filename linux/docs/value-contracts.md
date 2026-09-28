@@ -52,6 +52,19 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 
 The focused local DuckDB contract passed.
 
+## DuckDB row-cap completeness, 2026-09-28
+
+The local DuckDB result limit is checked at both boundaries. A query returning
+exactly `MAX_QUERY_ROWS` preserves the first and last ordered values and reports
+`truncated = false`; a query with one additional row still returns the capped
+count and reports `truncated = true`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration query_marks_only_results_over_the_row_cap_as_truncated -- --exact
+```
+
+The focused local DuckDB contract passed.
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
