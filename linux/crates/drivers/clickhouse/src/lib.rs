@@ -1017,6 +1017,28 @@ mod tests {
     }
 
     #[test]
+    fn clickhouse_json_row_preserves_wide_integer_tokens_exactly() {
+        let raw: Vec<serde_json::Value> = query::parse_line(
+            br#"[-170141183460469231731687303715884105728,170141183460469231731687303715884105727,340282366920938463463374607431768211455]"#,
+        )
+        .unwrap();
+        let columns = response_columns(
+            ["signed_min", "signed_max", "unsigned_max"].map(str::to_owned).into(),
+            ["Int128", "Int128", "UInt128"].map(str::to_owned).into(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            response_row(raw, &columns).unwrap(),
+            [
+                Value::Text("-170141183460469231731687303715884105728".into()),
+                Value::Text("170141183460469231731687303715884105727".into()),
+                Value::Text("340282366920938463463374607431768211455".into()),
+            ]
+        );
+    }
+
+    #[test]
     fn bind_question_marks() {
         let sql = bind_placeholders(
             "ALTER TABLE t UPDATE a = ? WHERE id = ?",

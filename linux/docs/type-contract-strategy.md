@@ -1,5 +1,8 @@
 # Type contracts for B3 and future drivers
 
+Coverage reconciled against `linux` at `66e8e6fe98d0e543a24851ad62985e657f05773a`
+on 2026-09-28. This is source/test inventory, not a fresh execution of every suite.
+
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.
 Keep this work inside the current eight drivers. Oracle is a later driver project,
@@ -50,14 +53,25 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 
 | Driver | Evidence established by the B3 contract suite | Remaining native-type targets |
 | --- | --- | --- |
-| PostgreSQL | Scalars, wide NUMERIC text, common scalar and temporal arrays, temporal eras/offsets, infinities, interval fields across styles | Finite ranges beyond the shared calendar, domains/enums/composites/ranges, JSON array elements, arbitrary-precision editing and consumer parity |
+| PostgreSQL | Scalars, wide NUMERIC text, scalar and temporal arrays, temporal eras/offsets/infinities, interval fields across styles; array SQL literals, typed text bindings, JSON text and server wire equality; integer[] grid update through keyed text cast | Finite ranges beyond the shared calendar, domains/enums/composites/ranges, JSON array elements, automatic typing outside the safe built-in array list, arbitrary-precision editing and remaining consumer parity |
 | DuckDB | Scalars, bounded native temporals, date text fallbacks, enum labels; native DATE, microsecond TIME and TIMESTAMP parameters; explicit collection/interval refusal | Exact interval and collection decoders, extended timestamps, native nanosecond and TIMESTAMPTZ parameters (the bundled client binds only microsecond TIMESTAMP, so these stay exact text), nested unsigned wide integers, consumer parity |
 | MySQL | Shared scalar and exact decimal paths, unsigned BIGINT, signed and extended TIME, zero and partial-zero dates, YEAR, text and JSON SQL exports with and without NO_BACKSLASH_ESCAPES on MySQL and MariaDB, BIT(1..64) as integers (bytes above i64), ENUM/SET labels, spatial values as stored SRID-prefixed bytes; grid edits parse bounded BIT values and keep spatial/too-wide BIT bytes read-only; backslash-bearing column comments are refused explicitly | Session time zones and SQL modes beyond permissive dates and backslash escapes, session-aware DDL comments, end-to-end UI edit acceptance, consumer parity |
 | SQL Server | Shared scalar and Unicode SQL export paths, datetime SQL exports, datetimeoffset as exact text with its original offset and 100 ns fraction through results, parameters and SQL export | Native temporal precision beyond datetimeoffset, money and variant families |
-| ClickHouse | Shared scalar, decimal with declared scale, nonfinite and long-value contracts, `DateTime64` scales 0/3/6/9, named-zone instants decoded through IANA timezone rules, nanosecond temporal parameters and SQL exports, local refusal of out-of-range `DateTime64(9)` parameters and SQL literals | Ambiguous/nonexistent local times remain explicit undecodable values because the wire format omits their offset; broader temporal bounds, wider integers and nested values |
+| ClickHouse | Shared scalar, decimal with declared scale, nonfinite and long-value contracts, `DateTime64` scales 0/3/6/9, named-zone instants decoded through IANA timezone rules, nanosecond temporal parameters and SQL exports, local refusal of out-of-range `DateTime64(9)` parameters and SQL literals; a local raw-row regression proves Int128 min/max and UInt128 max stay exact text | Real-server wide-integer results and binding, export, edit and re-import parity; ambiguous/nonexistent local times remain explicit undecodable values because the wire format omits their offset; broader temporal bounds and nested values |
 | MongoDB | Decimal128 extremes remain exact text; BSON dates outside chrono's RFC3339 range, nested documents/arrays and uncommon top-level BSON kinds use canonical Extended JSON; generic binary remains bytes while other subtypes retain canonical metadata; large nested Int64, null, Unicode, nested document/array and top-level BSON Timestamp/regex/MinKey grid edits, canonical Extended JSON inserts, JSON/CSV/XLSX and MCP browse output preserve their contracts | Editing remaining top-level special BSON kinds and mixed-type columns |
 | Redis | Integer/text/NULL protocol contracts | Nested reply shapes and command-specific binary/number semantics; SQL date types are not applicable |
 | SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import | Installed grid/UI acceptance across storage-class transitions; fixed-decimal storage is not applicable |
+
+## Consumer coverage reconciliation, 2026-09-28
+
+| Type / consumer | Established behavior | Remaining status |
+| --- | --- | --- |
+| PostgreSQL supported arrays / decode, SQL INSERT, JSON | Exact PostgreSQL array text preserves NULL, literal `NULL`, dimensions, lower bounds and supported scalar/temporal elements; real-server wire equality is tested after SQL and typed-text re-import | Built-in `integer[]` grid write-back is verified. Unsupported element OIDs, including JSON, are explicitly undecodable; no JSON-array support is claimed. |
+| PostgreSQL array text / grid edit | Array values are `Value::Text`; current generic grid gate allows text cells and the shared update builder binds them as text | The real-server contract first reproduced SQLSTATE 42804 (`integer[]` target, TEXT expression). The shared keyed-update builder now casts allowlisted built-in array text types safely; the regression passed against PostgreSQL. |
+| MongoDB nested BSON / grid, JSON, CSV, XLSX, MCP | Recent integration cases cover nested and top-level edits plus canonical Extended JSON preservation across these consumers | Remaining special top-level edit kinds and mixed-type columns are open. |
+| SQLite NUMERIC affinity / edit and import | Bound edits and SQL-literal re-import preserve SQLite storage classes; policy-guarded CSV import covers affinity transitions | Installed grid acceptance remains open. |
+| ClickHouse Int128/UInt128 / result decode | A local regression parses unquoted signed minimum/maximum and unsigned maximum JSON integer tokens through `parse_line` and `response_row`; all remain exact `Value::Text`. Focused unit and mapped change-contract checks passed. | Real-server response behavior, binding, export, edit and re-import parity remain untested. |
+| XLSX / wide numeric, temporal, nested BSON | Wide integers and exact decimals use text cells; temporal values use native cells only when exact, otherwise text; nested BSON markers are retained | Floating-point edge coverage and lossy format limitations remain per the checkpoint entries below. |
 
 ## Test workflow
 

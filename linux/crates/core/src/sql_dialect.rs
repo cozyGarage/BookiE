@@ -298,11 +298,15 @@ pub fn build_keyed_update(
     let set_clauses: Vec<String> = edits
         .iter()
         .map(|(col_idx, new_value)| {
-            let clause = format!(
-                "{} = {}",
-                quote_ident(driver_id, &columns[*col_idx].name),
-                placeholder_for(driver_id, params.len())
-            );
+            let placeholder = placeholder_for(driver_id, params.len());
+            let value_sql = if driver_id == "postgres" && matches!(new_value, Value::Text(_)) {
+                postgres_array_cast_type(&columns[*col_idx].data_type)
+                    .map(|array_type| format!("{placeholder}::text::{array_type}"))
+                    .unwrap_or(placeholder)
+            } else {
+                placeholder
+            };
+            let clause = format!("{} = {}", quote_ident(driver_id, &columns[*col_idx].name), value_sql);
             params.push(new_value.clone());
             clause
         })
@@ -311,6 +315,47 @@ pub fn build_keyed_update(
     let qualified = qualified_table(driver_id, schema, table);
     let sql = build_update(driver_id, &qualified, &set_clauses.join(", "), &where_clause);
     Ok((sql, params))
+}
+
+fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> {
+    let lowered = data_type.trim().to_ascii_lowercase();
+    let element = lowered.strip_suffix("[]")?;
+    let element = if let Some((base, modifier)) = element.split_once('(') {
+        let modifier = modifier.strip_suffix(')')?;
+        if modifier.is_empty()
+            || !modifier
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || matches!(byte, b',' | b' '))
+        {
+            return None;
+        }
+        base.trim()
+    } else {
+        element
+    };
+    Some(match element {
+        "bool" | "boolean" => "pg_catalog.bool[]",
+        "bytea" => "pg_catalog.bytea[]",
+        "name" => "pg_catalog.name[]",
+        "int2" | "smallint" => "pg_catalog.int2[]",
+        "int4" | "integer" | "int" => "pg_catalog.int4[]",
+        "int8" | "bigint" => "pg_catalog.int8[]",
+        "oid" => "pg_catalog.oid[]",
+        "text" => "pg_catalog.text[]",
+        "float4" | "real" => "pg_catalog.float4[]",
+        "float8" | "double precision" => "pg_catalog.float8[]",
+        "varchar" | "character varying" => "pg_catalog.varchar[]",
+        "char" | "bpchar" | "character" => "pg_catalog.bpchar[]",
+        "numeric" | "decimal" => "pg_catalog.numeric[]",
+        "uuid" => "pg_catalog.uuid[]",
+        "date" => "pg_catalog.date[]",
+        "time" | "time without time zone" => "pg_catalog.time[]",
+        "timetz" | "time with time zone" => "pg_catalog.timetz[]",
+        "timestamp" | "timestamp without time zone" => "pg_catalog.timestamp[]",
+        "timestamptz" | "timestamp with time zone" => "pg_catalog.timestamptz[]",
+        "interval" => "pg_catalog.interval[]",
+        _ => return None,
+    })
 }
 
 pub fn build_keyed_delete(
@@ -831,6 +876,37 @@ mod tests {
                 Value::Text("a".into())
             ]
         );
+    }
+
+    #[test]
+    fn postgres_text_array_updates_cast_through_text_to_a_builtin_array_type() {
+        let mut columns = [col("id", true), col("value", false)];
+        columns[1].data_type = "integer[]".into();
+        let (sql, params) = build_keyed_update(
+            "postgres",
+            None,
+            "t",
+            &columns,
+            &[(1, Value::Text("{3,NULL,5}".into()))],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+
+        assert_eq!(
+            sql,
+            r#"UPDATE "t" SET "value" = $1::text::pg_catalog.int4[] WHERE "id" = $2"#
+        );
+        assert_eq!(params, vec![Value::Text("{3,NULL,5}".into()), Value::Int(1)]);
+    }
+
+    #[test]
+    fn postgres_array_update_casts_allowlist_type_metadata() {
+        assert_eq!(
+            postgres_array_cast_type("CHARACTER VARYING(40)[]"),
+            Some("pg_catalog.varchar[]")
+        );
+        assert_eq!(postgres_array_cast_type("integer[]; DROP TABLE t"), None);
+        assert_eq!(postgres_array_cast_type("custom_type[]"), None);
     }
 
     #[test]

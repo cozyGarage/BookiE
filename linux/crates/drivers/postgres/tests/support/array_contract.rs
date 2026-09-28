@@ -95,6 +95,42 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
     }
 }
 
+pub async fn assert_array_grid_edit(connection: &dyn Connection) {
+    connection
+        .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO array_grid_edit VALUES (1, ARRAY[1,2])")
+        .await
+        .unwrap();
+    let mut row = connection.query("SELECT * FROM array_grid_edit").await.unwrap();
+    row.columns[0].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "array_grid_edit",
+        &row.columns,
+        &[(1, Value::Text("{3,NULL,5}".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    let updated = connection
+        .query("SELECT value = ARRAY[3,NULL,5]::integer[] FROM array_grid_edit WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(updated.rows, vec![vec![Value::Bool(true)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_array_grid_edit_preserves_array_elements() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    assert_array_grid_edit(connection.as_ref()).await;
+}
+
 fn assert_array_value(kind: &str, result: &QueryResult) {
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Null | Value::Text(_)), "{kind}: {value:?}");

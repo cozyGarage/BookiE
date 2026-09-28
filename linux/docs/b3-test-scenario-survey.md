@@ -1,17 +1,22 @@
 # B3 external test-scenario survey
 
-Reviewed 2026-09-26 against BookiE `2eb9414c2`. This is a first-pass review
-of eight test files in four projects and two issue reports, not an exhaustive
-scan or execution of their suites. No external source code or fixtures were copied.
+External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
+The local B3 status was reconciled 2026-09-28 against `linux` at
+`66e8e6fe98d0e543a24851ad62985e657f05773a`, including commits from September 26–28.
+The upstream review sampled eight test files in four projects and two issue
+reports; this local update is a source/test inventory, not a fresh execution of
+every suite. No external source code or fixtures were copied.
 
 ## Focus to carry forward
 
 - Finish B3 lossless values and consumer contracts before B4–B6 acceptance.
 - Use upstream tests, issues and fix commits as bug hypotheses. Reproduce locally
   before changing production behavior; keep the reproducer as a permanent regression.
-- Current baseline includes eight-driver scalar contracts, exact XLSX integer/decimal
-  export, and PostgreSQL wide NUMERIC decoding. Arrays, temporal/nested values,
-  arbitrary-precision editing and remaining consumer paths stay open.
+- Current coverage includes eight-driver scalar contracts, PostgreSQL scalar and
+  temporal arrays, temporal eras/infinities/interval fields, MongoDB nested BSON
+  consumers and SQLite NUMERIC-affinity transitions. B3 remains open for uncovered
+  type/consumer combinations and installed grid acceptance; see the current status
+  table and [value-contract evidence](value-contracts.md).
 - Docker/local tests support B3. The GNOME VM supports later installed desktop
   acceptance and does not block this work.
 
@@ -59,12 +64,12 @@ Inventory status below comes from current local code/tests, not new executions.
 
 | Priority | Candidate | Existing evidence / gap | Next test and oracle |
 | --- | --- | --- | --- |
-| B3-1 | PostgreSQL arrays | Common scalar and temporal arrays preserve elements, nulls and dimensions/lower bounds through SQL re-import. | Unsupported element types, JSON array elements and automatic array editing; compare native wire bytes and exercise the remaining consumers. |
-| B3-2 | Temporal boundaries | End-of-day time, timetz offsets, BC/extended-year SQL literals, infinities and mixed interval fields have server-backed contracts. | Finite dates/timestamps beyond the shared chrono calendar, additional temporal arrays and cross-consumer precision/zone parity. Compare with a server oracle under fixed session settings. |
-| B3-3 | Nested JSON/BSON | MongoDB nested documents/arrays and uncommon top-level BSON kinds preserve special markers; Decimal128 extrema/date bounds and all binary subtype tags have exact regressions, with server checks for UUID/user-defined binaries, large nested Int64, explicit null, Unicode, JSON/CSV parse-back, XLSX export, nested document/array and Timestamp/regex/MinKey grid write-back, canonical Extended JSON re-import and MCP browse output. | Editing remaining top-level special BSON kinds or mixed-type columns. Keep SQL NULL distinct from JSON null. |
-| B3-4 | Export/import consumers | SQL binary, SQLite NUMERIC-affinity storage-class re-import and policy-guarded CSV affinity import, XLSX integers/decimals/temporal fallbacks, finite/nonfinite floats and CSV quoting have regressions; full format equivalence is unproven. | Installed grid acceptance, delimiter/quote/newline combinations, empty versus NULL, formula-like text, remaining float/subnormal behavior and cross-format temporal parity. Parse generated files and re-import into typed columns where supported. Document lossy format contracts. |
+| B3-1 | PostgreSQL arrays | Scalar and temporal arrays preserve elements, NULL, dimensions and lower bounds as exact text; SQL INSERT, typed text input, JSON output and server wire equality have real-server contracts. Unsupported element OIDs are refused. | A real-server grid edit reproduced SQLSTATE 42804 because the shared update builder bound array text as TEXT. A safe built-in type cast now makes the integer[] write-back pass with NULL preserved. JSON array elements and automatic parameter typing remain unsupported/unverified. |
+| B3-2 | Temporal boundaries | End-of-day time, timetz offsets, BC/extended-year SQL literals, infinities, mixed interval fields and temporal arrays have server-backed contracts. | Finite dates/timestamps outside the shared chrono range and full non-SQL consumer/edit parity. |
+| B3-3 | Nested JSON/BSON | MongoDB nested documents/arrays and uncommon top-level BSON kinds preserve special markers; Decimal128 extrema/date bounds and binary subtype tags have exact regressions, with server checks for UUID/user-defined binaries, large nested Int64, explicit null, Unicode, JSON/CSV/XLSX, grid edits, canonical Extended JSON re-import and MCP browse output. | Editing remaining top-level special BSON kinds and mixed-type columns. Keep SQL NULL distinct from JSON null. |
+| B3-4 | Export/import consumers | SQL binary, SQLite NUMERIC-affinity storage-class re-import and policy-guarded CSV import, XLSX integers/decimals/temporal fallbacks, nested BSON markers, finite/nonfinite floats, XML text and CSV quoting have regressions; full format equivalence is unproven. XLSX explicitly refuses empty text. | Installed grid acceptance, remaining floating-point edges and cross-format temporal parity. Parse generated files and re-import into typed columns where supported. Document lossy format contracts. |
 | B3-5 | Lexer/parser consumer agreement | sql_lex covers quoting, dollar bodies, nested comments and cursor boundaries. | Issue-shaped leading/trailing comments, CRLF, multibyte cursor offsets, malformed tails and dialect delimiters through planner, parameters, formatter and policy. Assert executable statement identity/order. |
-| B3/B4 | Result delivery and session state | Driver cancellation and session tests exist; a uniform delivery matrix is not established. | Zero-row metadata, duplicate column names, row-cap boundaries, multiple results, mid-stream failure/cancel and late results. Assert row order/count, completeness status and connection state. |
+| B3/B4 | Result delivery and session state | The shared value path rejects incomplete rows instead of inventing NULL cells; driver cancellation and session tests also exist. A uniform delivery matrix is not established. | Zero-row metadata, duplicate column names, row-cap boundaries, multiple results, mid-stream failure/cancel and late results. Assert row order/count, completeness status and connection state. |
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
@@ -99,13 +104,14 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   does not prove coverage across every engine.
 - Review DBeaver statement-parser fixtures and the remaining SQLFluff dialect
   corpus selectively for our six SQL engines.
-- B3-1 implementation follow-up: common scalar arrays now preserve elements,
-  dimensions and lower bounds through SQL export/re-import; see the
-  [array checkpoint](value-contracts.md#postgresql-array-checkpoint). Unsupported
-  element types, automatic array editing and remaining consumers stay open.
-- B3-2 follow-up: end-of-day time and timetz offsets now have a
-  [server round-trip contract](value-contracts.md#postgresql-time-checkpoint).
-  BC/large years, infinities, mixed intervals and temporal arrays remain open.
+- B3-1 implementation follow-up: scalar and temporal arrays now preserve
+  elements, dimensions and lower bounds through server wire, SQL and JSON checks;
+  built-in `integer[]` grid write-back passes with NULL preserved. Broader array
+  types and automatic parameter typing remain open. See the
+  [array checkpoint](value-contracts.md#postgresql-array-checkpoint).
+- B3-2 implementation follow-up: end-of-day time and timetz offsets have a
+  [server round-trip contract](value-contracts.md#postgresql-time-checkpoint);
+  temporal eras, infinities, mixed intervals and temporal arrays are also covered.
 - Keep mutation testing alongside each decoder change and ensure its selected
   test filter includes malformed-input units as well as server regressions.
 - B3-2 SQL export follow-up: BC dates and years above 9999 have a

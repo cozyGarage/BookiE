@@ -28,8 +28,10 @@ not prevent the other compiled suites from running.
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
-proof requirements and remaining driver targets. A passing scalar suite does not
-establish complete native-type support.
+proof requirements and remaining driver targets. This status was reconciled against
+`linux` at `66e8e6fe98d0e543a24851ad62985e657f05773a` on 2026-09-28; it is an
+inventory, not a fresh run of every suite. A passing scalar suite does not establish
+complete native-type support.
 
 | Path | Assertions |
 | --- | --- |
@@ -53,9 +55,15 @@ SQL harness compare bit patterns. Existing driver tests still cover binary
 exports, typed row identity, cancellation, metadata and other engine behavior.
 The new suite supplements those tests.
 
-This is a growing contract, not proof of every database type. PostgreSQL arbitrary-precision numeric editing, remaining array element types, extreme finite calendars and interval consumer parity, nested BSON values,
-spreadsheet floating-point/temporal precision and every transport/persistence adapter still need
-focused cases. Add a reproducer before changing a decoder or parser. Never make
+This is a growing contract, not proof of every database type. PostgreSQL
+arbitrary-precision numeric editing, JSON and other unsupported array element
+types, array grid write-back beyond the verified built-in `integer[]` case,
+finite calendars beyond the shared range, and interval consumer parity still need
+focused cases. ClickHouse Int128/UInt128
+now have a local exact-text parser contract at signed and unsigned boundaries;
+real-server and consumer parity remain untested. Installed SQLite grid acceptance, spreadsheet floating-point edges and
+remaining transport/persistence adapters also need focused cases. Add a reproducer
+before changing a decoder or parser. Never make
 a failing exact-value case pass by converting both sides to floats or by treating
 an unsupported result as NULL.
 
@@ -185,15 +193,54 @@ size/product overflow. Deterministic malformed-input and header-mutation cases
 exercise bounded decoding. Binary-to-text array decoding is capped at 16 MiB; exceeding the
 limit returns the existing visible undecodable marker rather than truncated data.
 
-Limits: enum/domain/composite/range, temporal and JSON/BSON array elements still
-need explicit contracts; arbitrary array editing and the full grid/MCP/import
-acceptance matrix remain open. Binding text in these tests uses an explicit
+Limits: enum/domain/composite/range and JSON/BSON array elements remain unsupported
+or untested; automatic array editing and the full grid/MCP/import acceptance matrix
+remain open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
 Test locations: `crates/drivers/postgres/src/array.rs` and
 `crates/drivers/postgres/tests/support/array_contract.rs`, invoked by the ignored
 `value_contract_arrays_preserve_elements_dimensions_and_exports` integration test.
 The shared value runner selects this test automatically.
+
+The 2026-09-28 P1 reconciliation added a Docker-backed acceptance test in
+`crates/drivers/postgres/tests/support/array_contract.rs`,
+`array_contract::value_contract_array_grid_edit_preserves_array_elements`, for an
+`integer[]` grid edit containing NULL. With Docker access, it reproduced SQLSTATE
+42804: the generated UPDATE assigned a TEXT parameter to an `integer[]` column.
+The shared keyed-update builder now casts text through `text` to a fixed,
+allowlisted PostgreSQL built-in array type. Database metadata is never interpolated
+into SQL. PostgreSQL verified the edited value with a typed array comparison;
+NULL remained an array NULL element.
+
+The focused core cast and hostile-metadata tests passed. The Docker-backed
+PostgreSQL regression passed after the fix:
+
+```sh
+cargo test --locked -p tablepro-core --lib postgres_array_update
+cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
+```
+
+Exact grid editing is verified for this built-in integer-array path. JSON and other
+unsupported element OIDs, custom/user-defined arrays and automatic array parameter
+typing remain outside the tested support surface. B3 remains open.
+
+## ClickHouse wide integer parser contract, 2026-09-28
+
+ClickHouse `Int128` and `UInt128` values cannot fit `Value::Int`. A local
+regression feeds the unquoted JSON integer tokens for signed minimum, signed
+maximum and unsigned maximum through the same `parse_line` and `response_row`
+functions used by the driver. All three remain exact `Value::Text`. This verifies
+the parser boundary with `serde_json`'s `arbitrary_precision` feature enabled; it
+does not establish real-server output, binding, export, editing or re-import.
+
+The focused unit command passed, and the mapped change-contract gate passed all
+four ClickHouse response regressions. Its report is
+`target/quality/20260928T113903658583Z-change-contracts/report.json`.
+
+```sh
+cargo test --locked -p tablepro-driver-clickhouse --lib clickhouse_json_row_preserves_wide_integer_tokens_exactly
+```
 
 Protocol references: [PostgreSQL arrays](https://www.postgresql.org/docs/16/arrays.html)
 and [array_send](https://github.com/postgres/postgres/blob/REL_16_STABLE/src/backend/utils/adt/arrayfuncs.c).

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
+
 ## [0.1.5] - 2026-09-27
 
 ### Added

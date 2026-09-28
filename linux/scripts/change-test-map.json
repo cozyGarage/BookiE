@@ -13,6 +13,14 @@
     }
   ],
   "exact_tests": {
+    "crates/core/src/sql_dialect.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "sql_dialect::tests::postgres_text_array_updates_cast_through_text_to_a_builtin_array_type",
+        "sql_dialect::tests::postgres_array_update_casts_allowlist_type_metadata"
+      ]
+    },
     "crates/app/src/ui/browse_tab/row_ops.rs": {
       "package": "tablepro-app",
       "target": "--lib",
@@ -29,7 +37,8 @@
       "tests": [
         "tests::clickhouse_response_rejects_column_type_count_mismatch",
         "tests::clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls",
-        "tests::clickhouse_response_preserves_explicit_null_cells"
+        "tests::clickhouse_response_preserves_explicit_null_cells",
+        "tests::clickhouse_json_row_preserves_wide_integer_tokens_exactly"
       ]
     }
   }
