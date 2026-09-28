@@ -206,7 +206,8 @@ async fn mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_m
         result
             .rows
             .iter()
-            .all(|row| { row[value_index] == Value::Text("12345678901234567890.1234567890123".into()) })
+            .all(|row| matches!(&row[value_index], Value::Json(_))),
+        "mixed BSON scalar values must retain canonical Extended JSON types"
     );
 
     let persisted = collection
@@ -223,6 +224,117 @@ async fn mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_m
     assert_eq!(
         persisted_text.get("value"),
         Some(&mongodb::bson::Bson::String(decimal.to_string()))
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mixed_string_decimal128_exports_preserve_bson_kind() {
+    use mongodb::bson::{Decimal128, doc};
+
+    let (_container, host, port) = start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("mixed_export_values");
+    let decimal_text = "12345678901234567890.1234567890123";
+    let decimal = decimal_text.parse::<Decimal128>().unwrap();
+    collection
+        .insert_many([
+            doc! { "_id": "text", "value": decimal_text },
+            doc! { "_id": "decimal", "value": decimal },
+        ])
+        .await
+        .expect("seed mixed BSON types");
+
+    let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
+    let result = connection
+        .query("db.mixed_export_values.find({})")
+        .await
+        .expect("read mixed BSON values");
+    assert_eq!(
+        result
+            .columns
+            .iter()
+            .find(|column| column.name == "value")
+            .unwrap()
+            .data_type,
+        "mixed"
+    );
+
+    let mut bytes = Vec::new();
+    tablepro_core::export::write_csv_header(&mut bytes, &result.columns).unwrap();
+    for row in &result.rows {
+        tablepro_core::export::write_csv_row(&mut bytes, row).unwrap();
+    }
+    let mut csv = csv::Reader::from_reader(bytes.as_slice());
+    let headers = csv.headers().unwrap().clone();
+    let id_index = headers.iter().position(|header| header == "_id").unwrap();
+    let value_index = headers.iter().position(|header| header == "value").unwrap();
+    let records = csv
+        .records()
+        .map(|record| {
+            let record = record.unwrap();
+            (record[id_index].to_string(), record[value_index].to_string())
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+
+    assert_eq!(
+        records.get("text").unwrap(),
+        &serde_json::to_string(decimal_text).unwrap()
+    );
+    assert_eq!(
+        records.get("decimal").unwrap(),
+        &format!(r#"{{"$numberDecimal":"{decimal_text}"}}"#),
+        "CSV must retain the BSON Decimal128 marker in a mixed-type column"
+    );
+
+    let json: serde_json::Value =
+        serde_json::from_str(&tablepro_core::export::render_json(&result.columns, &result.rows)).unwrap();
+    let json_rows = json.as_array().unwrap();
+    let value_for_id = |id: &str| {
+        json_rows
+            .iter()
+            .find(|row| row["_id"] == id)
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(value_for_id("text"), serde_json::json!(decimal_text));
+    assert_eq!(
+        value_for_id("decimal"),
+        serde_json::json!({"$numberDecimal": decimal_text})
+    );
+
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("mixed-bson.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let value_column = result.columns.iter().position(|column| column.name == "value").unwrap();
+    let workbook_values = (2..=3)
+        .map(|row| xlsx_shared_cell_text(&workbook_path, value_column, row).unwrap())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        workbook_values,
+        [
+            serde_json::to_string(decimal_text).unwrap(),
+            format!(r#"{{"$numberDecimal":"{decimal_text}"}}"#)
+        ]
+        .into_iter()
+        .collect()
     );
 }
 
@@ -394,7 +506,10 @@ async fn browse_page_types_include_documents_after_the_metadata_sample() {
     assert_eq!(page.rows.len(), 1);
     assert_eq!(page.rows[0][id_index], Value::Int(50));
     assert_eq!(page.columns[value_index].data_type, "mixed");
-    assert_eq!(page.rows[0][value_index], Value::Text(decimal_text.into()));
+    assert_eq!(
+        page.rows[0][value_index],
+        Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))
+    );
 
     let query_page = connection
         .query("db.late_mixed_values.find({}).skip(50).limit(1)")
@@ -406,7 +521,10 @@ async fn browse_page_types_include_documents_after_the_metadata_sample() {
         .position(|column| column.name == "value")
         .unwrap();
     assert_eq!(query_page.columns[query_value_index].data_type, "mixed");
-    assert_eq!(query_page.rows[0][query_value_index], Value::Text(decimal_text.into()));
+    assert_eq!(
+        query_page.rows[0][query_value_index],
+        Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))
+    );
 
     let persisted = collection
         .find_one(doc! { "_id": 50 })
@@ -447,6 +565,19 @@ async fn value_contract_preserves_numbers_and_text_through_json_commands() {
         let result = connection.query(&query).await.unwrap();
         let column = result.columns.iter().position(|column| column.name == "value").unwrap();
         assert_eq!(result.rows.len(), 1);
+        let expected = if result.columns[column].data_type == "mixed" {
+            let bson = match &expected {
+                Value::Null => mongodb::bson::Bson::Null,
+                Value::Bool(value) => mongodb::bson::Bson::Boolean(*value),
+                Value::Int(value) => mongodb::bson::Bson::Int64(*value),
+                Value::Float(value) => mongodb::bson::Bson::Double(*value),
+                Value::Text(value) => mongodb::bson::Bson::String(value.clone()),
+                value => panic!("unexpected value-contract case: {value:?}"),
+            };
+            Value::Json(bson.into_canonical_extjson())
+        } else {
+            expected
+        };
         assert_eq!(result.rows[0][column], expected);
     }
 }

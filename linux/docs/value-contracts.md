@@ -83,9 +83,11 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `a90b86041` on 2026-09-28; it is an
-inventory, not a fresh run of every suite. A passing scalar suite does not establish
-complete native-type support.
+`linux` commit `7b42666e00b4bf0fb35b5a0258d13aded0543de1` on 2026-09-28; it is an
+inventory, not a fresh run of every suite. The current worktree contains the mixed
+MongoDB BSON export fix, unignored BSON round-trip and seeded-float regressions,
+and their local evidence below; these changes are not part of that commit. A
+passing scalar suite does not establish complete native-type support.
 
 | Path | Assertions |
 | --- | --- |
@@ -163,8 +165,7 @@ The default CSV export and typed `DOUBLE PRECISION` import also preserve the
 smallest positive subnormal (`f64::from_bits(1)`) exactly. The importer result is
 compared by IEEE-754 bits; the focused regression passes with no production
 mismatch. The largest finite `f64` also survives the default CSV export and
-typed import with its exact bit pattern. Other finite float bit patterns and
-spreadsheet-application import remain open.
+typed import with its exact bit pattern.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_smallest_subnormal_bits
@@ -173,6 +174,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_con
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_round_trip_preserves_largest_finite_float_bits
 ```
+
+### Seeded finite float consumer parity
+
+A deterministic xorshift corpus combines adjacent representable values, values
+near the normal/subnormal boundary, and finite values spread across signs,
+mantissas and exponents. All 262 values round-trip through default CSV export,
+typed `DOUBLE PRECISION` import, and JSON export/parse with exact IEEE-754 bit
+comparisons. The fixed seed makes failures repeatable without adding a test
+dependency. The unignored core unit test passed; it samples finite values and
+does not claim to exhaust all `f64` bit patterns.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib value_contract_csv_and_json_round_trip_seeded_finite_float_bits
+```
+
+Spreadsheet-application import and other finite `f64` bit patterns remain open.
 
 A typed `TIMESTAMP WITH TIME ZONE` CSV contract starts with a timestamp at
 `+05:30` and nine fractional digits. Default export normalizes it to the exact
@@ -1470,19 +1487,32 @@ the native BSON client. App parser tests route MongoDB object, array and ObjectI
 columns through JSON parsing. MongoDB 7 integration tests verify canonical
 Extended JSON re-import and MCP browse output preserve nested BSON types.
 They also check nested Int64 above 2^53, explicit nested null and Unicode across
-driver results, JSON/CSV/XLSX output, import and MCP browse response.
+driver results, JSON/CSV/XLSX output, import and MCP browse response. An
+unignored codec unit regression converts canonical Extended JSON back to native
+BSON for Timestamp, regex, JavaScript, code-with-scope, Symbol, ObjectId,
+DbPointer, Undefined, MinKey and MaxKey; it complements the Docker-backed
+grid-write cases without requiring a server. The same non-ignored test checks
+mixed String/Decimal128 identity through the JSON renderer and CSV exporter. A
+second non-ignored unit case builds metadata from a String sample, merges a later
+Decimal128 page value, and checks that the merged column is `mixed` before that
+value is decoded with its canonical BSON marker.
 Top-level Timestamp, regex, MinKey, MaxKey, JavaScriptCode, JavaScriptCodeWithScope
 and Symbol grid edits also round-trip as native BSON. JavaScriptCode is checked
 separately without scope; the CodeWithScope regression checks both stored code
 and its Int64 scope value; the Symbol regression checks a stored native BSON
-Symbol through the native client. Other special types and mixed-type-column
-edits remain open.
+Symbol through the native client. The mixed String/Decimal128 grid case is
+covered as a read-only refusal; exact editing remains unsupported. Other
+top-level BSON kinds outside the named server-backed edits remain open, even
+where codec conversion now has a non-ignored round-trip unit test.
 
 Focused local checks:
 
 ```sh
 cargo test --locked -p tablepro-driver-mongodb --lib nested_bson_special_values_keep_their_extended_json_types
 cargo test --locked -p tablepro-driver-mongodb --lib bson_decimal_and_date_extremes_remain_exact_outside_core_ranges
+rtk cargo test --manifest-path linux/Cargo.toml --locked -p tablepro-driver-mongodb --lib uncommon_top_level_bson_kinds_keep_extended_json_type_markers
+rtk cargo test --manifest-path linux/Cargo.toml --locked -p tablepro-driver-mongodb --lib mixed_scalar_bson_column_keeps_canonical_type_markers
+rtk cargo test --manifest-path linux/Cargo.toml --locked -p tablepro-driver-mongodb --lib page_type_conflict_marks_column_mixed_before_decoding_late_values
 cargo test --locked -p tablepro-driver-mongodb --test integration -- nested_bson_special_values_keep_exact_extended_json_types --include-ignored --test-threads=1
 cargo test --locked -p tablepro-driver-mongodb --test integration a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson -- --include-ignored --exact --test-threads=1
 ```
@@ -1503,29 +1533,43 @@ Extended JSON is passed through without flattening; Mongo-backed MCP browse and
 native BSON re-import checks now run in the integration suite. Top-level
 Timestamp, regex, MinKey, MaxKey, JavaScriptCodeWithScope and Symbol grid edits
 are covered; Docker assertions check native CodeWithScope code/scope and Symbol
-types after edits. Local regressions use a BSON
+types after edits. The JavaScriptCode and Undefined cases also verify native
+BSON kinds after edits. Local regressions use a BSON
 String and Decimal128 with identical text: the field is labeled `mixed`, and
 the shared app grid editability gate refuses both values because the result
-model maps each scalar to the same `Value::Text`. The grid still displays the
-exact text. JSON, CSV and XLSX consume that same text value and do not retain
-the BSON-kind distinction. The Docker-backed real-server test passed and
-confirmed storage still contains BSON String and Decimal128 as distinct kinds.
+model previously mapped each scalar to the same `Value::Text`. The grid gate
+still refuses editing mixed values. The fix now makes `document_to_row` encode
+every value in a `mixed` BSON column as canonical Extended JSON: a BSON String
+becomes a JSON string and Decimal128 retains its `$numberDecimal` marker. The
+unignored codec unit test checks this distinction through JSON and CSV; the
+Docker-backed regression also verifies JSON, CSV and XLSX exports from a real
+query and confirms the native BSON values remain distinct in storage.
 Browse and `find` metadata starts from a 50-document sample, then incorporates
 the bounded documents actually returned on the page. A Docker regression puts
 Decimal128 at offset 50 after 50 String values and verifies the returned page's
-column is `mixed` while both BSON values still display as the same exact text.
-The shared grid gate keeps that mixed column read-only. Heterogeneity outside
-both the sample and the returned page remains undetected, as do remaining
-special BSON kinds and mixed-type export fidelity. The earlier MongoDB 7
-query/export/import and MCP browse Docker tests passed with large Int64, null
-and Unicode values added on 2026-09-28.
+column is `mixed`; the returned Decimal128 cell carries canonical Extended JSON
+while the shared grid gate keeps the column read-only. Heterogeneity outside
+both the sample and returned page remains undetected. A separate Docker test
+checks that identical BSON String/Decimal128 text remains type-distinct through
+the JSON renderer, CSV writer and XLSX workbook:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration mixed_string_decimal128_exports_preserve_bson_kind -- --include-ignored --exact --test-threads=1
+```
+
+The contract first failed against the old decoder because CSV flattened both
+values to the same text. After the fix, the focused test passed. The full MongoDB
+unit suite passed (31 tests), and the Docker-backed integration suite passed (17
+tests) on the current worktree. These are local results, not CI evidence. The
+earlier MongoDB 7 query/export/import and MCP browse Docker tests passed with
+large Int64, null and Unicode values added on 2026-09-28.
 
 A separate homogeneous Decimal128 contract composes the default CSV exporter,
 typed CSV parser, and keyed grid update. The decimal column metadata parses the
 CSV cell as `Value::Decimal`; after the update, a native BSON read confirms the
 field remains `Bson::Decimal128` with the exact original value. This covers a
-typed same-schema round trip and does not preserve BSON identity in generic
-exports or mixed String/Decimal128 columns.
+typed same-schema round trip. The new mixed-column contract independently checks
+Extended JSON identity through JSON, CSV and XLSX.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson -- --include-ignored --exact --test-threads=1

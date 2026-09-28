@@ -413,6 +413,57 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_and_json_round_trip_seeded_finite_float_bits() {
+        let mut value_column = column("value");
+        value_column.data_type = "DOUBLE PRECISION".into();
+        let columns = [value_column];
+
+        // Fixed xorshift seed makes this a reproducible spread across signs,
+        // mantissas and finite exponents without an extra property-test dependency.
+        let mut state = 0x6a09_e667_f3bc_c909_u64;
+        let mut expected = vec![
+            f64::from_bits(0x3fef_ffff_ffff_ffff),
+            f64::from_bits(0x3ff0_0000_0000_0001),
+            f64::from_bits(0x0000_0000_0000_0002),
+            f64::from_bits(0x0010_0000_0000_0001),
+            f64::from_bits(0x7fef_ffff_ffff_fffe),
+            f64::from_bits(0xffef_ffff_ffff_fffe),
+        ];
+        for _ in 0..256 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let exponent = ((state >> 52) % 0x7fe) + 1;
+            let bits = (state & !(0x7ff_u64 << 52)) | (exponent << 52);
+            expected.push(f64::from_bits(bits));
+        }
+        let rows = expected
+            .iter()
+            .map(|value| vec![Value::Float(*value)])
+            .collect::<Vec<_>>();
+
+        let csv = render_csv(&columns, &rows, &CsvOptions::default());
+        let options = crate::import::CsvImportOptions::default();
+        let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let imported = sheet
+            .rows
+            .iter()
+            .map(|row| crate::import::row_to_values(row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
+            .collect::<Vec<_>>();
+        for (expected, actual) in expected.iter().zip(imported) {
+            let Value::Float(actual) = actual else {
+                panic!("CSV changed a finite float's value type: {actual:?}");
+            };
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
+
+        let json: serde_json::Value = serde_json::from_str(&crate::export::render_json(&columns, &rows)).unwrap();
+        for (expected, row) in expected.iter().zip(json.as_array().unwrap()) {
+            assert_eq!(row["value"].as_f64().unwrap().to_bits(), expected.to_bits());
+        }
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_preserves_timestamptz_nanoseconds() {
         let mut value_column = column("value");
         value_column.data_type = "TIMESTAMP WITH TIME ZONE".into();

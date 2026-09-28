@@ -106,6 +106,7 @@ pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Val
     columns
         .iter()
         .map(|c| match doc.get(&c.name) {
+            Some(b) if c.data_type == "mixed" => Value::Json(b.clone().into_canonical_extjson()),
             Some(b) => bson_to_value(b),
             None => Value::Null,
         })
@@ -251,7 +252,7 @@ mod tests {
     use mongodb::bson::doc;
 
     #[test]
-    fn mixed_scalar_bson_column_is_marked_and_values_remain_visible() {
+    fn mixed_scalar_bson_column_keeps_canonical_type_markers() {
         let decimal = "12345678901234567890.1234567890123"
             .parse::<mongodb::bson::Decimal128>()
             .unwrap();
@@ -261,14 +262,59 @@ mod tests {
         ];
         let columns = columns_from_docs(&docs);
         assert_eq!(columns[0].data_type, "mixed");
+        let rows = docs
+            .iter()
+            .map(|doc| document_to_row(doc, &columns))
+            .collect::<Vec<_>>();
         assert_eq!(
-            docs.iter()
-                .map(|doc| document_to_row(doc, &columns)[0].clone())
-                .collect::<Vec<_>>(),
+            rows.iter().map(|row| row[0].clone()).collect::<Vec<_>>(),
             vec![
-                Value::Text("12345678901234567890.1234567890123".into()),
-                Value::Text("12345678901234567890.1234567890123".into()),
+                Value::Json(serde_json::json!("12345678901234567890.1234567890123")),
+                Value::Json(serde_json::json!({"$numberDecimal": "12345678901234567890.1234567890123"})),
             ]
+        );
+
+        let json: serde_json::Value =
+            serde_json::from_str(&tablepro_core::export::render_json(&columns, &rows)).unwrap();
+        let json_rows = json.as_array().unwrap();
+        assert_eq!(json_rows[0]["value"], "12345678901234567890.1234567890123");
+        assert_eq!(
+            json_rows[1]["value"],
+            serde_json::json!({"$numberDecimal": "12345678901234567890.1234567890123"})
+        );
+
+        let csv_text =
+            tablepro_core::export::render_csv(&columns, &rows, &tablepro_core::export::CsvOptions::default());
+        let mut csv = csv::Reader::from_reader(csv_text.as_bytes());
+        let csv_values = csv
+            .records()
+            .map(|record| record.unwrap()[0].to_string())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(
+            csv_values,
+            [
+                serde_json::to_string("12345678901234567890.1234567890123").unwrap(),
+                r#"{"$numberDecimal":"12345678901234567890.1234567890123"}"#.into(),
+            ]
+            .into_iter()
+            .collect()
+        );
+    }
+
+    #[test]
+    fn page_type_conflict_marks_column_mixed_before_decoding_late_values() {
+        let decimal_text = "12345678901234567890.1234567890123";
+        let sample = doc! { "value": decimal_text };
+        let page = doc! { "value": decimal_text.parse::<mongodb::bson::Decimal128>().unwrap() };
+        let mut columns = columns_from_docs(std::slice::from_ref(&sample));
+        assert_eq!(columns[0].data_type, "string");
+
+        merge_page_types(&mut columns, std::slice::from_ref(&page));
+
+        assert_eq!(columns[0].data_type, "mixed");
+        assert_eq!(
+            document_to_row(&page, &columns),
+            vec![Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))]
         );
     }
 
@@ -405,6 +451,14 @@ mod tests {
     fn uncommon_top_level_bson_kinds_keep_extended_json_type_markers() {
         use mongodb::bson::{JavaScriptCodeWithScope, Regex, Timestamp, oid::ObjectId};
 
+        let db_pointer = Bson::try_from(serde_json::json!({
+            "$dbPointer": {
+                "$ref": "legacy.collection",
+                "$id": {"$oid": "0123456789abcdef01234567"}
+            }
+        }))
+        .unwrap();
+
         let uncommon = [
             (Bson::Timestamp(Timestamp { time: 42, increment: 7 }), "$timestamp"),
             (
@@ -424,6 +478,7 @@ mod tests {
             ),
             (Bson::Symbol("legacy-symbol".into()), "$symbol"),
             (Bson::ObjectId(ObjectId::new()), "$oid"),
+            (db_pointer, "$dbPointer"),
             (Bson::Undefined, "$undefined"),
             (Bson::MinKey, "$minKey"),
             (Bson::MaxKey, "$maxKey"),
@@ -435,7 +490,12 @@ mod tests {
                 panic!("{bson:?} must retain its BSON kind");
             };
             assert!(json.to_string().contains(marker), "{bson:?}: {json}");
-            assert_eq!(json, bson.into_canonical_extjson(), "{marker}");
+            assert_eq!(json, bson.clone().into_canonical_extjson(), "{marker}");
+            assert_eq!(
+                value_to_bson(&Value::Json(json)).unwrap(),
+                bson,
+                "{marker} must restore the native BSON value for grid writes"
+            );
         }
     }
 
