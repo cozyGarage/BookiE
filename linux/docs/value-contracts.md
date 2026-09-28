@@ -438,6 +438,18 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib postgres_n
 
 The test passed against the PostgreSQL 16 Docker fixture.
 
+A separate PostgreSQL 16 contract covers a custom domain over `numeric`. The
+40-digit integer/20-digit fraction remains exact in the domain result and the
+server's `numeric::text` oracle; SQL-literal re-import and an explicitly typed
+text binding also return the same value. This establishes the numeric-domain
+cell, not broad domain, enum, composite or range support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_across_consumers -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL Docker test passed.
+
 ### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
 
 The shared keyed-update builder's final focused mutation report selected 16

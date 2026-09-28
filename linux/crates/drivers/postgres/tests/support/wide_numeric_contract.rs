@@ -35,6 +35,47 @@ pub async fn assert_grid_edit(connection: &dyn Connection) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_numeric_domain_preserves_wide_value_across_consumers() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    const VALUE: &str = "1234567890123456789012345678901234567890.12345678901234567890";
+    connection
+        .execute("CREATE DOMAIN value_contract_numeric_domain AS numeric")
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(&format!(
+            "SELECT '{VALUE}'::value_contract_numeric_domain AS domain_value, \
+             ('{VALUE}'::value_contract_numeric_domain)::numeric::text AS numeric_text"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![Value::Text(VALUE.into()), Value::Text(VALUE.into())]]
+    );
+
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]).unwrap();
+    let literal_result = connection
+        .query(&format!(
+            "SELECT {literal}::value_contract_numeric_domain::numeric::text"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text(VALUE.into())]]);
+    let bound_result = connection
+        .query_params(
+            "SELECT $1::value_contract_numeric_domain::numeric::text",
+            &[Value::Text(VALUE.into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text(VALUE.into())]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_wide_numeric_grid_edit_preserves_exact_value() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
