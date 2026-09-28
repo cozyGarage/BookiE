@@ -495,6 +495,18 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The focused PostgreSQL Docker test passed.
 
+A second domain contract uses PostgreSQL's `uuid` base type. The direct domain
+result remains `Value::Uuid`; an independent `uuid::text` value and
+`pg_typeof` name confirm the native value/type. SQL-literal re-import and a
+typed UUID parameter also produce the exact text. This closes one non-numeric
+domain consumer case only.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_uuid_domain_preserves_uuid_across_consumers -- --include-ignored --exact --test-threads=1
+```
+
+The PostgreSQL 16 Docker contract passed.
+
 ### PostgreSQL scalar enum label text projection
 
 A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For

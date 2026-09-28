@@ -144,6 +144,49 @@ async fn value_contract_citext_preserves_label_and_case_insensitive_comparison()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_uuid_domain_preserves_uuid_across_consumers() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE DOMAIN value_contract_uuid_domain AS uuid")
+        .await
+        .unwrap();
+    let expected = Uuid::from_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    let expected_text = expected.to_string();
+
+    let result = connection
+        .query(&format!(
+            "SELECT value, value::uuid::text AS uuid_text, pg_typeof(value)::text AS domain_type \
+             FROM (SELECT '{expected_text}'::value_contract_uuid_domain AS value) source"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Uuid(expected),
+            Value::Text(expected_text.clone()),
+            Value::Text("value_contract_uuid_domain".into()),
+        ]]
+    );
+
+    let value = Value::Uuid(expected);
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+    let literal_result = connection
+        .query(&format!("SELECT {literal}::value_contract_uuid_domain::uuid::text"))
+        .await
+        .unwrap();
+    assert_eq!(literal_result.rows, vec![vec![Value::Text(expected_text.clone())]]);
+
+    let bound_result = connection
+        .query_params("SELECT $1::value_contract_uuid_domain::uuid::text", &[value])
+        .await
+        .unwrap();
+    assert_eq!(bound_result.rows, vec![vec![Value::Text(expected_text)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_dates_preserve_eras_large_years_and_instants() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
