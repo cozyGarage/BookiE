@@ -261,6 +261,13 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_workbook_float_negative_zero_keeps_its_signed_numeric_token() {
+        let (sheet, _) = workbook_parts(&[Value::Float(-0.0)]);
+
+        assert!(sheet.contains("<c r=\"A2\"><v>-0</v></c>"), "{sheet}");
+    }
+
+    #[test]
     fn value_contract_workbook_preserves_nested_extended_json_as_exact_text() {
         let value = Value::Json(serde_json::json!({
             "decimal": {"$numberDecimal": "9.999999999999999999999999999999999E+6144"},

@@ -222,7 +222,21 @@ exact shared strings, not just successful file creation. The shared value runner
 picks up both workbook regressions automatically.
 
 Excel documents its [15-digit precision limit](https://support.microsoft.com/en-us/excel/format-numbers-as-text).
-Floating-point, temporal and nested-value spreadsheet contracts remain open.
+Spreadsheet import and spreadsheet-application re-import contracts remain open.
+
+### XLSX negative-zero cell token, 2026-09-28
+
+The XLSX writer stores finite floats as numeric cells. A focused workbook
+regression checks the generated worksheet XML directly and confirms that
+negative zero is serialized as the numeric token `-0`, not positive `0` or a
+string. BookiE has no XLSX import path, so this establishes the exported file
+representation only, not later spreadsheet-application round-trip behavior.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_workbook_float_negative_zero_keeps_its_signed_numeric_token
+```
+
+The test passed. No production mismatch was found.
 
 ### XLSX nested Extended JSON consumer check, 2026-09-27
 
