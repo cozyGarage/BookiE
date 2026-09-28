@@ -141,6 +141,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 The Docker-backed test passed; no production mismatch was found.
 
+## SQL Server money float-decoding refusal
+
+A Docker regression first reproduced SQL Server `money` as
+`Float(123456789012345.67)` even though an independent server-side decimal text
+cast returned `123456789012345.6789`. `smallmoney` also travels through the
+TDS client's floating-point representation. Both native money types now return
+an `Undecodable("money")` marker for non-NULL values, while NULL remains NULL;
+the result's separate decimal text oracles preserve the server's exact values.
+This is a safe refusal, not exact `money` editing or binding support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --lib money_columns_refuse_float_decoding_but_preserve_null
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration money_types_refuse_values_decoded_through_binary_float -- --include-ignored --exact --test-threads=1
+```
+
+Both focused tests passed; the integration reproducer fails before the refusal fix.
+
 ## MySQL DELIMITER consumer agreement, 2026-09-28
 
 An app regression uses `DELIMITER $$` around a stored procedure, resets the

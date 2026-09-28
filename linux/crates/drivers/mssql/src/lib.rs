@@ -554,7 +554,15 @@ async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> 
             }
             QueryItem::Row(_) if result_sets > 1 => {}
             QueryItem::Row(_) if rows.len() >= limit => truncated = true,
-            QueryItem::Row(row) => rows.push(row.into_iter().map(|cd| column_data_to_value(&cd)).collect()),
+            QueryItem::Row(row) => {
+                let types: Vec<ColumnType> = row.columns().iter().map(Column::column_type).collect();
+                rows.push(
+                    row.into_iter()
+                        .zip(types)
+                        .map(|(data, column_type)| column_data_to_value_for_type(&data, column_type))
+                        .collect(),
+                );
+            }
         }
     }
     Ok(QueryResult {
@@ -676,6 +684,18 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
     }
 }
 
+fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_type: ColumnType) -> Value {
+    let value = column_data_to_value(cd);
+    if value == Value::Null {
+        return value;
+    }
+    match column_type {
+        ColumnType::Money => Value::Undecodable("money".into()),
+        ColumnType::Money4 => Value::Undecodable("smallmoney".into()),
+        _ => value,
+    }
+}
+
 fn numeric_text(value: i128, scale: usize) -> String {
     let sign = if value < 0 { "-" } else { "" };
     let digits = format!("{:0>width$}", value.unsigned_abs(), width = scale + 1);
@@ -718,7 +738,8 @@ fn column_type_to_string(ct: ColumnType) -> String {
         ColumnType::Float4 => "real",
         ColumnType::Float8 | ColumnType::Floatn => "float",
         ColumnType::Decimaln | ColumnType::Numericn => "decimal",
-        ColumnType::Money | ColumnType::Money4 => "money",
+        ColumnType::Money => "money",
+        ColumnType::Money4 => "smallmoney",
         ColumnType::Datetime | ColumnType::Datetime4 | ColumnType::Datetimen => "datetime",
         ColumnType::Datetime2 => "datetime2",
         ColumnType::DatetimeOffsetn => "datetimeoffset",
@@ -1187,7 +1208,28 @@ mod tests {
         assert_eq!(column_type_to_string(ColumnType::Int4), "int");
         assert_eq!(column_type_to_string(ColumnType::NVarchar), "nvarchar");
         assert_eq!(column_type_to_string(ColumnType::Datetime2), "datetime2");
+        assert_eq!(column_type_to_string(ColumnType::Money4), "smallmoney");
         assert_eq!(column_type_to_string(ColumnType::Guid), "uniqueidentifier");
         assert_eq!(column_type_to_string(ColumnType::Bit), "bit");
+    }
+
+    #[test]
+    fn money_columns_refuse_float_decoding_but_preserve_null() {
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::F64(Some(123.45)), ColumnType::Money),
+            Value::Undecodable("money".into())
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::F64(None), ColumnType::Money),
+            Value::Null
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::F32(Some(-12.34)), ColumnType::Money4),
+            Value::Undecodable("smallmoney".into())
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::F32(None), ColumnType::Money4),
+            Value::Null
+        );
     }
 }
