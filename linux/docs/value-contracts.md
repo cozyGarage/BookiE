@@ -450,6 +450,25 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The focused PostgreSQL Docker test passed.
 
+### PostgreSQL scalar enum label text projection
+
+A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For
+each label, PostgreSQL's `pg_typeof` confirms the source expression remains the
+custom enum while `enum::text` returns the exact label; SQL-literal re-import
+and an explicitly typed text parameter also preserve it. SQL NULL is checked
+separately from the literal label `NULL`. Directly returning the enum-typed
+column currently fails during SQLx type metadata resolution (`enum_labels`:
+unexpected NULL), so direct enum result decoding remains open; this contract
+does not claim it is supported.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
+```
+
+The text-projection and consumer round-trip contract passed against PostgreSQL
+16. The direct enum projection attempt failed before assertions in SQLx metadata
+resolution and is recorded as an open boundary, not a passing result contract.
+
 ### PostgreSQL keyed-update cast and parser mutation checkpoint, 2026-09-28
 
 The shared keyed-update builder's final focused mutation report selected 16
