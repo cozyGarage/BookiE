@@ -98,24 +98,27 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn wide_integer_grid_edit_preserves_exact_value_and_row_identity() {
+async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
     conn.execute(
         "CREATE TABLE wide_grid_edits (
             id UInt64,
-            amount Int128
+            signed_amount Int128,
+            unsigned_amount UInt128
         ) ENGINE = MergeTree ORDER BY id",
     )
     .await
     .unwrap();
     conn.execute_params(
-        "INSERT INTO wide_grid_edits VALUES (?, ?), (?, ?)",
+        "INSERT INTO wide_grid_edits VALUES (?, ?, ?), (?, ?, ?)",
         &[
             Value::Int(1),
             Value::Text("-170141183460469231731687303715884105728".into()),
+            Value::Text("340282366920938463463374607431768211455".into()),
             Value::Int(2),
             Value::Text("170141183460469231731687303715884105727".into()),
+            Value::Text("0".into()),
         ],
     )
     .await
@@ -123,28 +126,41 @@ async fn wide_integer_grid_edit_preserves_exact_value_and_row_identity() {
 
     let columns = conn.fetch_columns(None, "wide_grid_edits").await.unwrap();
     let result = conn
-        .query("SELECT id, amount FROM wide_grid_edits ORDER BY id")
+        .query("SELECT id, signed_amount, unsigned_amount FROM wide_grid_edits ORDER BY id")
         .await
         .unwrap();
     let id_index = columns.iter().position(|column| column.name == "id").unwrap();
-    let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
+    let signed_index = columns
+        .iter()
+        .position(|column| column.name == "signed_amount")
+        .unwrap();
+    let unsigned_index = columns
+        .iter()
+        .position(|column| column.name == "unsigned_amount")
+        .unwrap();
     assert!(columns[id_index].primary_key);
     let update = tablepro_core::sql_dialect::build_keyed_update(
         "clickhouse",
         None,
         "wide_grid_edits",
         &columns,
-        &[(
-            amount_index,
-            Value::Text("-170141183460469231731687303715884105727".into()),
-        )],
+        &[
+            (
+                signed_index,
+                Value::Text("-170141183460469231731687303715884105727".into()),
+            ),
+            (
+                unsigned_index,
+                Value::Text("340282366920938463463374607431768211454".into()),
+            ),
+        ],
         &[result.rows[0][id_index].clone()],
     )
     .unwrap();
     conn.execute_in_transaction(&[update]).await.unwrap();
 
     let after = conn
-        .query("SELECT id, amount FROM wide_grid_edits ORDER BY id")
+        .query("SELECT id, signed_amount, unsigned_amount FROM wide_grid_edits ORDER BY id")
         .await
         .unwrap();
     assert_eq!(
@@ -153,10 +169,12 @@ async fn wide_integer_grid_edit_preserves_exact_value_and_row_identity() {
             vec![
                 Value::Int(1),
                 Value::Text("-170141183460469231731687303715884105727".into()),
+                Value::Text("340282366920938463463374607431768211454".into()),
             ],
             vec![
                 Value::Int(2),
                 Value::Text("170141183460469231731687303715884105727".into()),
+                Value::Text("0".into()),
             ],
         ]
     );
