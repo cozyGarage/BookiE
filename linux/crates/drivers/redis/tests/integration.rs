@@ -25,6 +25,75 @@ async fn start_redis_resp3() -> (ContainerAsync<GenericImage>, String, u16) {
     (container, host, port)
 }
 
+#[tokio::test]
+async fn value_contract_resp3_attribute_wire_frame_survives_the_request_response_connection() {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind RESP3 fixture");
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                let (read, mut write) = stream.into_split();
+                let mut read = BufReader::new(read);
+                loop {
+                    let mut line = String::new();
+                    if read.read_line(&mut line).await.expect("read request length") == 0 {
+                        return;
+                    }
+                    let count: usize = line.trim().strip_prefix('*').unwrap().parse().unwrap();
+                    let mut args = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        line.clear();
+                        read.read_line(&mut line).await.expect("read bulk length");
+                        let len: usize = line.trim().strip_prefix('$').unwrap().parse().unwrap();
+                        let mut bytes = vec![0; len];
+                        read.read_exact(&mut bytes).await.expect("read bulk argument");
+                        let mut crlf = [0; 2];
+                        read.read_exact(&mut crlf).await.expect("read bulk terminator");
+                        args.push(String::from_utf8(bytes).expect("command is UTF-8"));
+                    }
+
+                    let response = match args.first().map(String::as_str) {
+                        Some("HELLO") => concat!(
+                            "%7\r\n+server\r\n+redis\r\n+version\r\n+7.4.0\r\n+proto\r\n:3\r\n",
+                            "+id\r\n:1\r\n+mode\r\n+standalone\r\n+role\r\n+master\r\n+modules\r\n*0\r\n"
+                        ),
+                        Some("PING") => "|1\r\n+ttl\r\n:3600\r\n+PONG\r\n",
+                        _ => "-ERR unexpected fixture command\r\n",
+                    };
+                    write.write_all(response.as_bytes()).await.expect("write RESP3 reply");
+                    write.flush().await.expect("flush RESP3 reply");
+                }
+            });
+        }
+    });
+
+    let connection = RedisDriver
+        .connect(opts("127.0.0.1", port, "0"))
+        .await
+        .expect("connect to RESP3 protocol fixture");
+    connection.query("HELLO 3").await.expect("enable RESP3");
+    let result = connection.query("PING").await.expect("read attributed reply");
+    assert_eq!(
+        result.rows,
+        vec![vec![Value::Json(serde_json::json!({
+            "$redisAttribute": {
+                "data": "PONG",
+                "attributes": [["ttl", 3600]]
+            }
+        }))]],
+        "RESP3 attribute framing must survive the actual socket decoder"
+    );
+
+    drop(connection);
+    server.abort();
+}
+
 fn opts(host: &str, port: u16, database: &str) -> ConnectOptions {
     ConnectOptions {
         host: host.to_string(),

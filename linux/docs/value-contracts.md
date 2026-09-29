@@ -148,9 +148,10 @@ rtk cargo test --locked -p tablepro-driver-redis --lib redis_nested_replies_keep
 rtk cargo test --locked -p tablepro-driver-redis --test integration value_contract_resp3_hash_map_preserves_binary_fields_and_values -- --include-ignored --exact --test-threads=1
 ```
 
-RESP3 push, attribute and stream reply semantics still need live-server
-subscription acceptance; the stream map/array response has real Redis coverage,
-while attribute and push markers currently have unit conversion tests only.
+The XREAD stream map/array response has real Redis 7.4 coverage. Attribute
+wire framing is checked through a local RESP3 TCP fixture in addition to unit
+conversion tests. Asynchronous push delivery is covered by explicit refusal for
+streaming commands; other server push-frame delivery remains open.
 
 ### Redis Pub/Sub and MONITOR stream refusal, 2026-09-29
 
@@ -188,6 +189,19 @@ test and ledger edits were present in the working tree during the run).
 
 ```sh
 rtk cargo test -p tablepro-driver-redis --test integration value_contract_redis_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
+```
+
+### Redis RESP3 attribute wire framing
+
+An unignored local TCP fixture switches the real redis client connection to
+RESP3 with `HELLO 3`, then sends a wire-level attribute frame attached to
+`PONG`. The driver returns the payload and TTL metadata in its tagged JSON
+representation, verifying framing through the socket decoder and query
+conversion. This is protocol-client evidence; the separate Docker fixture
+continues to verify responses from Redis 7.4 itself.
+
+```sh
+rtk cargo test -p tablepro-driver-redis --test integration value_contract_resp3_attribute_wire_frame_survives_the_request_response_connection -- --exact --test-threads=1
 ```
 
 ## CSV negative-zero export/import, 2026-09-28

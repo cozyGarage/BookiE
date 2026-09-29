@@ -1141,6 +1141,12 @@ The clean combined runner passed after the tracking-push addition at
 suites, with no missing suites. Evidence:
 `target/quality/20260929T191639404194Z-values/report.json` (`dirty: false`).
 
+An unignored local TCP test now exercises the full RESP3 attribute frame through
+the redis client socket after `HELLO 3`. The payload and attached TTL metadata
+must survive as tagged JSON; the strict runner includes it under the
+`value_contract` filter. This verifies wire decoding without claiming delivery
+of asynchronous server pushes.
+
 B3 remains open.
 
 ### B3 MySQL BIT parser and keyed grid path — September 29
