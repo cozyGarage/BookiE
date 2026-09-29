@@ -1089,16 +1089,27 @@ fn is_certificate_failure(err: &std::io::Error) -> bool {
 fn map_sqlx_error(err: sqlx::Error) -> DriverError {
     use sqlx::Error::*;
     match err {
-        Database(e) => DriverError::Query {
-            message: e.message().to_string(),
-            sqlstate: e.code().map(|c| c.to_string()),
-        },
+        Database(e) => {
+            let sqlstate = e.code().map(|c| c.to_string());
+            if is_server_disconnect_sqlstate(sqlstate.as_deref()) {
+                DriverError::Disconnected
+            } else {
+                DriverError::Query {
+                    message: e.message().to_string(),
+                    sqlstate,
+                }
+            }
+        }
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Io(e) if is_certificate_failure(&e) => DriverError::Tls(e.to_string()),
         Tls(e) => DriverError::Tls(e.to_string()),
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }
+}
+
+fn is_server_disconnect_sqlstate(sqlstate: Option<&str>) -> bool {
+    matches!(sqlstate, Some("57P01" | "57P02" | "57P03" | "57P04"))
 }
 
 #[cfg(test)]
@@ -1113,6 +1124,16 @@ mod tests {
             bind_pg_params(sqlx::query(sqlx::AssertSqlSafe("SELECT $1")), &params),
             Err(DriverError::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn server_termination_states_are_disconnections_but_query_cancel_is_not() {
+        for sqlstate in ["57P01", "57P02", "57P03", "57P04"] {
+            assert!(is_server_disconnect_sqlstate(Some(sqlstate)), "{sqlstate}");
+        }
+        assert!(!is_server_disconnect_sqlstate(Some("57014")));
+        assert!(!is_server_disconnect_sqlstate(Some("23505")));
+        assert!(!is_server_disconnect_sqlstate(None));
     }
 
     #[derive(Clone, Default)]

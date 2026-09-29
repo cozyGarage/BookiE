@@ -389,6 +389,59 @@ async fn wait_for_tagged_query(connection: &dyn Connection, tag: &str, active: b
     panic!("query tag {tag} did not reach active={active}");
 }
 
+async fn tagged_query_pid(connection: &dyn Connection, tag: &str) -> Option<i64> {
+    let sql = format!(
+        "SELECT pid::bigint FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
+    );
+    let result = connection.query(&sql).await.expect("inspect active query pid");
+    result.rows.first().and_then(|row| match row.first() {
+        Some(Value::Int(pid)) => Some(*pid),
+        _ => None,
+    })
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
+    let (_container, opts) = start_pg().await;
+    let connection: std::sync::Arc<dyn Connection> = PgDriver.connect(opts.clone()).await.expect("connect").into();
+    let observer = connect(opts).await;
+    let tag = "bookie_backend_termination";
+    let running = connection.clone();
+    let task = tokio::spawn(async move { running.query(&format!("SELECT pg_sleep(30) /* {tag} */")).await });
+
+    let mut pid = None;
+    for _ in 0..100 {
+        pid = tagged_query_pid(observer.as_ref(), tag).await;
+        if pid.is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    let pid = pid.expect("tagged query must reach PostgreSQL");
+    let terminated = observer
+        .query(&format!("SELECT pg_terminate_backend({pid})"))
+        .await
+        .expect("terminate query backend");
+    assert_eq!(terminated.rows, vec![vec![Value::Bool(true)]]);
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .expect("terminated query must not hang")
+        .expect("query task")
+        .expect_err("a terminated query must not return success");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "an I/O loss must be reported as disconnected, got {error:?}"
+    );
+
+    let recovered = connection
+        .query("SELECT 1")
+        .await
+        .expect("pool must recover on a new connection");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn controlled_cancel_stops_server_query_and_keeps_pool_usable() {
