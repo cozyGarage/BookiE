@@ -166,6 +166,22 @@ mutation runs caught the authentication and server-selection mutants. Reports:
 `target/quality/20260930-mongodb-auth-map-mutant/mutants.out/outcomes.json`, and
 `target/quality/20260930-mongodb-selection-map-mutant/mutants.out/outcomes.json`.
 
+## Redis disconnect classification, 2026-09-30
+
+A Docker-backed regression first connected and completed `PING`, stopped the
+Redis server, then required a second command to fail as `Disconnected`. Before
+the fix it returned a generic query error (`broken pipe`). Redis error mapping
+now treats dropped connections, timeouts and I/O errors during established
+operations as `Disconnected`; TLS and authentication checks still run first,
+and connect-time refusal remains `ConnectionRefused`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-redis --lib
+rtk cargo test --locked -p tablepro-driver-redis --test integration a_lost_redis_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
+```
+
+All 35 Redis library tests and the Docker server-loss test passed.
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.

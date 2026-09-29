@@ -690,21 +690,31 @@ fn redis_error_can_hide_tls(err: &RedisError) -> bool {
 }
 
 fn map_redis_error(err: RedisError) -> DriverError {
-    map_redis_connect_error(err, false)
+    map_redis_error_in_context(err, false, false)
 }
 
 fn map_redis_connect_error(err: RedisError, verifies_cert: bool) -> DriverError {
+    map_redis_error_in_context(err, true, verifies_cert)
+}
+
+fn map_redis_error_in_context(err: RedisError, connecting: bool, verifies_cert: bool) -> DriverError {
     let chain = error_chain_text(&err);
     if redis_error_can_hide_tls(&err) && looks_like_tls_failure(&chain) {
         return DriverError::Tls(chain);
     }
     let msg = err.to_string();
     if msg.contains("Connection refused") || err.is_connection_refusal() {
-        DriverError::ConnectionRefused
+        if connecting {
+            DriverError::ConnectionRefused
+        } else {
+            DriverError::Disconnected
+        }
     } else if msg.contains("NOAUTH") || msg.contains("WRONGPASS") || msg.contains("invalid password") {
         DriverError::AuthFailed
     } else if verifies_cert && err.is_connection_dropped() {
         DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
+    } else if !connecting && (err.kind() == redis::ErrorKind::Io || err.is_connection_dropped() || err.is_timeout()) {
+        DriverError::Disconnected
     } else {
         DriverError::Query {
             message: msg,
@@ -852,9 +862,9 @@ mod tests {
     }
 
     #[test]
-    fn map_redis_error_recognizes_a_connection_refusal() {
+    fn map_redis_error_classifies_connection_refusal_during_operation_as_disconnected() {
         let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
-        assert!(matches!(map_redis_error(err), DriverError::ConnectionRefused));
+        assert!(matches!(map_redis_error(err), DriverError::Disconnected));
     }
 
     #[test]
@@ -915,7 +925,7 @@ mod tests {
     #[test]
     fn verifying_connect_maps_a_dropped_handshake_without_tls_text() {
         let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
-        assert!(matches!(map_redis_error(err.clone()), DriverError::Query { .. }));
+        assert!(matches!(map_redis_error(err.clone()), DriverError::Disconnected));
         let mapped = map_redis_connect_error(err, true);
         assert!(
             matches!(mapped, DriverError::Tls(detail) if detail.contains("certificate") && detail.contains("hostname"))

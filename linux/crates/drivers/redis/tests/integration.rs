@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use drivers_redis::RedisDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
+use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers_modules::redis::Redis;
@@ -23,6 +23,27 @@ async fn start_redis_resp3() -> (ContainerAsync<GenericImage>, String, u16) {
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(6379).await.expect("port");
     (container, host, port)
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_lost_redis_server_is_reported_as_disconnected() {
+    let (container, host, port) = start_redis().await;
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.expect("connect");
+    connection
+        .query("PING")
+        .await
+        .expect("initial operation confirms server is reachable");
+
+    container.stop().await.expect("stop Redis server");
+    let error = connection
+        .query("PING")
+        .await
+        .expect_err("an operation after server loss must fail");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "loss of an established Redis server must be reported as disconnected, got {error:?}"
+    );
 }
 
 #[tokio::test]
