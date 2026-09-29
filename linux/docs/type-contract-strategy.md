@@ -93,6 +93,39 @@ Redis refuses identified asynchronous command streams and tests RESP3 attribute
 wire decoding, while asynchronous push consumption is unsupported; SQLite has
 storage-class/parser/import contracts but installed GTK acceptance is untested.
 
+### Connection-loss contract update — September 30
+
+At `636584f44f826f7cbcca7087673d53c2a5caa2f9`, Docker-backed tests stop each
+remote server after a successful request and require the next operation on the
+established connection to return `DriverError::Disconnected` for PostgreSQL,
+MySQL, SQL Server, MongoDB, Redis and ClickHouse. PostgreSQL and MySQL also
+verify pool recovery on a new connection. Restart recovery is not yet asserted
+for SQL Server, MongoDB, Redis or ClickHouse. SQLite and DuckDB are local
+engines, so they are not part of this remote-server-loss set. Connect-time
+refusal remains separately classified in driver contracts.
+
+Redis and ClickHouse mapper mutations are retained at
+`target/quality/20260930-redis-disconnect-mutants-final/` and
+`target/quality/20260930-clickhouse-disconnect-mutants-final/`. Redis caught
+8/9 mutants, with one unviable and none missed or timed out; a temporary-filesystem
+quota blocked the first copy-based baseline before mutation execution. The
+in-place retry exposed two equivalent Redis predicates, which were simplified
+before the final run. ClickHouse caught 4/5 mutants, with one unviable and none
+missed or timed out; the first run's missed connect-error distinction gained a
+regression before the final run. MySQL and MongoDB disconnect mapper mutation
+evidence is recorded in [value contracts](value-contracts.md).
+
+The remaining delivery gaps are server restart recovery for the four drivers
+above and mid-stream failure, cancellation, completeness and connection-state
+parity across engines. Passing the six initial server-loss cases does not close
+those gaps or the remaining native-type and consumer targets in this matrix.
+
+The strict combined values layer also passed against source SHA `636584f` on
+September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is
+`target/quality/20260929T233014301456Z-layers/report.json`; local Docker
+server-loss regressions are recorded separately because they are not all part of
+the shared value-contract filter.
+
 MongoDB Decimal128's bounded grid-edit gap is now covered for 34-digit integer
 and fractional text beyond `rust_decimal`, with an independent BSON oracle; input
 outside Decimal128 precision is explicitly refused.
