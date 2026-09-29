@@ -100,8 +100,9 @@ Tests that change XDG environment variables must avoid racing with other tests. 
 
 Certificate rejection tests open and ping a trusted control before testing the
 rejected configuration, then require a TLS error or explicit certificate-verification
-reason (SQLx wraps MySQL rustls failures as I/O errors). Wrong-authority cases exercise
-both verifying modes across all five TLS fixture drivers; fixture outages and
+reason. MySQL may report a rustls rejection as a disconnect after the TLS alert, so
+that case is accepted only after its trusted control succeeds. Wrong-authority cases
+exercise both verifying modes across all five TLS fixture drivers; fixture outages and
 authentication errors cannot stand in for certificate rejection.
 
 ## Real-driver integration tests

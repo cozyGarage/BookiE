@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use secrecy::SecretString;
-use tablepro_core::{ConnectOptions, TlsConfig, TlsMode};
+use tablepro_core::{ConnectOptions, DriverError, TlsConfig, TlsMode};
 
 /// A negative identity test must fail for certificate verification, not because
 /// the fixture is down or credentials are wrong. Exercise a verified control first.
@@ -28,11 +28,13 @@ pub async fn assert_certificate_rejected(
         Err(error) => error,
     };
     let detail = error.to_string().to_ascii_lowercase();
+    let mysql_tls_rejection = driver.id() == "mysql" && matches!(&error, DriverError::Disconnected);
     assert!(
-        matches!(&error, tablepro_core::DriverError::Tls(_))
+        matches!(&error, DriverError::Tls(_))
+            || mysql_tls_rejection
             || detail.contains("invalid peer certificate")
             || detail.contains("certificate verify failed"),
-        "expected TLS verification failure: {error}"
+        "expected TLS verification rejection: {error}"
     );
 }
 

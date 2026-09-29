@@ -72,11 +72,11 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
     }
 }
 
-/// Legacy DATETIME uses 1/300-second ticks, which are not all representable as
-/// integer nanoseconds. `DATETIMN` metadata also covers SMALLDATETIME, so inspect
-/// Tiberius's payload variant instead of refusing based on column metadata.
+/// Legacy DATETIME uses 1/300-second ticks; every third tick is exact in
+/// nanoseconds. `DATETIMN` metadata also covers SMALLDATETIME, so inspect the
+/// payload variant instead of refusing based on column metadata.
 fn is_inexact_legacy_datetime_payload(cd: &ColumnData<'static>) -> bool {
-    matches!(cd, ColumnData::DateTime(Some(_)))
+    matches!(cd, ColumnData::DateTime(Some(value)) if value.seconds_fragments() % 3 != 0)
 }
 
 pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_type: ColumnType) -> Value {
@@ -267,6 +267,13 @@ mod tests {
             assert_eq!(
                 column_data_to_value_for_type(&ColumnData::DateTime(Some(legacy)), column_type),
                 Value::Undecodable("datetime".into())
+            );
+            assert_eq!(
+                column_data_to_value_for_type(
+                    &ColumnData::DateTime(Some(tiberius::time::DateTime::new(days_since_1900, 3))),
+                    column_type
+                ),
+                Value::DateTime(date.and_hms_milli_opt(0, 0, 0, 10).unwrap())
             );
             assert_eq!(
                 column_data_to_value_for_type(&ColumnData::DateTime(None), column_type),

@@ -24,6 +24,7 @@ def main():
         path
         for folder in [ROOT / "crates/app/src", ROOT / "crates/mcp/src"]
         for path in folder.rglob("*.rs")
+        if not path.name.endswith("_tests.rs")
     ]
     violations = list(unbounded_calls(paths))
     if violations:

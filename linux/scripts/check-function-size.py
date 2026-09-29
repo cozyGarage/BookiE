@@ -4,7 +4,7 @@
 A function body longer than the limit needs an entry in
 function-size-baselines.txt, which records how many over-limit functions a file
 may still contain. That count may shrink but never grow. Test code is excluded:
-`#[cfg(test)]` modules and every file under a crate's tests/.
+`#[cfg(test)]` modules, `*_tests.rs` modules, and every file under a crate's tests/.
 """
 
 from __future__ import annotations
@@ -174,7 +174,7 @@ def main() -> int:
 
     for path in sorted(CRATES.rglob("*.rs")):
         relative = path.relative_to(ROOT).as_posix()
-        if "/tests/" in relative:
+        if "/tests/" in relative or path.name.endswith("_tests.rs"):
             continue
         over_limit = []
         for name, line, body in measure(path):

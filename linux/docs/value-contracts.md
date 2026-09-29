@@ -614,10 +614,11 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 A SQL Server Docker contract checks legacy `datetime`
 rounding around its 1/300-second tick boundaries (`.001`, `.002`, `.004`,
 `.005`, `.008`). Tiberius exposes each 1/300-second tick through
-`NaiveDateTime`, which truncates some values to integer nanoseconds. The driver
-now returns non-NULL legacy `datetime` values as `Undecodable("datetime")`
-instead of exposing that editable approximation; SQL NULL stays `Value::Null`.
-The fixture checks each refusal beside SQL Server's independent rounded text.
+`NaiveDateTime`, which truncates some values to integer nanoseconds. Every third
+tick is exact in nanoseconds and remains a typed value; other non-NULL legacy
+`datetime` values become `Undecodable("datetime")` instead of exposing an
+editable approximation. SQL NULL stays `Value::Null`. The fixture checks each
+result beside SQL Server's independent rounded text.
 `smalldatetime` and `datetime2` continue to use typed values.
 
 ```sh

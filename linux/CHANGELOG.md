@@ -15,6 +15,7 @@
 - MongoDB browse pages mark BSON fields as mixed when values on the page differ from the metadata sample, keeping lossy mixed-type cells read-only.
 - MySQL pooled connections use UTC for `TIMESTAMP` decoding; dedicated sessions refuse non-UTC `TIMESTAMP` values instead of presenting a wrong instant.
 - SQL Server `money` and `smallmoney` results are refused as undecodable instead of exposing the TDS client's rounded float conversion.
+- SQL Server legacy `datetime` values decode only when their 1/300-second ticks map exactly to nanoseconds; inexact ticks remain undecodable.
 - Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
 - If the app is killed or crashes while using the system OpenSSH client, its ssh master process now exits with it instead of continuing to run in the background until the next launch.
 

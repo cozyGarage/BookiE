@@ -780,9 +780,9 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
     .unwrap();
     conn.execute(
         "INSERT INTO temporal_source VALUES \
-         (1, '2024-01-02 03:04:05.997', '2024-01-02 03:04:00', '2024-01-02 03:04:05.1234567', \
+         (1, '2024-01-02 03:04:05.990', '2024-01-02 03:04:00', '2024-01-02 03:04:05.1234567', \
           '03:04:05.1234567', '0001-01-01'), \
-         (2, '1753-01-01 00:00:00.003', '1900-01-01 00:00:00', '9999-12-31 23:59:59.9999999', \
+         (2, '1753-01-01 00:00:00.000', '1900-01-01 00:00:00', '9999-12-31 23:59:59.9999999', \
           '23:59:59.9999999', '9999-12-31')",
     )
     .await
@@ -884,17 +884,29 @@ async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() 
         )
         .await
         .unwrap();
-    let expected = [
+    let expected_server_text = [
         "2024-01-02T03:04:05",
         "2024-01-02T03:04:05.003",
         "2024-01-02T03:04:05.003",
         "2024-01-02T03:04:05.007",
         "2024-01-02T03:04:05.007",
     ];
-    assert_eq!(result.rows.len(), expected.len());
-    for (row, expected_server_text) in result.rows.iter().zip(expected) {
-        assert_eq!(row[0], Value::Undecodable("datetime".into()));
-        assert_eq!(row[1], Value::Text(expected_server_text.into()));
+    let expected_values = [
+        Value::DateTime(
+            NaiveDate::from_ymd_opt(2024, 1, 2)
+                .unwrap()
+                .and_hms_opt(3, 4, 5)
+                .unwrap(),
+        ),
+        Value::Undecodable("datetime".into()),
+        Value::Undecodable("datetime".into()),
+        Value::Undecodable("datetime".into()),
+        Value::Undecodable("datetime".into()),
+    ];
+    assert_eq!(result.rows.len(), expected_server_text.len());
+    for ((row, expected_value), expected_text) in result.rows.iter().zip(expected_values).zip(expected_server_text) {
+        assert_eq!(row[0], expected_value);
+        assert_eq!(row[1], Value::Text(expected_text.into()));
     }
 }
 

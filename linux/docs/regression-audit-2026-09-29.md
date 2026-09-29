@@ -134,7 +134,7 @@ Before-fix reproductions are retained beside the validation manifest:
   the existing value-contract ledger. Refusal coverage is not native support.
 - BSON scalar kinds represented by identical text remain ambiguous in generic
   exports. Collection-wide heterogeneity beyond metadata/page samples remains open.
-- SQL Server Kerberos/KDC qualification and exact legacy datetime tick representation
+- SQL Server Kerberos/KDC qualification and lossless recovery of inexact legacy datetime ticks
   remain separate gaps; another driver’s green suite cannot close them.
 - CSV empty text/NULL ambiguity, configurable lossy export options, locale decimal
   formats, unsupported native types and spreadsheet application re-import still
