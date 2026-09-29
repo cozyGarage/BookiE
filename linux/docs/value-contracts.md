@@ -174,10 +174,10 @@ After adding live negative assertions, iteration caught both survivors:
 cumulatively 4 caught, 1 unviable, no survivors or timeouts. Evidence:
 `target/quality/20260929-redis-async-push-mutants/mutants.out.old/outcomes.json`
 and `target/quality/20260929-redis-async-push-mutants/mutants.out/outcomes.json`.
-The clean combined runner passed after the MONITOR addition at
-`b9b4757d14f5b989df4c73a46d400b9e3943f70a`: 125 selected contracts across 11
+The clean combined runner passed after the tracking-push addition at
+`af46f18461e98a5ec83833e9c18556211b7f1b56`: 125 selected contracts across 11
 suites, with no missing suites. Evidence:
-`target/quality/20260929T190700976288Z-values/report.json` (`dirty: false`).
+`target/quality/20260929T191639404194Z-values/report.json` (`dirty: false`).
 
 ```sh
 rtk cargo test -p tablepro-driver-redis --test integration value_contract_redis_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
