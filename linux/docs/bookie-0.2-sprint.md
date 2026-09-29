@@ -1115,17 +1115,20 @@ Open findings from the audit:
 
 B3 remains open.
 
-### Redis Pub/Sub request/response boundary — September 29
+### Redis Pub/Sub and MONITOR stream boundary — September 29
 
 A Redis 7.4 regression first showed `SUBSCRIBE` returning its push
-acknowledgement as an ordinary one-shot query result. The driver now visibly
-refuses all six subscribe/unsubscribe command forms before sending them. The
-live Docker test checks the error type and explanation, then verifies the same
-connection still answers `PING`. This establishes the unsupported streaming
-boundary; asynchronous push delivery and attribute framing remain open.
-Scoped mutations caught both replacements of the refusal predicate; the
-whole-query replacement was unviable, with no survivors or timeouts. Evidence:
-`target/quality/20260929-redis-pubsub-mutants/mutants.out/outcomes.json`.
+acknowledgement as an ordinary one-shot query result. The same fixture showed
+`MONITOR` returning `OK` before entering its event stream. The driver now
+visibly refuses all six subscribe/unsubscribe command forms and `MONITOR`
+before sending them. The live Docker test checks the error type and explanation,
+then verifies the same connection still answers `PING`. This establishes the
+unsupported streaming boundary; asynchronous push delivery and attribute
+framing remain open.
+Scoped mutations of the updated guard caught both generated boolean
+replacements; the whole-query replacement was unviable, with no survivors or
+timeouts. Evidence:
+`target/quality/20260929-redis-stream-commands-mutants/mutants.out/outcomes.json`.
 
 The clean combined runner passed at `1226177671f62c4b65e03cbee9df01b8672b786d`:
 125 selected contracts across 11 suites, with no missing suites. Evidence:

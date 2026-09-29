@@ -181,7 +181,7 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_pubsub_stream_commands_are_refused_without_consuming_the_connection() {
+async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_connection() {
     let (_container, host, port) = start_redis_resp3().await;
     let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
     connection.query("HELLO 3").await.expect("enable RESP3");
@@ -193,18 +193,19 @@ async fn value_contract_pubsub_stream_commands_are_refused_without_consuming_the
         "UNSUBSCRIBE updates",
         "PUNSUBSCRIBE updates.*",
         "SUNSUBSCRIBE updates",
+        "MONITOR",
     ] {
         let error = connection
             .query(command)
             .await
-            .expect_err("streaming Pub/Sub must not return a misleading one-shot result");
+            .expect_err("streaming commands must not return a misleading one-shot result");
         assert!(
             matches!(error, tablepro_core::DriverError::Unsupported(_)),
             "{command} should have a visible unsupported result, got {error:?}"
         );
         assert!(
-            error.to_string().to_ascii_lowercase().contains("pub/sub"),
-            "the refusal should explain the unsupported operation: {error}"
+            error.to_string().to_ascii_lowercase().contains("stream"),
+            "the refusal should explain the unsupported streaming operation: {error}"
         );
     }
 

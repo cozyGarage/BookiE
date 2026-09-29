@@ -231,9 +231,10 @@ impl Connection for RedisConnection {
                 sqlstate: None,
             });
         }
-        if is_pubsub_stream_command(&args[0]) {
+        if is_redis_stream_command(&args[0]) {
             return Err(DriverError::Unsupported(
-                "Redis Pub/Sub streaming commands are not supported by the request/response query interface".into(),
+                "Redis Pub/Sub and MONITOR streaming commands are not supported by the request/response query interface"
+                    .into(),
             ));
         }
         let mut cmd = redis::cmd(&args[0]);
@@ -492,10 +493,10 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
     }
 }
 
-fn is_pubsub_stream_command(command: &str) -> bool {
+fn is_redis_stream_command(command: &str) -> bool {
     matches!(
         command.to_ascii_uppercase().as_str(),
-        "SUBSCRIBE" | "PSUBSCRIBE" | "SSUBSCRIBE" | "UNSUBSCRIBE" | "PUNSUBSCRIBE" | "SUNSUBSCRIBE"
+        "SUBSCRIBE" | "PSUBSCRIBE" | "SSUBSCRIBE" | "UNSUBSCRIBE" | "PUNSUBSCRIBE" | "SUNSUBSCRIBE" | "MONITOR"
     )
 }
 
@@ -1098,7 +1099,7 @@ mod tests {
     }
 
     #[test]
-    fn only_pubsub_stream_commands_are_refused() {
+    fn redis_stream_commands_are_refused() {
         for command in [
             "subscribe",
             "PSubscribe",
@@ -1106,11 +1107,12 @@ mod tests {
             "UNSUBSCRIBE",
             "punsubscribe",
             "sunsubscribe",
+            "monitor",
         ] {
-            assert!(is_pubsub_stream_command(command), "{command}");
+            assert!(is_redis_stream_command(command), "{command}");
         }
         for command in ["PING", "PUBLISH", "PUBSUB", "GET", ""] {
-            assert!(!is_pubsub_stream_command(command), "{command}");
+            assert!(!is_redis_stream_command(command), "{command}");
         }
     }
 }

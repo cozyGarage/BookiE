@@ -152,27 +152,30 @@ RESP3 push, attribute and stream reply semantics still need live-server
 subscription acceptance; the stream map/array response has real Redis coverage,
 while attribute and push markers currently have unit conversion tests only.
 
-### Redis Pub/Sub streaming refusal, 2026-09-29
+### Redis Pub/Sub and MONITOR stream refusal, 2026-09-29
 
 A Redis 7.4 Docker regression first demonstrated that `SUBSCRIBE` returned a
 one-shot `$redisPush` subscription acknowledgement, although the request /
-response API cannot deliver later message pushes. The driver now refuses
+response API cannot deliver later message pushes. A second failing-first case
+showed that `MONITOR` returns `OK` before switching into its continuous event
+stream. The driver now refuses
 `SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE`, and their three unsubscribe commands
-as `Unsupported` before sending them. The live contract exercises each spelling
-on one connection, checks the refusal explains the Pub/Sub limitation, and
-confirms `PING` still works afterward. This prevents a successful-looking
-subscription result from implying that messages are being received. It does
-not add a streaming API or establish live delivery for other asynchronous
-pushes or attribute frames. Scoped mutation testing of the refusal predicate
-caught both generated boolean replacements; the whole-query replacement was
-unviable at compile time, with no missed or timed-out mutants. Evidence:
-`target/quality/20260929-redis-pubsub-mutants/mutants.out/outcomes.json`.
+as `Unsupported` before sending them. The live contract exercises each command
+on one connection, checks the
+refusal explains the streaming limitation, and confirms `PING` still works
+afterward. This prevents a one-shot acknowledgement from implying that the
+ongoing stream is being received. It does not add a streaming API or establish
+live delivery for other asynchronous
+pushes or attribute frames. Scoped mutation testing of the updated guard caught
+both generated boolean replacements; the whole-query replacement was unviable
+at compile time, with no missed or timed-out mutants. Evidence:
+`target/quality/20260929-redis-stream-commands-mutants/mutants.out/outcomes.json`.
 The clean combined runner passed at `1226177671f62c4b65e03cbee9df01b8672b786d`:
 125 selected contracts across 11 suites, with no missing suites. Evidence:
 `target/quality/20260929T183351980968Z-values/report.json` (`dirty: false`).
 
 ```sh
-rtk cargo test -p tablepro-driver-redis --test integration value_contract_pubsub_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
+rtk cargo test -p tablepro-driver-redis --test integration value_contract_redis_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
 ```
 
 ## CSV negative-zero export/import, 2026-09-28
