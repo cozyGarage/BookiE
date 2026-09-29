@@ -83,11 +83,12 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `77ff32d05f24bdb3b355299e5421aadda149ece8` on 2026-09-29; it is an
-inventory, not a fresh run of every suite. The strict `values` layer passed at
-this baseline with GTK and DuckDB enabled. The SQL Server sql_variant regression
-and scoped mutation report are documented with the remaining driver targets.
-A passing layer does not establish complete native-type support.
+`linux` commit `8f22a0cb8e697a151f893f589834c15695aae3fe` on 2026-09-29. The
+strict combined run passed with GTK and DuckDB enabled: all 11 selected crates
+passed, no suites were missing, 743 artifacts were fresh, and two packages
+(DuckDB and MySQL) rebuilt. Evidence:
+`target/quality/20260929T003002787128Z-values/report.json`. This does not establish
+complete native-type support or replace installed-app acceptance.
 
 | Path | Assertions |
 | --- | --- |

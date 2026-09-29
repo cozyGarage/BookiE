@@ -1,11 +1,13 @@
 # Type contracts for B3 and future drivers
 
 Coverage reconciled against `linux` at
-`77ff32d05f24bdb3b355299e5421aadda149ece8` on 2026-09-29. The baseline includes
+`8f22a0cb8e697a151f893f589834c15695aae3fe` on 2026-09-29. The baseline includes
 the Redis RESP3 contracts, PostgreSQL multirange metadata cases, ClickHouse
 DateTime64(9) boundary behavior and SQL Server's safe `sql_variant` metadata
-refusal. The SQL Server type remains unsupported for exact decoding. This
-remains a source/test inventory, not a fresh execution of every suite.
+refusal, DuckDB mixed-interval exact-text round trips, and MySQL comment behavior
+under both backslash modes. The SQL Server type remains unsupported for exact
+decoding. The strict value suite passed on this baseline; other gates remain
+distinct from this source/test inventory.
 
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.
