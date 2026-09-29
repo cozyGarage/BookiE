@@ -1616,7 +1616,12 @@ timeouts:
 ```sh
 rtk cargo test -p tablepro-app --lib value_contract_duckdb_timestamptz_parser_refuses_submicro_edits
 rtk cargo test -p tablepro-app --features duckdb --lib value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding
+rtk proxy ./scripts/test-value-contracts.sh --gtk --duckdb
 ```
+
+The strict combined run passed all 127 tests across 11 suites with no missing
+suites and a clean checkout at `cdbb15b538656602a9fdd08f4e6626deb2553540`.
+The report is `target/quality/20260929T194746719695Z-values/report.json`.
 
 ### DuckDB scalar HUGEINT consumer parity
 
