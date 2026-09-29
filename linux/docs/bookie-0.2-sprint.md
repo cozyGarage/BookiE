@@ -1340,3 +1340,19 @@ and `target/quality/20260929-mysql-spatial-ui-mutants/mutants.out/outcomes.json`
 
 Installed-app acceptance and server-backed spatial grid interaction remain
 open; B3 remains open.
+
+### DuckDB TIMESTAMPTZ edit precision — September 29
+
+A failing-first parser test showed that DuckDB grid edits accepted
+nanosecond `TimestampTz` input even though native TIMESTAMPTZ casts keep only
+microseconds. An embedded server oracle confirms the cast changes the epoch.
+The parser now refuses off-microsecond-aligned TIMESTAMPTZ edits before the
+keyed update; microsecond-aligned values, including nine-digit forms with
+trailing zeroes, remain editable. The app-level test verifies the rejected
+edit leaves the existing row untouched and a valid `+05:30` edit stores the
+expected UTC epoch. Scoped mutation testing caught 9 of 10 generated guard
+mutations, with one unviable whole-function replacement and no survivors or
+timeouts. Evidence:
+`target/quality/20260929-duckdb-timestamptz-guard-mutants-final/mutants.out/outcomes.json`.
+
+B3 remains open.

@@ -1593,7 +1593,30 @@ must cast explicitly when using these text parameters in typed expressions.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_submicro_temporals_bind_as_exact_text -- --exact --test-threads=1
 ```
 
-The focused test and the full DuckDB integration suite passed (15 tests).
+The focused test and the full DuckDB integration suite passed (16 tests).
+
+### DuckDB TIMESTAMPTZ grid-edit precision boundary
+
+A failing-first app parser contract showed that a nine-digit
+`TimestampTz` edit was accepted for DuckDB `TIMESTAMP WITH TIME ZONE`. The
+independent embedded-engine oracle binds the exact value as text and casts it
+to native TIMESTAMPTZ; `epoch_us` proves the server drops the non-microsecond
+digits. The app now refuses values whose nanoseconds are not divisible by
+1,000 before the keyed update is built. It still accepts ordinary microsecond
+precision and nine-digit spellings with three trailing zeroes. An app-level
+DuckDB grid contract uses actual column metadata, verifies refusal leaves the
+stored epoch unchanged, then saves an offset-origin, microsecond-aligned edit
+and checks the resulting native type and exact UTC epoch.
+
+The scoped mutation report caught 9 of 10 generated changes to this precision
+guard; one whole-function replacement was unviable, with no survivors or
+timeouts:
+`target/quality/20260929-duckdb-timestamptz-guard-mutants-final/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test -p tablepro-app --lib value_contract_duckdb_timestamptz_parser_refuses_submicro_edits
+rtk cargo test -p tablepro-app --features duckdb --lib value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding
+```
 
 ### DuckDB scalar HUGEINT consumer parity
 

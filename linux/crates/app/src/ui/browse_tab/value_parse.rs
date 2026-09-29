@@ -57,6 +57,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
             Err(error) => Err(error),
         };
     }
+    if let Some(result) = parse_duckdb_timestamptz_input(trimmed, col, driver_id) {
+        return result;
+    }
     parse_input_for_column(text, col)
 }
 
@@ -65,6 +68,34 @@ fn is_postgres_numeric_type(data_type: &str) -> bool {
     matches!(data_type.as_str(), "numeric" | "decimal")
         || data_type.starts_with("numeric(")
         || data_type.starts_with("decimal(")
+}
+
+fn is_duckdb_timestamptz_type(data_type: &str) -> bool {
+    matches!(
+        data_type.trim().to_ascii_lowercase().as_str(),
+        "timestamptz" | "timestamp with time zone"
+    )
+}
+
+fn parse_duckdb_timestamptz_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    driver_id: &str,
+) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "duckdb" || !is_duckdb_timestamptz_type(&column.data_type) {
+        return None;
+    }
+    Some((|| {
+        let value = parse_timestamptz_value(text)?;
+        let Value::TimestampTz(timestamp) = &value else {
+            unreachable!("timestamp-with-time-zone parser returns TimestampTz")
+        };
+        if timestamp.timestamp_subsec_nanos() % 1_000 != 0 {
+            return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+        }
+        Ok(value)
+    })())
 }
 
 fn is_postgres_numeric_literal(text: &str) -> bool {
@@ -449,6 +480,109 @@ mod tests {
                 Value::Int(-2),
                 Value::Int(4),
                 Value::Int(-5),
+            ]]
+        );
+    }
+
+    #[cfg(feature = "duckdb")]
+    #[tokio::test]
+    async fn value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let connection = drivers_duckdb::DuckdbDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        connection
+            .execute("CREATE TABLE tz_grid (id INTEGER PRIMARY KEY, event_at TIMESTAMPTZ)")
+            .await
+            .unwrap();
+        connection
+            .execute("INSERT INTO tz_grid VALUES (1, TIMESTAMPTZ '2026-09-29 12:34:56.123456+00')")
+            .await
+            .unwrap();
+
+        let columns = connection.fetch_columns(None, "tz_grid").await.unwrap();
+        let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+        let event_index = columns.iter().position(|column| column.name == "event_at").unwrap();
+        assert!(columns[id_index].primary_key);
+        let original = connection
+            .query("SELECT epoch_us(event_at) FROM tz_grid WHERE id = 1")
+            .await
+            .unwrap();
+
+        let submicro = Value::TimestampTz(
+            chrono::DateTime::parse_from_rfc3339("2026-09-29T12:34:56.123456789+00:00")
+                .unwrap()
+                .to_utc(),
+        );
+        let Value::TimestampTz(submicro_instant) = &submicro else {
+            unreachable!()
+        };
+        let implicit_cast = connection
+            .query_params(
+                "SELECT typeof(CAST(? AS TIMESTAMPTZ)), epoch_us(CAST(? AS TIMESTAMPTZ))",
+                &[submicro.clone(), submicro.clone()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            implicit_cast.rows,
+            vec![vec![
+                Value::Text("TIMESTAMP WITH TIME ZONE".into()),
+                Value::Int(submicro_instant.timestamp_micros()),
+            ]],
+            "DuckDB's native TIMESTAMPTZ cast drops sub-microsecond digits"
+        );
+
+        let rejected = parse_input_for_driver(
+            "2026-09-29T12:34:56.123456789+00:00",
+            Some(&columns[event_index]),
+            "duckdb",
+        )
+        .unwrap_err();
+        assert_eq!(rejected, "DuckDB TIMESTAMPTZ supports microsecond precision only");
+        assert_eq!(
+            connection
+                .query("SELECT epoch_us(event_at) FROM tz_grid WHERE id = 1")
+                .await
+                .unwrap()
+                .rows,
+            original.rows,
+            "a rejected sub-microsecond edit must leave the stored instant unchanged"
+        );
+
+        let accepted = parse_input_for_driver(
+            "2026-09-29T18:04:56.654321000+05:30",
+            Some(&columns[event_index]),
+            "duckdb",
+        )
+        .unwrap();
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "duckdb",
+            None,
+            "tz_grid",
+            &columns,
+            &[(event_index, accepted)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        connection.execute_params(&update.0, &update.1).await.unwrap();
+        let saved = connection
+            .query("SELECT typeof(event_at), epoch_us(event_at) FROM tz_grid WHERE id = 1")
+            .await
+            .unwrap();
+        let expected = chrono::DateTime::parse_from_rfc3339("2026-09-29T18:04:56.654321000+05:30")
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(
+            saved.rows,
+            vec![vec![
+                Value::Text("TIMESTAMP WITH TIME ZONE".into()),
+                Value::Int(expected)
             ]]
         );
     }
@@ -953,6 +1087,46 @@ mod tests {
             comment: None,
             collation: None,
         }
+    }
+
+    #[test]
+    fn value_contract_duckdb_timestamptz_parser_refuses_submicro_edits() {
+        let column = col("TIMESTAMP WITH TIME ZONE", false);
+        let submicro = "2026-09-29T12:34:56.123456789+00:00";
+        assert_eq!(
+            parse_input_for_driver("2026-09-29T12:34:56.123456+00:00", Some(&column), "duckdb").unwrap(),
+            Value::TimestampTz(
+                chrono::DateTime::parse_from_rfc3339("2026-09-29T12:34:56.123456Z")
+                    .unwrap()
+                    .to_utc()
+            )
+        );
+        assert_eq!(
+            parse_input_for_driver("2026-09-29T12:34:56.123456000+00:00", Some(&column), "duckdb").unwrap(),
+            Value::TimestampTz(
+                chrono::DateTime::parse_from_rfc3339("2026-09-29T12:34:56.123456Z")
+                    .unwrap()
+                    .to_utc()
+            ),
+            "extra trailing zero digits are still exactly microsecond-aligned"
+        );
+        assert_eq!(
+            parse_input_for_driver(submicro, Some(&column), "duckdb").unwrap_err(),
+            "DuckDB TIMESTAMPTZ supports microsecond precision only"
+        );
+        assert_eq!(
+            parse_input_for_driver(submicro, Some(&col("TEXT", false)), "duckdb").unwrap(),
+            Value::Text(submicro.into()),
+            "ordinary text is not subject to TIMESTAMPTZ precision limits"
+        );
+        assert!(matches!(
+            parse_input_for_driver(submicro, Some(&column), "sqlite").unwrap(),
+            Value::TimestampTz(timestamp) if timestamp.timestamp_subsec_nanos() == 123_456_789
+        ));
+        assert_eq!(
+            parse_input_for_driver(submicro, None, "duckdb").unwrap(),
+            Value::Text(submicro.into())
+        );
     }
 
     fn col_with_default(data_type: &str, default: &str) -> ColumnInfo {
