@@ -409,7 +409,10 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --lib m
 rtk cargo test -p tablepro-driver-mssql --test integration value_contract_money_values_are_refused_but_server_nulls_remain_null -- --include-ignored --exact --test-threads=1
 ```
 
-The focused codec unit test and updated Docker integration test passed.
+The focused codec unit test and updated Docker integration test passed. The
+strict combined runner also passed all 121 selected contracts on commit
+`71813f8d2`; evidence is
+[`20260929T162725389033Z-values/report.json`](../target/quality/20260929T162725389033Z-values/report.json).
 
 ### SQL Server `sql_variant` metadata refusal
 

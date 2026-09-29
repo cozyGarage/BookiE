@@ -1122,7 +1122,10 @@ must be refused because Tiberius decodes them through binary floats. The live
 fixture now includes NULL rows for both types and confirms those cells remain
 `Value::Null`, distinct from the non-NULL `Undecodable` markers. The focused
 SQL Server Docker test passed; the ignored-test inventory was regenerated and
-validated. Exact money decoding/editing remains open.
+validated. The strict combined value runner then passed all 121 selected
+contracts across 11 suites, including GTK, DuckDB and the updated SQL Server
+fixture; evidence is `target/quality/20260929T162725389033Z-values/report.json`.
+Exact money decoding/editing remains open.
 
 B3 remains open.
 
