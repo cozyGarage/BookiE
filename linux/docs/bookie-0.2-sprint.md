@@ -1127,8 +1127,9 @@ Scoped mutations caught both replacements of the refusal predicate; the
 whole-query replacement was unviable, with no survivors or timeouts. Evidence:
 `target/quality/20260929-redis-pubsub-mutants/mutants.out/outcomes.json`.
 
-The value-contract runner selects this integration test by name and must be
-rerun after the fix before recording a clean combined gate.
+The clean combined runner passed at `1226177671f62c4b65e03cbee9df01b8672b786d`:
+125 selected contracts across 11 suites, with no missing suites. Evidence:
+`target/quality/20260929T183351980968Z-values/report.json` (`dirty: false`).
 
 B3 remains open.
 
