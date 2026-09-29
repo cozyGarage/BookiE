@@ -1188,6 +1188,10 @@ driver returns an undecodable value, and both SQL-literal and parameter
 consumers refuse it. Run
 `cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_wide_map_refuses_lossy_consumers_with_native_oracle -- --exact --test-threads=1`.
 
+LIST, fixed ARRAY, STRUCT and UNION each now have native `typeof` and exact JSON
+rendering oracles; the driver returns an undecodable value and both SQL-literal
+and parameter consumers refuse it. The DuckDB crate suite passes with 35 tests.
+
 B3 remains open.
 
 ### ClickHouse `DateTime64(9)` bounds — September 29
