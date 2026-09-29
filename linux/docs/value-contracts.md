@@ -1470,6 +1470,20 @@ The integration corpus checks server-rendered source values against both paramet
 
 Mixed month/day/microsecond intervals now preserve DuckDB's native month, day and nanosecond carrier fields as exact text with an explicit microsecond unit. A live embedded-engine contract checks `typeof`, DuckDB's `VARCHAR` representation and independent `date_part` component oracles, then re-imports through both a generated SQL literal and an explicitly cast bound parameter. DuckDB column metadata now exposes simple and composite primary keys from `duckdb_constraints()`, with an independent catalog oracle. A separate app-parser contract sends edited text through the keyed-update builder and verifies the saved native INTERVAL type and signed month/day/microsecond components. Intervals with sub-microsecond carrier precision remain explicitly undecodable. A MAP containing a UHUGEINT above `u64::MAX` and explicit NULL has exact native `typeof` and `VARCHAR` oracles; LIST, fixed ARRAY, STRUCT and UNION have exact native type and JSON rendering oracles. The driver, SQL-literal and parameter consumers explicitly refuse all these collection kinds. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; it is explicitly undecodable, and SQL literal and parameter consumers refuse it. Other interval boundaries, installed GTK acceptance and additional nested collection combinations remain open. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, MCP or release acceptance.
 
+The interval boundary contract now covers `i32::MIN`/`i32::MAX` months and days,
+plus the largest positive and negative whole-microsecond values that fit the
+driver's signed nanosecond carrier. Independent `typeof`, `VARCHAR`, and
+`date_part` assertions account for DuckDB normalizing months into years and
+microseconds into clock fields. Both extremes round-trip through generated SQL
+and explicitly cast bound parameters. Other mixed-sign combinations and the
+installed GTK edit path remain open.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_component_extremes_round_trip_as_exact_text -- --exact --test-threads=1
+```
+
+The focused embedded-engine contract passed.
+
 The DuckDB decoder mutation pass initially found a surviving `UBigInt` signed-boundary comparison. Unit assertions now pin `i64::MAX` to `Value::Int` and `i64::MAX + 1` to exact decimal text. The final scoped run caught 11/12 mutants, with one unviable whole-function replacement and no survivors or timeouts: `target/quality/20260929-duckdb-interval-mutants-final/mutants.out/outcomes.json`.
 
 ```sh

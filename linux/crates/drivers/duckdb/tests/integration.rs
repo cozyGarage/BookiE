@@ -475,6 +475,77 @@ async fn value_contract_interval_components_round_trip_as_exact_text() {
 }
 
 #[tokio::test]
+async fn value_contract_interval_component_extremes_round_trip_as_exact_text() {
+    let connection = native_connection().await;
+    for (expression, expected, native_text, years, residual_months, days, residual_micros) in [
+        (
+            "to_months(-2147483648) + to_days(2147483647) + to_microseconds(9223372036854775)",
+            "-2147483648 months 2147483647 days 9223372036854775 microseconds",
+            "-178956970 years -8 months 2147483647 days 2562047:47:16.854775",
+            -178_956_970,
+            -8,
+            i32::MAX as i64,
+            16_854_775,
+        ),
+        (
+            "to_months(2147483647) + to_days(-2147483648) + to_microseconds(-9223372036854775)",
+            "2147483647 months -2147483648 days -9223372036854775 microseconds",
+            "178956970 years 7 months -2147483648 days -2562047:47:16.854775",
+            178_956_970,
+            7,
+            i32::MIN as i64,
+            -16_854_775,
+        ),
+    ] {
+        let source = connection
+            .query(&format!(
+                "SELECT value, typeof(value), value::VARCHAR, date_part('year', value)::INTEGER, \
+                        date_part('month', value)::INTEGER, \
+                        date_part('day', value)::INTEGER, date_part('microsecond', value)::BIGINT \
+                 FROM (SELECT {expression} AS value)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            source.rows,
+            vec![vec![
+                Value::Text(expected.into()),
+                Value::Text("INTERVAL".into()),
+                Value::Text(native_text.into()),
+                Value::Int(years),
+                Value::Int(residual_months),
+                Value::Int(days),
+                Value::Int(residual_micros),
+            ]]
+        );
+
+        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", &source.rows[0][0]).unwrap();
+        let literal_round_trip = connection
+            .query(&format!(
+                "SELECT typeof(CAST({literal} AS INTERVAL)), CAST({literal} AS INTERVAL)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            literal_round_trip.rows,
+            vec![vec![Value::Text("INTERVAL".into()), source.rows[0][0].clone()]]
+        );
+
+        let bound_round_trip = connection
+            .query_params(
+                "SELECT typeof(CAST(? AS INTERVAL)), CAST(? AS INTERVAL)",
+                &[source.rows[0][0].clone(), source.rows[0][0].clone()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            bound_round_trip.rows,
+            vec![vec![Value::Text("INTERVAL".into()), source.rows[0][0].clone()]]
+        );
+    }
+}
+
+#[tokio::test]
 async fn value_contract_interval_grid_edit_persists_native_components() {
     let connection = native_connection().await;
     connection
