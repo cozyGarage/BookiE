@@ -878,13 +878,16 @@ async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() 
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn money_types_refuse_values_decoded_through_binary_float() {
+async fn value_contract_money_values_are_refused_but_server_nulls_remain_null() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
-    conn.execute("CREATE TABLE money_source (amount money, small_amount smallmoney)")
+    conn.execute("CREATE TABLE money_source (id int PRIMARY KEY, amount money, small_amount smallmoney)")
         .await
         .unwrap();
-    conn.execute("INSERT INTO money_source VALUES (123456789012345.6789, -123456.7891)")
+    conn.execute("INSERT INTO money_source VALUES (1, 123456789012345.6789, -123456.7891)")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO money_source VALUES (2, NULL, NULL)")
         .await
         .unwrap();
 
@@ -892,7 +895,7 @@ async fn money_types_refuse_values_decoded_through_binary_float() {
         .query(
             "SELECT amount, CONVERT(varchar(40), CAST(amount AS decimal(19,4))) AS amount_text, \
              small_amount, CONVERT(varchar(40), CAST(small_amount AS decimal(10,4))) AS small_text \
-             FROM money_source",
+             FROM money_source ORDER BY id",
         )
         .await
         .unwrap();
@@ -900,6 +903,7 @@ async fn money_types_refuse_values_decoded_through_binary_float() {
     assert_eq!(result.rows[0][3], Value::Text("-123456.7891".into()));
     assert_eq!(result.rows[0][0], Value::Undecodable("money".into()));
     assert_eq!(result.rows[0][2], Value::Undecodable("money".into()));
+    assert_eq!(result.rows[1], vec![Value::Null, Value::Null, Value::Null, Value::Null]);
 }
 
 #[tokio::test]

@@ -1115,6 +1115,17 @@ Open findings from the audit:
 
 B3 remains open.
 
+### SQL Server money NULL distinction — September 29
+
+The existing `money`/`smallmoney` contract already proved that non-NULL values
+must be refused because Tiberius decodes them through binary floats. The live
+fixture now includes NULL rows for both types and confirms those cells remain
+`Value::Null`, distinct from the non-NULL `Undecodable` markers. The focused
+SQL Server Docker test passed; the ignored-test inventory was regenerated and
+validated. Exact money decoding/editing remains open.
+
+B3 remains open.
+
 ### B3 PostgreSQL zero-row results and numeric parser mutation follow-up — September 29
 
 The all-driver value runner passed on `0b1dab8b8`: all 11 expected suites were

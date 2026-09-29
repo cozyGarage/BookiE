@@ -400,14 +400,16 @@ Nullable `smallmoney` is `ColumnType::Money` because pinned Tiberius maps every
 `VarLenType::Money` to `Money`, so that path returns `Undecodable("money")`.
 NULL remains NULL. The result's separate decimal text oracles preserve the
 server's exact values. This is a safe refusal, not exact `money` editing or
-binding support.
+binding support. A second live row sets both native values to SQL NULL and
+checks that the result cells stay `Value::Null`, separate from the undecodable
+non-NULL row.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --lib money_columns_refuse_float_decoding_but_preserve_null
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration money_types_refuse_values_decoded_through_binary_float -- --include-ignored --exact --test-threads=1
+rtk cargo test -p tablepro-driver-mssql --test integration value_contract_money_values_are_refused_but_server_nulls_remain_null -- --include-ignored --exact --test-threads=1
 ```
 
-Both focused tests passed; the integration reproducer fails before the refusal fix.
+The focused codec unit test and updated Docker integration test passed.
 
 ### SQL Server `sql_variant` metadata refusal
 
