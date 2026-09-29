@@ -4,7 +4,10 @@ use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
-use sqlx::{Column, Connection as SqlxConnection, Pool, Postgres, Row, TypeInfo, ValueRef};
+use sqlx::{
+    Column, Connection as SqlxConnection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, Type, TypeInfo,
+    ValueRef,
+};
 
 use futures::stream::StreamExt;
 
@@ -307,7 +310,19 @@ impl Connection for PgConnection {
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
         let mut stream = query.fetch(&self.pool);
-        collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
+        let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+        if result.columns.is_empty() && result.rows.is_empty() {
+            let statement = self
+                .pool
+                .prepare_with(
+                    sqlx::AssertSqlSafe(sql).into_sql_str(),
+                    &pg_parameter_type_infos(params),
+                )
+                .await
+                .map_err(map_sqlx_error)?;
+            result.columns = statement_columns(statement.columns());
+        }
+        Ok(result)
     }
 
     async fn query_params_controlled(
@@ -784,7 +799,17 @@ async fn query_connection(
 ) -> Result<QueryResult, DriverError> {
     let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut **connection);
-    collect_query_rows(&mut stream, MAX_QUERY_ROWS).await
+    let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+    drop(stream);
+    if result.columns.is_empty() && result.rows.is_empty() {
+        let parameter_types = pg_parameter_type_infos(params);
+        let statement = connection
+            .prepare_with(sqlx::AssertSqlSafe(sql).into_sql_str(), &parameter_types)
+            .await
+            .map_err(map_sqlx_error)?;
+        result.columns = statement_columns(statement.columns());
+    }
+    Ok(result)
 }
 
 async fn execute_connection(
@@ -801,7 +826,54 @@ async fn execute_connection(
 
 async fn stream_into_result(pool: &Pool<Postgres>, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(pool);
-    collect_query_rows(&mut stream, limit).await
+    let mut result = collect_query_rows(&mut stream, limit).await?;
+    if result.columns.is_empty() && result.rows.is_empty() {
+        let statement = pool
+            .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+            .await
+            .map_err(map_sqlx_error)?;
+        result.columns = statement_columns(statement.columns());
+    }
+    Ok(result)
+}
+
+fn statement_columns(columns: &[sqlx::postgres::PgColumn]) -> Vec<ColumnInfo> {
+    columns
+        .iter()
+        .map(|column| ColumnInfo {
+            name: column.name().to_string(),
+            data_type: column.type_info().name().to_ascii_lowercase(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        })
+        .collect()
+}
+
+fn pg_parameter_type_infos(params: &[Value]) -> Vec<sqlx::postgres::PgTypeInfo> {
+    params
+        .iter()
+        .map(|param| match param {
+            Value::Null => <Option<&str> as Type<Postgres>>::type_info(),
+            Value::Bool(_) => <bool as Type<Postgres>>::type_info(),
+            Value::Int(_) => <i64 as Type<Postgres>>::type_info(),
+            Value::Float(_) => <f64 as Type<Postgres>>::type_info(),
+            Value::Text(_) => <String as Type<Postgres>>::type_info(),
+            Value::Bytes(_) => <Vec<u8> as Type<Postgres>>::type_info(),
+            Value::Date(_) => <chrono::NaiveDate as Type<Postgres>>::type_info(),
+            Value::Time(_) => <chrono::NaiveTime as Type<Postgres>>::type_info(),
+            Value::DateTime(_) => <chrono::NaiveDateTime as Type<Postgres>>::type_info(),
+            Value::TimestampTz(_) => <chrono::DateTime<chrono::Utc> as Type<Postgres>>::type_info(),
+            Value::Decimal(_) => <rust_decimal::Decimal as Type<Postgres>>::type_info(),
+            Value::Uuid(_) => <uuid::Uuid as Type<Postgres>>::type_info(),
+            Value::Json(_) => <sqlx::types::Json<serde_json::Value> as Type<Postgres>>::type_info(),
+            Value::Undecodable(_) => sqlx::postgres::PgTypeInfo::with_name("TEXT"),
+        })
+        .collect()
 }
 
 async fn collect_query_rows<'a, S>(stream: &mut S, limit: usize) -> Result<QueryResult, DriverError>

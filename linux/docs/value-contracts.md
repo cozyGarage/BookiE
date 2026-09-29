@@ -39,6 +39,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 
 The focused local DuckDB contract passed.
 
+## PostgreSQL zero-row result metadata and ordered delivery, 2026-09-29
+
+A PostgreSQL Docker contract first reproduced a result-delivery defect: a
+zero-row `SELECT` returned no column metadata because the driver populated
+names and types only from the first `PgRow`. The driver now prepares an empty
+result to recover its statement metadata, using the original parameter types
+for bound queries. The regression checks ordered names and native types for
+plain and parameterized empty results, then checks duplicate aliases, values,
+and row order for a populated result.
+
+```sh
+rtk cargo test -p tablepro-driver-postgres --test integration value_contract_result_delivery_keeps_zero_row_metadata_duplicate_names_and_order -- --ignored --exact --test-threads=1
+```
+
+The focused Docker contract passed against PostgreSQL; the empty-result
+metadata defect is fixed.
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.

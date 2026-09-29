@@ -765,6 +765,77 @@ async fn pagination_and_truncated_flag() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_result_delivery_keeps_zero_row_metadata_duplicate_names_and_order() {
+    let (_container, opts) = start_pg().await;
+    let conn = connect(opts).await;
+
+    let empty = conn
+        .query("SELECT 9007199254740993::numeric AS amount, 'payload'::text AS label WHERE false")
+        .await
+        .unwrap();
+    assert!(empty.rows.is_empty());
+    assert!(!empty.truncated);
+    assert_eq!(
+        empty
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["amount", "label"]
+    );
+    assert_eq!(
+        empty
+            .columns
+            .iter()
+            .map(|column| column.data_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["numeric", "text"]
+    );
+
+    let empty_with_params = conn
+        .query_params(
+            "SELECT $1::bigint AS amount, $2::text AS label WHERE false",
+            &[Value::Int(9007199254740993), Value::Text("payload".into())],
+        )
+        .await
+        .unwrap();
+    assert!(empty_with_params.rows.is_empty());
+    assert_eq!(
+        empty_with_params
+            .columns
+            .iter()
+            .map(|column| (column.name.as_str(), column.data_type.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("amount", "int8"), ("label", "text")]
+    );
+
+    let duplicate_names = conn
+        .query(
+            "SELECT 17::bigint AS duplicate, 'second'::text AS duplicate \
+             UNION ALL SELECT 23::bigint, 'fourth'::text",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        duplicate_names
+            .columns
+            .iter()
+            .map(|column| column.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["duplicate", "duplicate"]
+    );
+    assert_eq!(
+        duplicate_names.rows,
+        vec![
+            vec![Value::Int(17), Value::Text("second".into())],
+            vec![Value::Int(23), Value::Text("fourth".into())],
+        ]
+    );
+    assert!(!duplicate_names.truncated);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn bad_sql_returns_query_error() {
     let (_c, opts) = start_pg().await;
     let conn = connect(opts).await;
