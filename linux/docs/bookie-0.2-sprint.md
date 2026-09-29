@@ -1131,6 +1131,10 @@ parser contract, all 11 remaining mutants were caught with no survivors or
 timeouts. The Docker and parser tests passed. Installed GTK-to-MySQL acceptance,
 spatial edits and broader mode coverage remain open.
 
+The strict all-driver runner passed on `c1b393f8d`: all 11 suites and 123
+selected contracts passed with GTK and DuckDB enabled and no missing suites.
+Evidence: `target/quality/20260929T164906704313Z-values/report.json`.
+
 B3 remains open.
 
 ### SQL Server money NULL distinction — September 29

@@ -1644,6 +1644,10 @@ existing Docker-only test was not selecting a pure parser test. After adding
 the unignored contract, the follow-up mutation run caught all 11 remaining
 mutants with no survivors or timeouts; evidence is
 `target/quality/20260929-mysql-bit-parser-mutants/mutants.out/outcomes.json`.
+The strict combined runner passed the app, all seven server drivers, SQLite,
+DuckDB and MCP suites on commit `c1b393f8d`: all 123 selected contracts passed
+with no missing suites. Evidence is
+[`20260929T164906704313Z-values/report.json`](../target/quality/20260929T164906704313Z-values/report.json).
 
 ```sh
 rtk cargo test -p tablepro-app --lib value_contract_mysql_bit_parser_enforces_declared_width_and_safe_range -- --test-threads=1
