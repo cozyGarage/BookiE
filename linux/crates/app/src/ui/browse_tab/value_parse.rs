@@ -540,6 +540,142 @@ mod tests {
         }
     }
 
+    #[test]
+    fn value_contract_mysql_bit_parser_enforces_declared_width_and_safe_range() {
+        for (data_type, input, expected) in [
+            ("bit(1)", "0", Value::Bool(false)),
+            ("bit(1)", "1", Value::Bool(true)),
+            ("bit(2)", "3", Value::Int(3)),
+            ("bit(8)", "170", Value::Int(170)),
+            ("bit(8)", "255", Value::Int(255)),
+            ("bit(63)", "9223372036854775807", Value::Int(i64::MAX)),
+            ("bit(64)", "9223372036854775807", Value::Int(i64::MAX)),
+        ] {
+            assert_eq!(
+                parse_input_for_driver(input, Some(&col(data_type, false)), "mysql"),
+                Ok(expected),
+                "{input:?} as {data_type}"
+            );
+        }
+
+        for (data_type, input) in [
+            ("bit(1)", "2"),
+            ("bit(2)", "4"),
+            ("bit(8)", "256"),
+            ("bit(8)", "-1"),
+            ("bit(64)", "9223372036854775808"),
+        ] {
+            assert!(
+                parse_input_for_driver(input, Some(&col(data_type, false)), "mysql").is_err(),
+                "out-of-range {input:?} must be refused for {data_type}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn value_contract_mysql_bit_parser_edits_preserve_native_values() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
+        use testcontainers::ImageExt;
+        use testcontainers::runners::AsyncRunner;
+        use testcontainers_modules::mysql::Mysql;
+
+        let container = Mysql::default()
+            .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+            .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+            .start()
+            .await
+            .unwrap();
+        let options = ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(3306).await.unwrap(),
+            database: "test".into(),
+            username: "root".into(),
+            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            tls: TlsConfig::disabled(),
+            ..Default::default()
+        };
+        let connection = drivers_mysql::MysqlDriver.connect(options).await.unwrap();
+        connection
+            .execute(
+                "CREATE TABLE bit_edit_contract (
+                    id INT PRIMARY KEY,
+                    one_bit BIT(1),
+                    eight_bit BIT(8),
+                    sixty_three_bit BIT(63),
+                    sixty_four_bit BIT(64)
+                )",
+            )
+            .await
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO bit_edit_contract VALUES
+                 (1, b'1', b'00000000', b'00000000', x'8000000000000000')",
+            )
+            .await
+            .unwrap();
+
+        let columns = connection.fetch_columns(None, "bit_edit_contract").await.unwrap();
+        let column_index = |name: &str| columns.iter().position(|column| column.name == name).unwrap();
+        let id = column_index("id");
+        let one_bit = column_index("one_bit");
+        let eight_bit = column_index("eight_bit");
+        let sixty_three_bit = column_index("sixty_three_bit");
+        let sixty_four_bit = column_index("sixty_four_bit");
+        assert!(columns[id].primary_key);
+        assert_eq!(columns[one_bit].data_type, "bit(1)");
+        assert_eq!(columns[eight_bit].data_type, "bit(8)");
+        assert_eq!(columns[sixty_three_bit].data_type, "bit(63)");
+        assert_eq!(columns[sixty_four_bit].data_type, "bit(64)");
+
+        let bit_one = parse_input_for_driver("0", Some(&columns[one_bit]), "mysql").unwrap();
+        let bit_eight = parse_input_for_driver("170", Some(&columns[eight_bit]), "mysql").unwrap();
+        let bit_sixty_three =
+            parse_input_for_driver("9223372036854775807", Some(&columns[sixty_three_bit]), "mysql").unwrap();
+        assert_eq!(bit_one, Value::Bool(false));
+        assert_eq!(bit_eight, Value::Int(170));
+        assert_eq!(bit_sixty_three, Value::Int(i64::MAX));
+        assert!(parse_input_for_driver("9223372036854775808", Some(&columns[sixty_four_bit]), "mysql").is_err());
+
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "mysql",
+            None,
+            "bit_edit_contract",
+            &columns,
+            &[
+                (one_bit, bit_one),
+                (eight_bit, bit_eight),
+                (sixty_three_bit, bit_sixty_three),
+            ],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+        let saved = connection
+            .query(
+                "SELECT one_bit, eight_bit, sixty_three_bit, sixty_four_bit,
+                        HEX(one_bit), HEX(eight_bit), HEX(sixty_three_bit), HEX(sixty_four_bit)
+                 FROM bit_edit_contract WHERE id = 1",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.rows,
+            vec![vec![
+                Value::Int(0),
+                Value::Int(170),
+                Value::Int(i64::MAX),
+                Value::Bytes(vec![0x80, 0, 0, 0, 0, 0, 0, 0]),
+                Value::Text("0".into()),
+                Value::Text("AA".into()),
+                Value::Text("7FFFFFFFFFFFFFFF".into()),
+                Value::Text("8000000000000000".into()),
+            ]]
+        );
+    }
+
     #[tokio::test]
     #[ignore = "requires docker"]
     async fn postgres_numeric_parser_outputs_round_trip_through_server() {

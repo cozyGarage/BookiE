@@ -1622,6 +1622,34 @@ that mode-independent output needs session-aware DDL execution. Run it with
 Session time-zone and stricter SQL-mode matrices, installed-app-to-MySQL grid
 acceptance and broader consumer parity remain open.
 
+### MySQL BIT parser, keyed edit and server value contract
+
+The app-level Docker contract reads the actual `bit(1)`, `bit(8)`, `bit(63)`
+and `bit(64)` column metadata, parses edits with the grid input parser, builds
+the keyed update and writes through the MySQL driver. A false BIT(1), value 170
+in BIT(8), and `i64::MAX` in BIT(63) are compared with both decoded results and
+MySQL `HEX()` output. A BIT(64) value with its high bit set remains exact bytes;
+the parser refuses an edit above the shared signed integer range. GTK-level
+tests separately keep such bytes and spatial cells read-only.
+
+```sh
+rtk cargo test -p tablepro-app --lib value_contract_mysql_bit_parser_edits_preserve_native_values -- --include-ignored --test-threads=1
+```
+
+The focused Docker contract passed. Installed-app interaction and other MySQL
+session modes remain separate acceptance targets. The unignored parser contract
+checks BIT(1), (2), (8), (63) and (64) widths, width-specific maxima, negative
+input and the shared signed bound. The first mutation run found that the
+existing Docker-only test was not selecting a pure parser test. After adding
+the unignored contract, the follow-up mutation run caught all 11 remaining
+mutants with no survivors or timeouts; evidence is
+`target/quality/20260929-mysql-bit-parser-mutants/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test -p tablepro-app --lib value_contract_mysql_bit_parser_enforces_declared_width_and_safe_range -- --test-threads=1
+rtk cargo mutants --in-place --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_mysql_bit_value|mysql_bit_width' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260929-mysql-bit-parser-mutants -- --lib mysql_bit
+```
+
 ## SQLite dynamic storage-class checkpoint
 
 A new file-backed regression starts a `NUMERIC` column with TEXT, BLOB and NULL

@@ -1115,6 +1115,24 @@ Open findings from the audit:
 
 B3 remains open.
 
+### B3 MySQL BIT parser and keyed grid path — September 29
+
+The app now has an unignored parser contract for BIT(1), (2), (8), (63) and
+(64), including each width boundary, negative input and the signed-value limit.
+A Docker-backed app test takes BIT(1), BIT(8) and BIT(63) edits through the
+parser, keyed-update builder and MySQL driver, then checks decoded values and
+independent `HEX()` server output. BIT(64) with its high bit set remains exact
+bytes and cannot be edited as a signed integer; GTK tests keep wide binary and
+spatial values read-only.
+
+The first scoped mutation attempt discovered there was no unignored BIT parser
+test; its filter had selected only the ignored Docker case. After adding the
+parser contract, all 11 remaining mutants were caught with no survivors or
+timeouts. The Docker and parser tests passed. Installed GTK-to-MySQL acceptance,
+spatial edits and broader mode coverage remain open.
+
+B3 remains open.
+
 ### SQL Server money NULL distinction — September 29
 
 The existing `money`/`smallmoney` contract already proved that non-NULL values
