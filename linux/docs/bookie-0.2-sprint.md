@@ -1367,3 +1367,24 @@ timeouts. Evidence:
 `target/quality/20260929-duckdb-timestamptz-guard-mutants-final/mutants.out/outcomes.json`.
 
 B3 remains open.
+
+### MongoDB top-level ObjectId grid edit — September 29
+
+A Docker-backed MongoDB 7 contract edits a non-key ObjectId field through the
+keyed-update path. It checks the returned `$oid`, confirms the row `_id` is
+unchanged, and verifies both fields as native `Bson::ObjectId` values through an
+independent client. The existing app parser unit covers `$oid` classification;
+this closes the server-backed driver/edit gap without claiming collection-wide
+heterogeneity or every top-level BSON edit is complete. The focused test passed,
+and the clean strict runner passed 129 selected contracts across 11 suites at
+`63d67fc915e95c87ffbd8c7f781b60ca56a65657`, with no missing suites. Evidence:
+`target/quality/20260929T202504448591Z-values/report.json` (`dirty: false`;
+MongoDB selected 8 contracts, including the new edit).
+
+Focused command:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contracts::value_contract_object_id_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
+```
+
+B3 remains open.

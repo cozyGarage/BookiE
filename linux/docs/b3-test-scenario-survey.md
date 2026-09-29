@@ -2,13 +2,13 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled against source
-`887a1bd61060e5c604e9d4e52cb821de4dcf2202` and documentation tip `49faf79bb`,
+`63d67fc915e95c87ffbd8c7f781b60ca56a65657` and documentation tip `ba1803525`,
 including September 26–29 changes. The source baseline contains Redis RESP3
 nested-value/binary and attribute-wire contracts, explicit
 PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
 server-boundary evidence and safe SQL Server `sql_variant` refusal. The upstream
 review sampled eight test files in four projects and two issue reports. The
-strict selected-contract report passed 128 tests across 11 suites at the source
+strict selected-contract report passed 129 tests across 11 suites at the source
 tip, with no missing suites; this is not a fresh execution of every crate test
 or installed-app workflow. Evidence:
 `target/quality/20260929T200632950370Z-values/report.json`.
@@ -100,11 +100,12 @@ some top-level server-backed edits. Redis's one-shot API explicitly refuses
 Pub/Sub, MONITOR and CLIENT TRACKING ON; the local RESP3 attribute-wire test
 passes, while asynchronous push consumption remains unsupported.
 
-The smallest next implementation case is a top-level MongoDB ObjectId regular
-field edit. Unit evidence already covers `$oid` parser classification and
-Extended JSON to BSON conversion, but no named Docker contract persists an edit
-to a non-`_id` ObjectId field. Add the native-client value/type oracle and keep
-the row `_id` unchanged. Planned test and command are recorded in
+The first smallest MongoDB edit gap found here—a top-level ObjectId regular
+field—has since been closed by `value_contract_object_id_grid_edit_preserves_native_bson`.
+It keeps `_id` stable, reloads the edited `$oid`, and checks the stored BSON type
+through an independent client. The clean strict report shows this test among
+MongoDB's eight selected contracts. Collection-wide heterogeneity and other
+unnamed top-level edits remain open; see the updated
 [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,

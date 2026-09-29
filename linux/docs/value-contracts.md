@@ -1846,27 +1846,26 @@ stored code and its Int64 scope value; the Symbol and DbPointer regressions read
 back native BSON values through the MongoDB client. The mixed String/Decimal128
 grid case is covered as a read-only refusal; exact editing remains unsupported.
 The current native-server grid matrix covers Timestamp, regex, MinKey, MaxKey,
-JavaScriptCode, JavaScriptCodeWithScope, Symbol, Undefined, DbPointer and
-Decimal128. A top-level ObjectId regular field is the smallest remaining
-server-backed edit case: canonical `$oid` conversion and parser classification
-are covered by unit tests, but the keyed update has not yet been checked against
-MongoDB's stored BSON type/value. Other top-level kinds without a named
-server-backed edit remain open too.
+JavaScriptCode, JavaScriptCodeWithScope, Symbol, Undefined, DbPointer,
+Decimal128 and now a top-level ObjectId regular field. The ObjectId contract
+keeps `_id` stable, performs a keyed update to the `reference` field, checks the
+reloaded `$oid`, then uses an independent MongoDB client to confirm both native
+ObjectId values. The existing app parser unit separately checks `$oid`
+classification. Other top-level kinds without a named server-backed edit and
+collection-wide heterogeneity outside the metadata sample and returned page
+remain open.
 
-Next B3-P4 case: add `value_contract_object_id_grid_edit_preserves_native_bson`
-to `crates/drivers/mongodb/tests/support/value_contracts.rs`. Use a non-key
-ObjectId field, preserve the row's `_id`, edit through the app parser and keyed
-update builder, then compare the reloaded `$oid` and an independent
-`mongodb::bson::Bson::ObjectId` oracle. The focused runner command is:
+The focused ObjectId grid contract is:
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contracts::value_contract_object_id_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
 ```
 
-Coverage review source tip: `887a1bd61060e5c604e9d4e52cb821de4dcf2202`;
-current documentation tip: `49faf79bb`. The clean all-driver selected-contract
-run at the source tip passed 128 tests across 11 suites, no missing suites:
-`target/quality/20260929T200632950370Z-values/report.json`. This is selected
+The focused MongoDB 7 test passed. The clean all-driver selected-contract run
+at source tip `63d67fc915e95c87ffbd8c7f781b60ca56a65657` passed 129 tests across
+11 suites with no missing suites; MongoDB selected all eight contracts,
+including this case. Evidence:
+`target/quality/20260929T202504448591Z-values/report.json`. This is selected
 contract evidence, not a claim that every crate test or installed UI path ran.
 
 Focused local checks:
