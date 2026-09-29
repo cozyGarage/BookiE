@@ -87,6 +87,16 @@ class LayerRunnerTests(unittest.TestCase):
         for path in (ROOT / "scripts/tests").glob("test_*.py"):
             self.assertTrue("unittest.TestCase" in path.read_text() or f"scripts/tests/{path.name}" in explicit, path.name)
 
+    def test_app_support_fixture_inventory_uses_its_library_test_target(self):
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "scripts/inventory-ignored-tests.py")],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        self.assertIn("../crates/app/tests/support/value_parse.rs)", result.stdout)
+        self.assertIn("cargo test -p tablepro-app --lib value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision", result.stdout)
+
     def test_linux_workflows_are_all_registered_for_lint(self):
         workflows = ROOT.parent / ".github/workflows"
         expected = {f"../.github/workflows/{path.name}" for path in workflows.glob("*linux*.yml")}

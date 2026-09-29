@@ -37,7 +37,11 @@ def package_owning(path, packages):
 def docker_activation(path, name, packages):
     package = package_owning(path, packages)
     relative = path.relative_to(root)
-    if relative.parts[-2] == "tests":
+    if package == "tablepro-app" and relative.parts[-3:-1] == ("tests", "support"):
+        # Included through #[path] from a cfg(test) app module, rather than a
+        # Cargo integration-test crate. Keep its activation command on --lib.
+        selector = f"--lib {name}"
+    elif relative.parts[-2] == "tests":
         selector = f"--test {path.stem}"
     elif "src" in relative.parts:
         selector = f"--lib {name}"

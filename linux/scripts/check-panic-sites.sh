@@ -39,9 +39,9 @@ declared_module_files() {
     dir="$(dirname "$file")"
     while IFS= read -r target; do
       if [[ -f "$dir/$target" ]]; then
-        printf '%s\n' "$dir/$target"
+        printf '%s\n' "$(realpath -m "$dir/$target")"
       elif [[ -f "$dir/${target%.rs}/mod.rs" ]]; then
-        printf '%s\n' "$dir/${target%.rs}/mod.rs"
+        printf '%s\n' "$(realpath -m "$dir/${target%.rs}/mod.rs")"
       fi
     done < <(awk -v gated_only="$gated_only" '
       BEGIN { if (!gated_only) pending = 1 }
