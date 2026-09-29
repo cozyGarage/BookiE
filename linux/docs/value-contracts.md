@@ -59,6 +59,29 @@ selected contracts on the source tree including this regression and the added
 numeric parser cases; see
 [`20260929T161811049211Z-values/report.json`](../target/quality/20260929T161811049211Z-values/report.json).
 
+## PostgreSQL server termination and pool recovery, 2026-09-29
+
+A failing-first Docker contract terminated an active PostgreSQL backend and
+showed SQLSTATE `57P01` was surfaced as an ordinary query error. The driver now
+classifies PostgreSQL server termination states `57P01` through `57P04` as
+`Disconnected`; the normal query-cancel state `57014` remains a query error. The
+contract checks that the terminated operation fails visibly and that the same
+pooled connection can complete a fresh `SELECT 1` afterward. A unit contract
+distinguishes the termination states from query cancellation and constraint
+errors.
+
+```sh
+rtk cargo test -p tablepro-driver-postgres --lib server_termination_states_are_disconnections_but_query_cancel_is_not
+rtk cargo test -p tablepro-driver-postgres --test integration server_terminated_query_reports_disconnection_and_pool_recovers -- --include-ignored --exact --test-threads=1
+```
+
+Both focused tests passed. The scoped mutation run caught both generated
+classifier changes. The clean strict value runner passed 131 selected tests
+across all 11 suites at source `7b9659575fc206027d24849ff0f42087c5dbb0a5`, with
+no missing suites. Evidence:
+`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`
+and `target/quality/20260929T210639863435Z-values/report.json` (`dirty: false`).
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.

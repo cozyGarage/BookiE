@@ -1115,6 +1115,25 @@ Open findings from the audit:
 
 B3 remains open.
 
+### PostgreSQL server disconnect classification — September 29
+
+A failing-first PostgreSQL 16 Docker test terminated an active query backend.
+Before the fix, SQLSTATE `57P01` surfaced as an ordinary query error. The driver
+now classifies server termination states `57P01`–`57P04` as `Disconnected`, while
+preserving `57014` cancellation as a query error. The contract verifies the
+terminated query cannot succeed or hang, and that the pooled connection can
+answer `SELECT 1` afterward. A unit test covers the termination/cancellation
+distinction.
+
+The focused unit and Docker tests passed; scoped mutation testing caught both
+classifier mutants. The clean strict runner passed 131 selected contracts across
+11 suites with no missing suites at source
+`7b9659575fc206027d24849ff0f42087c5dbb0a5`. Evidence:
+`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`
+and `target/quality/20260929T210639863435Z-values/report.json`.
+
+B3 remains open.
+
 ### MongoDB BSON DateTime grid-edit precision — September 29
 
 A failing-first app parser test showed that MongoDB `date` cells display RFC3339

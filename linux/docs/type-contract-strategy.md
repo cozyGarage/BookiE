@@ -1,7 +1,7 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against source at `93d60ea818fe7d4c283bb86440deb7cf2501fe29`
-and documentation tip `3b7cd22c8` on 2026-09-29. The source baseline includes
+Coverage reconciled against source at `7b9659575fc206027d24849ff0f42087c5dbb0a5`
+and documentation tip `5a37c12de` on 2026-09-29. The source baseline includes
 the Redis RESP3 contracts, PostgreSQL multirange metadata cases, ClickHouse
 DateTime64(9) boundary behavior and SQL Server's safe `sql_variant` metadata
 refusal, DuckDB mixed-interval exact-text round trips, and MySQL comment behavior
@@ -11,7 +11,7 @@ decoding. The strict value suite passed on this clean baseline with 16 DuckDB,
 4 Redis, 8 MongoDB driver and 10 app contracts (131 selected tests across 11
 suites, no missing suites);
 other gates remain distinct from this source/test inventory. Evidence:
-`target/quality/20260929T200632950370Z-values/report.json`.
+`target/quality/20260929T210639863435Z-values/report.json` (`dirty: false`).
 
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.
@@ -97,7 +97,7 @@ BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms
 input before writes. The latter combines app parsing, keyed update construction,
 and an independent MongoDB client oracle. The clean strict run passed 131
 selected contracts across 11 suites at
-`93d60ea818fe7d4c283bb86440deb7cf2501fe29`. Collection-wide heterogeneity and
+`7b9659575fc206027d24849ff0f42087c5dbb0a5`. Collection-wide heterogeneity and
 named top-level edits without native-server assertions remain open; evidence is
 in [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
