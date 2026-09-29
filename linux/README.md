@@ -18,8 +18,7 @@ BookiE 0.1.4 (tag `linux-v0.1.4`) targets:
 
 | Distro | Arch | Artifact | Package name | Launch |
 |---|---|---|---|---|
-| Ubuntu 25.10+ | amd64 | `tablepro_0.1.4-1_amd64.deb` | `tablepro` | `bookie` |
-| Debian testing with GNOME 50 libraries | amd64 | same `.deb` | `tablepro` | `bookie` |
+| Debian / Ubuntu with the required GNOME 50 libraries | amd64 | `tablepro_0.1.4-1_amd64.deb` | `tablepro` | `bookie` |
 | Arch Linux / Omarchy | x86_64 | `bookie-0.1.4-1-x86_64.pkg.tar.zst` | `bookie` | `bookie` |
 
 `tablepro` and `tablepro-agentd` remain aliases. Application ID and XDG paths stay `com.tablepro.linux` / `tablepro`.
@@ -54,7 +53,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 | Async work | Tokio for database and service work, GLib main context for GTK |
 | Drivers | sqlx, tiberius, clickhouse, and engine-specific Rust crates |
 | Storage | XDG JSON files, SQLite FTS5, JSONL audit journal, Secret Service through `oo7` |
-| Packaging | GitHub Release `.deb` (Ubuntu 25.10+) and Arch `.pkg`; no AUR or Flathub yet |
+| Packaging | GitHub Release `.deb` (required native libraries below) and Arch `.pkg`; no AUR or Flathub yet |
 
 Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
 
@@ -154,6 +153,7 @@ The helper archives that commit, verifies a real checksum, and does not publish 
 | Storage | [docs/storage.md](docs/storage.md) |
 | Error handling | [docs/error-handling.md](docs/error-handling.md) |
 | Testing | [docs/testing.md](docs/testing.md) |
+| Latest regression audit | [docs/regression-audit-2026-09-29.md](docs/regression-audit-2026-09-29.md) |
 | Architecture decisions | [docs/decisions/](docs/decisions/) |
 
 ## License

@@ -156,6 +156,60 @@ async fn rows_in(guard: &PolicyGuard, sql: &str) -> Vec<Vec<Value>> {
 }
 
 #[tokio::test]
+async fn value_contract_csv_binary_export_import_keeps_null_empty_and_every_byte() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled(
+            "CREATE TABLE payloads (id INTEGER PRIMARY KEY, payload BLOB)",
+            &control(),
+        )
+        .await
+        .expect("create");
+    let columns = vec![column("id", "INTEGER"), column("payload", "BLOB")];
+    let expected = vec![
+        vec![Value::Int(1), Value::Null],
+        vec![Value::Int(2), Value::Bytes(vec![])],
+        vec![Value::Int(3), Value::Bytes((0..=255).collect())],
+    ];
+    let csv = tablepro_core::export::render_csv(&columns, &expected, &tablepro_core::export::CsvOptions::default());
+    let plan = plan_for("payloads", &columns, csv.as_bytes());
+    assert_eq!(plan.rows, expected);
+    let mut scope = begin(&fixture.guard, "payloads", &plan).await;
+    run_batches(&fixture.guard, &mut scope, "payloads", &plan, None)
+        .await
+        .expect("import");
+    assert_eq!(
+        fixture
+            .guard
+            .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+            .await
+            .unwrap(),
+        3
+    );
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT id, payload FROM payloads ORDER BY id").await,
+        expected
+    );
+    assert_eq!(
+        rows_in(
+            &fixture.guard,
+            "SELECT typeof(payload), length(payload) FROM payloads ORDER BY id"
+        )
+        .await,
+        vec![
+            vec![Value::Text("null".into()), Value::Null],
+            vec![Value::Text("blob".into()), Value::Int(0)],
+            vec![Value::Text("blob".into()), Value::Int(256)],
+        ],
+    );
+    assert_eq!(
+        fixture.audit.import_outcomes(),
+        vec![(AuditTerminalStatus::Succeeded, Some(3))]
+    );
+}
+
+#[tokio::test]
 async fn a_csv_file_creates_the_table_it_is_loaded_into_and_fills_it() {
     let fixture = fixture().await;
     let csv = b"id,name,joined\n1,ada,2024-05-06\n2,grace,2024-05-07\n3,alan,2024-05-08\n";

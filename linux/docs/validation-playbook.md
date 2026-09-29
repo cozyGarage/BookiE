@@ -26,7 +26,7 @@ python3 scripts/run-test-layer.py quick
 python3 scripts/run-test-layer.py change-contracts
 python3 scripts/run-test-layer.py security-policy supply-chain
 python3 scripts/run-test-layer.py drivers tls postgres-release
-python3 scripts/run-test-layer.py widgets keyring ui
+python3 scripts/run-test-layer.py widgets app-server keyring ui
 python3 scripts/run-test-layer.py values
 ```
 
@@ -48,7 +48,9 @@ tests. Edit `scripts/change-test-map.json` when adding a focused value
 regression. Driver integration-test files stay in the Docker `drivers` layer,
 which executes those server fixtures. The runner fails if Cargo returns success
 without a passing test summary or if an expected exact test does not appear
-exactly once as passed.
+exactly once as passed, with a single summary, no ignored or measured tests, and matching counts.
+The named-test runners share `scripts/rust_test_evidence.py`; full workspace
+summaries allow ignored fixture tests because their owning layers execute them.
 
 Choose the layers affected by the change; the examples are separate invocations,
 not a requirement to repeat overlapping unit suites. The runner executes selected
@@ -96,7 +98,7 @@ incomplete, never passed. Review every step status, not just the final log line.
 | `quick` | Guards, formatting, non-GTK Clippy, units and sandbox | Rust 1.98 and native libraries |
 | `full` | Default workspace checks including app logic | GNOME 50 development stack; no display automation or DuckDB |
 | `sandbox` | Integration tests without external servers or a display | Local sockets/processes must be allowed |
-| `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
+| `drivers` | PostgreSQL, MySQL, MSSQL, ClickHouse, Redis, MongoDB, MCP BSON, policy sessions, PostgreSQL socket and SSH | Docker and OpenSSH; SQLite is in sandbox, DuckDB has its own Build job |
 | `values` | Exact values across eight drivers, core, app and MCP | Docker, GTK build dependencies, optional DuckDB build; strict selected-test counts |
 | `tls` | CA, hostname, encryption and plaintext refusal against real servers | Docker Compose and generated private fixture certificates |
 | `ssh` | SSH agent authentication and OpenSSH sessions | Docker and OpenSSH client tools |
@@ -104,6 +106,7 @@ incomplete, never passed. Review every step status, not just the final log line.
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GNOME 50, Xvfb and private D-Bus |
+| `app-server` | Exact registered app numeric-parser PostgreSQL round trip | GNOME 50 build libraries and Docker; hosted GTK fast job |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GNOME 50, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 

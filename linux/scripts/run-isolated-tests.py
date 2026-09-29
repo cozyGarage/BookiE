@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+from rust_test_evidence import completed_tests
+
 root = Path(__file__).resolve().parents[1]
 registry = json.loads((root / "scripts/isolated-tests.json").read_text())
 entries = registry[sys.argv[1]]
@@ -14,8 +16,9 @@ for package, target, name in entries:
     selection = [target] if target.startswith("--") else ["--test", target]
     command = ["cargo", "test", "--locked", "-p", package, *selection,
                "--", "--ignored", "--exact", name, "--test-threads=1"]
-    result = subprocess.run(command, cwd=root, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    result = subprocess.run(command, cwd=root, text=True, capture_output=True)
     print(result.stdout, flush=True)
-    if result.returncode or "test result: ok. 1 passed;" not in result.stdout:
+    print(result.stderr, file=sys.stderr, flush=True)
+    if result.returncode or not completed_tests(result.stdout, [name]):
         raise SystemExit(f"isolated test failed or did not execute exactly once: {name}")
 print(f"{sys.argv[1]}: {len(entries)} tests executed successfully")

@@ -3,12 +3,12 @@ import argparse
 import datetime
 import json
 import os
-import re
-from collections import Counter
 from pathlib import Path
 import subprocess
 import sys
 import time
+
+from rust_test_evidence import completed_tests
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVERS = ("postgres", "mysql", "sqlite", "mssql", "clickhouse", "redis", "mongodb")
@@ -70,13 +70,6 @@ def compile_suites(command, expected, directory):
                 artifacts[artifact[0]] = artifact[1]
         status = process.wait()
     return artifacts, {"exit_code": status, "seconds": round(time.monotonic() - started, 3), "fresh_artifacts": fresh, "rebuilt_packages": sorted(rebuilt)}
-
-
-def completed_tests(output, expected):
-    passed = re.findall(r"^test (.+) \.\.\. ok$", output, re.MULTILINE)
-    summaries = re.findall(r"^test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored; (\d+) measured; (\d+) filtered out", output, re.MULTILINE)
-    return (Counter(passed) == Counter(expected) and len(summaries) == 1
-            and tuple(map(int, summaries[0][:4])) == (len(expected), 0, 0, 0))
 
 
 def run_suite(manifest, executable, directory):

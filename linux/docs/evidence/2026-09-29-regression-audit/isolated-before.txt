@@ -1,0 +1,41 @@
+.FFF.F
+======================================================================
+FAIL: test_duplicate_summaries_cannot_satisfy_a_registered_test (test_isolated_runner.IsolatedRunnerTests.test_duplicate_summaries_cannot_satisfy_a_registered_test)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tmpkdtjdrmf/scripts/tests/test_isolated_runner.py", line 36, in test_duplicate_summaries_cannot_satisfy_a_registered_test
+    self.assertNotEqual(result.returncode, 0)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_every_registered_name_must_execute (test_isolated_runner.IsolatedRunnerTests.test_every_registered_name_must_execute)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tmpkdtjdrmf/scripts/tests/test_isolated_runner.py", line 48, in test_every_registered_name_must_execute
+    self.assertNotEqual(result.returncode, 0)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_ignored_tests_cannot_satisfy_a_registered_test (test_isolated_runner.IsolatedRunnerTests.test_ignored_tests_cannot_satisfy_a_registered_test)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tmpkdtjdrmf/scripts/tests/test_isolated_runner.py", line 40, in test_ignored_tests_cannot_satisfy_a_registered_test
+    self.assertNotEqual(result.returncode, 0)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+======================================================================
+FAIL: test_wrong_test_name_cannot_satisfy_a_registered_test (test_isolated_runner.IsolatedRunnerTests.test_wrong_test_name_cannot_satisfy_a_registered_test)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/tmpkdtjdrmf/scripts/tests/test_isolated_runner.py", line 32, in test_wrong_test_name_cannot_satisfy_a_registered_test
+    self.assertNotEqual(result.returncode, 0)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.432s
+
+FAILED (failures=4)

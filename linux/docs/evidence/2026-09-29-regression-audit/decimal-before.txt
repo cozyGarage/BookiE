@@ -1,0 +1,22 @@
+
+running 1 test
+test import::cell::tests::value_contract_formula_safe_decimal_import_rejects_excess_precision ... FAILED
+
+failures:
+
+---- import::cell::tests::value_contract_formula_safe_decimal_import_rejects_excess_precision stdout ----
+
+thread 'import::cell::tests::value_contract_formula_safe_decimal_import_rejects_excess_precision' (1385377) panicked at crates/core/src/import/cell.rs:426:22:
+excess precision must not be rounded: [Decimal(-0.1234567890123456789012345679)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    import::cell::tests::value_contract_formula_safe_decimal_import_rejects_excess_precision
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 457 filtered out; finished in 0.00s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.49s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+error: test failed, to rerun pass `-p tablepro-core --lib`

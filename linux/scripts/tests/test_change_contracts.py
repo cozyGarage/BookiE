@@ -1,8 +1,10 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 SPEC = importlib.util.spec_from_file_location("run_change_contract_tests", ROOT / "run-change-contract-tests.py")
 CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
@@ -55,8 +57,20 @@ class ChangeContractTests(unittest.TestCase):
 
     def test_exact_regression_must_appear_once_in_passed_output(self):
         name = "module::regression"
-        valid = f"test {name} ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored\n"
+        valid = f"test {name} ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
         self.assertTrue(CHECKER.exact_test_evidence(valid, name))
         self.assertFalse(CHECKER.exact_test_evidence("test result: ok. 1 passed; 0 failed; 0 ignored\n", name))
         duplicate = f"test {name} ... ok\ntest {name} ... ok\ntest result: ok. 2 passed; 0 failed; 0 ignored\n"
         self.assertFalse(CHECKER.exact_test_evidence(duplicate, name))
+
+    def test_exact_regression_rejects_ignored_measured_and_multiple_summaries(self):
+        name = "module::regression"
+        line = f"test {name} ... ok\n"
+        for summary in [
+            "test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 1 measured; 0 filtered out\n",
+            "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n",
+        ]:
+            with self.subTest(summary=summary):
+                self.assertFalse(CHECKER.exact_test_evidence(line + summary, name))

@@ -1,6 +1,6 @@
 # Packaging
 
-GitHub Release `linux-v0.1.4` ships an Arch/Omarchy `.pkg.tar.zst` and an Ubuntu 25.10 `.deb`.
+GitHub Release `linux-v0.1.4` ships an Arch/Omarchy `.pkg.tar.zst` and an amd64 `.deb`.
 Nothing here is ready for AUR or Flathub. BookiE keeps the existing repository and
 application ID. Portal permissions and the public update channel still need release review.
 
@@ -40,7 +40,8 @@ the user's XDG configuration, data, state, and keyring records untouched.
 
 ## Debian / Ubuntu package
 
-The amd64 `.deb` on the `linux-v0.1.4` GitHub Release is built on Ubuntu 25.10.
+Current GTK CI uses a Debian testing container. A distro name alone does not
+establish compatibility with a rebuilt `.deb`; verify its required libraries.
 The GNOME 50 baseline needs GTK 4.22, GLib 2.88, libadwaita 1.9 and GtkSourceView 5.18.
 Use `flatpak/com.tablepro.linux.Devel.json` for an isolated development Flatpak.
 

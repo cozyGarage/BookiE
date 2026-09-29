@@ -2,9 +2,11 @@ import importlib.util
 from pathlib import Path
 import unittest
 import tempfile
+import sys
 from unittest.mock import patch
 
 path = Path(__file__).resolve().parents[1] / "test-value-contracts.py"
+sys.path.insert(0, str(path.parent))
 spec = importlib.util.spec_from_file_location("value_runner", path)
 runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
@@ -71,6 +73,10 @@ class ValueRunnerTests(unittest.TestCase):
         self.assertTrue(runner.completed_tests(output, ["value_contract_case"]))
         self.assertFalse(runner.completed_tests(output + output, ["value_contract_case"]))
         self.assertFalse(runner.completed_tests(output, ["value_contract_case", "value_contract_missing"]))
+        self.assertFalse(runner.completed_tests(
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n", []))
+        duplicate = "test value_contract_case ... ok\n" * 2 + "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n"
+        self.assertFalse(runner.completed_tests(duplicate, ["value_contract_case"] * 2))
 
     def test_nonzero_exit_is_never_overridden_by_success_output(self):
         listed = runner.subprocess.CompletedProcess([], 0, "value_contract_case: test\n", "")

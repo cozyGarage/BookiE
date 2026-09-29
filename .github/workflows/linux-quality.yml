@@ -100,6 +100,7 @@ jobs:
               --file crates/drivers/postgres/src/array.rs \
               --file crates/drivers/postgres/src/numeric.rs \
               --file crates/drivers/postgres/src/temporal.rs \
+              --file crates/drivers/postgres/src/decode.rs \
               -- --lib --test integration value_contract -- --include-ignored --test-threads=1
           else
             cargo mutants "${args[@]}" -- --lib

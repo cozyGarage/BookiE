@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- CSV imports accept the `\x` hexadecimal blob format written by exports, preserving empty blobs and NULL separately.
+- Formula-safe decimal CSV imports reject excess precision instead of rounding it.
 - CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
 - MongoDB browse pages mark BSON fields as mixed when values on the page differ from the metadata sample, keeping lossy mixed-type cells read-only.

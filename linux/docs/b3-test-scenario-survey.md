@@ -178,6 +178,9 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   built-in `integer[]` grid write-back passes with NULL preserved. Broader array
   types and automatic parameter typing remain open. See the
   [array checkpoint](value-contracts.md#postgresql-array-checkpoint).
+- PostgreSQL IPv6 `inet[]` now has a bounded safe-refusal contract: independent
+  server type/text/JSON and per-element host/prefix/family oracles pass, while
+  result, SQL-literal and parameter consumers refuse the unsupported array.
 - B3-2 implementation follow-up: end-of-day time and timetz offsets have a
   [server round-trip contract](value-contracts.md#postgresql-time-checkpoint);
   temporal eras, infinities, mixed intervals and temporal arrays are also covered.

@@ -1,14 +1,49 @@
 from pathlib import Path
 import importlib.util
+import json
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 spec = importlib.util.spec_from_file_location("ci_jobs", ROOT / "linux/scripts/check-ci-jobs.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
+bounded_spec = importlib.util.spec_from_file_location("bounded_operations", ROOT / "linux/scripts/check-bounded-operations.py")
+bounded_checker = importlib.util.module_from_spec(bounded_spec)
+bounded_spec.loader.exec_module(bounded_checker)
 
 
 class CiWorkflowTests(unittest.TestCase):
+    def test_bounded_operation_guard_catches_multiline_calls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "fixture.rs"
+            source.write_text("connection\n    .query(\"SELECT 1\");\nconn.fetch_columns(None, \"x\");\nconnection.execute_controlled(\"ok\", &control);\n")
+            found = list(bounded_checker.unbounded_calls([source]))
+        self.assertEqual([row[2] for row in found], ["connection .query(", "conn.fetch_columns("])
+
+    def test_cross_consumer_server_targets_are_gated_and_documented(self):
+        local = (ROOT / "linux/scripts/ci-local.sh").read_text()
+        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+            self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
+        registry = json.loads((ROOT / "linux/scripts/isolated-tests.json").read_text())
+        self.assertEqual(registry["app-server"], [["tablepro-app", "--lib", "ui::browse_tab::value_parse::tests::postgres_numeric_parser_outputs_round_trip_through_server"]])
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
+        for required in ["run-test-layer.py app-server", "/var/run/docker.sock:/var/run/docker.sock"]:
+            self.assertIn(required, fast)
+        ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
+        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+            self.assertIn(f"-p {package} --test {target}", ledger)
+        self.assertIn("-p tablepro-app --lib postgres_numeric_parser", ledger)
+        self.assertNotIn("tablepro-driver-tests", ledger)
+        self.assertNotIn("tablepro-driver-src", ledger)
+
+    def test_full_gate_enforces_function_size_like_preflight(self):
+        script = (ROOT / "linux/scripts/ci-local.sh").read_text()
+        full = script.split("run_full() {", 1)[1].split("run_integration()", 1)[0]
+        self.assertIn("python3 scripts/check-function-size.py", full)
+
     def test_jobs_share_an_immutable_checkout(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         self.assertNotIn("continue-on-error:", workflow)

@@ -26,6 +26,11 @@ class MutationWorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", mutation)
         self.assertIn("--lib --test integration value_contract -- --include-ignored", mutation)
 
+    def test_postgres_mutations_include_every_binary_value_decoder(self):
+        text = WORKFLOW.read_text().split("  coverage:")[0]
+        for module in ["array", "numeric", "temporal", "decode"]:
+            self.assertIn(f"--file crates/drivers/postgres/src/{module}.rs", text)
+
     def test_missing_mutation_reports_cannot_pass_the_summary(self):
         text = WORKFLOW.read_text()
         section = text.split("      - name: Summarise surviving mutants\n", 1)[1]

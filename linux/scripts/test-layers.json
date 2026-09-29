@@ -93,7 +93,7 @@
       ]
     },
     "drivers": {
-      "purpose": "Six server drivers, PostgreSQL sockets and SSH fixtures",
+      "purpose": "Six server drivers, MCP BSON, policy PostgreSQL sessions, sockets and SSH fixtures",
       "prerequisites": "Rust 1.98; Docker; OpenSSH client tools",
       "hosted_gate": "Build Linux / integration",
       "steps": [
@@ -150,6 +150,18 @@
           ],
           "timeout_seconds": 1200,
           "evidence": "rust-tests"
+        }
+      ]
+    },
+    "app-server": {
+      "purpose": "App numeric parser writes and PostgreSQL server round trips",
+      "prerequisites": "Rust 1.98; GNOME 50 development stack; Docker",
+      "hosted_gate": "Build Linux / fast",
+      "steps": [
+        {
+          "argv": ["python3", "scripts/run-isolated-tests.py", "app-server"],
+          "timeout_seconds": 900,
+          "evidence": "exit"
         }
       ]
     },

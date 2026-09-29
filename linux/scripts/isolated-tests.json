@@ -1,4 +1,11 @@
 {
+  "app-server": [
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::tests::postgres_numeric_parser_outputs_round_trip_through_server"
+    ]
+  ],
   "gtk": [
     [
       "tablepro-app",

@@ -39,6 +39,9 @@ run_full() {
   echo "==> panic sites in production code"
   "$ROOT/scripts/check-panic-sites.sh"
 
+  echo "==> function sizes"
+  python3 scripts/check-function-size.py
+
   echo "==> cargo fmt --check"
   cargo fmt --all -- --check
 
@@ -64,6 +67,8 @@ run_integration() {
     -p tablepro-driver-postgres -p tablepro-driver-mysql -p tablepro-driver-mssql \
     -p tablepro-driver-clickhouse -p tablepro-driver-redis -p tablepro-driver-mongodb \
     -- --include-ignored --test-threads=1
+  cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --test-threads=1
+  cargo test --locked -p tablepro-policy --test session_postgres -- --include-ignored --test-threads=1
   echo "==> PostgreSQL Unix-socket integration"
   ./scripts/test-postgres-socket.sh
   bash ./scripts/test-ssh.sh
@@ -74,6 +79,7 @@ run_release() {
   run_full
   bash "$ROOT/scripts/test-gtk-widgets.sh"
   run_integration
+  python3 scripts/run-isolated-tests.py app-server
   "$ROOT/scripts/test-driver-tls.sh"
   "$ROOT/scripts/test-secret-service.sh"
   echo "==> PostgreSQL release fixture"

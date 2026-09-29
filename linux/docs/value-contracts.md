@@ -25,6 +25,26 @@ failure or five-minute fixture timeout makes the command fail. Every selected su
 report is under `target/quality/*-values/report.json`. Failures in one engine do
 not prevent the other compiled suites from running.
 
+## CSV regression audit, 2026-09-29
+
+The [regression audit](regression-audit-2026-09-29.md) reproduced two missing
+consumer cases. Formula-safe negative decimal imports rounded values beyond
+Decimal's exact scale, and binary CSV exports used a `\x` prefix the importer
+did not accept. The shared parsers now refuse excess decimal precision and
+accept that binary prefix. Ordinary hex and SQL-style prefixes remain supported.
+
+The core binary contract exports and imports NULL, empty bytes and all 256 byte
+values with each of the four delimiters. A real SQLite contract then builds the
+import plan, executes policy-guarded batches and checks native blob/null storage,
+exact bytes and the terminal audit count. Decimal units test both raw and
+formula-safe inputs beyond the exact scale, alongside existing valid negative
+and trailing-zero cases. These are separate from deliberate unsupported native
+types and installed grid acceptance.
+
+PostgreSQL/MySQL fixture scenarios extracted to `tests/support/value_contracts.rs`
+remain part of their `integration` target. Their module prefixes change displayed
+test names; the `value_contract` selection still includes them.
+
 ## DuckDB zero-row result metadata, 2026-09-28
 
 A local DuckDB query selects a `HUGEINT` and `VARCHAR` under `WHERE false`.
@@ -1254,7 +1274,9 @@ failed on an empty int4 array, which returned Undecodable. No external fixture
 or source code was copied.
 
 The driver now decodes binary arrays of bool, int2/int4/int8, oid, text/name/
-varchar/bpchar, float4/float8, numeric, UUID and bytea. Results use PostgreSQL array
+varchar/bpchar, float4/float8, numeric, UUID and bytea. IPv6 `inet[]` remains
+an explicit safe refusal even though PostgreSQL's type, text, JSON and element
+oracles are covered. Results use PostgreSQL array
 text in Value::Text and retain the original array type in ColumnInfo. Whole-array
 NULL remains Value::Null. Nested braces and explicit bounds preserve dimensions;
 quoted elements distinguish NULL, literal NULL, empty strings and escaped text.
@@ -1273,8 +1295,8 @@ size/product overflow. Deterministic malformed-input and header-mutation cases
 exercise bounded decoding. Binary-to-text array decoding is capped at 16 MiB; exceeding the
 limit returns the existing visible undecodable marker rather than truncated data.
 
-Limits: enum/domain/composite/range and most JSON/BSON array element contracts
-remain unsupported or untested; automatic array editing and the full grid/MCP/import acceptance matrix
+Limits: network, enum/domain/composite/range and most JSON/BSON array element
+contracts remain unsupported or untested; automatic array editing and the full grid/MCP/import acceptance matrix
 remain open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
@@ -1346,6 +1368,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 ```
 
 The PostgreSQL 16 Docker contract passed.
+
+### PostgreSQL IPv6 `inet[]` explicit refusal
+
+A PostgreSQL 16 contract returns an IPv6 `inet[]` containing a host-prefix
+address, a network-prefix address, and NULL. The driver reports the array as
+`Undecodable("INET[]")`; PostgreSQL independently reports its native type,
+exact array text, JSON representation, element host/prefix/family values, and
+equal `array_send` bytes after server-side text re-import. SQL-literal and
+parameter consumers refuse the undecodable marker, while a NULL array remains
+`Value::Null`. This records the current safe boundary without claiming network
+array support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_ipv6_inet_array_is_explicitly_unsupported -- --include-ignored --exact --test-threads=1
+```
+
+The focused PostgreSQL 16 Docker contract passed.
 
 ## ClickHouse wide integer parser contract, 2026-09-28
 

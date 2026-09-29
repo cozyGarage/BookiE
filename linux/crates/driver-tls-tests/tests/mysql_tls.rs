@@ -49,24 +49,22 @@ async fn verify_full_rejects_an_ip_endpoint_absent_from_the_certificate() {
 #[ignore = "requires the driver tls fixture"]
 async fn a_verifying_mode_without_an_authority_is_refused() {
     let fixture = DriverTlsFixture::from_env();
-    let result = MysqlDriver.connect(fixture.mysql(TlsMode::VerifyFull, None)).await;
-    assert!(
-        result.is_err(),
-        "the system trust store does not know the fixture authority"
-    );
+    for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
+        let accepted = fixture.mysql(mode, Some(fixture.ca_cert.clone()));
+        let rejected = fixture.mysql(mode, None);
+        tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
+    }
 }
 
 #[tokio::test]
 #[ignore = "requires the driver tls fixture"]
 async fn a_verifying_mode_naming_the_wrong_authority_is_refused() {
     let fixture = DriverTlsFixture::from_env();
-    let result = MysqlDriver
-        .connect(fixture.mysql(TlsMode::VerifyFull, Some(fixture.other_ca_cert.clone())))
-        .await;
-    assert!(
-        result.is_err(),
-        "an unrelated authority must not verify the fixture certificate"
-    );
+    for mode in [TlsMode::VerifyCa, TlsMode::VerifyFull] {
+        let accepted = fixture.mysql(mode, Some(fixture.ca_cert.clone()));
+        let rejected = fixture.mysql(mode, Some(fixture.other_ca_cert.clone()));
+        tablepro_driver_tls_tests::assert_certificate_rejected(&MysqlDriver, accepted, rejected).await;
+    }
 }
 
 #[tokio::test]

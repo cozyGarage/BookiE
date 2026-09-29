@@ -320,6 +320,42 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_csv_binary_round_trip_preserves_null_empty_and_every_byte() {
+        let mut binary_column = column("payload");
+        binary_column.data_type = "BYTEA".into();
+        let columns = [column("id"), binary_column];
+        let rows = vec![
+            vec![Value::Text("null".into()), Value::Null],
+            vec![Value::Text("empty".into()), Value::Bytes(vec![])],
+            vec![Value::Text("binary".into()), Value::Bytes((0..=255).collect())],
+        ];
+        for delimiter in CsvDelimiter::ALL {
+            let csv = render_csv(
+                &columns,
+                &rows,
+                &CsvOptions {
+                    delimiter,
+                    ..CsvOptions::default()
+                },
+            );
+            let options = crate::import::CsvImportOptions {
+                delimiter,
+                ..Default::default()
+            };
+            let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+            let restored: Vec<Vec<Value>> = sheet
+                .rows
+                .iter()
+                .enumerate()
+                .map(|(index, row)| {
+                    crate::import::row_to_values(row, &[Some(0), Some(1)], &columns, &options, index + 2).unwrap()
+                })
+                .collect();
+            assert_eq!(restored, rows);
+        }
+    }
+
+    #[test]
     fn value_contract_csv_round_trip_preserves_signed_integer_boundaries() {
         let mut value_column = column("value");
         value_column.data_type = "BIGINT".into();

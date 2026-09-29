@@ -1,5 +1,7 @@
 # Testing
 
+The [September 29 regression audit](regression-audit-2026-09-29.md) records the latest findings, added tests, structure changes and execution evidence.
+
 Start with the [validation playbook](validation-playbook.md) for the executable
 layer catalog, local commands, CI ownership, agent handoffs and regression intake.
 The shared runner retains reports and logs and fails on incomplete execution.
@@ -45,9 +47,9 @@ cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D wa
 cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 ```
 
-Keep both `--lib` and `--bins`. `tablepro-app` is a binary crate, so `--lib` alone skips its tests. DuckDB is excluded from the default gate because its optional native build is large.
+Keep both `--lib` and `--bins`. `tablepro-app` now puts its UI and service tests in the `tablepro_app` library; its binary calls that library. `agentd` still has tests in both targets. DuckDB is excluded from the default gate because its optional native build is large.
 
-The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, the `print!` family and `dbg!`, and Clippy runs with `-D warnings`, so a violation fails the gate. Unit tests inside a `#[cfg(test)]` module are exempt through `linux/clippy.toml`. Integration tests under `tests/` are separate crates that those settings do not reach, so **a new file in a `tests/` directory must start with**:
+The workspace lints deny `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, the `print!` family and `dbg!`, and Clippy runs with `-D warnings`, so a violation fails the gate. Unit tests inside a `#[cfg(test)]` module are exempt through `linux/clippy.toml`. Integration tests under `tests/` are separate crates that those settings do not reach, so **a new standalone Cargo test target in a `tests/` directory must start with**:
 
 ```rust
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -82,13 +84,25 @@ python3 scripts/inventory-ignored-tests.py > docs/ignored-tests.md
 
 Place focused tests beside the Rust module under `#[cfg(test)]`. Pure parsing, SQL generation, policy, mapping, persistence, and state-transition behavior should be tested without GTK where possible.
 
-The full `--lib --bins` command builds and runs tests from library crates and binary crates. Application service tests are included through the `tablepro-app` binary target.
+Driver value fixtures can live in `tests/support/value_contracts.rs` as modules of
+`tests/integration.rs`. Keep the module declaration in that target: support files
+are not independent Cargo test targets. PostgreSQL and MySQL use this layout;
+SQL Server unit tests live in `src/tests.rs` under `#[cfg(test)]`. Run the
+ignored-test inventory generator after moving tests so its links stay correct.
+
+The full `--lib --bins` command builds and runs tests from library crates and binary crates. Application service and UI logic tests are included through the `tablepro_app` library target.
 
 ## Storage tests
 
 Storage tests use temporary directories and explicit file paths for JSON and audit behavior. Query-history tests use SQLite. The Secret Service round-trip test is ignored by default because it needs a keyring. `scripts/test-secret-service.sh` always creates an isolated D-Bus/keyring session, even when invoked from a desktop session.
 
 Tests that change XDG environment variables must avoid racing with other tests. Prefer internal functions that accept a path when the module already provides them.
+
+Certificate rejection tests open and ping a trusted control before testing the
+rejected configuration, then require a TLS error or explicit certificate-verification
+reason (SQLx wraps MySQL rustls failures as I/O errors). Wrong-authority cases exercise
+both verifying modes across all five TLS fixture drivers; fixture outages and
+authentication errors cannot stand in for certificate rejection.
 
 ## Real-driver integration tests
 
@@ -97,6 +111,18 @@ Run all configured Docker suites with:
 ```bash
 ./scripts/ci-local.sh integration
 ```
+
+This gate also runs the MCP MongoDB Extended JSON target and PostgreSQL policy
+session rollback/commit regressions. The app numeric-parser server round trip
+needs GTK build libraries as well as Docker:
+
+```bash
+python3 scripts/run-test-layer.py app-server
+```
+
+The GTK fast CI job runs that exact registered test with the host Docker socket.
+Testcontainers resolves the Docker bridge gateway from inside the job container.
+The local release gate uses the same registration.
 
 The script runs:
 
@@ -263,13 +289,13 @@ For ordinary UI changes, test the affected flow manually and include before and 
 `.github/workflows/build-linux.yml` has these jobs:
 
 1. Preflight on Rust 1.98 without the GTK application.
-2. GTK formatting, Clippy, and `cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins` in Ubuntu 25.10.
+2. GTK formatting, Clippy, and `cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins` in a Debian testing container.
 3. Required installed GTK safety smoke under Xvfb and PyAT-SPI, including a real Secret Service round-trip.
 4. PostgreSQL, MySQL, SQL Server, ClickHouse, and Redis integration tests on Docker.
 5. The PostgreSQL release fixture with TLS, an SSH bastion, and Toxiproxy on Docker.
 6. Scheduled and manually triggered Clippy on current stable Rust.
 7. Supply-chain checks with `cargo deny` and `cargo audit` in the GTK job.
-8. Driver TLS fixtures for MySQL, ClickHouse, Redis, and MongoDB, plus the optional DuckDB driver and application build.
+8. Driver TLS fixtures for MySQL, SQL Server, ClickHouse, Redis, and MongoDB, plus the optional DuckDB driver and application build.
 
 `.github/workflows/gtk-soak.yml` supplies the independent daily five-attempt soak ledger.
 
@@ -318,7 +344,7 @@ crate here once it accumulates unit-testable logic worth pinning this way;
 a driver crate whose logic is mostly "call the real client library" is not
 a good target until it grows some.
 
-The 2026-09-26 B3 follow-up adds PostgreSQL numeric, array and time decoders,
+The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders,
 using the `value_contract` unit and real-server regressions. Their malformed-input
 unit tests share that prefix so the mutation filter cannot omit them. Relevant
 pushes to `linux` also trigger the workflow. A scheduled workflow must exist on

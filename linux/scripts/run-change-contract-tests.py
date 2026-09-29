@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tomllib
 
+from rust_test_evidence import completed_tests
+
 ROOT = Path(__file__).resolve().parents[1]
 MAP = ROOT / "scripts/change-test-map.json"
 REPORT_ROOT = ROOT / "target/quality"
@@ -111,12 +113,7 @@ def rust_test_evidence(output):
 
 
 def exact_test_evidence(output, test_name):
-    if not rust_test_evidence(output):
-        return False
-    test_line = re.compile(rf"^test {re.escape(test_name)} \.\.\. ok$", re.M)
-    return len(test_line.findall(output)) == 1 and bool(
-        re.search(r"test result: ok\. 1 passed; 0 failed;", output)
-    )
+    return completed_tests(output, [test_name])
 
 
 def execute(command, log_path, expected_test=None, timeout=900):

@@ -93,6 +93,8 @@ jobs:
     # only on tablepro-core, so they don't pull in libadwaita.
     container:
       image: debian:testing
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
       env:
         DEBIAN_FRONTEND: noninteractive
     defaults:
@@ -150,6 +152,8 @@ jobs:
         run: python3 scripts/run-test-layer.py full
       - name: Isolated GTK widget regressions
         run: python3 scripts/run-test-layer.py widgets
+      - name: App numeric parser against PostgreSQL
+        run: python3 scripts/run-test-layer.py app-server
 
       - name: Upload validation evidence
         if: always()

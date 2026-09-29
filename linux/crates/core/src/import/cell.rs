@@ -207,6 +207,7 @@ fn parse_bytes(text: &str) -> Result<Value, CellError> {
     let digits = text
         .strip_prefix("0x")
         .or_else(|| text.strip_prefix("0X"))
+        .or_else(|| text.strip_prefix("\\x"))
         .unwrap_or(text);
     if !digits.len().is_multiple_of(2) {
         return Err(CellError::NotBytes);
@@ -307,7 +308,7 @@ fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a
 }
 
 fn sanitized_decimal(text: &str) -> Option<Decimal> {
-    text.strip_prefix('\'')?.parse().ok()
+    Decimal::from_str_exact(text.strip_prefix('\'')?).ok()
 }
 
 #[cfg(test)]
@@ -415,6 +416,20 @@ mod tests {
                 Value::Text("'-170141183460469231731687303715884105728".into()),
             ]
         );
+    }
+
+    #[test]
+    fn value_contract_formula_safe_decimal_import_rejects_excess_precision() {
+        let columns = vec![column("amount", "decimal")];
+        for input in ["-0.12345678901234567890123456789", "-1.00000000000000000000000000001"] {
+            for text in [input.to_owned(), format!("'{input}")] {
+                let error = row_to_values(&[text], &[Some(0)], &columns, &CsvImportOptions::default(), 2)
+                    .expect_err("excess precision must not be rounded");
+                assert_eq!(error.reason, CellError::NotANumber);
+                assert_eq!(error.line, 2);
+                assert_eq!(error.column, "amount");
+            }
+        }
     }
 
     #[test]
@@ -553,9 +568,18 @@ mod tests {
             Ok(Value::Bytes(vec![0xde, 0xad]))
         );
         assert_eq!(
+            parse_cell("0XDEad", ColumnKind::Bytes),
+            Ok(Value::Bytes(vec![0xde, 0xad]))
+        );
+        assert_eq!(
             parse_cell("beef", ColumnKind::Bytes),
             Ok(Value::Bytes(vec![0xbe, 0xef]))
         );
         assert_eq!(parse_cell("xyz", ColumnKind::Bytes), Err(CellError::NotBytes));
+        assert_eq!(parse_cell("\\x", ColumnKind::Bytes), Ok(Value::Bytes(vec![])));
+        assert_eq!(parse_cell("\\x00ff", ColumnKind::Bytes), Ok(Value::Bytes(vec![0, 255])));
+        for text in ["\\x0", "\\xgg", "\\xé", "0x0", "0xgg"] {
+            assert_eq!(parse_cell(text, ColumnKind::Bytes), Err(CellError::NotBytes));
+        }
     }
 }

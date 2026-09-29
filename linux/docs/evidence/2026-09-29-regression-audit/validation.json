@@ -1,0 +1,719 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-09-29T06:24:45.607325+00:00",
+  "branch": "linux",
+  "base_commit": "f142d3fea520964424143ec7401c157a65469188",
+  "scope": "Local Linux branch dirty-tree audit; passing execution counts include repeated and subprocess tests, not unique coverage.",
+  "source_sha256": {
+    ".github/workflows/build-linux.yml": "900533fa2aedbfe04ff971b86e08c69329c8307c89b4a94574114d1d984b7e11",
+    ".github/workflows/linux-quality.yml": "c2cc81921d9eabe4fc29b5e3d348846b2f44e02ccc8bdff8f1844d7a7cea8b64",
+    "linux/CHANGELOG.md": "a5c6852867a7f873ab23735a26e94af0054a43a24e6c2ba7b41ccbb22f606bb5",
+    "linux/README.md": "2fdb027e5a4ad3f6db77002359b3f6ff44b7314f3736d69d503ab8f6a0020664",
+    "linux/crates/app/src/ui/browse_tab/value_parse.rs": "4d6fe79d1581bab2b9fbb7b5e1ab92dcbeaee7c4b15e586a3dbb77830b28c746",
+    "linux/crates/core/src/export/csv.rs": "909aec20cadcced419cb513ec57e1ceb9a18774e95f235be0591bfee6f97c382",
+    "linux/crates/core/src/import/cell.rs": "ea2f3c5d3cdc5bbde34470c5d19afbe577006a2f290f0f39ef22a706e285aa28",
+    "linux/crates/driver-tls-tests/src/lib.rs": "2a56777efdcd5e0af16be36a2a0c98e8ca5a3458a9d61469dea5bc0466b29397",
+    "linux/crates/driver-tls-tests/tests/clickhouse_tls.rs": "eb5fca5f040bd5ff2d8ebca9902e09f65840a37f5b6ffc1d422b5bb2dd66edd0",
+    "linux/crates/driver-tls-tests/tests/mongodb_tls.rs": "5fa067cbad07bf84d1c7a77252b5e46d39331793eedc058c310d5ffff5303e30",
+    "linux/crates/driver-tls-tests/tests/mssql_tls.rs": "c21e19075261053e73bb666d206e2bb0e6c1f261f9bf2bb600f591899298bc01",
+    "linux/crates/driver-tls-tests/tests/mysql_tls.rs": "ddfc2301423d3a3b7691556f5d4987afb51e886bbe23975497e02de4b3a05d01",
+    "linux/crates/driver-tls-tests/tests/redis_tls.rs": "ba192ba6c55049af697ad7d2f493ce6372ebb15b00a7cf658d43c97b832cfb02",
+    "linux/crates/drivers/mssql/src/lib.rs": "26ce7d89b3f70462eb52815e77b0b6fc79c0fdedf79c8c43c0b710eeb49f8b6e",
+    "linux/crates/drivers/mssql/src/tests.rs": "0e640f7eb610022f46de67462fc1cdf2d00362bb8076012e5263487cbdce01f3",
+    "linux/crates/drivers/mysql/src/session.rs": "b0ced15a12fac594ab0c7b8484f97d63f13620933627cee6e264d7300e6fb1d9",
+    "linux/crates/drivers/mysql/tests/integration.rs": "84c5ff8e23c2ec3ec60eb73f86064078f774672924b35858bf7e26a3c8b4ad1a",
+    "linux/crates/drivers/mysql/tests/support/value_contracts.rs": "d24ab5496ee900f1362a06761638b8e04c6b816343c00d3b753fa3b4c396994c",
+    "linux/crates/drivers/postgres/src/decode.rs": "f1b31957aedae9ae6a3085be18df0de1d09e38a0f4ec5c4c24341b0fa8b2c9d3",
+    "linux/crates/drivers/postgres/tests/integration.rs": "9d2d5bf9e2e61faeafd8bdbaf2ca1242cb0edd63584d7f84d95e5fabee996b29",
+    "linux/crates/drivers/postgres/tests/support/value_contracts.rs": "ab68789de9418f3066922ddd44b48b6ce82c24650bde6991d31fc2102b1b0d41",
+    "linux/crates/drivers/sqlite/tests/csv_import.rs": "2b2e0568037b530af398839ab78853bbfe7264a42f31a27cfe919dd2a1035ca7",
+    "linux/docs/b3-test-scenario-survey.md": "68461ce29495a5ca45a756aa5ec4a2f5b063471aaff6a5937b43f9003c322d3b",
+    "linux/docs/ignored-tests.md": "88c020c4ad5f11f9c8dae88bd58c57af5848bf9d65c81c9440c6e361ce98355d",
+    "linux/docs/regression-audit-2026-09-29.md": "980255047f37c731fea3b2e493065b0eb3cfe780159c18f3c1270898e5b19ecf",
+    "linux/docs/testing.md": "854e2d87398e8e5c1f34172b6253c5893c345b99077e68313cd6e6f4444f385a",
+    "linux/docs/validation-playbook.md": "8bb0a8d0ee9168a77fc22146f3e8058fc2937387c97f917940b702f3f95cf015",
+    "linux/docs/value-contracts.md": "749a459e8dfe4b3e832419117a7e3e6dc692c9346eef9816747490755323114a",
+    "linux/file-size-baselines.txt": "4dc05d41f55f1763a2b6456d89106e1e8e1af5bad33c5250d94931556f98eff3",
+    "linux/packaging/README.md": "59f0f3d09ac67220c928ef17bb6643c412dbde3e8e32bfd0c06a1cd7ec88c0e2",
+    "linux/scripts/ci-local.sh": "561cea84581938277d5c875b30d14dc9c5c3bf79be96f0ebd6ca800f6bf2f97a",
+    "linux/scripts/inventory-ignored-tests.py": "41cd144b6a4e2038a4a52251d6d83dc3aa657ac50a16a5ab1d55fb579ea63b53",
+    "linux/scripts/isolated-tests.json": "1f18e63a5049b8c69f98c81c568c3a5b288c6f20876b68345ff57e218e3697e4",
+    "linux/scripts/run-change-contract-tests.py": "517d21047b280bcbbeb1e21aaa18e946e06d1f98fdb9c9f6b66f86ff33d320af",
+    "linux/scripts/run-isolated-tests.py": "b07f461fa02b87b83c7eb7a18022b2933242dfc19985a6562dde7191d86cc330",
+    "linux/scripts/rust_test_evidence.py": "419f4e9fc7f800d2a9824d9927140696704c82513396990f6145f44b3adfe3a8",
+    "linux/scripts/test-layers.json": "b3347abd1fc63e4491e523ae09a62d4e58e27a5749d9fd9c315d2d5bf11d2809",
+    "linux/scripts/test-value-contracts.py": "9060a5ec42d7de2db6560a15a68aaf0dae8530a2c2a3070fe34b782770bb4794",
+    "linux/scripts/tests/test_change_contracts.py": "66d4cfbb5ff1ff2604918855334430db7cac6eee081e256ad0a9eabc600c3003",
+    "linux/scripts/tests/test_ci_workflow.py": "4c35571975ae12a6012dc7606000b8410e0bac40bfcd60a3dc611ae8f2bc55f3",
+    "linux/scripts/tests/test_isolated_runner.py": "11c135c8a8b0c534a9c3d0c76cc20a820cb2e3a107b3881b309edf4c27179e7d",
+    "linux/scripts/tests/test_mutation_workflow.py": "adaf8e9ec3961822859d469a95ab3ebb8baaf67a4d619472ca5f5633e08b574b",
+    "linux/scripts/tests/test_value_contract_runner.py": "9335f5ebd2ebf1bc0d36d319d21c1af9135edb4610104e6b3b274e24d77117a9"
+  },
+  "layer_reports": [
+    {
+      "path": "target/quality/20260929T053221194451Z-layers/report.json",
+      "sha256": "ee191143d9f1d12d53ca5ef408a7d18b11b772ab571d62069aadaa4d6f44f65b",
+      "status": "failed",
+      "started_utc": "2026-09-29T05:32:21.215203+00:00",
+      "layers": {
+        "drivers": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/ci-local.sh",
+                "integration"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "drivers-1.log",
+              "exit_code": 0,
+              "seconds": 905.077,
+              "log_sha256": "abd1613b205bfe3ff4248c7824bc9647c38041f22d07147e8f9f9099e04f3424",
+              "rust_passing_executions": 176,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "tls": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-driver-tls.sh"
+              ],
+              "timeout_seconds": 1200,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "tls-1.log",
+              "exit_code": 0,
+              "seconds": 86.332,
+              "log_sha256": "f3134f22084a39d24390bc905fd09f99ab77fb09a35187a30d8b47bc375aa439",
+              "rust_passing_executions": 35,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "postgres-release": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-postgres-release.sh"
+              ],
+              "timeout_seconds": 1200,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "postgres-release-1.log",
+              "exit_code": 0,
+              "seconds": 43.452,
+              "log_sha256": "38fad5be7e38df71d2f3246a6a00cb118793bfa6786a458b28c409a7ef9de90e",
+              "rust_passing_executions": 54,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "widgets": {
+          "status": "failed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-gtk-widgets.sh"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "failed",
+              "log": "widgets-1.log",
+              "exit_code": 1,
+              "seconds": 0.016,
+              "log_sha256": "6f574b72b71509dd8b22e4fa41a646169609c3afabc1b637243be3dc8bcba5d2",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "keyring": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-secret-service.sh"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "keyring-1.log",
+              "exit_code": 0,
+              "seconds": 13.944,
+              "log_sha256": "fabde8826810eb0e4deea8c489d8c202172b413c04a82e2e562a4abb5bbe4c14",
+              "rust_passing_executions": 7,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "target/quality/20260929T055126867767Z-layers/report.json",
+      "sha256": "f792e97423854baad0ebc1bf874faf6ed47f6e39a7427c87075f025d5355a32a",
+      "status": "failed",
+      "started_utc": "2026-09-29T05:51:26.907300+00:00",
+      "layers": {
+        "full": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/ci-local.sh",
+                "full"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "full-1.log",
+              "exit_code": 0,
+              "seconds": 116.972,
+              "log_sha256": "44aab49fc70da8fc4f6496201bf157f703e00703e98593bcb286782d610db7f0",
+              "rust_passing_executions": 2690,
+              "python_test_counts": [
+                57
+              ],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "widgets": {
+          "status": "failed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-gtk-widgets.sh"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "failed",
+              "log": "widgets-1.log",
+              "exit_code": 1,
+              "seconds": 8.249,
+              "log_sha256": "493b50628a7f02d7e08ac6760567f3679dd0e18c946395efe289ad080787515d",
+              "rust_passing_executions": 1,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "tls": {
+          "status": "failed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-driver-tls.sh"
+              ],
+              "timeout_seconds": 1200,
+              "evidence": "rust-tests",
+              "status": "failed",
+              "log": "tls-1.log",
+              "exit_code": 101,
+              "seconds": 88.177,
+              "log_sha256": "4f3c063221e3b854bd9dc106d5223313c022e0e4efc158ef4e85fdd78456d9f2",
+              "rust_passing_executions": 16,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "ui": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-gtk-safety.sh"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "ui-1.log",
+              "exit_code": 0,
+              "seconds": 316.507,
+              "log_sha256": "eba1c593060d3459bbff34f71179895a7e1ddb920a66775cfe89cab95a80a440",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": [
+                "jump_to_column_keyboard_search",
+                "committed_editor_ddl_refreshes_sidebar",
+                "new_connection_form_keeps_title_and_help_text_visible",
+                "sql_character_warnings_leave_query_unchanged",
+                "dismissed_approval_denies",
+                "approve_once_prompts_again",
+                "audit_failure_denies",
+                "named_parameter_binds_a_value",
+                "favorite_round_trips_through_open_quickly",
+                "successful_switch_keeps_database_ownership",
+                "failed_switch_preserves_the_old_workspace",
+                "running_query_is_cancelled_before_switch",
+                "current_page_csv_export_is_pk_ordered",
+                "current_page_json_export_preserves_values",
+                "restart_restores_active_editor_and_connection",
+                "pending_edits_gate_a_connection_switch",
+                "a_browse_tab_reads_the_new_connection_after_a_switch",
+                "two_windows_hold_two_connections",
+                "switched_connection_keeps_workspace_tabs_after_debounce",
+                "switching_one_window_leaves_the_other_windows_edits",
+                "current_page_workbook_preserves_typed_values",
+                "cancelled_workbook_export_preserves_existing_file",
+                "workbook_empty_text_shows_error_without_creating_file",
+                "repeated_parameters_preserve_wide_ids_and_sql_like_text",
+                "cancelled_parameters_never_execute_and_retry_uses_new_values",
+                "xml_export_preserves_line_endings_and_null_distinctions",
+                "xml_export_refuses_illegal_text_without_publishing"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "target/quality/20260929T060030311700Z-layers/report.json",
+      "sha256": "0f4e1f309bfbc6b767e4d2597de4f6d144d25a9cb355997124e668a9400023e8",
+      "status": "passed",
+      "started_utc": "2026-09-29T06:00:30.334291+00:00",
+      "layers": {
+        "full": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/ci-local.sh",
+                "full"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "full-1.log",
+              "exit_code": 0,
+              "seconds": 93.529,
+              "log_sha256": "fbd855d020d29931a101c51c591027770a78761567222ac0493217b726fa9b23",
+              "rust_passing_executions": 2690,
+              "python_test_counts": [
+                59
+              ],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "widgets": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-gtk-widgets.sh"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "widgets-1.log",
+              "exit_code": 0,
+              "seconds": 5.54,
+              "log_sha256": "5b541df77b2188d1c7c22ad8d13405a43e0028cd65b10a6019c0c2a4003a4194",
+              "rust_passing_executions": 5,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "tls": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-driver-tls.sh"
+              ],
+              "timeout_seconds": 1200,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "tls-1.log",
+              "exit_code": 0,
+              "seconds": 78.197,
+              "log_sha256": "f70d22a9adf548ac979c03b17cf9da0e596e741049bb1cdb7054f1b44552a462",
+              "rust_passing_executions": 35,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "app-server": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "python3",
+                "scripts/run-isolated-tests.py",
+                "app-server"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "app-server-1.log",
+              "exit_code": 0,
+              "seconds": 2.47,
+              "log_sha256": "7807af13bcbd5b8820e6bd45db81a7ae873e4c53a3244a7f33482f00270a448c",
+              "rust_passing_executions": 1,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "drivers": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/ci-local.sh",
+                "integration"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "rust-tests",
+              "status": "passed",
+              "log": "drivers-1.log",
+              "exit_code": 0,
+              "seconds": 911.831,
+              "log_sha256": "713e9d801e81accd8af5737812d360cceebb342a348f7b106a3141e77b210e19",
+              "rust_passing_executions": 180,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "target/quality/20260929T062348321714Z-layers/report.json",
+      "sha256": "1f2b97bfaa72fb437b383b0cbdf22ab506aac75e7c8ae65db44b2edd63ccd8a1",
+      "status": "passed",
+      "started_utc": "2026-09-29T06:23:48.346432+00:00",
+      "layers": {
+        "change-contracts": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "python3",
+                "scripts/run-change-contract-tests.py"
+              ],
+              "timeout_seconds": 1800,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "change-contracts-1.log",
+              "exit_code": 0,
+              "seconds": 7.079,
+              "log_sha256": "2f7600b8e1f40bc9d72abaf19d0caecb1aa04cb4680a24191a8e2b059f9e9967",
+              "rust_passing_executions": 532,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "target/quality/20260929T062355500637Z-layers/report.json",
+      "sha256": "a89441ad80ae18891843aa75ae1f619c8da52b52b8ea21fb46d249bc1c476102",
+      "status": "passed",
+      "started_utc": "2026-09-29T06:23:55.523222+00:00",
+      "layers": {
+        "keyring": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "bash",
+                "scripts/test-secret-service.sh"
+              ],
+              "timeout_seconds": 900,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "keyring-1.log",
+              "exit_code": 0,
+              "seconds": 7.782,
+              "log_sha256": "db269ed81af71e268cf97f9ee8e57c096e2c642a6dd19f46497ba9d8d7939720",
+              "rust_passing_executions": 7,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "workflow-lint": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "actionlint",
+                "../.github/workflows/build-linux.yml",
+                "../.github/workflows/flatpak-linux.yml",
+                "../.github/workflows/gtk-soak.yml",
+                "../.github/workflows/linux-quality.yml",
+                "../.github/workflows/linux-security.yml",
+                "../.github/workflows/linux-ci-contracts.yml"
+              ],
+              "timeout_seconds": 120,
+              "evidence": "exit",
+              "required_tools": [
+                "actionlint",
+                "shellcheck"
+              ],
+              "status": "passed",
+              "log": "workflow-lint-1.log",
+              "exit_code": 0,
+              "seconds": 0.265,
+              "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        },
+        "packaging-contracts": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "python3",
+                "scripts/tests/test_arch_candidate.py"
+              ],
+              "timeout_seconds": 180,
+              "evidence": "exit",
+              "required_tools": [
+                "git",
+                "tar"
+              ],
+              "status": "passed",
+              "log": "packaging-contracts-1.log",
+              "exit_code": 0,
+              "seconds": 0.115,
+              "log_sha256": "16f3621b7b594821beb70dcc6698df906a258b2677aa8ba69817cf77bdab49fe",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            },
+            {
+              "argv": [
+                "python3",
+                "scripts/tests/test_deb_package.py"
+              ],
+              "timeout_seconds": 180,
+              "evidence": "exit",
+              "required_tools": [
+                "dpkg-deb"
+              ],
+              "status": "passed",
+              "log": "packaging-contracts-2.log",
+              "exit_code": 0,
+              "seconds": 0.164,
+              "log_sha256": "da44f83d7f6073ad20cbce1cc5de77a3461a1bd0c63161fc16286a8ab1079cdf",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "target/quality/20260929T062432839168Z-layers/report.json",
+      "sha256": "b69d9eadd3f182abaef9a96945fd19009422fb8e3c3f42d8fc6814ca151c32f3",
+      "status": "passed",
+      "started_utc": "2026-09-29T06:24:32.861503+00:00",
+      "layers": {
+        "harness": {
+          "status": "passed",
+          "steps": [
+            {
+              "argv": [
+                "python3",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "scripts/tests",
+                "-p",
+                "test_*.py"
+              ],
+              "timeout_seconds": 180,
+              "evidence": "python-tests",
+              "status": "passed",
+              "log": "harness-1.log",
+              "exit_code": 0,
+              "seconds": 0.866,
+              "log_sha256": "431f31aef7e86eecc3f5997e72ac6b7ecad9fea2e98eb1b8c88a754f9601bfea",
+              "rust_passing_executions": 0,
+              "python_test_counts": [
+                59
+              ],
+              "gtk_scenarios": []
+            },
+            {
+              "argv": [
+                "python3",
+                "scripts/tests/test_function_size.py"
+              ],
+              "timeout_seconds": 180,
+              "evidence": "exit",
+              "status": "passed",
+              "log": "harness-2.log",
+              "exit_code": 0,
+              "seconds": 0.065,
+              "log_sha256": "41368e33fbdd0bd82fdb2d1e9e3b0606059e3c2c26f876768a27facaa037719f",
+              "rust_passing_executions": 0,
+              "python_test_counts": [],
+              "gtk_scenarios": []
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "mutation_reports": [
+    {
+      "path": "target/quality/2026-09-29-core-import-mutants/mutants.out/outcomes.json",
+      "sha256": "cbcd88cb9edd23f44ee485d9bb56b1676a226f3b162fc58a9d368db60b5816fa",
+      "total_mutants": 4,
+      "missed": 0,
+      "caught": 3,
+      "timeout": 0,
+      "unviable": 1,
+      "success": 0,
+      "start_time": "2026-09-29T05:33:03.156644767Z",
+      "end_time": "2026-09-29T05:33:22.160837539Z",
+      "cargo_mutants_version": "27.1.0"
+    },
+    {
+      "path": "target/quality/2026-09-29-postgres-binary-mutants/mutants.out/outcomes.json",
+      "sha256": "6db9fb3555fa2d8a3af9626c426cd9a6aec30ab4ed89fe3c662481e6d3aaaa94",
+      "total_mutants": 84,
+      "missed": 6,
+      "caught": 78,
+      "timeout": 0,
+      "unviable": 0,
+      "success": 0,
+      "start_time": "2026-09-29T05:33:34.173638637Z",
+      "end_time": "2026-09-29T05:37:53.283936323Z",
+      "cargo_mutants_version": "27.1.0"
+    },
+    {
+      "path": "target/quality/2026-09-29-postgres-binary-mutants-final/mutants.out/outcomes.json",
+      "sha256": "f3aa5b279394c5c96a35c788543bbb660396643bd54d64fc8370a35a1f2dbf5a",
+      "total_mutants": 73,
+      "missed": 0,
+      "caught": 73,
+      "timeout": 0,
+      "unviable": 0,
+      "success": 0,
+      "start_time": "2026-09-29T05:38:33.057309031Z",
+      "end_time": "2026-09-29T05:41:49.532800479Z",
+      "cargo_mutants_version": "27.1.0"
+    }
+  ],
+  "retained_tests": [
+    {
+      "original": "linux/crates/drivers/postgres/tests/integration.rs",
+      "retained_test_names": 46,
+      "missing": []
+    },
+    {
+      "original": "linux/crates/drivers/mysql/tests/integration.rs",
+      "retained_test_names": 26,
+      "missing": []
+    },
+    {
+      "original": "linux/crates/drivers/mssql/src/lib.rs",
+      "retained_test_names": 26,
+      "missing": []
+    }
+  ],
+  "additional_checks": [
+    {
+      "name": "duckdb-tests",
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "tablepro-driver-duckdb"
+      ],
+      "exit_code": 0,
+      "seconds": 4.427,
+      "log": "target/quality/2026-09-29-audit-additional/duckdb-tests.log",
+      "log_sha256": "17700bc71851930b27be67472e799ada02979467369ef92464c4b82ec5694194",
+      "rust_passing_executions": 28
+    },
+    {
+      "name": "duckdb-app-build",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "tablepro-app",
+        "--features",
+        "duckdb"
+      ],
+      "exit_code": 0,
+      "seconds": 235.946,
+      "log": "target/quality/2026-09-29-audit-additional/duckdb-app-build.log",
+      "log_sha256": "4edcbef737f9d65c91d741d24b4736f0a7b01eaa0703b12dbf4643138628fbe5",
+      "rust_passing_executions": 0
+    },
+    {
+      "name": "change-contracts",
+      "argv": [
+        "python3",
+        "scripts/run-test-layer.py",
+        "change-contracts"
+      ],
+      "exit_code": 0,
+      "seconds": 7.179,
+      "log": "target/quality/2026-09-29-audit-additional/change-contracts.log",
+      "log_sha256": "a2e48b21b0fc5d370f85521c4af0361cfacd5cd1e0856d1cb0e7d3b4249c40cb",
+      "rust_passing_executions": 0
+    },
+    {
+      "name": "remaining-layers",
+      "argv": [
+        "python3",
+        "scripts/run-test-layer.py",
+        "keyring",
+        "workflow-lint",
+        "packaging-contracts"
+      ],
+      "exit_code": 0,
+      "seconds": 8.434,
+      "log": "target/quality/2026-09-29-audit-additional/remaining-layers.log",
+      "log_sha256": "2aead3b9bf80c34625320b4e66c3c50d399c93ac6bd7716ba510e8138e28838c",
+      "rust_passing_executions": 0
+    }
+  ],
+  "limitations": [
+    "Hosted CI was updated and linted, not executed here.",
+    "Line coverage and whole-repository mutation coverage were not measured.",
+    "Native Wayland, package installation/upgrade/rollback and candidate soak remain operator acceptance."
+  ]
+}
