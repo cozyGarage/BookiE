@@ -1117,12 +1117,14 @@ B3 remains open.
 
 ### B3 PostgreSQL zero-row results and numeric parser mutation follow-up — September 29
 
-The all-driver value runner passed on `c553f0671`: all 11 expected suites were
+The all-driver value runner passed on `0b1dab8b8`: all 11 expected suites were
 present and passed, including GTK and DuckDB, with 120 selected contracts and
-no missing suites. The PostgreSQL Docker suite includes a new result-delivery
-contract. It first reproduced that a zero-row `SELECT` returned no column
-names or types; the driver now recovers statement metadata for plain and
-parameterized queries. The test also checks duplicate aliases and row order.
+no missing suites. The report is
+`target/quality/20260929T161811049211Z-values/report.json`. The PostgreSQL
+Docker suite includes a new result-delivery contract. It first reproduced that
+a zero-row `SELECT` returned no column names or types; the driver now recovers
+statement metadata for plain and parameterized queries. The test also checks
+duplicate aliases and row order.
 
 Mutation follow-up for PostgreSQL wide NUMERIC parsing added integer-only,
 fraction-only and exponent values that exceed `rust_decimal`, closing eight of

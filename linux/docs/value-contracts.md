@@ -54,7 +54,10 @@ rtk cargo test -p tablepro-driver-postgres --test integration value_contract_res
 ```
 
 The focused Docker contract passed against PostgreSQL; the empty-result
-metadata defect is fixed.
+metadata defect is fixed. The strict combined runner later passed all 120
+selected contracts on the source tree including this regression and the added
+numeric parser cases; see
+[`20260929T161811049211Z-values/report.json`](../target/quality/20260929T161811049211Z-values/report.json).
 
 ## DuckDB duplicate result column names, 2026-09-28
 
