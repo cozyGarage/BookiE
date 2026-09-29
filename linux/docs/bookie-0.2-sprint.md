@@ -1130,9 +1130,10 @@ replacements; the whole-query replacement was unviable, with no survivors or
 timeouts. Evidence:
 `target/quality/20260929-redis-stream-commands-mutants/mutants.out/outcomes.json`.
 
-The clean combined runner passed at `1226177671f62c4b65e03cbee9df01b8672b786d`:
-125 selected contracts across 11 suites, with no missing suites. Evidence:
-`target/quality/20260929T183351980968Z-values/report.json` (`dirty: false`).
+The clean combined runner passed after the MONITOR addition at
+`b9b4757d14f5b989df4c73a46d400b9e3943f70a`: 125 selected contracts across 11
+suites, with no missing suites. Evidence:
+`target/quality/20260929T190700976288Z-values/report.json` (`dirty: false`).
 
 B3 remains open.
 
