@@ -253,7 +253,6 @@ async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
         assert_eq!(bound_result.rows[0][1], Value::Text(label.into()));
     }
     for expression in [
-        "INTERVAL '2 months -3 days 1 microsecond'",
         "[1, NULL, 3]",
         "[1, 2]::INTEGER[2]",
         "{'a': 1}",
@@ -344,27 +343,38 @@ async fn value_contract_scalar_hugeints_preserve_exact_text_across_consumers() {
 }
 
 #[tokio::test]
-async fn value_contract_interval_components_refuse_lossy_consumers() {
+async fn value_contract_interval_components_round_trip_as_exact_text() {
     let connection = native_connection().await;
     let result = connection
         .query(
             "WITH source AS (SELECT INTERVAL '1 month 2 days 3 microseconds' AS value) \
-             SELECT value, typeof(value), value::VARCHAR FROM source",
+             SELECT value, typeof(value), value::VARCHAR, date_part('month', value)::INTEGER, \
+                    date_part('day', value)::INTEGER, date_part('microsecond', value)::BIGINT \
+             FROM source",
         )
         .await
         .unwrap();
 
     let value = &result.rows[0][0];
-    assert!(matches!(value, Value::Undecodable(_)), "{value:?}");
+    assert_eq!(value, &Value::Text("1 month 2 days 3 microseconds".into()));
     assert_eq!(result.rows[0][1], Value::Text("INTERVAL".into()));
     assert_eq!(result.rows[0][2], Value::Text("1 month 2 days 00:00:00.000003".into()));
-    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
-    assert!(
-        connection
-            .query_params("SELECT ?", std::slice::from_ref(value))
-            .await
-            .is_err()
-    );
+    assert_eq!(result.rows[0][3], Value::Int(1));
+    assert_eq!(result.rows[0][4], Value::Int(2));
+    assert_eq!(result.rows[0][5], Value::Int(3));
+
+    let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
+    let literal_round_trip = connection
+        .query(&format!("SELECT CAST({literal} AS INTERVAL)"))
+        .await
+        .unwrap();
+    assert_eq!(literal_round_trip.rows, vec![vec![value.clone()]]);
+
+    let bound_round_trip = connection
+        .query_params("SELECT CAST(? AS INTERVAL)", std::slice::from_ref(value))
+        .await
+        .unwrap();
+    assert_eq!(bound_round_trip.rows, vec![vec![value.clone()]]);
 }
 
 #[tokio::test]

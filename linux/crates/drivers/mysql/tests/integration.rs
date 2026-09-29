@@ -624,6 +624,38 @@ async fn a_column_comment_round_trips_and_an_uncommented_column_reads_as_none() 
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_column_comment_backslash_literals_depend_on_sql_mode() {
+    let (_container, opts) = start_mysql().await;
+    let connection = connect(opts).await;
+    for (table, sql_mode, expected) in [
+        ("comment_mode_default", "", r"path\to\value"),
+        ("comment_mode_no_backslash", "NO_BACKSLASH_ESCAPES", r"path\\to\\value"),
+    ] {
+        let mut session = connection.open_session().await.unwrap();
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+        for sql in [
+            format!("SET SESSION sql_mode = '{sql_mode}'"),
+            format!("CREATE TABLE {table} (label varchar(64) COMMENT 'path\\\\to\\\\value')"),
+        ] {
+            session
+                .query_params_controlled(&sql, &[], &control)
+                .await
+                .unwrap_or_else(|error| panic!("statement in SQL mode {sql_mode:?}: {error:?}"));
+        }
+        session.close().await.unwrap();
+        let columns = connection.fetch_columns(None, table).await.unwrap();
+        let label = columns.iter().find(|column| column.name == "label").unwrap();
+        assert_eq!(
+            label.comment.as_deref().unwrap().as_bytes(),
+            expected.as_bytes(),
+            "SQL mode {sql_mode:?}; actual bytes {:?}",
+            label.comment.as_deref().unwrap().as_bytes()
+        );
+    }
+}
+
 async fn column_default(conn: &dyn Connection, table: &str, column: &str) -> Option<String> {
     let columns = conn.fetch_columns(None, table).await.unwrap();
     columns.into_iter().find(|c| c.name == column).unwrap().default_value

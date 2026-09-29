@@ -458,6 +458,20 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
         ValueRef::Date32(d) => temporal::date(d),
         ValueRef::Time64(unit, t) => temporal::time(unit, t),
         ValueRef::Timestamp(unit, t) => temporal::timestamp(unit, t),
+        ValueRef::Interval { months, days, nanos } if nanos % 1_000 == 0 => {
+            let micros = nanos / 1_000;
+            let month_unit = if months.unsigned_abs() == 1 { "month" } else { "months" };
+            let day_unit = if days.unsigned_abs() == 1 { "day" } else { "days" };
+            let microsecond_unit = if micros.unsigned_abs() == 1 {
+                "microsecond"
+            } else {
+                "microseconds"
+            };
+            Value::Text(format!(
+                "{months} {month_unit} {days} {day_unit} {micros} {microsecond_unit}"
+            ))
+        }
+        ValueRef::Interval { .. } => Value::Undecodable("INTERVAL with sub-microsecond precision".into()),
         ValueRef::Enum(..) => v
             .as_str()
             .map(|s| Value::Text(s.into()))
@@ -607,6 +621,38 @@ mod tests {
             values_to_duck_params(&[Value::Undecodable("DECIMAL".into())]),
             Err(DriverError::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn intervals_preserve_signed_components_and_refuse_submicrosecond_values() {
+        assert_eq!(
+            duck_value_ref_to_value(ValueRef::Interval {
+                months: -2,
+                days: 3,
+                nanos: -1_000,
+            }),
+            Value::Text("-2 months 3 days -1 microsecond".into())
+        );
+        assert!(matches!(
+            duck_value_ref_to_value(ValueRef::Interval {
+                months: 0,
+                days: 0,
+                nanos: 1,
+            }),
+            Value::Undecodable(_)
+        ));
+    }
+
+    #[test]
+    fn unsigned_bigint_keeps_the_signed_boundary_exact() {
+        assert_eq!(
+            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64)),
+            Value::Int(i64::MAX)
+        );
+        assert_eq!(
+            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64 + 1)),
+            Value::Text("9223372036854775808".into())
+        );
     }
 
     #[test]

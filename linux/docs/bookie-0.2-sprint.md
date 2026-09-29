@@ -1135,7 +1135,7 @@ The source version is 0.1.5 in Cargo, Meson, Arch, Debian and AppStream. Meson h
 
 Open:
 - DuckDB nanosecond and TIMESTAMPTZ parameters bind as exact text, so expressions on them still need a cast.
-- MySQL column comments containing backslashes are refused with an explicit error because generated DDL cannot preserve them across SQL modes. Session-aware DDL execution is still needed to support those comments safely.
+- MySQL column comments containing backslashes are refused with an explicit error because generated DDL cannot preserve them across SQL modes. A live MySQL regression now creates the same comment under default mode and `NO_BACKSLASH_ESCAPES` on dedicated sessions; it proves the server stores different bytes (one slash versus two). Session-aware DDL execution is still needed to support those comments safely. Run `cargo test --locked -p tablepro-driver-mysql --test integration mysql_column_comment_backslash_literals_depend_on_sql_mode -- --include-ignored --exact --test-threads=1` with Docker available.
 - ClickHouse DateTime values in DST folds or gaps, or with an unrecognized timezone, remain explicit undecodable results until the wire format carries enough information to identify the instant.
 
 B3 remains open.
@@ -1151,6 +1151,28 @@ checked separately. A wrong expected `tsmultirange` canonical string was
 caught by the initial run and corrected against the real PostgreSQL 16 result.
 All six built-in multirange families now have explicit coverage; direct decoding
 remains open because SQLx fails before a value reaches BookiE.
+
+B3 remains open.
+
+### DuckDB mixed interval component preservation — September 29
+
+The DuckDB binding exposes interval values as separate month, day and
+nanosecond fields. The driver previously discarded all three as undecodable.
+It now preserves microsecond-aligned values as explicit text, retaining each
+component independently; values with sub-microsecond carrier precision remain
+undecodable. The local engine regression compares `typeof`, DuckDB's rendered
+value and independent `date_part` month/day/microsecond results, then round-trips
+through a generated SQL literal and an explicitly cast bound parameter. This
+closes mixed-interval read/export/import coverage, not native typed interval
+editing or collection support.
+
+Scoped cargo-mutants on `duck_value_ref_to_value` caught 11 of 12 mutants, had
+one unviable whole-function replacement, and left no survivors or timeouts. The
+first pass exposed a surviving unsigned-BIGINT threshold mutation; explicit
+`i64::MAX` and `i64::MAX + 1` decoder assertions were added and the final run
+caught it. Evidence: `target/quality/20260929-duckdb-interval-mutants-final/mutants.out/outcomes.json`.
+
+Run `cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_components_round_trip_as_exact_text -- --exact --test-threads=1`.
 
 B3 remains open.
 

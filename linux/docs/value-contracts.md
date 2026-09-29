@@ -1440,10 +1440,12 @@ SQL NULL.
 
 The integration corpus checks server-rendered source values against both parameter rebinding and generated SQL literals, plus independent JSON expectations for nanosecond timestamps and microsecond times. It includes nulls for every temporal family. Decoder unit tests cover all four units, negative remainders, end-of-day boundaries and arithmetic overflow.
 
-Intervals, lists, fixed arrays, structs, maps and unions now return `Undecodable`, never debug text masquerading as the original value. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; the result is explicitly undecodable, and SQL literal and parameter consumers refuse it. A mixed `INTERVAL '1 month 2 days 3 microseconds'` case separately checks DuckDB's exact `VARCHAR` rendering while requiring `Undecodable` and SQL-literal/parameter refusal. Full interval/collection decoding remains open, including other nested unsigned values and interval carrier limits. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, GTK, MCP or release acceptance.
+Mixed month/day/microsecond intervals now preserve DuckDB's native month, day and nanosecond carrier fields as exact text with an explicit microsecond unit. A live embedded-engine contract checks `typeof`, DuckDB's `VARCHAR` representation and independent `date_part` component oracles, then re-imports through both a generated SQL literal and an explicitly cast bound parameter. Intervals with sub-microsecond carrier precision remain explicitly undecodable. Lists, fixed arrays, structs, maps and unions also remain explicitly undecodable. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; the result is explicitly undecodable, and SQL literal and parameter consumers refuse it. Full interval typed editing and collection decoding remain open, including other nested unsigned values. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, GTK, MCP or release acceptance.
+
+The DuckDB decoder mutation pass initially found a surviving `UBigInt` signed-boundary comparison. Unit assertions now pin `i64::MAX` to `Value::Int` and `i64::MAX + 1` to exact decimal text. The final scoped run caught 11/12 mutants, with one unviable whole-function replacement and no survivors or timeouts: `target/quality/20260929-duckdb-interval-mutants-final/mutants.out/outcomes.json`.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_interval_components_refuse_lossy_consumers
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_interval_components_round_trip_as_exact_text -- --exact --test-threads=1
 ```
 
 The local embedded-engine contract passed.
@@ -1529,10 +1531,14 @@ MySQL `TIMESTAMP` values are exact only while the server session is UTC because 
 
 Subsequent B3 coverage verifies BIT(1..64), ENUM/SET labels and spatial bytes;
 bounded BIT edits survive a driver update, while spatial and too-wide BIT values
-remain read-only. Text exports also run with and without `NO_BACKSLASH_ESCAPES`;
-backslash-bearing column comments are explicitly refused. Session time-zone and
-stricter SQL-mode matrices, installed-app-to-MySQL grid acceptance and broader
-consumer parity remain open.
+remain read-only. Text exports also run with and without `NO_BACKSLASH_ESCAPES`.
+Backslash-bearing column comments are explicitly refused. A dedicated-session
+Docker regression creates the same DDL under default mode and
+`NO_BACKSLASH_ESCAPES`; the server stores one backslash versus two, confirming
+that mode-independent output needs session-aware DDL execution. Run it with
+`cargo test --locked -p tablepro-driver-mysql --test integration mysql_column_comment_backslash_literals_depend_on_sql_mode -- --include-ignored --exact --test-threads=1`.
+Session time-zone and stricter SQL-mode matrices, installed-app-to-MySQL grid
+acceptance and broader consumer parity remain open.
 
 ## SQLite dynamic storage-class checkpoint
 
