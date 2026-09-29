@@ -1291,4 +1291,8 @@ line, lseg, box, path, polygon and circle. Each is compared with the server's
 NULL remains distinct for every type. The focused Docker regression passed;
 this records safe refusal, not geometry editing or shared exact-type support.
 
+The strict combined value-contract runner passed at the same revision: 124
+selected contracts across 11 suites, no missing suites. Evidence:
+`target/quality/20260929T165940977032Z-values/report.json`.
+
 B3 remains open.

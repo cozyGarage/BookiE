@@ -945,8 +945,11 @@ marker. A separate NULL projection for every type remains `Value::Null`.
 rtk cargo test -p tablepro-driver-postgres --test integration value_contract_geometric_types_keep_native_oracles_when_projection_is_refused -- --include-ignored --test-threads=1
 ```
 
-The focused PostgreSQL Docker contract passed. This establishes explicit safe
-refusal, not geometry editing or exact shared-type support.
+The focused PostgreSQL Docker contract passed. The strict combined runner also
+passed at `ab6c38442dbc5ef6f3a4d7e477df97dcb7b3a411`: 124 selected contracts
+across 11 suites, with no missing suites. Report:
+`target/quality/20260929T165940977032Z-values/report.json`. This establishes
+explicit safe refusal, not geometry editing or exact shared-type support.
 
 ### PostgreSQL `citext` text consumer contract
 
