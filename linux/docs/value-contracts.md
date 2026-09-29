@@ -68,19 +68,24 @@ classifies PostgreSQL server termination states `57P01` through `57P04` as
 contract checks that the terminated operation fails visibly and that the same
 pooled connection can complete a fresh `SELECT 1` afterward. A unit contract
 distinguishes the termination states from query cancellation and constraint
-errors.
+errors. A second failing-first unit case showed generic SQLx socket EOF/reset
+errors also surfaced as `Internal`; those now map to `Disconnected`, while
+connection refusal and TLS errors retain their distinct classifications.
 
 ```sh
 rtk cargo test -p tablepro-driver-postgres --lib server_termination_states_are_disconnections_but_query_cancel_is_not
+rtk cargo test -p tablepro-driver-postgres --lib unexpected_io_eof_is_disconnected_and_connection_refusal_stays_distinct
 rtk cargo test -p tablepro-driver-postgres --test integration server_terminated_query_reports_disconnection_and_pool_recovers -- --include-ignored --exact --test-threads=1
 ```
 
-Both focused tests passed. The scoped mutation run caught both generated
-classifier changes. The clean strict value runner passed 131 selected tests
-across all 11 suites at source `7b9659575fc206027d24849ff0f42087c5dbb0a5`, with
-no missing suites. Evidence:
-`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`
-and `target/quality/20260929T210639863435Z-values/report.json` (`dirty: false`).
+All 35 PostgreSQL unit tests and the focused Docker test passed. The SQLSTATE
+mutation run caught both generated changes; the socket/error-classification run
+caught 7 of 8 mutants, with one unviable. The clean strict value runner passed
+131 selected tests across all 11 suites at source
+`12e795cec416fca9da92ed1c95ae6bd9b77e754e`, with no missing suites. Evidence:
+`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`,
+`target/quality/20260929-pg-io-disconnect-mutants-final/mutants.out/outcomes.json`,
+and `target/quality/20260929T212538645091Z-values/report.json` (`dirty: false`).
 
 ## MySQL server termination and pool recovery, 2026-09-29
 

@@ -1120,17 +1120,20 @@ B3 remains open.
 A failing-first PostgreSQL 16 Docker test terminated an active query backend.
 Before the fix, SQLSTATE `57P01` surfaced as an ordinary query error. The driver
 now classifies server termination states `57P01`–`57P04` as `Disconnected`, while
-preserving `57014` cancellation as a query error. The contract verifies the
-terminated query cannot succeed or hang, and that the pooled connection can
-answer `SELECT 1` afterward. A unit test covers the termination/cancellation
-distinction.
+preserving `57014` cancellation as a query error. A second failing-first test
+found unexpected SQLx socket EOF/reset errors were also reported as `Internal`;
+these now map to `Disconnected`, while connection refusal and TLS errors remain
+distinct. The Docker contract verifies the terminated query cannot succeed or
+hang, and that the pool can answer `SELECT 1` afterward.
 
-The focused unit and Docker tests passed; scoped mutation testing caught both
-classifier mutants. The clean strict runner passed 131 selected contracts across
-11 suites with no missing suites at source
-`7b9659575fc206027d24849ff0f42087c5dbb0a5`. Evidence:
-`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`
-and `target/quality/20260929T210639863435Z-values/report.json`.
+All 35 PostgreSQL unit tests and the focused Docker test passed. The SQLSTATE
+mutation run caught both generated changes; the socket/error-classification run
+caught 7 of 8 mutants, with one unviable. The clean strict runner passed 131
+selected contracts across 11 suites with no missing suites at source
+`12e795cec416fca9da92ed1c95ae6bd9b77e754e`. Evidence:
+`target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`,
+`target/quality/20260929-pg-io-disconnect-mutants-final/mutants.out/outcomes.json`,
+and `target/quality/20260929T212538645091Z-values/report.json`.
 
 B3 remains open.
 
