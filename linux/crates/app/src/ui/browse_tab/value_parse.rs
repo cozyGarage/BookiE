@@ -520,6 +520,26 @@ mod tests {
         assert!(parse_input_for_driver(wide, Some(&col("money", false)), "postgres").is_err());
     }
 
+    #[test]
+    fn postgres_numeric_fallback_covers_integer_fraction_and_exponent_grammar() {
+        let column = col("numeric", false);
+        let wide_integer = "9".repeat(100);
+        let wide_fraction = format!(".{}", "1".repeat(100));
+        let wide_exponent = format!("{}e+2", "9".repeat(40));
+
+        for value in [&wide_integer, &wide_fraction, &wide_exponent] {
+            assert!(
+                parse_decimal_value(value).is_err(),
+                "{value:?} must use the text fallback"
+            );
+            assert_eq!(
+                parse_input_for_driver(value, Some(&column), "postgres"),
+                Ok(Value::Text(value.clone())),
+                "valid PostgreSQL numeric literal {value:?} must remain exact"
+            );
+        }
+    }
+
     #[tokio::test]
     #[ignore = "requires docker"]
     async fn postgres_numeric_parser_outputs_round_trip_through_server() {

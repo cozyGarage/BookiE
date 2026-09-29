@@ -951,23 +951,26 @@ the same core suite also checks safe metadata handling at and beyond the 64-byte
 allowlist input limit.
 
 The app-parser check adds malformed-literal refusals to the wide numeric parser
-contract. Its final `--iterate` report covers the 18 remaining mutations: seven
-were caught, nine survived, and two cursor-increment mutations timed out. The
-remaining survivors are in `is_postgres_numeric_literal` (cursor comparison,
-fraction/exponent grammar, and cursor advancement); they are recorded as open
-parser-test coverage, not as confirmed production defects. The timeout mutants
-replace cursor increments with multiplication and can stall the scanner. No
-source behavior was changed in response to these parser survivors.
+contract. A fresh in-place run generated 28 mutations: 17 were caught, nine
+survived and two cursor-increment mutations timed out. The survivors showed that
+the existing wide decimal had both integer and fractional digits, leaving
+integer-only, fractional-only and exponent paths unasserted. The parser
+regression now checks all three with values too large for `rust_decimal`; the
+updated run caught eight previously missed mutations. One prior survivor and
+the two prior timeouts now all time out because `+=` to `*=` prevents cursor
+advancement inside digit-scanning loops. These are non-terminating mutated
+scanners, not surviving valid-input behavior; the 30-second mutant timeout
+stopped each run. There are no surviving mutants. No production behavior changed.
 
 ```sh
 rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/sql_dialect.rs --re 'build_keyed_update|postgres_numeric_cast_type' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260928-pg-keyed-update-cast-final -- --lib
-rtk cargo mutants --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_input_for_driver|is_postgres_numeric_type|is_postgres_numeric_literal' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260928-pg-numeric-parser-mutants -- --lib postgres_
+rtk cargo mutants --in-place --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'is_postgres_numeric_literal' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260929-pg-numeric-parser-resume-inplace -- --lib postgres_
 ```
 
 Reports: `target/quality/20260928-pg-keyed-update-cast-final/mutants.out/outcomes.json`
-and `target/quality/20260928-pg-numeric-parser-mutants/mutants.out/outcomes.json`.
-The app parser unit regression passed. The PostgreSQL Docker acceptance contracts
-remain a separate server-side check.
+and `target/quality/20260928-pg-numeric-parser-resume-inplace/mutants.out/outcomes.json`.
+The updated parser regression passed, and the PostgreSQL Docker acceptance
+contracts remain a separate server-side check.
 
 ### PostgreSQL NUMERIC special-value grid edit
 

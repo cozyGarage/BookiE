@@ -1115,6 +1115,25 @@ Open findings from the audit:
 
 B3 remains open.
 
+### B3 PostgreSQL zero-row results and numeric parser mutation follow-up — September 29
+
+The all-driver value runner passed on `c553f0671`: all 11 expected suites were
+present and passed, including GTK and DuckDB, with 120 selected contracts and
+no missing suites. The PostgreSQL Docker suite includes a new result-delivery
+contract. It first reproduced that a zero-row `SELECT` returned no column
+names or types; the driver now recovers statement metadata for plain and
+parameterized queries. The test also checks duplicate aliases and row order.
+
+Mutation follow-up for PostgreSQL wide NUMERIC parsing added integer-only,
+fraction-only and exponent values that exceed `rust_decimal`, closing eight of
+nine prior survivors. The one remaining survivor changed into a timeout when
+the expanded test exercised its non-advancing exponent scanner. The final
+in-place run had 8 caught, 3 scanner-stall timeouts and no survivors or
+unviable mutants. The timeout bound prevented a hang. The parser regression,
+report paths and exact follow-up command are in [value contracts](value-contracts.md).
+
+B3 remains open for the remaining driver/type and consumer targets.
+
 ### B3 driver gaps and version 0.1.5 — September 27
 
 Each open finding from the audit was reproduced with a failing test first and then fixed:
