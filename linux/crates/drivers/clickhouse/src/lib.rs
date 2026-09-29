@@ -780,7 +780,7 @@ const AUTH_CODES: [&str; 5] = ["code: 192", "code: 193", "code: 194", "code: 497
 
 fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bool) -> DriverError {
     let is_ambiguous_network_disconnect = matches!(&err, clickhouse::error::Error::Network(_));
-    match map_clickhouse_error(err) {
+    match map_clickhouse_error_in_context(err, true) {
         DriverError::Disconnected if verifies_cert && is_ambiguous_network_disconnect => {
             DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
         }
@@ -789,13 +789,17 @@ fn map_clickhouse_connect_error(err: clickhouse::error::Error, verifies_cert: bo
 }
 
 fn map_clickhouse_error(err: clickhouse::error::Error) -> DriverError {
+    map_clickhouse_error_in_context(err, false)
+}
+
+fn map_clickhouse_error_in_context(err: clickhouse::error::Error, connecting: bool) -> DriverError {
     let chain = error_chain_text(&err);
     let lower = chain.to_ascii_lowercase();
     match &err {
         clickhouse::error::Error::Network(_) => {
             if looks_like_tls_failure(&lower) {
                 DriverError::Tls(chain)
-            } else if lower.contains("connection refused") || lower.contains("connect error") {
+            } else if connecting && (lower.contains("connection refused") || lower.contains("connect error")) {
                 DriverError::ConnectionRefused
             } else {
                 DriverError::Disconnected

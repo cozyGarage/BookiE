@@ -160,6 +160,10 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
 
 ## Remaining survey work
 
+- Server-loss contracts now reproduce `Disconnected` after established
+  operations for PostgreSQL, MySQL, MongoDB, Redis and ClickHouse; setup-time
+  refusal remains separate. MongoDB pool recovery and consistent mid-stream
+  interruption behavior across drivers remain open.
 - Inspect transport/authentication suites and fix commits in depth; only their
   inventory was sampled here. Include driver/protocol projects for wire behavior.
 - Read the delegated Beekeeper helper assertions and CI entry points before

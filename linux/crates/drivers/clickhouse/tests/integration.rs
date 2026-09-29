@@ -43,6 +43,28 @@ async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_lost_clickhouse_server_is_reported_as_disconnected() {
+    let (container, opts) = start_clickhouse().await;
+    let connection = connect(opts).await;
+    let initial = connection
+        .query("SELECT 1")
+        .await
+        .expect("initial query reaches server");
+    assert_eq!(initial.rows, vec![vec![Value::Int(1)]]);
+
+    container.stop().await.expect("stop ClickHouse server");
+    let error = connection
+        .query("SELECT 1")
+        .await
+        .expect_err("query after server loss must fail");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "loss of an established ClickHouse server must be reported as disconnected, got {error:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;

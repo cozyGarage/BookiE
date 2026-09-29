@@ -182,6 +182,22 @@ rtk cargo test --locked -p tablepro-driver-redis --test integration a_lost_redis
 
 All 35 Redis library tests and the Docker server-loss test passed.
 
+## ClickHouse disconnect classification, 2026-09-30
+
+A Docker-backed regression completed `SELECT 1`, stopped ClickHouse, then
+required a second query to return `Disconnected`. The test initially received
+`ConnectionRefused`: the shared mapper classified network refusal as a
+connection-setup error even for established queries. Error mapping now keeps
+`ConnectionRefused` during connect and reports network loss during later
+operations as `Disconnected`; TLS detection remains ahead of both paths.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-clickhouse --lib
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration a_lost_clickhouse_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
+```
+
+All 37 ClickHouse library tests and the Docker server-loss test passed.
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.
