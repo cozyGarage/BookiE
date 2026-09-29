@@ -187,6 +187,12 @@ passed all 127 contracts across 11 suites. Evidence:
 `target/quality/20260929T195657915401Z-values/report.json` (`dirty: true`; the
 test and ledger edits were present in the working tree during the run).
 
+After the RESP3 wire contract was committed, the strict combined runner passed
+all 128 contracts across 11 suites with no missing suites at
+`887a1bd61060e5c604e9d4e52cb821de4dcf2202` (`dirty: false`). Both the stream
+refusal contract and the attribute-wire contract appear as passed Redis tests.
+Evidence: `target/quality/20260929T200632950370Z-values/report.json`.
+
 ```sh
 rtk cargo test -p tablepro-driver-redis --test integration value_contract_redis_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
 ```

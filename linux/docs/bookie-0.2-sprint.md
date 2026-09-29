@@ -1134,7 +1134,7 @@ timeouts. Evidence:
 `target/quality/20260929-redis-async-push-mutants/mutants.out.old/outcomes.json`
 and `target/quality/20260929-redis-async-push-mutants/mutants.out/outcomes.json`.
 
-Asynchronous push delivery and attribute framing remain open.
+Consuming asynchronous push frames remains open.
 
 The clean combined runner passed after the tracking-push addition at
 `af46f18461e98a5ec83833e9c18556211b7f1b56`: 125 selected contracts across 11
@@ -1145,7 +1145,10 @@ An unignored local TCP test now exercises the full RESP3 attribute frame through
 the redis client socket after `HELLO 3`. The payload and attached TTL metadata
 must survive as tagged JSON; the strict runner includes it under the
 `value_contract` filter. This verifies wire decoding without claiming delivery
-of asynchronous server pushes.
+of asynchronous server pushes. The clean strict run passed 128 selected
+contracts across all 11 suites at `887a1bd61060e5c604e9d4e52cb821de4dcf2202`,
+with both Redis stream refusal and attribute wire tests visibly passed. Evidence:
+`target/quality/20260929T200632950370Z-values/report.json` (`dirty: false`).
 
 B3 remains open.
 
