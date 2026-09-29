@@ -1171,6 +1171,24 @@ mod tests {
     }
 
     #[test]
+    fn connect_error_text_during_connect_is_connection_refused() {
+        for message in ["connection refused", "connect error: network unreachable"] {
+            let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other(message)));
+            assert!(
+                matches!(map_clickhouse_connect_error(err, false), DriverError::ConnectionRefused),
+                "connect failure {message:?} must remain distinct from established disconnects"
+            );
+        }
+    }
+
+    #[test]
+    fn connection_refusal_during_an_operation_is_disconnected() {
+        let err =
+            clickhouse::error::Error::Network(Box::new(std::io::Error::from(std::io::ErrorKind::ConnectionRefused)));
+        assert!(matches!(map_clickhouse_error(err), DriverError::Disconnected));
+    }
+
+    #[test]
     fn verifying_connect_does_not_report_a_hostname_mismatch_as_a_drop() {
         let err = clickhouse::error::Error::Network(Box::new(std::io::Error::other("connection closed unexpectedly")));
         assert!(matches!(map_clickhouse_error(err), DriverError::Disconnected));

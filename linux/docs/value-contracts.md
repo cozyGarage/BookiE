@@ -206,7 +206,13 @@ rtk cargo test --locked -p tablepro-driver-clickhouse --lib
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration a_lost_clickhouse_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-All 37 ClickHouse library tests and the Docker server-loss test passed.
+All 39 ClickHouse library tests and the Docker server-loss test passed. The
+first scoped mutation run found an uncovered distinction between setup-time
+`connect error` and operation-time refusal. New mapper regressions cover both
+forms, including refusal during an established operation. The rerun caught 4
+of 5 mutants; one was unviable, with no missed or timed-out mutants. Reports:
+`target/quality/20260930-clickhouse-disconnect-mutants/mutants.out/outcomes.json`
+and `target/quality/20260930-clickhouse-disconnect-mutants-final/mutants.out/outcomes.json`.
 
 ## SQL Server disconnect delivery, 2026-09-30
 
