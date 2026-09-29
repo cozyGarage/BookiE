@@ -2,12 +2,12 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled 2026-09-29 through commit
-`1bfc163d0fc88929a077aacfb11f378ac37d7caf`, including September 26–29 changes.
+`77ff32d05f24bdb3b355299e5421aadda149ece8`, including September 26–29 changes.
 The baseline contains Redis RESP3 nested-value/binary contracts, explicit
-PostgreSQL multirange metadata refusal coverage and ClickHouse DateTime64(9)
-server-boundary evidence. The upstream review sampled eight test files in four
-projects and two issue reports; this local update is a source/test inventory, not
-a fresh execution of every suite.
+PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
+server-boundary evidence and safe SQL Server `sql_variant` refusal. The upstream
+review sampled eight test files in four projects and two issue reports; this
+local update is a source/test inventory, not a fresh execution of every suite.
 No external source code or fixtures were copied.
 
 ## Focus to carry forward
