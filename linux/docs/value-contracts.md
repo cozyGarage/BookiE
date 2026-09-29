@@ -198,6 +198,19 @@ rtk cargo test --locked -p tablepro-driver-clickhouse --test integration a_lost_
 
 All 37 ClickHouse library tests and the Docker server-loss test passed.
 
+## SQL Server disconnect delivery, 2026-09-30
+
+A Docker-backed test completes `SELECT 1`, stops the SQL Server container, then
+requires the next query on the established connection to return `Disconnected`.
+This confirms the driver does not surface server loss as a generic query error.
+Recovery after the server restarts is not asserted by this case.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mssql --test integration a_lost_sql_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
+```
+
+The focused SQL Server server-loss test passed.
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.

@@ -37,6 +37,28 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_lost_sql_server_is_reported_as_disconnected() {
+    let (container, opts) = start_mssql().await;
+    let connection = connect(opts).await;
+    let initial = connection
+        .query("SELECT 1")
+        .await
+        .expect("initial query reaches server");
+    assert_eq!(initial.rows, vec![vec![Value::Int(1)]]);
+
+    container.stop().await.expect("stop SQL Server");
+    let error = connection
+        .query("SELECT 1")
+        .await
+        .expect_err("query after server loss must fail");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "loss of an established SQL Server must be reported as disconnected, got {error:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn connect_list_tables_pk_and_identity() {
     let (_c, opts) = start_mssql().await;
     let conn = connect(opts).await;
