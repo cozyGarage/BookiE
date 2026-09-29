@@ -1320,7 +1320,9 @@ B3 remains open.
 An isolated GTK widget test binds geometry, point and multipolygon byte values
 and verifies they render as read-only labels, create no editable cell widgets,
 and emit no pending edit. The `widgets` layer passed with the new case included
-in the isolated-test registry. The focused mutation run caught both generated
+in the isolated-test registry at clean commit
+`2db9f59dc0b1be614440e941baa889f4036bcfb2`; report:
+`target/quality/20260929T190108119267Z-layers/report.json`. The focused mutation run caught both generated
 changes to the bytes-specific editability guard. A broader 11-mutant function
 audit caught 6; its 5 survivors only altered stricter read-only behavior or
 unrelated primary-key/generated/auto-increment/mixed guards. Reports:

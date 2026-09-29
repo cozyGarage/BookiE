@@ -1701,7 +1701,9 @@ The isolated GTK widget contract binds `geometry`, `point` and `multipolygon`
 columns containing spatial byte payloads. Each appears as the expected
 `<9 bytes>` read-only label, the grid creates no editable `CellEditor`, and
 binding the cells emits no pending edit. The widgets layer passed with this
-test registered in the isolated-test inventory. Scoped mutation testing of the
+test registered in the isolated-test inventory at clean commit
+`2db9f59dc0b1be614440e941baa889f4036bcfb2`; report:
+`target/quality/20260929T190108119267Z-layers/report.json`. Scoped mutation testing of the
 bytes-specific editability guard caught both generated mutations. A broader
 mutation pass also exercised primary-key, generated-column, auto-increment and
 `mixed` guards; its five survivors were the unconditional read-only result and
