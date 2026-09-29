@@ -1120,15 +1120,19 @@ B3 remains open.
 A Redis 7.4 regression first showed `SUBSCRIBE` returning its push
 acknowledgement as an ordinary one-shot query result. The same fixture showed
 `MONITOR` returning `OK` before entering its event stream. The driver now
-visibly refuses all six subscribe/unsubscribe command forms and `MONITOR`
-before sending them. The live Docker test checks the error type and explanation,
-then verifies the same connection still answers `PING`. This establishes the
-unsupported streaming boundary; asynchronous push delivery and attribute
-framing remain open.
-Scoped mutations of the updated guard caught both generated boolean
-replacements; the whole-query replacement was unviable, with no survivors or
+`CLIENT TRACKING ON BCAST` returning `OK` while enabling invalidation pushes.
+The driver visibly refuses all six subscribe/unsubscribe forms, `MONITOR`, and
+`CLIENT TRACKING ON` with trailing options. The live Docker test verifies the
+unsupported errors and confirms `PING`, `CLIENT TRACKING OFF`, `PUBLISH`,
+`PUBSUB CHANNELS` and `CLIENT LIST` still work on the same connection. Scoped
+mutation testing first caught 2 mutations, with 2 misses and one unviable
+whole-query replacement. After adding live negative assertions, iteration
+caught both survivors: cumulatively 4 caught, 1 unviable, no survivors or
 timeouts. Evidence:
-`target/quality/20260929-redis-stream-commands-mutants/mutants.out/outcomes.json`.
+`target/quality/20260929-redis-async-push-mutants/mutants.out.old/outcomes.json`
+and `target/quality/20260929-redis-async-push-mutants/mutants.out/outcomes.json`.
+
+Asynchronous push delivery and attribute framing remain open.
 
 The clean combined runner passed after the MONITOR addition at
 `b9b4757d14f5b989df4c73a46d400b9e3943f70a`: 125 selected contracts across 11

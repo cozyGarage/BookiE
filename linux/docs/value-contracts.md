@@ -158,18 +158,22 @@ A Redis 7.4 Docker regression first demonstrated that `SUBSCRIBE` returned a
 one-shot `$redisPush` subscription acknowledgement, although the request /
 response API cannot deliver later message pushes. A second failing-first case
 showed that `MONITOR` returns `OK` before switching into its continuous event
-stream. The driver now refuses
+stream. `CLIENT TRACKING ON BCAST` likewise returned `OK` while enabling
+invalidation pushes. The driver now refuses
 `SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE`, and their three unsubscribe commands
-as `Unsupported` before sending them. The live contract exercises each command
-on one connection, checks the
-refusal explains the streaming limitation, and confirms `PING` still works
-afterward. This prevents a one-shot acknowledgement from implying that the
-ongoing stream is being received. It does not add a streaming API or establish
-live delivery for other asynchronous
-pushes or attribute frames. Scoped mutation testing of the updated guard caught
-both generated boolean replacements; the whole-query replacement was unviable
-at compile time, with no missed or timed-out mutants. Evidence:
-`target/quality/20260929-redis-stream-commands-mutants/mutants.out/outcomes.json`.
+as `Unsupported` before sending them. It also refuses `MONITOR` and
+`CLIENT TRACKING ON` with any trailing flags. The live contract exercises each
+streaming command on one connection, checks the refusal explanation, then
+confirms `PING`, `CLIENT TRACKING OFF`, `PUBLISH`, `PUBSUB CHANNELS` and
+`CLIENT LIST` still work. This prevents a one-shot acknowledgement from
+implying that an ongoing stream is being received while preserving adjacent
+one-shot commands. It does not add a streaming API or establish live delivery
+for other asynchronous pushes or attribute frames. The first scoped mutation
+pass caught 2, left 2 missed and found one unviable whole-query replacement.
+After adding live negative assertions, iteration caught both survivors:
+cumulatively 4 caught, 1 unviable, no survivors or timeouts. Evidence:
+`target/quality/20260929-redis-async-push-mutants/mutants.out.old/outcomes.json`
+and `target/quality/20260929-redis-async-push-mutants/mutants.out/outcomes.json`.
 The clean combined runner passed after the MONITOR addition at
 `b9b4757d14f5b989df4c73a46d400b9e3943f70a`: 125 selected contracts across 11
 suites, with no missing suites. Evidence:

@@ -194,6 +194,7 @@ async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_
         "PUNSUBSCRIBE updates.*",
         "SUNSUBSCRIBE updates",
         "MONITOR",
+        "CLIENT TRACKING ON BCAST",
     ] {
         let error = connection
             .query(command)
@@ -208,6 +209,25 @@ async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_
             "the refusal should explain the unsupported streaming operation: {error}"
         );
     }
+
+    assert_eq!(
+        connection.query("CLIENT TRACKING OFF").await.unwrap().rows,
+        vec![vec![Value::Text("OK".into())]],
+        "disabling tracking is a one-shot command and remains available"
+    );
+    assert_eq!(
+        connection.query("PUBLISH updates payload").await.unwrap().rows,
+        vec![vec![Value::Int(0)]],
+        "ordinary one-shot PUBLISH must remain available"
+    );
+    assert!(
+        connection.query("PUBSUB CHANNELS").await.is_ok(),
+        "one-shot Pub/Sub inspection remains available"
+    );
+    assert!(
+        !connection.query("CLIENT LIST").await.unwrap().rows.is_empty(),
+        "ordinary client inspection remains available"
+    );
 
     assert_eq!(
         connection.query("PING").await.unwrap().rows,

@@ -231,10 +231,9 @@ impl Connection for RedisConnection {
                 sqlstate: None,
             });
         }
-        if is_redis_stream_command(&args[0]) {
+        if is_redis_stream_command(&args) {
             return Err(DriverError::Unsupported(
-                "Redis Pub/Sub and MONITOR streaming commands are not supported by the request/response query interface"
-                    .into(),
+                "Redis Pub/Sub, MONITOR, and client tracking streams are not supported by the request/response query interface".into(),
             ));
         }
         let mut cmd = redis::cmd(&args[0]);
@@ -493,11 +492,19 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
     }
 }
 
-fn is_redis_stream_command(command: &str) -> bool {
-    matches!(
+fn is_redis_stream_command(args: &[String]) -> bool {
+    let Some(command) = args.first() else {
+        return false;
+    };
+    if matches!(
         command.to_ascii_uppercase().as_str(),
         "SUBSCRIBE" | "PSUBSCRIBE" | "SSUBSCRIBE" | "UNSUBSCRIBE" | "PUNSUBSCRIBE" | "SUNSUBSCRIBE" | "MONITOR"
-    )
+    ) {
+        return true;
+    }
+    command.eq_ignore_ascii_case("CLIENT")
+        && args.get(1).is_some_and(|arg| arg.eq_ignore_ascii_case("TRACKING"))
+        && args.get(2).is_some_and(|arg| arg.eq_ignore_ascii_case("ON"))
 }
 
 fn text_col(name: &str) -> ColumnInfo {
@@ -1101,18 +1108,30 @@ mod tests {
     #[test]
     fn redis_stream_commands_are_refused() {
         for command in [
-            "subscribe",
-            "PSubscribe",
-            "SSUBSCRIBE",
-            "UNSUBSCRIBE",
-            "punsubscribe",
-            "sunsubscribe",
-            "monitor",
+            vec!["subscribe", "updates"],
+            vec!["PSubscribe", "updates.*"],
+            vec!["SSUBSCRIBE", "updates"],
+            vec!["UNSUBSCRIBE", "updates"],
+            vec!["punsubscribe", "updates.*"],
+            vec!["sunsubscribe", "updates"],
+            vec!["monitor"],
+            vec!["CLIENT", "TRACKING", "ON"],
+            vec!["client", "tracking", "on", "bcast"],
         ] {
-            assert!(is_redis_stream_command(command), "{command}");
+            let args = command.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            assert!(is_redis_stream_command(&args), "{args:?}");
         }
-        for command in ["PING", "PUBLISH", "PUBSUB", "GET", ""] {
-            assert!(!is_redis_stream_command(command), "{command}");
+        for command in [
+            vec!["PING"],
+            vec!["PUBLISH", "updates", "value"],
+            vec!["PUBSUB", "CHANNELS"],
+            vec!["GET", "key"],
+            vec!["CLIENT", "TRACKING", "OFF"],
+            vec!["CLIENT", "LIST"],
+            vec![],
+        ] {
+            let args = command.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            assert!(!is_redis_stream_command(&args), "{args:?}");
         }
     }
 }
