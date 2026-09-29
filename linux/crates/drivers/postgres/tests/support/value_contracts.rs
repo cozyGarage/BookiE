@@ -76,6 +76,57 @@ async fn value_contract_postgres_money_is_refused_with_exact_server_oracle() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_geometric_types_keep_native_oracles_when_projection_is_refused() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let cases = [
+        ("point", "'(1,2)'::point"),
+        ("line", "'{1,2,3}'::line"),
+        ("lseg", "'[(1,2),(3,4)]'::lseg"),
+        ("box", "'(3,4),(1,2)'::box"),
+        ("path", "'((1,2),(3,4))'::path"),
+        ("polygon", "'((1,2),(3,4),(5,6))'::polygon"),
+        ("circle", "'<(1,2),3>'::circle"),
+    ];
+
+    for (native_type, expression) in cases {
+        let oracle = connection
+            .query(&format!("SELECT pg_typeof({expression})::text, ({expression})::text"))
+            .await
+            .unwrap();
+        assert_eq!(oracle.rows[0][0], Value::Text(native_type.into()));
+        let exact_native_text = oracle.rows[0][1].clone();
+
+        let projected = connection
+            .query(&format!("SELECT {expression} AS value"))
+            .await
+            .unwrap_or_else(|error| {
+                panic!("{native_type} should reach the value decoder: {error:?}; native text: {exact_native_text:?}")
+            });
+        assert_eq!(projected.rows.len(), 1);
+        assert!(
+            matches!(&projected.rows[0][0], Value::Undecodable(name) if name.eq_ignore_ascii_case(native_type)),
+            "{native_type} projection must be explicit, not lossy: {:?}; native text: {exact_native_text:?}",
+            projected.rows[0][0]
+        );
+        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &projected.rows[0][0]).is_err());
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(&projected.rows[0][0]))
+                .await
+                .is_err()
+        );
+
+        let null = connection
+            .query(&format!("SELECT NULL::{native_type} AS value"))
+            .await
+            .unwrap();
+        assert_eq!(null.rows, vec![vec![Value::Null]], "{native_type}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_citext_preserves_label_and_case_insensitive_comparison() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

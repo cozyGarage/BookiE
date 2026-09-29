@@ -933,6 +933,21 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 Docker contract passed.
 
+### PostgreSQL geometric types: exact server oracle and visible refusal
+
+A PostgreSQL 16 Docker contract checks the built-in `point`, `line`, `lseg`,
+`box`, `path`, `polygon` and `circle` types. For each type, PostgreSQL supplies
+an independent `pg_typeof` and `::text` oracle. Direct projections return the
+matching `Undecodable` marker; SQL-literal and parameter consumers refuse that
+marker. A separate NULL projection for every type remains `Value::Null`.
+
+```sh
+rtk cargo test -p tablepro-driver-postgres --test integration value_contract_geometric_types_keep_native_oracles_when_projection_is_refused -- --include-ignored --test-threads=1
+```
+
+The focused PostgreSQL Docker contract passed. This establishes explicit safe
+refusal, not geometry editing or exact shared-type support.
+
 ### PostgreSQL `citext` text consumer contract
 
 The PostgreSQL 16 fixture creates the `citext` extension and checks that a

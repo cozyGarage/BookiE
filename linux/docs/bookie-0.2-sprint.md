@@ -1281,3 +1281,14 @@ added; the final run caught 7 mutations, had 1 unviable mutation, and had no
 survivors or timeouts.
 
 B3 remains open.
+
+### PostgreSQL geometric native-type boundary — September 29
+
+The PostgreSQL 16 contract covers the seven built-in geometric types: point,
+line, lseg, box, path, polygon and circle. Each is compared with the server's
+`pg_typeof` and `::text` oracle, direct projection is an explicit
+`Undecodable` marker, and literal/parameter consumers refuse the marker. SQL
+NULL remains distinct for every type. The focused Docker regression passed;
+this records safe refusal, not geometry editing or shared exact-type support.
+
+B3 remains open.
