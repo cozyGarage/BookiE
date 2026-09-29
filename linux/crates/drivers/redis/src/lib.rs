@@ -713,7 +713,7 @@ fn map_redis_error_in_context(err: RedisError, connecting: bool, verifies_cert: 
         DriverError::AuthFailed
     } else if verifies_cert && err.is_connection_dropped() {
         DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
-    } else if !connecting && (err.kind() == redis::ErrorKind::Io || err.is_connection_dropped() || err.is_timeout()) {
+    } else if !connecting && err.kind() == redis::ErrorKind::Io {
         DriverError::Disconnected
     } else {
         DriverError::Query {
@@ -864,6 +864,15 @@ mod tests {
     #[test]
     fn map_redis_error_classifies_connection_refusal_during_operation_as_disconnected() {
         let err = RedisError::from(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
+        assert!(matches!(map_redis_error(err), DriverError::Disconnected));
+    }
+
+    #[test]
+    fn a_non_timeout_io_error_during_an_operation_is_disconnected() {
+        let err = RedisError::from(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "socket transport failed",
+        ));
         assert!(matches!(map_redis_error(err), DriverError::Disconnected));
     }
 

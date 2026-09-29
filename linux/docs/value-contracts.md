@@ -180,7 +180,17 @@ rtk cargo test --locked -p tablepro-driver-redis --lib
 rtk cargo test --locked -p tablepro-driver-redis --test integration a_lost_redis_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-All 35 Redis library tests and the Docker server-loss test passed.
+All 36 Redis library tests and the Docker server-loss test passed. The first
+copy-based mutation attempt stopped during its clean baseline build because the
+temporary filesystem quota was exhausted; it ran no mutants. An in-place scoped
+run found two survivors caused by redundant checks: in redis 1.7, timeout and
+dropped-connection predicates are both I/O errors, and `is_connection_dropped`
+is already implied by `ErrorKind::Io`. The mapper now uses that single I/O-kind
+contract. The final run caught 8 of 9 mutants; one was unviable, with no missed
+or timed-out mutants. Reports:
+`target/quality/20260930-redis-disconnect-mutants/mutants.out/outcomes.json`,
+`target/quality/20260930-redis-disconnect-mutants-inplace/mutants.out/outcomes.json`,
+and `target/quality/20260930-redis-disconnect-mutants-final/mutants.out/outcomes.json`.
 
 ## ClickHouse disconnect classification, 2026-09-30
 
