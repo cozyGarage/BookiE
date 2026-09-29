@@ -1166,3 +1166,21 @@ records the transformed result so it is not represented as lossless input
 handling.
 
 B3 remains open.
+
+### SQL Server `sql_variant` safe refusal — September 29
+
+A failing-first Docker regression reproduced Tiberius's `SSVariant` metadata
+panic using a `bigint` value beyond binary64's exact range. A separate server
+query verifies the native base type and exact decimal text before the direct
+projection is attempted. The driver now catches only this known pinned-library
+panic, returns an explicit unsupported error, and retires the affected shared
+connection or isolated session. The test verifies both paths and that the shared
+connection cannot be reused. This prevents a client panic but does not add
+`sql_variant` decoding or editing; exact support remains open.
+
+Scoped mutation testing of the guard first found one surviving “always
+unsupported” classifier mutation. Negative assertions for unrelated errors were
+added; the final run caught 7 mutations, had 1 unviable mutation, and had no
+survivors or timeouts.
+
+B3 remains open.

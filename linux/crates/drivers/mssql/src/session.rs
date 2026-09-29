@@ -4,6 +4,7 @@ use tablepro_core::{
     run_server_cancellable,
 };
 
+use crate::variant_guard::is_unsupported_result;
 use crate::{CONNECT_TIMEOUT, MssqlClient, build_target, open_client, open_kerberos_client, run_batch, run_query};
 
 pub(crate) struct MssqlSession {
@@ -41,7 +42,9 @@ impl tablepro_core::Session for MssqlSession {
             }
         };
         let result = run_server_cancellable(execution, async { Ok(()) }, |_| false, control).await;
-        if !matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
+        if !matches!(result, Err(DriverError::OperationOutcomeUnknown { .. }))
+            && !result.as_ref().is_err_and(is_unsupported_result)
+        {
             self.client = Some(client);
         }
         result

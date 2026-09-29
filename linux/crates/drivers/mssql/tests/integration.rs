@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use secrecy::SecretString;
 
 use drivers_mssql::MssqlDriver;
-use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
+use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ContainerAsync;
 use testcontainers_modules::mssql_server::MssqlServer;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -903,6 +903,60 @@ async fn money_types_refuse_values_decoded_through_binary_float() {
     assert_eq!(result.rows[0][3], Value::Text("-123456.7891".into()));
     assert_eq!(result.rows[0][0], Value::Undecodable("money".into()));
     assert_eq!(result.rows[0][2], Value::Undecodable("money".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn sql_variant_result_is_refused_without_panicking_or_reusing_the_connection() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    let oracle = conn
+        .query(
+            "SELECT CONVERT(varchar(20), SQL_VARIANT_PROPERTY(value, 'BaseType')) AS base_type, \
+             CONVERT(varchar(40), value) AS exact_text \
+             FROM (VALUES (CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)))) \
+             AS source(value)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        oracle.rows,
+        vec![vec![
+            Value::Text("bigint".into()),
+            Value::Text("9007199254740993".into())
+        ]],
+        "the native SQL Server oracle must preserve the value beyond binary64 precision"
+    );
+
+    let result = conn
+        .query("SELECT CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)) AS value")
+        .await;
+    assert!(
+        matches!(result, Err(DriverError::Unsupported(_))),
+        "sql_variant must return an explicit unsupported result, got {result:?}"
+    );
+    assert!(
+        matches!(conn.query("SELECT 1").await, Err(DriverError::Disconnected)),
+        "a TDS stream that panicked during metadata decoding must be retired"
+    );
+
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::new(tokio_util::sync::CancellationToken::new(), None);
+    let session_result = session
+        .query_params_controlled(
+            "SELECT CONVERT(sql_variant, CONVERT(bigint, 9007199254740993)) AS value",
+            &[],
+            &control,
+        )
+        .await;
+    assert!(
+        matches!(session_result, Err(DriverError::Unsupported(_))),
+        "session sql_variant must also return an explicit refusal: {session_result:?}"
+    );
+    assert!(
+        !session.is_usable(),
+        "a session with an unread TDS stream must be retired"
+    );
 }
 
 const ZONED_STAMPS: [&str; 5] = [

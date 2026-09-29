@@ -18,15 +18,10 @@ use tablepro_core::{
 
 mod codec;
 mod session;
+mod variant_guard;
 mod zoned;
 
 type MssqlClient = Client<Compat<TcpStream>>;
-
-enum StoredClient {
-    Live(MssqlClient),
-    #[cfg(test)]
-    Absent,
-}
 
 /// Matches the `acquire_timeout` the sqlx-backed drivers give their
 /// pools, so a dead host fails at the same speed on every engine.
@@ -182,7 +177,7 @@ async fn open_client(target: MssqlTarget) -> Result<MssqlClient, DriverError> {
 }
 
 struct MssqlConnection {
-    client: Mutex<StoredClient>,
+    client: Mutex<Option<MssqlClient>>,
     usable: AtomicBool,
     fault: std::sync::Mutex<Option<Arc<Notify>>>,
     session_options: ConnectOptions,
@@ -191,7 +186,7 @@ struct MssqlConnection {
 impl MssqlConnection {
     fn new(client: MssqlClient, session_options: ConnectOptions) -> Self {
         Self {
-            client: Mutex::new(StoredClient::Live(client)),
+            client: Mutex::new(Some(client)),
             usable: AtomicBool::new(true),
             fault: std::sync::Mutex::new(None),
             session_options,
@@ -201,7 +196,7 @@ impl MssqlConnection {
     #[cfg(test)]
     fn unconnected() -> Self {
         Self {
-            client: Mutex::new(StoredClient::Absent),
+            client: Mutex::new(None),
             usable: AtomicBool::new(true),
             fault: std::sync::Mutex::new(None),
             session_options: ConnectOptions::default(),
@@ -218,11 +213,7 @@ impl MssqlConnection {
             return Err(DriverError::Disconnected);
         }
         let guard = self.client.lock().await;
-        match tokio::sync::MutexGuard::try_map(guard, |stored| match stored {
-            StoredClient::Live(client) => Some(client),
-            #[cfg(test)]
-            StoredClient::Absent => None,
-        }) {
+        match tokio::sync::MutexGuard::try_map(guard, Option::as_mut) {
             Ok(client) => Ok(client),
             Err(_guard) => Err(DriverError::Disconnected),
         }
@@ -250,6 +241,20 @@ impl MssqlConnection {
         }
         Ok(())
     }
+
+    async fn query_result(
+        &self,
+        client: &mut MssqlClient,
+        sql: &str,
+        params: &[Value],
+        limit: usize,
+    ) -> Result<QueryResult, DriverError> {
+        let result = run_query(client, sql, params, limit).await;
+        if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
+            self.retire().await?;
+        }
+        result
+    }
 }
 
 #[async_trait]
@@ -268,7 +273,7 @@ impl Connection for MssqlConnection {
                    JOIN sys.schemas s ON t.schema_id = s.schema_id \
                    ORDER BY s.name, t.name";
         let mut client = self.client().await?;
-        let result = run_query(&mut client, sql, &[], MAX_QUERY_ROWS).await?;
+        let result = self.query_result(&mut client, sql, &[], MAX_QUERY_ROWS).await?;
         Ok(result
             .rows
             .iter()
@@ -321,13 +326,14 @@ impl Connection for MssqlConnection {
                    WHERE o.name = @P1 AND sc.name = COALESCE(@P2, SCHEMA_NAME()) \
                    ORDER BY c.column_id";
         let mut client = self.client().await?;
-        let result = run_query(
-            &mut client,
-            sql,
-            &[text_param(table), schema_param(schema)],
-            MAX_QUERY_ROWS,
-        )
-        .await?;
+        let result = self
+            .query_result(
+                &mut client,
+                sql,
+                &[text_param(table), schema_param(schema)],
+                MAX_QUERY_ROWS,
+            )
+            .await?;
         Ok(result.rows.iter().map(|r| row_to_column_info(r.as_slice())).collect())
     }
 
@@ -344,12 +350,12 @@ impl Connection for MssqlConnection {
             build_order_and_pagination("mssql", None, limit, offset)
         );
         let mut client = self.client().await?;
-        run_query(&mut client, &sql, &[], limit as usize).await
+        self.query_result(&mut client, &sql, &[], limit as usize).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         let mut client = self.client().await?;
-        run_query(&mut client, sql, &[], MAX_QUERY_ROWS).await
+        self.query_result(&mut client, sql, &[], MAX_QUERY_ROWS).await
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
@@ -363,7 +369,7 @@ impl Connection for MssqlConnection {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let mut client = self.client().await?;
-        self.run_abandonable(run_query(&mut client, sql, params, MAX_QUERY_ROWS), control)
+        self.run_abandonable(self.query_result(&mut client, sql, params, MAX_QUERY_ROWS), control)
             .await
     }
 
@@ -386,7 +392,7 @@ impl Connection for MssqlConnection {
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let mut client = self.client().await?;
-        run_query(&mut client, sql, params, MAX_QUERY_ROWS).await
+        self.query_result(&mut client, sql, params, MAX_QUERY_ROWS).await
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
@@ -449,13 +455,14 @@ impl Connection for MssqlConnection {
                      AND ic.is_included_column = 0 \
                    ORDER BY i.name, ic.key_ordinal";
         let mut client = self.client().await?;
-        let result = run_query(
-            &mut client,
-            sql,
-            &[text_param(table), schema_param(schema)],
-            MAX_QUERY_ROWS,
-        )
-        .await?;
+        let result = self
+            .query_result(
+                &mut client,
+                sql,
+                &[text_param(table), schema_param(schema)],
+                MAX_QUERY_ROWS,
+            )
+            .await?;
         let mut out: Vec<IndexInfo> = Vec::new();
         for row in &result.rows {
             let Some(name) = as_text(row.first()) else {
@@ -497,13 +504,14 @@ impl Connection for MssqlConnection {
                    WHERE o.name = @P1 AND s.name = COALESCE(@P2, SCHEMA_NAME()) \
                    ORDER BY fk.name, fkc.constraint_column_id";
         let mut client = self.client().await?;
-        let result = run_query(
-            &mut client,
-            sql,
-            &[text_param(table), schema_param(schema)],
-            MAX_QUERY_ROWS,
-        )
-        .await?;
+        let result = self
+            .query_result(
+                &mut client,
+                sql,
+                &[text_param(table), schema_param(schema)],
+                MAX_QUERY_ROWS,
+            )
+            .await?;
         let mut out: Vec<ForeignKeyInfo> = Vec::new();
         for row in &result.rows {
             let Some(name) = as_text(row.first()) else {
@@ -544,14 +552,22 @@ impl Connection for MssqlConnection {
             return Ok(());
         }
         match self.client.into_inner() {
-            StoredClient::Live(client) => client.close().await.map_err(map_tiberius_error),
-            #[cfg(test)]
-            StoredClient::Absent => Ok(()),
+            Some(client) => client.close().await.map_err(map_tiberius_error),
+            None => Ok(()),
         }
     }
 }
 
 async fn run_query(
+    client: &mut MssqlClient,
+    sql: &str,
+    params: &[Value],
+    limit: usize,
+) -> Result<QueryResult, DriverError> {
+    variant_guard::catch_tiberius_variant_panic(async { run_query_inner(client, sql, params, limit).await }).await
+}
+
+async fn run_query_inner(
     client: &mut MssqlClient,
     sql: &str,
     params: &[Value],
@@ -567,8 +583,11 @@ async fn run_query(
 // #temp table and refuses a transaction left open when it returns. A
 // statement without parameters is sent as a plain batch so both survive.
 async fn run_batch(client: &mut MssqlClient, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
-    let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
-    collect_result(stream, limit).await
+    variant_guard::catch_tiberius_variant_panic(async {
+        let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
+        collect_result(stream, limit).await
+    })
+    .await
 }
 
 async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> Result<QueryResult, DriverError> {

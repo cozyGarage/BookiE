@@ -374,16 +374,37 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 Both focused tests passed; the integration reproducer fails before the refusal fix.
 
-### SQL Server `sql_variant` result blocker
+### SQL Server `sql_variant` metadata refusal
 
-A Docker probe selected a `sql_variant` containing `bigint` value
-`9007199254740993`, alongside `SQL_VARIANT_PROPERTY(..., 'BaseType')` and an
-exact `CONVERT(varchar(40), ...)` oracle. The request panicked before the driver
-could decode or refuse the result: the pinned Tiberius TDS metadata parser has
-an unimplemented `SSVariant` branch. The probe is not retained as a passing
-regression because running this query crashes the client; `sql_variant` remains
-an open driver/dependency defect. A future fix must make metadata decoding safe,
-then assert the bigint identity and server text without passing through a float.
+A SQL Server Docker regression first checks the native base type and exact
+`CONVERT(varchar(40), value)` text for `bigint` value `9007199254740993`, which
+is beyond binary64's exact-integer range. Selecting the `sql_variant` then
+reproduced a panic in the pinned Tiberius TDS metadata parser's unimplemented
+`SSVariant` branch. The driver now catches that specific dependency panic at
+the result boundary, returns `DriverError::Unsupported`, and retires the
+affected connection instead of reusing a partially consumed TDS stream. The
+same behavior is checked for both a shared connection and an isolated session.
+The value is still unsupported; this is safe refusal, not `sql_variant`
+decoding or editing.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration sql_variant_result_is_refused_without_panicking_or_reusing_the_connection -- --include-ignored --exact --test-threads=1
+```
+
+The focused SQL Server Docker contract passed. Exact decoding remains open
+until Tiberius supports `SSVariant` metadata without panicking.
+
+Scoped `cargo-mutants` testing of `variant_guard.rs` first found that a
+mutation making the refusal classifier return `true` for every error survived.
+Negative assertions for unrelated unsupported operations and server query errors
+were added. The final run caught 7 mutations, had 1 unviable mutation, and had
+no survivors or timeouts. The initial survivor and final report are retained at
+`target/quality/20260929-mssql-variant-guard-mutants/` and
+`target/quality/20260929-mssql-variant-guard-mutants-final/`.
+
+```sh
+rtk cargo mutants --package tablepro-driver-mssql --file crates/drivers/mssql/src/variant_guard.rs --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260929-mssql-variant-guard-mutants-final -- --lib variant_guard::tests
+```
 
 ## MySQL DELIMITER consumer agreement, 2026-09-28
 
