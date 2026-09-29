@@ -1845,8 +1845,29 @@ checked separately without scope; the CodeWithScope regression checks both
 stored code and its Int64 scope value; the Symbol and DbPointer regressions read
 back native BSON values through the MongoDB client. The mixed String/Decimal128
 grid case is covered as a read-only refusal; exact editing remains unsupported.
-Other top-level BSON kinds outside the named server-backed edits remain open,
-even where codec conversion has a non-ignored round-trip unit test.
+The current native-server grid matrix covers Timestamp, regex, MinKey, MaxKey,
+JavaScriptCode, JavaScriptCodeWithScope, Symbol, Undefined, DbPointer and
+Decimal128. A top-level ObjectId regular field is the smallest remaining
+server-backed edit case: canonical `$oid` conversion and parser classification
+are covered by unit tests, but the keyed update has not yet been checked against
+MongoDB's stored BSON type/value. Other top-level kinds without a named
+server-backed edit remain open too.
+
+Next B3-P4 case: add `value_contract_object_id_grid_edit_preserves_native_bson`
+to `crates/drivers/mongodb/tests/support/value_contracts.rs`. Use a non-key
+ObjectId field, preserve the row's `_id`, edit through the app parser and keyed
+update builder, then compare the reloaded `$oid` and an independent
+`mongodb::bson::Bson::ObjectId` oracle. The focused runner command is:
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contracts::value_contract_object_id_grid_edit_preserves_native_bson -- --include-ignored --exact --test-threads=1
+```
+
+Coverage review source tip: `887a1bd61060e5c604e9d4e52cb821de4dcf2202`;
+current documentation tip: `49faf79bb`. The clean all-driver selected-contract
+run at the source tip passed 128 tests across 11 suites, no missing suites:
+`target/quality/20260929T200632950370Z-values/report.json`. This is selected
+contract evidence, not a claim that every crate test or installed UI path ran.
 
 Focused local checks:
 

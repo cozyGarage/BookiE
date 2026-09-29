@@ -1,13 +1,17 @@
 # B3 external test-scenario survey
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
-The local B3 status was reconciled 2026-09-29 through commit
-`77ff32d05f24bdb3b355299e5421aadda149ece8`, including September 26–29 changes.
-The baseline contains Redis RESP3 nested-value/binary contracts, explicit
+The local B3 status was reconciled against source
+`887a1bd61060e5c604e9d4e52cb821de4dcf2202` and documentation tip `49faf79bb`,
+including September 26–29 changes. The source baseline contains Redis RESP3
+nested-value/binary and attribute-wire contracts, explicit
 PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
 server-boundary evidence and safe SQL Server `sql_variant` refusal. The upstream
-review sampled eight test files in four projects and two issue reports; this
-local update is a source/test inventory, not a fresh execution of every suite.
+review sampled eight test files in four projects and two issue reports. The
+strict selected-contract report passed 128 tests across 11 suites at the source
+tip, with no missing suites; this is not a fresh execution of every crate test
+or installed-app workflow. Evidence:
+`target/quality/20260929T200632950370Z-values/report.json`.
 No external source code or fixtures were copied.
 
 ## Focus to carry forward
@@ -76,6 +80,32 @@ Inventory status below comes from current local code/tests, not new executions.
 | B3-5 | Lexer/parser consumer agreement | A PostgreSQL CRLF script with issue-shaped leading, inter-statement, inline and trailing comments keeps its two executable statements in order across planner, named-parameter extraction, formatter and policy classification; SELECT/UPDATE classes, UPDATE target and WHERE survive formatting. The editor cursor contract maps GTK character offsets to byte offsets and selects the second statement after multibyte text. A malformed quoted tail reports a planner diagnostic, blocks whole-script execution, remains intact through parameter extraction and formatting, and classifies as unparseable/write. SQL Server GO batches retain three statements and batch policy through formatting, ignore placeholder-shaped delimiter comments, and classify SELECT/UPDATE/SELECT in order; `GO 2` keeps its count in the plan/formatter and is refused for execution, with only SQL placeholders extracted and full-script policy failing closed. MySQL `DELIMITER $$` and `DELIMITER //` directives survive planning and formatting, yield routine plus trailing query in order, and do not add parameters; the routine is unparseable and denied to agents by policy. | Broaden the executable-identity, malformed-tail and delimiter oracle across dialects; cover other MySQL delimiters and human approval behavior for unparseable routines. |
 | B3/B4 | Result delivery and session state | The shared value path rejects incomplete rows instead of inventing NULL cells; PostgreSQL Docker and DuckDB local contracts preserve zero-row metadata, duplicate column names and row order; the row cap is checked at exactly `MAX_QUERY_ROWS` and one row over. SQL Server returns only the first result set but drains later sets, reports a later-set error, and remains usable afterward. Driver cancellation and session tests also exist. A uniform delivery matrix is not established. | Confirm result-set semantics on other drivers; exercise mid-stream failure/cancel and late results. Assert row order/count, completeness status and connection state. |
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
+
+### B3-P1 current coverage verdict — September 29
+
+Read the driver matrix in `type-contract-strategy.md` as four separate states:
+exact typed support, exact text fallback, explicit refusal, and untested. The
+current rows contain examples of all four. PostgreSQL range/multirange,
+geometric, composite, money and JSON-array cases have independent server oracles
+for their visible refusal; direct enum-array projection stops in SQLx metadata
+resolution before BookiE can return a value. DuckDB off-microsecond TIMESTAMPTZ
+grid edits now refuse before write, while native sub-microsecond binding and
+additional nested combinations remain unsupported or untested. SQL Server's
+legacy `datetime`, `money`/`smallmoney` and `sql_variant` have visible refusals;
+exact support remains open. MySQL session modes, ClickHouse additional nested
+and temporal combinations, SQLite installed-grid transitions, and broad
+cross-format parity remain untested. MongoDB keeps canonical Extended JSON for
+supported nested/mixed values, with untested collection-wide heterogeneity and
+some top-level server-backed edits. Redis's one-shot API explicitly refuses
+Pub/Sub, MONITOR and CLIENT TRACKING ON; the local RESP3 attribute-wire test
+passes, while asynchronous push consumption remains unsupported.
+
+The smallest next implementation case is a top-level MongoDB ObjectId regular
+field edit. Unit evidence already covers `$oid` parser classification and
+Extended JSON to BSON conversion, but no named Docker contract persists an edit
+to a non-`_id` ObjectId field. Add the native-client value/type oracle and keep
+the row `_id` unchanged. Planned test and command are recorded in
+[value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,

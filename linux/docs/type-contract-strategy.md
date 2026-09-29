@@ -1,14 +1,16 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against `linux` at
-`fe22716459c242b350bf34e7070dde19bba184ba` on 2026-09-29. The baseline includes
+Coverage reconciled against source at `887a1bd61060e5c604e9d4e52cb821de4dcf2202`
+and documentation tip `49faf79bb` on 2026-09-29. The source baseline includes
 the Redis RESP3 contracts, PostgreSQL multirange metadata cases, ClickHouse
 DateTime64(9) boundary behavior and SQL Server's safe `sql_variant` metadata
 refusal, DuckDB mixed-interval exact-text round trips, and MySQL comment behavior
 under both backslash modes. DuckDB primary-key metadata now includes composite
 keys for keyed grid edits. The SQL Server type remains unsupported for exact
-decoding. The strict value suite passed on this clean baseline with 15 DuckDB
-contracts; other gates remain distinct from this source/test inventory.
+decoding. The strict value suite passed on this clean baseline with 16 DuckDB
+and 4 Redis contracts (128 selected tests across 11 suites, no missing suites);
+other gates remain distinct from this source/test inventory. Evidence:
+`target/quality/20260929T200632950370Z-values/report.json`.
 
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.
@@ -68,6 +70,31 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | MongoDB | Decimal128 extremes remain exact text; BSON dates outside chrono's RFC3339 range, nested documents/arrays and uncommon top-level BSON kinds use canonical Extended JSON; generic binary remains bytes while other subtypes retain canonical metadata; unignored codec unit tests verify canonical Extended JSON conversion and `value_to_bson` round trips for Timestamp, regex, JavaScript, code-with-scope, Symbol, ObjectId, DbPointer, Undefined, MinKey and MaxKey, plus distinct mixed String/Decimal128 values through JSON and CSV and page-type conflict merging; large nested Int64, null, Unicode, nested document/array and named top-level special-kind grid edits have Docker contracts, now including DbPointer; page metadata combines the first-50 sample with returned rows; homogeneous positive Decimal128 and formula-sanitized negative Decimal128 survive default CSV export, typed import parsing and keyed grid save as native BSON Decimal128; mixed BSON columns now decode each value as canonical Extended JSON, preserving String versus Decimal128 through JSON/CSV/XLSX | Collection-wide heterogeneity outside sampled and returned-page documents; native-server grid acceptance for any remaining top-level BSON kinds |
 | Redis | Integer/text/NULL protocol contracts; RESP3 hash maps retain key/value rows and invalid UTF-8 bulk values as bytes; XREAD stream replies preserve nested arrays and binary markers; a local RESP3 TCP fixture proves attribute wire frames survive the redis client and become tagged JSON; nested arrays, maps, sets and binary leaves retain JSON structure with explicit tags; BigNumber replies retain exact decimal digits as text, including inside nested arrays; map row caps set `truncated`; Pub/Sub subscribe/unsubscribe, MONITOR and CLIENT TRACKING ON are explicitly refused by the one-shot query interface and verified against Redis 7.4; tracking refusal covers BCAST, OPTIN, NOLOOP, REDIRECT and mixed-case command spellings | Consuming asynchronous push frames remains open; SQL date types are not applicable |
 | SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import; the app parser plus keyed-update contract verifies `42.50` becomes SQLite REAL `42.5` | Installed GTK/package acceptance across storage-class transitions; fixed-decimal storage is not applicable |
+
+### B3-P1 consumer audit result — September 29
+
+The remaining-column entries above are classified as untested combinations or
+unfinished exact support unless they explicitly name a refusal or an external
+blocker. Explicit refusal protects existing data but does not satisfy exact
+support. Applied across drivers, the live status is: PostgreSQL has exact
+scalar/array/temporal coverage plus explicit refusal or SQLx metadata blockage
+for several advanced families; DuckDB has exact text fallbacks and a grid-write
+refusal at the TIMESTAMPTZ precision boundary, with native sub-microsecond
+bindings still unsupported; MySQL has exact temporal/BIT and session-mode
+contracts but broader SQL-mode and DDL-session cases open; SQL Server safely
+refuses money, legacy datetime and sql_variant pending exact representations;
+ClickHouse has explicit finite-range/DST behavior but more nested/temporal
+combinations open; MongoDB has native-server edits for named BSON kinds, while
+collection-wide type heterogeneity and some top-level edits remain untested;
+Redis refuses identified asynchronous command streams and tests RESP3 attribute
+wire decoding, while asynchronous push consumption is unsupported; SQLite has
+storage-class/parser/import contracts but installed GTK acceptance is untested.
+
+The smallest next gap is a MongoDB non-key ObjectId grid edit: codec conversion
+and app parser classification exist, but the live server has not verified that
+a keyed row update preserves the BSON ObjectId type and row identity. The
+proposed reproducer and exact command are recorded in
+[value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 ## Consumer coverage reconciliation, 2026-09-28
 
