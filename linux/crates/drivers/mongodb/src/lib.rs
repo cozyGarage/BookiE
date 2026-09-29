@@ -29,6 +29,14 @@ const SAMPLE_DOCS: i64 = 50;
 
 pub struct MongodbDriver;
 
+/// Validate text using BSON Decimal128's range and return its exact canonical text.
+/// The app uses this when Rust's narrower `Decimal` parser cannot represent an edit.
+pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
+    text.parse::<mongodb::bson::Decimal128>()
+        .map(|value| value.to_string())
+        .map_err(|error| DriverError::Unsupported(format!("invalid MongoDB Decimal128 value: {error}")))
+}
+
 #[async_trait]
 impl DatabaseDriver for MongodbDriver {
     fn id(&self) -> &'static str {
@@ -482,6 +490,22 @@ mod tests {
         assert_eq!(d.default_port(), 27017);
         assert_eq!(d.default_database(), "test");
         assert_eq!(d.default_username(), "");
+    }
+
+    #[test]
+    fn decimal128_edit_parser_preserves_native_precision_and_refuses_rounding() {
+        for value in [
+            "1234567890123456789012345678901234",
+            "0.1234567890123456789012345678901234",
+            "1.2300",
+            "NaN",
+            "Infinity",
+            "-Infinity",
+        ] {
+            assert_eq!(canonical_decimal128_text(value).unwrap(), value, "{value}");
+        }
+        assert!(canonical_decimal128_text("12345678901234567890123456789012345").is_err());
+        assert!(canonical_decimal128_text("1.2.3").is_err());
     }
 
     #[test]

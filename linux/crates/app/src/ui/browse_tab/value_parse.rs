@@ -57,6 +57,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
             Err(error) => Err(error),
         };
     }
+    if let Some(result) = parse_mongodb_decimal_input(trimmed, col, driver_id) {
+        return result;
+    }
     if let Some(result) = parse_mongodb_date_input(trimmed, col, driver_id) {
         return result;
     }
@@ -64,6 +67,21 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_mongodb_decimal_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "mongodb" || !column.data_type.trim().eq_ignore_ascii_case("decimal") {
+        return None;
+    }
+    if let Ok(value) = parse_decimal_value(text) {
+        return Some(Ok(value));
+    }
+    Some(
+        drivers_mongodb::canonical_decimal128_text(text)
+            .map(|canonical| Value::Json(serde_json::json!({"$numberDecimal": canonical})))
+            .map_err(|_| crate::tr!("Invalid decimal")),
+    )
 }
 
 fn parse_mongodb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
@@ -549,6 +567,79 @@ mod tests {
             persisted.get_datetime("event_at").unwrap().timestamp_millis(),
             expected_millis,
             "the server must store the edited UTC instant at BSON millisecond precision"
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() {
+        use mongodb::bson::{Decimal128, doc, oid::ObjectId};
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+        use testcontainers::ImageExt;
+        use testcontainers_modules::mongo::Mongo;
+        use testcontainers_modules::testcontainers::runners::AsyncRunner;
+
+        let container = Mongo::default().with_tag("7").start().await.unwrap();
+        let host = container.get_host().await.unwrap().to_string();
+        let port = container.get_host_port_ipv4(27017).await.unwrap();
+        let native = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+            .await
+            .unwrap();
+        let collection = native
+            .database("appdb")
+            .collection::<mongodb::bson::Document>("decimal128_grid_edits");
+        let row_id = ObjectId::parse_str("0123456789abcdef01234567").unwrap();
+        let wide = "1234567890123456789012345678901234";
+        let initial = "9.9900".parse::<Decimal128>().unwrap();
+        let expected = wide.parse::<Decimal128>().unwrap();
+        collection
+            .insert_one(doc! { "_id": row_id, "amount": initial })
+            .await
+            .unwrap();
+
+        let connection = drivers_mongodb::MongodbDriver
+            .connect(ConnectOptions {
+                host,
+                port,
+                database: "appdb".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let before = connection.query("db.decimal128_grid_edits.find({})").await.unwrap();
+        let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+        let amount_index = before
+            .columns
+            .iter()
+            .position(|column| column.name == "amount")
+            .unwrap();
+        assert_eq!(before.columns[amount_index].data_type, "decimal");
+        assert_eq!(before.rows[0][amount_index], Value::Text(initial.to_string()));
+
+        let edited = parse_input_for_driver(wide, Some(&before.columns[amount_index]), "mongodb").unwrap();
+        assert_eq!(edited, Value::Json(serde_json::json!({"$numberDecimal": wide})));
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "mongodb",
+            Some("appdb"),
+            "decimal128_grid_edits",
+            &before.columns,
+            &[(amount_index, edited)],
+            &[before.rows[0][id_index].clone()],
+        )
+        .unwrap();
+        connection.execute_in_transaction(&[update]).await.unwrap();
+
+        let after = connection.query("db.decimal128_grid_edits.find({})").await.unwrap();
+        assert_eq!(
+            after.rows[0][id_index], before.rows[0][id_index],
+            "row identity changed"
+        );
+        assert_eq!(after.rows[0][amount_index], Value::Text(wide.into()));
+        let persisted = collection.find_one(doc! { "_id": row_id }).await.unwrap().unwrap();
+        assert_eq!(persisted.get("_id"), Some(&mongodb::bson::Bson::ObjectId(row_id)));
+        assert_eq!(
+            persisted.get("amount"),
+            Some(&mongodb::bson::Bson::Decimal128(expected))
         );
     }
 
@@ -1288,6 +1379,33 @@ mod tests {
             parse_input_for_driver("2026-09-29", Some(&column), "mongodb").unwrap(),
             Value::Date(_)
         ));
+    }
+
+    #[test]
+    fn value_contract_mongodb_decimal128_parser_preserves_wide_precision() {
+        let column = col("decimal", false);
+        let wide_integer = "1234567890123456789012345678901234";
+        assert!(parse_decimal_value(wide_integer).is_err());
+        assert_eq!(
+            parse_input_for_driver(wide_integer, Some(&column), "mongodb").unwrap(),
+            Value::Json(serde_json::json!({"$numberDecimal": wide_integer})),
+            "34-digit Decimal128 values must not be rejected by rust_decimal's narrower range"
+        );
+
+        let wide_fraction = "0.1234567890123456789012345678901234";
+        assert_eq!(
+            parse_input_for_driver(wide_fraction, Some(&column), "mongodb").unwrap(),
+            Value::Json(serde_json::json!({"$numberDecimal": wide_fraction}))
+        );
+        let over_precision = "12345678901234567890123456789012345";
+        assert!(
+            parse_input_for_driver(over_precision, Some(&column), "mongodb").is_err(),
+            "input beyond Decimal128 precision must be refused rather than rounded"
+        );
+        assert!(
+            parse_input_for_driver(wide_integer, Some(&column), "mysql").is_err(),
+            "MongoDB Decimal128 fallback must not change another driver's decimal contract"
+        );
     }
 
     fn col_with_default(data_type: &str, default: &str) -> ColumnInfo {
