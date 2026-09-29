@@ -18,6 +18,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::column::tests::mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column_jump::tests::stale_picker_cannot_target_a_replacement_grid"
     ],
     [

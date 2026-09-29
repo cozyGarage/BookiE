@@ -1314,3 +1314,19 @@ selected contracts across 11 suites, no missing suites. Evidence:
 `target/quality/20260929T165940977032Z-values/report.json`.
 
 B3 remains open.
+
+### MySQL spatial grid refusal — September 29
+
+An isolated GTK widget test binds geometry, point and multipolygon byte values
+and verifies they render as read-only labels, create no editable cell widgets,
+and emit no pending edit. The `widgets` layer passed with the new case included
+in the isolated-test registry. The focused mutation run caught both generated
+changes to the bytes-specific editability guard. A broader 11-mutant function
+audit caught 6; its 5 survivors only altered stricter read-only behavior or
+unrelated primary-key/generated/auto-increment/mixed guards. Reports:
+`target/quality/20260929T184259972000Z-layers/report.json`,
+`target/quality/20260929-mysql-spatial-ui-guard-mutants/mutants.out/outcomes.json`,
+and `target/quality/20260929-mysql-spatial-ui-mutants/mutants.out/outcomes.json`.
+
+Installed-app acceptance and server-backed spatial grid interaction remain
+open; B3 remains open.

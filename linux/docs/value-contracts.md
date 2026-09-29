@@ -1695,6 +1695,25 @@ rtk cargo test -p tablepro-app --lib value_contract_mysql_bit_parser_enforces_de
 rtk cargo mutants --in-place --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_mysql_bit_value|mysql_bit_width' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260929-mysql-bit-parser-mutants -- --lib mysql_bit
 ```
 
+### MySQL spatial bytes in the GTK grid
+
+The isolated GTK widget contract binds `geometry`, `point` and `multipolygon`
+columns containing spatial byte payloads. Each appears as the expected
+`<9 bytes>` read-only label, the grid creates no editable `CellEditor`, and
+binding the cells emits no pending edit. The widgets layer passed with this
+test registered in the isolated-test inventory. Scoped mutation testing of the
+bytes-specific editability guard caught both generated mutations. A broader
+mutation pass also exercised primary-key, generated-column, auto-increment and
+`mixed` guards; its five survivors were the unconditional read-only result and
+those four unrelated guards, outside this spatial-byte contract. Evidence:
+`target/quality/20260929-mysql-spatial-ui-guard-mutants/mutants.out/outcomes.json`
+and `target/quality/20260929-mysql-spatial-ui-mutants/mutants.out/outcomes.json`.
+Installed-app acceptance and server-backed grid interaction remain open.
+
+```sh
+rtk proxy python3 scripts/run-test-layer.py widgets
+```
+
 ## SQLite dynamic storage-class checkpoint
 
 A new file-backed regression starts a `NUMERIC` column with TEXT, BLOB and NULL

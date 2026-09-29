@@ -707,6 +707,80 @@ mod tests {
 
     #[test]
     #[ignore = "requires an isolated GTK display"]
+    fn mysql_spatial_grid_bytes_bind_as_read_only_labels_without_edits() {
+        use futures::FutureExt;
+        use gtk4::prelude::*;
+        fn spatial_labels(widget: &gtk4::Widget) -> Vec<gtk4::Label> {
+            let mut found = Vec::new();
+            if let Ok(label) = widget.clone().downcast::<gtk4::Label>() {
+                if label.text() == "<9 bytes>" {
+                    found.push(label);
+                }
+                return found;
+            }
+            let mut child = widget.first_child();
+            while let Some(current) = child {
+                found.extend(spatial_labels(&current));
+                child = current.next_sibling();
+            }
+            found
+        }
+        gtk4::init().unwrap();
+
+        let columns = ["geometry", "point", "multipolygon"]
+            .into_iter()
+            .map(|data_type| col(data_type, false))
+            .collect::<Vec<_>>();
+        let values = [
+            Value::Bytes(vec![0, 0, 0, 1, 1, 1, 0, 0, 0]),
+            Value::Bytes(vec![0, 0, 0, 1, 1, 1, 0, 0, 0]),
+            Value::Bytes(vec![0, 0, 0, 1, 1, 1, 0, 0, 0]),
+        ];
+        let result = tablepro_core::QueryResult {
+            columns: columns.clone(),
+            rows: vec![values.to_vec()],
+            truncated: false,
+        };
+        let (sender, receiver) = relm4::channel::<GridMsg>();
+        let (view, _) = crate::ui::grid::build_column_view(
+            &result,
+            &columns,
+            "spatial_values",
+            Some(sender),
+            None,
+            None,
+            None,
+            None,
+            TabGridContext::default(),
+            None,
+            std::sync::Arc::new(crate::services::database_service::DatabaseService::new()),
+        );
+        let window = gtk4::Window::builder().child(&view).build();
+        window.present();
+        let context = gtk4::glib::MainContext::default();
+        let mut labels = Vec::new();
+        for _ in 0..200 {
+            while context.iteration(false) {}
+            labels = spatial_labels(view.upcast_ref());
+            if labels.len() >= 3 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(labels.len(), 3, "all spatial values should bind to read-only labels");
+        assert!(
+            collect_cell_editors(view.upcast_ref()).is_empty(),
+            "spatial bytes must not be given editable CellEditor widgets"
+        );
+        assert!(
+            receiver.recv().now_or_never().flatten().is_none(),
+            "read-only spatial values must not emit a pending edit"
+        );
+        window.close();
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
     fn entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value() {
         use gtk4::prelude::*;
         gtk4::init().unwrap();
