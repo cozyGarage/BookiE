@@ -83,12 +83,12 @@ The focused SQL Server Docker contract passed.
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
-`linux` commit `fe22716459c242b350bf34e7070dde19bba184ba` on 2026-09-29. The
+`linux` commit `f302661f9ee835f5f71858e42d42e886bf3e8723` on 2026-09-29. The
 strict combined run passed with GTK and DuckDB enabled, including the app's
-optional DuckDB parser/edit contract: all 11 selected crates passed 117
-contracts, no suites were missing, 746 artifacts were fresh, and DuckDB was the
-only package rebuilt. The report records `dirty: false` and the exact commit:
-`target/quality/20260929T053820328918Z-values/report.json`. This does not
+optional DuckDB parser/edit contract: all 11 selected crates passed 118
+contracts, no suites were missing, 709 artifacts were fresh, and 17 packages
+were rebuilt. The report records `dirty: false` and the exact commit:
+`target/quality/20260929T055830619428Z-values/report.json`. This does not
 establish complete native-type support or replace installed-app acceptance.
 
 | Path | Assertions |
