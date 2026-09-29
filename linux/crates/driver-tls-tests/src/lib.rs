@@ -28,10 +28,8 @@ pub async fn assert_certificate_rejected(
         Err(error) => error,
     };
     let detail = error.to_string().to_ascii_lowercase();
-    let mysql_tls_rejection = driver.id() == "mysql" && matches!(&error, DriverError::Disconnected);
     assert!(
         matches!(&error, DriverError::Tls(_))
-            || mysql_tls_rejection
             || detail.contains("invalid peer certificate")
             || detail.contains("certificate verify failed"),
         "expected TLS verification rejection: {error}"
