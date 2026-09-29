@@ -924,6 +924,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             sqlstate: e.code().map(|c| c.to_string()),
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
+        Io(_) => DriverError::Disconnected,
         Tls(e) => DriverError::Tls(e.to_string()),
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
@@ -941,6 +942,24 @@ mod tests {
             bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe("SELECT ?")), &params),
             Err(DriverError::Unsupported(_))
         ));
+    }
+
+    #[test]
+    fn unexpected_io_eof_is_reported_as_disconnected() {
+        let error = sqlx::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "server closed the connection",
+        ));
+        assert!(matches!(map_sqlx_error(error), DriverError::Disconnected));
+    }
+
+    #[test]
+    fn connection_refusal_remains_distinct_from_disconnection() {
+        let error = sqlx::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "connection refused",
+        ));
+        assert!(matches!(map_sqlx_error(error), DriverError::ConnectionRefused));
     }
 
     #[test]

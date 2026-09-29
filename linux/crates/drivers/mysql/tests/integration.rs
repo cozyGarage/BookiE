@@ -61,6 +61,56 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
+    let (_container, opts) = start_mysql().await;
+    let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.expect("connect").into();
+    let observer = connect(opts).await;
+    let tag = "tablepro_mysql_backend_termination";
+    let running = connection.clone();
+    let task = tokio::spawn(async move { running.query(&format!("SELECT SLEEP(30) /* {tag} */")).await });
+
+    let mut connection_id = None;
+    for _ in 0..100 {
+        let result = observer
+            .query(&format!(
+                "SELECT ID FROM information_schema.PROCESSLIST WHERE INFO LIKE '%{tag}%' AND ID <> CONNECTION_ID()"
+            ))
+            .await
+            .expect("inspect active query");
+        connection_id = result.rows.first().and_then(|row| match row.first() {
+            Some(Value::Int(id)) => Some(*id),
+            _ => None,
+        });
+        if connection_id.is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    let connection_id = connection_id.expect("tagged query must reach MySQL");
+    observer
+        .execute(&format!("KILL CONNECTION {connection_id}"))
+        .await
+        .expect("terminate active query connection");
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .expect("terminated query must not hang")
+        .expect("query task")
+        .expect_err("a terminated query must not return success");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "a terminated MySQL connection must be reported as disconnected, got {error:?}"
+    );
+
+    let recovered = connection
+        .query("SELECT 1")
+        .await
+        .expect("pool must recover on a new connection");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_column_collation_survives_a_nullability_change() {
     let (_c, opts) = start_mysql().await;
     let conn = connect(opts).await;
