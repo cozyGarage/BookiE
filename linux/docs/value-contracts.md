@@ -179,6 +179,13 @@ The clean combined runner passed after the tracking-push addition at
 suites, with no missing suites. Evidence:
 `target/quality/20260929T191639404194Z-values/report.json` (`dirty: false`).
 
+The command matrix now also covers `CLIENT TRACKING ON OPTIN NOLOOP`,
+`CLIENT TRACKING ON REDIRECT 1`, and mixed-case `CLIENT TRACKING ON BCAST
+NOLOOP`. The strict combined runner selected the ignored Redis Docker test and
+passed all 127 contracts across 11 suites. Evidence:
+`target/quality/20260929T195657915401Z-values/report.json` (`dirty: true`; the
+test and ledger edits were present in the working tree during the run).
+
 ```sh
 rtk cargo test -p tablepro-driver-redis --test integration value_contract_redis_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
 ```

@@ -1119,12 +1119,14 @@ B3 remains open.
 
 A Redis 7.4 regression first showed `SUBSCRIBE` returning its push
 acknowledgement as an ordinary one-shot query result. The same fixture showed
-`MONITOR` returning `OK` before entering its event stream. The driver now
-`CLIENT TRACKING ON BCAST` returning `OK` while enabling invalidation pushes.
+`MONITOR` returning `OK` before entering its event stream.
+`CLIENT TRACKING ON BCAST` also returned `OK` while enabling invalidation pushes.
 The driver visibly refuses all six subscribe/unsubscribe forms, `MONITOR`, and
 `CLIENT TRACKING ON` with trailing options. The live Docker test verifies the
 unsupported errors and confirms `PING`, `CLIENT TRACKING OFF`, `PUBLISH`,
-`PUBSUB CHANNELS` and `CLIENT LIST` still work on the same connection. Scoped
+`PUBSUB CHANNELS` and `CLIENT LIST` still work on the same connection. The
+tracking refusal cases cover BCAST, OPTIN, REDIRECT, NOLOOP and mixed-case
+spellings. Scoped
 mutation testing first caught 2 mutations, with 2 misses and one unviable
 whole-query replacement. After adding live negative assertions, iteration
 caught both survivors: cumulatively 4 caught, 1 unviable, no survivors or

@@ -195,6 +195,9 @@ async fn value_contract_redis_stream_commands_are_refused_without_consuming_the_
         "SUNSUBSCRIBE updates",
         "MONITOR",
         "CLIENT TRACKING ON BCAST",
+        "CLIENT TRACKING ON OPTIN NOLOOP",
+        "CLIENT TRACKING ON REDIRECT 1",
+        "cLiEnT tRaCkInG oN bCaSt nOlOoP",
     ] {
         let error = connection
             .query(command)
