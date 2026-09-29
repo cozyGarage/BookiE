@@ -1115,6 +1115,26 @@ Open findings from the audit:
 
 B3 remains open.
 
+### MongoDB BSON DateTime grid-edit precision — September 29
+
+A failing-first app parser test showed that MongoDB `date` cells display RFC3339
+instants while the generic parser treated their metadata as date-only. The
+driver-aware parser now preserves UTC milliseconds and offsets, accepts extra
+fractional digits only when they are zero, and refuses sub-millisecond edits
+before update construction. A MongoDB 7 app contract verifies the parser-to-keyed-
+update path against the stored BSON millisecond epoch and confirms refused edits
+leave the original value unchanged.
+
+The focused parser and server-backed app tests passed. Scoped mutation testing
+caught 7 of 8 generated changes; one whole-function default-return mutant was
+unviable at compile time, with no missed mutants or timeouts. The clean strict
+value runner passed 131 selected contracts across 11 suites with no missing
+suites at `93d60ea818fe7d4c283bb86440deb7cf2501fe29`. Evidence:
+`target/quality/20260929-mongodb-date-parser-mutants-home/mutants.out/outcomes.json`
+and `target/quality/20260929T204726972421Z-values/report.json`.
+
+B3 remains open.
+
 ### Redis Pub/Sub and MONITOR stream boundary — September 29
 
 A Redis 7.4 regression first showed `SUBSCRIBE` returning its push

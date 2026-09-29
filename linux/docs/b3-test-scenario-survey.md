@@ -2,13 +2,13 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled against source
-`63d67fc915e95c87ffbd8c7f781b60ca56a65657` and documentation tip `ba1803525`,
+`93d60ea818fe7d4c283bb86440deb7cf2501fe29` and documentation tip `3b7cd22c8`,
 including September 26–29 changes. The source baseline contains Redis RESP3
 nested-value/binary and attribute-wire contracts, explicit
 PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
 server-boundary evidence and safe SQL Server `sql_variant` refusal. The upstream
 review sampled eight test files in four projects and two issue reports. The
-strict selected-contract report passed 129 tests across 11 suites at the source
+strict selected-contract report passed 131 tests across 11 suites at the source
 tip, with no missing suites; this is not a fresh execution of every crate test
 or installed-app workflow. Evidence:
 `target/quality/20260929T200632950370Z-values/report.json`.
@@ -95,8 +95,9 @@ legacy `datetime`, `money`/`smallmoney` and `sql_variant` have visible refusals;
 exact support remains open. MySQL session modes, ClickHouse additional nested
 and temporal combinations, SQLite installed-grid transitions, and broad
 cross-format parity remain untested. MongoDB keeps canonical Extended JSON for
-supported nested/mixed values, with untested collection-wide heterogeneity and
-some top-level server-backed edits. Redis's one-shot API explicitly refuses
+supported nested/mixed values and now has native-server ObjectId and
+millisecond DateTime edit contracts; collection-wide heterogeneity and other
+unnamed top-level edits remain untested. Redis's one-shot API explicitly refuses
 Pub/Sub, MONITOR and CLIENT TRACKING ON; the local RESP3 attribute-wire test
 passes, while asynchronous push consumption remains unsupported.
 
@@ -107,6 +108,16 @@ through an independent client. The clean strict report shows this test among
 MongoDB's eight selected contracts. Collection-wide heterogeneity and other
 unnamed top-level edits remain open; see the updated
 [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
+
+The same follow-up found that BSON `date` values display RFC3339 text but the
+generic app parser treated their metadata as date-only and rejected the value.
+A failing-first app parser contract now proves that error; the driver-aware
+parser preserves UTC milliseconds and refuses sub-millisecond edits. A MongoDB
+7 app integration contract verifies parser-to-keyed-update-to-native-BSON
+round-trip and unchanged data after refusal. The clean strict report passed 131
+selected contracts across 11 suites at
+`93d60ea818fe7d4c283bb86440deb7cf2501fe29`; details and mutation evidence are
+in [value contracts](value-contracts.md#mongodb-bson-datetime-grid-edit-precision).
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,

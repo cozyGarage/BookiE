@@ -1,14 +1,15 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against source at `63d67fc915e95c87ffbd8c7f781b60ca56a65657`
-and documentation tip `ba1803525` on 2026-09-29. The source baseline includes
+Coverage reconciled against source at `93d60ea818fe7d4c283bb86440deb7cf2501fe29`
+and documentation tip `3b7cd22c8` on 2026-09-29. The source baseline includes
 the Redis RESP3 contracts, PostgreSQL multirange metadata cases, ClickHouse
 DateTime64(9) boundary behavior and SQL Server's safe `sql_variant` metadata
 refusal, DuckDB mixed-interval exact-text round trips, and MySQL comment behavior
 under both backslash modes. DuckDB primary-key metadata now includes composite
 keys for keyed grid edits. The SQL Server type remains unsupported for exact
 decoding. The strict value suite passed on this clean baseline with 16 DuckDB,
-4 Redis and 8 MongoDB contracts (129 selected tests across 11 suites, no missing suites);
+4 Redis, 8 MongoDB driver and 10 app contracts (131 selected tests across 11
+suites, no missing suites);
 other gates remain distinct from this source/test inventory. Evidence:
 `target/quality/20260929T200632950370Z-values/report.json`.
 
@@ -90,14 +91,15 @@ Redis refuses identified asynchronous command streams and tests RESP3 attribute
 wire decoding, while asynchronous push consumption is unsupported; SQLite has
 storage-class/parser/import contracts but installed GTK acceptance is untested.
 
-The smallest gap from this inventory, a MongoDB non-key ObjectId grid edit, is
-now covered by a Docker contract that preserves `_id`, reloads the edited
-`$oid`, and confirms native BSON ObjectId through a separate client. The clean
-strict run selected all eight MongoDB value contracts and passed 129 tests
-across 11 suites at `63d67fc915e95c87ffbd8c7f781b60ca56a65657`. Remaining
-MongoDB gaps include collection-wide heterogeneity and named top-level edits
-without native-server assertions; the evidence and exact focused command are in
-[value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
+Two small MongoDB edit gaps identified in this audit now have native-server
+contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
+BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms
+input before writes. The latter combines app parsing, keyed update construction,
+and an independent MongoDB client oracle. The clean strict run passed 131
+selected contracts across 11 suites at
+`93d60ea818fe7d4c283bb86440deb7cf2501fe29`. Collection-wide heterogeneity and
+named top-level edits without native-server assertions remain open; evidence is
+in [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 ## Consumer coverage reconciliation, 2026-09-28
 

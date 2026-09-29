@@ -1847,13 +1847,15 @@ back native BSON values through the MongoDB client. The mixed String/Decimal128
 grid case is covered as a read-only refusal; exact editing remains unsupported.
 The current native-server grid matrix covers Timestamp, regex, MinKey, MaxKey,
 JavaScriptCode, JavaScriptCodeWithScope, Symbol, Undefined, DbPointer,
-Decimal128 and now a top-level ObjectId regular field. The ObjectId contract
-keeps `_id` stable, performs a keyed update to the `reference` field, checks the
-reloaded `$oid`, then uses an independent MongoDB client to confirm both native
-ObjectId values. The existing app parser unit separately checks `$oid`
-classification. Other top-level kinds without a named server-backed edit and
-collection-wide heterogeneity outside the metadata sample and returned page
-remain open.
+Decimal128, top-level ObjectId fields and in-range BSON DateTime edits. The
+ObjectId contract keeps `_id` stable, performs a keyed update to the `reference`
+field, checks the reloaded `$oid`, then uses an independent MongoDB client to
+confirm native ObjectId values. The date contract routes the RFC3339 value shown
+in a `date` cell through the driver-aware parser, rejects sub-millisecond input
+without changing the row, and verifies a valid offset-origin edit against the
+stored BSON millisecond epoch. Other top-level kinds without a named
+server-backed edit and collection-wide heterogeneity outside the metadata sample
+and returned page remain open.
 
 The focused ObjectId grid contract is:
 
@@ -1867,6 +1869,38 @@ at source tip `63d67fc915e95c87ffbd8c7f781b60ca56a65657` passed 129 tests across
 including this case. Evidence:
 `target/quality/20260929T202504448591Z-values/report.json`. This is selected
 contract evidence, not a claim that every crate test or installed UI path ran.
+
+### MongoDB BSON DateTime grid-edit precision
+
+A failing-first parser contract showed the exact RFC3339 value displayed for a
+MongoDB `date` column failed with `Invalid date. Use YYYY-MM-DD.` because the
+shared parser classified BSON DateTime metadata as date-only. The app now parses
+MongoDB RFC3339 date edits as UTC instants, retains offsets and milliseconds,
+accepts extra fractional digits only when they are zero, and refuses
+sub-millisecond precision before update construction. Date-only input and other
+drivers retain their existing parser behavior.
+
+An app-level MongoDB 7 contract seeds a native BSON date, reads its displayed
+text, runs the app parser and keyed update builder, then verifies the native
+millisecond epoch through an independent MongoDB client. It also checks that a
+sub-millisecond edit leaves the original server value unchanged and that a
+valid `+05:30` edit preserves the exact UTC instant.
+
+```sh
+rtk cargo test -p tablepro-app --lib value_contract_mongodb_date_parser_preserves_milliseconds_and_refuses_rounding
+rtk cargo test -p tablepro-app --lib value_contract_mongodb_date_grid_edit_preserves_millisecond_instant -- --include-ignored --test-threads=1
+```
+
+The focused tests passed. Scoped mutation testing of the MongoDB date parser
+caught 7 of 8 generated mutations; one default-return mutant was unviable at
+compile time, with no misses or timeouts. Its first isolated baseline build hit
+the `/tmp` quota before any mutant ran; rerunning with scratch under
+`target/mutation-tmp-20260929` completed successfully. Evidence:
+`target/quality/20260929-mongodb-date-parser-mutants-home/mutants.out/outcomes.json`.
+The clean strict combined runner passed 131 selected contracts across 11 suites,
+no missing suites, at source tip `93d60ea818fe7d4c283bb86440deb7cf2501fe29`.
+Both new app contracts appear in the log:
+`target/quality/20260929T204726972421Z-values/report.json` (`dirty: false`).
 
 Focused local checks:
 
