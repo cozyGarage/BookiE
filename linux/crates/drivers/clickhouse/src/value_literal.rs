@@ -32,7 +32,11 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
         Value::TimestampTz(ts) => format!("toDateTime64('{}', 9, 'UTC')", ts.format("%Y-%m-%d %H:%M:%S%.9f")),
         Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
         Value::Uuid(u) => format!("toUUID('{u}')"),
-        Value::Json(j) => format!("'{}'", escape_str(&j.to_string())),
+        Value::Json(_) => {
+            return Err(DriverError::Unsupported(
+                "ClickHouse nested values cannot be edited losslessly without their native type metadata".into(),
+            ));
+        }
         Value::Undecodable(type_name) => {
             return Err(DriverError::Internal(format!(
                 "cannot write back an undecodable {type_name} value"
@@ -60,4 +64,18 @@ fn hex_encode(bytes: &[u8]) -> String {
         out.push(LUT[(byte & 0xf) as usize] as char);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::literal;
+    use tablepro_core::{DriverError, Value};
+
+    #[test]
+    fn nested_json_cell_edits_refuse_values_without_native_type_metadata() {
+        assert!(matches!(
+            literal(&Value::Json(serde_json::json!(["18446744073709551616", null]))),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 }

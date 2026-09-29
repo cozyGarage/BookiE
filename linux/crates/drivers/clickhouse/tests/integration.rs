@@ -157,6 +157,49 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_nested_array_keeps_wide_integer_and_refeeds_consumers() {
+    let (_container, opts) = start_clickhouse().await;
+    let connection = connect(opts).await;
+    let expression =
+        "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))";
+    let source = connection
+        .query(&format!(
+            "SELECT {expression} AS value, toTypeName(value) AS native_type, toJSONString(value) AS exact_json"
+        ))
+        .await
+        .unwrap();
+    // ClickHouse's JSON serializer quotes UInt128 values because JSON numbers
+    // cannot represent their full range exactly. Preserve the decimal text.
+    let expected_json: serde_json::Value = serde_json::from_str("[\"18446744073709551616\",null]").unwrap();
+    assert_eq!(
+        source.rows,
+        vec![vec![
+            Value::Json(expected_json.clone()),
+            Value::Text("Array(Nullable(UInt128))".into()),
+            Value::Text("[\"18446744073709551616\",null]".into()),
+        ]]
+    );
+
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
+        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
+    );
+
+    let bound_result = connection
+        .query_params(
+            "SELECT CAST(? AS Array(Nullable(UInt128))) AS value, \
+                    toTypeName(value) AS native_type, toJSONString(value) AS exact_json",
+            &[source.rows[0][0].clone()],
+        )
+        .await;
+    assert!(
+        bound_result.is_err(),
+        "a nested value without native type metadata must not bind as a lossy string"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn wide_integer_grid_edits_preserve_exact_values_and_row_identity() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;

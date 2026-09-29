@@ -1113,6 +1113,32 @@ adjacent wide-integer boundaries:
 Int128 minimum to minimum+1, Int128 maximum to maximum-1, UInt128 zero to one,
 and UInt128 maximum to maximum-1. Other export formats remain open.
 
+### ClickHouse nested wide integer refusal, 2026-09-29
+
+A live `Array(Nullable(UInt128))` oracle includes the value
+`18446744073709551616` and NULL. ClickHouse JSON output quotes the UInt128
+digits, and casting that JSON text back to the native array fails. Since a
+`Value::Json` no longer carries the native type needed to distinguish numeric
+strings from text strings, SQL export and grid-edit literals now return an
+explicit unsupported error for ClickHouse nested JSON. The parameter contract
+also verifies that the driver surfaces the failed cast instead of returning a
+different value. Support for other nested types remains open.
+
+The focused live test passed. Its ignored Docker fixture is listed in
+`docs/ignored-tests.md`.
+
+The two exporter refusal tests also passed scoped mutation checks: the shared
+renderer caught all three selected mutations, including making the ClickHouse
+guard unconditional; the ClickHouse grid renderer caught both selected
+function-replacement mutations. Reports are in
+`target/quality/20260929-clickhouse-json-mutants-core-final/mutants.out/outcomes.json`
+and
+`target/quality/20260929-clickhouse-grid-json-mutants-lib-only-final/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_array_keeps_wide_integer_and_refeeds_consumers -- --include-ignored --exact --test-threads=1
+```
+
 ### ClickHouse Int128 and UInt128 grid edits, 2026-09-28
 
 A real-server keyed update changes both rows through the same shared builder

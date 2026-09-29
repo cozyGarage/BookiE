@@ -77,6 +77,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         }
         Value::TimestampTz(stamp) => string_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => string_literal(driver_id, &id.to_string()),
+        Value::Json(_) if driver_id == "clickhouse" => return Err(LiteralError::Unsupported),
         Value::Json(json) => string_literal(driver_id, &json.to_string()),
         Value::Undecodable(_) => return Err(LiteralError::Undecodable),
     })
@@ -297,6 +298,21 @@ mod tests {
         for value in [Value::DateTime(below), Value::TimestampTz(above.and_utc())] {
             assert_eq!(render_sql_literal("clickhouse", &value), Err(LiteralError::Unsupported));
         }
+    }
+
+    #[test]
+    fn clickhouse_nested_json_export_requires_native_type_metadata() {
+        assert_eq!(
+            render_sql_literal(
+                "clickhouse",
+                &Value::Json(serde_json::json!(["18446744073709551616", null]))
+            ),
+            Err(LiteralError::Unsupported)
+        );
+        assert_eq!(
+            render_sql_literal("postgres", &Value::Json(serde_json::json!({"a": 1}))).unwrap(),
+            "'{\"a\":1}'"
+        );
     }
 
     #[test]
