@@ -1468,3 +1468,27 @@ unviable changes. The clean strict runner passed 131 selected contracts across
 and `target/quality/20260929T214023821465Z-values/report.json`.
 
 B3 remains open.
+
+### MongoDB wide Decimal128 grid edit — September 30
+
+A failing-first app parser test showed that a valid 34-digit Decimal128 integer
+was refused as `Invalid decimal` because `rust_decimal` has a narrower range.
+The MongoDB-only parser now validates values beyond that range with BSON's
+Decimal128 parser and returns canonical `$numberDecimal` JSON markers so the
+driver reconstructs the native value. Invalid syntax and precision beyond
+Decimal128 are refused; other drivers retain their existing decimal parser.
+
+A MongoDB 7 app integration test seeds `9.9900`, routes a 34-digit edit through
+the parser and keyed-update builder, then verifies the row identity and exact
+native BSON value through an independent client. App and driver parser tests
+cover a 34-digit fraction, scale preservation, NaN/infinities and refusal of
+over-precision input. The focused parser and Docker tests passed. Scoped mutation
+runs caught 4 of 5 app parser mutations (one default-return mutant was
+unviable), and both BSON Decimal128 helper mutations. The clean strict runner
+passed 133 selected contracts across 11 suites with no missing suites at source
+`35d457fa488768a5204a26d785c90114073d4acd`. Evidence:
+`target/quality/20260929-mongodb-decimal-parser-mutants/mutants.out/outcomes.json`,
+`target/quality/20260929-mongodb-decimal-driver-mutants/mutants.out/outcomes.json`,
+and `target/quality/20260929T215946474345Z-values/report.json`.
+
+B3 remains open.

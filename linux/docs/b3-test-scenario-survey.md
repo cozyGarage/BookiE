@@ -2,17 +2,16 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled against source
-`70206f6fb9a5ce9901ffe4552743e63730100fe0` and documentation tip `4c5d9a543`,
+`35d457fa488768a5204a26d785c90114073d4acd` and documentation tip `62dc257c7`,
 including September 26–29 changes. The source baseline contains Redis RESP3
 nested-value/binary and attribute-wire contracts, explicit
 PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
 server-boundary evidence and safe SQL Server `sql_variant` refusal. The upstream
 review sampled eight test files in four projects and two issue reports. The
-strict selected-contract report passed 131 tests across 11 suites at the source
+strict selected-contract report passed 133 tests across 11 suites at the source
 tip, with no missing suites; this is not a fresh execution of every crate test
-or installed-app workflow. The latest clean strict report at the reconciled
-source also passed 131 tests across all 11 suites. Evidence:
-`target/quality/20260929T214023821465Z-values/report.json` (`dirty: false`).
+or installed-app workflow. Evidence:
+`target/quality/20260929T215946474345Z-values/report.json` (`dirty: false`).
 No external source code or fixtures were copied.
 
 ### B3-P6 mutation follow-up — September 29
@@ -23,6 +22,13 @@ VARCHAR positive-control contract now proves regular text columns remain
 editable. Running the full app library suite against the editability guard caught
 all 11 generated mutants, with no misses, timeouts or unviable changes. Evidence:
 `target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json`.
+
+The MongoDB Decimal128 edit audit also found Rust `Decimal` rejected valid
+34-digit inputs. The app now validates the fallback with BSON Decimal128 and
+passes canonical type markers through the keyed edit path. A MongoDB 7 contract
+confirms the row identity and exact native BSON value; invalid over-precision
+input is refused. The clean strict report at `35d457fa` includes both app-level
+parser and Docker edit contracts.
 
 ## Focus to carry forward
 
@@ -124,9 +130,9 @@ generic app parser treated their metadata as date-only and rejected the value.
 A failing-first app parser contract now proves that error; the driver-aware
 parser preserves UTC milliseconds and refuses sub-millisecond edits. A MongoDB
 7 app integration contract verifies parser-to-keyed-update-to-native-BSON
-round-trip and unchanged data after refusal. The clean strict report passed 131
+round-trip and unchanged data after refusal. The clean strict report passed 133
 selected contracts across 11 suites at
-`12e795cec416fca9da92ed1c95ae6bd9b77e754e`; details and mutation evidence are
+`35d457fa488768a5204a26d785c90114073d4acd`; details and mutation evidence are
 in [value contracts](value-contracts.md#mongodb-bson-datetime-grid-edit-precision).
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,

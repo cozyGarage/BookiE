@@ -2058,6 +2058,38 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --tes
 
 Both the focused core regression and MongoDB 7 Docker contract passed.
 
+### MongoDB wide Decimal128 grid edit
+
+A failing-first app parser contract showed that a valid 34-digit Decimal128
+value was rejected as `Invalid decimal` because `rust_decimal` has a narrower
+range. The MongoDB parser now keeps ordinary in-range decimals on the existing
+`Value::Decimal` path and validates wider input with BSON Decimal128. Wider
+values travel through the keyed update as canonical `$numberDecimal` Extended
+JSON, preserving BSON type and digits. Inputs exceeding Decimal128 precision or
+with invalid syntax are refused rather than rounded. The fallback is limited to
+MongoDB `decimal` columns.
+
+A MongoDB 7 app contract seeds `9.9900`, edits it to a 34-digit integer through
+the app parser and keyed-update builder, then checks the row identity and exact
+native `Bson::Decimal128` value through an independent client. Parser tests also
+cover a 34-digit fraction, preserved `1.2300` scale, NaN and infinities, invalid
+syntax, over-precision refusal, and unchanged MySQL behavior.
+
+```sh
+rtk cargo test -p tablepro-driver-mongodb --lib decimal128_edit_parser_preserves_native_precision_and_refuses_rounding
+rtk cargo test -p tablepro-app --lib value_contract_mongodb_decimal128_parser_preserves_wide_precision
+rtk cargo test -p tablepro-app --lib value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision -- --include-ignored --test-threads=1
+```
+
+The three focused tests passed. Scoped mutation testing caught 4 of 5 app-parser
+mutations; one generated default-return mutant was unviable at compile time.
+Both BSON Decimal128 helper mutations were caught. The clean strict runner passed
+133 selected tests across all 11 suites at source
+`35d457fa488768a5204a26d785c90114073d4acd`, with no missing suites. Evidence:
+`target/quality/20260929-mongodb-decimal-parser-mutants/mutants.out/outcomes.json`,
+`target/quality/20260929-mongodb-decimal-driver-mutants/mutants.out/outcomes.json`,
+and `target/quality/20260929T215946474345Z-values/report.json` (`dirty: false`).
+
 Focused local results:
 
 ```sh

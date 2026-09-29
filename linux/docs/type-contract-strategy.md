@@ -1,17 +1,19 @@
 # Type contracts for B3 and future drivers
 
-Coverage reconciled against source at `70206f6fb9a5ce9901ffe4552743e63730100fe0`
-and documentation tip `4c5d9a543` on 2026-09-29. The source baseline includes
+Coverage reconciled against source at `35d457fa488768a5204a26d785c90114073d4acd`
+and documentation tip `62dc257c7` on 2026-09-29. The source baseline includes
 the Redis RESP3 contracts, PostgreSQL multirange metadata cases, ClickHouse
 DateTime64(9) boundary behavior and SQL Server's safe `sql_variant` metadata
 refusal, DuckDB mixed-interval exact-text round trips, and MySQL comment behavior
 under both backslash modes. DuckDB primary-key metadata now includes composite
 keys for keyed grid edits. The SQL Server type remains unsupported for exact
-decoding. The strict value suite passed on this clean baseline with 16 DuckDB,
-4 Redis, 8 MongoDB driver and 10 app contracts (131 selected tests across 11
+decoding. MongoDB's app parser now sends values beyond Rust Decimal range through
+canonical `$numberDecimal` markers and preserves a 34-digit integer on a native
+Decimal128 keyed edit. The strict value suite passed on this clean baseline with
+16 DuckDB, 4 Redis, 8 MongoDB driver and 12 app contracts (133 selected tests across 11
 suites, no missing suites);
 other gates remain distinct from this source/test inventory. Evidence:
-`target/quality/20260929T214023821465Z-values/report.json` (`dirty: false`).
+`target/quality/20260929T215946474345Z-values/report.json` (`dirty: false`).
 
 A successful query is not evidence that its values survived. The acceptance unit
 is a database type, its boundary cases, and each operation that consumes it.
@@ -91,6 +93,10 @@ Redis refuses identified asynchronous command streams and tests RESP3 attribute
 wire decoding, while asynchronous push consumption is unsupported; SQLite has
 storage-class/parser/import contracts but installed GTK acceptance is untested.
 
+MongoDB Decimal128's bounded grid-edit gap is now covered for 34-digit integer
+and fractional text beyond `rust_decimal`, with an independent BSON oracle; input
+outside Decimal128 precision is explicitly refused.
+
 PostgreSQL and MySQL now have failing-first server-side connection-loss tests.
 PostgreSQL maps server-termination SQLSTATEs and unexpected SQLx socket loss to
 `Disconnected`, preserving query cancellation, TLS and connection-refusal
@@ -101,9 +107,9 @@ Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
 BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms
 input before writes. The latter combines app parsing, keyed update construction,
-and an independent MongoDB client oracle. The clean strict run passed 131
+and an independent MongoDB client oracle. The clean strict run passed 133
 selected contracts across 11 suites at
-`70206f6fb9a5ce9901ffe4552743e63730100fe0`. Collection-wide heterogeneity and
+`35d457fa488768a5204a26d785c90114073d4acd`. Collection-wide heterogeneity and
 named top-level edits without native-server assertions remain open; evidence is
 in [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
