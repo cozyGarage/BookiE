@@ -1102,6 +1102,7 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         }
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
         Io(e) if is_certificate_failure(&e) => DriverError::Tls(e.to_string()),
+        Io(_) => DriverError::Disconnected,
         Tls(e) => DriverError::Tls(e.to_string()),
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
@@ -1134,6 +1135,21 @@ mod tests {
         assert!(!is_server_disconnect_sqlstate(Some("57014")));
         assert!(!is_server_disconnect_sqlstate(Some("23505")));
         assert!(!is_server_disconnect_sqlstate(None));
+    }
+
+    #[test]
+    fn unexpected_io_eof_is_disconnected_and_connection_refusal_stays_distinct() {
+        let eof = sqlx::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::UnexpectedEof,
+            "server closed the connection",
+        ));
+        assert!(matches!(map_sqlx_error(eof), DriverError::Disconnected));
+
+        let refused = sqlx::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::ConnectionRefused,
+            "connection refused",
+        ));
+        assert!(matches!(map_sqlx_error(refused), DriverError::ConnectionRefused));
     }
 
     #[derive(Clone, Default)]
@@ -1209,9 +1225,9 @@ mod tests {
     }
 
     #[test]
-    fn map_plain_io_failure_stays_internal() {
+    fn map_plain_io_failure_is_disconnected() {
         let err = sqlx::Error::Io(std::io::Error::other("connection reset by peer"));
-        assert!(matches!(map_sqlx_error(err), DriverError::Internal(_)));
+        assert!(matches!(map_sqlx_error(err), DriverError::Disconnected));
     }
 
     #[test]
