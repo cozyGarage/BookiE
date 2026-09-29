@@ -1134,6 +1134,24 @@ and `target/quality/20260929T210639863435Z-values/report.json`.
 
 B3 remains open.
 
+### MySQL server disconnect classification — September 29
+
+A failing-first MySQL Docker test killed the connection serving an active
+`SLEEP` query. The SQLx unexpected-EOF error surfaced as `Internal`; the driver
+now reports SQLx I/O loss as `Disconnected`, while preserving the distinct
+`ConnectionRefused` and TLS outcomes. The contract verifies the killed query
+fails promptly and the pool recovers for a fresh `SELECT 1`.
+
+The focused Docker case and all 12 MySQL library tests passed. The first scoped
+mutation pass exposed a missing refusal-path assertion; after adding it, all
+three viable mapping mutations were caught and one was unviable. The clean strict
+runner passed 131 selected contracts across 11 suites with no missing suites at
+source `064b4947d07d4fddbc2a210c0d658f62cef59805`. Evidence:
+`target/quality/20260929-mysql-disconnect-mutants-final/mutants.out/outcomes.json`
+and `target/quality/20260929T211702925065Z-values/report.json`.
+
+B3 remains open.
+
 ### MongoDB BSON DateTime grid-edit precision — September 29
 
 A failing-first app parser test showed that MongoDB `date` cells display RFC3339

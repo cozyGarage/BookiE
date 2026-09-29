@@ -82,6 +82,30 @@ no missing suites. Evidence:
 `target/quality/20260929-pg-disconnect-mutants-home/mutants.out/outcomes.json`
 and `target/quality/20260929T210639863435Z-values/report.json` (`dirty: false`).
 
+## MySQL server termination and pool recovery, 2026-09-29
+
+A failing-first MySQL Docker contract killed the connection serving an active
+`SLEEP` query. The server closed the socket with unexpected EOF, which the SQLx
+mapper previously surfaced as `Internal`. The driver now maps SQLx I/O failures
+to `Disconnected`, while keeping connection refusal and TLS errors distinct.
+The integration contract requires the killed query to fail promptly, then checks
+the pool completes a new `SELECT 1`. Unit tests separately preserve
+`ConnectionRefused` and unexpected EOF classifications.
+
+```sh
+rtk cargo test -p tablepro-driver-mysql --lib
+rtk cargo test -p tablepro-driver-mysql --test integration server_terminated_query_reports_disconnection_and_pool_recovers -- --include-ignored --exact --test-threads=1
+```
+
+The focused integration test and all 12 MySQL library tests passed. The first
+scoped mutation pass found the connection-refusal branch lacked its own
+assertion; after adding it, all three viable mutations were caught and one was
+unviable. Evidence:
+`target/quality/20260929-mysql-disconnect-mutants-final/mutants.out/outcomes.json`.
+The clean strict runner passed 131 selected tests across 11 suites at source
+`064b4947d07d4fddbc2a210c0d658f62cef59805`; no suites were missing:
+`target/quality/20260929T211702925065Z-values/report.json` (`dirty: false`).
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.
