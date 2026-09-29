@@ -1182,6 +1182,12 @@ Scoped cargo-mutants on `fetch_columns` caught its empty-result mutation; one
 whole-function `Default::default()` replacement was unviable, with no survivors
 or timeouts. Evidence: `target/quality/20260929-duckdb-pk-mutants-final/mutants.out/outcomes.json`.
 
+A new MAP refusal contract provides DuckDB `typeof` and exact `VARCHAR` oracles
+for a map containing a UHUGEINT above `u64::MAX` and an explicit NULL. The
+driver returns an undecodable value, and both SQL-literal and parameter
+consumers refuse it. Run
+`cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_wide_map_refuses_lossy_consumers_with_native_oracle -- --exact --test-threads=1`.
+
 B3 remains open.
 
 ### ClickHouse `DateTime64(9)` bounds — September 29
