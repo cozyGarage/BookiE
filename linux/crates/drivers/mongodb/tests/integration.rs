@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use drivers_mongodb::MongodbDriver;
-use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig, Value};
+use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::mongo::Mongo;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -31,6 +31,42 @@ fn opts(host: &str, port: u16, database: &str) -> ConnectOptions {
         tls: TlsConfig::disabled(),
         ..Default::default()
     }
+}
+
+#[tokio::test]
+async fn an_unavailable_mongodb_server_is_classified_as_connection_refused() {
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+
+    let error = match MongodbDriver.connect(opts("127.0.0.1", port, "appdb")).await {
+        Ok(_) => panic!("an unused local port must not accept MongoDB connections"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, DriverError::ConnectionRefused), "{error:?}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
+    let container = Mongo::default()
+        .with_tag(MONGO_TAG)
+        .with_env_var("MONGO_INITDB_ROOT_USERNAME", "tablepro")
+        .with_env_var("MONGO_INITDB_ROOT_PASSWORD", "correct-password")
+        .start()
+        .await
+        .expect("start authenticated MongoDB");
+    let host = container.get_host().await.expect("host").to_string();
+    let port = container.get_host_port_ipv4(27017).await.expect("port");
+    let mut connection_options = opts(&host, port, "admin");
+    connection_options.username = "tablepro".into();
+    connection_options.password = secrecy::SecretString::new("wrong-password".to_string().into());
+
+    let error = match MongodbDriver.connect(connection_options).await {
+        Ok(_) => panic!("incorrect credentials must not connect"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, DriverError::AuthFailed), "{error:?}");
 }
 
 async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Connection> {

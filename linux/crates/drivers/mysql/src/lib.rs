@@ -924,6 +924,9 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             sqlstate: e.code().map(|c| c.to_string()),
         },
         Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
+        Io(e) if tablepro_core::looks_like_tls_failure(&tablepro_core::error_chain_text(&e)) => {
+            DriverError::Tls(tablepro_core::error_chain_text(&e))
+        }
         Io(_) => DriverError::Disconnected,
         Tls(e) => DriverError::Tls(e.to_string()),
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
@@ -951,6 +954,41 @@ mod tests {
             "server closed the connection",
         ));
         assert!(matches!(map_sqlx_error(error), DriverError::Disconnected));
+    }
+
+    #[test]
+    fn a_tls_certificate_failure_wrapped_in_io_remains_a_tls_error() {
+        #[derive(Debug)]
+        struct CertificateNameMismatch;
+
+        impl std::fmt::Display for CertificateNameMismatch {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("invalid peer certificate: NotValidForName")
+            }
+        }
+
+        impl std::error::Error for CertificateNameMismatch {}
+
+        #[derive(Debug)]
+        struct ClosedTlsHandshake(CertificateNameMismatch);
+
+        impl std::fmt::Display for ClosedTlsHandshake {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("connection closed unexpectedly")
+            }
+        }
+
+        impl std::error::Error for ClosedTlsHandshake {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+
+        let error = sqlx::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            ClosedTlsHandshake(CertificateNameMismatch),
+        ));
+        assert!(matches!(map_sqlx_error(error), DriverError::Tls(message) if message.contains("certificate")));
     }
 
     #[test]

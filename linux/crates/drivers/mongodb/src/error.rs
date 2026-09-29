@@ -36,6 +36,18 @@ pub(super) fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert
     match &*err.kind {
         ErrorKind::Authentication { .. } => DriverError::AuthFailed,
         ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
+        ErrorKind::Io(io)
+            if matches!(
+                io.kind(),
+                std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::UnexpectedEof
+                    | std::io::ErrorKind::NotConnected
+            ) =>
+        {
+            DriverError::Disconnected
+        }
         ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } => DriverError::ConnectionRefused,
         _ => DriverError::Query {
             message: err.to_string(),
@@ -60,6 +72,19 @@ mod tests {
         let io = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
         let error = mongodb::error::Error::from(io);
         assert!(matches!(map_mongo_error(error), DriverError::Query { .. }));
+    }
+
+    #[test]
+    fn unexpected_transport_loss_is_reported_as_disconnected() {
+        for kind in [
+            std::io::ErrorKind::ConnectionReset,
+            std::io::ErrorKind::UnexpectedEof,
+            std::io::ErrorKind::BrokenPipe,
+        ] {
+            let io = std::io::Error::new(kind, "MongoDB server closed the connection");
+            let mapped = map_mongo_error(mongodb::error::Error::from(io));
+            assert!(matches!(mapped, DriverError::Disconnected), "{kind:?}: {mapped:?}");
+        }
     }
 
     /// The mongodb error's own Display prints only the io error's message,

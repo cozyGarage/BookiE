@@ -111,6 +111,54 @@ The clean strict runner passed 131 selected tests across 11 suites at source
 `064b4947d07d4fddbc2a210c0d658f62cef59805`; no suites were missing:
 `target/quality/20260929T211702925065Z-values/report.json` (`dirty: false`).
 
+### MySQL TLS error classification, 2026-09-30
+
+The full TLS fixture exposed a second MySQL I/O classification case: SQLx wraps
+rustls `InvalidCertificate(NotValidForName)` in an `InvalidData` I/O error, so
+the mapper returned `Disconnected` for a certificate hostname mismatch. The
+mapper now walks the I/O source chain and detects TLS failures before its
+generic disconnection fallback. The regression asserts a wrapped TLS cause
+stays `Tls`; ordinary EOF remains `Disconnected`, and connection refusal stays
+`ConnectionRefused`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mysql --lib
+rtk python3 scripts/run-test-layer.py tls
+```
+
+All 13 MySQL library tests passed. The complete TLS layer passed all 35
+fixture tests, including the previously failing MySQL identity check. The
+scoped mutation run caught 5 of 6 generated mutations; one was unviable:
+`target/quality/20260930-mysql-tls-map-mutants/mutants.out/outcomes.json`.
+Layer evidence:
+`target/quality/20260929T225302522187Z-layers/report.json`.
+
+## MongoDB transport disconnect classification, 2026-09-30
+
+A failing-first mapper test showed that MongoDB reset, EOF and broken-pipe
+transport errors were surfaced as generic query errors. The mapper now returns
+`Disconnected` for connection-aborted, reset, broken-pipe, unexpected-EOF and
+not-connected I/O failures. Connection refusal remains distinct; TLS detection
+still runs first, and unrelated I/O such as permission denial remains a query
+error. A local unused-port test checks server-selection failures remain
+`ConnectionRefused`; a Docker-backed wrong-password test verifies
+`AuthFailed`. An end-to-end MongoDB server-loss and recovery test remains open.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --lib
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration an_unavailable_mongodb_server_is_classified_as_connection_refused -- --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration wrong_mongodb_credentials_are_classified_as_auth_failed -- --ignored --exact --test-threads=1
+```
+
+All 33 MongoDB library tests, the local refused-endpoint test and the Docker
+authentication test passed. The first nine-mutant mapper run caught 6, missed
+the untested authentication and server-selection branches, and found one
+unviable mutation. Both missed branches now have regressions; separate targeted
+mutation runs caught the authentication and server-selection mutants. Reports:
+`target/quality/20260930-mongodb-disconnect-mutants/mutants.out/outcomes.json`,
+`target/quality/20260930-mongodb-auth-map-mutant/mutants.out/outcomes.json`, and
+`target/quality/20260930-mongodb-selection-map-mutant/mutants.out/outcomes.json`.
+
 ## DuckDB duplicate result column names, 2026-09-28
 
 A local `UNION ALL` result returns two columns with the same alias and two rows.
