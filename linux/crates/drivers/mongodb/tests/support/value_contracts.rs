@@ -729,3 +729,74 @@ async fn value_contract_db_pointer_grid_edit_preserves_native_bson() {
         .expect("source document exists");
     assert_eq!(persisted.get("value"), Some(&after_pointer));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_object_id_grid_edit_preserves_native_bson() {
+    use mongodb::bson::{Bson, doc, oid::ObjectId};
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("object_id_edits");
+    let row_id = ObjectId::parse_str("0123456789abcdef01234567").unwrap();
+    let before_value = ObjectId::parse_str("111111111111111111111111").unwrap();
+    let after_value = ObjectId::parse_str("fedcba987654321001234567").unwrap();
+    collection
+        .insert_one(doc! { "_id": row_id, "reference": before_value })
+        .await
+        .expect("seed ObjectId regular field");
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let before = connection
+        .query("db.object_id_edits.find({})")
+        .await
+        .expect("read before ObjectId edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "reference")
+        .unwrap();
+    assert_eq!(before.columns[value_index].data_type, "ObjectId");
+    assert_eq!(
+        before.rows[0][value_index],
+        Value::Json(serde_json::json!({"$oid": before_value.to_hex()}))
+    );
+
+    let edited = Value::Json(serde_json::json!({"$oid": after_value.to_hex()}));
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "object_id_edits",
+        &before.columns,
+        &[(value_index, edited.clone())],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build ObjectId keyed grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply ObjectId grid edit");
+
+    let after = connection
+        .query("db.object_id_edits.find({})")
+        .await
+        .expect("read after ObjectId edit");
+    assert_eq!(
+        after.rows[0][id_index], before.rows[0][id_index],
+        "row identity changed"
+    );
+    assert_eq!(after.rows[0][value_index], edited);
+
+    let persisted = collection
+        .find_one(doc! { "_id": row_id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("edited row still exists");
+    assert_eq!(persisted.get("_id"), Some(&Bson::ObjectId(row_id)));
+    assert_eq!(persisted.get("reference"), Some(&Bson::ObjectId(after_value)));
+}
