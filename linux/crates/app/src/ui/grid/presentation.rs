@@ -83,6 +83,23 @@ mod tests {
     }
 
     #[test]
+    fn ordinary_text_columns_remain_editable() {
+        let column = ColumnInfo {
+            name: "note".into(),
+            data_type: "VARCHAR".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            is_generated: false,
+            comment: None,
+            default_value: None,
+            collation: None,
+        };
+        assert!(column_is_editable(&column));
+        assert!(cell_allows_inline_edit(&column, &Value::Text("editable".into())));
+    }
+
+    #[test]
     fn mysql_bit_and_spatial_cells_follow_their_decoded_value_contract() {
         let bit1 = ColumnInfo {
             name: "tiny_bits".into(),
