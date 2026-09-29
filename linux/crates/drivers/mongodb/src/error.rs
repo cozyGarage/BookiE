@@ -24,10 +24,14 @@ fn mongo_error_can_hide_tls(kind: &mongodb::error::ErrorKind) -> bool {
 }
 
 pub(super) fn map_mongo_error(err: mongodb::error::Error) -> DriverError {
-    map_mongo_connect_error(err, false)
+    map_mongo_error_in_context(err, false)
 }
 
 pub(super) fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert: bool) -> DriverError {
+    map_mongo_error_in_context(err, true)
+}
+
+fn map_mongo_error_in_context(err: mongodb::error::Error, connecting: bool) -> DriverError {
     use mongodb::error::ErrorKind;
     let chain = error_chain_text(&err);
     if mongo_error_can_hide_tls(&err.kind) && looks_like_tls_failure(&chain) {
@@ -35,7 +39,10 @@ pub(super) fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert
     }
     match &*err.kind {
         ErrorKind::Authentication { .. } => DriverError::AuthFailed,
-        ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
+        ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused && connecting => {
+            DriverError::ConnectionRefused
+        }
+        ErrorKind::Io(io) if io.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::Disconnected,
         ErrorKind::Io(io)
             if matches!(
                 io.kind(),
@@ -48,7 +55,10 @@ pub(super) fn map_mongo_connect_error(err: mongodb::error::Error, _verifies_cert
         {
             DriverError::Disconnected
         }
-        ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } => DriverError::ConnectionRefused,
+        ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } if connecting => {
+            DriverError::ConnectionRefused
+        }
+        ErrorKind::ServerSelection { .. } | ErrorKind::DnsResolve { .. } => DriverError::Disconnected,
         _ => DriverError::Query {
             message: err.to_string(),
             sqlstate: None,
@@ -61,10 +71,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_connection_refused_io_error_maps_to_connection_refused() {
+    fn a_connection_refused_io_error_during_connect_maps_to_connection_refused() {
         let io = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
         let error = mongodb::error::Error::from(io);
-        assert!(matches!(map_mongo_error(error), DriverError::ConnectionRefused));
+        assert!(matches!(
+            map_mongo_connect_error(error, false),
+            DriverError::ConnectionRefused
+        ));
+    }
+
+    #[test]
+    fn a_connection_refused_io_error_during_an_operation_maps_to_disconnected() {
+        let io = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        let error = mongodb::error::Error::from(io);
+        assert!(matches!(map_mongo_error(error), DriverError::Disconnected));
     }
 
     #[test]

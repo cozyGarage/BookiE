@@ -69,6 +69,30 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
     assert!(matches!(error, DriverError::AuthFailed), "{error:?}");
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_lost_mongodb_server_is_reported_as_disconnected() {
+    let (container, host, port) = start_mongo().await;
+    let connection = MongodbDriver
+        .connect(opts(&host, port, "appdb"))
+        .await
+        .expect("connect");
+    connection
+        .list_tables()
+        .await
+        .expect("initial operation confirms server is reachable");
+
+    container.stop().await.expect("stop MongoDB server");
+    let error = connection
+        .list_tables()
+        .await
+        .expect_err("an operation after server loss must fail");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "loss of an established MongoDB server must be reported as disconnected, got {error:?}"
+    );
+}
+
 async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Connection> {
     let conn = MongodbDriver.connect(opts(host, port, "appdb")).await.expect("connect");
     conn.execute(r#"db.people.insertOne({"name": "ada", "team": "core"})"#)

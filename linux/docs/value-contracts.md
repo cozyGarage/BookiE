@@ -142,16 +142,23 @@ not-connected I/O failures. Connection refusal remains distinct; TLS detection
 still runs first, and unrelated I/O such as permission denial remains a query
 error. A local unused-port test checks server-selection failures remain
 `ConnectionRefused`; a Docker-backed wrong-password test verifies
-`AuthFailed`. An end-to-end MongoDB server-loss and recovery test remains open.
+`AuthFailed`. The Docker-backed server-loss contract connects and performs an
+operation, stops MongoDB, and requires the next operation to return
+`Disconnected`. Pool recovery after the server restarts remains open.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --lib
 rtk cargo test --locked -p tablepro-driver-mongodb --test integration an_unavailable_mongodb_server_is_classified_as_connection_refused -- --exact --test-threads=1
 rtk cargo test --locked -p tablepro-driver-mongodb --test integration wrong_mongodb_credentials_are_classified_as_auth_failed -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration a_lost_mongodb_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-All 33 MongoDB library tests, the local refused-endpoint test and the Docker
-authentication test passed. The first nine-mutant mapper run caught 6, missed
+All 34 MongoDB library tests, the local refused-endpoint test, the Docker
+authentication test and the server-loss classification test passed. The new
+server-loss test first failed because an established operation surfaced
+`ConnectionRefused`; operations now map server-selection failures and transport
+refusal to `Disconnected`, while connect-time refusal stays `ConnectionRefused`. The first
+nine-mutant mapper run caught 6, missed
 the untested authentication and server-selection branches, and found one
 unviable mutation. Both missed branches now have regressions; separate targeted
 mutation runs caught the authentication and server-selection mutants. Reports:
