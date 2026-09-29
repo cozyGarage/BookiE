@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::str::FromStr;
 
-use chrono::{NaiveDate, NaiveTime, Timelike};
+use chrono::{NaiveDate, NaiveTime};
 use rust_decimal::Decimal;
 use secrecy::SecretString;
 
@@ -846,7 +846,7 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_legacy_datetime_rounding_matches_server_milliseconds() {
+async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
     let result = conn
@@ -863,18 +863,15 @@ async fn value_contract_legacy_datetime_rounding_matches_server_milliseconds() {
         .await
         .unwrap();
     let expected = [
-        (0, "2024-01-02T03:04:05"),
-        (3_333_333, "2024-01-02T03:04:05.003"),
-        (3_333_333, "2024-01-02T03:04:05.003"),
-        (6_666_666, "2024-01-02T03:04:05.007"),
-        (6_666_666, "2024-01-02T03:04:05.007"),
+        "2024-01-02T03:04:05",
+        "2024-01-02T03:04:05.003",
+        "2024-01-02T03:04:05.003",
+        "2024-01-02T03:04:05.007",
+        "2024-01-02T03:04:05.007",
     ];
     assert_eq!(result.rows.len(), expected.len());
-    for (row, (expected_nanos, expected_server_text)) in result.rows.iter().zip(expected) {
-        let Value::DateTime(value) = row[0] else {
-            panic!("legacy datetime did not decode as DateTime: {:?}", row[0]);
-        };
-        assert_eq!(value.nanosecond(), expected_nanos);
+    for (row, expected_server_text) in result.rows.iter().zip(expected) {
+        assert_eq!(row[0], Value::Undecodable("datetime".into()));
         assert_eq!(row[1], Value::Text(expected_server_text.into()));
     }
 }

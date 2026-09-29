@@ -347,15 +347,22 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 A SQL Server Docker contract checks legacy `datetime`
 rounding around its 1/300-second tick boundaries (`.001`, `.002`, `.004`,
-`.005`, `.008`). The decoded nanoseconds and SQL Server's independent
-millisecond text agree on the rounded values. The `2/300` tick maps to
-6,666,666 nanoseconds in chrono, one nanosecond below the rational instant;
-this is the current `NaiveDateTime` representation ceiling and remains an
-explicit exactness limitation. The test passed without a production change.
+`.005`, `.008`). Tiberius exposes each 1/300-second tick through
+`NaiveDateTime`, which truncates some values to integer nanoseconds. The driver
+now returns non-NULL legacy `datetime` values as `Undecodable("datetime")`
+instead of exposing that editable approximation; SQL NULL stays `Value::Null`.
+The fixture checks each refusal beside SQL Server's independent rounded text.
+`smalldatetime` and `datetime2` continue to use typed values.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration value_contract_legacy_datetime_rounding_matches_server_milliseconds -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mssql --test integration value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent -- --include-ignored --exact --test-threads=1
 ```
+
+The focused SQL Server Docker contract passed. A codec unit contract also checks
+both nullable legacy type identifiers and confirms `datetime2` remains exact.
+The scoped mutation that deleted the legacy-type refusal was caught by the
+codec test; evidence is retained at
+`target/quality/20260929-mssql-legacy-datetime-mutants/mutants.out/outcomes.json`.
 
 ## SQL Server money float-decoding refusal
 

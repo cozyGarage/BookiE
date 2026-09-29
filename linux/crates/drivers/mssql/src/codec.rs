@@ -77,6 +77,10 @@ pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_typ
     match column_type {
         ColumnType::Money => Value::Undecodable("money".into()),
         ColumnType::Money4 => Value::Undecodable("smallmoney".into()),
+        // Legacy DATETIME stores 1/300-second ticks. Most ticks are not an
+        // integer number of nanoseconds, so Tiberius's chrono conversion
+        // exposes a truncated value that cannot be safely edited or exported.
+        ColumnType::Datetime | ColumnType::Datetimen => undecodable("datetime"),
         _ => value,
     }
 }
@@ -245,6 +249,32 @@ mod tests {
         assert_eq!(
             column_data_to_value_for_type(&ColumnData::F32(None), ColumnType::Money4),
             Value::Null
+        );
+    }
+
+    #[test]
+    fn legacy_datetime_refuses_inexact_ticks_but_keeps_null_and_datetime2() {
+        let date = chrono::NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+        let days_since_1900 = (date - chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap()).num_days() as i32;
+        let legacy = tiberius::time::DateTime::new(days_since_1900, 2);
+        for column_type in [ColumnType::Datetime, ColumnType::Datetimen] {
+            assert_eq!(
+                column_data_to_value_for_type(&ColumnData::DateTime(Some(legacy)), column_type),
+                Value::Undecodable("datetime".into())
+            );
+            assert_eq!(
+                column_data_to_value_for_type(&ColumnData::DateTime(None), column_type),
+                Value::Null
+            );
+        }
+        let days_since_year_one = (date - chrono::NaiveDate::from_ymd_opt(1, 1, 1).unwrap()).num_days() as u32;
+        let datetime2 = tiberius::time::DateTime2::new(
+            tiberius::time::Date::new(days_since_year_one),
+            tiberius::time::Time::new(110_450_066_666, 7),
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::DateTime2(Some(datetime2)), ColumnType::Datetime2),
+            Value::DateTime(date.and_hms_nano_opt(3, 4, 5, 6_666_600).unwrap())
         );
     }
 }
