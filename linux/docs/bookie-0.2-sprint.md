@@ -1162,9 +1162,13 @@ It now preserves microsecond-aligned values as explicit text, retaining each
 component independently; values with sub-microsecond carrier precision remain
 undecodable. The local engine regression compares `typeof`, DuckDB's rendered
 value and independent `date_part` month/day/microsecond results, then round-trips
-through a generated SQL literal and an explicitly cast bound parameter. This
-closes mixed-interval read/export/import coverage, not native typed interval
-editing or collection support.
+through a generated SQL literal and an explicitly cast bound parameter. The
+DuckDB column reader now marks all columns in simple or composite primary keys
+from native constraint metadata. The app's grid parser and keyed-update builder
+save edited interval text back into a native INTERVAL column; the server
+confirms its type and all three components.
+This closes the supported mixed-interval read/export/import/keyed-edit path, not
+installed GTK acceptance, other interval boundaries or collection support.
 
 Scoped cargo-mutants on `duck_value_ref_to_value` caught 11 of 12 mutants, had
 one unviable whole-function replacement, and left no survivors or timeouts. The
@@ -1172,7 +1176,11 @@ first pass exposed a surviving unsigned-BIGINT threshold mutation; explicit
 `i64::MAX` and `i64::MAX + 1` decoder assertions were added and the final run
 caught it. Evidence: `target/quality/20260929-duckdb-interval-mutants-final/mutants.out/outcomes.json`.
 
-Run `cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_components_round_trip_as_exact_text -- --exact --test-threads=1`.
+The driver contracts `fetch_columns_reports_composite_primary_key_columns` and `value_contract_interval_grid_edit_persists_native_components` run in the DuckDB integration suite. The app parser/keyed-edit contract is `cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb_interval_grid_edit_preserves_native_components -- --test-threads=1`.
+
+Scoped cargo-mutants on `fetch_columns` caught its empty-result mutation; one
+whole-function `Default::default()` replacement was unviable, with no survivors
+or timeouts. Evidence: `target/quality/20260929-duckdb-pk-mutants-final/mutants.out/outcomes.json`.
 
 B3 remains open.
 

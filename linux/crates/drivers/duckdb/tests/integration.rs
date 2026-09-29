@@ -55,6 +55,36 @@ async fn query_with_zero_rows_preserves_column_metadata_and_completeness() {
 }
 
 #[tokio::test]
+async fn fetch_columns_reports_composite_primary_key_columns() {
+    let connection = native_connection().await;
+    connection
+        .execute(
+            "CREATE TABLE composite_keys (tenant INTEGER, item INTEGER, label VARCHAR, \
+             PRIMARY KEY (tenant, item))",
+        )
+        .await
+        .unwrap();
+
+    let oracle = connection
+        .query(
+            "SELECT constraint_column_names::VARCHAR FROM duckdb_constraints() \
+             WHERE table_name = 'composite_keys' AND constraint_type = 'PRIMARY KEY'",
+        )
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows, vec![vec![Value::Text("[tenant, item]".into())]]);
+
+    let columns = connection.fetch_columns(None, "composite_keys").await.unwrap();
+    assert_eq!(
+        columns
+            .iter()
+            .map(|column| (column.name.as_str(), column.primary_key))
+            .collect::<Vec<_>>(),
+        vec![("tenant", true), ("item", true), ("label", false)]
+    );
+}
+
+#[tokio::test]
 async fn query_preserves_duplicate_column_names_and_row_order() {
     let connection = native_connection().await;
     let result = connection
@@ -375,6 +405,69 @@ async fn value_contract_interval_components_round_trip_as_exact_text() {
         .await
         .unwrap();
     assert_eq!(bound_round_trip.rows, vec![vec![value.clone()]]);
+}
+
+#[tokio::test]
+async fn value_contract_interval_grid_edit_persists_native_components() {
+    let connection = native_connection().await;
+    connection
+        .execute("CREATE TABLE interval_grid (id INTEGER PRIMARY KEY, span INTERVAL)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO interval_grid VALUES (1, INTERVAL '1 month 2 days 3 microseconds')")
+        .await
+        .unwrap();
+
+    let primary_key_oracle = connection
+        .query(
+            "SELECT constraint_type, constraint_column_names::VARCHAR \
+             FROM duckdb_constraints() WHERE table_name = 'interval_grid' \
+                 AND constraint_type = 'PRIMARY KEY'",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        primary_key_oracle.rows,
+        vec![vec![Value::Text("PRIMARY KEY".into()), Value::Text("[id]".into())]]
+    );
+
+    let columns = connection.fetch_columns(None, "interval_grid").await.unwrap();
+    let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+    assert!(
+        columns[id_index].primary_key,
+        "DuckDB must expose its primary key for keyed grid edits"
+    );
+    let span_index = columns.iter().position(|column| column.name == "span").unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "duckdb",
+        None,
+        "interval_grid",
+        &columns,
+        &[(span_index, Value::Text("-2 months 4 days -5 microseconds".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_params(&update.0, &update.1).await.unwrap();
+
+    let saved = connection
+        .query(
+            "SELECT typeof(span), span::VARCHAR, date_part('month', span)::INTEGER, \
+                    date_part('day', span)::INTEGER, date_part('microsecond', span)::BIGINT \
+             FROM interval_grid WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        saved.rows,
+        vec![vec![
+            Value::Text("INTERVAL".into()),
+            Value::Text("-2 months 4 days -00:00:00.000005".into()),
+            Value::Int(-2),
+            Value::Int(4),
+            Value::Int(-5),
+        ]]
+    );
 }
 
 #[tokio::test]

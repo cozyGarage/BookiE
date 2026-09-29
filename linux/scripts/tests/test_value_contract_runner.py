@@ -22,6 +22,12 @@ class ValueRunnerTests(unittest.TestCase):
         self.assertIn("tablepro-driver-duckdb", runner.build_command())
         self.assertNotIn("--exclude", runner.build_command(gtk=True, duckdb=True))
 
+    def test_combined_gtk_duckdb_run_enables_app_duckdb_consumer_tests(self):
+        command = runner.build_command(gtk=True, duckdb=True)
+        self.assertIn("tablepro-app/duckdb", command)
+        self.assertNotIn("tablepro-app/duckdb", runner.build_command(gtk=True))
+        self.assertNotIn("tablepro-app/duckdb", runner.build_command(duckdb=True))
+
     def test_a_suite_with_no_matching_tests_is_a_failure(self):
         with tempfile.TemporaryDirectory() as root:
             directory = Path(root)

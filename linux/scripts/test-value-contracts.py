@@ -30,6 +30,8 @@ def build_command(gtk=False, duckdb=False):
         command += ["--exclude", "tablepro-app"]
     if not duckdb:
         command += ["--exclude", "tablepro-driver-duckdb"]
+    if gtk and duckdb:
+        command += ["--features", "tablepro-app/duckdb"]
     return command + ["--lib", "--test", "integration", "--no-run", "--message-format=json"]
 
 

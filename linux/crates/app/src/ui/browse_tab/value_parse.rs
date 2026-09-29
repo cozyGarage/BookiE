@@ -392,6 +392,67 @@ mod tests {
         assert_eq!(saved.rows, vec![vec![Value::Text("real".into()), Value::Float(42.5)]]);
     }
 
+    #[cfg(feature = "duckdb")]
+    #[tokio::test]
+    async fn value_contract_duckdb_interval_grid_edit_preserves_native_components() {
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+        let connection = drivers_duckdb::DuckdbDriver
+            .connect(ConnectOptions {
+                database: ":memory:".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        connection
+            .execute("CREATE TABLE interval_grid (id INTEGER PRIMARY KEY, span INTERVAL)")
+            .await
+            .unwrap();
+        connection
+            .execute("INSERT INTO interval_grid VALUES (1, INTERVAL '1 month 2 days 3 microseconds')")
+            .await
+            .unwrap();
+
+        let columns = connection.fetch_columns(None, "interval_grid").await.unwrap();
+        let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+        assert!(
+            columns[id_index].primary_key,
+            "DuckDB must expose its primary key for keyed grid edits"
+        );
+        let span_index = columns.iter().position(|column| column.name == "span").unwrap();
+        let edit = parse_input_for_column("-2 months 4 days -5 microseconds", Some(&columns[span_index])).unwrap();
+        assert_eq!(edit, Value::Text("-2 months 4 days -5 microseconds".into()));
+
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "duckdb",
+            None,
+            "interval_grid",
+            &columns,
+            &[(span_index, edit)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        connection.execute_params(&update.0, &update.1).await.unwrap();
+
+        let saved = connection
+            .query(
+                "SELECT typeof(span), date_part('month', span)::INTEGER, \
+                        date_part('day', span)::INTEGER, date_part('microsecond', span)::BIGINT \
+                 FROM interval_grid WHERE id = 1",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.rows,
+            vec![vec![
+                Value::Text("INTERVAL".into()),
+                Value::Int(-2),
+                Value::Int(4),
+                Value::Int(-5),
+            ]]
+        );
+    }
+
     #[test]
     fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
         super::parser_contract::assert_numeric_parsers(
@@ -462,7 +523,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires docker"]
     async fn postgres_numeric_parser_outputs_round_trip_through_server() {
-        use tablepro_core::{ConnectOptions, Connection, DatabaseDriver};
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
         use testcontainers::ImageExt;
         use testcontainers::runners::AsyncRunner;
         use testcontainers_modules::postgres::Postgres;

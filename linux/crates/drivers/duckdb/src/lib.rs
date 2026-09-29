@@ -171,17 +171,27 @@ impl Connection for DuckdbConnection {
                 .map_err(|_| DriverError::Internal("duckdb lock poisoned".into()))?;
             let (sql, binds) = match schema {
                 Some(schema) => (
-                    "SELECT column_name, data_type, is_nullable, column_default \
-                     FROM information_schema.columns \
-                     WHERE table_schema = ? AND table_name = ? \
-                     ORDER BY ordinal_position",
+                    "SELECT c.column_name, c.data_type, c.is_nullable, c.column_default, \
+                            EXISTS (SELECT 1 FROM duckdb_constraints() con \
+                                    WHERE con.schema_name = c.table_schema \
+                                      AND con.table_name = c.table_name \
+                                      AND con.constraint_type = 'PRIMARY KEY' \
+                                      AND list_contains(con.constraint_column_names, c.column_name)) \
+                     FROM information_schema.columns c \
+                     WHERE c.table_schema = ? AND c.table_name = ? \
+                     ORDER BY c.ordinal_position",
                     vec![schema, table],
                 ),
                 None => (
-                    "SELECT column_name, data_type, is_nullable, column_default \
-                     FROM information_schema.columns \
-                     WHERE table_name = ? \
-                     ORDER BY ordinal_position",
+                    "SELECT c.column_name, c.data_type, c.is_nullable, c.column_default, \
+                            EXISTS (SELECT 1 FROM duckdb_constraints() con \
+                                    WHERE con.schema_name = c.table_schema \
+                                      AND con.table_name = c.table_name \
+                                      AND con.constraint_type = 'PRIMARY KEY' \
+                                      AND list_contains(con.constraint_column_names, c.column_name)) \
+                     FROM information_schema.columns c \
+                     WHERE c.table_name = ? \
+                     ORDER BY c.ordinal_position",
                     vec![table],
                 ),
             };
@@ -193,7 +203,7 @@ impl Connection for DuckdbConnection {
                         name: row.get(0)?,
                         data_type: row.get(1)?,
                         nullable: nullable.eq_ignore_ascii_case("YES"),
-                        primary_key: false,
+                        primary_key: row.get(4)?,
                         is_auto_increment: false,
                         default_value: row.get(3)?,
                         is_generated: false,
