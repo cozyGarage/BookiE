@@ -152,6 +152,26 @@ RESP3 push, attribute and stream reply semantics still need live-server
 subscription acceptance; the stream map/array response has real Redis coverage,
 while attribute and push markers currently have unit conversion tests only.
 
+### Redis Pub/Sub streaming refusal, 2026-09-29
+
+A Redis 7.4 Docker regression first demonstrated that `SUBSCRIBE` returned a
+one-shot `$redisPush` subscription acknowledgement, although the request /
+response API cannot deliver later message pushes. The driver now refuses
+`SUBSCRIBE`, `PSUBSCRIBE`, `SSUBSCRIBE`, and their three unsubscribe commands
+as `Unsupported` before sending them. The live contract exercises each spelling
+on one connection, checks the refusal explains the Pub/Sub limitation, and
+confirms `PING` still works afterward. This prevents a successful-looking
+subscription result from implying that messages are being received. It does
+not add a streaming API or establish live delivery for other asynchronous
+pushes or attribute frames. Scoped mutation testing of the refusal predicate
+caught both generated boolean replacements; the whole-query replacement was
+unviable at compile time, with no missed or timed-out mutants. Evidence:
+`target/quality/20260929-redis-pubsub-mutants/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test -p tablepro-driver-redis --test integration value_contract_pubsub_stream_commands_are_refused_without_consuming_the_connection -- --include-ignored --exact --test-threads=1
+```
+
 ## CSV negative-zero export/import, 2026-09-28
 
 A focused core contract exports IEEE-754 negative zero as CSV, reads the result

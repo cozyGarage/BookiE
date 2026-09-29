@@ -1115,6 +1115,23 @@ Open findings from the audit:
 
 B3 remains open.
 
+### Redis Pub/Sub request/response boundary — September 29
+
+A Redis 7.4 regression first showed `SUBSCRIBE` returning its push
+acknowledgement as an ordinary one-shot query result. The driver now visibly
+refuses all six subscribe/unsubscribe command forms before sending them. The
+live Docker test checks the error type and explanation, then verifies the same
+connection still answers `PING`. This establishes the unsupported streaming
+boundary; asynchronous push delivery and attribute framing remain open.
+Scoped mutations caught both replacements of the refusal predicate; the
+whole-query replacement was unviable, with no survivors or timeouts. Evidence:
+`target/quality/20260929-redis-pubsub-mutants/mutants.out/outcomes.json`.
+
+The value-contract runner selects this integration test by name and must be
+rerun after the fix before recording a clean combined gate.
+
+B3 remains open.
+
 ### B3 MySQL BIT parser and keyed grid path — September 29
 
 The app now has an unignored parser contract for BIT(1), (2), (8), (63) and

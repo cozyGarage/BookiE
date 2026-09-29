@@ -178,3 +178,39 @@ async fn value_contract_resp3_hash_map_preserves_binary_fields_and_values() {
     assert!(nested.to_string().contains(r#""$redisBytes":"ff0041""#), "{nested}");
     assert!(!nested.to_string().contains("BulkString"), "{nested}");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_pubsub_stream_commands_are_refused_without_consuming_the_connection() {
+    let (_container, host, port) = start_redis_resp3().await;
+    let connection = RedisDriver.connect(opts(&host, port, "0")).await.unwrap();
+    connection.query("HELLO 3").await.expect("enable RESP3");
+
+    for command in [
+        "SUBSCRIBE updates",
+        "PSUBSCRIBE updates.*",
+        "SSUBSCRIBE updates",
+        "UNSUBSCRIBE updates",
+        "PUNSUBSCRIBE updates.*",
+        "SUNSUBSCRIBE updates",
+    ] {
+        let error = connection
+            .query(command)
+            .await
+            .expect_err("streaming Pub/Sub must not return a misleading one-shot result");
+        assert!(
+            matches!(error, tablepro_core::DriverError::Unsupported(_)),
+            "{command} should have a visible unsupported result, got {error:?}"
+        );
+        assert!(
+            error.to_string().to_ascii_lowercase().contains("pub/sub"),
+            "the refusal should explain the unsupported operation: {error}"
+        );
+    }
+
+    assert_eq!(
+        connection.query("PING").await.unwrap().rows,
+        vec![vec![Value::Text("PONG".into())]],
+        "refused stream commands must not leave the connection in Pub/Sub mode"
+    );
+}
