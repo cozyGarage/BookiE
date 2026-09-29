@@ -57,10 +57,26 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
             Err(error) => Err(error),
         };
     }
+    if let Some(result) = parse_mongodb_date_input(trimmed, col, driver_id) {
+        return result;
+    }
     if let Some(result) = parse_duckdb_timestamptz_input(trimmed, col, driver_id) {
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_mongodb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "mongodb" || !column.data_type.trim().eq_ignore_ascii_case("date") {
+        return None;
+    }
+    let timestamp = chrono::DateTime::parse_from_rfc3339(text).ok()?;
+    Some(if timestamp.timestamp_subsec_nanos() % 1_000_000 == 0 {
+        Ok(Value::TimestampTz(timestamp.to_utc()))
+    } else {
+        Err(crate::tr!("MongoDB BSON dates support millisecond precision only"))
+    })
 }
 
 fn is_postgres_numeric_type(data_type: &str) -> bool {
@@ -421,6 +437,119 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(saved.rows, vec![vec![Value::Text("real".into()), Value::Float(42.5)]]);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires docker"]
+    async fn value_contract_mongodb_date_grid_edit_preserves_millisecond_instant() {
+        use mongodb::bson::{DateTime, doc, oid::ObjectId};
+        use tablepro_core::{ConnectOptions, DatabaseDriver};
+        use testcontainers::ImageExt;
+        use testcontainers_modules::mongo::Mongo;
+        use testcontainers_modules::testcontainers::runners::AsyncRunner;
+
+        let container = Mongo::default().with_tag("7").start().await.unwrap();
+        let host = container.get_host().await.unwrap().to_string();
+        let port = container.get_host_port_ipv4(27017).await.unwrap();
+        let native = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+            .await
+            .unwrap();
+        let collection = native
+            .database("appdb")
+            .collection::<mongodb::bson::Document>("date_edits");
+        let row_id = ObjectId::parse_str("0123456789abcdef01234567").unwrap();
+        let initial = DateTime::from_millis(1_780_000_000_123);
+        collection
+            .insert_one(doc! { "_id": row_id, "event_at": initial })
+            .await
+            .unwrap();
+
+        let connection = drivers_mongodb::MongodbDriver
+            .connect(ConnectOptions {
+                host,
+                port,
+                database: "appdb".into(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        let before = connection.query("db.date_edits.find({})").await.unwrap();
+        let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+        let date_index = before
+            .columns
+            .iter()
+            .position(|column| column.name == "event_at")
+            .unwrap();
+        assert_eq!(before.columns[date_index].data_type, "date");
+        let Value::Text(displayed) = &before.rows[0][date_index] else {
+            panic!(
+                "MongoDB date must remain readable RFC3339 text: {:?}",
+                before.rows[0][date_index]
+            );
+        };
+        assert_eq!(
+            parse_input_for_driver(displayed, Some(&before.columns[date_index]), "mongodb").unwrap(),
+            Value::TimestampTz(
+                chrono::DateTime::from_timestamp_millis(initial.timestamp_millis())
+                    .unwrap()
+                    .to_utc()
+            ),
+            "the displayed MongoDB date must parse to the same millisecond instant"
+        );
+
+        let rejected = parse_input_for_driver(
+            "2026-09-29T18:04:56.789001+05:30",
+            Some(&before.columns[date_index]),
+            "mongodb",
+        )
+        .unwrap_err();
+        assert_eq!(rejected, "MongoDB BSON dates support millisecond precision only");
+        let unchanged = collection.find_one(doc! { "_id": row_id }).await.unwrap().unwrap();
+        assert_eq!(
+            unchanged.get_datetime("event_at").unwrap().timestamp_millis(),
+            initial.timestamp_millis()
+        );
+
+        let input = "2026-09-29T18:04:56.789+05:30";
+        let edited = parse_input_for_driver(input, Some(&before.columns[date_index]), "mongodb").unwrap();
+        let expected_millis = chrono::DateTime::parse_from_rfc3339(input).unwrap().timestamp_millis();
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "mongodb",
+            Some("appdb"),
+            "date_edits",
+            &before.columns,
+            &[(date_index, edited)],
+            &[before.rows[0][id_index].clone()],
+        )
+        .unwrap();
+        connection.execute_in_transaction(&[update]).await.unwrap();
+
+        let after = connection.query("db.date_edits.find({})").await.unwrap();
+        assert_eq!(
+            after.rows[0][id_index], before.rows[0][id_index],
+            "row identity changed"
+        );
+        let Value::Text(saved_text) = &after.rows[0][date_index] else {
+            panic!(
+                "MongoDB date must remain RFC3339 text after edit: {:?}",
+                after.rows[0][date_index]
+            );
+        };
+        assert_eq!(
+            parse_input_for_driver(saved_text, Some(&after.columns[date_index]), "mongodb").unwrap(),
+            Value::TimestampTz(
+                chrono::DateTime::from_timestamp_millis(expected_millis)
+                    .unwrap()
+                    .to_utc()
+            )
+        );
+        let persisted = collection.find_one(doc! { "_id": row_id }).await.unwrap().unwrap();
+        assert_eq!(persisted.get("_id"), Some(&mongodb::bson::Bson::ObjectId(row_id)));
+        assert_eq!(
+            persisted.get_datetime("event_at").unwrap().timestamp_millis(),
+            expected_millis,
+            "the server must store the edited UTC instant at BSON millisecond precision"
+        );
     }
 
     #[cfg(feature = "duckdb")]
@@ -1127,6 +1256,38 @@ mod tests {
             parse_input_for_driver(submicro, None, "duckdb").unwrap(),
             Value::Text(submicro.into())
         );
+    }
+
+    #[test]
+    fn value_contract_mongodb_date_parser_preserves_milliseconds_and_refuses_rounding() {
+        let column = col("date", false);
+        let input = "2026-09-29T18:04:56.789+05:30";
+        assert_eq!(
+            parse_input_for_driver(input, Some(&column), "mongodb").unwrap(),
+            Value::TimestampTz(chrono::DateTime::parse_from_rfc3339(input).unwrap().to_utc()),
+            "MongoDB date edit input must retain the displayed UTC instant and millisecond"
+        );
+        assert_eq!(
+            parse_input_for_driver("2026-09-29T18:04:56.789000+05:30", Some(&column), "mongodb").unwrap(),
+            Value::TimestampTz(
+                chrono::DateTime::parse_from_rfc3339("2026-09-29T18:04:56.789000+05:30")
+                    .unwrap()
+                    .to_utc()
+            ),
+            "precision beyond milliseconds is safe only when all extra digits are zero"
+        );
+        assert_eq!(
+            parse_input_for_driver("2026-09-29T18:04:56.789001+05:30", Some(&column), "mongodb").unwrap_err(),
+            "MongoDB BSON dates support millisecond precision only"
+        );
+        assert!(
+            parse_input_for_driver(input, Some(&column), "sqlite").is_err(),
+            "the MongoDB date spelling must not change another driver's date contract"
+        );
+        assert!(matches!(
+            parse_input_for_driver("2026-09-29", Some(&column), "mongodb").unwrap(),
+            Value::Date(_)
+        ));
     }
 
     fn col_with_default(data_type: &str, default: &str) -> ColumnInfo {

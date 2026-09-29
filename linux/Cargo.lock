@@ -6152,6 +6152,7 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "libc",
+ "mongodb",
  "relm4",
  "rust_decimal",
  "secrecy",

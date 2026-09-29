@@ -63,7 +63,8 @@ futures.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["mysql", "postgres"] }
+testcontainers-modules = { workspace = true, features = ["mongo", "mysql", "postgres"] }
+mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 
 [build-dependencies]
 glib-build-tools.workspace = true
