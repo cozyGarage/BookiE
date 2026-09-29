@@ -27,6 +27,9 @@ pub(crate) fn col_to_info(c: &Column) -> ColumnInfo {
 const MAX_DECIMAL_MANTISSA: u128 = 0x0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF;
 
 fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
+    if is_inexact_legacy_datetime_payload(cd) {
+        return undecodable("datetime");
+    }
     match cd {
         ColumnData::Bit(v) => (*v).map(Value::Bool).unwrap_or(Value::Null),
         ColumnData::U8(v) => (*v).map(|n| Value::Int(i64::from(n))).unwrap_or(Value::Null),
@@ -69,6 +72,13 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
     }
 }
 
+/// Legacy DATETIME uses 1/300-second ticks, which are not all representable as
+/// integer nanoseconds. `DATETIMN` metadata also covers SMALLDATETIME, so inspect
+/// Tiberius's payload variant instead of refusing based on column metadata.
+fn is_inexact_legacy_datetime_payload(cd: &ColumnData<'static>) -> bool {
+    matches!(cd, ColumnData::DateTime(Some(_)))
+}
+
 pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_type: ColumnType) -> Value {
     let value = column_data_to_value(cd);
     if value == Value::Null {
@@ -77,10 +87,6 @@ pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_typ
     match column_type {
         ColumnType::Money => Value::Undecodable("money".into()),
         ColumnType::Money4 => Value::Undecodable("smallmoney".into()),
-        // Legacy DATETIME stores 1/300-second ticks. Most ticks are not an
-        // integer number of nanoseconds, so Tiberius's chrono conversion
-        // exposes a truncated value that cannot be safely edited or exported.
-        ColumnType::Datetime | ColumnType::Datetimen => undecodable("datetime"),
         _ => value,
     }
 }
@@ -272,9 +278,14 @@ mod tests {
             tiberius::time::Date::new(days_since_year_one),
             tiberius::time::Time::new(110_450_066_666, 7),
         );
+        let smalldatetime = tiberius::time::SmallDateTime::new(days_since_1900 as u16, 3 * 60 + 4);
         assert_eq!(
             column_data_to_value_for_type(&ColumnData::DateTime2(Some(datetime2)), ColumnType::Datetime2),
             Value::DateTime(date.and_hms_nano_opt(3, 4, 5, 6_666_600).unwrap())
+        );
+        assert_eq!(
+            column_data_to_value_for_type(&ColumnData::SmallDateTime(Some(smalldatetime)), ColumnType::Datetimen),
+            Value::DateTime(date.and_hms_opt(3, 4, 0).unwrap())
         );
     }
 }

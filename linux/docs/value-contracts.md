@@ -360,9 +360,14 @@ rtk cargo test --locked -p tablepro-driver-mssql --test integration value_contra
 
 The focused SQL Server Docker contract passed. A codec unit contract also checks
 both nullable legacy type identifiers and confirms `datetime2` remains exact.
-The scoped mutation that deleted the legacy-type refusal was caught by the
-codec test; evidence is retained at
-`target/quality/20260929-mssql-legacy-datetime-mutants/mutants.out/outcomes.json`.
+The first combined value run caught that `DATETIMN` metadata is shared by
+`datetime` and `smalldatetime`; refusal now keys off Tiberius's distinct
+`ColumnData::DateTime` versus `SmallDateTime` variants. The failed run is retained
+at `target/quality/20260929T062250469254Z-values/report.json`; the focused
+smalldatetime regression passes after the correction.
+The final codec predicate mutation run caught both polarity changes (2/2),
+including treating every nullable temporal payload as inexact; evidence is at
+`target/quality/20260929-mssql-legacy-datetime-mutants-precise/mutants.out/outcomes.json`.
 
 ## SQL Server money float-decoding refusal
 
