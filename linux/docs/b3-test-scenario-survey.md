@@ -2,7 +2,7 @@
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The local B3 status was reconciled against source
-`12e795cec416fca9da92ed1c95ae6bd9b77e754e` and documentation tip `b9433dc7b`,
+`70206f6fb9a5ce9901ffe4552743e63730100fe0` and documentation tip `4c5d9a543`,
 including September 26–29 changes. The source baseline contains Redis RESP3
 nested-value/binary and attribute-wire contracts, explicit
 PostgreSQL multirange metadata refusal coverage, ClickHouse DateTime64(9)
@@ -12,8 +12,17 @@ strict selected-contract report passed 131 tests across 11 suites at the source
 tip, with no missing suites; this is not a fresh execution of every crate test
 or installed-app workflow. The latest clean strict report at the reconciled
 source also passed 131 tests across all 11 suites. Evidence:
-`target/quality/20260929T212538645091Z-values/report.json` (`dirty: false`).
+`target/quality/20260929T214023821465Z-values/report.json` (`dirty: false`).
 No external source code or fixtures were copied.
+
+### B3-P6 mutation follow-up — September 29
+
+The MySQL spatial GTK mutation report had five missed, stricter-read-only
+mutations because that isolated test only asserted spatial refusal. An ordinary
+VARCHAR positive-control contract now proves regular text columns remain
+editable. Running the full app library suite against the editability guard caught
+all 11 generated mutants, with no misses, timeouts or unviable changes. Evidence:
+`target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json`.
 
 ## Focus to carry forward
 

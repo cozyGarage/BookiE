@@ -1448,3 +1448,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --tes
 ```
 
 B3 remains open.
+
+### B3-P6 MySQL spatial editability mutant triage — September 29
+
+The earlier spatial-only GTK mutation pass missed five changes that made more
+columns read-only, including an unconditional `false` result. This was a coverage
+gap, not evidence that stricter behavior was acceptable: the case asserted that
+spatial bytes cannot be edited but lacked a positive editable-column control. An
+unignored contract now asserts that a normal VARCHAR column remains editable;
+the existing unit contract separately asserts that spatial bytes remain
+read-only.
+
+The focused text test passed. A scoped run against the full app library suite
+caught all 11 generated editability mutations, with no misses, timeouts or
+unviable changes. The clean strict runner passed 131 selected contracts across
+11 suites with no missing suites at source
+`70206f6fb9a5ce9901ffe4552743e63730100fe0`. Evidence:
+`target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json`
+and `target/quality/20260929T214023821465Z-values/report.json`.
+
+B3 remains open.

@@ -1821,14 +1821,26 @@ test registered in the isolated-test inventory at clean commit
 `target/quality/20260929T190108119267Z-layers/report.json`. Scoped mutation testing of the
 bytes-specific editability guard caught both generated mutations. A broader
 mutation pass also exercised primary-key, generated-column, auto-increment and
-`mixed` guards; its five survivors were the unconditional read-only result and
-those four unrelated guards, outside this spatial-byte contract. Evidence:
+`mixed` guards; it left five stricter-read-only survivors because this test only
+asserted the spatial refusal. The unignored positive control
+`ordinary_text_columns_remain_editable` now verifies regular VARCHAR columns
+remain editable, alongside the existing unit contract that spatial values stay
+read-only. The full app-library mutation rerun caught all 11 generated
+editability mutations, with no survivors, timeouts or unviable mutants. Evidence:
 `target/quality/20260929-mysql-spatial-ui-guard-mutants/mutants.out/outcomes.json`
-and `target/quality/20260929-mysql-spatial-ui-mutants/mutants.out/outcomes.json`.
+`target/quality/20260929-mysql-spatial-ui-mutants/mutants.out/outcomes.json`,
+and `target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json`.
+The strict runner passed 131 selected contracts on clean source
+`70206f6fb9a5ce9901ffe4552743e63730100fe0`, with no missing suites:
+`target/quality/20260929T214023821465Z-values/report.json` (`dirty: false`).
 Installed-app acceptance and server-backed grid interaction remain open.
 
 ```sh
 rtk proxy python3 scripts/run-test-layer.py widgets
+rtk cargo test -p tablepro-app --lib ordinary_text_columns_remain_editable
+rtk cargo test -p tablepro-app --lib mysql_bit_and_spatial_cells_follow_their_decoded_value_contract
+rtk mkdir -p target/mutation-tmp-20260929-grid-editability
+TMPDIR=$PWD/target/mutation-tmp-20260929-grid-editability CARGO_TARGET_DIR=$PWD/target rtk cargo mutants --dir . --package tablepro-app --file crates/app/src/ui/grid/presentation.rs --re 'column_is_editable' --test-tool cargo --timeout 60 --build-timeout 180 --output target/quality/20260929-grid-editability-positive-control-mutants-final -- --lib
 ```
 
 ## SQLite dynamic storage-class checkpoint
