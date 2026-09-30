@@ -16,6 +16,8 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
+#[path = "support/datetimeoffset_csv.rs"]
+mod datetimeoffset_csv;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
 
@@ -1145,11 +1147,11 @@ async fn value_contract_datetimeoffset_keeps_its_offset_through_results_paramete
             .await
             .unwrap();
     }
-    let rows = conn
+    let source = conn
         .query("SELECT id, zoned FROM zoned_source ORDER BY id")
         .await
-        .unwrap()
-        .rows;
+        .unwrap();
+    let rows = source.rows.clone();
     let decoded: Vec<Value> = rows.iter().map(|row| row[1].clone()).collect();
     let expected: Vec<Value> = ZONED_STAMPS.iter().map(|stamp| Value::Text((*stamp).into())).collect();
     assert_eq!(decoded, expected);
@@ -1170,4 +1172,5 @@ async fn value_contract_datetimeoffset_keeps_its_offset_through_results_paramete
     let total = Value::Int(ZONED_STAMPS.len() as i64);
     assert_eq!(zoned_copies_matching(conn.as_ref(), "zoned_bound").await, total);
     assert_eq!(zoned_copies_matching(conn.as_ref(), "zoned_exported").await, total);
+    datetimeoffset_csv::assert_csv_round_trip(conn.as_ref(), &source).await;
 }

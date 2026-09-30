@@ -68,6 +68,32 @@ The integrated strict shared-values runner also passed all 135 selected tests
 across GTK, DuckDB, all eight drivers and MCP, with no missing suites:
 [`20260930T002923239431Z-values/report.json`](../target/quality/20260930T002923239431Z-values/report.json).
 
+## SQL Server datetimeoffset CSV import, 2026-10-01
+
+A failing-first extension to the live `datetimeoffset(7)` contract reproduced a
+CSV import failure: SQL Server's space-separated timestamp with a numeric UTC
+offset was rejected as `NotATimestamp`. Parsing it as the shared UTC-normalized
+`TimestampTz` value would also discard the original stored offset. The CSV type
+classifier now keeps `datetimeoffset` as exact text. A core test pins all seven
+fractional digits and the `+05:30` offset.
+
+The Docker-backed driver contract now checks exact JSON output, CSV export and
+production CSV import, then inserts the imported values using native bound
+parameters. An independent SQL Server query compares both the instant and
+`DATEPART(TZOFFSET, ...)` with the source for five offsets, including calendar
+extremes. The focused test passed after first reproducing the failure. Scoped
+mutation testing of `temporal_kind` caught 4 of 5 generated mutations; one was
+unviable, with no missed or timed-out mutants. The strict runner passed 165
+selected tests across all 11 suites:
+[`20260930T230409137178Z-values/report.json`](../target/quality/20260930T230409137178Z-values/report.json).
+The quick layer also passed after the documentation update:
+[`20260930T231132409175Z-layers/report.json`](../target/quality/20260930T231132409175Z-layers/report.json).
+
+```sh
+rtk cargo test -p tablepro-core --lib import::cell::tests::value_contract_mssql_datetimeoffset_csv_cells_preserve_the_original_offset_and_scale -- --exact
+rtk cargo test -p tablepro-driver-mssql --test integration value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports -- --include-ignored --exact --test-threads=1
+```
+
 ## DuckDB zero-row result metadata, 2026-09-28
 
 A local DuckDB query selects a `HUGEINT` and `VARCHAR` under `WHERE false`.

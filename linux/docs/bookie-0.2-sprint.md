@@ -70,6 +70,16 @@ semantics and MongoDB mixed-type editing. Audit first; do not silently remove
 those targets to mark B3 done. Close B3 only when each in-scope contract has
 explicit evidence and outstanding correctness findings are resolved.
 
+### B3 continuation — SQL Server datetimeoffset CSV, 2026-10-01
+
+A live failing-first regression found CSV import rejected SQL Server's
+space-separated `datetimeoffset(7)` values. Import now retains them as exact
+text so the original UTC offset is not normalized away. The core classifier
+regression and Docker-backed JSON/CSV export-import contract pass; the driver
+contract checks the stored instant and offset against SQL Server. See the
+[value-contract evidence](value-contracts.md#sql-server-datetimeoffset-csv-import-2026-10-01).
+The full strict values layer and quick gate passed; B3 remains open.
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the

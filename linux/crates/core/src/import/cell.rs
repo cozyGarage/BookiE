@@ -118,7 +118,13 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
 }
 
 fn temporal_kind(base: &str, lowered: &str) -> Option<ColumnKind> {
-    if base.contains("timestamptz") || lowered.contains("with time zone") || base.contains("datetimeoffset") {
+    // SQL Server datetimeoffset stores the original UTC offset as part of the
+    // value. Value::TimestampTz normalizes offsets to UTC, so CSV import must
+    // retain this native type as exact text for a lossless bound insert.
+    if base.contains("datetimeoffset") {
+        return Some(ColumnKind::Text);
+    }
+    if base.contains("timestamptz") || lowered.contains("with time zone") {
         return Some(ColumnKind::TimestampTz);
     }
     if base.contains("timestamp") || base.contains("datetime") {
@@ -413,6 +419,16 @@ mod tests {
             .expect("float8[] CSV cells remain exact text");
 
         assert_eq!(values, vec![Value::Text(row[0].clone())]);
+    }
+
+    #[test]
+    fn value_contract_mssql_datetimeoffset_csv_cells_preserve_the_original_offset_and_scale() {
+        let columns = vec![column("zoned", "datetimeoffset(7)")];
+        let original = "2024-01-02 03:04:05.1234567 +05:30";
+        let row = vec![original.to_owned()];
+        let values = row_to_values(&row, &[Some(0)], &columns, &CsvImportOptions::default(), 2).unwrap();
+
+        assert_eq!(values, vec![Value::Text(original.into())]);
     }
 
     #[test]
