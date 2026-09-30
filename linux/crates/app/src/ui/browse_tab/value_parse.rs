@@ -450,5 +450,9 @@ mod tests;
 mod mysql_integer_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/postgres_array_contract.rs"]
+mod postgres_array_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mongodb_nested_edit_contract.rs"]
 mod mongodb_nested_edit_contract;
