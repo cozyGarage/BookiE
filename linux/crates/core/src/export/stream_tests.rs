@@ -1,5 +1,6 @@
 use super::*;
 use crate::export::test_support::column;
+use crate::export::{CsvDecimal, CsvDelimiter, render_csv};
 use std::io;
 
 struct Sink {
@@ -69,6 +70,45 @@ fn value_contract_text_exports_retry_interruptions_and_complete_short_writes() {
         render(format, &mut actual).unwrap();
         assert_eq!(actual.bytes, expected, "{format:?}");
         assert!(String::from_utf8(actual.bytes).unwrap().contains("東京"), "{format:?}");
+    }
+}
+
+#[test]
+fn value_contract_streamed_csv_matches_renderer_with_and_without_header() {
+    let columns = vec![column("value"), column("note")];
+    let rows = vec![vec![
+        Value::Decimal("12.30".parse().unwrap()),
+        Value::Text("東京;line\nbreak".into()),
+    ]];
+
+    for header_row in [true, false] {
+        let options = CsvOptions {
+            delimiter: CsvDelimiter::Semicolon,
+            decimal: CsvDecimal::Comma,
+            line_break_to_space: true,
+            header_row,
+            ..CsvOptions::default()
+        };
+        let expected = render_csv(&columns, &rows, &options);
+        let data = QueryResult {
+            columns: columns.clone(),
+            rows: rows.clone(),
+            truncated: false,
+        };
+        let export = ResultExport {
+            format: ResultFormat::Csv,
+            csv: &options,
+            sql: None,
+        };
+        let mut writer = writer_for(&export, &data).unwrap();
+        let mut actual = Vec::new();
+        writer.begin(&mut actual, &data.columns).unwrap();
+        for (index, row) in data.rows.iter().enumerate() {
+            writer.write_row(&mut actual, index, row).unwrap();
+        }
+        writer.finish(&mut actual).unwrap();
+
+        assert_eq!(actual, expected.as_bytes(), "header_row={header_row}");
     }
 }
 

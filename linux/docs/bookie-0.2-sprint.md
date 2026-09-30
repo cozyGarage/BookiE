@@ -1735,6 +1735,17 @@ and `target/quality/20260930T130050566423Z-layers/report.json`. The strict
 shared-value layer passed 145 tests across 11 suites with GTK and DuckDB enabled
 and no missing suites: `target/quality/20260930T130742944866Z-values/report.json`.
 
+The follow-up CSV writer audit closed two more export misses: streamed file
+output now matches the in-memory renderer with headers on and off, and the plain
+RFC header writer preserves formula-like column names without sanitization.
+Focused tests passed; the scoped writer/header mutation run caught 5/6 mutants,
+with the remaining `header_row` deletion classified as equivalent. See the
+[CSV writer evidence](value-contracts.md#csv-export-quoting-and-decimal-comma-contracts-2026-09-30).
+The current strict value layer passes 146 tests across all 11 suites with GTK
+and DuckDB enabled and no missing suites; the quick layer passes as well. Reports:
+`target/quality/20260930T132204286258Z-values/report.json` and
+`target/quality/20260930T131958872775Z-layers/report.json`.
+
 Hosted Linux test-quality run `36705047234` completed with failure on base
 `8ed0f66`: eight broad mutation shards failed because viable mutants survived;
 the failure was reported rather than skipped. Its artifacts were reviewed and

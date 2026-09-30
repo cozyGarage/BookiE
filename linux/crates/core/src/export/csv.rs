@@ -298,6 +298,16 @@ mod tests {
     }
 
     #[test]
+    fn rfc4180_csv_header_keeps_formula_like_column_names_unchanged() {
+        let columns = vec![column("=expression"), column("+label")];
+        let mut output = Vec::new();
+
+        write_csv_header(&mut output, &columns).unwrap();
+
+        assert_eq!(output, b"=expression,+label\n");
+    }
+
+    #[test]
     fn the_plain_csv_writers_keep_formula_text_and_render_null_as_an_empty_field() {
         let mut buf = Vec::new();
         write_csv_row(&mut buf, &[Value::Text("=SUM(A1)".into()), Value::Null]).unwrap();

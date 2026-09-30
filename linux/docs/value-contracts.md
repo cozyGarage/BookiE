@@ -2873,8 +2873,26 @@ deletes `header_row` from the RFC 4180 row-writer options; this is equivalent
 because `csv_row_line` never reads that option. Evidence:
 `target/quality/20260930-csv-export-contract-mutants/mutants.out/outcomes.json`.
 
+The streaming/file writer now compares directly with `render_csv` for both
+header modes, including comma-decimal, delimiter quoting and line-break
+replacement. A separate RFC 4180 header case keeps formula-like column names
+unchanged. These regressions caught surviving mutations that omitted CSV
+headers or enabled formula sanitization in the plain header writer. The
+combined writer/header mutation run caught 5 of 6 mutants with no timeouts or
+unviable cases; its only survivor deletes `header_row` from RFC row options,
+which is equivalent for row rendering. Evidence:
+`target/quality/20260930-csv-stream-and-rfc-mutants/mutants.out/outcomes.json`.
+The current strict value-contract run passed 146 tests across all 11 selected
+suites with GTK and DuckDB enabled, no missing suites, 709 fresh artifacts and
+17 rebuilt packages. The quick layer also passed. Reports:
+`target/quality/20260930T132204286258Z-values/report.json` and
+`target/quality/20260930T131958872775Z-layers/report.json`.
+
 ```sh
 rtk cargo test --locked -p tablepro-core --lib export::csv::tests
+rtk cargo test --locked -p tablepro-core --lib value_contract_streamed_csv_matches_renderer_with_and_without_header
+rtk cargo test --locked -p tablepro-core --lib rfc4180_csv_header_keeps_formula_like_column_names_unchanged
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/csv.rs --re 'CsvWriter|rfc4180_options' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-csv-stream-and-rfc-mutants -- --lib -- --test-threads=1
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/csv.rs --re 'is_plain_decimal|escape_csv_field' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-csv-export-contract-mutants -- --lib -- --test-threads=1
 ```
 
