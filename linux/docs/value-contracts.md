@@ -2500,3 +2500,23 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --
 ```
 
 The focused ClickHouse 24.8 Docker contract passed.
+
+## DuckDB unsigned boundaries and mixed interval signs, 2026-09-30
+
+The native DuckDB result contract now covers UBIGINT values immediately above
+`i64::MAX` and at `u64::MAX`, checking the native type and exact server text as
+well as SQL literal and bound-text round trips. The interval contract covers all
+eight sign combinations across months, days and microseconds; each case checks
+the decoded text, native type, `VARCHAR`, independent `date_part` values, SQL
+literal re-import and explicitly cast parameter re-import. The existing decoder
+unit contract separately refuses synthetic sub-microsecond interval payloads.
+
+Both focused integration cases passed. Mutation testing ran the decoder's unit
+and integration suites together: 11 mutants caught, one unviable, no missed or
+timed out mutants. The report is
+`target/quality/20260930-duckdb-native-values-mutants-with-unit/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_scalar_hugeints_preserve_exact_text_across_consumers -- --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_all_component_signs_round_trip_as_exact_text -- --exact --test-threads=1
+```

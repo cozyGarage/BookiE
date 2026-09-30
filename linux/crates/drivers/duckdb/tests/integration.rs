@@ -406,6 +406,8 @@ async fn value_contract_scalar_hugeints_preserve_exact_text_across_consumers() {
     for (kind, text) in [
         ("HUGEINT", "-170141183460469231731687303715884105728"),
         ("HUGEINT", "170141183460469231731687303715884105727"),
+        ("UBIGINT", "9223372036854775808"),
+        ("UBIGINT", "18446744073709551615"),
         ("UHUGEINT", "340282366920938463463374607431768211455"),
     ] {
         let result = connection
@@ -472,6 +474,120 @@ async fn value_contract_interval_components_round_trip_as_exact_text() {
         .await
         .unwrap();
     assert_eq!(bound_round_trip.rows, vec![vec![value.clone()]]);
+}
+
+#[tokio::test]
+async fn value_contract_interval_all_component_signs_round_trip_as_exact_text() {
+    let connection = native_connection().await;
+    let cases = [
+        (
+            -1,
+            -2,
+            -3,
+            "-1 month -2 days -3 microseconds",
+            "-1 month -2 days -00:00:00.000003",
+        ),
+        (
+            -1,
+            -2,
+            3,
+            "-1 month -2 days 3 microseconds",
+            "-1 month -2 days 00:00:00.000003",
+        ),
+        (
+            -1,
+            2,
+            -3,
+            "-1 month 2 days -3 microseconds",
+            "-1 month 2 days -00:00:00.000003",
+        ),
+        (
+            -1,
+            2,
+            3,
+            "-1 month 2 days 3 microseconds",
+            "-1 month 2 days 00:00:00.000003",
+        ),
+        (
+            1,
+            -2,
+            -3,
+            "1 month -2 days -3 microseconds",
+            "1 month -2 days -00:00:00.000003",
+        ),
+        (
+            1,
+            -2,
+            3,
+            "1 month -2 days 3 microseconds",
+            "1 month -2 days 00:00:00.000003",
+        ),
+        (
+            1,
+            2,
+            -3,
+            "1 month 2 days -3 microseconds",
+            "1 month 2 days -00:00:00.000003",
+        ),
+        (
+            1,
+            2,
+            3,
+            "1 month 2 days 3 microseconds",
+            "1 month 2 days 00:00:00.000003",
+        ),
+    ];
+
+    for (months, days, micros, expected_text, expected_native_text) in cases {
+        let source = connection
+            .query(&format!(
+                "SELECT value, typeof(value), value::VARCHAR, \
+                        date_part('month', value)::INTEGER, date_part('day', value)::INTEGER, \
+                        date_part('microsecond', value)::BIGINT \
+                 FROM (SELECT to_months({months}) + to_days({days}) + to_microseconds({micros}) AS value)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            source.rows,
+            vec![vec![
+                Value::Text(expected_text.into()),
+                Value::Text("INTERVAL".into()),
+                Value::Text(expected_native_text.into()),
+                Value::Int(months),
+                Value::Int(days),
+                Value::Int(micros),
+            ]],
+            "months={months}, days={days}, micros={micros}"
+        );
+
+        let value = &source.rows[0][0];
+        let literal = tablepro_core::sql_literal::render_sql_literal("duckdb", value).unwrap();
+        let literal_round_trip = connection
+            .query(&format!(
+                "SELECT typeof(CAST({literal} AS INTERVAL)), CAST({literal} AS INTERVAL)"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            literal_round_trip.rows,
+            vec![vec![Value::Text("INTERVAL".into()), value.clone()]],
+            "SQL literal lost a component sign for months={months}, days={days}, micros={micros}"
+        );
+
+        let bound_round_trip = connection
+            .query_params(
+                "SELECT typeof(CAST(? AS INTERVAL)), CAST(? AS INTERVAL)",
+                &[value.clone(), value.clone()],
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            bound_round_trip.rows,
+            vec![vec![Value::Text("INTERVAL".into()), value.clone()]],
+            "bound text lost a component sign for months={months}, days={days}, micros={micros}"
+        );
+    }
 }
 
 #[tokio::test]
