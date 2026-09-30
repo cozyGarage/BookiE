@@ -995,9 +995,10 @@ No production mismatch was found.
 The workbook regression writes a nested value containing Decimal128, binary
 subtype and millisecond-date Extended JSON markers. It inspects the generated
 XLSX shared-string cell and confirms the markers remain in one exact text cell.
-The focused regression and all 436 core library tests passed. This verifies the
-shared XLSX writer boundary; it does not yet run MongoDB values through the
-application's complete query-to-workbook path.
+The focused regression and all 436 core library tests passed. At this
+checkpoint, it verified the shared XLSX writer boundary. A later MongoDB 7
+integration regression now exercises actual driver query results through XLSX;
+see [MongoDB nested BSON and native boundary checkpoint](#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 Validation: 415 core tests, core/workspace Clippy, size guards and `cargo deny
 check` passed. The full local gate passed at
@@ -2369,6 +2370,26 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --tes
 ```
 
 The focused MongoDB 7 Docker contract passed.
+
+### Generic BSON binary grid editing, 2026-09-30
+
+A native MongoDB 7 regression reads a top-level Generic-subtype binary field as
+editable `Value::Bytes`, builds the keyed update, and writes different bytes
+including NUL and invalid UTF-8. A separate MongoDB client confirms both the
+persisted bytes and Generic subtype; the driver then reads back the same byte
+sequence. This confirms exact editing for this binary subtype without
+converting it to display text or canonical JSON.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::value_contract_generic_binary_grid_edit_preserves_native_bson -- --ignored --exact --test-threads=1
+```
+
+The focused Docker test passed. Mutation testing of `value_to_bson` first found
+ten viable survivors in the naive/UTC date millisecond-alignment guards. A unit
+contract now checks exact millisecond bindings and refusal of one-nanosecond
+sub-millisecond values for both variants; the rerun caught all 11 generated
+mutants, with no misses, timeouts or unviable mutants:
+`target/quality/20260930-mongodb-value-to-bson-mutants-final/mutants.out/outcomes.json`.
 
 ### MongoDB negative Decimal128 CSV formula marker
 

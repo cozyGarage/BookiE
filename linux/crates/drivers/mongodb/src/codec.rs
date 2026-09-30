@@ -252,6 +252,35 @@ mod tests {
     use mongodb::bson::doc;
 
     #[test]
+    fn mongodb_date_grid_bindings_refuse_submillisecond_rounding() {
+        use chrono::{NaiveDate, TimeZone, Utc};
+        use mongodb::bson::DateTime;
+
+        let date = NaiveDate::from_ymd_opt(2026, 9, 30).unwrap();
+        let aligned = date.and_hms_nano_opt(12, 34, 56, 123_000_000).unwrap();
+        let submillisecond = date.and_hms_nano_opt(12, 34, 56, 123_000_001).unwrap();
+        assert_eq!(
+            value_to_bson(&Value::DateTime(aligned)).unwrap(),
+            Bson::DateTime(DateTime::from_millis(aligned.and_utc().timestamp_millis()))
+        );
+        assert!(matches!(
+            value_to_bson(&Value::DateTime(submillisecond)),
+            Err(DriverError::Unsupported(_))
+        ));
+
+        let aligned_tz = Utc.timestamp_opt(1_790_769_296, 123_000_000).unwrap();
+        let submillisecond_tz = Utc.timestamp_opt(1_790_769_296, 123_000_001).unwrap();
+        assert_eq!(
+            value_to_bson(&Value::TimestampTz(aligned_tz)).unwrap(),
+            Bson::DateTime(DateTime::from_millis(aligned_tz.timestamp_millis()))
+        );
+        assert!(matches!(
+            value_to_bson(&Value::TimestampTz(submillisecond_tz)),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
+
+    #[test]
     fn mixed_scalar_bson_column_keeps_canonical_type_markers() {
         let decimal = "12345678901234567890.1234567890123"
             .parse::<mongodb::bson::Decimal128>()

@@ -732,6 +732,78 @@ async fn value_contract_db_pointer_grid_edit_preserves_native_bson() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_generic_binary_grid_edit_preserves_native_bson() {
+    use mongodb::bson::{Binary, Bson, doc, oid::ObjectId, spec::BinarySubtype};
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("binary_grid_edits");
+    let row_id = ObjectId::new();
+    collection
+        .insert_one(doc! {
+            "_id": row_id,
+            "payload": Binary { subtype: BinarySubtype::Generic, bytes: vec![0, 255, 65] },
+        })
+        .await
+        .expect("seed generic BSON binary");
+
+    let connection = MongodbDriver
+        .connect(super::opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.binary_grid_edits.find({})")
+        .await
+        .expect("read before edit");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let payload_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "payload")
+        .unwrap();
+    assert_eq!(before.columns[payload_index].data_type, "binData");
+    assert_eq!(before.rows[0][payload_index], Value::Bytes(vec![0, 255, 65]));
+
+    let edited = vec![255, 0, 66, 128];
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "binary_grid_edits",
+        &before.columns,
+        &[(payload_index, Value::Bytes(edited.clone()))],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build generic binary grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply generic binary grid edit");
+
+    let after = connection
+        .query("db.binary_grid_edits.find({})")
+        .await
+        .expect("read after edit");
+    assert_eq!(after.rows[0][payload_index], Value::Bytes(edited.clone()));
+    let persisted = collection
+        .find_one(doc! { "_id": row_id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("source document exists");
+    assert_eq!(
+        persisted.get("payload"),
+        Some(&Bson::Binary(Binary {
+            subtype: BinarySubtype::Generic,
+            bytes: edited,
+        }))
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_object_id_grid_edit_preserves_native_bson() {
     use mongodb::bson::{Bson, doc, oid::ObjectId};
 
