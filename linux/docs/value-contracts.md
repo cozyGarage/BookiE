@@ -3238,3 +3238,24 @@ After adding this contract, the full DuckDB crate passed 42 tests and the strict
 GTK+DuckDB runner passed all 160 selected tests across 11 suites, including 21
 DuckDB contracts:
 [`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).
+
+## MySQL spatial grid edit refusal, 2026-09-30
+
+The grid's GTK path rendered spatial bytes read-only, but direct driver-aware
+edit parsing still accepted text for those same columns. A failing-first parser
+contract reproduced this for `geometry`; it now requires refusal for all eight
+MySQL spatial types. The Docker-backed app contract creates GEOMETRY, POINT and
+MULTIPOLYGON rows, verifies native geometry type/WKT/HEX values, tries each
+spatial edit through the parser, and confirms the native values and both row
+identities remain unchanged.
+
+Scoped mutation testing of `parse_mysql_spatial_input` caught two mutants; one
+was unviable, with no missed or timed-out mutants. The strict GTK+DuckDB runner
+passed all 162 selected tests across 11 suites, including the new parser and
+live-server app contracts:
+[`20260930T203202118084Z-values/report.json`](../target/quality/20260930T203202118084Z-values/report.json).
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_spatial_parser_refuses_lossy_text_edits -- --nocapture
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_spatial_grid_refusal_preserves_native_bytes -- --include-ignored --test-threads=1
+```

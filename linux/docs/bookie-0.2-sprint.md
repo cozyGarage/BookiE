@@ -1806,3 +1806,16 @@ contracts:
 [`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).
 The quick layer also passed formatting, Clippy, unit and sandbox gates:
 [`20260930T200925216322Z-layers/report.json`](../target/quality/20260930T200925216322Z-layers/report.json).
+
+### MySQL spatial grid refusal — September 30
+
+A failing-first parser test showed that a direct edit request for MySQL
+`GEOMETRY` was parsed as text even though the GTK cell is read-only. The
+driver-aware parser now refuses all eight MySQL spatial types. A live MySQL
+contract verifies geometry types, WKT and stored HEX values for GEOMETRY, POINT
+and MULTIPOLYGON, then checks those values and both row identities remain
+unchanged after the refusal path. The focused parser and Docker cases passed.
+Scoped mutation testing caught two changes to the spatial guard; one was
+unviable, with no survivors or timeouts. The strict GTK+DuckDB layer passed 162
+tests across 11 suites:
+[`20260930T203202118084Z-values/report.json`](../target/quality/20260930T203202118084Z-values/report.json).

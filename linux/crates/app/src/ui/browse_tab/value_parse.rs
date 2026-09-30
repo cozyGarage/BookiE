@@ -53,6 +53,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     {
         return result;
     }
+    if let Some(result) = parse_mysql_spatial_input(col, driver_id) {
+        return result;
+    }
     if driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type)) {
         if matches!(trimmed, "NaN" | "Infinity" | "-Infinity") {
             return Ok(Value::Text(trimmed.into()));
@@ -76,6 +79,26 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    if driver_id != "mysql" {
+        return None;
+    }
+    let data_type = col?.data_type.trim().to_ascii_lowercase();
+    let base = data_type.split('(').next()?.trim();
+    matches!(
+        base,
+        "geometry"
+            | "point"
+            | "linestring"
+            | "polygon"
+            | "multipoint"
+            | "multilinestring"
+            | "multipolygon"
+            | "geometrycollection"
+    )
+    .then(|| Err(crate::tr!("MySQL spatial values cannot be edited losslessly")))
 }
 
 fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, String>> {
@@ -496,6 +519,10 @@ mod tests;
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mysql_spatial_contract.rs"]
+mod mysql_spatial_contract;
 
 #[cfg(test)]
 #[path = "../../../tests/support/postgres_array_contract.rs"]

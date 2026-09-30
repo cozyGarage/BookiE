@@ -196,6 +196,14 @@ before requiring `Undecodable` output and refusal by SQL-literal and parameter
 consumers. Other nested collection combinations remain open; this does not
 claim general nested unsigned support.
 
+### MySQL spatial grid refusal — September 30
+
+All eight MySQL spatial column types now have driver-aware parser refusal
+coverage. A native MySQL contract verifies type, WKT and stored HEX values for
+GEOMETRY, POINT and MULTIPOLYGON and confirms the refused edit leaves both rows
+unchanged. GTK-level read-only behavior remains covered separately; installed
+GTK-to-MySQL acceptance and other SQL-mode cases remain open.
+
 ## Test workflow
 
 1. Add a failing native-engine or decoder reproducer. Record the failure before
