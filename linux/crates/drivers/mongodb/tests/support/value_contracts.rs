@@ -375,6 +375,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             "symbol": mongodb::bson::Bson::Symbol("before".into()),
             "floor": mongodb::bson::Bson::MinKey,
             "ceiling": mongodb::bson::Bson::MaxKey,
+            "uuid_binary": Binary { subtype: BinarySubtype::Uuid, bytes: (0..16).collect() },
         })
         .await
         .expect("seed editable nested document");
@@ -428,6 +429,12 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         .position(|column| column.name == "ceiling")
         .unwrap();
     assert_eq!(before.columns[max_key_index].data_type, "maxkey");
+    let uuid_binary_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "uuid_binary")
+        .unwrap();
+    assert_eq!(before.columns[uuid_binary_index].data_type, "binData");
 
     let edited = serde_json::json!({
         "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
@@ -444,6 +451,9 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     let edited_symbol = serde_json::json!({"$symbol": "after"});
     let edited_min_key = serde_json::json!({"$minKey": 1});
     let edited_max_key = serde_json::json!({"$maxKey": 1});
+    let edited_uuid_binary = serde_json::json!({
+        "$binary": { "base64": "EBESExQVFhcYGRobHB0eHw==", "subType": "04" }
+    });
     let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
         "mongodb",
         Some("appdb"),
@@ -458,6 +468,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
             (symbol_index, Value::Json(edited_symbol.clone())),
             (min_key_index, Value::Json(edited_min_key)),
             (max_key_index, Value::Json(edited_max_key)),
+            (uuid_binary_index, Value::Json(edited_uuid_binary.clone())),
         ],
         &[before.rows[0][id_index].clone()],
     )
@@ -475,6 +486,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     assert_eq!(after.rows[0][items_index], Value::Json(edited_items));
     assert_eq!(after.rows[0][script_index], Value::Json(edited_script));
     assert_eq!(after.rows[0][symbol_index], Value::Json(edited_symbol));
+    assert_eq!(after.rows[0][uuid_binary_index], Value::Json(edited_uuid_binary));
 
     let persisted = client
         .database("appdb")
@@ -519,6 +531,13 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
     );
     assert_eq!(persisted.get("floor"), Some(&mongodb::bson::Bson::MinKey));
     assert_eq!(persisted.get("ceiling"), Some(&mongodb::bson::Bson::MaxKey));
+    assert_eq!(
+        persisted.get("uuid_binary"),
+        Some(&mongodb::bson::Bson::Binary(Binary {
+            subtype: BinarySubtype::Uuid,
+            bytes: (16..32).collect(),
+        }))
+    );
     assert_eq!(
         persisted.get_array("items").unwrap(),
         &vec![mongodb::bson::Bson::Document(doc! { "ordinal": 7_i64 })]

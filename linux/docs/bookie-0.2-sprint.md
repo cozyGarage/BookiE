@@ -1173,6 +1173,19 @@ and acceptance gaps remain open.
 
 B3 remains open.
 
+### MongoDB UUID binary grid edit — September 30
+
+The MongoDB coverage audit found that the matrix claimed a UUID subtype `04`
+grid edit, but the server-backed edit was absent. The existing special-value
+keyed-update contract now edits a top-level UUID binary field and verifies the
+canonical Extended JSON result plus native `BinarySubtype::Uuid` and all 16
+bytes through an independent client. The focused test and complete MongoDB
+Docker integration suite passed (24 tests). The matrix now marks UUID subtype
+editing as covered; collection-wide heterogeneity and remaining unnamed BSON
+kinds are still open.
+
+B3 remains open.
+
 ### MongoDB BSON DateTime grid-edit precision — September 29
 
 A failing-first app parser test showed that MongoDB `date` cells display RFC3339

@@ -2391,6 +2391,18 @@ sub-millisecond values for both variants; the rerun caught all 11 generated
 mutants, with no misses, timeouts or unviable mutants:
 `target/quality/20260930-mongodb-value-to-bson-mutants-final/mutants.out/outcomes.json`.
 
+### MongoDB UUID binary grid editing, 2026-09-30
+
+The existing Generic-subtype edit did not prove subtype-04 UUID binary editing.
+The native-server nested/special-value edit contract now changes a top-level
+UUID binary field through the keyed update path. A MongoDB client independently
+checks that subtype `Uuid` and all 16 bytes survive, while a driver query checks
+the canonical Extended JSON value. The focused Docker integration test passed:
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson -- --include-ignored --exact --test-threads=1
+```
+
 ### MongoDB negative Decimal128 CSV formula marker
 
 The default CSV exporter prefixes negative text cells with an apostrophe to
