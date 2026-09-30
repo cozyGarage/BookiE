@@ -1701,10 +1701,32 @@ exponent text. The focused suite passed 16 tests; scoped mutation testing caught
 does not consult that option. Details and reproducible commands are in the
 [value-contract ledger](value-contracts.md#csv-export-quoting-and-decimal-comma-contracts-2026-09-30).
 
-The existing full six-driver Docker integration run at base `8ed0f66` passed
-219 tests and includes connection loss, mid-stream loss, and reconnect/recovery
-coverage across ClickHouse, MongoDB, SQL Server, MySQL, PostgreSQL and Redis.
-The run is recorded in the [disconnect coverage evidence](value-contracts.md#redis-disconnect-classification-2026-09-30)
-and layer report `target/quality/20260930T110146955489Z-layers/report.json`.
-No driver code changed in this follow-up; hosted Linux test-quality run
-`36705047234` remains queued on the same base and its result is not green evidence.
+The full Docker-backed integration layer passed again on exact commit `8680cc0`
+in 930.5 seconds with a clean worktree and no failed or ignored executed tests.
+This layer includes whole-query failure on loss during active row streams or
+cursor reads, plus same-pool recovery for PostgreSQL and MySQL and fresh
+connection recovery for MongoDB, across all six server drivers. The same run
+also passed the real-MongoDB MCP browse round trip and BSON Extended JSON
+re-import with a native BSON oracle. Evidence is
+`target/quality/20260930T122803925695Z-layers/report.json` and
+[`drivers-1.log`](../target/quality/20260930T122803925695Z-layers/drivers-1.log);
+the older base run remains at `target/quality/20260930T110146955489Z-layers/report.json`.
+The per-driver contracts are recorded in the [PostgreSQL](value-contracts.md#postgresql-server-termination-and-pool-recovery-2026-09-29),
+[MySQL](value-contracts.md#mysql-mid-stream-disconnect-completeness-2026-09-30),
+[MongoDB](value-contracts.md#mongodb-transport-disconnect-classification-2026-09-30),
+[Redis](value-contracts.md#redis-disconnect-classification-2026-09-30),
+[ClickHouse](value-contracts.md#clickhouse-row-stream-interruption-completeness-2026-09-30),
+and [SQL Server](value-contracts.md#sql-server-disconnect-delivery-2026-09-30) entries.
+
+The strict shared-value layer also passed 144 tests across all 11 selected
+suites with GTK and DuckDB enabled, no missing suites, 709 fresh artifacts and
+17 rebuilt packages (17.3 seconds compile). It ran at revision `8680cc0` with
+documentation-only edits present. Evidence:
+`target/quality/20260930T124658464646Z-values/report.json`. The CSV export case
+and quick layer passed separately at this revision; the quick report is
+`target/quality/20260930T122453423577Z-layers/report.json`.
+
+Hosted Linux test-quality run `36705047234` is still in progress on the older
+base `8ed0f66`; some mutation jobs failed and the SSH mutation job remains
+active. It is not green evidence, and the authorized push remains pending its
+completion.

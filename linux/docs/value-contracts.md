@@ -403,6 +403,34 @@ Reports:
 [`20260930T021134930354Z-layers/report.json`](../target/quality/20260930T021134930354Z-layers/report.json)
 and [`20260930T020929420585Z-layers/report.json`](../target/quality/20260930T020929420585Z-layers/report.json).
 
+The integrated layer passed again on exact commit
+`8680cc0d38a917218163eaf3ce9fe4b9c190a6da`: 930.5 seconds, exit code 0, clean
+worktree. All six server-driver suites, the real-MongoDB MCP browse round trip,
+Extended JSON BSON re-import, PostgreSQL socket tests and SSH fixtures passed;
+no executed suite failed or ignored a test. The report and complete test log are
+[`20260930T122803925695Z-layers/report.json`](../target/quality/20260930T122803925695Z-layers/report.json)
+and [`drivers-1.log`](../target/quality/20260930T122803925695Z-layers/drivers-1.log).
+`scripts/ci-local.sh integration` activates the ignored MCP fixture explicitly;
+the direct rerun also passed:
+
+```sh
+rtk cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --exact mongodb_extended_json_survives_the_mcp_query_tool_round_trip --test-threads=1
+```
+
+The same integrated layer passed again on exact commit `8680cc0d38a917218163eaf3ce9fe4b9c190a6da`:
+930.5 seconds, exit code 0, clean worktree. Its six server-driver suites,
+MCP's real-MongoDB `browse_table` round trip, Extended JSON BSON re-import,
+PostgreSQL socket tests and SSH fixtures all passed with no failed or ignored
+executed tests. The report and complete command/test log are
+[`20260930T122803925695Z-layers/report.json`](../target/quality/20260930T122803925695Z-layers/report.json)
+and [`drivers-1.log`](../target/quality/20260930T122803925695Z-layers/drivers-1.log).
+The MCP fixture is enabled explicitly by `scripts/ci-local.sh integration`; its
+standalone reproduction is:
+
+```sh
+rtk cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --exact mongodb_extended_json_survives_the_mcp_query_tool_round_trip --test-threads=1
+```
+
 On September 30, the full Docker-backed `drivers` layer was rerun at source SHA
 `8ed0f66ed54b1411feaac5d7a8e49abc6999fb18`. It ran 219 tests with zero failures
 or ignored tests in the executed suites in 939.7 seconds. The six server-driver
