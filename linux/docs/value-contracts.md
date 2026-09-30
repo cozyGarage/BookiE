@@ -2365,6 +2365,11 @@ cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_numeric
 The mapped change-contract gate passed this exact app regression at
 `target/quality/20260928T130321776497Z-change-contracts/report.json`.
 
+The CSV import contract also checks the integer-form text `42`: SQLite stores
+it as INTEGER in INTEGER and NUMERIC columns, and as REAL in the REAL column.
+Together with `42.50` and nonnumeric text, this pins the three storage outcomes
+after policy-guarded import; the focused Docker-free test passed.
+
 ## MongoDB nested BSON and native boundary checkpoint
 
 A decoder unit regression first failed for nested `Decimal128`, binary and date

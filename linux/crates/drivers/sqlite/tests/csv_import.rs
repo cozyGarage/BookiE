@@ -331,7 +331,7 @@ async fn csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities
     let plan = plan_for(
         "flexible",
         &columns,
-        b"integer_value,real_value,numeric_value\nnot numeric,not numeric,not numeric\n42.50,42.50,42.50\n",
+        b"integer_value,real_value,numeric_value\nnot numeric,not numeric,not numeric\n42.50,42.50,42.50\n42,42,42\n",
     );
     let mut scope = begin(&fixture.guard, "flexible", &plan).await;
     run_batches(&fixture.guard, &mut scope, "flexible", &plan, None)
@@ -343,7 +343,7 @@ async fn csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities
         .await
         .expect("finish");
 
-    assert_eq!(committed, 2);
+    assert_eq!(committed, 3);
     assert_eq!(
         rows_in(
             &fixture.guard,
@@ -360,6 +360,11 @@ async fn csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities
                 Value::Text("real".into()), Value::Float(42.5),
                 Value::Text("real".into()), Value::Float(42.5),
                 Value::Text("real".into()), Value::Float(42.5),
+            ],
+            vec![
+                Value::Text("integer".into()), Value::Int(42),
+                Value::Text("real".into()), Value::Float(42.0),
+                Value::Text("integer".into()), Value::Int(42),
             ],
         ]
     );
