@@ -128,6 +128,27 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_single_row_json_export_preserves_value_types() {
+        let columns = vec![column("id"), column("payload"), column("enabled"), column("note")];
+        let row = vec![
+            Value::Int(9_007_199_254_740_993),
+            Value::Json(serde_json::json!({"$numberDecimal": "1234567890123456789.123456789012345"})),
+            Value::Bool(true),
+            Value::Null,
+        ];
+
+        assert_eq!(
+            row_to_json(&columns, &row),
+            serde_json::json!({
+                "id": 9_007_199_254_740_993_i64,
+                "payload": {"$numberDecimal": "1234567890123456789.123456789012345"},
+                "enabled": true,
+                "note": null,
+            })
+        );
+    }
+
+    #[test]
     fn value_contract_json_keeps_booleans_distinct_from_text_and_null() {
         let columns = vec![column("value")];
         let rows = vec![

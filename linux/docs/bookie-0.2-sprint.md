@@ -1726,7 +1726,20 @@ documentation-only edits present. Evidence:
 and quick layer passed separately at this revision; the quick report is
 `target/quality/20260930T122453423577Z-layers/report.json`.
 
-Hosted Linux test-quality run `36705047234` is still in progress on the older
-base `8ed0f66`; some mutation jobs failed and the SSH mutation job remains
-active. It is not green evidence, and the authorized push remains pending its
-completion.
+A second B3 export audit found the public single-row JSON renderer was not
+called by the existing `render_json` assertions. The new direct contract checks
+a wide integer, canonical Decimal128 JSON marker, boolean and SQL NULL. It
+caught both scoped `row_to_json` mutants; the focused test and quick layer pass.
+Evidence and commands are in the [value ledger](value-contracts.md#single-row-json-export-2026-09-30)
+and `target/quality/20260930T130050566423Z-layers/report.json`. The strict
+shared-value layer passed 145 tests across 11 suites with GTK and DuckDB enabled
+and no missing suites: `target/quality/20260930T130742944866Z-values/report.json`.
+
+Hosted Linux test-quality run `36705047234` completed with failure on base
+`8ed0f66`: eight broad mutation shards failed because viable mutants survived;
+the failure was reported rather than skipped. Its artifacts were reviewed and
+the B3-specific misses addressed here have focused catch evidence. The updated
+hosted run `36718134597` is queued on `d385041` (the just-pushed baseline before
+the direct `row_to_json` case); Build Linux is still running and Linux Security
+has passed. The working-tree JSON case has local quick and mutation evidence;
+it still needs a hosted run after it is committed and pushed.

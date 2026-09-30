@@ -2877,3 +2877,21 @@ because `csv_row_line` never reads that option. Evidence:
 rtk cargo test --locked -p tablepro-core --lib export::csv::tests
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/csv.rs --re 'is_plain_decimal|escape_csv_field' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-csv-export-contract-mutants -- --lib -- --test-threads=1
 ```
+
+### Single-row JSON export, 2026-09-30
+
+The public `row_to_json` consumer now has its own direct contract. It compares a
+wide integer above 2^53, a BSON Decimal128 Extended JSON marker, a boolean and
+SQL NULL with the expected JSON object. This closes a mutation survivor where
+`row_to_json` could return an empty/default JSON value while `render_json`
+tests still passed. The focused test passed, and its scoped mutation run caught
+both generated mutations with no misses, timeouts or unviable cases. The strict
+shared-value layer then passed 145 tests across 11 suites with GTK and DuckDB
+enabled and no missing suites; the quick layer also passed. The strict report is
+`target/quality/20260930T130742944866Z-values/report.json`. Evidence:
+`target/quality/20260930-single-row-json-mutants/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib value_contract_single_row_json_export_preserves_value_types
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/json.rs --re 'row_to_json' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-single-row-json-mutants -- --lib -- --test-threads=1
+```
