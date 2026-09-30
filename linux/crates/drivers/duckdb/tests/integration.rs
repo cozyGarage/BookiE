@@ -969,3 +969,80 @@ async fn value_contract_bound_timestamptz_keeps_its_instant_in_any_session_zone(
         }
     }
 }
+
+#[tokio::test]
+async fn temporal_filter_parameters_keep_duckdb_column_precision_end_to_end() {
+    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+
+    let connection = native_connection().await;
+    connection
+        .execute("CREATE TABLE filter_ms (value TIMESTAMP_MS); INSERT INTO filter_ms VALUES (TIMESTAMP_MS '2026-09-30 12:34:56.123'), (TIMESTAMP_MS '2026-09-30 12:34:56.124')")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "filter_ms").await.unwrap();
+    assert_eq!(columns[0].data_type.to_ascii_lowercase(), "timestamp_ms");
+
+    let lossy = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("2026-09-30 12:34:56.123000001".into())),
+        }],
+        ..Default::default()
+    };
+    assert!(build_filter_where("duckdb", &columns, &lossy).is_err());
+
+    let exact = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("2026-09-30 12:34:56.123000000".into())),
+        }],
+        ..Default::default()
+    };
+    let (predicate, params) = build_filter_where("duckdb", &columns, &exact).unwrap().unwrap();
+    let result = connection
+        .query_params(
+            &format!("SELECT typeof(value), CAST(value AS VARCHAR) FROM filter_ms WHERE {predicate}"),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("TIMESTAMP_MS".into()),
+            Value::Text("2026-09-30 12:34:56.123".into())
+        ]]
+    );
+
+    connection
+        .execute("CREATE TABLE filter_ns (value TIMESTAMP_NS); INSERT INTO filter_ns VALUES (TIMESTAMP_NS '2026-09-30 12:34:56.123456789')")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "filter_ns").await.unwrap();
+    assert_eq!(columns[0].data_type.to_ascii_lowercase(), "timestamp_ns");
+    let exact = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("2026-09-30 12:34:56.123456789".into())),
+        }],
+        ..Default::default()
+    };
+    let (predicate, params) = build_filter_where("duckdb", &columns, &exact).unwrap().unwrap();
+    let result = connection
+        .query_params(
+            &format!("SELECT typeof(value), CAST(value AS VARCHAR) FROM filter_ns WHERE {predicate}"),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("TIMESTAMP_NS".into()),
+            Value::Text("2026-09-30 12:34:56.123456789".into())
+        ]]
+    );
+}

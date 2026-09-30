@@ -1772,3 +1772,12 @@ sandbox tests:
 [`20260930T192142875147Z-layers/report.json`](../target/quality/20260930T192142875147Z-layers/report.json).
 Hosted CI must be checked again on the correction commit; the earlier hosted
 failure is not treated as green.
+
+The accepted DuckDB filter values are now exercised against embedded DuckDB,
+using native `TIMESTAMP_MS` and `TIMESTAMP_NS` schema metadata and actual bound
+predicates. The millisecond comparison returns only the matching row; the
+sub-millisecond predicate refuses before query execution; the nanosecond
+predicate matches the exact nine-digit value through the driver's text
+fallback. The focused engine contract passed. This extends the shared filter
+unit and mutation evidence to the native consumer path; the broader B3 matrix
+and hosted gates remain open.
