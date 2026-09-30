@@ -504,13 +504,19 @@ remain read-only and late fields use their observed metadata. Schema discovery
 for documents outside the sample and returned page is still not exhaustive.
 
 The regression tests cover the Mongo page-schema handoff, preservation of
-non-Mongo behavior and same-width type-change invalidation. The app library
-passed 405 tests (10 ignored) and the widget layer passed. Scoped mutation
-testing caught 6 mutants; 3 were unviable, with no missed or timed-out mutants.
+non-Mongo behavior and same-width type-change invalidation. A follow-up now
+feeds the effective page schema into the actual cell editability predicate: a
+text cell stays editable under the sampled string schema, but becomes read-only
+when the current page reports `mixed`. The latest app library run passed 408
+tests (12 ignored). A scoped in-place mutation run against the page-schema
+handoff caught all 3 viable mutations; 3 whole-function replacements were
+unviable, with no survivors or timeouts.
 
 ```sh
 rtk cargo test --locked -p tablepro-app --lib browse_tab::tests -- --nocapture
+rtk cargo test --locked -p tablepro-app --lib mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing -- --test-threads=1
 rtk cargo test --locked -p tablepro-app --lib
+rtk cargo mutants --dir linux --in-place --package tablepro-app --file crates/app/src/ui/browse_tab/mod.rs --re 'columns_for_browse_page' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-mongodb-page-editability-mutants-inplace -- --lib mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing -- --test-threads=1
 rtk python3 scripts/run-test-layer.py widgets
 ```
 

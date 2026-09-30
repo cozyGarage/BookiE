@@ -76,6 +76,12 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
         !column_layout_matches(&loaded, &effective),
         "new page metadata must rebuild cached factories and editability"
     );
+    let text_value = Value::Text("ordinary text on the mixed page".into());
+    assert!(crate::ui::grid::cell_allows_inline_edit(&loaded[1], &text_value));
+    assert!(
+        !crate::ui::grid::cell_allows_inline_edit(&effective[1], &text_value),
+        "page-discovered mixed BSON types must make the same text cell read-only"
+    );
 }
 
 #[test]
