@@ -24,7 +24,17 @@ exec sleep 300
 "#;
 
 fn process_alive(pid: u32) -> bool {
-    Path::new(&format!("/proc/{pid}")).exists()
+    std::fs::read_to_string(format!("/proc/{pid}/stat")).is_ok_and(|stat| process_stat_is_alive(&stat))
+}
+
+fn process_stat_is_alive(stat: &str) -> bool {
+    // The command name is parenthesized and can itself contain spaces or ')'.
+    // State is the first field after the final ')'; a killed but unreaped
+    // child remains under /proc as a zombie and is already dead for this test.
+    let Some((_, fields)) = stat.rsplit_once(") ") else {
+        return false;
+    };
+    !matches!(fields.split_whitespace().next(), Some("Z" | "X"))
 }
 
 fn wait_for(timeout: Duration, mut check: impl FnMut() -> bool) -> bool {
@@ -119,4 +129,12 @@ fn killing_the_parent_process_takes_the_ssh_master_down_with_it() {
         wait_for(Duration::from_secs(10), || !process_alive(master_pid)),
         "the ssh master must die when its parent is killed"
     );
+}
+
+#[test]
+fn proc_zombies_are_not_reported_as_live_ssh_masters() {
+    assert!(process_stat_is_alive("91 (ssh master) S 1 2 3 4"));
+    assert!(!process_stat_is_alive("91 (ssh master) Z 1 2 3 4"));
+    assert!(!process_stat_is_alive("91 (ssh master) X 1 2 3 4"));
+    assert!(!process_stat_is_alive("malformed stat"));
 }
