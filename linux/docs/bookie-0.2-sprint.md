@@ -1173,6 +1173,21 @@ and acceptance gaps remain open.
 
 B3 remains open.
 
+### MongoDB browse-page schema reaches the grid — September 30
+
+The MongoDB driver merges the first-50 schema sample with fields and types in
+the returned page, marking conflicting BSON types as `mixed`. The browse UI
+previously kept using the earlier `ColumnsLoaded` sample for its editability
+metadata, so fields first seen on later pages and mixed-type columns could be
+displayed with stale edit behavior. The current page's metadata now drives the
+grid and schema-dependent filters. Cached column factories rebuild whenever
+metadata changes, including a type change that leaves the column count alone.
+Regression tests cover late fields, mixed types, non-Mongo schema stability and
+same-width metadata changes. The app library and widget layers passed; scoped
+mutation testing caught 6 mutants, with 3 unviable and none missed or timed out.
+This fixes page-scoped metadata propagation; exhaustive collection-wide schema
+discovery remains open. B3 remains open.
+
 ### MongoDB UUID binary grid edit — September 30
 
 The MongoDB coverage audit found that the matrix claimed a UUID subtype `04`

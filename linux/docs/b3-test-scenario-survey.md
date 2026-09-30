@@ -123,7 +123,10 @@ field—has since been closed by `value_contract_object_id_grid_edit_preserves_n
 It keeps `_id` stable, reloads the edited `$oid`, and checks the stored BSON type
 through an independent client. The clean strict report shows this test among
 MongoDB's eight selected contracts. Collection-wide heterogeneity and other
-unnamed top-level edits remain open; see the updated
+unnamed top-level edits remain open. Returned-page metadata now reaches the
+browse grid, so late fields and mixed types update editability and rebuild
+factories even when the number of columns is unchanged; whole-collection
+schema discovery remains outside this page-scoped contract. See the updated
 [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 The same follow-up found that BSON `date` values display RFC3339 text but the

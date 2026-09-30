@@ -20,6 +20,24 @@ const DEFAULT_PAGE_SIZE: u64 = 1_000;
 /// "Delete N items?" pattern.
 const BULK_DELETE_CONFIRM_THRESHOLD: usize = 10;
 
+/// MongoDB is schemaless: fetch_rows returns the union of the first-50 sample
+/// and the current page, with conflicting BSON kinds marked `mixed`. Use that
+/// page schema for rendering and edits so late fields/types do not inherit the
+/// stale metadata from the initial collection sample.
+pub(super) fn columns_for_browse_page(
+    driver_id: &str,
+    loaded_columns: &[ColumnInfo],
+    page: Option<&QueryResult>,
+) -> Vec<ColumnInfo> {
+    if driver_id == "mongodb"
+        && let Some(page) = page
+        && !page.columns.is_empty()
+    {
+        return page.columns.clone();
+    }
+    loaded_columns.to_vec()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BrowsePageRequest {
     pub id: Uuid,
@@ -124,12 +142,10 @@ pub struct BrowseTab {
     /// on every `RowsLoaded`. Used by the inline-Insert flow to
     /// scroll-to-and-focus the freshly-prepended draft row.
     current_column_view: Option<gtk::ColumnView>,
-    /// Column count at the time `current_column_view` was last built.
-    /// `render_grid_if_ready` compares this to `current_columns.len()`
-    /// to decide whether the cached view can be reused or needs a
-    /// full rebuild. Within a single tab the count never changes
-    /// after the first ColumnsLoaded; mismatch implies cold-path.
-    rendered_column_count: std::cell::Cell<usize>,
+    /// Column metadata used when the live factories were last built.
+    /// Type and editability changes can require a rebuild even when the
+    /// number of columns stays the same (for example, MongoDB page types).
+    rendered_columns: Vec<ColumnInfo>,
     /// Persistent-state banners (per HIG: banners for state, toasts
     /// for events). Pending-changes is communicated through the
     /// ActionBar footer + tab-title bullet, not a banner — the banner
@@ -872,7 +888,7 @@ impl SimpleComponent for BrowseTab {
             inner_stack,
             grid_holder,
             current_column_view: None,
-            rendered_column_count: std::cell::Cell::new(0),
+            rendered_columns: Vec::new(),
             read_only_banner,
             no_pk_banner,
             was_dirty: std::cell::Cell::new(false),
@@ -947,6 +963,7 @@ impl SimpleComponent for BrowseTab {
                 if result.columns.is_empty() && !self.current_columns.is_empty() {
                     result.columns = self.current_columns.clone();
                 }
+                self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
                 self.keyset_cursor = extract_keyset_cursor(&self.current_columns, &result);
                 self.current_result = Some(result);
                 // Defer rendering until columns are also loaded — the
@@ -959,6 +976,7 @@ impl SimpleComponent for BrowseTab {
                 self.render_grid_if_ready(sender);
             }
             BrowseTabInput::ColumnsLoaded(columns) => {
+                let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_ref());
                 let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
                 self.current_columns = columns.clone();
                 // Late-arriving columns: if RowsLoaded already cached a

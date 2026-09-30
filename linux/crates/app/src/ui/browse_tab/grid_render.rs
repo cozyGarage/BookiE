@@ -5,6 +5,10 @@ use tablepro_core::QueryResult;
 
 use super::*;
 
+pub(super) fn column_layout_matches(rendered: &[ColumnInfo], current: &[ColumnInfo]) -> bool {
+    rendered == current
+}
+
 impl BrowseTab {
     pub(super) fn list_store(&self) -> Option<gtk::gio::ListStore> {
         let selection = self.current_selection.as_ref()?;
@@ -255,7 +259,7 @@ impl BrowseTab {
         );
         self.current_selection = Some(selection);
         self.current_column_view = Some(column_view.clone());
-        self.rendered_column_count.set(self.current_columns.len());
+        self.rendered_columns.clone_from(&self.current_columns);
 
         // Selection-changed signal updates the count badge and the
         // Delete button's tooltip live. The new MultiSelection is a
@@ -290,13 +294,11 @@ impl BrowseTab {
         let _ = sender.output(BrowseTabOutput::StateChanged);
     }
 
-    /// True when the cached `ColumnView` is structurally compatible
-    /// with `current_columns` and can have its data swapped without a
-    /// full rebuild. Within a single tab this is always true after
-    /// the first render — `current_columns` only mutates on
-    /// ColumnsLoaded, which fires once per (table, connection) open.
+    /// True when the cached `ColumnView` uses the current column metadata.
+    /// A type or editability change requires new factories even if the count
+    /// stays fixed.
     pub(super) fn column_view_matches_current_columns(&self) -> bool {
-        self.current_column_view.is_some() && self.rendered_column_count.get() == self.current_columns.len()
+        self.current_column_view.is_some() && column_layout_matches(&self.rendered_columns, &self.current_columns)
     }
 
     /// Replace the rows in the existing `ListStore` without touching

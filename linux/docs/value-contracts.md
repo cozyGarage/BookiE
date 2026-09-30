@@ -449,6 +449,29 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test 
 
 The focused SQL Server Docker contract passed.
 
+## MongoDB page metadata and grid editability, 2026-09-30
+
+MongoDB's `fetch_rows` returns page columns formed from the first-50 sample
+and the current page; conflicting observed BSON kinds are labeled `mixed`.
+The browse UI previously retained only the earlier `ColumnsLoaded` columns,
+leaving grid factories and schema-dependent filters with stale metadata. It now
+uses page columns for the active result, keeps the initial metadata for drivers
+whose page results omit columns, and rebuilds factories when any `ColumnInfo`
+changes, even when the column count is unchanged. This ensures mixed columns
+remain read-only and late fields use their observed metadata. Schema discovery
+for documents outside the sample and returned page is still not exhaustive.
+
+The regression tests cover the Mongo page-schema handoff, preservation of
+non-Mongo behavior and same-width type-change invalidation. The app library
+passed 405 tests (10 ignored) and the widget layer passed. Scoped mutation
+testing caught 6 mutants; 3 were unviable, with no missed or timed-out mutants.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib browse_tab::tests -- --nocapture
+rtk cargo test --locked -p tablepro-app --lib
+rtk python3 scripts/run-test-layer.py widgets
+```
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
