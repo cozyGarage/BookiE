@@ -473,6 +473,14 @@ mod tests {
             let bits = (state & !(0x7ff_u64 << 52)) | (exponent << 52);
             expected.push(f64::from_bits(bits));
         }
+        let mantissas = [0, 1, 1 << 51, (1 << 52) - 2, (1 << 52) - 1];
+        for sign in [0, 1_u64 << 63] {
+            for exponent in 0..0x7ff_u64 {
+                for mantissa in mantissas {
+                    expected.push(f64::from_bits(sign | (exponent << 52) | mantissa));
+                }
+            }
+        }
         let rows = expected
             .iter()
             .map(|value| vec![Value::Float(*value)])

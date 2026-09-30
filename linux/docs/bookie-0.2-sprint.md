@@ -1115,6 +1115,16 @@ Open findings from the audit:
 
 B3 remains open.
 
+The same exponent/mantissa-boundary values were added to the CSV typed
+export/import corpus: 262 seeded values plus 20,480 deterministic boundary
+values (20,742 total) preserve their `f64` bits through both CSV re-import and
+JSON parse. The focused test passed. This closes the prior sampled-only claim
+for those exponent bands; unenumerated mantissas remain open.
+
+```sh
+rtk cargo test --locked -p tablepro-core value_contract_csv_and_json_round_trip_seeded_finite_float_bits
+```
+
 ### PostgreSQL server disconnect classification — September 29
 
 A failing-first PostgreSQL 16 Docker test terminated an active query backend.
