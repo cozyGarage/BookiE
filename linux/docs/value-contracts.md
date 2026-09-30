@@ -156,6 +156,19 @@ The clean strict runner passed 131 selected tests across 11 suites at source
 `064b4947d07d4fddbc2a210c0d658f62cef59805`; no suites were missing:
 `target/quality/20260929T211702925065Z-values/report.json` (`dirty: false`).
 
+### MySQL mid-stream disconnect completeness, 2026-09-30
+
+A Docker regression streams 100 rows with a short delay per row, waits until
+MySQL reports the query active, then kills its connection after row production
+has begun. The driver must return `Disconnected` for the whole query, not a
+partial result, and the pool must complete a fresh `SELECT 1`. The focused
+integration test passed locally: 1 test passed. Cross-driver mid-stream coverage
+remains open for the other remote engines.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mysql --test integration backend_loss_during_row_stream_fails_the_whole_query_as_disconnected -- --ignored --exact --test-threads=1
+```
+
 ### MySQL TLS error classification, 2026-09-30
 
 The full TLS fixture exposed a second MySQL I/O classification case: SQLx wraps

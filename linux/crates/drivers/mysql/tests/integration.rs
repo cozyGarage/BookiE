@@ -124,6 +124,63 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() {
+    let (_container, opts) = start_mysql().await;
+    let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.expect("connect").into();
+    let observer = connect(opts).await;
+    let tag = "tablepro_mysql_midstream_backend_termination";
+    let running = connection.clone();
+    let task = tokio::spawn(async move {
+        running
+            .query(&format!(
+                "WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM seq WHERE n < 100) \
+                 SELECT n, SLEEP(0.05) FROM seq /* {tag} */"
+            ))
+            .await
+    });
+
+    let mut connection_id = None;
+    for _ in 0..100 {
+        let result = observer
+            .query(&format!(
+                "SELECT ID FROM information_schema.PROCESSLIST WHERE INFO LIKE '%{tag}%' AND ID <> CONNECTION_ID()"
+            ))
+            .await
+            .expect("inspect active streaming query");
+        connection_id = result.rows.first().and_then(|row| match row.first() {
+            Some(Value::Int(id)) => Some(*id),
+            _ => None,
+        });
+        if connection_id.is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    let connection_id = connection_id.expect("tagged streaming query must reach MySQL");
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    observer
+        .execute(&format!("KILL CONNECTION {connection_id}"))
+        .await
+        .expect("terminate streaming query connection");
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .expect("interrupted row stream must not hang")
+        .expect("query task")
+        .expect_err("interrupted row stream must not return a partial result");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "mid-stream backend loss must be reported as disconnected, got {error:?}"
+    );
+    let recovered = connection
+        .query("SELECT 1")
+        .await
+        .expect("pool recovers after stream loss");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_restarted_mysql_server_restores_the_existing_pool() {
     let port_probe = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("reserve test port");
     let host_port = port_probe.local_addr().expect("test port address").port();
