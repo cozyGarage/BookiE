@@ -832,22 +832,27 @@ fn map_tiberius_error(err: tiberius::error::Error) -> DriverError {
     match err {
         E::Io { .. } => DriverError::Disconnected,
         E::Tls(msg) => DriverError::Tls(msg),
-        E::Server(token) => {
-            // 18456 = "Login failed for user"; surface as an auth failure so
-            // the UI shows the right remediation instead of a raw SQL error.
-            if token.code() == 18456 {
-                DriverError::AuthFailed
-            } else {
-                DriverError::Query {
-                    message: token.message().to_string(),
-                    sqlstate: Some(token.state().to_string()),
-                }
-            }
-        }
+        E::Server(token) => map_server_error(token.code(), token.message(), token.state()),
         #[cfg(feature = "kerberos")]
         E::Gssapi(detail) => DriverError::IntegratedAuth(detail),
         E::Routing { host, port } => DriverError::Internal(format!("server requested routing to {host}:{port}")),
         other => DriverError::Internal(other.to_string()),
+    }
+}
+
+fn map_server_error(code: u32, message: &str, state: u8) -> DriverError {
+    match code {
+        // Surface login failure as an auth error so the UI shows the right
+        // remediation instead of a raw SQL error.
+        18456 => DriverError::AuthFailed,
+        // SQL Server emits 596 after the session is killed during result
+        // streaming. The socket may remain open, but the session cannot
+        // deliver the rest of the result.
+        596 => DriverError::Disconnected,
+        _ => DriverError::Query {
+            message: message.to_string(),
+            sqlstate: Some(state.to_string()),
+        },
     }
 }
 

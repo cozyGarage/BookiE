@@ -161,7 +161,7 @@ fn write_and_replace(temp_path: &Path, path: &Path, bytes: &[u8]) -> Result<(), 
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
+    use std::process::{Command, Stdio};
     use std::time::{Duration, Instant};
 
     use tempfile::TempDir;
@@ -180,6 +180,8 @@ mod tests {
             .env("TABLEPRO_LOCK_TEST_PATH", &path)
             .env("TABLEPRO_LOCK_TEST_MARKER", &first_marker)
             .env("TABLEPRO_LOCK_TEST_HOLD_MS", "500")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .unwrap();
         wait_for_path(&first_marker);
@@ -188,6 +190,8 @@ mod tests {
             .env("TABLEPRO_LOCK_TEST_PATH", &path)
             .env("TABLEPRO_LOCK_TEST_MARKER", &second_marker)
             .env("TABLEPRO_LOCK_TEST_HOLD_MS", "0")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .spawn()
             .unwrap();
 

@@ -330,6 +330,24 @@ rtk cargo test --locked -p tablepro-driver-mssql --test integration a_lost_sql_s
 
 The focused SQL Server server-loss/restart test passed.
 
+A second Docker contract interrupts a multi-result stream after its first row
+set has arrived, while the server is in `WAITFOR`. SQL Server returns TDS error
+596 (session is in the kill state) when the stream is drained. The mapper
+previously surfaced this terminal session failure as an ordinary query error;
+it now reports `Disconnected`. The test requires the query to fail as a whole,
+then restarts SQL Server and verifies a fresh `SELECT 1`. A unit contract keeps
+596 distinct from login failure and ordinary SQL errors. All 32 library tests
+and the complete SQL Server integration suite passed (31 tests, including the
+Docker cases; 147 seconds). The mapper mutation run caught both viable
+match-arm mutations; one whole-function mutant was unviable, with no missed or
+timed-out mutants:
+`target/quality/20260930-mssql-terminal-session-map-mutants/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mssql --test integration server_loss_during_multi_result_stream_rejects_the_whole_query -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mssql --lib terminal_session_kill_is_disconnected_but_sql_errors_are_preserved
+```
+
 ## Connect refusal versus established disconnect, 2026-09-30
 
 Native-driver checks against unused local TCP ports cover PostgreSQL, MySQL,
@@ -345,11 +363,14 @@ endpoint test supplies its native-driver check.
 The focused checks passed for all five shared-helper callers; MongoDB's existing
 unused-port test remains in the driver's integration suite. The initial failing
 PostgreSQL and MySQL runs reproduced the incorrect `Disconnected` classification.
-Scoped mutation runs caught both viable changes to the setup-time timeout
-predicate in each driver. The first function-wide mutation was unviable because
-`DriverError` has no `Default`; the predicate-scoped reruns are the retained
-mutation evidence:
-`target/quality/20260930-pg-connect-refusal-predicate-final/mutants.out/outcomes.json`
+Scoped mutation runs caught both generated changes to the setup-time timeout
+predicate in PostgreSQL and MySQL. An earlier PostgreSQL broad test run missed
+the `true` mutant because no `PoolClosed` case distinguished a startup timeout;
+the added unit case now catches it. The final PostgreSQL and MySQL predicate
+runs each caught 2 of 2 mutants. The first function-wide mutation was unviable
+because `DriverError` has no `Default`; the predicate-scoped reruns are the
+retained mutation evidence:
+`target/quality/20260930-pg-connect-refusal-predicate-mutants-final/mutants.out/outcomes.json`
 and `target/quality/20260930-mysql-connect-refusal-predicate-final/mutants.out/outcomes.json`.
 
 ```sh

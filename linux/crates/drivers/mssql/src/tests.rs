@@ -1,6 +1,20 @@
 use super::*;
 
 #[test]
+fn terminal_session_kill_is_disconnected_but_sql_errors_are_preserved() {
+    assert!(matches!(map_server_error(596, "killed", 1), DriverError::Disconnected));
+    assert!(matches!(
+        map_server_error(18456, "login failed", 1),
+        DriverError::AuthFailed
+    ));
+    assert!(matches!(
+        map_server_error(245, "conversion failed", 2),
+        DriverError::Query { message, sqlstate }
+            if message == "conversion failed" && sqlstate.as_deref() == Some("2")
+    ));
+}
+
+#[test]
 fn undecodable_cell_cannot_be_bound_as_null() {
     assert!(matches!(
         boxed_params(&[Value::Undecodable("geometry".into())]),
