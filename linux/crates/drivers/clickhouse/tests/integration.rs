@@ -1,4 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
+
 use chrono::Timelike;
 use drivers_clickhouse::ClickhouseDriver;
 use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
@@ -45,7 +48,7 @@ async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
 #[ignore = "requires docker"]
 async fn a_lost_clickhouse_server_is_reported_as_disconnected() {
     let (container, opts) = start_clickhouse().await;
-    let connection = connect(opts).await;
+    let connection = connect(opts.clone()).await;
     let initial = connection
         .query("SELECT 1")
         .await
@@ -61,6 +64,24 @@ async fn a_lost_clickhouse_server_is_reported_as_disconnected() {
         matches!(error, DriverError::Disconnected),
         "loss of an established ClickHouse server must be reported as disconnected, got {error:?}"
     );
+
+    container.start().await.expect("restart ClickHouse server");
+    let mut replacement_options = opts;
+    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
+    replacement_options.port = container
+        .get_host_port_ipv4(8123)
+        .await
+        .expect("restarted ClickHouse port");
+    let recovered = server_restart::retry_operation("ClickHouse", || {
+        let options = replacement_options.clone();
+        async move {
+            let replacement = ClickhouseDriver.connect(options).await?;
+            replacement.query("SELECT 1").await
+        }
+    })
+    .await
+    .expect("ClickHouse restarts and accepts SELECT 1");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
 }
 
 #[tokio::test]

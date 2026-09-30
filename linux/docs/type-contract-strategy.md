@@ -95,14 +95,16 @@ storage-class/parser/import contracts but installed GTK acceptance is untested.
 
 ### Connection-loss contract update — September 30
 
-At `636584f44f826f7cbcca7087673d53c2a5caa2f9`, Docker-backed tests stop each
-remote server after a successful request and require the next operation on the
-established connection to return `DriverError::Disconnected` for PostgreSQL,
-MySQL, SQL Server, MongoDB, Redis and ClickHouse. PostgreSQL and MySQL also
-verify pool recovery on a new connection. Restart recovery is not yet asserted
-for SQL Server, MongoDB, Redis or ClickHouse. SQLite and DuckDB are local
-engines, so they are not part of this remote-server-loss set. Connect-time
-refusal remains separately classified in driver contracts.
+Docker-backed tests stop each remote server after a successful request and
+require the next operation on the established connection to return
+`DriverError::Disconnected` for PostgreSQL, MySQL, SQL Server, MongoDB, Redis
+and ClickHouse. PostgreSQL and MySQL also verify pool recovery after a query
+terminates a pooled connection. SQL Server, MongoDB, Redis and ClickHouse now
+restart the same container, open a fresh driver connection and require a
+protocol-level operation to succeed. This verifies explicit reconnect after
+restart, not transparent recovery of the previous connection handle. SQLite
+and DuckDB are local engines, so they are not part of this remote-server-loss
+set. Connect-time refusal remains separately classified in driver contracts.
 
 Redis and ClickHouse mapper mutations are retained at
 `target/quality/20260930-redis-disconnect-mutants-final/` and
@@ -115,10 +117,10 @@ missed or timed out; the first run's missed connect-error distinction gained a
 regression before the final run. MySQL and MongoDB disconnect mapper mutation
 evidence is recorded in [value contracts](value-contracts.md).
 
-The remaining delivery gaps are server restart recovery for the four drivers
-above and mid-stream failure, cancellation, completeness and connection-state
-parity across engines. Passing the six initial server-loss cases does not close
-those gaps or the remaining native-type and consumer targets in this matrix.
+Mid-stream failure, cancellation, completeness and connection-state parity
+across engines remain open, as do the native-type and consumer targets in this
+matrix. Passing the server-loss and explicit reconnect cases does not close
+those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is

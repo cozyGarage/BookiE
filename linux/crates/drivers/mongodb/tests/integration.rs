@@ -1,4 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
+
 use drivers_mongodb::MongodbDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::{ContainerAsync, ImageExt};
@@ -73,10 +76,8 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
 #[ignore = "requires docker"]
 async fn a_lost_mongodb_server_is_reported_as_disconnected() {
     let (container, host, port) = start_mongo().await;
-    let connection = MongodbDriver
-        .connect(opts(&host, port, "appdb"))
-        .await
-        .expect("connect");
+    let options = opts(&host, port, "appdb");
+    let connection = MongodbDriver.connect(options.clone()).await.expect("connect");
     connection
         .list_tables()
         .await
@@ -90,6 +91,26 @@ async fn a_lost_mongodb_server_is_reported_as_disconnected() {
     assert!(
         matches!(error, DriverError::Disconnected),
         "loss of an established MongoDB server must be reported as disconnected, got {error:?}"
+    );
+
+    container.start().await.expect("restart MongoDB server");
+    let restarted_host = container.get_host().await.expect("restarted host").to_string();
+    let restarted_port = container
+        .get_host_port_ipv4(27017)
+        .await
+        .expect("restarted MongoDB port");
+    let recovered = server_restart::retry_operation("MongoDB", || {
+        let options = opts(&restarted_host, restarted_port, "appdb");
+        async move {
+            let replacement = MongodbDriver.connect(options).await?;
+            replacement.list_tables().await
+        }
+    })
+    .await
+    .expect("MongoDB restarts and accepts collection listing");
+    assert!(
+        recovered.is_empty(),
+        "the restarted test database should have no collections"
     );
 }
 

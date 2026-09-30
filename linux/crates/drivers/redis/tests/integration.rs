@@ -1,4 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
+
 use drivers_redis::RedisDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};
@@ -29,7 +32,8 @@ async fn start_redis_resp3() -> (ContainerAsync<GenericImage>, String, u16) {
 #[ignore = "requires docker"]
 async fn a_lost_redis_server_is_reported_as_disconnected() {
     let (container, host, port) = start_redis().await;
-    let connection = RedisDriver.connect(opts(&host, port, "0")).await.expect("connect");
+    let options = opts(&host, port, "0");
+    let connection = RedisDriver.connect(options.clone()).await.expect("connect");
     connection
         .query("PING")
         .await
@@ -44,6 +48,20 @@ async fn a_lost_redis_server_is_reported_as_disconnected() {
         matches!(error, DriverError::Disconnected),
         "loss of an established Redis server must be reported as disconnected, got {error:?}"
     );
+
+    container.start().await.expect("restart Redis server");
+    let restarted_host = container.get_host().await.expect("restarted host").to_string();
+    let restarted_port = container.get_host_port_ipv4(6379).await.expect("restarted Redis port");
+    let recovered = server_restart::retry_operation("Redis", || {
+        let options = opts(&restarted_host, restarted_port, "0");
+        async move {
+            let replacement = RedisDriver.connect(options).await?;
+            replacement.query("PING").await
+        }
+    })
+    .await
+    .expect("Redis server restarts and accepts PING");
+    assert_eq!(recovered.rows, vec![vec![Value::Text("PONG".into())]]);
 }
 
 #[tokio::test]

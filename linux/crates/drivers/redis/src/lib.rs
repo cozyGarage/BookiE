@@ -713,8 +713,12 @@ fn map_redis_error_in_context(err: RedisError, connecting: bool, verifies_cert: 
         DriverError::AuthFailed
     } else if verifies_cert && err.is_connection_dropped() {
         DriverError::Tls("certificate hostname mismatch; connection closed during TLS verification".into())
-    } else if !connecting && err.kind() == redis::ErrorKind::Io {
-        DriverError::Disconnected
+    } else if err.kind() == redis::ErrorKind::Io {
+        if connecting {
+            DriverError::ConnectionRefused
+        } else {
+            DriverError::Disconnected
+        }
     } else {
         DriverError::Query {
             message: msg,
@@ -883,6 +887,17 @@ mod tests {
             map_redis_connect_error(err, true),
             DriverError::ConnectionRefused
         ));
+    }
+
+    #[test]
+    fn setup_time_socket_reset_and_broken_pipe_are_connection_refused() {
+        for kind in [std::io::ErrorKind::ConnectionReset, std::io::ErrorKind::BrokenPipe] {
+            let err = RedisError::from(std::io::Error::from(kind));
+            assert!(
+                matches!(map_redis_connect_error(err, false), DriverError::ConnectionRefused),
+                "setup-time {kind:?} must stay distinct from established disconnection"
+            );
+        }
     }
 
     #[test]

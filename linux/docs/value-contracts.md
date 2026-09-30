@@ -183,7 +183,8 @@ error. A local unused-port test checks server-selection failures remain
 `ConnectionRefused`; a Docker-backed wrong-password test verifies
 `AuthFailed`. The Docker-backed server-loss contract connects and performs an
 operation, stops MongoDB, and requires the next operation to return
-`Disconnected`. Pool recovery after the server restarts remains open.
+`Disconnected`. It then restarts the same container and verifies a fresh driver
+connection can list collections.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --lib
@@ -211,15 +212,17 @@ A Docker-backed regression first connected and completed `PING`, stopped the
 Redis server, then required a second command to fail as `Disconnected`. Before
 the fix it returned a generic query error (`broken pipe`). Redis error mapping
 now treats dropped connections, timeouts and I/O errors during established
-operations as `Disconnected`; TLS and authentication checks still run first,
-and connect-time refusal remains `ConnectionRefused`.
+operations as `Disconnected`; TLS and authentication checks still run first.
+Connection refusal, reset and broken pipe during connection setup remain
+`ConnectionRefused`, distinct from an established connection loss. The Docker
+contract now restarts Redis and requires a fresh connection to complete `PING`.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-redis --lib
 rtk cargo test --locked -p tablepro-driver-redis --test integration a_lost_redis_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-All 36 Redis library tests and the Docker server-loss test passed. The first
+All 37 Redis library tests and the Docker server-loss/restart test passed. The first
 copy-based mutation attempt stopped during its clean baseline build because the
 temporary filesystem quota was exhausted; it ran no mutants. An in-place scoped
 run found two survivors caused by redundant checks: in redis 1.7, timeout and
@@ -230,6 +233,10 @@ or timed-out mutants. Reports:
 `target/quality/20260930-redis-disconnect-mutants/mutants.out/outcomes.json`,
 `target/quality/20260930-redis-disconnect-mutants-inplace/mutants.out/outcomes.json`,
 and `target/quality/20260930-redis-disconnect-mutants-final/mutants.out/outcomes.json`.
+The setup-time reset/broken-pipe regression failed before the mapper fix. A
+targeted mutation run of the mapper caught 6 of 7 mutants; one was unviable,
+with no missed or timed-out mutants:
+`target/quality/20260930-redis-startup-disconnect-mutants/mutants.out/outcomes.json`.
 
 ## ClickHouse disconnect classification, 2026-09-30
 
@@ -245,7 +252,7 @@ rtk cargo test --locked -p tablepro-driver-clickhouse --lib
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration a_lost_clickhouse_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-All 39 ClickHouse library tests and the Docker server-loss test passed. The
+All 39 ClickHouse library tests and the Docker server-loss/restart test passed. The
 first scoped mutation run found an uncovered distinction between setup-time
 `connect error` and operation-time refusal. New mapper regressions cover both
 forms, including refusal during an established operation. The rerun caught 4
@@ -258,13 +265,33 @@ and `target/quality/20260930-clickhouse-disconnect-mutants-final/mutants.out/out
 A Docker-backed test completes `SELECT 1`, stops the SQL Server container, then
 requires the next query on the established connection to return `Disconnected`.
 This confirms the driver does not surface server loss as a generic query error.
-Recovery after the server restarts is not asserted by this case.
+The test then restarts the same container, reconnects through the driver and
+requires a fresh `SELECT 1` to succeed.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mssql --test integration a_lost_sql_server_is_reported_as_disconnected -- --ignored --exact --test-threads=1
 ```
 
-The focused SQL Server server-loss test passed.
+The focused SQL Server server-loss/restart test passed.
+
+## Restart recovery across remote drivers, 2026-09-30
+
+The MongoDB, Redis, ClickHouse and SQL Server server-loss tests now restart the
+same Docker container after checking `Disconnected`, refresh the mapped host
+port, and establish a fresh connection through the driver. A bounded shared
+test helper retries only connection refusal, disconnection, timeouts and the
+Redis startup broken-pipe case; each test still requires a protocol-level
+operation to succeed. This proves explicit reconnect after restart; it does not
+claim transparent recovery of the old connection handle.
+
+The complete `drivers` layer passed all 200 selected driver, socket and SSH
+tests at the integrated source. The strict shared-values layer passed 135 tests
+with GTK and DuckDB enabled and no missing suites. The quick layer also passed.
+Evidence:
+[`20260930T010431493880Z-layers/report.json`](../target/quality/20260930T010431493880Z-layers/report.json),
+[`20260930T011850614654Z-layers/report.json`](../target/quality/20260930T011850614654Z-layers/report.json),
+[`20260930T011850675572Z-values/report.json`](../target/quality/20260930T011850675572Z-values/report.json),
+and [`20260930T012435775212Z-layers/report.json`](../target/quality/20260930T012435775212Z-layers/report.json).
 
 ## DuckDB duplicate result column names, 2026-09-28
 

@@ -1,4 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
+
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveTime};
@@ -39,7 +42,7 @@ async fn connect(opts: ConnectOptions) -> Box<dyn Connection> {
 #[ignore = "requires docker"]
 async fn a_lost_sql_server_is_reported_as_disconnected() {
     let (container, opts) = start_mssql().await;
-    let connection = connect(opts).await;
+    let connection = connect(opts.clone()).await;
     let initial = connection
         .query("SELECT 1")
         .await
@@ -55,6 +58,24 @@ async fn a_lost_sql_server_is_reported_as_disconnected() {
         matches!(error, DriverError::Disconnected),
         "loss of an established SQL Server must be reported as disconnected, got {error:?}"
     );
+
+    container.start().await.expect("restart SQL Server");
+    let mut replacement_options = opts;
+    replacement_options.host = container.get_host().await.expect("restarted host").to_string();
+    replacement_options.port = container
+        .get_host_port_ipv4(1433)
+        .await
+        .expect("restarted SQL Server port");
+    let recovered = server_restart::retry_operation("SQL Server", || {
+        let options = replacement_options.clone();
+        async move {
+            let replacement = MssqlDriver.connect(options).await?;
+            replacement.query("SELECT 1").await
+        }
+    })
+    .await
+    .expect("SQL Server restarts and accepts SELECT 1");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
 }
 
 #[tokio::test]
