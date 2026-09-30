@@ -823,6 +823,116 @@ async fn value_contract_generic_binary_grid_edit_preserves_native_bson() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_binary_subtypes_survive_native_grid_edits() {
+    use mongodb::bson::{Binary, Bson, Document, doc, oid::ObjectId, spec::BinarySubtype};
+
+    let subtypes = [
+        ("generic", BinarySubtype::Generic, "00"),
+        ("function", BinarySubtype::Function, "01"),
+        ("binary_old", BinarySubtype::BinaryOld, "02"),
+        ("uuid_old", BinarySubtype::UuidOld, "03"),
+        ("uuid", BinarySubtype::Uuid, "04"),
+        ("md5", BinarySubtype::Md5, "05"),
+        ("encrypted", BinarySubtype::Encrypted, "06"),
+        ("sensitive", BinarySubtype::Sensitive, "08"),
+        ("vector", BinarySubtype::Vector, "09"),
+        ("reserved", BinarySubtype::Reserved(0x0a), "0a"),
+        ("user_defined", BinarySubtype::UserDefined(0x80), "80"),
+    ];
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<Document>("binary_subtype_grid_edits");
+    let row_id = ObjectId::new();
+    let mut seed = doc! { "_id": row_id };
+    for (field, subtype, _) in subtypes {
+        seed.insert(
+            field,
+            Bson::Binary(Binary {
+                subtype,
+                bytes: vec![1, 2, 3],
+            }),
+        );
+    }
+    collection
+        .insert_one(seed)
+        .await
+        .expect("seed every BSON binary subtype");
+
+    let connection = MongodbDriver
+        .connect(super::opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.binary_subtype_grid_edits.find({})")
+        .await
+        .expect("read before edits");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let edited_bytes = vec![0, 255, 65];
+    let edits: Vec<_> = subtypes
+        .iter()
+        .map(|(field, subtype, code)| {
+            let index = before.columns.iter().position(|column| column.name == *field).unwrap();
+            assert_eq!(before.columns[index].data_type, "binData");
+            let value = if *subtype == BinarySubtype::Generic {
+                Value::Bytes(edited_bytes.clone())
+            } else {
+                Value::Json(serde_json::json!({
+                    "$binary": { "base64": "AP9B", "subType": code }
+                }))
+            };
+            (index, value)
+        })
+        .collect();
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "binary_subtype_grid_edits",
+        &before.columns,
+        &edits,
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build one keyed update across binary subtype markers");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply binary subtype grid edits");
+
+    let after = connection
+        .query("db.binary_subtype_grid_edits.find({})")
+        .await
+        .expect("read after edits");
+    let persisted = collection
+        .find_one(doc! { "_id": row_id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("seed row remains present");
+    for (field, subtype, code) in subtypes {
+        let index = after.columns.iter().position(|column| column.name == field).unwrap();
+        let expected = if subtype == BinarySubtype::Generic {
+            Value::Bytes(edited_bytes.clone())
+        } else {
+            Value::Json(serde_json::json!({
+                "$binary": { "base64": "AP9B", "subType": code }
+            }))
+        };
+        assert_eq!(after.rows[0][index], expected, "driver result for {field}");
+        assert_eq!(
+            persisted.get(field),
+            Some(&Bson::Binary(Binary {
+                subtype,
+                bytes: edited_bytes.clone(),
+            })),
+            "native subtype and bytes for {field}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_object_id_grid_edit_preserves_native_bson() {
     use mongodb::bson::{Bson, doc, oid::ObjectId};
 

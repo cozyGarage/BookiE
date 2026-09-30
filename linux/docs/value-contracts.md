@@ -2391,6 +2391,21 @@ sub-millisecond values for both variants; the rerun caught all 11 generated
 mutants, with no misses, timeouts or unviable mutants:
 `target/quality/20260930-mongodb-value-to-bson-mutants-final/mutants.out/outcomes.json`.
 
+### MongoDB binary subtype grid matrix, 2026-09-30
+
+A Docker-backed keyed-edit contract now verifies Generic, Function, BinaryOld,
+UUIDOld, UUID, MD5, Encrypted, Sensitive, Vector, Reserved `0a`, and
+user-defined `80` subtype values. It checks both the canonical driver value and
+the native BSON subtype plus bytes after editing. MongoDB 7 rejects arbitrary
+bytes for Column subtype `07` at insert with `NonConformantBSON` (code 378), so
+that subtype needs a valid BSONColumn payload before it can have a positive grid
+edit oracle; it is not included in this opaque-byte matrix. The focused test
+passed:
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::value_contract_binary_subtypes_survive_native_grid_edits -- --include-ignored --exact --test-threads=1
+```
+
 ### MongoDB UUID binary grid editing, 2026-09-30
 
 The existing Generic-subtype edit did not prove subtype-04 UUID binary editing.

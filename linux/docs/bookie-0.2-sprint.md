@@ -1186,6 +1186,19 @@ kinds are still open.
 
 B3 remains open.
 
+### MongoDB BSON binary subtype contracts — September 30
+
+The follow-up audit extended native-server grid editing across BSON binary
+subtypes. MongoDB 7 confirms exact subtype and edited-byte preservation for
+Generic, Function, BinaryOld, UUIDOld, UUID, MD5, Encrypted, Sensitive, Vector,
+Reserved `0a`, and UserDefined `80`. MongoDB rejects arbitrary bytes for Column
+subtype `07` with `NonConformantBSON` code 378, so valid BSONColumn encoding and
+a positive edit contract remain open. The focused edit test passed. This is a
+native format constraint; do not count the rejection of malformed opaque bytes
+as successful BSONColumn editing.
+
+B3 remains open.
+
 ### MongoDB BSON DateTime grid-edit precision — September 29
 
 A failing-first app parser test showed that MongoDB `date` cells display RFC3339
