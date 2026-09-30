@@ -1499,12 +1499,14 @@ A live ClickHouse 24.8 query showed `DateTime64(0)` accepts the exact endpoint
 `2299-12-31 23:59:59`, while the parameter and SQL-literal helpers always chose
 scale 9 and refused it at the Int64 nanosecond ceiling. The shared temporal
 renderer now picks the coarsest scale that preserves every fractional digit and
-fits the native calendar and Int64 tick range. The value round-trips as a bound
-parameter and SQL literal with an independent millisecond epoch oracle. The
-scale-9 upper boundary and below-1900 refusal remain covered. The first full
+fits the native calendar and Int64 tick range. Native tests prove year-2299
+round trips at scales 0 through 7 through bound parameters and SQL literals,
+with value and millisecond epoch oracles. Unit boundaries cover scale 8, the
+scale-9 upper endpoint and below-1900 refusal. The first full
 suite run caught an obsolete expectation that all values beyond the scale-9
 ceiling must refuse; the corrected test distinguishes explicit scale-9 failure
 from exact scale-0 support. All 33 ClickHouse Docker integration tests passed
 on the final source, as did the core and driver unit suites and quick gate. The
-final scoped scale-range run caught all 16 generated mutations, with no misses
-or timeouts. B3 remains open.
+final scoped scale-range run caught all 16 generated mutations, and the
+scale-selection run caught all 3 generated mutations, with no misses or
+timeouts. B3 remains open.

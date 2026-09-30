@@ -348,6 +348,14 @@ mod tests {
             .unwrap()
             .and_hms_nano_opt(23, 47, 16, 854_775_807)
             .unwrap();
+        let ten_nanos_edge = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_790)
+            .unwrap();
+        let past_nanos_edge = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_808)
+            .unwrap();
         assert_eq!(clickhouse_datetime64_precision(wide), Some(0));
         assert!(!clickhouse_datetime64_fits_precision(wide, 10));
         assert_eq!(
@@ -356,6 +364,8 @@ mod tests {
         );
         assert_eq!(clickhouse_datetime64_precision(fractional), Some(6));
         assert_eq!(clickhouse_datetime64_precision(nanos_edge), Some(9));
+        assert_eq!(clickhouse_datetime64_precision(ten_nanos_edge), Some(8));
+        assert_eq!(clickhouse_datetime64_precision(past_nanos_edge), None);
         assert_eq!(
             clickhouse_datetime64_literal(fractional, Some("UTC")).as_deref(),
             Some("toDateTime64('2026-09-30 12:34:56.123456', 6, 'UTC')")

@@ -2585,14 +2585,18 @@ A ClickHouse 24.8 native query proved that `DateTime64(0)` accepts
 parameter/literal code previously forced scale 9, then refused this value at
 the Int64 nanosecond ceiling. The shared renderer now chooses the coarsest
 scale that preserves every supplied fractional digit and fits the server
-calendar and Int64 ticks. `DateTime64(0)` year 2299 now round-trips through both
-bound parameters and SQL literals. Forcing the same year-2262 value through an
-explicit scale-9 cast still produces a visible server error; timestamps below
-the 1900 calendar bound still refuse locally. The native regression, both
-focused boundary tests, core/driver unit tests, all 33 ClickHouse Docker
-integration tests, and all 16 final-source scale-range mutants passed. Reports:
-`target/quality/20260930-clickhouse-scale-precision-mutants/mutants.out/outcomes.json`
-and `target/quality/20260930-clickhouse-scale-range-mutants-final3/mutants.out/outcomes.json`.
+calendar and Int64 ticks. Year 2299 now round-trips through bound parameters and
+SQL literals at every exact scale from 0 through 7, with native value and epoch
+assertions. Core unit boundaries cover the scale-8 ten-nanosecond edge, the
+scale-9 maximum and the first unrepresentable nanosecond. Forcing a value beyond
+the scale-9 ceiling through an explicit scale-9 cast still produces a visible
+server error; timestamps below the 1900 calendar bound still refuse locally.
+The native regression, both focused boundary tests, core/driver unit tests, all
+33 ClickHouse Docker integration tests, all 16 final-source scale-range mutants
+and all 3 precision-selection mutants passed. Reports:
+`target/quality/20260930-clickhouse-scale-precision-mutants/mutants.out/outcomes.json`,
+`target/quality/20260930-clickhouse-scale-selection-mutants-final/mutants.out/outcomes.json`,
+and `target/quality/20260930-clickhouse-scale-range-mutants-final4/mutants.out/outcomes.json`.
 
 ```sh
 rtk cargo test --locked -p tablepro-core --lib clickhouse_datetime64_literal_uses_the_coarsest_exact_native_precision
