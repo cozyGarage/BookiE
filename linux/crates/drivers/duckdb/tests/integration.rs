@@ -234,6 +234,31 @@ async fn value_contract_submicro_temporals_bind_as_exact_text() {
     );
 }
 
+#[test]
+fn pinned_duckdb_binding_api_truncates_nanosecond_temporals_to_microseconds() {
+    use duckdb::types::{TimeUnit, Value as DuckdbValue};
+
+    let connection = duckdb::Connection::open_in_memory().unwrap();
+    let time = DuckdbValue::Time64(TimeUnit::Nanosecond, 45_296_123_456_789);
+    let timestamp = DuckdbValue::Timestamp(TimeUnit::Nanosecond, 1_790_512_496_123_456_789);
+
+    let (time_type, time_text): (String, String) = connection
+        .query_row("SELECT typeof(?1), CAST(?1 AS VARCHAR)", [&time], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .unwrap();
+    let (timestamp_type, timestamp_text): (String, String) = connection
+        .query_row("SELECT typeof(?1), CAST(?1 AS VARCHAR)", [&timestamp], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .unwrap();
+
+    assert_eq!(time_type, "TIME");
+    assert_eq!(time_text, "12:34:56.123456");
+    assert_eq!(timestamp_type, "TIMESTAMP");
+    assert_eq!(timestamp_text, "2026-09-27 12:34:56.123456");
+}
+
 #[tokio::test]
 async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
     let connection = native_connection().await;

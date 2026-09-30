@@ -2043,6 +2043,18 @@ nanosecond TIMESTAMP, and a nine-digit offset-origin TIMESTAMPTZ. It confirms
 transport preservation and the UTC instant, not native typed binding; callers
 must cast explicitly when using these text parameters in typed expressions.
 
+A companion direct-binding contract uses the pinned `duckdb` crate's own
+`Value::Time64(Nanosecond, ...)` and `Value::Timestamp(Nanosecond, ...)`
+parameters. DuckDB reports native TIME/TIMESTAMP types but returns only the
+first six fractional digits (`12:34:56.123456` and
+`2026-09-27 12:34:56.123456`), proving the crate's nanoseconds-to-microseconds
+conversion is lossy. This is why the adapter retains exact VARCHAR fallback.
+The focused regression passed:
+
+```sh
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration pinned_duckdb_binding_api_truncates_nanosecond_temporals_to_microseconds -- --exact --test-threads=1
+```
+
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_submicro_temporals_bind_as_exact_text -- --exact --test-threads=1
 ```

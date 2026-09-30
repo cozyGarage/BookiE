@@ -1601,3 +1601,18 @@ both generated whole-function literal-renderer mutations, with no missed,
 timed-out or unviable mutants; evidence is in
 `target/quality/20260930-clickhouse-nested-grid-refusal-mutants/mutants.out/outcomes.json`.
 B3 remains open.
+
+### DuckDB nanosecond bind-loss oracle — September 30
+
+A direct embedded-engine test bypasses BookiE's adapter and binds
+`duckdb::types::Value::Time64(Nanosecond, ...)` and `Timestamp(Nanosecond, ...)`
+through the pinned Rust client. The native result remains TIME/TIMESTAMP but
+drops digits after microseconds, confirming the crate binding's conversion is
+lossy. The existing adapter contract separately proves it sends these values
+as exact VARCHAR and preserves every digit; explicit casts remain the caller's
+way to request a typed expression. The focused native regression passed.
+B3 remains open.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration pinned_duckdb_binding_api_truncates_nanosecond_temporals_to_microseconds -- --exact --test-threads=1
+```
