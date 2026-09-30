@@ -185,7 +185,8 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   sibling-row identity; bytea[] verifies escaped byte elements, empty bytes,
   NULL and sibling wire identity; uuid[] verifies array_send equality and
   sibling identity. UUID[] also exposed scalar-parser dispatch on the whole array
-  literal, now fixed by retaining PostgreSQL `[]` metadata as text. The float8[] case also traverses CSV export/import
+  literal, now fixed by retaining PostgreSQL `[]` metadata as text; the parser
+  matrix covers uuid/date/time/numeric/boolean/timestamptz arrays. The float8[] case also traverses CSV export/import
   and a keyed re-edit, with PostgreSQL wire-byte and sibling-row oracles. CSV
   import now keeps array-shaped cells as exact text. Broader array types and
   automatic parameter typing remain open. See the

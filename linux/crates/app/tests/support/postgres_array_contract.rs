@@ -1,4 +1,31 @@
 use super::parse_input_for_driver;
+
+#[test]
+fn postgres_scalar_named_array_types_stay_text_in_the_grid_parser() {
+    for (data_type, literal) in [
+        ("uuid[]", "{550e8400-e29b-41d4-a716-446655440000,NULL}"),
+        ("date[]", "{2026-09-30,NULL}"),
+        ("time[]", "{12:34:56.123456,NULL}"),
+        ("numeric[]", "{1.2300,NULL}"),
+        ("boolean[]", "{true,NULL}"),
+        ("timestamp with time zone[]", "{2026-09-30 12:34:56+00,NULL}"),
+    ] {
+        let column = ColumnInfo {
+            name: "value".into(),
+            data_type: data_type.into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        };
+        let parsed = parse_input_for_driver(literal, Some(&column), "postgres")
+            .unwrap_or_else(|error| panic!("{data_type}: {error}"));
+        assert_eq!(parsed, Value::Text(literal.into()), "{data_type}");
+    }
+}
 use tablepro_core::{ColumnInfo, Value};
 
 #[test]

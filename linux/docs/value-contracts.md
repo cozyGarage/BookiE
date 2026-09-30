@@ -1635,6 +1635,9 @@ independent server array and confirms the sibling row is unchanged. Both focused
 tests passed. The strict GTK + DuckDB runner passed 148 selected tests across
 all 11 suites with no missing suites:
 `target/quality/20260930T162631263421Z-values/report.json`.
+An additional app parser matrix checks that UUID, date, time, numeric, boolean,
+and timestamptz array metadata preserve the complete literal as text. The full
+app library suite passed 413 tests, with 12 existing ignored tests.
 
 ```sh
 rtk cargo test --manifest-path linux/crates/app/Cargo.toml postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder
