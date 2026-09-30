@@ -156,6 +156,18 @@ fn datetime64_nine_digit_range_edges_remain_representable() {
 }
 
 #[test]
+fn datetime64_parameters_use_a_wider_exact_scale_when_subseconds_are_zero() {
+    let stamp = chrono::NaiveDate::from_ymd_opt(2299, 12, 31)
+        .unwrap()
+        .and_hms_opt(23, 59, 59)
+        .unwrap();
+    assert_eq!(
+        literal(&Value::DateTime(stamp)).unwrap(),
+        "toDateTime64('2299-12-31 23:59:59', 0)"
+    );
+}
+
+#[test]
 fn base_type_strips_arguments_and_wrappers() {
     assert_eq!(base_type("String"), "String");
     assert_eq!(base_type("Decimal(9, 2)"), "Decimal");

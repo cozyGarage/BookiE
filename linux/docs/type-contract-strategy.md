@@ -86,10 +86,12 @@ refusal at the TIMESTAMPTZ precision boundary, with native sub-microsecond
 bindings still unsupported; MySQL has exact temporal/BIT and session-mode
 contracts but broader SQL-mode and DDL-session cases open; SQL Server safely
 refuses inexact legacy datetime ticks, money and sql_variant pending exact representations;
-ClickHouse has explicit finite-range/DST behavior but more nested/temporal
-combinations open; MongoDB has native-server edits for named BSON kinds,
-including Generic-subtype binary; millisecond-aligned DateTime writes are exact
-and sub-millisecond writes refuse before rounding. Collection-wide type
+ClickHouse has explicit finite-range/DST behavior and now selects a lower exact
+DateTime64 precision for values beyond the scale-9 Int64 ceiling, while more
+nested/temporal combinations remain open; MongoDB has native-server edits for
+named BSON kinds, including Generic-subtype binary; millisecond-aligned
+DateTime writes are exact and sub-millisecond writes refuse before rounding.
+Collection-wide type
 heterogeneity outside sampled/current-page documents remains unverified, and
 other unnamed top-level edits remain untested;
 Redis refuses identified asynchronous command streams and tests RESP3 attribute

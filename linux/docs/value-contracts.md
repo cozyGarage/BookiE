@@ -2578,6 +2578,29 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --
 
 The focused ClickHouse 24.8 Docker contract passed.
 
+### Exact lower-precision DateTime64 bindings, 2026-09-30
+
+A ClickHouse 24.8 native query proved that `DateTime64(0)` accepts
+`2299-12-31 23:59:59` and returns the exact millisecond epoch. The driver's
+parameter/literal code previously forced scale 9, then refused this value at
+the Int64 nanosecond ceiling. The shared renderer now chooses the coarsest
+scale that preserves every supplied fractional digit and fits the server
+calendar and Int64 ticks. `DateTime64(0)` year 2299 now round-trips through both
+bound parameters and SQL literals. Forcing the same year-2262 value through an
+explicit scale-9 cast still produces a visible server error; timestamps below
+the 1900 calendar bound still refuse locally. The native regression, both
+focused boundary tests, core/driver unit tests, all 33 ClickHouse Docker
+integration tests, and all 16 final-source scale-range mutants passed. Reports:
+`target/quality/20260930-clickhouse-scale-precision-mutants/mutants.out/outcomes.json`
+and `target/quality/20260930-clickhouse-scale-range-mutants-final3/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib clickhouse_datetime64_literal_uses_the_coarsest_exact_native_precision
+rtk cargo test --locked -p tablepro-driver-clickhouse --lib datetime64_parameters_use_a_wider_exact_scale_when_subseconds_are_zero
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration temporal::second_precision_datetime64_beyond_nanosecond_limit_round_trips -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal -- --ignored --exact --test-threads=1
+```
+
 ## DuckDB unsigned boundaries and mixed interval signs, 2026-09-30
 
 The native DuckDB result contract now covers UBIGINT values immediately above

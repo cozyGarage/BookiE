@@ -7,6 +7,8 @@ mod connect_refusal;
 
 #[path = "support/disconnection.rs"]
 mod disconnection;
+#[path = "support/temporal.rs"]
+mod temporal;
 
 #[tokio::test]
 async fn an_unavailable_clickhouse_server_is_classified_as_connection_refused() {
@@ -1167,21 +1169,26 @@ async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
         "ClickHouse 24.8 rejects the first nanosecond date beyond the upper bound"
     );
 
-    for (date, sql) in [
-        (below, "1899-12-31 23:59:59.999999999"),
-        (requested, "2262-04-12 00:00:00.000000000"),
-    ] {
-        let parameter_result = connection
-            .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(date)])
-            .await;
-        assert!(
-            matches!(parameter_result, Err(DriverError::Unsupported(_))),
-            "driver must reject out-of-range parameter {sql}"
-        );
-        assert_eq!(
-            tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(date)),
-            Err(tablepro_core::sql_literal::LiteralError::Unsupported),
-            "literal renderer must reject out-of-range value {sql}"
-        );
-    }
+    let lower_parameter = connection
+        .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(below)])
+        .await;
+    assert!(
+        matches!(lower_parameter, Err(DriverError::Unsupported(_))),
+        "values below the 1900 calendar boundary are refused before dispatch"
+    );
+    assert_eq!(
+        tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(below)),
+        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
+    );
+
+    let precision_nine_parameter = connection
+        .query_params("SELECT CAST(? AS DateTime64(9))", &[Value::DateTime(requested)])
+        .await;
+    assert!(
+        matches!(precision_nine_parameter, Err(DriverError::Query { .. })),
+        "an explicit DateTime64(9) cast above its Int64 epoch bound must fail visibly"
+    );
+    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested))
+        .expect("the same whole-second value has an exact lower-scale literal");
+    assert_eq!(literal, "toDateTime64('2262-04-12 00:00:00', 0)");
 }

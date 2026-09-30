@@ -1,6 +1,6 @@
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{BuildSqlError, quote_ident};
-use chrono::Datelike;
+use chrono::{Datelike, Timelike};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum LiteralError {
@@ -12,19 +12,58 @@ pub enum LiteralError {
     Unsupported,
 }
 
+/// Select the coarsest `DateTime64` scale that represents a timestamp exactly
+/// and fits ClickHouse's Int64 tick storage and calendar bounds.
+pub fn clickhouse_datetime64_precision(stamp: chrono::NaiveDateTime) -> Option<u32> {
+    (0..=9).find(|precision| clickhouse_datetime64_fits_precision(stamp, *precision))
+}
+
 /// Whether a timestamp fits ClickHouse `DateTime64(9)` without saturating its
-/// signed nanosecond count. The driver and generated SQL literals both use
-/// precision 9, so values outside this interval cannot round-trip exactly.
+/// signed nanosecond count.
 pub fn clickhouse_datetime64_nanos_supported(stamp: chrono::NaiveDateTime) -> bool {
+    clickhouse_datetime64_fits_precision(stamp, 9)
+}
+
+/// Render a timestamp as a precision-preserving ClickHouse DateTime64 literal.
+/// An optional timezone is included in the native expression.
+pub fn clickhouse_datetime64_literal(stamp: chrono::NaiveDateTime, timezone: Option<&str>) -> Option<String> {
+    let precision = clickhouse_datetime64_precision(stamp)?;
+    let value = if precision == 0 {
+        stamp.format("%Y-%m-%d %H:%M:%S").to_string()
+    } else {
+        let divisor = 10_u32.pow(9 - precision);
+        let fractional = stamp.nanosecond() / divisor;
+        format!(
+            "{}.{fractional:0width$}",
+            stamp.format("%Y-%m-%d %H:%M:%S"),
+            width = precision as usize
+        )
+    };
+    match timezone {
+        Some(zone) => Some(format!("toDateTime64('{value}', {precision}, '{zone}')")),
+        None => Some(format!("toDateTime64('{value}', {precision})")),
+    }
+}
+
+fn clickhouse_datetime64_fits_precision(stamp: chrono::NaiveDateTime, precision: u32) -> bool {
     let Some(minimum) = chrono::NaiveDate::from_ymd_opt(1900, 1, 1).and_then(|date| date.and_hms_opt(0, 0, 0)) else {
         return false;
     };
     let Some(maximum) =
-        chrono::NaiveDate::from_ymd_opt(2262, 4, 11).and_then(|date| date.and_hms_nano_opt(23, 47, 16, 854_775_807))
+        chrono::NaiveDate::from_ymd_opt(2299, 12, 31).and_then(|date| date.and_hms_nano_opt(23, 59, 59, 999_999_999))
     else {
         return false;
     };
-    (minimum..=maximum).contains(&stamp)
+    if !(minimum..=maximum).contains(&stamp) || precision > 9 {
+        return false;
+    }
+    let fraction_divisor = 10_u32.pow(9 - precision);
+    if !stamp.nanosecond().is_multiple_of(fraction_divisor) {
+        return false;
+    }
+    let scale = 10_i128.pow(precision);
+    let ticks = i128::from(stamp.and_utc().timestamp()) * scale + i128::from(stamp.nanosecond() / fraction_divisor);
+    (i128::from(i64::MIN)..=i128::from(i64::MAX)).contains(&ticks)
 }
 
 /// Render `value` as a SQL literal for `driver_id`.
@@ -60,21 +99,16 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
         Value::Date(date) => string_literal(driver_id, &date.format("%Y-%m-%d").to_string()),
         Value::Time(time) => string_literal(driver_id, &time.to_string()),
-        Value::DateTime(stamp) if driver_id == "clickhouse" && !clickhouse_datetime64_nanos_supported(*stamp) => {
-            return Err(LiteralError::Unsupported);
+        Value::DateTime(stamp) if driver_id == "clickhouse" => {
+            clickhouse_datetime64_literal(*stamp, None).ok_or(LiteralError::Unsupported)?
         }
         Value::DateTime(stamp) if driver_id == "mssql" => {
             format!("CAST({} AS datetime2)", string_literal(driver_id, &stamp.to_string()))
         }
-        Value::DateTime(stamp) => string_literal(driver_id, &stamp.to_string()),
-        Value::TimestampTz(stamp)
-            if driver_id == "clickhouse" && !clickhouse_datetime64_nanos_supported(stamp.naive_utc()) =>
-        {
-            return Err(LiteralError::Unsupported);
-        }
         Value::TimestampTz(stamp) if driver_id == "clickhouse" => {
-            format!("toDateTime64('{}', 9, 'UTC')", stamp.format("%Y-%m-%d %H:%M:%S%.9f"))
+            clickhouse_datetime64_literal(stamp.naive_utc(), Some("UTC")).ok_or(LiteralError::Unsupported)?
         }
+        Value::DateTime(stamp) => string_literal(driver_id, &stamp.to_string()),
         Value::TimestampTz(stamp) => string_literal(driver_id, &stamp.to_rfc3339()),
         Value::Uuid(id) => string_literal(driver_id, &id.to_string()),
         Value::Json(_) if driver_id == "clickhouse" => return Err(LiteralError::Unsupported),
@@ -298,6 +332,34 @@ mod tests {
         for value in [Value::DateTime(below), Value::TimestampTz(above.and_utc())] {
             assert_eq!(render_sql_literal("clickhouse", &value), Err(LiteralError::Unsupported));
         }
+    }
+
+    #[test]
+    fn clickhouse_datetime64_literal_uses_the_coarsest_exact_native_precision() {
+        let wide = chrono::NaiveDate::from_ymd_opt(2299, 12, 31)
+            .unwrap()
+            .and_hms_opt(23, 59, 59)
+            .unwrap();
+        let fractional = chrono::NaiveDate::from_ymd_opt(2026, 9, 30)
+            .unwrap()
+            .and_hms_nano_opt(12, 34, 56, 123_456_000)
+            .unwrap();
+        let nanos_edge = chrono::NaiveDate::from_ymd_opt(2262, 4, 11)
+            .unwrap()
+            .and_hms_nano_opt(23, 47, 16, 854_775_807)
+            .unwrap();
+        assert_eq!(clickhouse_datetime64_precision(wide), Some(0));
+        assert!(!clickhouse_datetime64_fits_precision(wide, 10));
+        assert_eq!(
+            clickhouse_datetime64_literal(wide, None).as_deref(),
+            Some("toDateTime64('2299-12-31 23:59:59', 0)")
+        );
+        assert_eq!(clickhouse_datetime64_precision(fractional), Some(6));
+        assert_eq!(clickhouse_datetime64_precision(nanos_edge), Some(9));
+        assert_eq!(
+            clickhouse_datetime64_literal(fractional, Some("UTC")).as_deref(),
+            Some("toDateTime64('2026-09-30 12:34:56.123456', 6, 'UTC')")
+        );
     }
 
     #[test]

@@ -20,16 +20,12 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
         Value::Bytes(b) => format!("unhex('{}')", hex_encode(b)),
         Value::Date(d) => format!("toDate('{}')", d.format("%Y-%m-%d")),
         Value::Time(t) => format!("'{}'", t.format("%H:%M:%S%.f")),
-        Value::DateTime(dt) if !tablepro_core::sql_literal::clickhouse_datetime64_nanos_supported(*dt) => {
-            return Err(unsupported_datetime64_range());
+        Value::DateTime(dt) => tablepro_core::sql_literal::clickhouse_datetime64_literal(*dt, None)
+            .ok_or_else(unsupported_datetime64_range)?,
+        Value::TimestampTz(ts) => {
+            tablepro_core::sql_literal::clickhouse_datetime64_literal(ts.naive_utc(), Some("UTC"))
+                .ok_or_else(unsupported_datetime64_range)?
         }
-        Value::DateTime(dt) => format!("toDateTime64('{}', 9)", dt.format("%Y-%m-%d %H:%M:%S%.9f")),
-        Value::TimestampTz(ts)
-            if !tablepro_core::sql_literal::clickhouse_datetime64_nanos_supported(ts.naive_utc()) =>
-        {
-            return Err(unsupported_datetime64_range());
-        }
-        Value::TimestampTz(ts) => format!("toDateTime64('{}', 9, 'UTC')", ts.format("%Y-%m-%d %H:%M:%S%.9f")),
         Value::Decimal(d) => format!("toDecimal128('{d}', {})", d.scale()),
         Value::Uuid(u) => format!("toUUID('{u}')"),
         Value::Json(_) => {
@@ -48,7 +44,7 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
 
 fn unsupported_datetime64_range() -> DriverError {
     DriverError::Unsupported(
-        "ClickHouse DateTime64(9) supports timestamps from 1900-01-01 through 2262-04-11 23:47:16.854775807".into(),
+        "ClickHouse DateTime64 cannot represent this timestamp exactly within its 1900-2299 calendar and Int64 precision bounds".into(),
     )
 }
 
