@@ -397,6 +397,10 @@ mod tests {
         assert_eq!(column_kind("uuid"), ColumnKind::Uuid);
         assert_eq!(column_kind("jsonb"), ColumnKind::Json);
         assert_eq!(column_kind("bytea"), ColumnKind::Bytes);
+        assert_eq!(column_kind("BLOB"), ColumnKind::Bytes);
+        assert_eq!(column_kind("BINARY(16)"), ColumnKind::Bytes);
+        assert_eq!(column_kind("VARBINARY(32)"), ColumnKind::Bytes);
+        assert_eq!(column_kind("IMAGE"), ColumnKind::Bytes);
     }
 
     #[test]

@@ -1679,9 +1679,12 @@ array elements with quotes while PostgreSQL `float8[]::text` does not; the
 contract therefore checks exported/imported driver text exactly and uses
 native wire bytes, rather than display-string equality, as the stored-value
 oracle. The scoped mutation test caught the sole mutation of the changed array
-classification condition (1/1; no timeouts or unviable mutants). After the fix,
-the strict GTK + DuckDB value runner passed 148 tests across all 11 suites with
-no missing suites; its report is
+classification condition (1/1). A wider classifier mutation pass initially
+exposed missing coverage for the `BLOB` and `BINARY` byte-type aliases; the
+catalog contract now pins those spellings, plus `VARBINARY` and `IMAGE`. The
+final classifier run caught 13 of 14 mutants, with one unviable replacement and
+no survivors or timeouts. After the array fix, the strict GTK + DuckDB value
+runner passed 148 tests across all 11 suites with no missing suites; its report is
 `target/quality/20260930T150331919913Z-values/report.json` (run against dirty
 working-tree changes based on `8758caa`).
 
@@ -1691,6 +1694,7 @@ rtk cargo test --locked -p tablepro-driver-postgres --test integration array_con
 rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
 rtk cargo test --locked -p tablepro-core postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars
 rtk cargo mutants --dir linux --package tablepro-core --file crates/core/src/import/cell.rs --re 'cell.rs:86:' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-postgres-array-csv-import-mutants-line -- --lib postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars -- --test-threads=1
+rtk cargo mutants --dir linux --package tablepro-core --file crates/core/src/import/cell.rs --re 'column_kind' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-csv-import-column-kind-mutants-followup -- --lib a_catalog_type_name_reads_as_the_value_shape_it_stores -- --test-threads=1
 ```
 
 ### PostgreSQL IPv6 `inet[]` explicit refusal
