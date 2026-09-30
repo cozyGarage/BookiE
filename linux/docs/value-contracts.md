@@ -1583,7 +1583,7 @@ limit returns the existing visible undecodable marker rather than truncated data
 
 Limits: network, enum/domain/composite/range and most JSON/BSON array element
 contracts remain unsupported or untested; grid edits are verified only for
-boolean[], bytea[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
+boolean[], bytea[], uuid[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
 acceptance matrix remains open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
@@ -1626,6 +1626,21 @@ preserves the array literal as exact text, the builder emits the fixed
 app-parser and Docker integration tests passed. The strict shared-value report
 above includes this bytea[] contract.
 
+The UUID[] edit exposed a parser bug: `classify_type` matched the `uuid`
+substring before accounting for PostgreSQL array metadata, so it tried to parse
+the entire `{...}` literal as one UUID. PostgreSQL `[]` metadata now stays text
+before scalar classification. The app test checks parsing and keyed-update SQL;
+the Docker test compares the edited array's native `array_send` bytes with an
+independent server array and confirms the sibling row is unchanged. Both focused
+tests passed. The strict GTK + DuckDB runner passed 148 selected tests across
+all 11 suites with no missing suites:
+`target/quality/20260930T162631263421Z-values/report.json`.
+
+```sh
+rtk cargo test --manifest-path linux/crates/app/Cargo.toml postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder
+rtk cargo test --manifest-path linux/crates/drivers/postgres/Cargo.toml --test integration value_contract_array_grid_edit_preserves_array_elements -- --include-ignored
+```
+
 ```sh
 rtk cargo test --locked -p tablepro-app --lib postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
@@ -1665,7 +1680,7 @@ with ordinality checks each element and a separate NULL flag. The app
 parser-to-builder unit, focused core cast test, and expanded integration test
 passed against PostgreSQL.
 
-Exact grid editing is server-verified for `boolean[]`, `bytea[]`, `integer[]`,
+Exact grid editing is server-verified for `boolean[]`, `bytea[]`, `uuid[]`, `integer[]`,
 `text[]`, `numeric[]` and `float8[]`. JSON and other
 unsupported element OIDs, custom/user-defined arrays
 and automatic array parameter typing remain outside the tested support surface.
