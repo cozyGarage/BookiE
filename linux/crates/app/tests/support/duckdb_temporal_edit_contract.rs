@@ -15,19 +15,38 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
         .await
         .unwrap();
     connection
-        .execute("CREATE TABLE temporal_grid (id INTEGER PRIMARY KEY, clock TIME, event_at TIMESTAMP)")
+        .execute(
+            "CREATE TABLE temporal_grid (id INTEGER PRIMARY KEY, clock TIME, event_at TIMESTAMP, \
+             second_precision TIMESTAMP_S, milli_precision TIMESTAMP_MS)",
+        )
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO temporal_grid VALUES (1, TIME '12:34:56.123456', TIMESTAMP '2026-09-29 12:34:56.123456')")
+        .execute(
+            "INSERT INTO temporal_grid VALUES (1, TIME '12:34:56.123456', \
+             TIMESTAMP '2026-09-29 12:34:56.123456', \
+             TIMESTAMP_S '2026-09-29 12:34:56', TIMESTAMP_MS '2026-09-29 12:34:56.123')",
+        )
         .await
         .unwrap();
 
     let columns = connection.fetch_columns(None, "temporal_grid").await.unwrap();
     let clock_index = columns.iter().position(|column| column.name == "clock").unwrap();
     let stamp_index = columns.iter().position(|column| column.name == "event_at").unwrap();
+    let seconds_index = columns
+        .iter()
+        .position(|column| column.name == "second_precision")
+        .unwrap();
+    let millis_index = columns
+        .iter()
+        .position(|column| column.name == "milli_precision")
+        .unwrap();
     let rejected_clock = parse_input_for_driver("12:34:56.123456789", Some(&columns[clock_index]), "duckdb");
     let rejected_stamp = parse_input_for_driver("2026-09-29 12:34:56.123456789", Some(&columns[stamp_index]), "duckdb");
+    let rejected_seconds =
+        parse_input_for_driver("2026-09-29 12:34:56.123456789", Some(&columns[seconds_index]), "duckdb");
+    let rejected_millis =
+        parse_input_for_driver("2026-09-29 12:34:56.123456789", Some(&columns[millis_index]), "duckdb");
     assert!(
         rejected_clock.is_err(),
         "TIME grid edits must not lose sub-microsecond digits"
@@ -36,12 +55,23 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
         rejected_stamp.is_err(),
         "TIMESTAMP grid edits must not lose sub-microsecond digits"
     );
+    assert!(
+        rejected_seconds.is_err(),
+        "TIMESTAMP_S grid edits must not lose fractional seconds"
+    );
+    assert!(
+        rejected_millis.is_err(),
+        "TIMESTAMP_MS grid edits must not lose sub-millisecond digits"
+    );
     assert_eq!(
         connection
             .query_params(
-                "SELECT CAST(CAST(? AS TIME) AS VARCHAR), CAST(CAST(? AS TIMESTAMP) AS VARCHAR)",
+                "SELECT CAST(CAST(? AS TIME) AS VARCHAR), CAST(CAST(? AS TIMESTAMP) AS VARCHAR), \
+                 CAST(CAST(? AS TIMESTAMP_S) AS VARCHAR), CAST(CAST(? AS TIMESTAMP_MS) AS VARCHAR)",
                 &[
                     Value::Text("12:34:56.123456789".into()),
+                    Value::Text("2026-09-29 12:34:56.123456789".into()),
+                    Value::Text("2026-09-29 12:34:56.123456789".into()),
                     Value::Text("2026-09-29 12:34:56.123456789".into()),
                 ],
             )
@@ -50,19 +80,27 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
             .rows,
         vec![vec![
             Value::Text("12:34:56.123456".into()),
-            Value::Text("2026-09-29 12:34:56.123456".into())
+            Value::Text("2026-09-29 12:34:56.123456".into()),
+            Value::Text("2026-09-29 12:34:56".into()),
+            Value::Text("2026-09-29 12:34:56.123".into())
         ]],
         "DuckDB casts to microsecond TIME/TIMESTAMP truncate unsupported nanoseconds"
     );
     assert_eq!(
         connection
-            .query("SELECT CAST(clock AS VARCHAR), CAST(event_at AS VARCHAR) FROM temporal_grid WHERE id = 1")
+            .query(
+                "SELECT CAST(clock AS VARCHAR), CAST(event_at AS VARCHAR), \
+                 CAST(second_precision AS VARCHAR), CAST(milli_precision AS VARCHAR) \
+                 FROM temporal_grid WHERE id = 1",
+            )
             .await
             .unwrap()
             .rows,
         vec![vec![
             Value::Text("12:34:56.123456".into()),
-            Value::Text("2026-09-29 12:34:56.123456".into())
+            Value::Text("2026-09-29 12:34:56.123456".into()),
+            Value::Text("2026-09-29 12:34:56".into()),
+            Value::Text("2026-09-29 12:34:56.123".into())
         ]],
         "refused edits must leave both stored values unchanged"
     );

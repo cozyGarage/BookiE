@@ -2285,15 +2285,16 @@ and checks the resulting native type and exact UTC epoch.
 
 The same precision check was missing for DuckDB `TIME` and `TIMESTAMP` grid
 edits. A new failing-first app parser regression reproduced acceptance of
-nine-digit fractions for these microsecond columns. The keyed-edit test confirms
-that explicit casts from those VARCHAR parameters truncate the final digits,
-then verifies the parser refuses both edits and leaves existing native values
-unchanged. Precision-aware parsing still accepts exact microsecond values and
-nanos for declared `TIME_NS`/`TIMESTAMP_NS` columns.
+nine-digit fractions for these microsecond columns. The keyed-edit test also
+checks native `TIMESTAMP_S` and `TIMESTAMP_MS` casts, proving those discard
+unsupported fractional digits at their declared precision. It then verifies the
+parser refuses all four edits and leaves existing native values unchanged.
+Precision-aware parsing still accepts exact microsecond and millisecond values;
+nanosecond `TIMESTAMP_NS` values remain exact, while `TIME_NS` stays as text.
 
 The strict GTK + DuckDB runner passed all 156 selected tests across 11 suites
-with no missing suites at dirty revision `7a7418b`:
-`target/quality/20260930T181711761089Z-values/report.json`. The DuckDB app
+with no missing suites at dirty revision `fde1128`:
+`target/quality/20260930T182412713329Z-values/report.json`. The DuckDB app
 parser/grid cases live in `crates/app/tests/support/duckdb_temporal_edit_contract.rs`
 to keep the shared parser contract below the hosted 1,200-line file-size limit.
 A scoped
