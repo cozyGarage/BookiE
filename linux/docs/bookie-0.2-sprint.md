@@ -1196,10 +1196,23 @@ keyed-update contract now edits a top-level UUID binary field and verifies the
 canonical Extended JSON result plus native `BinarySubtype::Uuid` and all 16
 bytes through an independent client. The focused test and complete MongoDB
 Docker integration suite passed (24 tests). The matrix now marks UUID subtype
-editing as covered; collection-wide heterogeneity and remaining unnamed BSON
-kinds are still open.
+editing as covered; collection-wide heterogeneity is still open.
 
 B3 remains open.
+
+### MongoDB BSON kind matrix audit — September 30
+
+The matrix still called unnamed top-level BSON kinds open after native edit
+coverage had accumulated. Reconciled the exhaustive `bson_type_name` match and
+the driver's canonical Extended JSON fallback against unit and Docker
+contracts: Timestamp, regex, JavaScript, code-with-scope, Symbol, DbPointer,
+Undefined, MinKey and MaxKey have native keyed-edit assertions; all binary
+subtypes and BSONColumn have separate native checks, and standard scalar and
+container variants have value contracts. The complete MongoDB integration
+suite passed all 26 tests with ignored Docker cases enabled. The remaining
+MongoDB schema gap is collection-wide discovery beyond the first-50 sample and
+currently returned page. The unnamed special-kind gap is closed; B3 remains
+open for other driver, consumer and acceptance targets.
 
 ### MongoDB BSON binary subtype contracts — September 30
 

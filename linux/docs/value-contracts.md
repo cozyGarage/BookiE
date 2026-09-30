@@ -472,6 +472,22 @@ rtk cargo test --locked -p tablepro-app --lib
 rtk python3 scripts/run-test-layer.py widgets
 ```
 
+## MongoDB BSON kind matrix audit, 2026-09-30
+
+The type matrix still listed unnamed top-level BSON kinds as open. The
+exhaustive driver type-classification match and Extended JSON fallback were
+compared with native grid fixtures: Timestamp, regex, JavaScript,
+JavaScript-with-scope, Symbol, DbPointer, Undefined, MinKey and MaxKey all have
+native keyed-edit assertions; binary subtypes and BSONColumn have dedicated
+native checks, and scalar/container variants have driver value contracts. The
+whole MongoDB integration suite passed all 26 tests, including ignored Docker
+fixtures. The remaining MongoDB schema gap is collection-wide discovery beyond
+the first-50 sample and current result page.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
+```
+
 ## Current corpus
 
 The [type-contract strategy](type-contract-strategy.md) defines boundary families,
