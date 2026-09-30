@@ -45,6 +45,25 @@ PostgreSQL/MySQL fixture scenarios extracted to `tests/support/value_contracts.r
 remain part of their `integration` target. Their module prefixes change displayed
 test names; the `value_contract` selection still includes them.
 
+## Full drivers layer, 2026-09-30
+
+After integrating the remote Linux updates, the strict `drivers` layer passed
+all six server drivers, PostgreSQL socket, SSH agent authentication and OpenSSH
+sessions: 200 tests, zero failures. Evidence:
+[`20260930T001431188722Z-layers/report.json`](../target/quality/20260930T001431188722Z-layers/report.json)
+and its detailed [`drivers-1.log`](../target/quality/20260930T001431188722Z-layers/drivers-1.log).
+
+The first integrated rerun caught a fixture mistake: `.990` legacy `datetime`
+lands on an exact every-third 1/300-second tick and is correctly decodable. The
+regression now uses `.997` and `.003`, which occupy inexact ticks; it compares
+their decoder results with SQL Server's native text, requires SQL export refusal,
+and separately round-trips supported temporal columns. The focused Docker test
+and the full integrated drivers layer passed.
+
+The integrated strict shared-values runner also passed all 135 selected tests
+across GTK, DuckDB, all eight drivers and MCP, with no missing suites:
+[`20260930T002923239431Z-values/report.json`](../target/quality/20260930T002923239431Z-values/report.json).
+
 ## DuckDB zero-row result metadata, 2026-09-28
 
 A local DuckDB query selects a `HUGEINT` and `VARCHAR` under `WHERE false`.
@@ -583,19 +602,25 @@ The test passed; no production defect was found.
 
 ## SQL Server `datetime2(7)` 100-nanosecond result precision
 
-The existing temporal export fixture now checks its `datetime2(7)` result
-directly: `2024-01-02 03:04:05.1234567` decodes to a `NaiveDateTime` with
+The temporal fixture checks its `datetime2(7)` result directly:
+`2024-01-02 03:04:05.1234567` decodes to a `NaiveDateTime` with
 `123456700` nanoseconds, matching the independent server text from
-`CONVERT(varchar(27), precise, 126)`. The same fixture exports its temporal rows
-as SQL literals and confirms source/export equality on the server. This verifies
-the seventh fractional digit through decoding and SQL export; it does not claim
-coverage for all SQL Server temporal edge cases.
+`CONVERT(varchar(27), precise, 126)`. Its full source row also contains legacy
+`datetime`, so SQL literal export must refuse that row rather than bypass the
+decoder's `Undecodable` marker. A separate projection round-trips supported
+`smalldatetime`, `datetime2(7)`, `time(7)` and `date` columns and compares native
+server values. This verifies the seventh fractional digit through decoding and
+SQL export; it does not claim coverage for all SQL Server temporal edge cases.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mssql --test integration temporal_sql_exports_round_trip_legacy_and_high_precision_columns -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mssql --test integration inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_round_trip -- --include-ignored --exact --test-threads=1
 ```
 
-The Docker-backed test passed; no production mismatch was found.
+The old integration assertion failed on `UnrepresentableValue { column: "legacy" }`,
+which was the correct safety behavior. The regression now compares both
+undecodable legacy cells with exact SQL Server text, requires export refusal for
+the legacy column, and round-trips the remaining supported temporal projection.
+The focused Docker test passed; no production mismatch was found.
 
 ### SQL Server `smalldatetime` rounding threshold
 

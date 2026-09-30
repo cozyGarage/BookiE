@@ -769,7 +769,7 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
+async fn inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_round_trip() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
     conn.execute(
@@ -780,22 +780,41 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
     .unwrap();
     conn.execute(
         "INSERT INTO temporal_source VALUES \
-         (1, '2024-01-02 03:04:05.990', '2024-01-02 03:04:00', '2024-01-02 03:04:05.1234567', \
+         (1, '2024-01-02 03:04:05.997', '2024-01-02 03:04:00', '2024-01-02 03:04:05.1234567', \
           '03:04:05.1234567', '0001-01-01'), \
-         (2, '1753-01-01 00:00:00.000', '1900-01-01 00:00:00', '9999-12-31 23:59:59.9999999', \
+         (2, '1753-01-01 00:00:00.003', '1900-01-01 00:00:00', '9999-12-31 23:59:59.9999999', \
           '23:59:59.9999999', '9999-12-31')",
     )
     .await
     .unwrap();
-    conn.execute("SELECT * INTO temporal_exported FROM temporal_source WHERE 1 = 0")
-        .await
-        .unwrap();
-    let columns = conn.fetch_columns(None, "temporal_exported").await.unwrap();
     let rows = conn
         .query("SELECT * FROM temporal_source ORDER BY id")
         .await
         .unwrap()
         .rows;
+    let legacy_oracle = conn
+        .query(
+            "SELECT id, legacy, CONVERT(varchar(27), legacy, 126) AS native_text \
+             FROM temporal_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(legacy_oracle.rows[0][1], Value::Undecodable("datetime".into()));
+    assert_eq!(legacy_oracle.rows[0][2], Value::Text("2024-01-02T03:04:05.997".into()));
+    assert_eq!(legacy_oracle.rows[1][1], Value::Undecodable("datetime".into()));
+    assert_eq!(legacy_oracle.rows[1][2], Value::Text("1753-01-01T00:00:00.003".into()));
+
+    let source_columns = conn.fetch_columns(None, "temporal_source").await.unwrap();
+    for row in &rows {
+        let error =
+            tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_source", &source_columns, row)
+                .expect_err("an inexact legacy datetime must refuse SQL export");
+        assert!(
+            matches!(error, tablepro_core::sql_dialect::BuildSqlError::UnrepresentableValue { ref column } if column == "legacy"),
+            "refusal must identify the inexact column, got {error:?}"
+        );
+    }
+
     let precise = conn
         .query(
             "SELECT precise, CONVERT(varchar(27), precise, 126) AS native_text \
@@ -812,10 +831,22 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
         )
     );
     assert_eq!(precise.rows[0][1], Value::Text("2024-01-02T03:04:05.1234567".into()));
-    for row in &rows {
+
+    conn.execute(
+        "CREATE TABLE temporal_exported (id int, small smalldatetime, precise datetime2(7), clock time(7), day date)",
+    )
+    .await
+    .unwrap();
+    let columns = conn.fetch_columns(None, "temporal_exported").await.unwrap();
+    let supported_rows = conn
+        .query("SELECT id, small, precise, clock, day FROM temporal_source ORDER BY id")
+        .await
+        .unwrap()
+        .rows;
+    for row in &supported_rows {
         let statement =
             tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_exported", &columns, row)
-                .unwrap();
+                .expect("supported temporal columns should be exportable");
         conn.execute(&statement)
             .await
             .unwrap_or_else(|error| panic!("{statement}: {error}"));
@@ -823,8 +854,7 @@ async fn temporal_sql_exports_round_trip_legacy_and_high_precision_columns() {
     let matching = conn
         .query(
             "SELECT COUNT(*) FROM temporal_source s JOIN temporal_exported c ON s.id = c.id \
-             AND s.legacy = c.legacy AND s.small = c.small AND s.precise = c.precise AND s.clock = c.clock \
-             AND s.day = c.day",
+             AND s.small = c.small AND s.precise = c.precise AND s.clock = c.clock AND s.day = c.day",
         )
         .await
         .unwrap();
