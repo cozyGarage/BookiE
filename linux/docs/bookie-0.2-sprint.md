@@ -1690,3 +1690,21 @@ Evidence and commands: [MySQL integer parser contract](value-contracts.md#mysql-
 
 The next audit packet adds file-based CSV import and byte/field/column boundary
 contracts, with scoped mutation evidence recorded in the [value ledger](value-contracts.md#csv-file-import-and-exact-size-boundaries-2026-09-30). The first hosted preflight for the MySQL change failed because the generated ignored-test inventory was stale; the inventory is regenerated and checked in this worktree before the next push. Do not treat that preflight as a product test result.
+
+### B3 CSV export conditions and disconnect coverage — September 30
+
+CSV export now has separate consumer cases for each `IfNeeded` quoting trigger
+and for positive/negative plain decimal conversion versus malformed and
+exponent text. The focused suite passed 16 tests; scoped mutation testing caught
+14/15 mutants with no timeout or unviable outcomes. The sole survivor removes
+`header_row` from RFC row-writer options; it is equivalent because row rendering
+does not consult that option. Details and reproducible commands are in the
+[value-contract ledger](value-contracts.md#csv-export-quoting-and-decimal-comma-contracts-2026-09-30).
+
+The existing full six-driver Docker integration run at base `8ed0f66` passed
+219 tests and includes connection loss, mid-stream loss, and reconnect/recovery
+coverage across ClickHouse, MongoDB, SQL Server, MySQL, PostgreSQL and Redis.
+The run is recorded in the [disconnect coverage evidence](value-contracts.md#redis-disconnect-classification-2026-09-30)
+and layer report `target/quality/20260930T110146955489Z-layers/report.json`.
+No driver code changed in this follow-up; hosted Linux test-quality run
+`36705047234` remains queued on the same base and its result is not green evidence.

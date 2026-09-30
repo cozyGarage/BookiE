@@ -578,6 +578,52 @@ mod tests {
     }
 
     #[test]
+    fn csv_if_needed_quotes_each_structural_and_sanitization_trigger() {
+        let columns = vec![
+            column("delimiter"),
+            column("quote"),
+            column("line_break"),
+            column("formula"),
+        ];
+        let rows = vec![vec![
+            Value::Text("a,b".into()),
+            Value::Text("a\"b".into()),
+            Value::Text("line\nbreak".into()),
+            Value::Text("=1+1".into()),
+        ]];
+        let options = CsvOptions {
+            line_break_to_space: true,
+            ..CsvOptions::default()
+        };
+
+        assert_eq!(
+            render_csv(&columns, &rows, &options),
+            "delimiter,quote,line_break,formula\n\"a,b\",\"a\"\"b\",\"line break\",\"'=1+1\"\n"
+        );
+    }
+
+    #[test]
+    fn csv_decimal_comma_only_rewrites_signed_plain_decimals() {
+        let columns = vec![column("value")];
+        let values = ["+1.20", "-2.50", "3.40", "1e2", ".5", "5.", "x.5", "5.x"];
+        let rows = values
+            .iter()
+            .map(|value| vec![Value::Text((*value).into())])
+            .collect::<Vec<_>>();
+        let options = CsvOptions {
+            delimiter: CsvDelimiter::Semicolon,
+            decimal: CsvDecimal::Comma,
+            sanitize_formulas: false,
+            ..CsvOptions::default()
+        };
+
+        assert_eq!(
+            render_csv(&columns, &rows, &options),
+            "value\n+1,20\n-2,50\n3,40\n1e2\n.5\n5.\nx.5\n5.x\n"
+        );
+    }
+
+    #[test]
     fn tsv_renderer_quotes_structural_characters_and_represents_nulls() {
         let columns = vec![column("a\tb"), column("value")];
         let rows = vec![vec![Value::Text("one\ntwo\"three".into()), Value::Null]];

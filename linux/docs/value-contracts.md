@@ -2846,3 +2846,20 @@ rtk cargo test --locked -p tablepro-core --lib import::
 rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/import/infer.rs --re 'infer_kind|sqlite_type' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260930-csv-infer-mutants -- --lib import::
 rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/import/plan.rs --re 'row_count|insert_columns|insert_statement' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260930-csv-plan-mutants-final -- --lib import::
 ```
+
+### CSV export quoting and decimal-comma contracts, 2026-09-30
+
+Export tests now check each `IfNeeded` quoting trigger independently: selected
+delimiter, embedded quote, a line break replaced by a space, and formula
+neutralization. Decimal-comma output accepts signed plain decimals while
+preserving exponent forms, missing integer/fraction digits and nonnumeric text.
+The focused core CSV export suite passed (16 tests). The scoped mutation run
+caught 14 of 15 mutants with no timeout or unviable cases. Its only survivor
+deletes `header_row` from the RFC 4180 row-writer options; this is equivalent
+because `csv_row_line` never reads that option. Evidence:
+`target/quality/20260930-csv-export-contract-mutants/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib export::csv::tests
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/csv.rs --re 'is_plain_decimal|escape_csv_field' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-csv-export-contract-mutants -- --lib -- --test-threads=1
+```
