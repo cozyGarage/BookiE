@@ -2292,8 +2292,11 @@ unchanged. Precision-aware parsing still accepts exact microsecond values and
 nanos for declared `TIME_NS`/`TIMESTAMP_NS` columns.
 
 The strict GTK + DuckDB runner passed all 156 selected tests across 11 suites
-with no missing suites at dirty revision `215fa07`:
-`target/quality/20260930T180736641968Z-values/report.json`. A scoped
+with no missing suites at dirty revision `7a7418b`:
+`target/quality/20260930T181711761089Z-values/report.json`. The DuckDB app
+parser/grid cases live in `crates/app/tests/support/duckdb_temporal_edit_contract.rs`
+to keep the shared parser contract below the hosted 1,200-line file-size limit.
+A scoped
 `cargo-mutants` pass generated 13 changes to `parse_duckdb_temporal_input`; the
 app library tests caught 12, with 0 missed, 0 timeouts and 1 unviable in
 `target/quality/20260930-duckdb-temporal-grid-mutants-final/mutants.out/outcomes.json`.
