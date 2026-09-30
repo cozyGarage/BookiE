@@ -119,6 +119,13 @@ error mapper. After these cases were added, the complete `drivers` layer passed
 
 The complete layer was rerun at source SHA `8ed0f66ed54b1411feaac5d7a8e49abc6999fb18` on September 30. It ran 219 tests with zero failures or ignored tests in the executed suites, taking 939.7 seconds. All six remote-driver disconnect and stream/page-loss cases passed, including PostgreSQL/MySQL pool recovery and SQL Server/MongoDB/Redis/ClickHouse restart paths. Evidence: [`20260930T110146955489Z-layers/report.json`](../target/quality/20260930T110146955489Z-layers/report.json).
 
+At `f88159dcb23dd74a960c638a6af42b608a1b4345`, the full `drivers` layer
+passed again: 220 tests, zero failures, in 984 seconds. The executed log
+contains established disconnect, whole-query failure after mid-stream loss,
+pool or reconnect recovery, and six unused-port `ConnectionRefused` checks.
+[`20260930T232244336622Z-layers/report.json`](../target/quality/20260930T232244336622Z-layers/report.json)
+is the clean-tree report.
+
 After splitting the nested MongoDB test into its own support module, the strict combined value-contract layer passed with GTK and DuckDB enabled at base SHA `736a73f8434a57fd33dbe9d6212956e29351b168`: 144 selected tests across 11 suites, no missing suites, and zero failures in 201.7 seconds. Its report records 746 fresh build artifacts and one rebuilt package. The quick layer then passed in 92.0 seconds, including the file-size and function-size guards. Evidence: [`20260930T114622059959Z-layers/report.json`](../target/quality/20260930T114622059959Z-layers/report.json) and [`20260930T114425279874Z-layers/report.json`](../target/quality/20260930T114425279874Z-layers/report.json).
 
 Redis and ClickHouse mapper mutations are retained at

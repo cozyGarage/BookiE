@@ -68,6 +68,17 @@ The integrated strict shared-values runner also passed all 135 selected tests
 across GTK, DuckDB, all eight drivers and MCP, with no missing suites:
 [`20260930T002923239431Z-values/report.json`](../target/quality/20260930T002923239431Z-values/report.json).
 
+The latest full driver-layer run, at clean source SHA
+`f88159dcb23dd74a960c638a6af42b608a1b4345`, passed 220 tests across the six
+server drivers, local PostgreSQL socket, SSH-agent authentication and OpenSSH
+sessions, with no failures or ignored tests in executed suites. It explicitly
+ran the connection-loss and mid-stream/partial-result contracts for each
+remote driver, plus PostgreSQL/MySQL pool recovery and the other drivers'
+restart/reconnect paths. Evidence:
+[`20260930T232244336622Z-layers/report.json`](../target/quality/20260930T232244336622Z-layers/report.json)
+and [`drivers-1.log`](../target/quality/20260930T232244336622Z-layers/drivers-1.log).
+The layer took 984 seconds, reflecting the Docker-backed end-to-end coverage.
+
 ## SQL Server datetimeoffset CSV import, 2026-10-01
 
 A failing-first extension to the live `datetimeoffset(7)` contract reproduced a
