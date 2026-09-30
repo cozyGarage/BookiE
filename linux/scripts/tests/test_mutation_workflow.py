@@ -24,7 +24,10 @@ class MutationWorkflowTests(unittest.TestCase):
         self.assertIn("if-no-files-found: error", mutation)
         self.assertIn("branches: [linux]", mutation)
         self.assertIn("cancel-in-progress: false", mutation)
-        self.assertIn("--lib --test integration value_contract -- --include-ignored", mutation)
+        self.assertIn("--file crates/drivers/postgres/src/decode.rs", mutation)
+        self.assertIn("-- --lib", mutation)
+        self.assertNotIn("--test integration", mutation)
+        self.assertNotIn("--include-ignored", mutation)
 
     def test_postgres_mutations_include_every_binary_value_decoder(self):
         text = WORKFLOW.read_text().split("  coverage:")[0]

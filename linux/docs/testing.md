@@ -345,10 +345,11 @@ crate here once it accumulates unit-testable logic worth pinning this way;
 a driver crate whose logic is mostly "call the real client library" is not
 a good target until it grows some.
 
-The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders,
-using the `value_contract` unit and real-server regressions. Their malformed-input
-unit tests share that prefix so the mutation filter cannot omit them. Relevant
-pushes to `linux` also trigger the workflow. A scheduled workflow must exist on
+The PostgreSQL mutation job covers numeric, array, temporal and binary-text decoders
+with the crate's unit tests. Docker-backed PostgreSQL value and driver regressions
+run independently in Build Linux, where native server oracles are available without
+rerunning the full container suite for every mutation. Relevant pushes to `linux`
+also trigger the workflow. A scheduled workflow must exist on
 the repository default branch; the fork did not expose this workflow there when
 checked on 2026-09-26, so the schedule alone was not reliable execution evidence.
 

@@ -1673,6 +1673,15 @@ rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/sql_dia
 The scoped mutation report is at
 `target/quality/20260930-postgres-array-cast-mutants/mutants.out/outcomes.json`.
 
+A focused mutation run on the PostgreSQL array wire decoder generated 13 mutants
+for `decode_binary`; all 13 were caught by the library contracts, with no misses,
+timeouts or unviable mutants. The hosted quality run at SHA
+`8ed0f66ed54b1411feaac5d7a8e49abc6999fb18` did not reach mutation testing for
+this crate: its baseline command ran the full Docker value suite and timed out
+at 60 seconds while still executing. The CI job now runs decoder mutations
+against the unit suite; Docker-backed server oracles remain in Build Linux.
+Focused report: `target/quality/20260930-postgres-decode-binary-mutants/mutants.out/outcomes.json`.
+
 The focused core cast and hostile-metadata tests passed. The Docker-backed
 PostgreSQL regression passed after the fix:
 
@@ -2357,6 +2366,12 @@ Docker regression creates the same DDL under default mode and
 `NO_BACKSLASH_ESCAPES`; the server stores one backslash versus two, confirming
 that mode-independent output needs session-aware DDL execution. Run it with
 `cargo test --locked -p tablepro-driver-mysql --test integration mysql_column_comment_backslash_literals_depend_on_sql_mode -- --include-ignored --exact --test-threads=1`.
+I tested reusing the SQL export's `_utf8mb4 X'…'` literal in a generated
+`COMMENT` clause; the MySQL server rejects it with syntax error 42000. The DDL
+builder therefore continues to refuse backslash comments safely. Supporting
+them requires controlled session-mode handling around DDL, including reliable
+restoration after errors; ordinary mode-independent string literals are not
+accepted by this COMMENT grammar.
 Session time-zone and stricter SQL-mode matrices, installed-app-to-MySQL grid
 acceptance and broader consumer parity remain open.
 
