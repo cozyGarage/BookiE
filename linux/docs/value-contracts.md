@@ -1,5 +1,6 @@
 # Value preservation tests
 
+
 B3 uses a shared boundary corpus at `testdata/value-contract.json`. Tests must
 compare the submitted value with the returned value, not just check that a query
 succeeded. A NULL, an empty value, an unsupported value and a failed conversion
@@ -3165,4 +3166,26 @@ semicolon. No planner or formatter defect was found.
 
 ```sh
 rtk cargo test --locked -p tablepro-app --lib mysql_repeated_semicolon_delimiter_keeps_body_statements_together -- --test-threads=1
+```
+
+## DuckDB temporal filter precision, 2026-09-30
+
+The shared filter builder now rejects predicates whose fractional input exceeds
+the target DuckDB temporal type's precision. Equality, both `BETWEEN` bounds,
+and each `IN` member use the same guard. TIME/TIMESTAMP/TIMESTAMPTZ accept
+microseconds; `TIMESTAMP_S` and `TIMESTAMP_MS` enforce seconds and milliseconds.
+`TIME_NS` and `TIMESTAMP_NS` retain nanosecond inputs. Exact millisecond and
+nanosecond values remain accepted. This prevents filter parameters from silently
+matching a rounded or truncated instant.
+
+The first regression run failed before the guard existed because a sub-
+microsecond TIME value was accepted. After the fix, the focused core contract
+passed, then the strict GTK+DuckDB runner passed all 11 suites (156 tests):
+[`20260930T185810190323Z-values/report.json`](../target/quality/20260930T185810190323Z-values/report.json).
+Scoped mutation testing of `parse_filter_value` caught 11 mutants; one mutation
+was unviable. The guard is in shared filter construction; driver-specific
+comparison semantics beyond DuckDB remain covered by the existing driver suites.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core duckdb_temporal_filters_refuse_values_the_column_would_truncate -- --nocapture
 ```

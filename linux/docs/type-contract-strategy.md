@@ -81,9 +81,9 @@ unfinished exact support unless they explicitly name a refusal or an external
 blocker. Explicit refusal protects existing data but does not satisfy exact
 support. Applied across drivers, the live status is: PostgreSQL has exact
 scalar/array/temporal coverage plus explicit refusal or SQLx metadata blockage
-for several advanced families; DuckDB has exact text fallbacks and a grid-write
-refusal at the TIMESTAMPTZ precision boundary, with native sub-microsecond
-bindings still unsupported; MySQL has exact temporal/BIT and session-mode
+for several advanced families; DuckDB has exact text fallbacks, grid-edit and
+filter refusals for sub-microsecond values targeting lower-precision temporal
+columns, with native sub-microsecond bindings still unsupported; MySQL has exact temporal/BIT and session-mode
 contracts but broader SQL-mode and DDL-session cases open; SQL Server safely
 refuses inexact legacy datetime ticks, money and sql_variant pending exact representations;
 ClickHouse has explicit finite-range/DST behavior and now selects a lower exact
