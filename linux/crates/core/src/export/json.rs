@@ -128,6 +128,30 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_json_keeps_booleans_distinct_from_text_and_null() {
+        let columns = vec![column("value")];
+        let rows = vec![
+            vec![Value::Bool(true)],
+            vec![Value::Text("true".into())],
+            vec![Value::Bool(false)],
+            vec![Value::Text("false".into())],
+            vec![Value::Null],
+        ];
+        let output: serde_json::Value = serde_json::from_str(&render_json(&columns, &rows)).unwrap();
+
+        assert_eq!(
+            output,
+            serde_json::json!([
+                {"value": true},
+                {"value": "true"},
+                {"value": false},
+                {"value": "false"},
+                {"value": null}
+            ])
+        );
+    }
+
+    #[test]
     fn value_contract_json_keeps_negative_zero_distinct_from_positive_zero_and_null() {
         let columns = vec![column("value")];
         let rows = vec![vec![Value::Float(-0.0)], vec![Value::Float(0.0)], vec![Value::Null]];
@@ -138,6 +162,33 @@ mod tests {
         assert_eq!(values[0]["value"].as_f64().unwrap().to_bits(), (-0.0f64).to_bits());
         assert_eq!(values[1]["value"].as_f64().unwrap().to_bits(), 0.0f64.to_bits());
         assert!(values[2]["value"].is_null());
+    }
+
+    #[test]
+    fn value_contract_json_round_trip_preserves_each_finite_exponent_and_mantissa_edges() {
+        let columns = vec![column("value")];
+        let mantissas = [0, 1, 1 << 51, (1 << 52) - 2, (1 << 52) - 1];
+        let mut expected = Vec::with_capacity(2 * 2048 * mantissas.len());
+        for sign in [0, 1_u64 << 63] {
+            for exponent in 0..0x7ff_u64 {
+                for mantissa in mantissas {
+                    expected.push(f64::from_bits(sign | (exponent << 52) | mantissa));
+                }
+            }
+        }
+        let rows = expected
+            .iter()
+            .map(|value| vec![Value::Float(*value)])
+            .collect::<Vec<_>>();
+
+        let text = render_json(&columns, &rows);
+        let output: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let values = output.as_array().expect("JSON export must be an array");
+        assert_eq!(values.len(), expected.len());
+        for (index, (json_row, expected)) in values.iter().zip(expected).enumerate() {
+            let actual = json_row["value"].as_f64().expect("finite float must be a JSON number");
+            assert_eq!(actual.to_bits(), expected.to_bits(), "f64 case {index}");
+        }
     }
 
     #[test]

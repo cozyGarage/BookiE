@@ -1633,3 +1633,22 @@ B3 remains open.
 ```sh
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-duckdb --file crates/drivers/duckdb/src/lib.rs --re 'duck_value_ref_to_value' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-duckdb-interval-decoder-mutants-audit-final -- --lib --test integration -- --test-threads=1
 ```
+
+### JSON finite float coverage and Bool distinction — September 30
+
+The JSON value contract now round-trips 20,480 deterministic finite `f64`
+values: both signs across every finite exponent field, with zero, adjacent and
+edge mantissas. A separate contract keeps booleans distinct from textual
+`true`/`false` and SQL NULL. The focused `tablepro-core` JSON value-contract
+tests passed (3 selected tests), as did formatting. A focused mutation run
+caught 7 of 8 generated mutations, with no timeout or unviable mutant. The one
+reported survivor deletes the explicit `Value::Null` match arm; the fallback
+still maps NULL to JSON null, so this mutant is equivalent and does not indicate
+a behavior gap. The test suite now catches deletion of the Bool arm. Remaining
+mantissa encodings are not exhaustively enumerated; B3 remains open.
+
+Evidence: `target/quality/20260930-json-exponent-float-mutants-final/mutants.out/outcomes.json`.
+
+```sh
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/json.rs --re 'value_to_json|row_to_json_object' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-json-exponent-float-mutants-final -- --lib -- --test-threads=1
+```
