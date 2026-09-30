@@ -3294,3 +3294,22 @@ The focused Docker contract passed. The strict GTK+DuckDB value runner passed
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1
 ```
+
+## ClickHouse nested decimal and temporal value, 2026-09-30
+
+The native nested-value matrix now includes an array of tuples containing
+`Decimal(38, 9)` and nanosecond `DateTime64(9, 'UTC')`. The contract compares
+BookiE's decoded JSON with ClickHouse `toJSONString` and checks `toTypeName`
+before verifying that SQL export, typed parameters and keyed grid editing
+refuse the type-less nested value without changing the stored MergeTree row.
+The focused Docker contract passed. Scoped mutation testing of `json_to_value`
+caught 9 of 10 generated mutations; one was compile-time unviable, with no
+survivors or timeouts. The strict GTK+DuckDB value runner passed 162 tests
+across 11 suites, including the expanded ClickHouse case:
+[`20260930T213122442487Z-values/report.json`](../target/quality/20260930T213122442487Z-values/report.json).
+The quick layer also passed:
+[`20260930T213517124497Z-layers/report.json`](../target/quality/20260930T213517124497Z-layers/report.json).
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --test-threads=1
+```

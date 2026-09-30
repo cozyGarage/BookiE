@@ -222,10 +222,19 @@ fn parameterised_types_decode_to_typed_values() {
 #[test]
 fn json_to_value_maps_common_types() {
     assert_eq!(json_to_value(serde_json::json!(true), "Bool"), Value::Bool(true));
+    assert_eq!(json_to_value(serde_json::json!(1), "Bool"), Value::Bool(true));
+    assert_eq!(json_to_value(serde_json::json!(0), "Bool"), Value::Bool(false));
     assert_eq!(json_to_value(serde_json::json!(42), "Int64"), Value::Int(42));
+    assert_eq!(json_to_value(serde_json::json!(1.25), "Float32"), Value::Float(1.25));
+    assert_eq!(json_to_value(serde_json::json!("-2.5"), "Float64"), Value::Float(-2.5));
     assert_eq!(
         json_to_value(serde_json::json!("hello"), "String"),
         Value::Text("hello".into())
+    );
+    let uuid = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    assert_eq!(
+        json_to_value(serde_json::json!(uuid.to_string()), "UUID"),
+        Value::Uuid(uuid)
     );
     assert_eq!(json_to_value(serde_json::Value::Null, "Nullable(String)"), Value::Null);
     assert_eq!(

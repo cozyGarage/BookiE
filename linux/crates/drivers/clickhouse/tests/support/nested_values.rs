@@ -35,6 +35,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "CAST(map('pair', tuple('wide', toUInt128('18446744073709551616'))) AS Map(String, Tuple(String, UInt128)))",
             "Map(String, Tuple(String, UInt128))",
         ),
+        (
+            "CAST([tuple(toDecimal128('12345678901234567890.123456789', 9), toDateTime64('2026-09-30 12:34:56.123456789', 9, 'UTC')), tuple(toDecimal128('-0.000000001', 9), toDateTime64('1999-12-31 23:59:59.000000001', 9, 'UTC'))] AS Array(Tuple(Decimal(38, 9), DateTime64(9, 'UTC'))))",
+            "Array(Tuple(Decimal(38, 9), DateTime64(9, 'UTC')))",
+        ),
     ];
 
     for (index, (expression, expected_type)) in cases.into_iter().enumerate() {

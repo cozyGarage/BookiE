@@ -172,6 +172,14 @@ permissive clamp with `STRICT_TRANS_TABLES` rejection, then verifies parser
 refusal and a valid exact edit in strict mode. Other SQL-mode and DDL-session
 combinations remain open.
 
+ClickHouse nested refusal coverage now also includes an array of tuples carrying
+`Decimal(38, 9)` and `DateTime64(9, 'UTC')`, checked against native type and JSON
+oracles with unchanged-row assertions after consumer refusals. More nested
+temporal, decimal and collection combinations remain untested. Its scoped
+decoder mutation run caught 9 of 10 generated changes; one was compile-time
+unviable, with no survivors or timeouts. The strict 162-test value run and quick
+layer passed on the working tree; details are in [value contracts](value-contracts.md).
+
 Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
 BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms

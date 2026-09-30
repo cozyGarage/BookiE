@@ -1844,3 +1844,15 @@ The strict value layer passed all 162 selected tests across 11 suites, and the
 quick layer passed formatting, Clippy, unit and sandbox gates:
 [`20260930T210700047035Z-values/report.json`](../target/quality/20260930T210700047035Z-values/report.json),
 [`20260930T211125388087Z-layers/report.json`](../target/quality/20260930T211125388087Z-layers/report.json).
+
+### ClickHouse nested decimal and temporal values — September 30
+
+The native nested-value contract now includes an array of tuples with
+`Decimal(38, 9)` and nanosecond `DateTime64(9, 'UTC')`. Independent
+`toTypeName` and `toJSONString` oracles verify the decoded value. The existing
+type-less SQL export, parameter and keyed-grid refusal assertions also verify
+that refusal leaves the native MergeTree row unchanged. The focused Docker case
+passed. Scoped decoder mutation testing caught 9 of 10 generated changes, with
+one compile-time unviable replacement and no survivors or timeouts. The strict
+value runner passed 162 tests across 11 suites, and quick passed; evidence is
+linked from [the value ledger](value-contracts.md#clickhouse-nested-decimal-and-temporal-value-2026-09-30).
