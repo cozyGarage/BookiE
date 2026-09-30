@@ -61,9 +61,29 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         let oracle: serde_json::Value = serde_json::from_str(exact_json).unwrap();
         assert_eq!(
             source.rows[0][0],
-            Value::Json(oracle),
+            Value::Json(oracle.clone()),
             "nested {expected_type} value differs from the native server JSON oracle"
         );
+        let json_output: serde_json::Value =
+            serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+        assert_eq!(
+            json_output[0]["value"], oracle,
+            "JSON export must preserve nested {expected_type}"
+        );
+        let csv_output = tablepro_core::export::render_csv(
+            &source.columns,
+            &source.rows,
+            &tablepro_core::export::CsvOptions::default(),
+        );
+        let csv_sheet = tablepro_core::import::read_csv(
+            csv_output.as_bytes(),
+            &tablepro_core::import::CsvImportOptions::default(),
+            None,
+        )
+        .unwrap();
+        let value_index = csv_sheet.headers.iter().position(|name| name == "value").unwrap();
+        let csv_json: serde_json::Value = serde_json::from_str(&csv_sheet.rows[0][value_index]).unwrap();
+        assert_eq!(csv_json, oracle, "CSV export must preserve nested {expected_type} JSON");
         assert_eq!(
             tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
             Err(tablepro_core::sql_literal::LiteralError::Unsupported),

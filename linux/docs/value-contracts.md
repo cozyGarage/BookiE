@@ -3341,11 +3341,13 @@ The same server-backed contract was extended with an
 native JSON result preserves a high-precision Decimal, a NULL array element,
 and an empty nested array. SQL export, parameter binding and keyed edit still
 refuse type-less JSON, with exact native row equality after the refusal. The
-focused Docker case and strict GTK+DuckDB selector passed; the selector included
-163 tests across 11 suites:
-[`20260930T220504654998Z-values/report.json`](../target/quality/20260930T220504654998Z-values/report.json).
+JSON and CSV exports are parsed back through their consumers and compared with
+the same native JSON oracle, preserving the nested value for downstream use.
+The focused Docker case and strict GTK+DuckDB selector passed 164 tests across
+11 suites:
+[`20260930T224745418261Z-values/report.json`](../target/quality/20260930T224745418261Z-values/report.json).
 The quick layer also passed:
-[`20260930T220959286873Z-layers/report.json`](../target/quality/20260930T220959286873Z-layers/report.json).
+[`20260930T225139833836Z-layers/report.json`](../target/quality/20260930T225139833836Z-layers/report.json).
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --test-threads=1

@@ -186,7 +186,8 @@ UInt128 containers: an array of tuples containing `Decimal(38, 9)` and
 `DateTime64(9, 'UTC')`. The server type and `toJSONString` outputs are compared
 with the decoded value; SQL export, parameter binding and keyed grid editing
 must refuse the type-less JSON value, and the live MergeTree row must remain
-unchanged. Other nested combinations remain open; see the matching contract in
+unchanged. JSON and CSV exports, plus CSV import parsing, preserve the same
+value against the native JSON oracle. Other nested combinations remain open; see the matching contract in
 the value ledger. Scoped mutation testing of the ClickHouse decoder caught 9
 of 10 changes, with one compile-time unviable replacement, no survivors and no
 timeouts. The same fixture now covers a nested nullable/empty Decimal array

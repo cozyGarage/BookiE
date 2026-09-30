@@ -1895,11 +1895,13 @@ The nested collection contract also covers
 precision Decimal, a NULL element, and an empty nested array. A real ClickHouse
 24.8 `toTypeName`/`toJSONString` oracle checks decoded structure. SQL export,
 parameter binding, and keyed grid editing refuse the type-less JSON value, and
-the stored MergeTree row remains unchanged. The focused Docker test passed, and
-the strict GTK/DuckDB selector passed 163 tests across 11 suites:
-[`20260930T220504654998Z-values/report.json`](../target/quality/20260930T220504654998Z-values/report.json).
+the stored MergeTree row remains unchanged. JSON and CSV output are parsed back
+through the corresponding consumers and compared with the native JSON oracle.
+The focused Docker test passed, and the strict GTK/DuckDB selector passed 164
+tests across 11 suites:
+[`20260930T224745418261Z-values/report.json`](../target/quality/20260930T224745418261Z-values/report.json).
 The quick layer also passed:
-[`20260930T220959286873Z-layers/report.json`](../target/quality/20260930T220959286873Z-layers/report.json).
+[`20260930T225139833836Z-layers/report.json`](../target/quality/20260930T225139833836Z-layers/report.json).
 
 ```sh
 rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
