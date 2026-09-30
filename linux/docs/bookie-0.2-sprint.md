@@ -1781,3 +1781,9 @@ predicate matches the exact nine-digit value through the driver's text
 fallback. The focused engine contract passed. This extends the shared filter
 unit and mutation evidence to the native consumer path; the broader B3 matrix
 and hosted gates remain open.
+
+The first strict value-runner pass omitted this integration case because test
+selection uses the `value_contract` name prefix. The case now follows that
+contract and runs as the 18th DuckDB suite test. The corrected strict runner
+passed all 157 tests across 11 suites, with no missing suites:
+[`20260930T194428530645Z-values/report.json`](../target/quality/20260930T194428530645Z-values/report.json).

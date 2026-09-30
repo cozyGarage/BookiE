@@ -971,7 +971,7 @@ async fn value_contract_bound_timestamptz_keeps_its_instant_in_any_session_zone(
 }
 
 #[tokio::test]
-async fn temporal_filter_parameters_keep_duckdb_column_precision_end_to_end() {
+async fn value_contract_temporal_filter_parameters_keep_duckdb_column_precision_end_to_end() {
     use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
 
     let connection = native_connection().await;

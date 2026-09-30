@@ -25,6 +25,9 @@ selected binary. A missing suite, zero matching tests, compilation error, test
 failure or five-minute fixture timeout makes the command fail. Every selected suite gets a log and the combined
 report is under `target/quality/*-values/report.json`. Failures in one engine do
 not prevent the other compiled suites from running.
+Integration tests are selected by the `value_contract` name prefix; new driver
+value-contract tests must use that prefix or they will run in the full crate
+suite but be excluded from this focused layer.
 
 ## CSV regression audit, 2026-09-29
 
@@ -3203,7 +3206,12 @@ also selects the exact `TIMESTAMP_NS` value after the driver sends its lossless
 text fallback.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration temporal_filter_parameters_keep_duckdb_column_precision_end_to_end -- --exact --nocapture
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_temporal_filter_parameters_keep_duckdb_column_precision_end_to_end -- --exact --nocapture
 ```
 
-The focused native DuckDB contract passed.
+The focused native DuckDB contract passed. The strict value runner selects
+integration tests by the `value_contract` name prefix. Its first rerun reported
+17 DuckDB tests and omitted this new case; renaming the test to follow the
+selection contract made it the 18th DuckDB case. The next strict run passed all
+157 selected tests across 11 suites, with no missing suites:
+[`20260930T194428530645Z-values/report.json`](../target/quality/20260930T194428530645Z-values/report.json).
