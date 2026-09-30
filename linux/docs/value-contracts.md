@@ -1561,6 +1561,25 @@ allowlisted PostgreSQL built-in array type. Database metadata is never interpola
 into SQL. PostgreSQL verified the edited value with a typed array comparison;
 NULL remained an array NULL element.
 
+### PostgreSQL array cast allowlist mutation follow-up, 2026-09-30
+
+The hosted core-1 mutation shard exposed missing assertions for the less common
+allowlisted array casts. The core regression now enumerates every built-in alias,
+checks the exact generated static cast for keyed updates, and rejects unknown
+types, SQL-shaped metadata, and malformed precision modifiers. A scoped
+`cargo-mutants` run generated 26 mutants for `postgres_array_cast_type`; all 26
+were caught, with no missed, timed-out or unviable mutants. This proves the
+builder mapping and refusal boundary, not a native-server round trip for every
+array type.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib postgres_array_update_casts_allowlist_type_metadata
+rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/sql_dialect.rs --re 'postgres_array_cast_type' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260930-postgres-array-cast-mutants -- --lib postgres_array_update_casts_allowlist_type_metadata
+```
+
+The scoped mutation report is at
+`target/quality/20260930-postgres-array-cast-mutants/mutants.out/outcomes.json`.
+
 The focused core cast and hostile-metadata tests passed. The Docker-backed
 PostgreSQL regression passed after the fix:
 
