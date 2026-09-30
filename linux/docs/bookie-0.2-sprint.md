@@ -1775,15 +1775,20 @@ failure is not treated as green.
 
 The accepted DuckDB filter values are now exercised against embedded DuckDB,
 using native `TIMESTAMP_MS` and `TIMESTAMP_NS` schema metadata and actual bound
-predicates. The millisecond comparison returns only the matching row; the
-sub-millisecond predicate refuses before query execution; the nanosecond
-predicate matches the exact nine-digit value through the driver's text
-fallback. The focused engine contract passed. This extends the shared filter
-unit and mutation evidence to the native consumer path; the broader B3 matrix
-and hosted gates remain open.
+predicates. Additional native cases cover `TIME_NS` exact text fallback and
+offset-origin `TIMESTAMPTZ`; the millisecond comparison returns only the
+matching row, while sub-millisecond TIMESTAMP_MS/TIMESTAMPTZ predicates refuse
+before execution. Nanosecond TIME/TIMESTAMP matches exact values through the
+driver's text fallback, and TIMESTAMPTZ uses an `epoch_us` instant oracle. The
+focused DuckDB crate passed 41 tests. This extends the shared filter unit and
+mutation evidence to the native consumer path; the broader B3 matrix and hosted
+gates remain open.
+The quick layer then passed with formatting, Clippy, unit and sandbox gates:
+[`20260930T195640249113Z-layers/report.json`](../target/quality/20260930T195640249113Z-layers/report.json).
 
 The first strict value-runner pass omitted this integration case because test
 selection uses the `value_contract` name prefix. The case now follows that
-contract and runs as the 18th DuckDB suite test. The corrected strict runner
-passed all 157 tests across 11 suites, with no missing suites:
-[`20260930T194428530645Z-values/report.json`](../target/quality/20260930T194428530645Z-values/report.json).
+contract, and the strict DuckDB selection now includes all 20 temporal filter
+contracts. The corrected runner passed all 159 tests across 11 suites, with no
+missing suites:
+[`20260930T195202641431Z-values/report.json`](../target/quality/20260930T195202641431Z-values/report.json).

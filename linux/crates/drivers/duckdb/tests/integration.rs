@@ -1046,3 +1046,89 @@ async fn value_contract_temporal_filter_parameters_keep_duckdb_column_precision_
         ]]
     );
 }
+
+#[tokio::test]
+async fn value_contract_time_ns_filter_uses_exact_text_fallback() {
+    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+
+    let connection = native_connection().await;
+    connection
+        .execute("CREATE TABLE filter_time_ns (value TIME_NS); INSERT INTO filter_time_ns VALUES (TIME_NS '12:34:56.123456789')")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "filter_time_ns").await.unwrap();
+    assert_eq!(columns[0].data_type.to_ascii_lowercase(), "time_ns");
+    let filter = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("12:34:56.123456789".into())),
+        }],
+        ..Default::default()
+    };
+    let (predicate, params) = build_filter_where("duckdb", &columns, &filter).unwrap().unwrap();
+    let result = connection
+        .query_params(
+            &format!("SELECT typeof(value), CAST(value AS VARCHAR) FROM filter_time_ns WHERE {predicate}"),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("TIME_NS".into()),
+            Value::Text("12:34:56.123456789".into())
+        ]]
+    );
+}
+
+#[tokio::test]
+async fn value_contract_timestamptz_filter_preserves_offset_origin_instant() {
+    use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where};
+
+    let connection = native_connection().await;
+    connection
+        .execute("CREATE TABLE filter_tz (value TIMESTAMPTZ); INSERT INTO filter_tz VALUES (TIMESTAMPTZ '2026-09-30 12:34:56.123456+05:30')")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "filter_tz").await.unwrap();
+    assert_eq!(columns[0].data_type.to_ascii_lowercase(), "timestamp with time zone");
+
+    let lossy = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("2026-09-30T12:34:56.123456789+05:30".into())),
+        }],
+        ..Default::default()
+    };
+    assert!(build_filter_where("duckdb", &columns, &lossy).is_err());
+
+    let exact = FilterSet {
+        rules: vec![FilterRule {
+            column: "value".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("2026-09-30T12:34:56.123456000+05:30".into())),
+        }],
+        ..Default::default()
+    };
+    let (predicate, params) = build_filter_where("duckdb", &columns, &exact).unwrap().unwrap();
+    let result = connection
+        .query_params(
+            &format!("SELECT typeof(value), epoch_us(value) FROM filter_tz WHERE {predicate}"),
+            &params,
+        )
+        .await
+        .unwrap();
+    let expected_epoch = chrono::DateTime::parse_from_rfc3339("2026-09-30T12:34:56.123456+05:30")
+        .unwrap()
+        .timestamp_micros();
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Text("TIMESTAMP WITH TIME ZONE".into()),
+            Value::Int(expected_epoch)
+        ]]
+    );
+}

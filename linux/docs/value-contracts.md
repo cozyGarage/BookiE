@@ -3197,21 +3197,25 @@ across all 11 suites:
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core duckdb_temporal_filters_refuse_values_the_column_would_truncate -- --nocapture
 ```
 
-The embedded DuckDB integration test now exercises the filter output through
-real parameter binding and native column comparisons. It checks server-reported
-`TIMESTAMP_MS` and `TIMESTAMP_NS` metadata and values, proves the exact
-millisecond predicate selects only its matching row, and verifies a
-sub-millisecond predicate is rejected before execution. Nanosecond filter input
-also selects the exact `TIMESTAMP_NS` value after the driver sends its lossless
-text fallback.
+Embedded DuckDB integration tests now exercise filter output through real
+parameter binding and native column comparisons. They check server-reported
+`TIMESTAMP_MS`, `TIMESTAMP_NS`, `TIME_NS`, and `TIMESTAMPTZ` metadata and values;
+the exact millisecond predicate selects only its matching row, while
+sub-millisecond `TIMESTAMP_MS` and `TIMESTAMPTZ` predicates refuse before
+execution. Nanosecond TIME/TIMESTAMP filters select their exact values through
+the driver's lossless text fallback. An offset-origin TIMESTAMPTZ filter keeps
+the exact instant through text binding and an `epoch_us` native oracle.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_temporal_filter_parameters_keep_duckdb_column_precision_end_to_end -- --exact --nocapture
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_time_ns_filter_uses_exact_text_fallback -- --exact --nocapture
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_timestamptz_filter_preserves_offset_origin_instant -- --exact --nocapture
 ```
 
-The focused native DuckDB contract passed. The strict value runner selects
+The focused DuckDB crate passed all 41 tests. The strict value runner selects
 integration tests by the `value_contract` name prefix. Its first rerun reported
-17 DuckDB tests and omitted this new case; renaming the test to follow the
-selection contract made it the 18th DuckDB case. The next strict run passed all
-157 selected tests across 11 suites, with no missing suites:
-[`20260930T194428530645Z-values/report.json`](../target/quality/20260930T194428530645Z-values/report.json).
+17 DuckDB tests and omitted the first new case; renaming it to follow the
+selection contract made it the 18th DuckDB case. After adding TIME_NS and
+TIMESTAMPTZ native filter cases, the strict run selected 20 DuckDB contracts
+and passed all 159 tests across 11 suites, with no missing suites:
+[`20260930T195202641431Z-values/report.json`](../target/quality/20260930T195202641431Z-values/report.json).
