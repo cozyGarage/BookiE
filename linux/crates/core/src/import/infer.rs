@@ -230,6 +230,21 @@ mod tests {
     }
 
     #[test]
+    fn blank_and_null_marker_cells_do_not_widen_numeric_inference() {
+        let options = CsvImportOptions {
+            null_marker: "NULL".into(),
+            ..Default::default()
+        };
+        let columns = infer_columns(
+            &sheet(&["amount"], &[&["12.30"], &[""], &["NULL"], &["2.50"]]),
+            &options,
+            "postgres",
+        );
+
+        assert_eq!(columns[0].data_type, "NUMERIC");
+    }
+
+    #[test]
     fn an_empty_field_is_text_rather_than_a_guess_from_nothing() {
         let columns = inferred(&["note"], &[&[""], &[""]]);
 
@@ -283,6 +298,19 @@ mod tests {
         assert_eq!(type_name("mysql", ColumnKind::Uuid), "CHAR(36)");
         assert_eq!(type_name("mssql", ColumnKind::Text), "NVARCHAR(MAX)");
         assert_eq!(type_name("clickhouse", ColumnKind::Int), "BIGINT");
+    }
+
+    #[test]
+    fn sqlite_import_types_preserve_storage_affinity_for_numeric_and_binary_kinds() {
+        for (kind, expected) in [
+            (ColumnKind::Bool, "INTEGER"),
+            (ColumnKind::Int, "INTEGER"),
+            (ColumnKind::Float, "REAL"),
+            (ColumnKind::Decimal, "NUMERIC"),
+            (ColumnKind::Bytes, "BLOB"),
+        ] {
+            assert_eq!(type_name("sqlite", kind), expected, "{kind:?}");
+        }
     }
 
     #[test]

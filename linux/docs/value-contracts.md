@@ -2823,3 +2823,26 @@ out mutants. Evidence:
 rtk cargo test --locked -p tablepro-core import::csv_import::tests
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/import/csv_import.rs --re 'read_csv_file|check_file_size|read_csv|record_strings|check_width|detect_delimiter|delimiter_score|detect_header|CsvFormat|MAX_FILE_BYTES|MAX_FIELD_BYTES' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-csv-import-boundaries-mutants-final -- --lib -- --test-threads=1
 ```
+
+### CSV inference and insert-plan mutation follow-up, 2026-09-30
+
+The hosted core-3 mutation shard found missing assertions around inference and
+plan construction. Import inference now proves blank and configured NULL-marker
+cells do not widen a numeric column to text. SQLite's bool/int/float/decimal/
+bytes type-name mappings are pinned to INTEGER/REAL/NUMERIC/BLOB. Plan tests now
+check reported row count, exclude both auto-increment and generated fields from
+the plan's columns and bound rows, and keep the SQL and row shapes aligned. The
+placeholder plan already uses non-NULL synthetic values, so an explicit
+`default_value: None` override was redundant and has been removed.
+
+The focused import suite passed 70 tests. Scoped mutation runs caught 9 of 10
+inference mutants (one was compile-time unviable) and 9 of 13 plan mutants (four
+were compile-time unviable); neither run had missed mutants or timeouts. Evidence:
+`target/quality/20260930-csv-infer-mutants/mutants.out/outcomes.json` and
+`target/quality/20260930-csv-plan-mutants-final/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib import::
+rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/import/infer.rs --re 'infer_kind|sqlite_type' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260930-csv-infer-mutants -- --lib import::
+rtk cargo mutants --dir . --package tablepro-core --file crates/core/src/import/plan.rs --re 'row_count|insert_columns|insert_statement' --test-tool cargo --timeout 30 --build-timeout 120 --output target/quality/20260930-csv-plan-mutants-final -- --lib import::
+```

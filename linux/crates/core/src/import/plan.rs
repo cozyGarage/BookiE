@@ -110,13 +110,7 @@ fn insert_columns(target: &ImportTarget<'_>) -> Result<(Vec<ColumnInfo>, Vec<Opt
 /// values that are never NULL, so no column is dropped from it for one
 /// row and kept for the next.
 fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result<String, PlanError> {
-    let shape_columns: Vec<ColumnInfo> = columns
-        .iter()
-        .map(|column| ColumnInfo {
-            default_value: None,
-            ..column.clone()
-        })
-        .collect();
+    let shape_columns: Vec<ColumnInfo> = columns.to_vec();
     let shape_values = vec![Value::Int(0); shape_columns.len()];
     let (statement, _) = build_insert_from_draft(
         target.driver_id,
@@ -211,6 +205,7 @@ mod tests {
             plan.statement,
             "INSERT INTO \"people\" (\"id\", \"name\") VALUES ($1, $2)"
         );
+        assert_eq!(plan.row_count(), 2);
         assert_eq!(plan.rows.len(), 2);
         assert_eq!(plan.rows[0], vec![Value::Int(1), Value::Text("ada".to_owned())]);
     }
@@ -246,14 +241,27 @@ mod tests {
 
     #[test]
     fn a_column_the_engine_fills_itself_is_never_written() {
-        let mut columns = vec![column("id", "bigint"), column("name", "text")];
+        let mut columns = vec![
+            column("id", "bigint"),
+            column("computed", "text"),
+            column("name", "text"),
+        ];
         columns[0].is_auto_increment = true;
-        let mapping = vec![Some(0), Some(1)];
-        let sheet = sheet(&[&["1", "ada"]], &["id", "name"]);
+        columns[1].is_generated = true;
+        let mapping = vec![Some(0), Some(1), Some(2)];
+        let sheet = sheet(&[&["1", "must be skipped", "ada"]], &["id", "computed", "name"]);
 
         let plan = build_insert_plan(&target(&columns, &mapping), &sheet, &CsvImportOptions::default()).expect("plan");
 
         assert_eq!(plan.statement, "INSERT INTO \"people\" (\"name\") VALUES ($1)");
+        assert_eq!(
+            plan.columns
+                .iter()
+                .map(|column| column.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["name"]
+        );
+        assert_eq!(plan.rows, vec![vec![Value::Text("ada".into())]]);
     }
 
     #[test]
