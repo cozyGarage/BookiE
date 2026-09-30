@@ -114,6 +114,58 @@ async fn a_lost_mongodb_server_is_reported_as_disconnected() {
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn connection_loss_during_cursor_get_more_fails_the_whole_query() {
+    use mongodb::bson::{Document, doc};
+
+    // MongoDB's failCommand failpoint closes only the getMore socket. The
+    // driver's preceding 50-document schema sample succeeds, then the query
+    // has already received its first batch before the next batch is lost.
+    let container = Mongo::default()
+        .with_tag(MONGO_TAG)
+        .with_cmd(["mongod", "--setParameter", "enableTestCommands=1", "--bind_ip_all"])
+        .start()
+        .await
+        .expect("start MongoDB with test failpoints enabled");
+    let host = container.get_host().await.expect("host").to_string();
+    let port = container.get_host_port_ipv4(27017).await.expect("port");
+    let options = opts(&host, port, "appdb");
+    let connection = MongodbDriver.connect(options).await.expect("connect");
+
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("native MongoDB client");
+    let documents: Vec<Document> = (0..150)
+        .map(|index| doc! { "sequence": index, "payload": format!("row-{index}") })
+        .collect();
+    client
+        .database("appdb")
+        .collection::<Document>("disconnect_cursor")
+        .insert_many(documents)
+        .await
+        .expect("seed more rows than MongoDB's initial cursor batch");
+
+    client
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "times": 1 },
+            "data": { "failCommands": ["getMore"], "closeConnection": true }
+        })
+        .await
+        .expect("arm one-shot getMore connection loss");
+
+    let error = connection
+        .query("db.disconnect_cursor.find({})")
+        .await
+        .expect_err("cursor loss after the first batch must reject the query");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "mid-cursor MongoDB connection loss must be Disconnected, got {error:?}"
+    );
+}
+
 async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Connection> {
     let conn = MongodbDriver.connect(opts(host, port, "appdb")).await.expect("connect");
     conn.execute(r#"db.people.insertOne({"name": "ada", "team": "core"})"#)

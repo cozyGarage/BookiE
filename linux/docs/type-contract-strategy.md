@@ -136,7 +136,9 @@ server's cancellation error rather than partial rows. SQL Server now tests
 server loss while draining a multi-result stream and requires `Disconnected`,
 no partial result, and a successful fresh connection after restart. These
 focused cases passed. Mid-stream failure, cancellation, completeness and
-connection-state parity on MongoDB and Redis remain open, as do the native-type
+connection-state parity during cursor/paged result production remains open on
+Redis; MongoDB now has a deterministic failpoint contract for cursor `getMore`
+loss after its first batch. Native-type
 and consumer targets in this matrix. Passing the server-loss and explicit
 reconnect cases does not close those other gaps.
 

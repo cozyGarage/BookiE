@@ -1155,6 +1155,20 @@ and `target/quality/20260929T211702925065Z-values/report.json`.
 
 B3 remains open.
 
+### MongoDB mid-cursor disconnect completeness — September 30
+
+A Docker integration test enables MongoDB's `failCommand` test failpoint in an
+isolated fixture, seeds 150 rows, and closes the connection on one `getMore`.
+The driver's schema sample completes first; the query then receives its initial
+cursor batch and must fail as `Disconnected` when fetching the next batch. The
+public query API cannot return rows alongside an error, so this also guards
+against treating a partial cursor as a successful result. The focused ignored
+integration test passed locally. Redis paged-result loss during row production
+remains open, along with B3's unrelated native-type, consumer and acceptance
+gaps.
+
+B3 remains open.
+
 ### MongoDB BSON DateTime grid-edit precision — September 29
 
 A failing-first app parser test showed that MongoDB `date` cells display RFC3339
