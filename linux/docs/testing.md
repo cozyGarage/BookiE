@@ -492,6 +492,11 @@ pass as exhaustive.
 
 Lower a baseline in the same change when an oversized file shrinks.
 
+When inline unit tests push a production module over the soft limit, move them
+to a sibling `tests.rs` and declare it with `#[cfg(test)] mod tests;`. Import
+the parent with `use super::*;` so private behavior stays directly testable
+without carrying the test bodies in the production file.
+
 ## Browse performance
 
 See [the September measurements](performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
