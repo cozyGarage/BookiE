@@ -1583,7 +1583,7 @@ limit returns the existing visible undecodable marker rather than truncated data
 
 Limits: network, enum/domain/composite/range and most JSON/BSON array element
 contracts remain unsupported or untested; grid edits are verified only for
-boolean[], bytea[], uuid[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
+boolean[], bytea[], uuid[], timestamptz[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
 acceptance matrix remains open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
@@ -1609,12 +1609,13 @@ parser preserves `{true,false,NULL}` as text, the update builder casts through
 remain unchanged. This expands the server-backed edit matrix to boolean[] as
 well as integer[], text[], numeric[] and float8[]. The full PostgreSQL integration
 suite passed 64 tests in 119.45 seconds. The strict GTK + DuckDB value runner
-passed 148 tests across all 11 suites with no missing suites:
-`target/quality/20260930T161458562268Z-values/report.json` (`dirty: true`, based
-on `209c8cd`).
+later passed 154 selected tests across all 11 suites with no missing suites.
+Its current report is `target/quality/20260930T174541378362Z-values/report.json`
+(`dirty: true`, based on `9cc0bbb`); the six PostgreSQL array parser tests are
+included in the 21 app tests selected by the strict runner.
 
 ```sh
-rtk cargo test --locked -p tablepro-app --lib postgres_boolean_array_grid_literal_stays_text_through_the_keyed_update_builder -- --test-threads=1
+rtk cargo test --locked -p tablepro-app --lib value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_keyed_update_builder -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
 ```
 
@@ -1632,9 +1633,9 @@ the entire `{...}` literal as one UUID. PostgreSQL `[]` metadata now stays text
 before scalar classification. The app test checks parsing and keyed-update SQL;
 the Docker test compares the edited array's native `array_send` bytes with an
 independent server array and confirms the sibling row is unchanged. Both focused
-tests passed. The strict GTK + DuckDB runner passed 148 selected tests across
+tests passed. The strict GTK + DuckDB runner passed 154 selected tests across
 all 11 suites with no missing suites:
-`target/quality/20260930T162631263421Z-values/report.json`.
+`target/quality/20260930T174541378362Z-values/report.json`.
 An additional app parser matrix checks that UUID, date, time, numeric, boolean,
 and timestamptz array metadata preserve the complete literal as text. The full
 app library suite passed 413 tests, with 12 existing ignored tests.
@@ -1644,13 +1645,25 @@ cargo-mutants report generated one whole-function replacement, which was
 unviable because `TypeKind` does not implement `Default`; it did not count as a
 caught mutant. Report: `target/quality/20260930-pg-array-type-parser-mutants-cached/`.
 
+A PostgreSQL `timestamptz[]` grid edit now carries two offset-origin values with
+six fractional digits plus NULL through the app parser and keyed-update cast.
+The Docker contract compares the stored value's native `array_send` bytes with
+an independently constructed timestamptz array and confirms the sibling row's
+wire bytes are unchanged. The app parser/builder test and PostgreSQL integration
+contract both pass.
+
 ```sh
-rtk cargo test --manifest-path linux/crates/app/Cargo.toml postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder
+rtk cargo test --manifest-path linux/crates/app/Cargo.toml value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the_keyed_update_builder
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
+```
+
+```sh
+rtk cargo test --manifest-path linux/crates/app/Cargo.toml value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder
 rtk cargo test --manifest-path linux/crates/drivers/postgres/Cargo.toml --test integration value_contract_array_grid_edit_preserves_array_elements -- --include-ignored
 ```
 
 ```sh
-rtk cargo test --locked -p tablepro-app --lib postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder -- --test-threads=1
+rtk cargo test --locked -p tablepro-app --lib value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
 ```
 
@@ -1697,7 +1710,7 @@ with ordinality checks each element and a separate NULL flag. The app
 parser-to-builder unit, focused core cast test, and expanded integration test
 passed against PostgreSQL.
 
-Exact grid editing is server-verified for `boolean[]`, `bytea[]`, `uuid[]`, `integer[]`,
+Exact grid editing is server-verified for `boolean[]`, `bytea[]`, `uuid[]`, `timestamptz[]`, `integer[]`,
 `text[]`, `numeric[]` and `float8[]`. JSON and other
 unsupported element OIDs, custom/user-defined arrays
 and automatic array parameter typing remain outside the tested support surface.
@@ -1764,12 +1777,12 @@ exposed missing coverage for the `BLOB` and `BINARY` byte-type aliases; the
 catalog contract now pins those spellings, plus `VARBINARY` and `IMAGE`. The
 final classifier run caught 13 of 14 mutants, with one unviable replacement and
 no survivors or timeouts. After the array fix, the strict GTK + DuckDB value
-runner passed 148 tests across all 11 suites with no missing suites; its report is
-`target/quality/20260930T150331919913Z-values/report.json` (run against dirty
-working-tree changes based on `8758caa`).
+runner passed 154 tests across all 11 suites with no missing suites; its latest
+report is `target/quality/20260930T174541378362Z-values/report.json` (run against
+dirty working-tree changes based on `9cc0bbb`).
 
 ```sh
-rtk cargo test --locked -p tablepro-app --lib postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text -- --test-threads=1
+rtk cargo test --locked -p tablepro-app --lib value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values -- --include-ignored --exact --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
 rtk cargo test --locked -p tablepro-core postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars

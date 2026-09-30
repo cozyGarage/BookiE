@@ -258,6 +258,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     assert_bool_array_grid_edit(connection).await;
     assert_bytea_array_grid_edit(connection).await;
     assert_uuid_array_grid_edit(connection).await;
+    assert_timestamptz_array_grid_edit(connection).await;
 }
 
 async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
@@ -403,6 +404,56 @@ async fn assert_uuid_array_grid_edit(connection: &dyn Connection) {
         .unwrap();
     let actual = connection
         .query("SELECT id, encode(array_send(value), 'hex') FROM uuid_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(actual.rows[0][0], Value::Int(1));
+    assert_eq!(actual.rows[0][1], expected.rows[0][0]);
+    assert_eq!(actual.rows[1][0], Value::Int(2));
+    assert_eq!(actual.rows[1][1], sibling_wire);
+}
+
+async fn assert_timestamptz_array_grid_edit(connection: &dyn Connection) {
+    const ARRAY: &str = r#"{"2026-09-30 12:34:56.123456+05:30","1999-12-31 23:59:59.000001-07:00",NULL}"#;
+    const ORACLE: &str = "ARRAY['2026-09-30 12:34:56.123456+05:30'::timestamptz,'1999-12-31 23:59:59.000001-07:00'::timestamptz,NULL]::timestamptz[]";
+
+    connection
+        .execute("CREATE TABLE timestamptz_array_grid_edit (id integer PRIMARY KEY, value timestamptz[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO timestamptz_array_grid_edit VALUES (1, ARRAY['2000-01-01 00:00:00+00'::timestamptz]), (2, ARRAY['2001-01-01 00:00:00+00'::timestamptz])")
+        .await
+        .unwrap();
+    let mut rows = connection
+        .query("SELECT * FROM timestamptz_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM timestamptz_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
+    rows.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "timestamptz_array_grid_edit",
+        &rows.columns,
+        &[(value_index, Value::Text(ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let expected = connection
+        .query(&format!("SELECT encode(array_send({ORACLE}), 'hex')"))
+        .await
+        .unwrap();
+    let actual = connection
+        .query("SELECT id, encode(array_send(value), 'hex') FROM timestamptz_array_grid_edit ORDER BY id")
         .await
         .unwrap();
     assert_eq!(actual.rows[0][0], Value::Int(1));
