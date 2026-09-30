@@ -125,13 +125,15 @@ evidence is recorded in [value contracts](value-contracts.md).
 
 PostgreSQL and MySQL have Docker regressions that terminate a slow query after
 row production has begun; each whole query must fail as `Disconnected`, never
-return a partial result, and its pool must recover. ClickHouse now tests both a
+return a partial result, and its pool must recover. ClickHouse tests both a
 hard server stop (`Disconnected`) and graceful shutdown, which must return the
-server's cancellation error rather than partial rows. These focused cases
-passed. Mid-stream failure, cancellation, completeness and connection-state
-parity across the other engines remain open, as do the native-type and consumer
-targets in this matrix. Passing the server-loss and explicit reconnect cases
-does not close those other gaps.
+server's cancellation error rather than partial rows. SQL Server now tests
+server loss while draining a multi-result stream and requires `Disconnected`,
+no partial result, and a successful fresh connection after restart. These
+focused cases passed. Mid-stream failure, cancellation, completeness and
+connection-state parity on MongoDB and Redis remain open, as do the native-type
+and consumer targets in this matrix. Passing the server-loss and explicit
+reconnect cases does not close those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is
