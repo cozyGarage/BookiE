@@ -258,6 +258,12 @@ pub(super) enum TypeKind {
 /// before bare `timestamp`, and `tinyint(1)` (MySQL bool) must be
 /// matched before generic `tinyint` / `int` patterns.
 pub(super) fn classify_type(dt: &str) -> TypeKind {
+    // PostgreSQL arrays arrive as their textual array literal. Classifying
+    // by the element name (for example `uuid[]` or `date[]`) would feed the
+    // whole literal to a scalar parser and reject valid grid edits.
+    if dt.trim_end().ends_with("[]") {
+        return TypeKind::Text;
+    }
     if let Some(kind) = classify_bool_or_bit(dt) {
         return kind;
     }

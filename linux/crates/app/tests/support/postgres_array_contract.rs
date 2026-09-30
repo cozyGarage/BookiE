@@ -126,3 +126,45 @@ fn postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder() {
     assert!(sql.contains("$1::text::pg_catalog.bytea[]"));
     assert_eq!(params[0], Value::Text(literal.into()));
 }
+
+#[test]
+fn postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder() {
+    let literal = "{550e8400-e29b-41d4-a716-446655440000,6ba7b810-9dad-11d1-80b4-00c04fd430c8,NULL}";
+    let columns = vec![
+        ColumnInfo {
+            name: "id".into(),
+            data_type: "integer".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        },
+        ColumnInfo {
+            name: "value".into(),
+            data_type: "uuid[]".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+        },
+    ];
+    let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "uuid_array_grid",
+        &columns,
+        &[(1, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(sql.contains("$1::text::pg_catalog.uuid[]"));
+    assert_eq!(params[0], Value::Text(literal.into()));
+}
