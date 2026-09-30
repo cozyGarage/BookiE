@@ -256,6 +256,68 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     );
 }
 
+pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
+    const ARRAY: &str = "{1.0000000000000002,-0,5e-324,NaN,Infinity,-Infinity,NULL}";
+    const ORACLE: &str = "ARRAY[1.0000000000000002::float8, '-0'::float8, '5e-324'::float8, \
+        'NaN'::float8, 'Infinity'::float8, '-Infinity'::float8, NULL::float8]";
+
+    connection
+        .execute("CREATE TABLE float8_array_grid_edit (id integer PRIMARY KEY, value float8[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO float8_array_grid_edit VALUES (1, ARRAY[0]::float8[]), (2, ARRAY[77]::float8[])")
+        .await
+        .unwrap();
+    let mut row = connection
+        .query("SELECT * FROM float8_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = row.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = row.columns.iter().position(|column| column.name == "value").unwrap();
+    row.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "float8_array_grid_edit",
+        &row.columns,
+        &[(value_index, Value::Text(ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let expected = connection
+        .query(&format!(
+            "SELECT ({ORACLE})::text, encode(array_send(({ORACLE})::float8[]), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let actual = connection
+        .query(
+            "SELECT id, value::text, encode(array_send(value), 'hex') \
+             FROM float8_array_grid_edit ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(actual.rows[0][0], Value::Int(1));
+    assert_eq!(&actual.rows[0][1..], expected.rows[0].as_slice());
+    assert_eq!(
+        actual.rows[1][0],
+        Value::Int(2),
+        "the sibling row identity remains intact"
+    );
+    assert_eq!(actual.rows[1][1], Value::Text("{77}".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    assert_float8_array_grid_edit(connection.as_ref()).await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_array_grid_edit_preserves_array_elements() {

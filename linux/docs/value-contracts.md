@@ -1563,8 +1563,9 @@ exercise bounded decoding. Binary-to-text array decoding is capped at 16 MiB; ex
 limit returns the existing visible undecodable marker rather than truncated data.
 
 Limits: network, enum/domain/composite/range and most JSON/BSON array element
-contracts remain unsupported or untested; automatic array editing and the full grid/MCP/import acceptance matrix
-remain open. Binding text in these tests uses an explicit
+contracts remain unsupported or untested; grid edits are verified only for
+integer[], text[], numeric[] and float8[], and the full grid/MCP/import acceptance
+matrix remains open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
 Test locations: `crates/drivers/postgres/src/array.rs` and
@@ -1616,7 +1617,8 @@ with ordinality checks each element and a separate NULL flag. The app
 parser-to-builder unit, focused core cast test, and expanded integration test
 passed against PostgreSQL.
 
-Exact grid editing is server-verified for `integer[]` and `text[]`. JSON and other
+Exact grid editing is server-verified for `integer[]`, `text[]`, `numeric[]` and
+`float8[]`. JSON and other
 unsupported element OIDs, custom/user-defined arrays
 and automatic array parameter typing remain outside the tested support surface.
 B3 remains open.
@@ -1654,6 +1656,24 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 ```
 
 The PostgreSQL 16 Docker contract passed.
+
+### PostgreSQL float8[] grid edit at floating-point boundaries, 2026-09-30
+
+The app parser keeps a float8[] grid literal as exact text, and the keyed-update
+builder casts it through `text` to the fixed `pg_catalog.float8[]` type. A
+PostgreSQL 16 Docker contract edits values containing the adjacent float above
+1.0, negative zero, the minimum positive subnormal, NaN, both infinities and
+NULL. It compares the stored array text and `array_send` bytes with an
+independently constructed native array oracle, verifies the update affects one
+row, and confirms a sibling row is unchanged. The focused parser, grid-edit and
+full PostgreSQL integration tests passed; the latter ran 64 tests in 154.01
+seconds.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text -- --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+```
 
 ### PostgreSQL IPv6 `inet[]` explicit refusal
 

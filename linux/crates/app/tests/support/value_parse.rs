@@ -873,6 +873,26 @@ fn postgres_numeric_array_grid_literal_stays_text_for_the_shared_cast() {
 }
 
 #[test]
+fn postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text() {
+    let literal = "{1.0000000000000002,-0,5e-324,NaN,Infinity,-Infinity,NULL}";
+    let mut columns = vec![col("id", false), col("float8[]", false)];
+    columns[0].primary_key = true;
+    let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "float8_array_grid",
+        &columns,
+        &[(1, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(sql.contains("$1::text::pg_catalog.float8[]"));
+    assert_eq!(params[0], Value::Text(literal.into()));
+}
+
+#[test]
 fn normalize_single_line_leaves_plain_text_untouched() {
     assert_eq!(normalize_single_line_input("hello world"), "hello world");
 }
