@@ -2913,3 +2913,24 @@ enabled and no missing suites; the quick layer also passed. The strict report is
 rtk cargo test --locked -p tablepro-core --lib value_contract_single_row_json_export_preserves_value_types
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/json.rs --re 'row_to_json' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-single-row-json-mutants -- --lib -- --test-threads=1
 ```
+
+## SQL Server DATE and DATETIME2 calendar edges, 2026-09-30
+
+A Docker-backed contract compares DATE year 0001/year 9999 and DATETIME2(7)
+minimum/maximum calendar values against independent SQL Server text. It checks
+exact `Value::Date` and `Value::DateTime` results, including the final 100 ns
+fraction, then binds those values as parameters and exports/re-imports them as
+SQL literals. Native text, decoded values and re-imported values must all agree.
+This narrows the temporal gap for DATE and DATETIME2; it does not establish
+support for conversions outside chrono's range or other SQL Server temporal
+families. No production defect was found.
+
+The focused Docker test and the complete SQL Server integration suite passed;
+the latter ran 32 tests in 175.97 seconds. The targeted mutation run generated
+one unviable mutant and no viable missed mutants, so it provides no additional
+test-sensitivity evidence.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mssql --test integration temporal_boundaries::value_contract_date_and_datetime2_calendar_edges_match_native_text_and_bind_exactly -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mssql --test integration -- --include-ignored --test-threads=1
+```

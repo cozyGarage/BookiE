@@ -16,6 +16,8 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
+#[path = "support/temporal_boundaries.rs"]
+mod temporal_boundaries;
 
 #[tokio::test]
 async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
