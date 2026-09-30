@@ -508,7 +508,7 @@ non-Mongo behavior and same-width type-change invalidation. A follow-up now
 feeds the effective page schema into the actual cell editability predicate: a
 text cell stays editable under the sampled string schema, but becomes read-only
 when the current page reports `mixed`. The latest full app library run passed
-410 tests (12 ignored). A scoped in-place mutation run against the page-schema
+411 tests (12 ignored). A scoped in-place mutation run against the page-schema
 handoff caught all 3 viable mutations; 3 whole-function replacements were
 unviable, with no survivors or timeouts.
 
@@ -1583,7 +1583,7 @@ limit returns the existing visible undecodable marker rather than truncated data
 
 Limits: network, enum/domain/composite/range and most JSON/BSON array element
 contracts remain unsupported or untested; grid edits are verified only for
-boolean[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
+boolean[], bytea[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
 acceptance matrix remains open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
@@ -1608,13 +1608,26 @@ parser preserves `{true,false,NULL}` as text, the update builder casts through
 `array_send` bytes match after the edit. A second row's original wire bytes
 remain unchanged. This expands the server-backed edit matrix to boolean[] as
 well as integer[], text[], numeric[] and float8[]. The full PostgreSQL integration
-suite passed 64 tests in 119.81 seconds. The strict GTK + DuckDB value runner
+suite passed 64 tests in 119.45 seconds. The strict GTK + DuckDB value runner
 passed 148 tests across all 11 suites with no missing suites:
-`target/quality/20260930T155358866891Z-values/report.json` (`dirty: true`, based
-on `2b5a01a`).
+`target/quality/20260930T161458562268Z-values/report.json` (`dirty: true`, based
+on `209c8cd`).
 
 ```sh
 rtk cargo test --locked -p tablepro-app --lib postgres_boolean_array_grid_literal_stays_text_through_the_keyed_update_builder -- --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
+```
+
+The same server-backed array-edit contract also round-trips a `bytea[]` value
+with two escaped byte elements, an empty byte string and NULL. The app parser
+preserves the array literal as exact text, the builder emits the fixed
+`pg_catalog.bytea[]` cast, and the edited row matches PostgreSQL's independent
+`array_send` bytes; a sibling row's wire bytes remain unchanged. The focused
+app-parser and Docker integration tests passed. The strict shared-value report
+above includes this bytea[] contract.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
 ```
 
@@ -1652,8 +1665,8 @@ with ordinality checks each element and a separate NULL flag. The app
 parser-to-builder unit, focused core cast test, and expanded integration test
 passed against PostgreSQL.
 
-Exact grid editing is server-verified for `integer[]`, `text[]`, `numeric[]` and
-`float8[]`. JSON and other
+Exact grid editing is server-verified for `boolean[]`, `bytea[]`, `integer[]`,
+`text[]`, `numeric[]` and `float8[]`. JSON and other
 unsupported element OIDs, custom/user-defined arrays
 and automatic array parameter typing remain outside the tested support surface.
 B3 remains open.

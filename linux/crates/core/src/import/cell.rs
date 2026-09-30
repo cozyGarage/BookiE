@@ -386,6 +386,7 @@ mod tests {
         assert_eq!(column_kind("numeric(10,2)"), ColumnKind::Decimal);
         assert_eq!(column_kind("integer[]"), ColumnKind::Text);
         assert_eq!(column_kind("float8[]"), ColumnKind::Text);
+        assert_eq!(column_kind("bytea[]"), ColumnKind::Text);
         assert_eq!(column_kind("numeric ARRAY"), ColumnKind::Text);
         assert_eq!(column_kind("double precision"), ColumnKind::Float);
         assert_eq!(column_kind("boolean"), ColumnKind::Bool);

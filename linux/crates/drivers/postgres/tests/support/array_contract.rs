@@ -256,6 +256,7 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     );
 
     assert_bool_array_grid_edit(connection).await;
+    assert_bytea_array_grid_edit(connection).await;
 }
 
 async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
@@ -304,6 +305,58 @@ async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
     assert_eq!(actual.rows[0][2], expected.rows[0][1]);
     assert_eq!(actual.rows[1][0], Value::Int(2));
     assert_eq!(actual.rows[1][2], sibling_wire);
+}
+
+async fn assert_bytea_array_grid_edit(connection: &dyn Connection) {
+    const ARRAY: &str = r#"{"\\x00ff","\\x5c5c","",NULL}"#;
+    const ORACLE: &str = "ARRAY[decode('00ff','hex'),decode('5c5c','hex'),decode('','hex'),NULL]::bytea[]";
+
+    connection
+        .execute("CREATE TABLE bytea_array_grid_edit (id integer PRIMARY KEY, value bytea[])")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO bytea_array_grid_edit VALUES (1, ARRAY[decode('01','hex')]), (2, ARRAY[decode('1234','hex')])",
+        )
+        .await
+        .unwrap();
+    let mut rows = connection
+        .query("SELECT * FROM bytea_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM bytea_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
+    rows.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "bytea_array_grid_edit",
+        &rows.columns,
+        &[(value_index, Value::Text(ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let expected = connection
+        .query(&format!("SELECT encode(array_send({ORACLE}), 'hex')"))
+        .await
+        .unwrap();
+    let actual = connection
+        .query("SELECT id, encode(array_send(value), 'hex') FROM bytea_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(actual.rows[0][0], Value::Int(1));
+    assert_eq!(actual.rows[0][1], expected.rows[0][0]);
+    assert_eq!(actual.rows[1][0], Value::Int(2));
+    assert_eq!(actual.rows[1][1], sibling_wire);
 }
 
 pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
