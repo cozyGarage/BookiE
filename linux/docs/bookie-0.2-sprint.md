@@ -1674,3 +1674,16 @@ parity remains open.
 ```sh
 rtk cargo test --locked -p tablepro-core value_contract_csv_round_trip_preserves_timestamptz_nanoseconds
 ```
+
+### MySQL unsigned integer edit bounds — September 30
+
+An unignored parser matrix now enforces MySQL's signed and unsigned integer
+ranges. The failing-first test reproduced an unbounded `TINYINT UNSIGNED`
+parse; a live Docker oracle confirms permissive MySQL clamps 256 to 255. The
+keyed-update contract rejects 256 before writing and persists `u64::MAX` to a
+`BIGINT UNSIGNED` column exactly, while an adjacent row stays unchanged. A
+focused mutation run caught 17/18 mutations, with one unviable compile-time
+replacement, no survivors and no timeouts. B3 remains open for the other driver,
+type and consumer gaps in the matrix.
+
+Evidence and commands: [MySQL integer parser contract](value-contracts.md#mysql-signed-and-unsigned-integer-grid-parser-2026-09-30).

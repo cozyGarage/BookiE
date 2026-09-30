@@ -47,6 +47,11 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
 
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
     let trimmed = text.trim();
+    if driver_id == "mysql"
+        && let Some(result) = parse_mysql_integer_input(trimmed, col)
+    {
+        return result;
+    }
     if driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type)) {
         if matches!(trimmed, "NaN" | "Infinity" | "-Infinity") {
             return Ok(Value::Text(trimmed.into()));
@@ -67,6 +72,45 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, String>> {
+    let data_type = col?.data_type.trim().to_ascii_lowercase();
+    let zerofill = data_type.strip_suffix(" zerofill");
+    let data_type = zerofill.unwrap_or(&data_type);
+    let unsigned = data_type.ends_with(" unsigned") || zerofill.is_some();
+    let base = data_type
+        .strip_suffix(" unsigned")
+        .unwrap_or(data_type)
+        .split('(')
+        .next()?;
+
+    // MySQL exposes TINYINT(1) as the app's boolean editing contract when
+    // it is signed. Preserve that behavior; an UNSIGNED declaration uses
+    // its actual numeric range and is handled below.
+    if !unsigned && base == "tinyint" && data_type.contains("(1)") {
+        return None;
+    }
+
+    let (minimum, maximum) = match (base, unsigned) {
+        ("tinyint", false) => (i128::from(i8::MIN), i128::from(i8::MAX)),
+        ("tinyint", true) => (0, i128::from(u8::MAX)),
+        ("smallint", false) => (i128::from(i16::MIN), i128::from(i16::MAX)),
+        ("smallint", true) => (0, i128::from(u16::MAX)),
+        ("mediumint", false) => (-8_388_608, 8_388_607),
+        ("mediumint", true) => (0, 16_777_215),
+        ("int" | "integer", false) => (i128::from(i32::MIN), i128::from(i32::MAX)),
+        ("int" | "integer", true) => (0, i128::from(u32::MAX)),
+        ("bigint", true) => (0, i128::from(u64::MAX)),
+        _ => return None,
+    };
+    Some((|| {
+        let value = text.parse::<i128>().map_err(|_| crate::tr!("Invalid integer"))?;
+        if !(minimum..=maximum).contains(&value) {
+            return Err(crate::tr!("Integer is outside the supported MySQL column range"));
+        }
+        Ok(i64::try_from(value).map_or_else(|_| Value::Text(value.to_string()), Value::Int))
+    })())
 }
 
 fn parse_mongodb_decimal_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {

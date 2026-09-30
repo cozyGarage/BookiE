@@ -2204,6 +2204,36 @@ rtk cargo test -p tablepro-app --lib value_contract_mysql_bit_parser_enforces_de
 rtk cargo mutants --in-place --dir . --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_mysql_bit_value|mysql_bit_width' --test-tool cargo --timeout 30 --build-timeout 120 --iterate --output target/quality/20260929-mysql-bit-parser-mutants -- --lib mysql_bit
 ```
 
+### MySQL signed and unsigned integer grid parser, 2026-09-30
+
+The failing-first parser contract found that unsigned metadata such as
+`tinyint unsigned` fell through to text parsing, allowing out-of-range digits
+to reach permissive sessions. The parser now enforces signed/unsigned ranges
+for TINYINT, SMALLINT, MEDIUMINT, INT and BIGINT, accepts MySQL display-width
+metadata, preserves the existing `tinyint(1)` boolean convention, and keeps
+`BIGINT UNSIGNED` values above `i64::MAX` as exact decimal text up to `u64::MAX`.
+The unit matrix checks both boundaries and one-past-range inputs for all widths.
+The initial mutation report
+`target/quality/20260930-mysql-integer-parser-mutants/mutants.out/outcomes.json`
+showed an untested signed INT branch and redundant signed BIGINT special case.
+
+A Docker-backed app contract sets `sql_mode = ''` and independently confirms
+that MySQL clamps an invalid `TINYINT UNSIGNED` value of 256 to 255. The parser
+refuses that value before the keyed update, while a valid edit stores 255 and
+`18446744073709551615` exactly. A second row remains unchanged. The focused
+parser test and native-server edit passed. The first scoped mutation run found
+the missing signed INT boundaries plus a redundant signed BIGINT arm; the
+regression now catches signed INT mutations and the duplicate BIGINT special
+case was removed. The final 18-mutant run caught 17, had one compile-time
+unviable replacement, and no survivors or timeouts:
+`target/quality/20260930-mysql-integer-parser-mutants-final2/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-app value_contract_mysql_integer_parser_enforces_signed_and_unsigned_widths
+rtk cargo test --locked -p tablepro-app value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_mysql_integer_input' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-mysql-integer-parser-mutants-final2 -- --lib -- --test-threads=1
+```
+
 ### MySQL spatial bytes in the GTK grid
 
 The isolated GTK widget contract binds `geometry`, `point` and `multipolygon`
