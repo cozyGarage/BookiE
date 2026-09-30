@@ -137,10 +137,12 @@ server loss while draining a multi-result stream and requires `Disconnected`,
 no partial result, and a successful fresh connection after restart. These
 focused cases passed. MongoDB now has a cursor `getMore` loss test after its
 first batch, and Redis has a browse-page loss test after `SCAN` while reading a
-key. Both require the whole operation to fail as `Disconnected`; they do not
-cover cancellation or transparent recovery of that in-progress operation.
-Native-type and consumer targets in this matrix remain open. Passing the
-server-loss and explicit reconnect cases does not close those other gaps.
+key. Both require the whole operation to fail as `Disconnected`; Redis also
+verifies that a later browse through the same driver object uses a fresh
+operation-local connection and returns the full row. These tests do not cover
+cancellation or transparent recovery of the interrupted operation. Native-type
+and consumer targets in this matrix remain open. Passing the server-loss and
+explicit reconnect cases does not close those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is

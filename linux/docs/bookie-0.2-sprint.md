@@ -1165,9 +1165,11 @@ public query API cannot return rows alongside an error, so this also guards
 against treating a partial cursor as a successful result. The focused ignored
 integration test passed locally. A separate RESP socket fixture returns one key
 from `SCAN`, then drops the browse connection on `TYPE`; the page must fail as
-`Disconnected` without returning an incomplete row set. That focused test also
-passed. These contracts close the mid-cursor/page disconnection gap; B3's
-unrelated native-type, consumer and acceptance gaps remain open.
+`Disconnected` without returning an incomplete row set. A second browse through
+the same driver object must reconnect and return the exact complete row. The
+focused test passed. These contracts close mid-cursor/page interruption and
+subsequent-operation recovery coverage; B3's unrelated native-type, consumer
+and acceptance gaps remain open.
 
 B3 remains open.
 

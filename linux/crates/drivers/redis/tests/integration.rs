@@ -14,16 +14,22 @@ async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
 
 #[tokio::test]
 async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
     use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
     use tokio::net::TcpListener;
 
     let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind RESP fixture");
     let port = listener.local_addr().unwrap().port();
+    let type_requests = Arc::new(AtomicUsize::new(0));
     let server = tokio::spawn(async move {
         loop {
             let Ok((stream, _)) = listener.accept().await else {
                 return;
             };
+            let type_requests = Arc::clone(&type_requests);
             tokio::spawn(async move {
                 let (read, mut write) = stream.into_split();
                 let mut read = BufReader::new(read);
@@ -52,7 +58,12 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
                             .write_all(b"*2\r\n:0\r\n*1\r\n$11\r\nfixture:key\r\n")
                             .await
                             .expect("return one scanned key"),
-                        Some("TYPE") => return, // Lose the established browse connection mid-page.
+                        Some("TYPE") if type_requests.fetch_add(1, Ordering::SeqCst) == 0 => {
+                            return; // Lose the first established browse connection mid-page.
+                        }
+                        Some("TYPE") => write.write_all(b"+string\r\n").await.expect("reply TYPE"),
+                        Some("TTL") => write.write_all(b":-1\r\n").await.expect("reply TTL"),
+                        Some("GET") => write.write_all(b"$5\r\nvalue\r\n").await.expect("reply GET"),
                         command => panic!("unexpected Redis browse command: {command:?}"),
                     }
                     write.flush().await.expect("flush RESP reply");
@@ -72,6 +83,20 @@ async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
     assert!(
         matches!(error, DriverError::Disconnected),
         "mid-page Redis connection loss must be Disconnected, got {error:?}"
+    );
+
+    let recovered = connection
+        .fetch_rows(None, "db0", 0, 10)
+        .await
+        .expect("a later browse operation obtains a fresh connection");
+    assert_eq!(
+        recovered.rows,
+        vec![vec![
+            Value::Text("fixture:key".into()),
+            Value::Text("string".into()),
+            Value::Int(-1),
+            Value::Text("value".into()),
+        ]]
     );
 
     drop(connection);
