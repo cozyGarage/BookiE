@@ -2279,7 +2279,8 @@ MySQL `TIMESTAMP` values are exact only while the server session is UTC because 
 
 Subsequent B3 coverage verifies BIT(1..64), ENUM/SET labels and spatial bytes;
 bounded BIT edits survive a driver update, while spatial and too-wide BIT values
-remain read-only. Text exports also run with and without `NO_BACKSLASH_ESCAPES`.
+remain read-only. Text exports also run with default,
+`NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and combined session modes.
 Backslash-bearing column comments are explicitly refused. A dedicated-session
 Docker regression creates the same DDL under default mode and
 `NO_BACKSLASH_ESCAPES`; the server stores one backslash versus two, confirming
@@ -2287,6 +2288,24 @@ that mode-independent output needs session-aware DDL execution. Run it with
 `cargo test --locked -p tablepro-driver-mysql --test integration mysql_column_comment_backslash_literals_depend_on_sql_mode -- --include-ignored --exact --test-threads=1`.
 Session time-zone and stricter SQL-mode matrices, installed-app-to-MySQL grid
 acceptance and broader consumer parity remain open.
+
+### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
+
+The existing MySQL and MariaDB SQL export round trip also runs with
+`ANSI_QUOTES` alone and combined with `NO_BACKSLASH_ESCAPES`. It writes
+backslash-sensitive text and JSON through generated SQL literals, then checks
+source and destination bytes with server-side `HEX()` equality. Default and
+`NO_BACKSLASH_ESCAPES` modes remain in the same matrix. All four mode settings
+passed on both MySQL 8 and MariaDB 11; production code did not need a change.
+The strict GTK + DuckDB value runner also passed 148 tests across all 11 suites
+with no missing suites. Report:
+`target/quality/20260930T152649001249Z-values/report.json` (`dirty: true`, based
+on `f8efdae`).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contracts::value_contract_text_exports_survive_with_and_without_backslash_escapes -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contracts::value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes -- --include-ignored --exact --test-threads=1
+```
 
 ### MySQL BIT parser, keyed edit and server value contract
 

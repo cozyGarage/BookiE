@@ -215,7 +215,19 @@ async fn connect_in_sql_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Co
     let Value::Text(active) = active else {
         panic!("{active:?}")
     };
-    assert_eq!(active.contains("NO_BACKSLASH_ESCAPES"), !mode.is_empty(), "{active}");
+    let active_modes = active.split(',').map(str::trim).collect::<Vec<_>>();
+    let expected_modes = mode.split(',').map(str::trim).filter(|mode| !mode.is_empty());
+    for expected_mode in expected_modes {
+        assert!(
+            active_modes.contains(&expected_mode),
+            "mode {expected_mode:?} missing from {active:?}"
+        );
+    }
+    assert_eq!(
+        active_modes.contains(&"NO_BACKSLASH_ESCAPES"),
+        mode.split(',').any(|mode| mode.trim() == "NO_BACKSLASH_ESCAPES"),
+        "NO_BACKSLASH_ESCAPES mode mismatch: {active}"
+    );
     conn
 }
 
@@ -276,7 +288,15 @@ async fn assert_text_exports_survive_sql_mode(options: &ConnectOptions, mode: &s
 }
 
 async fn assert_text_exports_survive_both_backslash_modes(options: ConnectOptions) {
-    for (suffix, mode) in ["", "NO_BACKSLASH_ESCAPES"].into_iter().enumerate() {
+    for (suffix, mode) in [
+        "",
+        "NO_BACKSLASH_ESCAPES",
+        "ANSI_QUOTES",
+        "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+    ]
+    .into_iter()
+    .enumerate()
+    {
         assert_text_exports_survive_sql_mode(&options, mode, suffix).await;
     }
 }
