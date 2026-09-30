@@ -1687,3 +1687,6 @@ replacement, no survivors and no timeouts. B3 remains open for the other driver,
 type and consumer gaps in the matrix.
 
 Evidence and commands: [MySQL integer parser contract](value-contracts.md#mysql-signed-and-unsigned-integer-grid-parser-2026-09-30).
+
+The next audit packet adds file-based CSV import and byte/field/column boundary
+contracts, with scoped mutation evidence recorded in the [value ledger](value-contracts.md#csv-file-import-and-exact-size-boundaries-2026-09-30). The first hosted preflight for the MySQL change failed because the generated ignored-test inventory was stale; the inventory is regenerated and checked in this worktree before the next push. Do not treat that preflight as a product test result.

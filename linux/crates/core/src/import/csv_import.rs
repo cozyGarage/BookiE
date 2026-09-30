@@ -100,14 +100,19 @@ pub struct CsvSheet {
 
 pub fn read_csv_file(path: &Path, options: &CsvImportOptions, limit: Option<usize>) -> Result<CsvSheet, ImportError> {
     let size = std::fs::metadata(path).map_err(|_| ImportError::Unreadable)?.len();
+    check_file_size(size)?;
+    let bytes = std::fs::read(path).map_err(|_| ImportError::Unreadable)?;
+    read_csv(&bytes, options, limit)
+}
+
+fn check_file_size(size: u64) -> Result<(), ImportError> {
     if size > MAX_FILE_BYTES {
         return Err(ImportError::FileTooLarge {
             size,
             limit: MAX_FILE_BYTES,
         });
     }
-    let bytes = std::fs::read(path).map_err(|_| ImportError::Unreadable)?;
-    read_csv(&bytes, options, limit)
+    Ok(())
 }
 
 /// Read `bytes` as delimited text. `limit` caps the rows returned, for the
@@ -117,12 +122,7 @@ pub fn read_csv_file(path: &Path, options: &CsvImportOptions, limit: Option<usiz
 /// empty fields and a long one keeps its extra fields, because the mapping
 /// decides which fields matter.
 pub fn read_csv(bytes: &[u8], options: &CsvImportOptions, limit: Option<usize>) -> Result<CsvSheet, ImportError> {
-    if bytes.len() as u64 > MAX_FILE_BYTES {
-        return Err(ImportError::FileTooLarge {
-            size: bytes.len() as u64,
-            limit: MAX_FILE_BYTES,
-        });
-    }
+    check_file_size(bytes.len() as u64)?;
     if let Err(error) = std::str::from_utf8(bytes) {
         return Err(ImportError::NotUtf8 {
             offset: error.valid_up_to(),
@@ -254,7 +254,9 @@ fn delimiter_score(bytes: &[u8], delimiter: CsvDelimiter) -> usize {
     if width < 2 {
         return 0;
     }
-    width * records.len()
+    // Every delimiter candidate sees the same CSV record boundaries; compare
+    // sampled width directly instead of scaling each candidate by that count.
+    width
 }
 
 fn sample_records(bytes: &[u8], delimiter: CsvDelimiter) -> Vec<Vec<String>> {
@@ -309,9 +311,77 @@ fn delimiter_byte(delimiter: CsvDelimiter) -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     fn options() -> CsvImportOptions {
         CsvImportOptions::default()
+    }
+
+    #[test]
+    fn csv_format_conversion_preserves_delimiter_and_header_choice() {
+        let format = CsvFormat {
+            delimiter: CsvDelimiter::Pipe,
+            has_header: false,
+        };
+
+        let options = CsvImportOptions::from(format);
+
+        assert_eq!(options.delimiter, CsvDelimiter::Pipe);
+        assert!(!options.has_header);
+        assert!(options.null_marker.is_empty());
+    }
+
+    #[test]
+    fn public_import_limits_keep_their_documented_units() {
+        assert_eq!(MAX_FILE_BYTES, 67_108_864);
+        assert_eq!(MAX_COLUMNS, 512);
+        assert_eq!(MAX_FIELD_BYTES, 1_048_576);
+        assert_eq!(MAX_IMPORT_ROWS, 1_000_000);
+        assert_eq!(MAX_PREVIEW_ROWS, 50);
+    }
+
+    #[test]
+    fn file_size_limit_accepts_exact_boundary_and_refuses_one_byte_more() {
+        assert_eq!(check_file_size(MAX_FILE_BYTES), Ok(()));
+        assert_eq!(
+            check_file_size(MAX_FILE_BYTES + 1),
+            Err(ImportError::FileTooLarge {
+                size: MAX_FILE_BYTES + 1,
+                limit: MAX_FILE_BYTES,
+            })
+        );
+    }
+
+    #[test]
+    fn read_csv_file_observes_delimiter_header_and_preview_options() {
+        let mut file = tempfile::NamedTempFile::new().expect("temporary csv file");
+        file.write_all(b"id\tname\n1\tAda\n2\tGrace\n")
+            .expect("write csv fixture");
+        let options = CsvImportOptions {
+            delimiter: CsvDelimiter::Tab,
+            has_header: true,
+            null_marker: "\\N".into(),
+        };
+
+        let sheet = read_csv_file(file.path(), &options, Some(1)).expect("read from path");
+
+        assert_eq!(sheet.headers, vec!["id", "name"]);
+        assert_eq!(sheet.rows, vec![vec!["1", "Ada"]]);
+        assert!(sheet.truncated);
+    }
+
+    #[test]
+    fn read_csv_file_refuses_oversized_sparse_files_from_metadata() {
+        let file = tempfile::NamedTempFile::new().expect("temporary csv file");
+        file.as_file().set_len(MAX_FILE_BYTES + 1).expect("make sparse file");
+
+        assert_eq!(
+            read_csv_file(file.path(), &options(), None),
+            Err(ImportError::FileTooLarge {
+                size: MAX_FILE_BYTES + 1,
+                limit: MAX_FILE_BYTES,
+            })
+        );
     }
 
     fn column(name: &str, data_type: &str) -> ColumnInfo {
@@ -446,6 +516,17 @@ mod tests {
     }
 
     #[test]
+    fn a_field_at_the_length_limit_is_accepted() {
+        let mut file = String::from("a\n");
+        file.push_str(&"x".repeat(MAX_FIELD_BYTES));
+        file.push('\n');
+
+        let sheet = read_csv(file.as_bytes(), &options(), None).expect("exact maximum field");
+
+        assert_eq!(sheet.rows[0][0].len(), MAX_FIELD_BYTES);
+    }
+
+    #[test]
     fn a_file_over_the_size_limit_is_refused_before_it_is_parsed() {
         let bytes = vec![b'a'; (MAX_FILE_BYTES + 1) as usize];
 
@@ -464,10 +545,27 @@ mod tests {
     }
 
     #[test]
+    fn the_maximum_column_count_is_accepted() {
+        let header = (0..MAX_COLUMNS).map(|index| format!("c{index}")).collect::<Vec<_>>();
+
+        let sheet = read_csv(header.join(",").as_bytes(), &options(), None).expect("exact maximum columns");
+
+        assert_eq!(sheet.headers.len(), MAX_COLUMNS);
+    }
+
+    #[test]
     fn a_semicolon_file_is_detected_as_semicolon_delimited() {
-        let format = detect_format(b"id;name\n1;ada\n2;grace\n");
+        let format = detect_format(b"id;name;age\n1;ada;36\n2;grace;30\n");
 
         assert_eq!(format.delimiter, CsvDelimiter::Semicolon);
+        assert!(format.has_header);
+    }
+
+    #[test]
+    fn a_comma_file_is_detected_as_comma_delimited() {
+        let format = detect_format(b"id,name,age\n1,ada,36\n");
+
+        assert_eq!(format.delimiter, CsvDelimiter::Comma);
         assert!(format.has_header);
     }
 
@@ -476,6 +574,7 @@ mod tests {
         let format = detect_format(b"id\tname\n1\tada\n");
 
         assert_eq!(format.delimiter, CsvDelimiter::Tab);
+        assert!(format.has_header);
     }
 
     #[test]

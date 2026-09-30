@@ -444,3 +444,7 @@ mod parser_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/value_parse.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mysql_integer_contract.rs"]
+mod mysql_integer_contract;
