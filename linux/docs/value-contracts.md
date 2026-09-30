@@ -1638,6 +1638,11 @@ all 11 suites with no missing suites:
 An additional app parser matrix checks that UUID, date, time, numeric, boolean,
 and timestamptz array metadata preserve the complete literal as text. The full
 app library suite passed 413 tests, with 12 existing ignored tests.
+Removing the PostgreSQL array guard made this matrix fail on `uuid[]` with the
+scalar UUID parser error; restoring it made the test pass. The targeted
+cargo-mutants report generated one whole-function replacement, which was
+unviable because `TypeKind` does not implement `Default`; it did not count as a
+caught mutant. Report: `target/quality/20260930-pg-array-type-parser-mutants-cached/`.
 
 ```sh
 rtk cargo test --manifest-path linux/crates/app/Cargo.toml postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder
