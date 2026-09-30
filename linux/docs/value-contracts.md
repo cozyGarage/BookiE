@@ -294,6 +294,28 @@ of 5 mutants; one was unviable, with no missed or timed-out mutants. Reports:
 `target/quality/20260930-clickhouse-disconnect-mutants/mutants.out/outcomes.json`
 and `target/quality/20260930-clickhouse-disconnect-mutants-final/mutants.out/outcomes.json`.
 
+### ClickHouse row-stream interruption completeness, 2026-09-30
+
+Docker contracts stop ClickHouse while `sleepEachRow` produces a chunked result.
+A forced stop must return `Disconnected`, never a partial `QueryResult`, and a
+fresh driver connection must work after restart. Graceful shutdown follows a
+different server path: ClickHouse 24.8 appends `QUERY_WAS_CANCELLED` as a
+single-cell JSON row after already emitted data. Before the fix, the driver
+returned those prior rows plus the exception text as a successful result. The
+decoder now recognizes the server exception shape and returns a query error,
+while the same message remains recognizable by the controlled-cancellation
+path. A unit contract distinguishes that exception payload from ordinary text.
+Both focused Docker cases and all 40 ClickHouse library tests passed. The
+decoder's scoped mutation run caught all 11 generated mutants, with no missed,
+timed-out or unviable mutants:
+`target/quality/20260930-clickhouse-exception-row-mutants-final/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-clickhouse --lib tests::clickhouse_terminal_exception_row_is_an_error_not_partial_success -- --exact
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration disconnection::server_loss_during_row_stream_fails_the_whole_query_as_disconnected -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration disconnection::graceful_server_stop_during_row_stream_returns_an_error_not_partial_rows -- --ignored --exact --test-threads=1
+```
+
 ## SQL Server disconnect delivery, 2026-09-30
 
 A Docker-backed test completes `SELECT 1`, stops the SQL Server container, then

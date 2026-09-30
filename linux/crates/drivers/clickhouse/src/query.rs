@@ -49,6 +49,26 @@ pub(super) fn parse_line<T: serde::de::DeserializeOwned>(line: &[u8]) -> Result<
     serde_json::from_slice(line).map_err(|e| DriverError::Internal(format!("clickhouse response parse: {e}")))
 }
 
+/// ClickHouse 24.x can append an exception to a partially streamed
+/// `JSONCompactEachRowWithNamesAndTypes` response as a one-cell JSON row. Do
+/// not let that terminal error masquerade as a successful data row.
+pub(super) fn exception_row_message(raw: &[serde_json::Value]) -> Option<&str> {
+    let [serde_json::Value::String(message)] = raw else {
+        return None;
+    };
+    let remainder = message.strip_prefix("Code: ")?;
+    let (code, detail) = remainder.split_once(". ")?;
+    if code.parse::<u32>().is_err()
+        || !detail.contains("DB::")
+        || !detail.contains("Exception:")
+        || !detail.contains(" (version ")
+        || !detail.ends_with("))")
+    {
+        return None;
+    }
+    Some(message)
+}
+
 /// `query_id` is a caller-generated UUID, so `KILL QUERY` can name the
 /// statement later. ClickHouse's HTTP interface accepts it as a request
 /// parameter; the server rejects a duplicate, which is why each call

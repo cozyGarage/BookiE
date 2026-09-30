@@ -8,7 +8,9 @@ mod value_literal;
 use async_trait::async_trait;
 use hyper_util::client::legacy::Client as HyperClient;
 use hyper_util::rt::TokioExecutor;
-use query::{LineReader, confirms_cancellation, new_query_id, parse_line, request_cancellation, tag_query};
+use query::{
+    LineReader, confirms_cancellation, exception_row_message, new_query_id, parse_line, request_cancellation, tag_query,
+};
 use secrecy::ExposeSecret;
 use serde::Deserialize;
 use tls::https_connector;
@@ -415,6 +417,12 @@ async fn fetch_result(
             break;
         }
         let raw: Vec<serde_json::Value> = parse_line(&line)?;
+        if let Some(message) = exception_row_message(&raw) {
+            return Err(DriverError::Query {
+                message: message.to_owned(),
+                sqlstate: None,
+            });
+        }
         rows.push(response_row(raw, &columns)?);
     }
 

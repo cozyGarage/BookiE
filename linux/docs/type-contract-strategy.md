@@ -123,13 +123,15 @@ missed or timed out; the first run's missed connect-error distinction gained a
 regression before the final run. MySQL and MongoDB disconnect mapper mutation
 evidence is recorded in [value contracts](value-contracts.md).
 
-PostgreSQL and MySQL now have Docker regressions that terminate a slow query
-after row production has begun; each whole query must fail as `Disconnected`,
-never return a partial result, and its pool must recover. The focused case passed
-for each driver. Mid-stream failure, cancellation, completeness and
-connection-state parity across the other engines remain open, as do the
-native-type and consumer targets in this matrix. Passing the server-loss and
-explicit reconnect cases does not close those other gaps.
+PostgreSQL and MySQL have Docker regressions that terminate a slow query after
+row production has begun; each whole query must fail as `Disconnected`, never
+return a partial result, and its pool must recover. ClickHouse now tests both a
+hard server stop (`Disconnected`) and graceful shutdown, which must return the
+server's cancellation error rather than partial rows. These focused cases
+passed. Mid-stream failure, cancellation, completeness and connection-state
+parity across the other engines remain open, as do the native-type and consumer
+targets in this matrix. Passing the server-loss and explicit reconnect cases
+does not close those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is

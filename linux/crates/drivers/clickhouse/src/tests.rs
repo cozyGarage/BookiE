@@ -50,6 +50,35 @@ fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
 }
 
 #[test]
+fn clickhouse_terminal_exception_row_is_an_error_not_partial_success() {
+    let exception = serde_json::json!(
+        "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED) (version 24.8.14.39 (official build))"
+    );
+    assert_eq!(
+        exception_row_message(std::slice::from_ref(&exception)),
+        exception.as_str()
+    );
+    assert_eq!(
+        exception_row_message(&[serde_json::json!("Code: this is ordinary user data")]),
+        None
+    );
+    assert_eq!(exception_row_message(&[serde_json::json!("Code: 394")]), None);
+    for malformed in [
+        "Code: invalid. DB::Exception: Query was cancelled. (version 24.8.14.39 (official build))",
+        "Code: 394. SomeException: Query was cancelled. (version 24.8.14.39 (official build))",
+        "Code: 394. DB::Failure: Query was cancelled. (version 24.8.14.39 (official build))",
+        "Code: 394. DB::Exception: Query was cancelled. (24.8.14.39 (official build))",
+        "Code: 394. DB::Exception: Query was cancelled. (version 24.8.14.39 (official build)",
+    ] {
+        assert_eq!(
+            exception_row_message(&[serde_json::json!(malformed)]),
+            None,
+            "{malformed}"
+        );
+    }
+}
+
+#[test]
 fn clickhouse_response_preserves_explicit_null_cells() {
     let columns = response_columns(
         vec!["a".into(), "b".into()],
