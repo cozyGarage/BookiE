@@ -1792,3 +1792,17 @@ contract, and the strict DuckDB selection now includes all 20 temporal filter
 contracts. The corrected runner passed all 159 tests across 11 suites, with no
 missing suites:
 [`20260930T195202641431Z-values/report.json`](../target/quality/20260930T195202641431Z-values/report.json).
+
+### DuckDB nested unsigned wide values — September 30
+
+The gap audit expanded native refusal coverage to `STRUCT(amount UHUGEINT)`
+and `STRUCT(amount UHUGEINT)[]`. DuckDB's own type and exact text oracle pins
+`18446744073709551616`; driver decoding must return `Undecodable`, and SQL
+literal and parameter consumers must refuse the value. The focused test passed.
+Other nested collection combinations remain open.
+The complete DuckDB crate then passed 42 tests, and the strict GTK+DuckDB
+runner passed 160 tests across 11 suites, including all 21 selected DuckDB
+contracts:
+[`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).
+The quick layer also passed formatting, Clippy, unit and sandbox gates:
+[`20260930T200925216322Z-layers/report.json`](../target/quality/20260930T200925216322Z-layers/report.json).

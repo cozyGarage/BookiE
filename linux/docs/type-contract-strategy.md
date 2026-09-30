@@ -188,6 +188,14 @@ in [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-
 | CSV / numeric, floating point, time zone and NULL | `BIGINT` CSV export/import preserves `i64::MIN`, `i64::MAX`, and `9007199254740993` exactly; typed `DECIMAL(10,4)` export/import preserves the `12.3000` trailing-zero scale; negative zero, the smallest positive subnormal, largest finite `f64`, 262 seeded values and 20,480 deterministic finite exponent/mantissa-boundary values preserve IEEE-754 bits through CSV export and typed import; that same 20,742-value corpus preserves bits through JSON export/parse; a nine-digit offset-origin `TIMESTAMP WITH TIME ZONE` produces identical canonical UTC text through CSV and JSON, then CSV typed import recovers the same instant; `NaN`, positive/negative infinity and NULL retain distinct float/null variants through CSV export/import | Uncovered finite mantissas, broader temporal combinations and spreadsheet-application import remain open. |
 | XLSX / wide numeric, temporal, nested BSON | Wide integers and exact decimals use text cells; temporal values use native cells only when exact, otherwise text; an offset-origin nine-digit `TIMESTAMP WITH TIME ZONE` is emitted as its exact canonical UTC instant; nested BSON markers are retained; negative zero, the smallest positive subnormal and the adjacent representable value above 1.0 are checked as numeric cells with IEEE-754 bit oracles | Spreadsheet-application re-import and remaining XLSX precision/format limitations remain per the checkpoint entries below. |
 
+### DuckDB nested UHUGEINT refusal coverage — September 30
+
+The native type ledger now includes both `STRUCT(amount UHUGEINT)` and a list
+of that struct. Each case checks DuckDB's independent `typeof` and exact text
+before requiring `Undecodable` output and refusal by SQL-literal and parameter
+consumers. Other nested collection combinations remain open; this does not
+claim general nested unsigned support.
+
 ## Test workflow
 
 1. Add a failing native-engine or decoder reproducer. Record the failure before

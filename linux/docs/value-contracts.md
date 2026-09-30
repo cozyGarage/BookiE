@@ -3219,3 +3219,22 @@ selection contract made it the 18th DuckDB case. After adding TIME_NS and
 TIMESTAMPTZ native filter cases, the strict run selected 20 DuckDB contracts
 and passed all 159 tests across 11 suites, with no missing suites:
 [`20260930T195202641431Z-values/report.json`](../target/quality/20260930T195202641431Z-values/report.json).
+
+## DuckDB nested UHUGEINT refusal boundaries, 2026-09-30
+
+The DuckDB gap audit added nested wide unsigned cases for a
+`STRUCT(amount UHUGEINT)` value and a list of that struct. Independent native
+`typeof` and `VARCHAR` results pin the full value `18446744073709551616`; the
+BookiE result must be `Undecodable`, and SQL-literal and bound-parameter
+consumers must refuse it. This expands explicit safe refusal to these two shapes
+without claiming general nested collection support.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_nested_uhugeint_struct_shapes_refuse_lossy_consumers -- --exact --nocapture
+```
+
+The focused native DuckDB case passed.
+After adding this contract, the full DuckDB crate passed 42 tests and the strict
+GTK+DuckDB runner passed all 160 selected tests across 11 suites, including 21
+DuckDB contracts:
+[`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).

@@ -359,6 +359,49 @@ async fn value_contract_nested_uhugeint_refuses_lossy_consumers() {
 }
 
 #[tokio::test]
+async fn value_contract_nested_uhugeint_struct_shapes_refuse_lossy_consumers() {
+    let connection = native_connection().await;
+    let wide = "18446744073709551616";
+    let cases = [
+        (
+            format!("STRUCT_PACK(amount := {wide}::UHUGEINT)"),
+            "STRUCT(amount UHUGEINT)",
+            format!("{{'amount': {wide}}}"),
+        ),
+        (
+            format!("[STRUCT_PACK(amount := {wide}::UHUGEINT)]"),
+            "STRUCT(amount UHUGEINT)[]",
+            format!("[{{'amount': {wide}}}]"),
+        ),
+    ];
+
+    for (expression, expected_type, expected_text) in cases {
+        let oracle = connection
+            .query(&format!(
+                "SELECT typeof(value), CAST(value AS VARCHAR) FROM (SELECT {expression} AS value) source"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            oracle.rows,
+            vec![vec![Value::Text(expected_type.into()), Value::Text(expected_text)]],
+            "native oracle for {expression}"
+        );
+
+        let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
+        let value = &result.rows[0][0];
+        assert!(matches!(value, Value::Undecodable(_)), "{expression}: {value:?}");
+        assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", value).is_err());
+        assert!(
+            connection
+                .query_params("SELECT ?", std::slice::from_ref(value))
+                .await
+                .is_err()
+        );
+    }
+}
+
+#[tokio::test]
 async fn value_contract_wide_map_refuses_lossy_consumers_with_native_oracle() {
     let connection = native_connection().await;
     let expression = "MAP(['alpha', 'beta'], [18446744073709551616::UHUGEINT, NULL]::UHUGEINT[])";
