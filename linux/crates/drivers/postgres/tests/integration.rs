@@ -10,6 +10,7 @@ use drivers_postgres::PgDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, DriverError, OperationControl, Value};
 use testcontainers::ContainerAsync;
 use testcontainers::ImageExt;
+use testcontainers::core::IntoContainerPort;
 use testcontainers_modules::postgres::Postgres;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 use tokio_util::sync::CancellationToken;
@@ -40,6 +41,9 @@ mod value_contracts;
 
 #[path = "support/disconnection.rs"]
 mod disconnection;
+
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
 
 async fn start_pg() -> (ContainerAsync<Postgres>, ConnectOptions) {
     // Pin to Postgres 16: the introspection query in `fetch_columns`

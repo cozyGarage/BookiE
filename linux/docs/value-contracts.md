@@ -105,7 +105,9 @@ showed SQLSTATE `57P01` was surfaced as an ordinary query error. The driver now
 classifies PostgreSQL server termination states `57P01` through `57P04` as
 `Disconnected`; the normal query-cancel state `57014` remains a query error. The
 contract checks that the terminated operation fails visibly and that the same
-pooled connection can complete a fresh `SELECT 1` afterward. A unit contract
+pooled connection can complete a fresh `SELECT 1` afterward. A second Docker test
+stops and restarts PostgreSQL on a stable mapped host port; the existing pool must
+report the outage as `Disconnected` and then complete a new `SELECT 1`. A unit contract
 distinguishes the termination states from query cancellation and constraint
 errors. A second failing-first unit case showed generic SQLx socket EOF/reset
 errors also surfaced as `Internal`; those now map to `Disconnected`, while
@@ -115,6 +117,7 @@ connection refusal and TLS errors retain their distinct classifications.
 rtk cargo test -p tablepro-driver-postgres --lib server_termination_states_are_disconnections_but_query_cancel_is_not
 rtk cargo test -p tablepro-driver-postgres --lib unexpected_io_eof_is_disconnected_and_connection_refusal_stays_distinct
 rtk cargo test -p tablepro-driver-postgres --test integration server_terminated_query_reports_disconnection_and_pool_recovers -- --include-ignored --exact --test-threads=1
+rtk cargo test -p tablepro-driver-postgres --test integration disconnection::a_restarted_postgres_server_restores_the_existing_pool -- --ignored --exact --test-threads=1
 ```
 
 All 35 PostgreSQL unit tests and the focused Docker test passed. The SQLSTATE
@@ -133,12 +136,15 @@ A failing-first MySQL Docker contract killed the connection serving an active
 mapper previously surfaced as `Internal`. The driver now maps SQLx I/O failures
 to `Disconnected`, while keeping connection refusal and TLS errors distinct.
 The integration contract requires the killed query to fail promptly, then checks
-the pool completes a new `SELECT 1`. Unit tests separately preserve
+the pool completes a new `SELECT 1`. A second Docker test stops and restarts MySQL
+on a stable mapped host port; the existing pool must return `Disconnected` during
+the outage and then complete a new `SELECT 1`. Unit tests separately preserve
 `ConnectionRefused` and unexpected EOF classifications.
 
 ```sh
 rtk cargo test -p tablepro-driver-mysql --lib
 rtk cargo test -p tablepro-driver-mysql --test integration server_terminated_query_reports_disconnection_and_pool_recovers -- --include-ignored --exact --test-threads=1
+rtk cargo test -p tablepro-driver-mysql --test integration a_restarted_mysql_server_restores_the_existing_pool -- --ignored --exact --test-threads=1
 ```
 
 The focused integration test and all 12 MySQL library tests passed. The first
@@ -276,9 +282,12 @@ The focused SQL Server server-loss/restart test passed.
 
 ## Restart recovery across remote drivers, 2026-09-30
 
-The MongoDB, Redis, ClickHouse and SQL Server server-loss tests now restart the
-same Docker container after checking `Disconnected`, refresh the mapped host
-port, and establish a fresh connection through the driver. A bounded shared
+The PostgreSQL and MySQL pool tests stop and restart the server container while
+keeping its mapped host port stable, then verify the existing pool reconnects
+after reporting `Disconnected`. The MongoDB, Redis, ClickHouse and SQL Server
+server-loss tests restart the same Docker container after checking
+`Disconnected`, refresh the mapped host port, and establish a fresh connection
+through the driver. A bounded shared
 test helper retries only connection refusal, disconnection, timeouts and the
 Redis startup broken-pipe case; each test still requires a protocol-level
 operation to succeed. This proves explicit reconnect after restart; it does not

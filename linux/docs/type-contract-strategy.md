@@ -98,13 +98,14 @@ storage-class/parser/import contracts but installed GTK acceptance is untested.
 Docker-backed tests stop each remote server after a successful request and
 require the next operation on the established connection to return
 `DriverError::Disconnected` for PostgreSQL, MySQL, SQL Server, MongoDB, Redis
-and ClickHouse. PostgreSQL and MySQL also verify pool recovery after a query
-terminates a pooled connection. SQL Server, MongoDB, Redis and ClickHouse now
-restart the same container, open a fresh driver connection and require a
-protocol-level operation to succeed. This verifies explicit reconnect after
-restart, not transparent recovery of the previous connection handle. SQLite
-and DuckDB are local engines, so they are not part of this remote-server-loss
-set. Connect-time refusal remains separately classified in driver contracts.
+and ClickHouse. PostgreSQL and MySQL verify pool recovery both after a query
+terminates a pooled connection and after the server container stops and restarts
+with its host port held stable. SQL Server, MongoDB, Redis and ClickHouse restart
+the same container, open a fresh driver connection and require a protocol-level
+operation to succeed. These tests verify pool or explicit reconnect after
+restart, not transparent recovery of a previous non-pooled connection handle.
+SQLite and DuckDB are local engines, so they are not part of this remote-server-
+loss set. Connect-time refusal remains separately classified in driver contracts.
 
 Redis and ClickHouse mapper mutations are retained at
 `target/quality/20260930-redis-disconnect-mutants-final/` and

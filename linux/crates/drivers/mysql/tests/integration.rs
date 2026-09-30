@@ -13,6 +13,9 @@ use testcontainers::{GenericImage, ImageExt};
 use testcontainers_modules::mysql::Mysql;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+#[path = "../../shared/server_restart.rs"]
+mod server_restart;
+
 async fn start_mysql() -> (ContainerAsync<Mysql>, ConnectOptions) {
     let container = Mysql::default()
         .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
@@ -106,6 +109,52 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
         .query("SELECT 1")
         .await
         .expect("pool must recover on a new connection");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_restarted_mysql_server_restores_the_existing_pool() {
+    let port_probe = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("reserve test port");
+    let host_port = port_probe.local_addr().expect("test port address").port();
+    drop(port_probe);
+    let container = Mysql::default()
+        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .with_mapped_port(host_port, 3306.tcp())
+        .start()
+        .await
+        .expect("start MySQL on a stable host port");
+    let opts = ConnectOptions {
+        host: container.get_host().await.expect("host").to_string(),
+        port: host_port,
+        database: "test".into(),
+        username: "root".into(),
+        password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+        tls: tablepro_core::TlsConfig::disabled(),
+        ..Default::default()
+    };
+    let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts).await.expect("connect").into();
+    let initial = connection.query("SELECT 1").await.expect("initial query");
+    assert_eq!(initial.rows, vec![vec![Value::Int(1)]]);
+
+    container.stop().await.expect("stop MySQL server");
+    let error = connection
+        .query("SELECT 1")
+        .await
+        .expect_err("the stopped server must break the established operation");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "server loss on an established MySQL pool connection must be Disconnected, got {error:?}"
+    );
+
+    container.start().await.expect("restart MySQL server");
+    let recovered = server_restart::retry_operation("MySQL", || {
+        let connection = connection.clone();
+        async move { connection.query("SELECT 1").await }
+    })
+    .await
+    .expect("the existing MySQL pool reconnects after server restart");
     assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
 }
 
