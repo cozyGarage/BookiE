@@ -1666,13 +1666,31 @@ PostgreSQL 16 Docker contract edits values containing the adjacent float above
 NULL. It compares the stored array text and `array_send` bytes with an
 independently constructed native array oracle, verifies the update affects one
 row, and confirms a sibling row is unchanged. The focused parser, grid-edit and
-full PostgreSQL integration tests passed; the latter ran 64 tests in 154.01
-seconds.
+full PostgreSQL integration tests passed; the latest full run passed 64 tests
+in 119.12 seconds.
+
+The consumer follow-up exercised CSV export, CSV parsing, typed row conversion,
+and keyed write-back for the same float8[] result. It found that the generic
+CSV importer classified `float8[]` by its element type and rejected the array
+cell as `NotANumber`. Array-shaped catalog types now remain exact text during
+CSV import. The live round-trip compares the restored row's `array_send` bytes
+to the original and checks a third row remains unchanged. SQLx formats numeric
+array elements with quotes while PostgreSQL `float8[]::text` does not; the
+contract therefore checks exported/imported driver text exactly and uses
+native wire bytes, rather than display-string equality, as the stored-value
+oracle. The scoped mutation test caught the sole mutation of the changed array
+classification condition (1/1; no timeouts or unviable mutants). After the fix,
+the strict GTK + DuckDB value runner passed 148 tests across all 11 suites with
+no missing suites; its report is
+`target/quality/20260930T150331919913Z-values/report.json` (run against dirty
+working-tree changes based on `8758caa`).
 
 ```sh
 rtk cargo test --locked -p tablepro-app --lib postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values -- --include-ignored --exact --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+rtk cargo test --locked -p tablepro-core postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars
+rtk cargo mutants --dir linux --package tablepro-core --file crates/core/src/import/cell.rs --re 'cell.rs:86:' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-postgres-array-csv-import-mutants-line -- --lib postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars -- --test-threads=1
 ```
 
 ### PostgreSQL IPv6 `inet[]` explicit refusal

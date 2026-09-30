@@ -266,7 +266,7 @@ pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO float8_array_grid_edit VALUES (1, ARRAY[0]::float8[]), (2, ARRAY[77]::float8[])")
+        .execute("INSERT INTO float8_array_grid_edit VALUES (1, ARRAY[0]::float8[]), (2, ARRAY[77]::float8[]), (3, ARRAY[88]::float8[])")
         .await
         .unwrap();
     let mut row = connection
@@ -295,19 +295,79 @@ pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {
         .unwrap();
     let actual = connection
         .query(
-            "SELECT id, value::text, encode(array_send(value), 'hex') \
+            "SELECT id, value, value::text, encode(array_send(value), 'hex') \
              FROM float8_array_grid_edit ORDER BY id",
         )
         .await
         .unwrap();
     assert_eq!(actual.rows[0][0], Value::Int(1));
-    assert_eq!(&actual.rows[0][1..], expected.rows[0].as_slice());
+    let Value::Text(native_text) = &expected.rows[0][0] else {
+        panic!("native float8[] text oracle must be text: {:?}", expected.rows[0][0]);
+    };
+    let Value::Text(decoded_text) = &actual.rows[0][1] else {
+        panic!("float8[] result must remain exact text: {:?}", actual.rows[0][1]);
+    };
+    assert_eq!(&actual.rows[0][2..], expected.rows[0].as_slice());
     assert_eq!(
         actual.rows[1][0],
         Value::Int(2),
         "the sibling row identity remains intact"
     );
-    assert_eq!(actual.rows[1][1], Value::Text("{77}".into()));
+    assert!(matches!(actual.rows[1][1], Value::Text(_)));
+
+    assert_float8_array_csv_round_trip(connection, &actual, native_text, decoded_text).await;
+}
+
+async fn assert_float8_array_csv_round_trip(
+    connection: &dyn Connection,
+    result: &QueryResult,
+    native_text: &str,
+    decoded_text: &str,
+) {
+    let columns = vec![result.columns[0].clone(), result.columns[1].clone()];
+    let row = vec![result.rows[0][0].clone(), result.rows[0][1].clone()];
+    let csv_text = tablepro_core::export::render_csv(
+        &columns,
+        std::slice::from_ref(&row),
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let mut reader = csv::Reader::from_reader(csv_text.as_bytes());
+    assert_eq!(reader.headers().unwrap().iter().collect::<Vec<_>>(), ["id", "value"]);
+    let exported = reader.records().next().unwrap().unwrap();
+    assert_eq!(
+        &exported[1], decoded_text,
+        "CSV must preserve the driver's exact float8[] value text"
+    );
+    assert!(reader.records().next().is_none());
+
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
+    let imported =
+        tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &columns, &options, 2).unwrap();
+    assert_eq!(imported, row, "CSV import must retain the array as exact text");
+
+    let mut update_columns = columns;
+    update_columns[0].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "float8_array_grid_edit",
+        &update_columns,
+        &[(1, imported[1].clone())],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    let restored = connection
+        .query("SELECT id, value::text, encode(array_send(value), 'hex') FROM float8_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(restored.rows[0][0], Value::Int(1));
+    assert_eq!(restored.rows[1][0], Value::Int(2));
+    assert_eq!(restored.rows[1][1], Value::Text(native_text.into()));
+    assert_eq!(restored.rows[1][2], restored.rows[0][2]);
+    assert_eq!(restored.rows[2][0], Value::Int(3));
+    assert_eq!(restored.rows[2][2], result.rows[2][3]);
 }
 
 #[tokio::test]

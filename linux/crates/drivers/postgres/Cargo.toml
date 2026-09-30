@@ -25,6 +25,7 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+csv.workspace = true
 secrecy.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["postgres"] }

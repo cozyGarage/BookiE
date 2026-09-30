@@ -80,6 +80,12 @@ impl ColumnKind {
 /// what the file said.
 pub fn column_kind(data_type: &str) -> ColumnKind {
     let lowered = data_type.trim().to_ascii_lowercase();
+    // Array values are transported as their driver's textual array form.
+    // Parsing the element type here would incorrectly treat the whole cell
+    // (for example, "{1,2}") as a scalar number.
+    if lowered.contains('[') || lowered.ends_with(" array") {
+        return ColumnKind::Text;
+    }
     let base = lowered.split(['(', '[']).next().unwrap_or("").trim().to_owned();
     if let Some(kind) = temporal_kind(&base, &lowered) {
         return kind;
@@ -378,6 +384,9 @@ mod tests {
         assert_eq!(column_kind("bigserial"), ColumnKind::Int);
         assert_eq!(column_kind("VARCHAR(255)"), ColumnKind::Text);
         assert_eq!(column_kind("numeric(10,2)"), ColumnKind::Decimal);
+        assert_eq!(column_kind("integer[]"), ColumnKind::Text);
+        assert_eq!(column_kind("float8[]"), ColumnKind::Text);
+        assert_eq!(column_kind("numeric ARRAY"), ColumnKind::Text);
         assert_eq!(column_kind("double precision"), ColumnKind::Float);
         assert_eq!(column_kind("boolean"), ColumnKind::Bool);
         assert_eq!(column_kind("date"), ColumnKind::Date);
@@ -388,6 +397,16 @@ mod tests {
         assert_eq!(column_kind("uuid"), ColumnKind::Uuid);
         assert_eq!(column_kind("jsonb"), ColumnKind::Json);
         assert_eq!(column_kind("bytea"), ColumnKind::Bytes);
+    }
+
+    #[test]
+    fn postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars() {
+        let columns = vec![column("value", "float8[]")];
+        let row = vec!["{\"1.0000000000000002\",\"-0\",\"5e-324\",\"NaN\",\"Infinity\",\"-Infinity\",NULL}".into()];
+        let values = row_to_values(&row, &[Some(0)], &columns, &CsvImportOptions::default(), 2)
+            .expect("float8[] CSV cells remain exact text");
+
+        assert_eq!(values, vec![Value::Text(row[0].clone())]);
     }
 
     #[test]
