@@ -1656,11 +1656,15 @@ compared with ClickHouse's native `toTypeName` and `toJSONString` oracles, inclu
 wide unsigned values that JSON must quote. A plain `Value::Json` no longer
 carries the native type needed to distinguish numeric strings from text
 strings, so SQL-literal export and parameter binding explicitly refuse all
-seven nested shapes instead of writing a changed value. The original array
-case also retains SQL-literal and grid-edit refusal contracts.
+seven nested shapes instead of writing a changed value. Each shape also goes
+through the keyed grid-update builder against a real MergeTree row: the driver
+returns `Transaction { statement_index: 0, source: Unsupported }`, and the
+stored id, value, native type and server JSON remain unchanged. The original
+array case retains its direct cell-literal refusal contract too.
 
 The focused Docker integration case and the complete ClickHouse Docker suite
-passed (33 tests). Its ignored test is listed in `docs/ignored-tests.md`.
+passed (33 tests). The expanded focused case verifies refusal for all seven
+grid edits; its ignored test is listed in `docs/ignored-tests.md`.
 
 The two exporter refusal tests also passed scoped mutation checks: the shared
 renderer caught all three selected mutations, including making the ClickHouse
@@ -1669,9 +1673,13 @@ function-replacement mutations. Reports are in
 `target/quality/20260929-clickhouse-json-mutants-core-final/mutants.out/outcomes.json`
 and
 `target/quality/20260929-clickhouse-grid-json-mutants-lib-only-final/mutants.out/outcomes.json`.
+The new seven-shape real-grid refusal contract also caught both selected
+whole-function renderer mutations, with no missed, timed-out or unviable cases:
+`target/quality/20260930-clickhouse-nested-grid-refusal-mutants/mutants.out/outcomes.json`.
 
 ```sh
-rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --test-threads=1
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration -- --include-ignored --test-threads=1
 ```
 
 ### ClickHouse Int128 and UInt128 grid edits, 2026-09-28

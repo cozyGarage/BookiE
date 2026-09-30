@@ -1591,6 +1591,13 @@ matrix's remaining nested-shape claim. Its real-server contract now also checks
 `Map(String, UInt128)`, `Tuple(String, UInt128)`, and four recursive Array/Map/Tuple
 combinations against `toTypeName` and `toJSONString` results. SQL export and
 typed parameter consumers refuse each value because `Value::Json` carries no
-native type metadata. The focused Docker integration contract and complete
-ClickHouse Docker suite passed (33 tests), including all seven shapes. Other
-nested combinations remain open; B3 remains open.
+native type metadata. Each shape now also attempts a keyed update against a real
+MergeTree row; the driver returns a transaction error with `Unsupported` as its
+source, and the exact stored id, value, native type and JSON remain unchanged.
+The focused Docker integration contract and complete ClickHouse Docker suite
+passed (33 tests), including all seven refusal/preservation paths. Other nested
+combinations remain open. A scoped mutation run of the real-grid contract caught
+both generated whole-function literal-renderer mutations, with no missed,
+timed-out or unviable mutants; evidence is in
+`target/quality/20260930-clickhouse-nested-grid-refusal-mutants/mutants.out/outcomes.json`.
+B3 remains open.

@@ -37,7 +37,7 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         ),
     ];
 
-    for (expression, expected_type) in cases {
+    for (index, (expression, expected_type)) in cases.into_iter().enumerate() {
         let source = connection
             .query(&format!(
                 "SELECT {expression} AS value, toTypeName(value) AS native_type, toJSONString(value) AS exact_json"
@@ -72,5 +72,67 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             bound_result.is_err(),
             "nested {expected_type} without type metadata must not bind as a lossy string"
         );
+
+        let table = format!("nested_json_edit_refusal_{index}");
+        connection
+            .query(&format!("DROP TABLE IF EXISTS {table}"))
+            .await
+            .unwrap();
+        connection
+            .query(&format!(
+                "CREATE TABLE {table} (id UInt8, value {expected_type}) ENGINE = MergeTree ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        connection
+            .query(&format!("INSERT INTO {table} SELECT 1, {expression}"))
+            .await
+            .unwrap();
+
+        let columns = connection.fetch_columns(None, &table).await.unwrap();
+        let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+        let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+        assert!(columns[id_index].primary_key, "{table} must expose its key for an edit");
+        let before = connection
+            .query(&format!(
+                "SELECT id, value, toTypeName(value), toJSONString(value) FROM {table}"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(before.rows.len(), 1);
+        assert_eq!(before.rows[0][2], Value::Text(expected_type.into()));
+        assert_eq!(before.rows[0][1], source.rows[0][0]);
+
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "clickhouse",
+            None,
+            &table,
+            &columns,
+            &[(value_index, before.rows[0][value_index].clone())],
+            &[before.rows[0][id_index].clone()],
+        )
+        .unwrap();
+        let edit_result = connection.execute_in_transaction(&[update]).await;
+        assert!(
+            matches!(
+                &edit_result,
+                Err(tablepro_core::DriverError::Transaction {
+                    statement_index: 0,
+                    source,
+                }) if matches!(source.as_ref(), tablepro_core::DriverError::Unsupported(_))
+            ),
+            "nested {expected_type} grid edit must be refused before changing the row, got {edit_result:?}"
+        );
+        let after = connection
+            .query(&format!(
+                "SELECT id, value, toTypeName(value), toJSONString(value) FROM {table}"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            after.rows, before.rows,
+            "refusing a nested {expected_type} edit must preserve the stored native value"
+        );
+        connection.query(&format!("DROP TABLE {table}")).await.unwrap();
     }
 }
