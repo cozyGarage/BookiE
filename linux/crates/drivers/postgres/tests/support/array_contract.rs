@@ -254,6 +254,56 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
             ],
         ]
     );
+
+    assert_bool_array_grid_edit(connection).await;
+}
+
+async fn assert_bool_array_grid_edit(connection: &dyn Connection) {
+    connection
+        .execute("CREATE TABLE bool_array_grid_edit (id integer PRIMARY KEY, value boolean[])")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO bool_array_grid_edit VALUES (1, ARRAY[true]::boolean[]), (2, ARRAY[false]::boolean[])")
+        .await
+        .unwrap();
+    let mut rows = connection
+        .query("SELECT * FROM bool_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM bool_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let id_index = rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = rows.columns.iter().position(|column| column.name == "value").unwrap();
+    rows.columns[id_index].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "bool_array_grid_edit",
+        &rows.columns,
+        &[(value_index, Value::Text("{true,false,NULL}".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let expected = connection
+        .query("SELECT ARRAY[true,false,NULL]::boolean[]::text, encode(array_send(ARRAY[true,false,NULL]::boolean[]), 'hex')")
+        .await
+        .unwrap();
+    let actual = connection
+        .query("SELECT id, value::text, encode(array_send(value), 'hex') FROM bool_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(actual.rows[0][0], Value::Int(1));
+    assert_eq!(actual.rows[0][1], expected.rows[0][0]);
+    assert_eq!(actual.rows[0][2], expected.rows[0][1]);
+    assert_eq!(actual.rows[1][0], Value::Int(2));
+    assert_eq!(actual.rows[1][2], sibling_wire);
 }
 
 pub async fn assert_float8_array_grid_edit(connection: &dyn Connection) {

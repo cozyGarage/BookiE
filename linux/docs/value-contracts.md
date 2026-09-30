@@ -1570,8 +1570,8 @@ limit returns the existing visible undecodable marker rather than truncated data
 
 Limits: network, enum/domain/composite/range and most JSON/BSON array element
 contracts remain unsupported or untested; grid edits are verified only for
-integer[], text[], numeric[] and float8[], and the full grid/MCP/import acceptance
-matrix remains open. Binding text in these tests uses an explicit
+boolean[], integer[], text[], numeric[] and float8[], and the full grid/MCP/import
+acceptance matrix remains open. Binding text in these tests uses an explicit
 PostgreSQL array cast; this does not establish automatic array parameter typing.
 
 Test locations: `crates/drivers/postgres/src/array.rs` and
@@ -1588,6 +1588,22 @@ The shared keyed-update builder now casts text through `text` to a fixed,
 allowlisted PostgreSQL built-in array type. Database metadata is never interpolated
 into SQL. PostgreSQL verified the edited value with a typed array comparison;
 NULL remained an array NULL element.
+
+The same retained integration case now also checks a `boolean[]` edit. The app
+parser preserves `{true,false,NULL}` as text, the update builder casts through
+`text` to `pg_catalog.bool[]`, and PostgreSQL's native array text and
+`array_send` bytes match after the edit. A second row's original wire bytes
+remain unchanged. This expands the server-backed edit matrix to boolean[] as
+well as integer[], text[], numeric[] and float8[]. The full PostgreSQL integration
+suite passed 64 tests in 119.81 seconds. The strict GTK + DuckDB value runner
+passed 148 tests across all 11 suites with no missing suites:
+`target/quality/20260930T155358866891Z-values/report.json` (`dirty: true`, based
+on `2b5a01a`).
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib postgres_boolean_array_grid_literal_stays_text_through_the_keyed_update_builder -- --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_array_grid_edit_preserves_array_elements -- --include-ignored --exact --test-threads=1
+```
 
 ### PostgreSQL array cast allowlist mutation follow-up, 2026-09-30
 

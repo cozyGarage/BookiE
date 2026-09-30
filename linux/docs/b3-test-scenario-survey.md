@@ -179,8 +179,10 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   corpus selectively for our six SQL engines.
 - B3-1 implementation follow-up: scalar and temporal arrays now preserve
   elements, dimensions and lower bounds through server wire, SQL and JSON checks;
-  built-in `integer[]`, `text[]`, `numeric[]`, and `float8[]` grid write-back
-  pass with NULL preserved. The float8[] case also traverses CSV export/import
+  built-in `boolean[]`, `integer[]`, `text[]`, `numeric[]`, and `float8[]` grid
+  write-back pass with NULL preserved. The boolean[] case now traverses app
+  parsing, the keyed builder and PostgreSQL wire verification with sibling-row
+  identity. The float8[] case also traverses CSV export/import
   and a keyed re-edit, with PostgreSQL wire-byte and sibling-row oracles. CSV
   import now keeps array-shaped cells as exact text. Broader array types and
   automatic parameter typing remain open. See the
