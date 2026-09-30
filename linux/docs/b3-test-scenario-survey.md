@@ -189,8 +189,11 @@ must refuse the type-less JSON value, and the live MergeTree row must remain
 unchanged. Other nested combinations remain open; see the matching contract in
 the value ledger. Scoped mutation testing of the ClickHouse decoder caught 9
 of 10 changes, with one compile-time unviable replacement, no survivors and no
-timeouts. The strict combined runner passed all 162 selected tests across 11
-suites, including the expanded nested contract.
+timeouts. The same fixture now covers a nested nullable/empty Decimal array
+inside an array of tuples, keeping a high-precision Decimal, NULL element and
+empty nested array distinct under the server JSON oracle. The strict combined
+runner passed all 163 selected tests across 11 suites, including both nested
+contracts.
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,

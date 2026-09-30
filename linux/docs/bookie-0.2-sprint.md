@@ -1865,3 +1865,20 @@ cached grid-layout invalidation and the actual inline-edit gate. A native
 MongoDB read verifies that the value and row identity remain unchanged. This
 proves the fetched-page safety boundary; whole-collection type discovery remains
 outside the page-scoped browse contract.
+
+### ClickHouse nested nullable Decimal array — September 30
+
+The nested collection contract also covers
+`Array(Tuple(String, Array(Nullable(Decimal(38, 9)))))`, with an exact high-
+precision Decimal, a NULL element, and an empty nested array. A real ClickHouse
+24.8 `toTypeName`/`toJSONString` oracle checks decoded structure. SQL export,
+parameter binding, and keyed grid editing refuse the type-less JSON value, and
+the stored MergeTree row remains unchanged. The focused Docker test passed, and
+the strict GTK/DuckDB selector passed 163 tests across 11 suites:
+[`20260930T220504654998Z-values/report.json`](../target/quality/20260930T220504654998Z-values/report.json).
+The quick layer also passed:
+[`20260930T220959286873Z-layers/report.json`](../target/quality/20260930T220959286873Z-layers/report.json).
+
+```sh
+rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
+```
