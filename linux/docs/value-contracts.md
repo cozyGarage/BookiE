@@ -2393,17 +2393,23 @@ mutants, with no misses, timeouts or unviable mutants:
 
 ### MongoDB binary subtype grid matrix, 2026-09-30
 
-A Docker-backed keyed-edit contract now verifies Generic, Function, BinaryOld,
+A Docker-backed keyed-edit contract verifies Generic, Function, BinaryOld,
 UUIDOld, UUID, MD5, Encrypted, Sensitive, Vector, Reserved `0a`, and
-user-defined `80` subtype values. It checks both the canonical driver value and
-the native BSON subtype plus bytes after editing. MongoDB 7 rejects arbitrary
-bytes for Column subtype `07` at insert with `NonConformantBSON` (code 378), so
-that subtype needs a valid BSONColumn payload before it can have a positive grid
-edit oracle; it is not included in this opaque-byte matrix. The focused test
-passed:
+user-defined `80` subtype values against both canonical driver values and native
+BSON subtype/byte oracles. Arbitrary bytes for Column subtype `07` are malformed
+and MongoDB rejects them with `NonConformantBSON` (code 378). The test now gets
+valid subtype-07 payloads directly from MongoDB time-series buckets: after
+closing and reopening each bucket, MongoDB compresses its measurements into a
+BSONColumn. The keyed grid edit replaces one valid server-generated column with
+another; BookiE and an independent client both confirm exact subtype and payload
+preservation. MongoDB's time-series compression description is in the
+[server documentation](https://www.mongodb.com/docs/v7.0/core/timeseries/timeseries-compression/).
+
+The opaque-subtype matrix and positive BSONColumn edit passed:
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::value_contract_binary_subtypes_survive_native_grid_edits -- --include-ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration value_contracts::value_contract_server_generated_bson_column_survives_grid_edit -- --include-ignored --exact --test-threads=1
 ```
 
 ### MongoDB UUID binary grid editing, 2026-09-30

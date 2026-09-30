@@ -933,6 +933,108 @@ async fn value_contract_binary_subtypes_survive_native_grid_edits() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_server_generated_bson_column_survives_grid_edit() {
+    use mongodb::bson::{Binary, Bson, DateTime, Document, doc, oid::ObjectId, spec::BinarySubtype};
+
+    async fn time_series_column(client: &mongodb::Client, name: &str, readings: [i32; 5]) -> Binary {
+        use futures::TryStreamExt;
+
+        let database = client.database("appdb");
+        database
+            .run_command(doc! {
+                "create": name,
+                "timeseries": { "timeField": "measured_at", "metaField": "sensor" }
+            })
+            .await
+            .expect("create time-series collection");
+        // Cross a bucket's one-hour time span, then write into the closed
+        // first bucket again so MongoDB reopens and compresses its BSONColumn.
+        let offsets = [0_i64, 1_800_000, 7_200_000, 7_201_000, 600_000];
+        database
+            .collection::<Document>(name)
+            .insert_many(offsets.into_iter().zip(readings).map(|(offset, reading)| {
+                doc! {
+                    "measured_at": DateTime::from_millis(1_700_000_000_000 + offset),
+                    "sensor": "test-sensor",
+                    "reading": reading,
+                }
+            }))
+            .await
+            .expect("insert measurements for server-generated BSONColumn");
+        let buckets = database.collection::<Document>(&format!("system.buckets.{name}"));
+        for _ in 0..40 {
+            let mut cursor = buckets.find(doc! {}).await.expect("find generated time-series buckets");
+            while let Some(bucket) = cursor.try_next().await.expect("read time-series bucket") {
+                let data = bucket.get_document("data").expect("bucket data");
+                if let Some(Bson::Binary(column)) = data.get("reading") {
+                    if column.subtype == BinarySubtype::Column {
+                        return column.clone();
+                    }
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("MongoDB did not compress a closed time-series bucket to BSONColumn");
+    }
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let original = time_series_column(&client, "column_source", [10, 20, 30, 40, 15]).await;
+    let replacement = time_series_column(&client, "column_replacement", [11, 22, 33, 44, 16]).await;
+    assert_ne!(original.bytes, replacement.bytes, "source payloads differ");
+
+    let collection = client.database("appdb").collection::<Document>("column_grid_edits");
+    let row_id = ObjectId::new();
+    collection
+        .insert_one(doc! { "_id": row_id, "payload": original.clone() })
+        .await
+        .expect("store a server-generated BSONColumn value");
+    let connection = MongodbDriver
+        .connect(super::opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.column_grid_edits.find({})")
+        .await
+        .expect("read source BSONColumn");
+    let id_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let payload_index = before
+        .columns
+        .iter()
+        .position(|column| column.name == "payload")
+        .unwrap();
+    let edited_marker = Bson::Binary(replacement.clone()).into_canonical_extjson();
+    let (statement, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "column_grid_edits",
+        &before.columns,
+        &[(payload_index, Value::Json(edited_marker.clone()))],
+        &[before.rows[0][id_index].clone()],
+    )
+    .expect("build BSONColumn grid update");
+    connection
+        .execute_in_transaction(&[(statement, params)])
+        .await
+        .expect("apply valid server-generated BSONColumn edit");
+
+    let after = connection
+        .query("db.column_grid_edits.find({})")
+        .await
+        .expect("read edited BSONColumn");
+    assert_eq!(after.rows[0][payload_index], Value::Json(edited_marker));
+    let persisted = collection
+        .find_one(doc! { "_id": row_id })
+        .await
+        .expect("read native persisted BSON")
+        .expect("edited row remains present");
+    assert_eq!(persisted.get("payload"), Some(&Bson::Binary(replacement)));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_object_id_grid_edit_preserves_native_bson() {
     use mongodb::bson::{Bson, doc, oid::ObjectId};
 

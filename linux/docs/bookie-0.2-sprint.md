@@ -1192,10 +1192,11 @@ The follow-up audit extended native-server grid editing across BSON binary
 subtypes. MongoDB 7 confirms exact subtype and edited-byte preservation for
 Generic, Function, BinaryOld, UUIDOld, UUID, MD5, Encrypted, Sensitive, Vector,
 Reserved `0a`, and UserDefined `80`. MongoDB rejects arbitrary bytes for Column
-subtype `07` with `NonConformantBSON` code 378, so valid BSONColumn encoding and
-a positive edit contract remain open. The focused edit test passed. This is a
-native format constraint; do not count the rejection of malformed opaque bytes
-as successful BSONColumn editing.
+subtype `07` with `NonConformantBSON` code 378. Using MongoDB-generated
+time-series BSONColumn payloads, a separate keyed edit now proves valid subtype
+`07` columns survive with their exact payload. Both focused edit contracts
+passed. The unsupported condition applies to malformed arbitrary bytes; it does
+not block valid BSONColumn re-import.
 
 B3 remains open.
 
