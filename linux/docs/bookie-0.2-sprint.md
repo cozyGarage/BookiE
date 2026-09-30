@@ -1163,9 +1163,11 @@ The driver's schema sample completes first; the query then receives its initial
 cursor batch and must fail as `Disconnected` when fetching the next batch. The
 public query API cannot return rows alongside an error, so this also guards
 against treating a partial cursor as a successful result. The focused ignored
-integration test passed locally. Redis paged-result loss during row production
-remains open, along with B3's unrelated native-type, consumer and acceptance
-gaps.
+integration test passed locally. A separate RESP socket fixture returns one key
+from `SCAN`, then drops the browse connection on `TYPE`; the page must fail as
+`Disconnected` without returning an incomplete row set. That focused test also
+passed. These contracts close the mid-cursor/page disconnection gap; B3's
+unrelated native-type, consumer and acceptance gaps remain open.
 
 B3 remains open.
 

@@ -135,12 +135,12 @@ hard server stop (`Disconnected`) and graceful shutdown, which must return the
 server's cancellation error rather than partial rows. SQL Server now tests
 server loss while draining a multi-result stream and requires `Disconnected`,
 no partial result, and a successful fresh connection after restart. These
-focused cases passed. Mid-stream failure, cancellation, completeness and
-connection-state parity during cursor/paged result production remains open on
-Redis; MongoDB now has a deterministic failpoint contract for cursor `getMore`
-loss after its first batch. Native-type
-and consumer targets in this matrix. Passing the server-loss and explicit
-reconnect cases does not close those other gaps.
+focused cases passed. MongoDB now has a cursor `getMore` loss test after its
+first batch, and Redis has a browse-page loss test after `SCAN` while reading a
+key. Both require the whole operation to fail as `Disconnected`; they do not
+cover cancellation or transparent recovery of that in-progress operation.
+Native-type and consumer targets in this matrix remain open. Passing the
+server-loss and explicit reconnect cases does not close those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is

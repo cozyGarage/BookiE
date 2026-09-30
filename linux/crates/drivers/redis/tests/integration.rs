@@ -12,6 +12,72 @@ async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
         .expect("Redis setup refusal remains distinct from established disconnect");
 }
 
+#[tokio::test]
+async fn connection_loss_while_building_a_browse_page_fails_the_whole_page() {
+    use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("bind RESP fixture");
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        loop {
+            let Ok((stream, _)) = listener.accept().await else {
+                return;
+            };
+            tokio::spawn(async move {
+                let (read, mut write) = stream.into_split();
+                let mut read = BufReader::new(read);
+                loop {
+                    let mut line = String::new();
+                    if read.read_line(&mut line).await.expect("read request length") == 0 {
+                        return;
+                    }
+                    let count: usize = line.trim().strip_prefix('*').unwrap().parse().unwrap();
+                    let mut args = Vec::with_capacity(count);
+                    for _ in 0..count {
+                        line.clear();
+                        read.read_line(&mut line).await.expect("read bulk length");
+                        let len: usize = line.trim().strip_prefix('$').unwrap().parse().unwrap();
+                        let mut bytes = vec![0; len];
+                        read.read_exact(&mut bytes).await.expect("read bulk argument");
+                        let mut crlf = [0; 2];
+                        read.read_exact(&mut crlf).await.expect("read bulk terminator");
+                        args.push(String::from_utf8(bytes).expect("Redis command is UTF-8"));
+                    }
+
+                    match args.first().map(String::as_str) {
+                        Some("CLIENT") => write.write_all(b"+OK\r\n").await.expect("reply CLIENT metadata"),
+                        Some("SELECT") => write.write_all(b"+OK\r\n").await.expect("reply SELECT"),
+                        Some("SCAN") => write
+                            .write_all(b"*2\r\n:0\r\n*1\r\n$11\r\nfixture:key\r\n")
+                            .await
+                            .expect("return one scanned key"),
+                        Some("TYPE") => return, // Lose the established browse connection mid-page.
+                        command => panic!("unexpected Redis browse command: {command:?}"),
+                    }
+                    write.flush().await.expect("flush RESP reply");
+                }
+            });
+        }
+    });
+
+    let connection = RedisDriver
+        .connect(opts("127.0.0.1", port, "0"))
+        .await
+        .expect("connect to RESP disconnect fixture");
+    let error = connection
+        .fetch_rows(None, "db0", 0, 10)
+        .await
+        .expect_err("a key-read failure must reject the incomplete browse page");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "mid-page Redis connection loss must be Disconnected, got {error:?}"
+    );
+
+    drop(connection);
+    server.abort();
+}
+
 use drivers_redis::RedisDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};
