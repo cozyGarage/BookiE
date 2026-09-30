@@ -84,6 +84,93 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit() {
+    use tablepro_core::OperationControl;
+
+    let (_container, connection, collection, decimal) = mongodb_late_mixed_page_fixture().await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let loaded_columns = connection
+        .fetch_columns_controlled(None, "page_mixed_edit_contract", &control)
+        .await
+        .unwrap();
+    let loaded_value_index = loaded_columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(loaded_columns[loaded_value_index].data_type, "string");
+
+    let page = connection
+        .fetch_rows_controlled(None, "page_mixed_edit_contract", 50, 1, &control)
+        .await
+        .unwrap();
+    let effective_columns = columns_for_browse_page("mongodb", &loaded_columns, Some(&page));
+    let value_index = effective_columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    let id_index = effective_columns
+        .iter()
+        .position(|column| column.name == "_id")
+        .unwrap();
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.rows[0][id_index], Value::Int(50));
+    assert_eq!(effective_columns[value_index].data_type, "mixed");
+    assert!(!column_layout_matches(&loaded_columns, &effective_columns));
+    assert!(
+        !crate::ui::grid::cell_allows_inline_edit(&effective_columns[value_index], &page.rows[0][value_index]),
+        "the page's conflicting BSON type must become read-only before the grid can edit it"
+    );
+
+    let persisted = collection
+        .find_one(mongodb::bson::doc! { "_id": 50 })
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(persisted.get("_id"), Some(&mongodb::bson::Bson::Int32(50)));
+    assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+}
+
+async fn mongodb_late_mixed_page_fixture() -> (
+    testcontainers::ContainerAsync<testcontainers_modules::mongo::Mongo>,
+    Box<dyn tablepro_core::Connection>,
+    mongodb::Collection<mongodb::bson::Document>,
+    mongodb::bson::Decimal128,
+) {
+    use mongodb::bson::{Decimal128, doc};
+    use tablepro_core::DatabaseDriver;
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::mongo::Mongo;
+
+    let container = Mongo::default().with_tag("7").start().await.unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(27017).await.unwrap();
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    let collection = client
+        .database("appdb")
+        .collection::<mongodb::bson::Document>("page_mixed_edit_contract");
+    let decimal_text = "12345678901234567890.1234567890123";
+    let decimal = decimal_text.parse::<Decimal128>().unwrap();
+    let mut docs = (0..50)
+        .map(|index| doc! { "_id": index, "value": "ordinary text" })
+        .collect::<Vec<_>>();
+    docs.push(doc! { "_id": 50, "value": decimal });
+    collection.insert_many(docs).await.unwrap();
+
+    let connection = drivers_mongodb::MongodbDriver
+        .connect(tablepro_core::ConnectOptions {
+            host,
+            port,
+            database: "appdb".into(),
+            tls: tablepro_core::TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    (container, connection, collection, decimal)
+}
+
 #[test]
 fn page_metadata_does_not_replace_schema_for_other_drivers() {
     let loaded = vec![column("value", "numeric", false)];

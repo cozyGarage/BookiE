@@ -1856,3 +1856,12 @@ passed. Scoped decoder mutation testing caught 9 of 10 generated changes, with
 one compile-time unviable replacement and no survivors or timeouts. The strict
 value runner passed 162 tests across 11 suites, and quick passed; evidence is
 linked from [the value ledger](value-contracts.md#clickhouse-nested-decimal-and-temporal-value-2026-09-30).
+
+### MongoDB late-page mixed grid refusal — September 30
+
+An app-level Docker contract now spans the initial 50-document string sample,
+a later page with a native Decimal128 value, the merged `mixed` column schema,
+cached grid-layout invalidation and the actual inline-edit gate. A native
+MongoDB read verifies that the value and row identity remain unchanged. This
+proves the fetched-page safety boundary; whole-collection type discovery remains
+outside the page-scoped browse contract.

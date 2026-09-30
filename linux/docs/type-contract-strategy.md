@@ -172,6 +172,21 @@ permissive clamp with `STRICT_TRANS_TABLES` rejection, then verifies parser
 refusal and a valid exact edit in strict mode. Other SQL-mode and DDL-session
 combinations remain open.
 
+MongoDB late-page BSON conflicts now have an app-level native-server contract:
+after an initial 50-row string sample, a fetched page containing Decimal128
+updates the column to `mixed`, rebuilds the grid layout and blocks inline edit.
+An independent client checks the persisted BSON kind and row identity. This
+establishes the current-page safety contract; a full-collection type census is
+not part of the paged browse contract and is not claimed.
+
+The Docker-backed app case passed with the strict GTK/DuckDB value selector:
+26 app tests and 163 tests across all 11 configured suites passed at working
+tree source `7fd33187c1f9bfa024a09be85e203bb82e8f24c4`. The quick layer also
+passed on that tree. Reports:
+[`20260930T215342621227Z-values/report.json`](../target/quality/20260930T215342621227Z-values/report.json)
+and
+[`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+
 ClickHouse nested refusal coverage now also includes an array of tuples carrying
 `Decimal(38, 9)` and `DateTime64(9, 'UTC')`, checked against native type and JSON
 oracles with unchanged-row assertions after consumer refusals. More nested

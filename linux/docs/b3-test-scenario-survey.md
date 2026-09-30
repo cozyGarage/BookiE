@@ -167,6 +167,20 @@ The focused command is
 `cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1`.
 Other SQL modes and DDL-session contracts remain open in the driver matrix.
 
+The MongoDB page-scoped heterogeneity contract is now checked through both
+driver metadata and the app's real grid-editability gate. After the initial
+50-string metadata sample, a later page returns a Decimal128 value for the same
+field. The merged page schema becomes `mixed`, invalidates the cached grid
+layout, and refuses inline editing; a native client confirms the Decimal128 and
+row identity remain unchanged. Whole-collection type census beyond the current
+page remains intentionally unclaimed; the UI only permits edits to rows in the
+current page, whose conflicting types are now checked before editing.
+The test passed in the strict GTK/DuckDB selector (26 app tests; 163 across all
+11 configured suites) and the quick layer. Reports:
+[`20260930T215342621227Z-values/report.json`](../target/quality/20260930T215342621227Z-values/report.json)
+and
+[`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+
 One ClickHouse nested-value combination is now covered beyond the existing
 UInt128 containers: an array of tuples containing `Decimal(38, 9)` and
 `DateTime64(9, 'UTC')`. The server type and `toJSONString` outputs are compared

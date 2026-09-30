@@ -3313,3 +3313,23 @@ The quick layer also passed:
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --test-threads=1
 ```
+
+## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
+
+The first 50 documents declare a field as string; the next fetched page contains
+a Decimal128 value for that field. A Docker-backed app contract obtains the
+initial metadata and later page from MongoDB, merges the page schema through
+`columns_for_browse_page`, and verifies the conflicting value marks the column
+`mixed`, invalidates the cached grid layout, and fails the actual inline-edit
+gate. A native MongoDB client confirms the Decimal128 value and row identity are
+unchanged. This proves safety for each fetched page; it does not claim a global
+type census for documents outside the current page.
+
+The test passed in `20260930T215342621227Z-values/report.json`: 26 app tests and
+163 tests across all 11 configured suites, including GTK and DuckDB. The quick
+layer passed at the same source revision; see
+[`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit -- --include-ignored --test-threads=1
+```
