@@ -43,6 +43,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "CAST([tuple('precise', CAST([toDecimal128('12345678901234567890.123456789', 9), CAST(NULL AS Nullable(Decimal(38, 9)))] AS Array(Nullable(Decimal(38, 9))))), tuple('empty', CAST([] AS Array(Nullable(Decimal(38, 9)))))] AS Array(Tuple(String, Array(Nullable(Decimal(38, 9))))))",
             "Array(Tuple(String, Array(Nullable(Decimal(38, 9)))))",
         ),
+        (
+            "CAST(map('measurements', [tuple('upper', toDecimal128('12345678901234567890.123456789', 9)), tuple('missing', CAST(NULL AS Nullable(Decimal(38, 9))))], 'empty', CAST([] AS Array(Tuple(String, Nullable(Decimal(38, 9)))))) AS Map(String, Array(Tuple(String, Nullable(Decimal(38, 9))))))",
+            "Map(String, Array(Tuple(String, Nullable(Decimal(38, 9)))))",
+        ),
     ];
 
     for (index, (expression, expected_type)) in cases.into_iter().enumerate() {

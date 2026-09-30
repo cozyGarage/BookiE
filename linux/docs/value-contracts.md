@@ -3379,6 +3379,20 @@ The quick layer also passed:
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --test-threads=1
 ```
 
+### ClickHouse nested Map of tuple arrays, 2026-10-01
+
+The same native-backed consumer contract now includes
+`Map(String, Array(Tuple(String, Nullable(Decimal(38, 9)))))` with an empty
+array, a NULL decimal and a high-precision decimal. It checks `toTypeName` and
+`toJSONString`, then compares the driver value and parsed JSON/CSV exports with
+that independent server oracle. The SQL literal, typed parameter and MergeTree
+grid consumers must refuse the type-less nested value without changing the
+stored row. The focused Docker case passed. Other nested combinations remain
+open; this increases the matrix from nine tested shapes to ten, rather than
+closing the broader nested-type audit. The strict values runner passed all 165
+selected tests across 11 suites, including the expanded ClickHouse contract:
+[`20260930T231755592573Z-values/report.json`](../target/quality/20260930T231755592573Z-values/report.json).
+
 ## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
 
 The first 50 documents declare a field as string; the next fetched page contains

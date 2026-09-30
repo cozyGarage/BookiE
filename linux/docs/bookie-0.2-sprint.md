@@ -80,6 +80,14 @@ contract checks the stored instant and offset against SQL Server. See the
 [value-contract evidence](value-contracts.md#sql-server-datetimeoffset-csv-import-2026-10-01).
 The full strict values layer and quick gate passed; B3 remains open.
 
+The next bounded B3 case extends ClickHouse nested consumer coverage with
+`Map(String, Array(Tuple(String, Nullable(Decimal(38, 9)))))`. The focused
+server test and strict 165-test, 11-suite value runner passed. Exact JSON/CSV
+matches the native `toJSONString` oracle; SQL literal, binding and grid edit
+refusals preserve the stored row. Other nested combinations remain open; see
+the [type matrix](type-contract-strategy.md#current-evidence-and-next-targets)
+and [value evidence](value-contracts.md#clickhouse-nested-map-of-tuple-arrays-2026-10-01).
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the
