@@ -73,6 +73,56 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() {
+    let (_container, opts) = start_pg().await;
+    let connection: std::sync::Arc<dyn Connection> = PgDriver.connect(opts.clone()).await.expect("connect").into();
+    let observer = connect(opts).await;
+    let tag = "bookie_midstream_backend_termination";
+    let running = connection.clone();
+    let task = tokio::spawn(async move {
+        running
+            .query(&format!(
+                "SELECT n, pg_sleep(0.05) FROM generate_series(1, 100) AS n /* {tag} */"
+            ))
+            .await
+    });
+
+    let mut pid = None;
+    for _ in 0..100 {
+        if let Some(backend_pid) = tagged_query_pid(observer.as_ref(), tag).await {
+            pid = Some(backend_pid);
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    let pid = pid.expect("tagged streaming query must reach PostgreSQL");
+    // Let the executor produce some rows before cutting its backend. The
+    // public query API returns a complete result, so a partial result is a bug.
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let terminated = observer
+        .query(&format!("SELECT pg_terminate_backend({pid})"))
+        .await
+        .expect("terminate streaming query backend");
+    assert_eq!(terminated.rows, vec![vec![Value::Bool(true)]]);
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .expect("interrupted row stream must not hang")
+        .expect("query task")
+        .expect_err("interrupted row stream must not return a partial result");
+    assert!(
+        matches!(error, DriverError::Disconnected),
+        "mid-stream backend loss must be reported as disconnected, got {error:?}"
+    );
+    let recovered = connection
+        .query("SELECT 1")
+        .await
+        .expect("pool recovers after stream loss");
+    assert_eq!(recovered.rows, vec![vec![Value::Int(1)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_restarted_postgres_server_restores_the_existing_pool() {
     let port_probe = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("reserve test port");
     let host_port = port_probe.local_addr().expect("test port address").port();

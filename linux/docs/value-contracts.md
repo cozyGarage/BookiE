@@ -244,6 +244,21 @@ targeted mutation run of the mapper caught 6 of 7 mutants; one was unviable,
 with no missed or timed-out mutants:
 `target/quality/20260930-redis-startup-disconnect-mutants/mutants.out/outcomes.json`.
 
+## PostgreSQL mid-stream disconnect completeness, 2026-09-30
+
+A Docker-backed regression starts a 100-row query with a short delay per row,
+waits until PostgreSQL reports its backend active, then terminates that backend
+after row production has begun. The driver must return `Disconnected` for the
+whole query rather than present any partial rows as a complete result. The same
+pool must then complete `SELECT 1` successfully. This complements the existing
+query-start termination and full-server restart cases. The focused integration
+case passed locally: 1 test passed. The broader cross-driver mid-stream contract
+remains open.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration disconnection::backend_loss_during_row_stream_fails_the_whole_query_as_disconnected -- --ignored --exact --test-threads=1
+```
+
 ## ClickHouse disconnect classification, 2026-09-30
 
 A Docker-backed regression completed `SELECT 1`, stopped ClickHouse, then

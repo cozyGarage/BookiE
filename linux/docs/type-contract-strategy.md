@@ -123,10 +123,12 @@ missed or timed out; the first run's missed connect-error distinction gained a
 regression before the final run. MySQL and MongoDB disconnect mapper mutation
 evidence is recorded in [value contracts](value-contracts.md).
 
-Mid-stream failure, cancellation, completeness and connection-state parity
-across engines remain open, as do the native-type and consumer targets in this
-matrix. Passing the server-loss and explicit reconnect cases does not close
-those other gaps.
+PostgreSQL now also has a Docker regression that terminates a slow query after
+row production has begun; the whole query must fail as `Disconnected`, never
+return a partial result, and the pool must recover. Mid-stream failure,
+cancellation, completeness and connection-state parity across the other engines
+remain open, as do the native-type and consumer targets in this matrix. Passing
+the server-loss and explicit reconnect cases does not close those other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is
