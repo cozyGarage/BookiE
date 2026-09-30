@@ -503,18 +503,18 @@ async fn parameterised_types_decode_to_typed_values() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_datetime64_precision_0_through_9_is_exact() {
+    use chrono::Timelike;
+
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
-    conn.execute(
-        "CREATE TABLE temporal_precision (
-            id UInt8,
-            seconds DateTime64(0),
-            millis DateTime64(3),
-            micros DateTime64(6),
-            nanos DateTime64(9)
-        ) ENGINE = MergeTree ORDER BY id",
-    )
+    let scale_columns = (0..=9)
+        .map(|scale| format!("p{scale} DateTime64({scale})"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    conn.execute(&format!(
+        "CREATE TABLE temporal_precision (id UInt8, {scale_columns}) ENGINE = MergeTree ORDER BY id"
+    ))
     .await
     .unwrap();
 
@@ -522,29 +522,55 @@ async fn value_contract_datetime64_precision_0_through_9_is_exact() {
         .unwrap()
         .and_hms_nano_opt(12, 34, 56, 123_456_789)
         .unwrap();
-    let values = [
-        Value::DateTime(stamp),
-        Value::DateTime(stamp.with_nanosecond(123_000_000).unwrap()),
-        Value::DateTime(stamp.with_nanosecond(123_456_000).unwrap()),
-        Value::DateTime(stamp),
-    ];
-    conn.execute_params("INSERT INTO temporal_precision VALUES (1, ?, ?, ?, ?)", &values)
+    let values = vec![Value::DateTime(stamp); 10];
+    let placeholders = vec!["?"; values.len()].join(", ");
+    conn.execute_params(
+        &format!("INSERT INTO temporal_precision VALUES (1, {placeholders})"),
+        &values,
+    )
+    .await
+    .unwrap();
+
+    let columns = (0..=9).map(|scale| format!("p{scale}")).collect::<Vec<_>>();
+    let epochs = columns
+        .iter()
+        .map(|column| format!("toUnixTimestamp64Nano({column})"))
+        .collect::<Vec<_>>();
+    let result = conn
+        .query(&format!(
+            "SELECT {}, {} FROM temporal_precision WHERE id = 1",
+            columns.join(", "),
+            epochs.join(", ")
+        ))
         .await
         .unwrap();
 
-    let result = conn
-        .query("SELECT seconds, millis, micros, nanos FROM temporal_precision WHERE id = 1")
-        .await
-        .unwrap();
+    // ClickHouse truncates fractional digits beyond a column's declared scale.
+    // Keep this expectation independent of the adapter's scale conversion.
+    let expected_nanos = [
+        0,
+        100_000_000,
+        120_000_000,
+        123_000_000,
+        123_400_000,
+        123_450_000,
+        123_456_000,
+        123_456_700,
+        123_456_780,
+        123_456_789,
+    ];
+    let expected_values = expected_nanos.map(|nanos| Value::DateTime(stamp.with_nanosecond(nanos).unwrap()));
+    let mut expected_row = expected_values.to_vec();
+    expected_row.extend(expected_values.iter().map(|value| {
+        let Value::DateTime(datetime) = value else {
+            unreachable!()
+        };
+        Value::Int(datetime.and_utc().timestamp_nanos_opt().unwrap())
+    }));
     assert_eq!(
         result.rows,
-        vec![vec![
-            Value::DateTime(stamp.with_nanosecond(0).unwrap()),
-            values[1].clone(),
-            values[2].clone(),
-            values[3].clone(),
-        ]],
-        "DateTime64 scales 0, 3, 6 and 9 must preserve the representable precision",
+        vec![expected_row],
+        "all DateTime64 scales 0 through 9 must retain exactly their declared precision"
     );
 }
 

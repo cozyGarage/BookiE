@@ -3000,6 +3000,18 @@ rtk cargo test --locked -p tablepro-driver-clickhouse --test integration tempora
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal -- --ignored --exact --test-threads=1
 ```
 
+The in-range precision contract was also narrower than its test name: it
+previously wrote only scales 0, 3, 6 and 9. It now inserts the same nine-digit
+timestamp into `DateTime64(0)` through `DateTime64(9)`, checks each decoded
+timestamp against an independently written truncation matrix, and compares each
+result's native nanosecond epoch. The focused Docker test passed.
+The strict GTK + DuckDB runner passed 156 selected tests across 11 suites with
+no missing suites; report: `target/quality/20260930T184141165918Z-values/report.json`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_datetime64_precision_0_through_9_is_exact -- --include-ignored --exact --test-threads=1
+```
+
 ## DuckDB unsigned boundaries and mixed interval signs, 2026-09-30
 
 The native DuckDB result contract now covers UBIGINT values immediately above
