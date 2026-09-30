@@ -3259,3 +3259,38 @@ live-server app contracts:
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_spatial_parser_refuses_lossy_text_edits -- --nocapture
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_spatial_grid_refusal_preserves_native_bytes -- --include-ignored --test-threads=1
 ```
+
+## MongoDB in-flight cancellation and disconnect classification, 2026-09-30
+
+A local TCP fixture accepts MongoDB's connection and holds it open after the
+read starts. Cancelling the operation must return
+`OperationOutcomeUnknown(Cancelled)`, not `Disconnected`; this distinguishes an
+interrupted request with an unknown server outcome from confirmed transport
+loss. The focused contract passed, and the complete MongoDB library suite passed
+36 tests. The strict value runner passed 162 selected contracts across 11
+suites; the library cancellation test was verified separately from that
+runner's integration-test selection:
+[`20260930T210700047035Z-values/report.json`](../target/quality/20260930T210700047035Z-values/report.json).
+
+```sh
+rtk cargo test --locked --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --lib value_contract_mongodb_cancelled_inflight_read_is_unknown_not_disconnected -- --nocapture
+rtk cargo test --locked --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --lib
+```
+
+## MySQL unsigned edit across session SQL modes, 2026-09-30
+
+The existing contract set `SESSION sql_mode` through the pooled connection API,
+then assumed later calls used that same physical connection. A new assertion
+exposed the mismatch: the pool reset/reused a session with the server's default
+mode. The contract now pins each mode with `open_session()`. In permissive mode,
+MySQL demonstrates that `TINYINT UNSIGNED` value 256 clamps to 255. In a pinned
+`STRICT_TRANS_TABLES` session, the native insert rejects 256, the app parser
+refuses the same out-of-range grid edit, and a valid keyed edit still preserves
+255 plus `BIGINT UNSIGNED` max while leaving the neighboring row unchanged.
+The focused Docker contract passed. The strict GTK+DuckDB value runner passed
+162 selected tests across 11 suites:
+[`20260930T210700047035Z-values/report.json`](../target/quality/20260930T210700047035Z-values/report.json).
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1
+```

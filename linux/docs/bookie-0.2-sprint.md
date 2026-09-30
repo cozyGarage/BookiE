@@ -1819,3 +1819,28 @@ Scoped mutation testing caught two changes to the spatial guard; one was
 unviable, with no survivors or timeouts. The strict GTK+DuckDB layer passed 162
 tests across 11 suites:
 [`20260930T203202118084Z-values/report.json`](../target/quality/20260930T203202118084Z-values/report.json).
+
+### MongoDB in-flight cancellation classification — September 30
+
+The B3 delivery audit confirmed all six remote drivers classify established
+server loss as `Disconnected` and reject incomplete streams or pages. It also
+found the MongoDB unit suite covered a timed-out read but not an explicitly
+cancelled in-flight read. A held-open TCP fixture now requires
+`OperationOutcomeUnknown(Cancelled)`, keeping cancellation distinct from
+disconnection. The focused regression and all 36 MongoDB library tests passed;
+the strict combined values run passed 162 selected tests across 11 suites, with
+the library cancellation case verified by its own focused command and quick
+gate. Remaining B3 type and consumer gaps are unchanged.
+
+### MySQL SQL-mode session isolation — September 30
+
+The unsigned-integer integration contract now uses pinned `open_session()`
+objects for permissive and `STRICT_TRANS_TABLES` cases. It demonstrates the
+server's permissive clamp, strict rejection, the parser's refusal in both
+modes, and a valid strict-mode grid update that preserves the neighboring row.
+This also prevents pooled connections from silently invalidating `SET SESSION`
+test assumptions. The focused Docker app contract passed.
+The strict value layer passed all 162 selected tests across 11 suites, and the
+quick layer passed formatting, Clippy, unit and sandbox gates:
+[`20260930T210700047035Z-values/report.json`](../target/quality/20260930T210700047035Z-values/report.json),
+[`20260930T211125388087Z-layers/report.json`](../target/quality/20260930T211125388087Z-layers/report.json).

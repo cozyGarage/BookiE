@@ -78,7 +78,7 @@ fn value_contract_mysql_integer_parser_enforces_signed_and_unsigned_widths() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64() {
-    use tablepro_core::{ConnectOptions, DatabaseDriver};
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
     use testcontainers::runners::AsyncRunner;
     use testcontainers_modules::mysql::Mysql;
@@ -101,24 +101,28 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
         })
         .await
         .unwrap();
-    connection.execute("SET SESSION sql_mode = ''").await.unwrap();
-    connection
-        .execute("CREATE TABLE permissive_probe (value TINYINT UNSIGNED)")
-        .await
-        .unwrap();
-    connection
-        .execute("INSERT INTO permissive_probe VALUES (256)")
-        .await
-        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let mut permissive_session = connection.open_session().await.unwrap();
+    for sql in [
+        "SET SESSION sql_mode = ''",
+        "CREATE TABLE permissive_probe (value TINYINT UNSIGNED)",
+        "INSERT INTO permissive_probe VALUES (256)",
+    ] {
+        permissive_session
+            .query_params_controlled(sql, &[], &control)
+            .await
+            .unwrap();
+    }
     assert_eq!(
-        connection
-            .query("SELECT value FROM permissive_probe")
+        permissive_session
+            .query_params_controlled("SELECT value FROM permissive_probe", &[], &control)
             .await
             .unwrap()
             .rows,
         vec![vec![Value::Int(255)]],
         "the independent server oracle demonstrates permissive-mode clamping"
     );
+    permissive_session.close().await.unwrap();
 
     connection
         .execute("CREATE TABLE mysql_integer_edit (id INT PRIMARY KEY, tiny TINYINT UNSIGNED, wide BIGINT UNSIGNED)")
@@ -132,6 +136,37 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
     let tiny_index = columns.iter().position(|column| column.name == "tiny").unwrap();
     let wide_index = columns.iter().position(|column| column.name == "wide").unwrap();
     assert!(parse_input_for_driver("256", Some(&columns[tiny_index]), "mysql").is_err());
+    let mut strict_session = connection.open_session().await.unwrap();
+    strict_session
+        .query_params_controlled("SET SESSION sql_mode = 'STRICT_TRANS_TABLES'", &[], &control)
+        .await
+        .unwrap();
+    let strict_mode = strict_session
+        .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+        .await
+        .unwrap();
+    assert!(matches!(&strict_mode.rows[0][0], Value::Text(mode) if mode.contains("STRICT_TRANS_TABLES")));
+    assert!(
+        parse_input_for_driver("256", Some(&columns[tiny_index]), "mysql").is_err(),
+        "the parser must refuse the same out-of-range edit under strict mode"
+    );
+    assert!(
+        strict_session
+            .query_params_controlled("INSERT INTO permissive_probe VALUES (256)", &[], &control)
+            .await
+            .is_err(),
+        "the native strict-mode oracle must reject the value instead of clamping"
+    );
+    assert_eq!(
+        strict_session
+            .query_params_controlled("SELECT CAST(value AS CHAR) FROM permissive_probe", &[], &control)
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("255".into())]],
+        "the strict-mode refusal must leave the earlier permissive row unchanged"
+    );
+
     let tiny = parse_input_for_driver("255", Some(&columns[tiny_index]), "mysql").unwrap();
     let wide = parse_input_for_driver("18446744073709551615", Some(&columns[wide_index]), "mysql").unwrap();
     let update = tablepro_core::sql_dialect::build_keyed_update(
@@ -143,12 +178,17 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
         &[Value::Int(1)],
     )
     .unwrap();
-    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    strict_session
+        .query_params_controlled(&update.0, &update.1, &control)
+        .await
+        .unwrap();
 
-    let after = connection
-        .query(
+    let after = strict_session
+        .query_params_controlled(
             "SELECT id, CAST(tiny AS CHAR), CAST(wide AS CHAR) \
              FROM mysql_integer_edit ORDER BY id",
+            &[],
+            &control,
         )
         .await
         .unwrap();
@@ -164,4 +204,5 @@ async fn value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_pr
         ],
         "typed grid updates must preserve the exact unsigned value and other row identity"
     );
+    strict_session.close().await.unwrap();
 }

@@ -472,6 +472,39 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn value_contract_mongodb_cancelled_inflight_read_is_unknown_not_disconnected() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let opts = ConnectOptions {
+            host: "127.0.0.1".into(),
+            port,
+            database: "test".into(),
+            ..Default::default()
+        };
+        let client_opts = build_client_options(&opts).await.unwrap();
+        let client = Client::with_options(client_opts).unwrap();
+        let conn = MongodbConnection {
+            client,
+            database_name: "test".into(),
+        };
+        let token = tokio_util::sync::CancellationToken::new();
+        let control = tablepro_core::OperationControl::new(token.clone(), None);
+        let operation = tokio::spawn(async move { conn.list_tables_controlled(&control).await });
+
+        // Hold the accepted socket open so this is an in-flight operation,
+        // rather than a connect failure or a server disconnect.
+        let (_stream, _) = listener.accept().await.unwrap();
+        token.cancel();
+
+        match operation.await.unwrap() {
+            Err(DriverError::OperationOutcomeUnknown { source }) => {
+                assert!(matches!(*source, DriverError::Cancelled), "{source:?}");
+            }
+            other => panic!("expected unknown cancelled outcome, not disconnection: {other:?}"),
+        }
+    }
+
     #[test]
     fn structure_metadata_is_not_declared_without_a_fetch() {
         let d = MongodbDriver;

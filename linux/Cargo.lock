@@ -6261,6 +6261,7 @@ dependencies = [
  "testcontainers",
  "testcontainers-modules",
  "tokio",
+ "tokio-util",
  "zip 8.6.0",
 ]
 

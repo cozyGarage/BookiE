@@ -143,10 +143,14 @@ focused cases passed. MongoDB now has a cursor `getMore` loss test after its
 first batch, and Redis has a browse-page loss test after `SCAN` while reading a
 key. Both require the whole operation to fail as `Disconnected`; Redis also
 verifies that a later browse through the same driver object uses a fresh
-operation-local connection and returns the full row. These tests do not cover
-cancellation or transparent recovery of the interrupted operation. Native-type
-and consumer targets in this matrix remain open. Passing the server-loss and
-explicit reconnect cases does not close those other gaps.
+operation-local connection and returns the full row. MongoDB also now tests an
+in-flight cancellation separately: the held-open socket yields
+`OperationOutcomeUnknown(Cancelled)`, not `Disconnected`. PostgreSQL, MySQL,
+ClickHouse, Redis and SQL Server retain their distinct cancellation and
+post-cancellation connection policies; a single cross-driver session-state
+matrix remains open. Native-type and consumer targets in this matrix remain
+open. Passing the server-loss and explicit reconnect cases does not close those
+other gaps.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is
@@ -163,6 +167,10 @@ PostgreSQL maps server-termination SQLSTATEs and unexpected SQLx socket loss to
 `Disconnected`, preserving query cancellation, TLS and connection-refusal
 errors. MySQL maps unexpected SQLx I/O loss to `Disconnected` while preserving
 TLS and connection refusal; both Docker cases verify pooled query recovery.
+The MySQL unsigned grid-edit contract now uses pinned sessions to compare the
+permissive clamp with `STRICT_TRANS_TABLES` rejection, then verifies parser
+refusal and a valid exact edit in strict mode. Other SQL-mode and DDL-session
+combinations remain open.
 
 Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339

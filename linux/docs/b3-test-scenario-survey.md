@@ -98,7 +98,7 @@ Inventory status below comes from current local code/tests, not new executions.
 | B3/B4 | Result delivery and session state | The shared value path rejects incomplete rows instead of inventing NULL cells; PostgreSQL Docker and DuckDB local contracts preserve zero-row metadata, duplicate column names and row order; the row cap is checked at exactly `MAX_QUERY_ROWS` and one row over. SQL Server returns only the first result set but drains later sets, reports a later-set error, and remains usable afterward. All six remote drivers classify established server loss as `Disconnected`; setup-time refusal remains distinct. PostgreSQL and MySQL verify pool recovery; SQL Server, MongoDB, Redis and ClickHouse reconnect and complete a fresh operation after restart. Mid-stream/page loss now has explicit whole-operation failure contracts for PostgreSQL, MySQL, SQL Server, MongoDB cursor `getMore`, Redis browse-page key reads, and ClickHouse row streams. PostgreSQL ordinary cancellation `57014` remains a query error, and ClickHouse graceful shutdown remains a server cancellation error. A uniform cross-driver cancellation, late-result and session-state matrix is not established. | Extend cancellation and late-result completeness contracts across drivers; compare reconnect/session behavior consistently, including whether a fresh connection or pool recovery is expected. Assert row order/count, completeness and connection state. |
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
 
-### B3-P1 current coverage verdict — September 29
+### B3-P1 current coverage verdict — September 30
 
 Read the driver matrix in `type-contract-strategy.md` as four separate states:
 exact typed support, exact text fallback, explicit refusal, and untested. The
@@ -138,6 +138,34 @@ round-trip and unchanged data after refusal. The clean strict report passed 133
 selected contracts across 11 suites at
 `35d457fa488768a5204a26d785c90114073d4acd`; details and mutation evidence are
 in [value contracts](value-contracts.md#mongodb-bson-datetime-grid-edit-precision).
+
+The September 30 pass checked two previously raised gaps against the current
+tests. MySQL spatial values now have parser refusals for all eight spatial base
+types and a Docker contract for GEOMETRY, POINT and MULTIPOLYGON that compares
+native geometry type, WKT, stored HEX and row identity. SQLite INTEGER/REAL CSV
+import is also already covered: `csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities`
+checks ordinary text, `42.50` and `42` against SQLite `typeof()` and returned
+values in INTEGER, REAL and NUMERIC columns. These items are not missing tests.
+The full six-driver disconnect audit likewise confirms established server loss
+maps to `Disconnected`, mid-stream/page loss rejects the whole result, and
+recovery is exercised through the existing pool for PostgreSQL/MySQL and a
+fresh connection for SQL Server, MongoDB, Redis and ClickHouse. That does not
+close the separate uniform cancellation, late-result and session-state matrix.
+
+The same delivery audit added a MongoDB held-open-socket regression for an
+explicit in-flight cancellation. It requires
+`OperationOutcomeUnknown(Cancelled)`, distinguishing cancellation from
+`Disconnected`; the focused case and all 36 MongoDB library tests passed. The
+broader cross-driver session-state matrix remains open because each driver has
+different cancellation and post-cancellation connection semantics.
+
+The MySQL `STRICT_TRANS_TABLES` unsigned-edit gap is now closed by extending
+`value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64`.
+The contract covers permissive clamping and strict native rejection in pinned
+sessions, parser refusal in both modes, valid exact edits and neighbor identity.
+The focused command is
+`cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1`.
+Other SQL modes and DDL-session contracts remain open in the driver matrix.
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,
