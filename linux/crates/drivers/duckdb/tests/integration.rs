@@ -3,6 +3,8 @@
 use drivers_duckdb::DuckdbDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 
+#[path = "support/submicro_parameter_expression.rs"]
+mod submicro_parameter_expression;
 #[path = "../../../core/tests/support/value_contract.rs"]
 mod value_contract;
 

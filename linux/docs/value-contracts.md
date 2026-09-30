@@ -3212,6 +3212,32 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_timestamptz_filter_preserves_offset_origin_instant -- --exact --nocapture
 ```
 
+### DuckDB sub-microsecond parameter expression boundary, 2026-10-01
+
+Nanosecond `Time` and `DateTime` parameters use exact VARCHAR fallback because
+the pinned Rust binding reduces native nanosecond values to microseconds.
+Explicit casts to `TIME_NS` and `TIMESTAMP_NS` compare equal to exact native
+nanosecond literals. The pinned DuckDB runtime rejects `TIME_NS + INTERVAL`
+even after the cast, so that expression remains an explicit server limitation rather than
+being coerced to microsecond `TIME`. `TimestampTz` remains canonical RFC3339
+text, including all nine digits and the UTC instant. Grid edits to lower-
+precision `TIMESTAMPTZ` columns continue to refuse sub-microsecond values.
+
+The focused integration contract passed. Scoped mutation testing of
+`time_param` and `timestamp_param` caught 8 of 10 generated changes; two were
+unviable, with no missed or timed-out mutants. The strict GTK+DuckDB selector
+passed 164 tests across all 11 suites, including 22 DuckDB tests:
+[`20260930T223807112958Z-values/report.json`](../target/quality/20260930T223807112958Z-values/report.json).
+The mutation report is
+[`outcomes.json`](../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json).
+The quick layer passed after the integration test was split into a support
+module to satisfy the file-size guard:
+[`20260930T224147348085Z-layers/report.json`](../target/quality/20260930T224147348085Z-layers/report.json).
+
+```sh
+rtk cargo test -p tablepro-driver-duckdb --test integration submicro_parameter_expression::value_contract_submicro_text_parameters_keep_precision_after_explicit_casts -- --exact --test-threads=1
+```
+
 The focused DuckDB crate passed all 41 tests. The strict value runner selects
 integration tests by the `value_contract` name prefix. Its first rerun reported
 17 DuckDB tests and omitted the first new case; renaming it to follow the
@@ -3340,6 +3366,13 @@ The test passed in `20260930T215342621227Z-values/report.json`: 26 app tests and
 163 tests across all 11 configured suites, including GTK and DuckDB. The quick
 layer passed at the same source revision; see
 [`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+
+Scoped mutation testing of `columns_for_browse_page` passed its clean app-test
+baseline. Three behavior-changing mutants were caught; three generated mutants
+were unviable, with no missed or timed-out mutants. The isolated-copy attempt
+ran no mutants because its duplicate GTK build exhausted temporary disk quota;
+the retained in-place run reused the workspace target:
+[`outcomes.json`](../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json).
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit -- --include-ignored --test-threads=1

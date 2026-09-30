@@ -1623,6 +1623,28 @@ as exact VARCHAR and preserves every digit; explicit casts remain the caller's
 way to request a typed expression. The focused native regression passed.
 B3 remains open.
 
+### DuckDB sub-microsecond expression boundary — October 1
+
+An app-facing driver contract checks the documented text-binding boundary:
+explicit casts to `TIME_NS` and `TIMESTAMP_NS` preserve exact nanosecond values,
+while the native server rejects `TIME_NS + INTERVAL` rather than silently
+coercing it to microsecond `TIME`. `TIMESTAMPTZ` parameters remain exact RFC3339
+text; sub-microsecond grid edits to the lower-precision native type are refused.
+The focused test passed. Mutation testing of `time_param` and
+`timestamp_param` caught 8 of 10 generated changes; two were unviable, with no
+misses or timeouts. The strict GTK+DuckDB value runner passed 164 tests across
+11 suites, including 22 DuckDB tests:
+[`20260930T223807112958Z-values/report.json`](../target/quality/20260930T223807112958Z-values/report.json).
+Mutation evidence:
+[`outcomes.json`](../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json).
+The quick layer passed after the function was moved to a support module to keep
+the integration source below the file-size threshold:
+[`20260930T224147348085Z-layers/report.json`](../target/quality/20260930T224147348085Z-layers/report.json).
+
+```sh
+rtk cargo test -p tablepro-driver-duckdb --test integration submicro_parameter_expression::value_contract_submicro_text_parameters_keep_precision_after_explicit_casts -- --exact --test-threads=1
+```
+
 ```sh
 rtk cargo test --locked -p tablepro-driver-duckdb --test integration pinned_duckdb_binding_api_truncates_nanosecond_temporals_to_microseconds -- --exact --test-threads=1
 ```
