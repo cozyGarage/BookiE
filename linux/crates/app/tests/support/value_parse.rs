@@ -1031,10 +1031,11 @@ fn value_contract_duckdb_time_and_timestamp_parsers_refuse_submicro_edits() {
         parse_input_for_driver("12:34:56.123456000", Some(&col("TIME", false)), "duckdb"),
         Ok(Value::Time(time)) if time.nanosecond() == 123_456_000
     ));
-    assert!(matches!(
-        parse_input_for_driver("12:34:56.123456789", Some(&col("TIME_NS", false)), "duckdb"),
-        Ok(Value::Time(time)) if time.nanosecond() == 123_456_789
-    ));
+    assert_eq!(
+        parse_input_for_driver("12:34:56.123456789", Some(&col("TIME_NS", false)), "duckdb").unwrap(),
+        Value::Text("12:34:56.123456789".into()),
+        "TIME_NS remains exact text instead of being parsed at lower precision"
+    );
     let aligned_timestamp = parse_input_for_driver(
         "2026-09-29 12:34:56.123456000",
         Some(&col("TIMESTAMP", false)),
@@ -1051,6 +1052,32 @@ fn value_contract_duckdb_time_and_timestamp_parsers_refuse_submicro_edits() {
             "duckdb"
         ),
         Ok(Value::DateTime(timestamp)) if timestamp.nanosecond() == 123_456_789
+    ));
+    assert_eq!(
+        parse_input_for_driver(
+            "2026-09-29 12:34:56.123456789",
+            Some(&col("TIMESTAMP_S", false)),
+            "duckdb"
+        )
+        .unwrap_err(),
+        "DuckDB TIMESTAMP_S precision cannot represent this value exactly"
+    );
+    assert_eq!(
+        parse_input_for_driver(
+            "2026-09-29 12:34:56.123456789",
+            Some(&col("TIMESTAMP_MS", false)),
+            "duckdb"
+        )
+        .unwrap_err(),
+        "DuckDB TIMESTAMP_MS precision cannot represent this value exactly"
+    );
+    assert!(matches!(
+        parse_input_for_driver(
+            "2026-09-29 12:34:56.123000000",
+            Some(&col("TIMESTAMP_MS", false)),
+            "duckdb"
+        ),
+        Ok(Value::DateTime(timestamp)) if timestamp.nanosecond() == 123_000_000
     ));
 }
 

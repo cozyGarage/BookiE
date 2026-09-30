@@ -188,15 +188,13 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
     let data_type = column.data_type.trim().to_ascii_lowercase();
     let (quantum_ns, kind) = match data_type.as_str() {
         "time" | "time without time zone" => (1_000, "TIME"),
-        "time_ns" => (1, "TIME_NS"),
         "timestamp" | "timestamp without time zone" => (1_000, "TIMESTAMP"),
         "timestamp_s" => (1_000_000_000, "TIMESTAMP_S"),
         "timestamp_ms" => (1_000_000, "TIMESTAMP_MS"),
-        "timestamp_ns" => (1, "TIMESTAMP_NS"),
         _ => return None,
     };
     Some((|| {
-        let (value, nanos) = if matches!(kind, "TIME" | "TIME_NS") {
+        let (value, nanos) = if kind == "TIME" {
             match parse_time_value(text)? {
                 Value::Time(value) => {
                     let nanos = value.nanosecond();
