@@ -3185,6 +3185,10 @@ passed, then the strict GTK+DuckDB runner passed all 11 suites (156 tests):
 Scoped mutation testing of `parse_filter_value` caught 11 mutants; one mutation
 was unviable. The guard is in shared filter construction; driver-specific
 comparison semantics beyond DuckDB remain covered by the existing driver suites.
+The same strict runner was rerun on corrected, pushed SHA
+`1a8d9f459c5707f512b72ad77b04ed6921e56039`; all 156 selected tests again passed
+across all 11 suites:
+[`20260930T192623654872Z-values/report.json`](../target/quality/20260930T192623654872Z-values/report.json).
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core duckdb_temporal_filters_refuse_values_the_column_would_truncate -- --nocapture
