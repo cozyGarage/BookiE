@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use tablepro_core::{ColumnInfo, Value};
 
 /// Collapse newlines / carriage returns to spaces, then squash any
@@ -69,6 +70,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     if let Some(result) = parse_duckdb_timestamptz_input(trimmed, col, driver_id) {
+        return result;
+    }
+    if let Some(result) = parse_duckdb_temporal_input(trimmed, col, driver_id) {
         return result;
     }
     parse_input_for_column(text, col)
@@ -173,6 +177,46 @@ fn parse_duckdb_timestamptz_input(
             return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
         }
         Ok(Value::TimestampTz(timestamp))
+    })())
+}
+
+fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "duckdb" {
+        return None;
+    }
+    let data_type = column.data_type.trim().to_ascii_lowercase();
+    let (quantum_ns, kind) = match data_type.as_str() {
+        "time" | "time without time zone" => (1_000, "TIME"),
+        "time_ns" => (1, "TIME_NS"),
+        "timestamp" | "timestamp without time zone" => (1_000, "TIMESTAMP"),
+        "timestamp_s" => (1_000_000_000, "TIMESTAMP_S"),
+        "timestamp_ms" => (1_000_000, "TIMESTAMP_MS"),
+        "timestamp_ns" => (1, "TIMESTAMP_NS"),
+        _ => return None,
+    };
+    Some((|| {
+        let (value, nanos) = if matches!(kind, "TIME" | "TIME_NS") {
+            match parse_time_value(text)? {
+                Value::Time(value) => {
+                    let nanos = value.nanosecond();
+                    (Value::Time(value), nanos)
+                }
+                _ => return Err(crate::tr!("Invalid time.")),
+            }
+        } else {
+            match parse_datetime_value(text)? {
+                Value::DateTime(value) => {
+                    let nanos = value.nanosecond();
+                    (Value::DateTime(value), nanos)
+                }
+                _ => return Err(crate::tr!("Invalid date and time.")),
+            }
+        };
+        if nanos % quantum_ns != 0 {
+            return Err(format!("DuckDB {kind} precision cannot represent this value exactly"));
+        }
+        Ok(value)
     })())
 }
 
