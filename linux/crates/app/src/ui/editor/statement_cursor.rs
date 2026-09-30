@@ -336,4 +336,42 @@ mod tests {
         assert_eq!(reformatted.statements().len(), 2);
         assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
     }
+
+    #[test]
+    fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
+        let sql = "DELIMITER $$\r\nCREATE PROCEDURE p() BEGIN SELECT 'unfinished :inside\r\nEND$$\r\nDELIMITER ;\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(!plan.diagnostics().is_empty());
+        assert!(script_statements(sql, "mysql").is_err());
+        let parameters = tablepro_core::extract_named_parameters(sql, "mysql");
+        assert!(
+            parameters.names.is_empty(),
+            "malformed tail parameters are not executable"
+        );
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("'unfinished :inside"));
+        assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
+        let facts = tablepro_policy::classify(sql, "mysql");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+        let decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::Agent {
+                token: "test".into(),
+                client: None,
+                model: None,
+            },
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+            None,
+        );
+        assert!(matches!(
+            decision,
+            tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        ));
+    }
 }

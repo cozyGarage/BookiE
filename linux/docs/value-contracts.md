@@ -507,8 +507,8 @@ The regression tests cover the Mongo page-schema handoff, preservation of
 non-Mongo behavior and same-width type-change invalidation. A follow-up now
 feeds the effective page schema into the actual cell editability predicate: a
 text cell stays editable under the sampled string schema, but becomes read-only
-when the current page reports `mixed`. The latest app library run passed 408
-tests (12 ignored). A scoped in-place mutation run against the page-schema
+when the current page reports `mixed`. The latest full app library run passed
+410 tests (12 ignored). A scoped in-place mutation run against the page-schema
 handoff caught all 3 viable mutations; 3 whole-function replacements were
 unviable, with no survivors or timeouts.
 
@@ -518,6 +518,19 @@ rtk cargo test --locked -p tablepro-app --lib mongodb_page_schema_updates_late_f
 rtk cargo test --locked -p tablepro-app --lib
 rtk cargo mutants --dir linux --in-place --package tablepro-app --file crates/app/src/ui/browse_tab/mod.rs --re 'columns_for_browse_page' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-mongodb-page-editability-mutants-inplace -- --lib mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing -- --test-threads=1
 rtk python3 scripts/run-test-layer.py widgets
+```
+
+### MySQL malformed routine delimiter fails closed, 2026-09-30
+
+An unterminated quote inside a `DELIMITER $$` routine must not expose the
+trailing query as executable script. The editor contract requires a planner
+diagnostic, execution planning refusal, no parameter extraction from the
+malformed tail, source preservation through formatting and an `Unparseable`
+write classification denied by the agent policy. The regression passed; no
+planner or policy defect was found.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib malformed_mysql_delimited_routine_blocks_the_whole_script -- --test-threads=1
 ```
 
 ## MongoDB BSON kind matrix audit, 2026-09-30
