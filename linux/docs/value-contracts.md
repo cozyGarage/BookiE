@@ -1945,9 +1945,16 @@ guard; one whole-function replacement was unviable, with no survivors or
 timeouts:
 `target/quality/20260929-duckdb-timestamptz-guard-mutants-final/mutants.out/outcomes.json`.
 
+The earlier app-parser mutation run had four apparent survivors because its test
+filter selected only the DuckDB case while `parse_input_for_driver` also routes
+PostgreSQL numeric input. A corrected full app-library mutation run caught all
+four viable changes; the fifth was an unviable whole-function replacement:
+`target/quality/20260930-app-value-parser-cross-driver-mutants/mutants.out/outcomes.json`.
+
 ```sh
 rtk cargo test -p tablepro-app --lib value_contract_duckdb_timestamptz_parser_refuses_submicro_edits
 rtk cargo test -p tablepro-app --features duckdb --lib value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding
+rtk cargo mutants --manifest-path crates/app/Cargo.toml --in-place --file crates/app/src/ui/browse_tab/value_parse.rs --re parse_input_for_driver --output target/quality/20260930-app-value-parser-cross-driver-mutants --no-config -- --lib
 rtk proxy ./scripts/test-value-contracts.sh --gtk --duckdb
 ```
 
