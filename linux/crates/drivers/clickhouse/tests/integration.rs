@@ -27,7 +27,6 @@ async fn an_unavailable_clickhouse_server_is_classified_as_connection_refused() 
         .expect("ClickHouse setup refusal remains distinct from established disconnect");
 }
 
-use chrono::Timelike;
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_lost_clickhouse_server_is_reported_as_disconnected() {
@@ -559,13 +558,19 @@ async fn value_contract_datetime64_precision_0_through_9_is_exact() {
         123_456_780,
         123_456_789,
     ];
-    let expected_values = expected_nanos.map(|nanos| Value::DateTime(stamp.with_nanosecond(nanos).unwrap()));
-    let mut expected_row = expected_values.to_vec();
-    expected_row.extend(expected_values.iter().map(|value| {
-        let Value::DateTime(datetime) = value else {
-            unreachable!()
-        };
-        Value::Int(datetime.and_utc().timestamp_nanos_opt().unwrap())
+    let mut expected_row: Vec<Value> = expected_nanos
+        .iter()
+        .map(|nanos| Value::DateTime(stamp.with_nanosecond(*nanos).unwrap()))
+        .collect();
+    expected_row.extend(expected_nanos.iter().map(|nanos| {
+        Value::Int(
+            stamp
+                .with_nanosecond(*nanos)
+                .unwrap()
+                .and_utc()
+                .timestamp_nanos_opt()
+                .unwrap(),
+        )
     }));
     assert_eq!(
         result.rows,

@@ -1,5 +1,4 @@
 use super::*;
-use super::*;
 
 #[test]
 fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {

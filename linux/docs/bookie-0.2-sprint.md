@@ -1754,3 +1754,21 @@ hosted run `36718134597` is queued on `d385041` (the just-pushed baseline before
 the direct `row_to_json` case); Build Linux is still running and Linux Security
 has passed. The working-tree JSON case has local quick and mutation evidence;
 it still needs a hosted run after it is committed and pushed.
+
+### B3 current baseline gates — September 30
+
+On pushed SHA `69e160c477dab8310bc57bc69116ba310bc7f2df`, the complete Docker-
+backed `drivers` layer passed 220 tests with no failures or ignored executed
+tests in 918.9 seconds. This includes all six remote-driver disconnect and
+mid-stream completeness contracts. Evidence:
+[`20260930T190433266840Z-layers/report.json`](../target/quality/20260930T190433266840Z-layers/report.json).
+
+Hosted CI on that SHA failed quick Clippy before later jobs could run: the new
+ClickHouse precision contract had an unused import and an `unreachable!()`;
+Clippy also caught a duplicate glob import in the extracted core filter test
+module. All three were removed. The quick layer then passed on that corrected
+working tree in 113.8 seconds, including formatting, Clippy, unit tests and
+sandbox tests:
+[`20260930T192142875147Z-layers/report.json`](../target/quality/20260930T192142875147Z-layers/report.json).
+Hosted CI must be checked again on the correction commit; the earlier hosted
+failure is not treated as green.
