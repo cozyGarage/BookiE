@@ -215,45 +215,60 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_nested_array_keeps_wide_integer_and_refeeds_consumers() {
+async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers() {
     let (_container, opts) = start_clickhouse().await;
     let connection = connect(opts).await;
-    let expression =
-        "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))";
-    let source = connection
-        .query(&format!(
-            "SELECT {expression} AS value, toTypeName(value) AS native_type, toJSONString(value) AS exact_json"
-        ))
-        .await
-        .unwrap();
-    // ClickHouse's JSON serializer quotes UInt128 values because JSON numbers
-    // cannot represent their full range exactly. Preserve the decimal text.
-    let expected_json: serde_json::Value = serde_json::from_str("[\"18446744073709551616\",null]").unwrap();
-    assert_eq!(
-        source.rows,
-        vec![vec![
-            Value::Json(expected_json.clone()),
-            Value::Text("Array(Nullable(UInt128))".into()),
-            Value::Text("[\"18446744073709551616\",null]".into()),
-        ]]
-    );
+    let cases = [
+        (
+            "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
+            "Array(Nullable(UInt128))",
+        ),
+        (
+            "CAST(map('wide', toUInt128('18446744073709551616')) AS Map(String, UInt128))",
+            "Map(String, UInt128)",
+        ),
+        (
+            "tuple('wide', toUInt128('340282366920938463463374607431768211455'))",
+            "Tuple(String, UInt128)",
+        ),
+    ];
 
-    assert_eq!(
-        tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
-        Err(tablepro_core::sql_literal::LiteralError::Unsupported)
-    );
+    for (expression, expected_type) in cases {
+        let source = connection
+            .query(&format!(
+                "SELECT {expression} AS value, toTypeName(value) AS native_type, toJSONString(value) AS exact_json"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(source.rows.len(), 1);
+        assert_eq!(source.rows[0][1], Value::Text(expected_type.into()));
+        let exact_json = match &source.rows[0][2] {
+            Value::Text(value) => value,
+            other => panic!("ClickHouse toJSONString oracle was not text: {other:?}"),
+        };
+        let oracle: serde_json::Value = serde_json::from_str(exact_json).unwrap();
+        assert_eq!(
+            source.rows[0][0],
+            Value::Json(oracle),
+            "nested {expected_type} value differs from the native server JSON oracle"
+        );
+        assert_eq!(
+            tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
+            Err(tablepro_core::sql_literal::LiteralError::Unsupported),
+            "nested {expected_type} without type metadata must be refused by SQL export"
+        );
 
-    let bound_result = connection
-        .query_params(
-            "SELECT CAST(? AS Array(Nullable(UInt128))) AS value, \
-                    toTypeName(value) AS native_type, toJSONString(value) AS exact_json",
-            &[source.rows[0][0].clone()],
-        )
-        .await;
-    assert!(
-        bound_result.is_err(),
-        "a nested value without native type metadata must not bind as a lossy string"
-    );
+        let bound_result = connection
+            .query_params(
+                &format!("SELECT CAST(? AS {expected_type}) AS value"),
+                &[source.rows[0][0].clone()],
+            )
+            .await;
+        assert!(
+            bound_result.is_err(),
+            "nested {expected_type} without type metadata must not bind as a lossy string"
+        );
+    }
 }
 
 #[tokio::test]

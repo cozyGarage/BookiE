@@ -1583,3 +1583,14 @@ on the final source, as did the core and driver unit suites and quick gate. The
 final scoped scale-range run caught all 16 generated mutations, and the
 scale-selection run caught all 3 generated mutations, with no misses or
 timeouts. B3 remains open.
+
+### ClickHouse nested collection consumer boundaries — September 30
+
+The existing native `Array(Nullable(UInt128))` boundary was too narrow for the
+matrix's remaining nested-shape claim. Its real-server contract now also checks
+`Map(String, UInt128)` and `Tuple(String, UInt128)` against `toTypeName` and
+`toJSONString` results, then requires SQL export and typed parameter consumers
+to refuse each value because `Value::Json` carries no native type metadata.
+The focused Docker integration contract and the complete ClickHouse Docker
+suite passed (33 tests), including the three nested shapes. Additional nested
+combinations remain open; B3 remains open.
