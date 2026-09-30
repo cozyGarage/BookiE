@@ -5,10 +5,20 @@ mod server_restart;
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
 
+#[path = "support/clickhouse.rs"]
+mod clickhouse;
 #[path = "support/disconnection.rs"]
 mod disconnection;
+#[path = "support/nested_values.rs"]
+mod nested_values;
 #[path = "support/temporal.rs"]
 mod temporal;
+
+use clickhouse::{connect, start_clickhouse};
+use drivers_clickhouse::ClickhouseDriver;
+use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
+use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, Value};
+use testcontainers::{ContainerAsync, GenericImage};
 
 #[tokio::test]
 async fn an_unavailable_clickhouse_server_is_classified_as_connection_refused() {
@@ -18,47 +28,6 @@ async fn an_unavailable_clickhouse_server_is_classified_as_connection_refused() 
 }
 
 use chrono::Timelike;
-use drivers_clickhouse::ClickhouseDriver;
-use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};
-use tablepro_core::{ColumnInfo, ConnectOptions, DatabaseDriver, DriverError, OperationControl, TlsConfig, Value};
-use testcontainers::core::wait::HttpWaitStrategy;
-use testcontainers::core::{IntoContainerPort, WaitFor};
-use testcontainers::runners::AsyncRunner;
-use testcontainers::{ContainerAsync, GenericImage, ImageExt};
-
-async fn start_clickhouse() -> (ContainerAsync<GenericImage>, ConnectOptions) {
-    let container = GenericImage::new("clickhouse/clickhouse-server", "24.8")
-        .with_exposed_port(8123.tcp())
-        .with_wait_for(WaitFor::http(
-            HttpWaitStrategy::new("/ping")
-                .with_port(8123.tcp())
-                .with_expected_status_code(200u16),
-        ))
-        .with_env_var("CLICKHOUSE_USER", "default")
-        .with_env_var("CLICKHOUSE_PASSWORD", "tablepro")
-        .with_env_var("CLICKHOUSE_DB", "default")
-        .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
-        .start()
-        .await
-        .expect("start clickhouse container");
-    let host = container.get_host().await.expect("host").to_string();
-    let port = container.get_host_port_ipv4(8123).await.expect("port");
-    let opts = ConnectOptions {
-        host,
-        port,
-        database: "default".into(),
-        username: "default".into(),
-        password: secrecy::SecretString::new("tablepro".to_string().into()),
-        tls: TlsConfig::disabled(),
-        ..Default::default()
-    };
-    (container, opts)
-}
-
-async fn connect(opts: ConnectOptions) -> Box<dyn tablepro_core::Connection> {
-    ClickhouseDriver.connect(opts).await.expect("connect")
-}
-
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_lost_clickhouse_server_is_reported_as_disconnected() {
@@ -211,64 +180,6 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
         .await
         .unwrap();
     assert_eq!(csv_roundtrip.rows, vec![values.to_vec()]);
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers() {
-    let (_container, opts) = start_clickhouse().await;
-    let connection = connect(opts).await;
-    let cases = [
-        (
-            "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
-            "Array(Nullable(UInt128))",
-        ),
-        (
-            "CAST(map('wide', toUInt128('18446744073709551616')) AS Map(String, UInt128))",
-            "Map(String, UInt128)",
-        ),
-        (
-            "tuple('wide', toUInt128('340282366920938463463374607431768211455'))",
-            "Tuple(String, UInt128)",
-        ),
-    ];
-
-    for (expression, expected_type) in cases {
-        let source = connection
-            .query(&format!(
-                "SELECT {expression} AS value, toTypeName(value) AS native_type, toJSONString(value) AS exact_json"
-            ))
-            .await
-            .unwrap();
-        assert_eq!(source.rows.len(), 1);
-        assert_eq!(source.rows[0][1], Value::Text(expected_type.into()));
-        let exact_json = match &source.rows[0][2] {
-            Value::Text(value) => value,
-            other => panic!("ClickHouse toJSONString oracle was not text: {other:?}"),
-        };
-        let oracle: serde_json::Value = serde_json::from_str(exact_json).unwrap();
-        assert_eq!(
-            source.rows[0][0],
-            Value::Json(oracle),
-            "nested {expected_type} value differs from the native server JSON oracle"
-        );
-        assert_eq!(
-            tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
-            Err(tablepro_core::sql_literal::LiteralError::Unsupported),
-            "nested {expected_type} without type metadata must be refused by SQL export"
-        );
-
-        let bound_result = connection
-            .query_params(
-                &format!("SELECT CAST(? AS {expected_type}) AS value"),
-                &[source.rows[0][0].clone()],
-            )
-            .await;
-        assert!(
-            bound_result.is_err(),
-            "nested {expected_type} without type metadata must not bind as a lossy string"
-        );
-    }
 }
 
 #[tokio::test]

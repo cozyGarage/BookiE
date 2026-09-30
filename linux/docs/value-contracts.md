@@ -1647,13 +1647,13 @@ and UInt128 maximum to maximum-1. Other export formats remain open.
 
 ### ClickHouse nested value consumer boundary, 2026-09-30
 
-The live contract now covers `Array(Nullable(UInt128))`,
-`Map(String, UInt128)`, and `Tuple(String, UInt128)`. Each value is compared
-with ClickHouse's native `toTypeName` and `toJSONString` oracles, including
+The live contract covers seven nested Array/Map/Tuple shapes: the three base
+forms plus Array(Map), Map(Array), Tuple(Array), and Map(Tuple). Each value is
+compared with ClickHouse's native `toTypeName` and `toJSONString` oracles, including
 wide unsigned values that JSON must quote. A plain `Value::Json` no longer
 carries the native type needed to distinguish numeric strings from text
 strings, so SQL-literal export and parameter binding explicitly refuse all
-three nested shapes instead of writing a changed value. The original array
+seven nested shapes instead of writing a changed value. The original array
 case also retains SQL-literal and grid-edit refusal contracts.
 
 The focused Docker integration case and the complete ClickHouse Docker suite
