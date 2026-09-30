@@ -312,4 +312,28 @@ mod tests {
         assert_eq!(reformatted.statements().len(), 2);
         assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
     }
+
+    #[test]
+    fn mysql_repeated_semicolon_delimiter_keeps_body_statements_together() {
+        let sql = "DELIMITER ;;\r\nCREATE PROCEDURE p() BEGIN SELECT ':inside' AS first; SELECT 2 AS second; END;;\r\nDELIMITER ;\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert!(planned.statements[0].contains("SELECT 2 AS second;"));
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+        assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("DELIMITER ;;"));
+        assert!(formatted.contains("DELIMITER ;"));
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        assert_eq!(reformatted.statements().len(), 2);
+        assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
+    }
 }

@@ -3002,3 +3002,18 @@ test-sensitivity evidence.
 rtk cargo test --locked -p tablepro-driver-mssql --test integration temporal_boundaries::value_contract_supported_temporal_calendar_edges_match_native_text_and_bind_exactly -- --include-ignored --exact --test-threads=1
 rtk cargo test --locked -p tablepro-driver-mssql --test integration -- --include-ignored --test-threads=1
 ```
+
+### MySQL repeated-semicolon script delimiter consumer contract, 2026-09-30
+
+An editor-level regression uses `DELIMITER ;;` around a procedure containing
+multiple semicolon-terminated body statements, followed by a delimiter reset
+and a parameterized SELECT. Planner and execution statement extraction must
+return exactly the routine and trailing query; the body placeholder must not
+be extracted, the trailing placeholder must be preserved, and formatting then
+replanning must retain the same two statements. This extends the existing
+`$$` and `//` contracts to a delimiter that contains the ordinary SQL
+semicolon. No planner or formatter defect was found.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib mysql_repeated_semicolon_delimiter_keeps_body_statements_together -- --test-threads=1
+```
