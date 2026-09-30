@@ -2368,7 +2368,12 @@ The mapped change-contract gate passed this exact app regression at
 The CSV import contract also checks the integer-form text `42`: SQLite stores
 it as INTEGER in INTEGER and NUMERIC columns, and as REAL in the REAL column.
 Together with `42.50` and nonnumeric text, this pins the three storage outcomes
-after policy-guarded import; the focused Docker-free test passed.
+after policy-guarded import; all 7 CSV import integration tests passed. A core
+unit contract checks that nonnumeric fallback applies only to SQLite for
+INTEGER/REAL/NUMERIC columns; MySQL and SQL Server keep rejecting those inputs.
+The complete CSV cell-parser mutation scope caught 9 of 12 generated mutants;
+the remaining 3 were unviable, with no misses or timeouts. Evidence:
+`target/quality/20260930-sqlite-affinity-fallback-mutants-all-cell-tests/mutants.out/outcomes.json`.
 
 ## MongoDB nested BSON and native boundary checkpoint
 

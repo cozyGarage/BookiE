@@ -343,6 +343,33 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers() {
+        let options = CsvImportOptions::default();
+        for (data_type, expected_error) in [
+            ("INTEGER", CellError::NotAnInteger),
+            ("REAL", CellError::NotANumber),
+            ("NUMERIC", CellError::NotANumber),
+        ] {
+            let target = column("value", data_type);
+            assert_eq!(
+                value_for("not numeric", &target, &options, "sqlite"),
+                Ok(Value::Text("not numeric".into())),
+                "SQLite affinity stores nonnumeric input as text for {data_type}"
+            );
+            assert_eq!(
+                value_for("not numeric", &target, &options, "mysql").unwrap_err(),
+                expected_error,
+                "the SQLite fallback must not mask a type error for {data_type}"
+            );
+            assert_eq!(
+                value_for("not numeric", &target, &options, "mssql").unwrap_err(),
+                expected_error,
+                "the SQLite fallback must not mask a type error for {data_type}"
+            );
+        }
+    }
+
+    #[test]
     fn a_catalog_type_name_reads_as_the_value_shape_it_stores() {
         assert_eq!(column_kind("BIGINT"), ColumnKind::Int);
         assert_eq!(column_kind("integer"), ColumnKind::Int);
