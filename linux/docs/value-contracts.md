@@ -2375,6 +2375,13 @@ The complete CSV cell-parser mutation scope caught 9 of 12 generated mutants;
 the remaining 3 were unviable, with no misses or timeouts. Evidence:
 `target/quality/20260930-sqlite-affinity-fallback-mutants-all-cell-tests/mutants.out/outcomes.json`.
 
+At clean source SHA `061180e5aab9787e5f5c818ecafb8ec4403b8acb`, the strict
+combined value-contract runner passed 147 selected tests across all 11 suites,
+with GTK and DuckDB enabled and no missing suites. The quick layer also passed
+in 93.1 seconds with a clean worktree. Reports:
+[`20260930T141019789442Z-values/report.json`](../target/quality/20260930T141019789442Z-values/report.json)
+and [`20260930T141439236199Z-layers/report.json`](../target/quality/20260930T141439236199Z-layers/report.json).
+
 ## MongoDB nested BSON and native boundary checkpoint
 
 A decoder unit regression first failed for nested `Decimal128`, binary and date
