@@ -966,10 +966,10 @@ async fn value_contract_server_generated_bson_column_survives_grid_edit() {
             let mut cursor = buckets.find(doc! {}).await.expect("find generated time-series buckets");
             while let Some(bucket) = cursor.try_next().await.expect("read time-series bucket") {
                 let data = bucket.get_document("data").expect("bucket data");
-                if let Some(Bson::Binary(column)) = data.get("reading") {
-                    if column.subtype == BinarySubtype::Column {
-                        return column.clone();
-                    }
+                if let Some(Bson::Binary(column)) = data.get("reading")
+                    && column.subtype == BinarySubtype::Column
+                {
+                    return column.clone();
                 }
             }
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
