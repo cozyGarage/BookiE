@@ -162,8 +162,11 @@ A Docker regression streams 100 rows with a short delay per row, waits until
 MySQL reports the query active, then kills its connection after row production
 has begun. The driver must return `Disconnected` for the whole query, not a
 partial result, and the pool must complete a fresh `SELECT 1`. The focused
-integration test passed locally: 1 test passed. Cross-driver mid-stream coverage
-remains open for the other remote engines.
+integration test passed locally: 1 test passed. Mid-stream or mid-page
+whole-operation failure cases now exist for all six remote drivers: PostgreSQL,
+MySQL, SQL Server, MongoDB, Redis and ClickHouse. The runner enables these
+ignored fixtures through the `drivers` layer. This is coverage inventory; the
+current commit's hosted driver-layer result is tracked separately.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mysql --test integration backend_loss_during_row_stream_fails_the_whole_query_as_disconnected -- --ignored --exact --test-threads=1
