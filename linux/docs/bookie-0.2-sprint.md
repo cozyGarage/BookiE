@@ -1616,3 +1616,20 @@ B3 remains open.
 ```sh
 rtk cargo test --locked -p tablepro-driver-duckdb --test integration pinned_duckdb_binding_api_truncates_nanosecond_temporals_to_microseconds -- --exact --test-threads=1
 ```
+
+### DuckDB decoder mutation-scope reconciliation — September 30
+
+The interval-only mutation reports selected the integration target but not the
+driver unit target. They therefore reported two misses: one was the
+sub-microsecond interval guard, whose direct refusal assertion is in the unit
+suite; the other was the unrelated `UBigInt` signed-boundary check. The current
+decoder audit ran both `--lib` and `--test integration` against
+`duck_value_ref_to_value`; it caught 11 of 12 mutations, with one unviable
+whole-function replacement and no misses or timeouts. This reconciles the
+older narrow reports without treating their incomplete scope as a product
+survivor. Evidence: `target/quality/20260930-duckdb-interval-decoder-mutants-audit-final/mutants.out/outcomes.json`.
+B3 remains open.
+
+```sh
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-driver-duckdb --file crates/drivers/duckdb/src/lib.rs --re 'duck_value_ref_to_value' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-duckdb-interval-decoder-mutants-audit-final -- --lib --test integration -- --test-threads=1
+```
