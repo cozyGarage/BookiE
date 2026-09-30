@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use drivers_mongodb::MongodbDriver;
+use mongodb::bson::{Binary, Bson, DateTime, Document, doc, spec::BinarySubtype};
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment, TlsConfig};
 use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
 use tablepro_policy::Principal;
@@ -70,6 +71,32 @@ async fn mongodb_extended_json_survives_the_mcp_query_tool_round_trip() {
         )
         .await
         .expect("seed Extended JSON document");
+
+    let native_client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native BSON oracle");
+    let stored = native_client
+        .database("appdb")
+        .collection::<Document>("values")
+        .find_one(doc! { "_id": "special" })
+        .await
+        .expect("read seeded document with native driver")
+        .expect("seeded document exists");
+    assert_eq!(
+        stored.get("nested"),
+        Some(&Bson::Document(doc! {
+            "amount": Bson::Decimal128("1234567890123456789.123456789012345".parse().unwrap()),
+            "when": Bson::DateTime(DateTime::from_millis(1_234_567_890_123)),
+            "binary": Bson::Binary(Binary {
+                subtype: BinarySubtype::UserDefined(0x80),
+                bytes: vec![0, 255, 65],
+            }),
+            "large_integer": Bson::Int64(9_007_199_254_740_993),
+            "explicit_null": Bson::Null,
+            "unicode": "数据库🙂 — café",
+        })),
+        "seed must contain the intended native BSON types before MCP reads it"
+    );
 
     let connection_id = Uuid::new_v4();
     let saved = SavedConnection {

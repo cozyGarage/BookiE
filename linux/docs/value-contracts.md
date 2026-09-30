@@ -417,6 +417,13 @@ the direct rerun also passed:
 rtk cargo test --locked -p tablepro-mcp --test mongodb_extended_json -- --include-ignored --exact mongodb_extended_json_survives_the_mcp_query_tool_round_trip --test-threads=1
 ```
 
+The real-server MCP test now independently reads the seeded document through
+MongoDB's native driver before dispatch. It checks Decimal128, BSON DateTime,
+user-defined binary subtype `80`, Int64 above 2^53, explicit NULL and Unicode,
+then requires the MCP browse result to preserve the matching Extended JSON
+markers and values. This distinguishes an exact MCP response from a fixture
+that happened to contain only JSON lookalikes. The focused Docker test passed.
+
 On September 30, the full Docker-backed `drivers` layer was rerun at source SHA
 `8ed0f66ed54b1411feaac5d7a8e49abc6999fb18`. It ran 219 tests with zero failures
 or ignored tests in the executed suites in 939.7 seconds. The six server-driver

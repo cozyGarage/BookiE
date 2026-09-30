@@ -6383,6 +6383,7 @@ dependencies = [
  "futures",
  "hex",
  "libc",
+ "mongodb",
  "secrecy",
  "serde",
  "serde_json",

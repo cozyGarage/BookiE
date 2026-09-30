@@ -36,6 +36,7 @@ tempfile.workspace = true
 tablepro-driver-mongodb = { path = "../drivers/mongodb" }
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mongo"] }
+mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 
 [lints]
 workspace = true
