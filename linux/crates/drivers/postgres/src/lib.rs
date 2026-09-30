@@ -114,7 +114,7 @@ impl DatabaseDriver for PgDriver {
             .acquire_timeout(Duration::from_secs(5))
             .connect_with(pg_opts)
             .await
-            .map_err(map_sqlx_error)?;
+            .map_err(map_sqlx_connect_error)?;
         // Lazy: a saved connection with a failed-login lockout policy
         // must not see two authentication attempts for one Connect
         // click. The real dial happens only when a cancel is actually
@@ -1107,6 +1107,21 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }
+}
+
+fn map_sqlx_connect_error(err: sqlx::Error) -> DriverError {
+    if is_pool_startup_timeout(&err) {
+        // SQLx retries refused pool connections until the acquire deadline,
+        // then erases the underlying I/O error into PoolTimedOut. During
+        // initial setup there is no established connection to disconnect.
+        DriverError::ConnectionRefused
+    } else {
+        map_sqlx_error(err)
+    }
+}
+
+fn is_pool_startup_timeout(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::PoolTimedOut)
 }
 
 fn is_server_disconnect_sqlstate(sqlstate: Option<&str>) -> bool {

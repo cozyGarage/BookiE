@@ -2,6 +2,16 @@
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
+#[path = "../../shared/connect_refusal.rs"]
+mod connect_refusal;
+
+#[tokio::test]
+async fn an_unavailable_clickhouse_server_is_classified_as_connection_refused() {
+    connect_refusal::assert_connection_refused(&ClickhouseDriver)
+        .await
+        .expect("ClickHouse setup refusal remains distinct from established disconnect");
+}
+
 use chrono::Timelike;
 use drivers_clickhouse::ClickhouseDriver;
 use tablepro_core::sql_dialect::{build_full_row_update, build_single_cell_update};

@@ -120,6 +120,22 @@ fn map_io_refused_returns_connection_refused() {
 }
 
 #[test]
+fn a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect() {
+    assert!(matches!(
+        map_sqlx_connect_error(sqlx::Error::PoolTimedOut),
+        DriverError::ConnectionRefused
+    ));
+    assert!(matches!(
+        map_sqlx_error(sqlx::Error::PoolTimedOut),
+        DriverError::Disconnected
+    ));
+    assert!(matches!(
+        map_sqlx_connect_error(sqlx::Error::PoolClosed),
+        DriverError::Disconnected
+    ));
+}
+
+#[test]
 fn patched_sqlx_postgres_caps_scram_iterations() {
     let source = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),

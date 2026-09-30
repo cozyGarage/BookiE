@@ -16,6 +16,16 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
+#[path = "../../shared/connect_refusal.rs"]
+mod connect_refusal;
+
+#[tokio::test]
+async fn an_unavailable_mysql_server_is_classified_as_connection_refused() {
+    connect_refusal::assert_connection_refused(&MysqlDriver)
+        .await
+        .expect("MySQL setup refusal remains distinct from established disconnect");
+}
+
 async fn start_mysql() -> (ContainerAsync<Mysql>, ConnectOptions) {
     let container = Mysql::default()
         .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")

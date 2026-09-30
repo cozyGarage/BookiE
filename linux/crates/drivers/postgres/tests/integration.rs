@@ -45,6 +45,16 @@ mod disconnection;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
+#[path = "../../shared/connect_refusal.rs"]
+mod connect_refusal;
+
+#[tokio::test]
+async fn an_unavailable_postgres_server_is_classified_as_connection_refused() {
+    connect_refusal::assert_connection_refused(&PgDriver)
+        .await
+        .expect("PostgreSQL setup refusal remains distinct from established disconnect");
+}
+
 async fn start_pg() -> (ContainerAsync<Postgres>, ConnectOptions) {
     // Pin to Postgres 16: the introspection query in `fetch_columns`
     // reads `pg_attribute.attgenerated`, which was added in PG 12.

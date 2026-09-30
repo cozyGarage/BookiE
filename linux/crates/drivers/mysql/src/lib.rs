@@ -76,7 +76,7 @@ impl DatabaseDriver for MysqlDriver {
             })
             .connect_with(mysql_opts)
             .await
-            .map_err(map_sqlx_error)?;
+            .map_err(map_sqlx_connect_error)?;
         // Lazy: a saved connection with a failed-login lockout policy
         // must not see two authentication attempts for one Connect
         // click. The real dial happens only when a cancel is actually
@@ -934,6 +934,21 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
     }
 }
 
+fn map_sqlx_connect_error(err: sqlx::Error) -> DriverError {
+    if is_pool_startup_timeout(&err) {
+        // SQLx retries refused pool connections until the acquire deadline,
+        // then erases the underlying I/O error into PoolTimedOut. During
+        // initial setup there is no established connection to disconnect.
+        DriverError::ConnectionRefused
+    } else {
+        map_sqlx_error(err)
+    }
+}
+
+fn is_pool_startup_timeout(err: &sqlx::Error) -> bool {
+    matches!(err, sqlx::Error::PoolTimedOut)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1024,6 +1039,22 @@ mod tests {
     fn map_io_refused_returns_connection_refused() {
         let err = sqlx::Error::Io(std::io::Error::from(std::io::ErrorKind::ConnectionRefused));
         assert!(matches!(map_sqlx_error(err), DriverError::ConnectionRefused));
+    }
+
+    #[test]
+    fn a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect() {
+        assert!(matches!(
+            map_sqlx_connect_error(sqlx::Error::PoolTimedOut),
+            DriverError::ConnectionRefused
+        ));
+        assert!(matches!(
+            map_sqlx_error(sqlx::Error::PoolTimedOut),
+            DriverError::Disconnected
+        ));
+        assert!(matches!(
+            map_sqlx_connect_error(sqlx::Error::PoolClosed),
+            DriverError::Disconnected
+        ));
     }
 
     #[test]

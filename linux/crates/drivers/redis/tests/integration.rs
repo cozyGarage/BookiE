@@ -2,6 +2,16 @@
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
+#[path = "../../shared/connect_refusal.rs"]
+mod connect_refusal;
+
+#[tokio::test]
+async fn an_unavailable_redis_server_is_classified_as_connection_refused() {
+    connect_refusal::assert_connection_refused(&RedisDriver)
+        .await
+        .expect("Redis setup refusal remains distinct from established disconnect");
+}
+
 use drivers_redis::RedisDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
 use testcontainers::core::{IntoContainerPort, WaitFor};

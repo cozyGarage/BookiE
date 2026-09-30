@@ -14,6 +14,16 @@ use testcontainers::ContainerAsync;
 use testcontainers_modules::mssql_server::MssqlServer;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
 
+#[path = "../../shared/connect_refusal.rs"]
+mod connect_refusal;
+
+#[tokio::test]
+async fn an_unavailable_sql_server_is_classified_as_connection_refused() {
+    connect_refusal::assert_connection_refused(&MssqlDriver)
+        .await
+        .expect("SQL Server setup refusal remains distinct from established disconnect");
+}
+
 async fn start_mssql() -> (ContainerAsync<MssqlServer>, ConnectOptions) {
     let container = MssqlServer::default()
         .with_accept_eula()

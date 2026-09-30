@@ -280,6 +280,35 @@ rtk cargo test --locked -p tablepro-driver-mssql --test integration a_lost_sql_s
 
 The focused SQL Server server-loss/restart test passed.
 
+## Connect refusal versus established disconnect, 2026-09-30
+
+Native-driver checks against unused local TCP ports cover PostgreSQL, MySQL,
+SQL Server, ClickHouse, Redis and MongoDB. The PostgreSQL and MySQL checks first
+failed: SQLx retries refused connections while creating a pool and eventually
+returns `PoolTimedOut`, which the shared operation mapper classified as
+`Disconnected`. Their setup paths now map that pool-startup failure to
+`ConnectionRefused`, while `PoolTimedOut` from an established operation remains
+`Disconnected`. Unit contracts assert both contexts, and the full driver
+connect path verifies the observable result. MongoDB's pre-existing refused-
+endpoint test supplies its native-driver check.
+
+The focused checks passed for all five shared-helper callers; MongoDB's existing
+unused-port test remains in the driver's integration suite. The initial failing
+PostgreSQL and MySQL runs reproduced the incorrect `Disconnected` classification.
+Scoped mutation runs caught both viable changes to the setup-time timeout
+predicate in each driver. The first function-wide mutation was unviable because
+`DriverError` has no `Default`; the predicate-scoped reruns are the retained
+mutation evidence:
+`target/quality/20260930-pg-connect-refusal-predicate-final/mutants.out/outcomes.json`
+and `target/quality/20260930-mysql-connect-refusal-predicate-final/mutants.out/outcomes.json`.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --lib a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect
+rtk cargo test --locked -p tablepro-driver-mysql --lib a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect
+rtk cargo test --locked -p tablepro-driver-postgres --test integration an_unavailable_postgres_server_is_classified_as_connection_refused -- --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-mysql --test integration an_unavailable_mysql_server_is_classified_as_connection_refused -- --exact --test-threads=1
+```
+
 ## Restart recovery across remote drivers, 2026-09-30
 
 The PostgreSQL and MySQL pool tests stop and restart the server container while
@@ -293,10 +322,17 @@ Redis startup broken-pipe case; each test still requires a protocol-level
 operation to succeed. This proves explicit reconnect after restart; it does not
 claim transparent recovery of the old connection handle.
 
-The complete `drivers` layer passed all 200 selected driver, socket and SSH
-tests at the integrated source. The strict shared-values layer passed 135 tests
-with GTK and DuckDB enabled and no missing suites. The quick layer also passed.
-Evidence:
+The full Docker-backed driver layer passed 207 driver, MCP, PostgreSQL socket
+and SSH tests after the restart and setup-refusal additions, with zero failures
+in 864.5 seconds. The quick layer also passed after the SQLx mapping correction.
+Reports:
+[`20260930T021134930354Z-layers/report.json`](../target/quality/20260930T021134930354Z-layers/report.json)
+and [`20260930T020929420585Z-layers/report.json`](../target/quality/20260930T020929420585Z-layers/report.json).
+
+Before the restart additions, an earlier source snapshot passed 200 selected
+driver, socket and SSH tests and the strict shared-values layer passed 135 tests
+with GTK and DuckDB enabled and no missing suites. That historical evidence is
+retained here; the current 207-test driver and quick reports are above:
 [`20260930T010431493880Z-layers/report.json`](../target/quality/20260930T010431493880Z-layers/report.json),
 [`20260930T011850614654Z-layers/report.json`](../target/quality/20260930T011850614654Z-layers/report.json),
 [`20260930T011850675572Z-values/report.json`](../target/quality/20260930T011850675572Z-values/report.json),

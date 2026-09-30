@@ -105,7 +105,12 @@ the same container, open a fresh driver connection and require a protocol-level
 operation to succeed. These tests verify pool or explicit reconnect after
 restart, not transparent recovery of a previous non-pooled connection handle.
 SQLite and DuckDB are local engines, so they are not part of this remote-server-
-loss set. Connect-time refusal remains separately classified in driver contracts.
+loss set. All six remote drivers also have native-driver checks against an unused
+local TCP port, proving connect-time refusal is distinct from established loss.
+PostgreSQL and MySQL exercise this through SQLx pool setup, not only the pure
+error mapper. After these cases were added, the complete `drivers` layer passed
+207 driver, MCP, socket and SSH tests in 864.5 seconds with no failures. Evidence:
+[`20260930T021134930354Z-layers/report.json`](../target/quality/20260930T021134930354Z-layers/report.json).
 
 Redis and ClickHouse mapper mutations are retained at
 `target/quality/20260930-redis-disconnect-mutants-final/` and
