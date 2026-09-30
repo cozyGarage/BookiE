@@ -1662,3 +1662,15 @@ Evidence: `target/quality/20260930-json-exponent-float-mutants-final/mutants.out
 ```sh
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/json.rs --re 'value_to_json|row_to_json_object' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20260930-json-exponent-float-mutants-final -- --lib -- --test-threads=1
 ```
+
+### CSV and JSON temporal export parity — September 30
+
+The nine-digit offset-origin `TIMESTAMP WITH TIME ZONE` contract now compares
+the CSV and JSON export text directly. Both represent the same canonical UTC
+instant with all fractional digits; typed CSV import recovers the original
+instant. The focused core regression passed. Broader temporal cross-format
+parity remains open.
+
+```sh
+rtk cargo test --locked -p tablepro-core value_contract_csv_round_trip_preserves_timestamptz_nanoseconds
+```

@@ -516,6 +516,10 @@ mod tests {
         let csv = render_csv(&columns, &[vec![expected.clone()]], &CsvOptions::default());
         assert_eq!(csv, "value\n2026-09-27T07:04:56.123456789+00:00\n");
 
+        let json: serde_json::Value =
+            serde_json::from_str(&crate::export::render_json(&columns, &[vec![expected.clone()]])).unwrap();
+        assert_eq!(json[0]["value"], "2026-09-27T07:04:56.123456789+00:00");
+
         let options = crate::import::CsvImportOptions::default();
         let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
         let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
