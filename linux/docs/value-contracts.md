@@ -403,6 +403,24 @@ Reports:
 [`20260930T021134930354Z-layers/report.json`](../target/quality/20260930T021134930354Z-layers/report.json)
 and [`20260930T020929420585Z-layers/report.json`](../target/quality/20260930T020929420585Z-layers/report.json).
 
+On September 30, the full Docker-backed `drivers` layer was rerun at source SHA
+`8ed0f66ed54b1411feaac5d7a8e49abc6999fb18`. It ran 219 tests with zero failures
+or ignored tests in the executed suites in 939.7 seconds. The six server-driver
+disconnect and mid-stream/page-loss regressions passed, as did the pool/fresh
+connection recovery paths, MCP, PostgreSQL socket and SSH checks. See
+[`20260930T110146955489Z-layers/report.json`](../target/quality/20260930T110146955489Z-layers/report.json)
+for the per-step report.
+
+After splitting the nested MongoDB test into its own support module, the strict
+shared value-contract runner passed with GTK and DuckDB enabled against base SHA
+`736a73f8434a57fd33dbe9d6212956e29351b168`. It executed 144 tests across all 11
+expected suites, reported no missing suites, and finished in 201.7 seconds.
+Compilation found 746 fresh artifacts and rebuilt one package. The quick layer
+then passed in 92.0 seconds, including file-size and function-size guards. See
+[`20260930T114622059959Z-layers/report.json`](../target/quality/20260930T114622059959Z-layers/report.json),
+[`20260930T114622117990Z-values/report.json`](../target/quality/20260930T114622117990Z-values/report.json)
+and [`20260930T114425279874Z-layers/report.json`](../target/quality/20260930T114425279874Z-layers/report.json).
+
 Before the restart additions, an earlier source snapshot passed 200 selected
 driver, socket and SSH tests and the strict shared-values layer passed 135 tests
 with GTK and DuckDB enabled and no missing suites. That historical evidence is
@@ -490,6 +508,22 @@ the first-50 sample and current result page.
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
 ```
+
+## MongoDB nested-document grid edit, 2026-09-30
+
+A Docker-backed app contract now takes a displayed nested document through the
+MongoDB app parser, keyed update builder and driver, then reads it with a separate
+native MongoDB client. The edited cell contains an Int64 above JavaScript's safe
+integer boundary, a scale-preserving Decimal128, and an ObjectId inside the
+nested document. The contract also checks the target `_id`, an untouched sibling
+field and a second row's full contents. This joins the app/driver paths that had
+previously only been covered separately by parser and BSON codec tests.
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity -- --ignored --test-threads=1
+```
+
+The focused Docker test passed: 1 passed, 0 failed.
 
 ## Current corpus
 

@@ -448,3 +448,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mongodb_nested_edit_contract.rs"]
+mod mongodb_nested_edit_contract;
