@@ -73,6 +73,50 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_disconnected_session_is_retired_without_affecting_the_shared_pool() {
+    let (_container, opts) = start_pg().await;
+    let connection = PgDriver.connect(opts.clone()).await.expect("connect");
+    let observer = connect(opts).await;
+    let mut session = connection.open_session().await.expect("open session");
+    let tag = "bookie_session_backend_termination";
+    let query = tokio::spawn(async move {
+        let result = session
+            .query_params_controlled(&format!("SELECT pg_sleep(30) /* {tag} */"), &[], &no_timeout())
+            .await;
+        (session, result)
+    });
+
+    let pid = tagged_query_pid(observer.as_ref(), tag)
+        .await
+        .expect("tagged session query must reach PostgreSQL");
+    let terminated = observer
+        .query(&format!("SELECT pg_terminate_backend({pid})"))
+        .await
+        .expect("terminate session backend");
+    assert_eq!(terminated.rows, vec![vec![Value::Bool(true)]]);
+
+    let (mut session, result) = tokio::time::timeout(std::time::Duration::from_secs(5), query)
+        .await
+        .expect("terminated session query must not hang")
+        .expect("session query task");
+    let error = result.expect_err("a terminated session query must not succeed");
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable(), "a lost session must be retired");
+    assert!(matches!(
+        session.query_params_controlled("SELECT 1", &[], &no_timeout()).await,
+        Err(DriverError::Internal(_))
+    ));
+
+    // The ordinary shared pool has its own recovery contract.
+    assert_eq!(
+        connection.query("SELECT 1").await.unwrap().rows,
+        vec![vec![Value::Int(1)]]
+    );
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() {
     let (_container, opts) = start_pg().await;
     let connection: std::sync::Arc<dyn Connection> = PgDriver.connect(opts.clone()).await.expect("connect").into();

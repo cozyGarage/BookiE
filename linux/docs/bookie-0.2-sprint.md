@@ -198,6 +198,22 @@ its automated runner. The sandbox layer passed in 65.12 seconds, including the
 standalone Redis cancellation test; evidence is linked from the matrix. B3
 remains open for native-type and consumer targets.
 
+### PostgreSQL session loss retires the lost handle — October 1
+
+A focused disconnect regression found that a PostgreSQL session could return
+`Disconnected` while retaining its one-slot pool handle. A later query could
+then acquire a replacement backend and look like the original session, even
+though its transaction and session-local state were lost. The session now
+retires its handle after `Disconnected`; the Docker test terminates the active
+backend, verifies the same handle refuses another query, and confirms the
+ordinary shared pool still recovers. The focused case, test harness and quick
+layer passed, followed by the full `drivers` layer: 225 tests across driver,
+MCP, socket and SSH suites, zero failures and zero ignored tests among executed
+tests. The generated ignored-test ledger was updated so this Docker test is
+explicitly registered. See [disconnect contracts](disconnection-contracts.md)
+for the exact test and execution command. B3 remains open for the remaining
+native-type and consumer targets.
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the

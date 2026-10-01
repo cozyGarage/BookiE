@@ -60,6 +60,12 @@ impl tablepro_core::Session for PgSession {
         )
         .await;
         self.connection = connection;
+        if matches!(result, Err(DriverError::Disconnected)) {
+            // A lost backend also loses session-local state. Do not let the
+            // single-slot pool silently replace it and masquerade as the same
+            // session on the next statement.
+            self.connection = None;
+        }
         result
     }
 

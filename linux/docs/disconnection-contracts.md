@@ -22,6 +22,14 @@ driver. The tests check server state or returned values where available; they do
 not assume that every driver can cancel a server operation or reuse a physical
 socket after interruption.
 
+PostgreSQL sessions are retired when an established backend is lost. A private
+one-slot session pool must not reconnect transparently and present a new backend
+as the same session, because its temporary tables, settings and transaction
+state are gone. The regression
+`disconnection::a_disconnected_session_is_retired_without_affecting_the_shared_pool`
+terminates the session backend, requires `Disconnected`, verifies that session
+handle is unusable, and checks the ordinary shared pool can still recover.
+
 ## Test ownership
 
 Run the six Docker-backed driver suites, including ignored fixtures, with:
@@ -67,3 +75,13 @@ tests. This includes each remote driver's established-loss and refusal
 distinction, its mid-stream or page-loss case where applicable, and its
 documented recovery path. The report was recorded against a clean tracked tree:
 [`20261001T025640026732Z-layers/report.json`](../target/quality/20261001T025640026732Z-layers/report.json).
+
+On October 1, the complete `drivers` layer passed in 949.8 seconds against the
+working tree based on `ed07e553e9f7e5a6f48bcd3b2d822092987e5308`. It executed
+225 tests across all driver, MCP, socket and SSH suites, with zero failures and
+zero ignored tests among executed tests. The new PostgreSQL session-loss case
+ran in the full layer and proved the lost session handle stays retired while a
+separate shared-pool query succeeds. The report is
+[`20261001T042714823272Z-layers/report.json`](../target/quality/20261001T042714823272Z-layers/report.json).
+The `quick` layer and test harness also passed after the ignored-test inventory
+was regenerated.
