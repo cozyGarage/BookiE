@@ -3701,16 +3701,19 @@ and maximum plus `UInt128` maximum through native results, SQL literals,
 parameters, CSV and grid edits. The shared XLSX writer test now includes these
 three values as `Value::Text` and inspects the workbook XML to require exact
 shared-string cells, preventing spreadsheet numeric conversion from losing
-digits. The focused core test passed. Scoped mutation testing of `write_cell`
+digits. A separate JSON contract requires them to remain exact JSON strings,
+since JSON numbers cannot safely represent the full 128-bit range. Both focused
+core tests passed. Scoped mutation testing of `write_cell`
 and this contract caught all 15 generated mutants, with no misses, timeouts or
 unviable mutations. The report is
 [`outcomes.json`](../target/quality/20261001-clickhouse-int128-xlsx-mutants/mutants.out/outcomes.json).
-The strict GTK+DuckDB value layer passed 176 tests across all 11 suites, with no
+The strict GTK+DuckDB value layer passed 177 tests across all 11 suites, with no
 missing suites, and the quick layer passed. Reports:
-[`20261001T054124079751Z-values/report.json`](../target/quality/20261001T054124079751Z-values/report.json),
-[`20261001T054630430028Z-layers/report.json`](../target/quality/20261001T054630430028Z-layers/report.json).
+[`20261001T055114378394Z-values/report.json`](../target/quality/20261001T055114378394Z-values/report.json),
+[`20261001T055614415328Z-layers/report.json`](../target/quality/20261001T055614415328Z-layers/report.json).
 
 ```sh
 rtk cargo test --locked -p tablepro-core --lib export::xlsx::tests::value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text -- --exact --test-threads=1
+rtk cargo test --locked -p tablepro-core --lib export::json::tests::value_contract_clickhouse_wide_integers_remain_exact_json_strings -- --exact --test-threads=1
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/xlsx.rs --re 'write_cell|value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-clickhouse-int128-xlsx-mutants -- --lib -- --test-threads=1
 ```

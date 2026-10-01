@@ -149,6 +149,26 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_clickhouse_wide_integers_remain_exact_json_strings() {
+        let columns = vec![column("signed_min"), column("signed_max"), column("unsigned_max")];
+        let rows = vec![vec![
+            Value::Text("-170141183460469231731687303715884105728".into()),
+            Value::Text("170141183460469231731687303715884105727".into()),
+            Value::Text("340282366920938463463374607431768211455".into()),
+        ]];
+
+        let output: serde_json::Value = serde_json::from_str(&render_json(&columns, &rows)).unwrap();
+        assert_eq!(
+            output,
+            serde_json::json!([{
+                "signed_min": "-170141183460469231731687303715884105728",
+                "signed_max": "170141183460469231731687303715884105727",
+                "unsigned_max": "340282366920938463463374607431768211455",
+            }])
+        );
+    }
+
+    #[test]
     fn value_contract_json_keeps_null_and_booleans_distinct_from_text() {
         let columns = vec![column("value")];
         let rows = vec![
