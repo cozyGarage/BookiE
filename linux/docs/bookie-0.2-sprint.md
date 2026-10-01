@@ -3,10 +3,10 @@
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
-## Current continuation plan: 2026-09-29
+## Current continuation plan: 2026-10-02
 
-Working branch: **`linux`**. Reviewed tip:
-`fe22716459c242b350bf34e7070dde19bba184ba` (source version 0.1.5).
+Working branch: **`linux`**. B3 code checkpoint:
+`f6ed03a` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -17,15 +17,15 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
-October 2 audit checkpoint: code fixes through
-`2dcf1cd434fd696603941bfe89cad42bb2dc8786`.
-The [B3 review](b3-review-2026-10-01.md) records R1–R5 as fixed with focused
-regressions, native database checks and hosted test ownership. The latest CI run
-is still in progress. R6 tracks portable evidence and a finite contract board;
-the native-type matrix and session reconnect follow-up remain open. Start with
-B3-P1 to reconcile remaining contracts, then assign one bounded engine/type/
-consumer case using the [agent task template](validation-playbook.md#agent-task-template).
-Keep the existing native-support targets and desktop acceptance visible.
+October 2 audit checkpoint: R1–R5 and R7 have focused fixes, regressions and
+native/consumer evidence; R5 also has hosted test ownership. R7 protects XLSX
+floats from Excel's precision and range limits. See the [B3 review](b3-review-2026-10-01.md)
+and its evidence. R6 tracks portable evidence and a finite contract board; the
+remaining native-type matrix and session reconnect follow-up stay open. Continue
+B3-P1 to reconcile those contracts, then assign one bounded engine/type/consumer
+case using the [agent task template](validation-playbook.md#agent-task-template).
+The current pushed head has Security green; Build Linux, Flatpak and test-quality
+CI are pending/in progress for the follow-up commits.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
@@ -63,7 +63,7 @@ VM setup is a prerequisite for current B3/B4 implementation or the Arch UI pass.
 | --- | --- | --- |
 | B1 | Platform foundation integrated; source version is 0.1.5 | Installed Arch candidate first, then required Debian/GNOME qualification; full Flatpak qualification remains separate |
 | B2 | Implemented; retain completed code and migration safeguards | Installed Arch upgrade/rollback in B7 |
-| B3 | Substantial eight-driver and export coverage; still open | Remaining native-type targets, exact editing, consumer parity and mutation triage |
+| B3 | R1–R5 and R7 fixed with focused contracts; milestone still open | Reconcile and close remaining native-type targets, consumer parity, acceptance and mutation triage |
 | B4 | A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence | C6, E, F, G3/G5 and active I tasks; A5 monitor follow-up F9 |
 | B5/B6 | Editor files and read-only PostgreSQL catalog implemented | Arch Wayland file-dialog/recovery and catalog stale/restricted-role acceptance |
 | B7 | Open; this review is documentation only | Freeze SHA, affected automated gates, installed Arch then Debian/GNOME acceptance and retry-free soak |

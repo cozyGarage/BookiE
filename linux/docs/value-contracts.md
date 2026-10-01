@@ -732,7 +732,7 @@ establish complete native-type support or replace installed-app acceptance.
 | MongoDB | JSON commands preserve integer, float, text and NULL values through BSON and result decoding |
 | Grid, filter, CSV and named parameter parsers | Integer overflow and decimal rounding are refused; representable boundaries survive parsing |
 | Float input parsers | Numeric overflow to infinity and nonzero underflow to zero are refused |
-| XLSX | Integers beyond 15 digits and all exact decimals are text cells; stored XML verifies each value and cell reference, including decimal scale |
+| XLSX | Integers beyond 15 digits, exact decimals, and finite floats Excel may round or underflow are text cells; XML verifies values and cell types, while safe finite floats remain numeric |
 | JSON and MCP | Non-finite values and negative zero remain distinct from SQL NULL and positive zero |
 
 ### Redis RESP3 nested values and binary replies
@@ -1234,23 +1234,33 @@ picks up both workbook regressions automatically.
 Excel documents its [15-digit precision limit](https://support.microsoft.com/en-us/excel/format-numbers-as-text).
 Spreadsheet import and spreadsheet-application re-import contracts remain open.
 
-### XLSX negative-zero cell token, 2026-09-28
+### XLSX float precision and Excel-safe cell types, 2026-10-02
 
-The XLSX writer stores finite floats as numeric cells. A focused workbook
-regression checks the generated worksheet XML directly and confirms that
-negative zero is serialized as the numeric token `-0`, not positive `0` or a
-string. Another regression parses the worksheet's numeric token for the smallest
-positive subnormal and the representable value immediately above `1.0`, then
-compares the recovered `f64` bits with independent expected values. All three
-focused float workbook tests pass. BookiE has no XLSX import path, so these
-contracts establish exported numeric tokens and their IEEE-754 parse-back, not
-later spreadsheet-application round-trip behavior.
+A failing-first workbook contract showed that finite `f64` values were always
+written as numeric cells, including negative zero, subnormals and values with
+more than Excel's 15 significant decimal digits. Excel documents both its
+15-digit precision and numeric magnitude limits in its
+[specifications](https://support.microsoft.com/en-us/excel/excel-specifications-and-limits).
+The writer now keeps finite floats numeric only when their shortest decimal has
+at most 15 significant digits and the magnitude is within Excel's supported
+numeric range. Risky values use exact text cells, preserving the sign of
+negative zero and the decimal needed to reconstruct the original float. This
+trades spreadsheet arithmetic for exact value retention on those cells, matching
+the existing text policy for wide integers and exact decimals.
+
+Workbook XML tests cover both numeric range boundaries, ordinary safe numbers,
+negative zero, the smallest subnormal, the adjacent value above 1.0, a 17-digit
+float, and `f64::MAX`. The exact-text cases were numeric cells before the fix;
+they now emit as shared-string cells, while safe values remain numeric cells.
+BookiE has no XLSX importer and LibreOffice is unavailable in the local
+verification environment, so application-specific formula/re-import behavior
+remains unverified.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_workbook_float
+rtk cargo test --locked -p tablepro-core --lib export::xlsx::tests::value_contract_workbook
 ```
 
-No production mismatch was found.
+The exact selectors and source SHA are retained with the current review evidence.
 
 ### XLSX nested Extended JSON consumer check, 2026-09-27
 
