@@ -273,6 +273,14 @@ pub(crate) fn row_to_values_for_driver(
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
     if text != options.null_marker {
+        if driver_id == "postgres"
+            && let Some(value) = postgres_text_temporal(text, &column.data_type)
+        {
+            // PostgreSQL's infinities, timetz offsets and 24:00 value are
+            // exact text in the driver contract. Restore the CSV formula
+            // marker only for recognized native sentinels.
+            return Ok(Value::Text(value.to_owned()));
+        }
         if kind == ColumnKind::Text
             && let Some(value) = sanitized_wide_integer_text(text, &column.data_type)
         {
@@ -308,6 +316,26 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         return Ok(Value::Text(String::new()));
     }
     Ok(Value::Null)
+}
+
+fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
+    let kind = data_type.trim().to_ascii_lowercase();
+    if matches!(kind.as_str(), "timetz" | "time with time zone") {
+        return Some(text);
+    }
+    if kind == "time" || kind == "time without time zone" {
+        return (text == "24:00:00" || text.starts_with("24:00:00.")).then_some(text);
+    }
+    if matches!(
+        kind.as_str(),
+        "date" | "timestamp" | "timestamp without time zone" | "timestamptz" | "timestamp with time zone"
+    ) {
+        let value = text.strip_prefix('\'').unwrap_or(text);
+        if matches!(value, "infinity" | "+infinity" | "-infinity") {
+            return Some(value);
+        }
+    }
+    None
 }
 
 fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
@@ -686,6 +714,54 @@ mod tests {
 
         assert_eq!(values[0], Value::Decimal(Decimal::new(-12345, 2)));
         assert_eq!(values[1], Value::Text("'-123.45".into()));
+    }
+
+    #[test]
+    fn value_contract_postgres_temporal_sentinels_restore_only_recognized_csv_formula_markers() {
+        let cases = [
+            ("date", "'-infinity", "-infinity"),
+            ("timestamp", "infinity", "infinity"),
+            ("timestamptz", "'+infinity", "+infinity"),
+            ("time", "24:00:00", "24:00:00"),
+            ("timetz", "01:02:03+05:45:12", "01:02:03+05:45:12"),
+        ];
+        for (data_type, input, expected) in cases {
+            let columns = vec![column("value", data_type)];
+            let values = row_to_values_for_driver(
+                &[input.to_owned()],
+                &[Some(0)],
+                &columns,
+                &CsvImportOptions::default(),
+                2,
+                "postgres",
+            )
+            .unwrap_or_else(|error| panic!("PostgreSQL {data_type} sentinel should import: {error}"));
+            assert_eq!(values, vec![Value::Text(expected.into())]);
+        }
+
+        let columns = vec![column("value", "date")];
+        assert!(
+            row_to_values_for_driver(
+                &["'=1+1".into()],
+                &[Some(0)],
+                &columns,
+                &CsvImportOptions::default(),
+                2,
+                "postgres",
+            )
+            .is_err()
+        );
+        assert!(
+            row_to_values_for_driver(
+                &["'-infinity".into()],
+                &[Some(0)],
+                &columns,
+                &CsvImportOptions::default(),
+                2,
+                "mysql",
+            )
+            .is_err()
+        );
     }
 
     #[test]

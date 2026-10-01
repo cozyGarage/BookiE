@@ -20,6 +20,15 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     for kind in ["date", "timestamp", "timestamptz"] {
+        let table = format!("temporal_infinity_csv_{kind}");
+        connection
+            .execute(&format!("CREATE TABLE {table} (value {kind} NOT NULL)"))
+            .await
+            .unwrap();
+        let columns = connection.fetch_columns(None, &table).await.unwrap();
+        let options = tablepro_core::import::CsvImportOptions::default();
+        let mapping = [Some(0)];
+        let mut expected_csv_imports = Vec::new();
         for input in ["infinity", "-infinity"] {
             let result = connection
                 .query(&format!("SELECT '{input}'::{kind} AS value"))
@@ -39,6 +48,55 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
                 tablepro_core::export::row_to_json(&result.columns, &result.rows[0])["value"],
                 input
             );
+            let csv = tablepro_core::export::render_csv(
+                &result.columns,
+                &result.rows,
+                &tablepro_core::export::CsvOptions::default(),
+            );
+            let sheet = tablepro_core::import::read_csv(
+                csv.as_bytes(),
+                &tablepro_core::import::CsvImportOptions::default(),
+                None,
+            )
+            .unwrap();
+            let expected_csv_cell = if input.starts_with(['+', '-']) {
+                format!("'{input}")
+            } else {
+                input.to_owned()
+            };
+            assert_eq!(
+                sheet.rows[0][0], expected_csv_cell,
+                "default CSV formula safety marker for PostgreSQL {kind} {input}"
+            );
+
+            let plan = tablepro_core::import::build_insert_plan(
+                &tablepro_core::import::ImportTarget {
+                    driver_id: "postgres",
+                    schema: None,
+                    table: &table,
+                    columns: &columns,
+                    mapping: &mapping,
+                },
+                &sheet,
+                &options,
+            )
+            .unwrap_or_else(|error| panic!("typed CSV import of PostgreSQL {kind} {input}: {error}"));
+            assert_eq!(plan.rows, vec![vec![Value::Text(input.into())]]);
+            connection
+                .execute_params(&plan.statement, &plan.rows[0])
+                .await
+                .unwrap_or_else(|error| panic!("insert PostgreSQL {kind} {input}: {error:?}"));
+            expected_csv_imports.push(vec![Value::Text(input.into())]);
+            let restored = connection
+                .query(&format!("SELECT value::text FROM {table} ORDER BY value::text"))
+                .await
+                .unwrap();
+            let mut expected = expected_csv_imports.clone();
+            expected.sort_by(|left, right| match (&left[0], &right[0]) {
+                (Value::Text(left), Value::Text(right)) => left.cmp(right),
+                _ => std::cmp::Ordering::Equal,
+            });
+            assert_eq!(restored.rows, expected, "native {kind} CSV re-import");
         }
     }
 }

@@ -100,6 +100,14 @@ Redis refuses identified asynchronous command streams and tests RESP3 attribute
 wire decoding, while asynchronous push consumption is unsupported; SQLite has
 storage-class/parser/import contracts but installed GTK acceptance is untested.
 
+The October 1 PostgreSQL CSV follow-up closes one temporal consumer gap:
+formula-safe `-infinity` markers are restored only for recognized PostgreSQL
+temporal columns, and text parameters are explicitly cast back to the catalog
+temporal type. Mixed finite/infinite rows share the same parameter type. The
+live integration contract checks DATE, TIME, TIMETZ, TIMESTAMP and TIMESTAMPTZ
+against exact server text after import; see the
+[value ledger](value-contracts.md#postgresql-era-and-mutation-checkpoint).
+
 ### Connection-loss contract update — September 30
 
 Docker-backed tests stop each remote server after a successful request and

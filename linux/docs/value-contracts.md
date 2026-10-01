@@ -2138,10 +2138,41 @@ The extended-calendar contract now parses the DATE and TIMESTAMP exports back
 through the CSV reader and checks their visible `<undecodable DATE>` and
 `<undecodable TIMESTAMP>` markers; JSON output is checked as structured JSON.
 This prevents either consumer from silently presenting these native values as
-empty cells or SQL NULL. The focused PostgreSQL Docker test passed. The strict
-GTK+DuckDB values layer passed 169 selected tests across all 11 suites with no
-missing suites:
-[`20261001T015111955335Z-values/report.json`](../target/quality/20261001T015111955335Z-values/report.json).
+empty cells or SQL NULL. The focused PostgreSQL Docker test passed.
+
+The PostgreSQL temporal infinity test then exposed a default CSV formula marker
+that typed import rejected for `-infinity`. Import now removes the marker only
+for recognized PostgreSQL temporal sentinels. Import plans cast consistent text
+parameters to the destination temporal type, and integration coverage confirms
+native re-import of positive/negative infinities, `TIME '24:00:00'`, and
+`TIMETZ` with offset seconds. The complete PostgreSQL integration target passed
+64 tests. Core import/planner and SQL-dialect suites passed 81 and 45 tests:
+
+Scoped mutation testing caught all 19 viable changes in the PostgreSQL
+temporal CSV classifier (5 unviable), all 21 viable import-plan mutations (1
+unviable), and all 15 viable SQL insert-cast mutations (2 unviable), with no
+survivors or timeouts. Reports:
+[`import classifier`](../target/quality/20261001-postgres-temporal-import-mutants-final/mutants.out/outcomes.json),
+[`import plan`](../target/quality/20261001-postgres-temporal-import-plan-mutants-final2/mutants.out/outcomes.json),
+[`SQL insert casts`](../target/quality/20261001-postgres-temporal-insert-mutants-final/mutants.out/outcomes.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_temporal_infinities_remain_distinct_from_null -- --ignored --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_times_preserve_midnight_fraction_and_offset -- --ignored --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+```
+
+The strict GTK+DuckDB values layer then passed 169 selected tests across all 11
+suites, with no missing suites:
+[`20261001T023544965607Z-values/report.json`](../target/quality/20261001T023544965607Z-values/report.json).
+
+Reproduce the mutation scopes:
+
+```sh
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/import/cell.rs --re 'postgres_text_temporal|value_for' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-postgres-temporal-import-mutants-final -- --lib import::
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/import/plan.rs --re 'insert_statement|bind_rows' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-postgres-temporal-import-plan-mutants-final2 -- --lib import::
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/sql_dialect.rs --re 'postgres_temporal_cast_type|build_insert_from_draft' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-postgres-temporal-insert-mutants-final -- --lib
+```
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --ignored --test-threads=1

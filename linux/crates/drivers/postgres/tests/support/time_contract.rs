@@ -61,4 +61,49 @@ pub async fn assert_time_contract(connection: &dyn Connection) {
             .unwrap();
         assert_eq!(nulls.rows[0], vec![Value::Null, Value::Null]);
     }
+
+    for (kind, input) in [("time", "24:00:00"), ("timetz", "01:02:03+05:45:12")] {
+        let table = format!("temporal_text_csv_{kind}");
+        connection
+            .execute(&format!("CREATE TABLE {table} (value {kind} NOT NULL)"))
+            .await
+            .unwrap();
+        let source = connection
+            .query(&format!("SELECT '{input}'::{kind} AS value"))
+            .await
+            .unwrap();
+        assert_eq!(source.rows, vec![vec![Value::Text(input.into())]]);
+
+        let csv = tablepro_core::export::render_csv(
+            &source.columns,
+            &source.rows,
+            &tablepro_core::export::CsvOptions::default(),
+        );
+        let options = tablepro_core::import::CsvImportOptions::default();
+        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+        let columns = connection.fetch_columns(None, &table).await.unwrap();
+        let mapping = [Some(0)];
+        let plan = tablepro_core::import::build_insert_plan(
+            &tablepro_core::import::ImportTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: &table,
+                columns: &columns,
+                mapping: &mapping,
+            },
+            &sheet,
+            &options,
+        )
+        .unwrap_or_else(|error| panic!("typed CSV import of PostgreSQL {kind} {input}: {error}"));
+        assert_eq!(plan.rows, vec![vec![Value::Text(input.into())]]);
+        connection
+            .execute_params(&plan.statement, &plan.rows[0])
+            .await
+            .unwrap_or_else(|error| panic!("insert PostgreSQL {kind} {input}: {error:?}"));
+        let restored = connection
+            .query(&format!("SELECT value::text FROM {table}"))
+            .await
+            .unwrap();
+        assert_eq!(restored.rows, vec![vec![Value::Text(input.into())]]);
+    }
 }

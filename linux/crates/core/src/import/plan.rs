@@ -3,7 +3,9 @@ use thiserror::Error;
 use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
-use crate::sql_dialect::{BuildSqlError, IdentError, build_insert_from_draft, validate_ident};
+use crate::sql_dialect::{
+    BuildSqlError, IdentError, build_insert_from_draft, postgres_temporal_cast_type, validate_ident,
+};
 
 /// Rows committed per transaction. Small enough that a failure loses
 /// little, large enough that the round trips do not dominate.
@@ -111,7 +113,19 @@ fn insert_columns(target: &ImportTarget<'_>) -> Result<(Vec<ColumnInfo>, Vec<Opt
 /// row and kept for the next.
 fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result<String, PlanError> {
     let shape_columns: Vec<ColumnInfo> = columns.to_vec();
-    let shape_values = vec![Value::Int(0); shape_columns.len()];
+    // PostgreSQL temporal CSV values use text parameters with an explicit
+    // server cast. This supports exact sentinels such as +/-infinity while
+    // keeping the parameter type consistent for every row in the import.
+    let shape_values = shape_columns
+        .iter()
+        .map(|column| {
+            if postgres_temporal_cast_type(&column.data_type).is_some() {
+                Value::Text(String::new())
+            } else {
+                Value::Int(0)
+            }
+        })
+        .collect::<Vec<_>>();
     let (statement, _) = build_insert_from_draft(
         target.driver_id,
         target.schema,
@@ -136,7 +150,22 @@ fn bind_rows(
     let mut total_failures = 0;
     for (index, row) in sheet.rows.iter().enumerate() {
         match row_to_values_for_driver(row, mapping, columns, options, index + header_offset + 1, driver_id) {
-            Ok(values) => rows.push(values),
+            Ok(mut values) => {
+                if driver_id == "postgres" {
+                    for (value, column) in values.iter_mut().zip(columns) {
+                        if postgres_temporal_cast_type(&column.data_type).is_some() {
+                            match value {
+                                Value::Date(date) => *value = Value::Text(date.to_string()),
+                                Value::Time(time) => *value = Value::Text(time.to_string()),
+                                Value::DateTime(datetime) => *value = Value::Text(datetime.to_string()),
+                                Value::TimestampTz(datetime) => *value = Value::Text(datetime.to_rfc3339()),
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                rows.push(values);
+            }
             Err(error) => {
                 total_failures += 1;
                 if failures.len() < MAX_REPORTED_ROW_ERRORS {
@@ -208,6 +237,79 @@ mod tests {
         assert_eq!(plan.row_count(), 2);
         assert_eq!(plan.rows.len(), 2);
         assert_eq!(plan.rows[0], vec![Value::Int(1), Value::Text("ada".to_owned())]);
+    }
+
+    #[test]
+    fn value_contract_postgres_temporal_csv_rows_share_text_cast_parameters() {
+        let columns = vec![
+            column("date_value", "date"),
+            column("time_value", "time"),
+            column("timetz_value", "timetz"),
+            column("timestamp_value", "timestamp"),
+            column("timestamptz_value", "timestamptz"),
+        ];
+        let mapping = vec![Some(0), Some(1), Some(2), Some(3), Some(4)];
+        let rows = sheet(
+            &[
+                &[
+                    "'-infinity",
+                    "24:00:00",
+                    "01:02:03+05:45:12",
+                    "2001-02-03 04:05:06.000007",
+                    "2001-02-03T04:05:06.000007+00:00",
+                ],
+                &[
+                    "2001-02-03",
+                    "12:13:14.000015",
+                    "01:02:03-03:30:12",
+                    "2001-02-03 04:05:06.000007",
+                    "2001-02-03T04:05:06.000007+00:00",
+                ],
+            ],
+            &["date", "time", "timetz", "timestamp", "timestamptz"],
+        );
+        let plan = build_insert_plan(&target(&columns, &mapping), &rows, &CsvImportOptions::default()).unwrap();
+
+        assert_eq!(
+            plan.statement,
+            "INSERT INTO \"people\" (\"date_value\", \"time_value\", \"timetz_value\", \"timestamp_value\", \"timestamptz_value\") VALUES ($1::text::pg_catalog.date, $2::text::pg_catalog.time, $3::text::pg_catalog.timetz, $4::text::pg_catalog.timestamp, $5::text::pg_catalog.timestamptz)"
+        );
+        assert_eq!(
+            plan.rows,
+            vec![
+                vec![
+                    Value::Text("-infinity".into()),
+                    Value::Text("24:00:00".into()),
+                    Value::Text("01:02:03+05:45:12".into()),
+                    Value::Text("2001-02-03 04:05:06.000007".into()),
+                    Value::Text("2001-02-03T04:05:06.000007+00:00".into()),
+                ],
+                vec![
+                    Value::Text("2001-02-03".into()),
+                    Value::Text("12:13:14.000015".into()),
+                    Value::Text("01:02:03-03:30:12".into()),
+                    Value::Text("2001-02-03 04:05:06.000007".into()),
+                    Value::Text("2001-02-03T04:05:06.000007+00:00".into()),
+                ],
+            ]
+        );
+
+        let mysql_columns = vec![column("date_value", "date")];
+        let mysql_mapping = [Some(0)];
+        let mysql_rows = sheet(&[&["2001-02-03"]], &["date"]);
+        let mysql_target = ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "people",
+            columns: &mysql_columns,
+            mapping: &mysql_mapping,
+        };
+        let mysql_plan = build_insert_plan(&mysql_target, &mysql_rows, &CsvImportOptions::default()).unwrap();
+        assert_eq!(mysql_plan.statement, "INSERT INTO `people` (`date_value`) VALUES (?)");
+        assert_eq!(
+            mysql_plan.rows,
+            vec![vec![Value::Date(chrono::NaiveDate::from_ymd_opt(2001, 2, 3).unwrap())]]
+        );
     }
 
     /// The statement builder drops a column whose value is NULL when the

@@ -260,7 +260,15 @@ pub fn build_insert_from_draft(
             continue;
         }
         col_idents.push(quote_ident(driver_id, &col.name));
-        placeholders.push(placeholder_for(driver_id, params.len()));
+        let placeholder = placeholder_for(driver_id, params.len());
+        let value_sql = if driver_id == "postgres" && matches!(values[i], Value::Text(_)) {
+            postgres_temporal_cast_type(&col.data_type)
+                .map(|type_name| format!("{placeholder}::text::{type_name}"))
+                .unwrap_or(placeholder)
+        } else {
+            placeholder
+        };
+        placeholders.push(value_sql);
         params.push(values[i].clone());
     }
     if col_idents.is_empty() {
@@ -378,6 +386,18 @@ fn postgres_numeric_cast_type(data_type: &str) -> Option<&'static str> {
         }
     }
     Some("pg_catalog.numeric")
+}
+
+pub(crate) fn postgres_temporal_cast_type(data_type: &str) -> Option<&'static str> {
+    let lowered = data_type.trim().to_ascii_lowercase();
+    Some(match lowered.as_str() {
+        "date" => "pg_catalog.date",
+        "time" | "time without time zone" => "pg_catalog.time",
+        "timetz" | "time with time zone" => "pg_catalog.timetz",
+        "timestamp" | "timestamp without time zone" => "pg_catalog.timestamp",
+        "timestamptz" | "timestamp with time zone" => "pg_catalog.timestamptz",
+        _ => return None,
+    })
 }
 
 pub fn build_keyed_delete(
@@ -769,6 +789,33 @@ mod tests {
         let (sql, params) = build_insert_from_draft("postgres", None, "users", &columns, &values).unwrap();
         assert_eq!(sql, "INSERT INTO \"users\" (\"name\") VALUES ($1)");
         assert_eq!(params, vec![Value::Text("alice".into())]);
+    }
+
+    #[test]
+    fn value_contract_postgres_temporal_insert_cast_is_limited_to_postgres_text_values() {
+        let mut date = col("value", false);
+        date.data_type = "date".into();
+        let (sql, _) = build_insert_from_draft(
+            "postgres",
+            None,
+            "dates",
+            std::slice::from_ref(&date),
+            &[Value::Text("-infinity".into())],
+        )
+        .unwrap();
+        assert_eq!(
+            sql,
+            "INSERT INTO \"dates\" (\"value\") VALUES ($1::text::pg_catalog.date)"
+        );
+
+        let native_date = Value::Date(chrono::NaiveDate::from_ymd_opt(2001, 2, 3).unwrap());
+        let (sql, _) =
+            build_insert_from_draft("postgres", None, "dates", std::slice::from_ref(&date), &[native_date]).unwrap();
+        assert_eq!(sql, "INSERT INTO \"dates\" (\"value\") VALUES ($1)");
+
+        let (sql, _) =
+            build_insert_from_draft("mysql", None, "dates", &[date], &[Value::Text("-infinity".into())]).unwrap();
+        assert_eq!(sql, "INSERT INTO `dates` (`value`) VALUES (?)");
     }
 
     #[test]

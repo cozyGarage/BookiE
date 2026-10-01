@@ -145,6 +145,27 @@ passed. The strict GTK+DuckDB values layer then passed 169 selected tests
 across all 11 suites with no missing suites; report:
 [`20261001T015111955335Z-values/report.json`](../target/quality/20261001T015111955335Z-values/report.json).
 
+### PostgreSQL temporal CSV sentinel imports — October 1
+
+A failing-first live test found default formula-safe CSV changes negative
+PostgreSQL infinity text to an apostrophe-prefixed cell, which the typed
+temporal importer rejected. The importer now restores that marker only for
+recognized PostgreSQL infinity tokens. PostgreSQL CSV temporal INSERT plans
+bind all values for a temporal column as text and explicitly cast each
+placeholder to the catalog type; this supports infinity and keeps mixed finite
+and infinite rows on one parameter type. The same path preserves `TIME`
+`24:00:00` and `TIMETZ` offsets with seconds. Live DATE, TIMESTAMP,
+TIMESTAMPTZ, TIME and TIMETZ cases compare exact server text after re-import.
+The focused regressions and the full PostgreSQL integration target passed (64
+tests). Core importer/planner tests passed (81 import, 45 SQL-dialect tests).
+Mutation testing caught all viable changes across the temporal CSV classifier,
+import plan and SQL insert casts (55 caught, 8 unviable, no survivors or
+timeouts); exact reports and commands are in the [value ledger](value-contracts.md#postgresql-era-and-mutation-checkpoint).
+The strict GTK+DuckDB values layer passed 169 tests across all 11 suites, with
+no missing suites:
+[`20261001T023544965607Z-values/report.json`](../target/quality/20261001T023544965607Z-values/report.json).
+B3 remains open.
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a
