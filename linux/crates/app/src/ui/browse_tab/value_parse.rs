@@ -53,6 +53,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     {
         return result;
     }
+    if let Some(result) = parse_mongodb_integer_input(trimmed, col, driver_id) {
+        return result;
+    }
     if let Some(result) = parse_mysql_spatial_input(col, driver_id) {
         return result;
     }
@@ -138,6 +141,21 @@ fn parse_mysql_integer_input(text: &str, col: Option<&ColumnInfo>) -> Option<Res
         }
         Ok(i64::try_from(value).map_or_else(|_| Value::Text(value.to_string()), Value::Int))
     })())
+}
+
+fn parse_mongodb_integer_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "mongodb" {
+        return None;
+    }
+    match column.data_type.trim().to_ascii_lowercase().as_str() {
+        "int" => Some(text.parse::<i32>().map_or_else(
+            |_| Err(crate::tr!("Integer is outside the supported MongoDB Int32 range")),
+            |value| Ok(Value::Json(serde_json::json!({"$numberInt": value.to_string()}))),
+        )),
+        "long" => Some(parse_int_value(text)),
+        _ => None,
+    }
 }
 
 fn parse_mongodb_decimal_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
@@ -531,3 +549,7 @@ mod postgres_array_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/mongodb_nested_edit_contract.rs"]
 mod mongodb_nested_edit_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mongodb_integer_width.rs"]
+mod mongodb_integer_width;

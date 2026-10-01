@@ -3768,3 +3768,28 @@ suites. Reports: [`20261001T064515312579Z-values/report.json`](../target/quality
 ```sh
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist -- --ignored --exact --test-threads=1
 ```
+
+
+## MongoDB Int32 grid edits preserve BSON width, 2026-10-01
+
+A failing-first live app contract found that BSON `int` cells decode to the shared
+`Value::Int` and were rebound as BSON Int64. It also found the parser accepted
+values beyond Int32 and could let MongoDB change the stored numeric value. For
+MongoDB `int` columns, grid parsing now checks the signed Int32 bounds and emits
+canonical Extended JSON `$numberInt`; `long` columns remain exact Int64. The live
+contract edits both widths through the app parser and keyed-update builder, checks
+row identity and native BSON kinds, and verifies overflowing Int32 input is refused
+with the stored Int32 unchanged. The parser unit contract checks both Int32
+boundaries, adjacent overflow, Int64 min/max and values above 2^53, and keeps other
+drivers on their existing path. The first live regression failed because Int32
+overflow was accepted; after the fix the focused live and parser tests passed.
+The full strict GTK+DuckDB layer passed 181 tests across all 11 suites with no
+missing suites. A scoped run caught all four viable parser mutants; one generated
+whole-function replacement was unviable, with no misses or timeouts. Reports:
+[`20261001T071947669210Z-values/report.json`](../target/quality/20261001T071947669210Z-values/report.json), [`20261001T072421865121Z-layers/report.json`](../target/quality/20261001T072421865121Z-layers/report.json), and [`mutation outcomes`](../target/quality/20261001-mongodb-integer-width-mutants-final/mutants.out/outcomes.json).
+
+```sh
+rtk cargo test --locked -p tablepro-app --lib ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths -- --exact --test-threads=1
+rtk cargo test --locked -p tablepro-app --lib ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width -- --include-ignored --exact --test-threads=1
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-app --file crates/app/src/ui/browse_tab/value_parse.rs --re 'parse_mongodb_integer_input' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-mongodb-integer-width-mutants-final -- --lib ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths
+```

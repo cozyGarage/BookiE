@@ -2164,3 +2164,19 @@ GTK+DuckDB value validation passed 179 tests across all 11 suites with no missin
 suites. See the
 [value ledger](value-contracts.md#postgresql-built-in-array-oid-census-2026-10-01)
 for the report links and reproduction command.
+
+
+### B3 MongoDB integer-width grid edit — October 1
+
+A failing-first real-server app contract caught BSON `int` edits being rebound
+as BSON Int64 and accepted Int32 overflow. The parser now emits canonical
+`$numberInt` only for MongoDB `int` columns and refuses values outside signed
+Int32; `long` values stay exact Int64. The Docker test exercises app parsing, the
+keyed-update builder, same-row identity, Int32/Int64 native persisted types, and
+unchanged data after rejected overflow. The focused test and a boundary parser
+unit test passed. Scoped mutation testing caught all four viable changes to the
+parser, with one unviable whole-function mutant. Strict GTK+DuckDB value validation
+passed 181 tests across all 11 suites with no missing suites. Harness and quick
+also passed; the test inventory and function/file size checks are current. This closes one
+MongoDB consumer gap; B3 remains open. Evidence and commands are in the
+[value ledger](value-contracts.md#mongodb-int32-grid-edits-preserve-bson-width-2026-10-01).
