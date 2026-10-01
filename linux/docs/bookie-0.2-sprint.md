@@ -17,6 +17,16 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
+October 1 audit checkpoint: source
+`b90cb4e38c1a98f41b552e03f739f9c51c67810f`.
+The [B3 review](b3-review-2026-10-01.md) reproduces empty-edit, text-normalization,
+wide-numeric INSERT and BC temporal CSV defects despite 181 passing value
+contracts. R1 was fixed and passed its focused plus strict value-layer checks
+on October 2. Resolve R2–R4 and the missing app/server gate ownership R5 before
+expanding B3 scenarios. R6 tracks portable evidence and a finite
+contract board. The review contains the proposed task format and acceptance
+criteria; existing native-support targets and desktop acceptance stay open.
+
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
 2. **B4:** finish the open transport, policy, daemon and GUI tasks on the
@@ -27,6 +37,18 @@ This section supersedes their next-task order and desktop-target requirements.
 4. **GNOME desktop on Debian / native Wayland UI and packaging:** the required
    next phase after the Arch pass. Complete Debian recipe task I1, installed
    workflows and upgrade/rollback before closing desktop qualification.
+
+### Local Rust build cache efficiency
+
+The 2026-10-02 checkout uses Rust 1.98.1 with `CARGO_TARGET_DIR` unset and the
+repository-local `linux/target`, but that directory occupies 80 GB: 43 GB in
+`debug/incremental`, 31 GB in `debug/deps`, and 3.8 GB in `release`. The current
+toolchain guide's approximate 5 GB development-cache estimate does not match
+this machine. Audit repeated profiles, feature sets and incremental artifacts;
+then choose a safe retention/configuration policy that preserves warm rebuild
+speed while bounding disk use. Record cold and warm build times, target size
+before/after, and exact commands. Do not add cache pruning to normal test runs
+until it proves it keeps active builds reusable.
 
 GTK/libadwaita and the already integrated GNOME 50 API/library requirements remain
 part of the build on Arch. The GNOME/Debian phase follows Arch in the same plan.

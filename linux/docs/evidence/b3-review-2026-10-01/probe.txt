@@ -1,0 +1,18 @@
+Source: b90cb4e38c1a98f41b552e03f739f9c51c67810f
+Command: cargo run --locked -p tablepro-app --example b3_review_probe --features duckdb
+Exit: 0 on the final diagnostic run with permitted Docker access.
+The lines below retain the diagnostic stdout. Assertions check the observed defects.
+
+empty nullable mysql/int: Err("Invalid integer")
+empty nullable mongodb/int: Err("Integer is outside the supported MongoDB Int32 range")
+empty nullable mongodb/long: Err("Invalid integer")
+empty nullable mongodb/decimal: Ok(Json(Object {"$numberDecimal": String("0")}))
+empty nullable postgres/numeric: Err("Invalid decimal")
+empty nullable duckdb/timestamp: Err("Invalid datetime. Use YYYY-MM-DD HH:MM:SS.")
+empty nullable duckdb/timestamptz: Err("Invalid timestamp. Use ISO 8601, e.g. 2024-01-15T14:30:00Z.")
+text input "  padded  CHAR  " becomes Text("padded CHAR")
+wide numeric plan: INSERT INTO "audit_values" ("value") VALUES ($1) [[Text("1234567890123456789012345678901234567890")]]
+wide numeric execution: Err(Query { message: "column \"value\" is of type numeric but expression is of type text", sqlstate: Some("42804") })
+BC date source [[Date(0000-01-02)]], CSV "value\n0000-01-02\n"
+year zero plan: INSERT INTO "audit_values" ("value") VALUES ($1::text::pg_catalog.date) [[Text("0000-01-02")]]
+year zero execution: Err(Query { message: "date/time field value out of range: \"0000-01-02\"", sqlstate: Some("22008") })

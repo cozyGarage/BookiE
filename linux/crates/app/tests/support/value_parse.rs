@@ -240,6 +240,21 @@ async fn value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision() 
         persisted.get("amount"),
         Some(&mongodb::bson::Bson::Decimal128(expected))
     );
+
+    let cleared = parse_input_for_driver("", Some(&after.columns[amount_index]), "mongodb").unwrap();
+    assert_eq!(cleared, Value::Null);
+    let clear = tablepro_core::sql_dialect::build_keyed_update(
+        "mongodb",
+        Some("appdb"),
+        "decimal128_grid_edits",
+        &after.columns,
+        &[(amount_index, cleared)],
+        &[after.rows[0][id_index].clone()],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[clear]).await.unwrap();
+    let persisted = collection.find_one(doc! { "_id": row_id }).await.unwrap().unwrap();
+    assert_eq!(persisted.get("amount"), Some(&mongodb::bson::Bson::Null));
 }
 
 #[cfg(feature = "duckdb")]
@@ -1036,6 +1051,30 @@ fn empty_on_not_null_no_default_is_rejected() {
     let r = parse_input_for_column("", Some(&col("text", false)));
     assert!(r.is_err());
     assert!(r.unwrap_err().contains("required"));
+}
+
+#[test]
+fn empty_driver_input_obeys_shared_nullable_and_required_rules() {
+    for (driver, data_type) in [
+        ("mysql", "int"),
+        ("mongodb", "decimal"),
+        ("postgres", "numeric"),
+        ("duckdb", "timestamp"),
+    ] {
+        assert!(matches!(
+            parse_input_for_driver("", Some(&col(data_type, true)), driver).unwrap(),
+            Value::Null
+        ));
+        assert!(matches!(
+            parse_input_for_driver("", Some(&col_with_default(data_type, "default")), driver).unwrap(),
+            Value::Null
+        ));
+        assert!(
+            parse_input_for_driver("", Some(&col(data_type, false)), driver)
+                .unwrap_err()
+                .contains("required")
+        );
+    }
 }
 
 #[test]

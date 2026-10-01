@@ -48,7 +48,7 @@ The weekly `Current stable Clippy (scheduled)` job is a required signal: fix a n
 
 ## Build cache
 
-All scripts share `linux/target`. Keep one compiler per checkout: a command that resolves to a different toolchain rebuilds the whole graph and keeps both copies. Development builds keep line tables for workspace crates and no debug information for dependencies, which keeps `target/debug` near 5 GB instead of growing past 100 GB.
+All scripts share `linux/target`. Keep one compiler per checkout: a command that resolves to a different toolchain rebuilds the whole graph and keeps both copies. Development builds keep line tables for workspace crates and no debug information for dependencies. Cache size still depends on profiles, feature sets and incremental artifacts; this checkout measured 76 GB in `target/debug` on 2026-10-02, including 43 GB in `target/debug/incremental`. See the sprint's local build-cache task for a measured retention/configuration review.
 
 A narrow `cargo test -p <crate>` can resolve a smaller dependency feature set than a workspace build and compiles those dependencies once. Later runs reuse them. Cargo's workspace feature unification is still unstable on 1.98.
 

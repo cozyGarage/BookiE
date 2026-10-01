@@ -47,6 +47,9 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
 }
 
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
+    if text.is_empty() {
+        return parse_input_for_column(text, col);
+    }
     let trimmed = text.trim();
     if driver_id == "mysql"
         && let Some(result) = parse_mysql_integer_input(trimmed, col)
