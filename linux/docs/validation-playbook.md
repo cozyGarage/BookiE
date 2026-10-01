@@ -26,20 +26,21 @@ directory and run the available hosted-equivalent layers before pushing:
 
 ```bash
 python3 scripts/run-test-layer.py full app-server values drivers tls \
-  postgres-release keyring security-policy supply-chain
+  postgres-release keyring security-policy supply-chain widgets ui \
+  workflow-lint harness packaging-contracts change-contracts
 ```
 
 This runs the fast workspace gate, app-server and cross-driver value contracts,
 Docker driver/TLS/PostgreSQL fixtures, keyring and dependency policy checks.
 The runner saves a commit-pinned report and logs under `target/quality/`.
-The October 2 report is
+The October 2 base report is
 [`20261001T232237703877Z-layers/report.json`](../target/quality/20261001T232237703877Z-layers/report.json).
-All selected layers passed except the `cargo audit` step: `cargo-audit` is not
-installed. GTK widget/UI display layers also
-remain unavailable because Xvfb is not installed. Install those two tools to
-include those checks in this local gate. The current `linux/target` already
-reuses compiled artifacts; it was 82 GiB, including 45 GiB of incremental
-state, so preserve it for reuse and review cache cleanup separately.
+The GTK widget and UI safety layers, both supply-chain checks, workflow lint,
+test harness, change-contract and Debian packaging layers passed after
+installing Xvfb, `cargo-audit`, `python-atspi`, and `dpkg`. The current
+`linux/target` already reuses compiled artifacts; it was 82 GiB, including
+45 GiB of incremental state, so preserve it for reuse and review cache cleanup
+separately.
 
 Run `quick` for a short edit loop. Run the pre-push gate after changes that
 touch shared core/value paths or before handing a B3 slice to review. Keep the
