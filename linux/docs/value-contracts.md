@@ -3717,3 +3717,29 @@ rtk cargo test --locked -p tablepro-core --lib export::xlsx::tests::value_contra
 rtk cargo test --locked -p tablepro-core --lib export::json::tests::value_contract_clickhouse_wide_integers_remain_exact_json_strings -- --exact --test-threads=1
 rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/xlsx.rs --re 'write_cell|value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-clickhouse-int128-xlsx-mutants -- --lib -- --test-threads=1
 ```
+
+## PostgreSQL unlisted built-in array refusal matrix, 2026-10-01
+
+The binary array decoder allowlist did not have server-backed refusal evidence
+for several built-in element OIDs even where scalar decoding is exact. A live
+Docker contract now checks `inet[]`, `cidr[]`, `macaddr[]`, `macaddr8[]`,
+`pg_lsn[]`, `bit[]`, and `bit varying[]`. For each, it requires a typed
+`Undecodable` marker, verifies PostgreSQL's `pg_typeof` and array text against
+fixed expected values, compares `array_to_json` with its native expected JSON,
+and confirms SQL literal and parameter consumers refuse the value. This makes
+the unsupported boundary explicit without claiming exact array support. The
+focused Docker test passed all seven cases:
+`array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles`.
+The complete PostgreSQL integration target passed 67 tests with
+`--include-ignored --test-threads=1`. The strict GTK+DuckDB value layer then
+passed 178 selected tests across all 11 suites, with no missing suites; its
+PostgreSQL suite ran 38 selected tests and the log confirms this case ran.
+Harness and quick also passed. Reports:
+[`20261001T061341105077Z-values/report.json`](../target/quality/20261001T061341105077Z-values/report.json),
+[`20261001T060930854105Z-layers/report.json`](../target/quality/20261001T060930854105Z-layers/report.json),
+[`20261001T060932648747Z-layers/report.json`](../target/quality/20261001T060932648747Z-layers/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles -- --ignored --exact --test-threads=1
+rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+```

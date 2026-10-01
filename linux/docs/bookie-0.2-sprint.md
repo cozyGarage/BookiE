@@ -2132,3 +2132,17 @@ with no misses, timeouts or unviable cases. The strict GTK+DuckDB layer passed
 [`20261001T055614415328Z-layers/report.json`](../target/quality/20261001T055614415328Z-layers/report.json).
 B3 remains open for the other matrix targets; evidence and commands are in the
 [value ledger](value-contracts.md#clickhouse-int128uint128-xlsx-preservation-2026-10-01).
+
+### B3 PostgreSQL unsupported built-in arrays — October 1
+
+The PostgreSQL decoder's static element allowlist left several built-in array
+types without server-backed refusal coverage. A new Docker matrix now checks
+`inet[]`, `cidr[]`, `macaddr[]`, `macaddr8[]`, `pg_lsn[]`, `bit[]`, and
+`bit varying[]`. It verifies `Undecodable`, native type and array-text oracles,
+`array_to_json`, and visible refusal by SQL literal and parameter consumers.
+The focused test passed all seven cases, the complete PostgreSQL integration
+target passed 67 tests, and the strict GTK+DuckDB value layer passed 178 tests
+across all 11 suites with no missing suite. Harness and quick passed. These
+arrays remain unsupported; other unlisted element OIDs still require audit.
+See the
+[value ledger](value-contracts.md#postgresql-unlisted-built-in-array-refusal-matrix-2026-10-01).

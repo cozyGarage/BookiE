@@ -97,6 +97,79 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let cases = [
+        (
+            "inet[]",
+            "ARRAY['192.0.2.1/24'::inet, NULL]",
+            "{192.0.2.1/24,NULL}",
+            "[\"192.0.2.1/24\",null]",
+        ),
+        (
+            "cidr[]",
+            "ARRAY['192.0.2.0/24'::cidr, NULL]",
+            "{192.0.2.0/24,NULL}",
+            "[\"192.0.2.0/24\",null]",
+        ),
+        (
+            "macaddr[]",
+            "ARRAY['08:00:2b:01:02:03'::macaddr, NULL]",
+            "{08:00:2b:01:02:03,NULL}",
+            "[\"08:00:2b:01:02:03\",null]",
+        ),
+        (
+            "macaddr8[]",
+            "ARRAY['08:00:2b:01:02:03:04:05'::macaddr8, NULL]",
+            "{08:00:2b:01:02:03:04:05,NULL}",
+            "[\"08:00:2b:01:02:03:04:05\",null]",
+        ),
+        (
+            "pg_lsn[]",
+            "ARRAY['0/16B6C50'::pg_lsn, NULL]",
+            "{0/16B6C50,NULL}",
+            "[\"0/16B6C50\",null]",
+        ),
+        ("bit[]", "ARRAY[B'101'::bit(3), NULL]", "{101,NULL}", "[\"101\",null]"),
+        (
+            "bit varying[]",
+            "ARRAY[B'101'::varbit, NULL]",
+            "{101,NULL}",
+            "[\"101\",null]",
+        ),
+    ];
+
+    for (expected_type, expression, expected_text, expected_json) in cases {
+        let sql = format!(
+            "SELECT ({expression}) AS value, pg_typeof(({expression}))::text, \
+             ({expression})::text, array_to_json(({expression}))::text"
+        );
+        let result = connection.query(&sql).await.expect("native array oracle query");
+        let value = &result.rows[0][0];
+        assert!(
+            matches!(value, Value::Undecodable(type_name) if !type_name.is_empty()),
+            "{expected_type}: {value:?}"
+        );
+        assert_eq!(result.rows[0][1], Value::Text(expected_type.into()), "{expected_type}");
+        assert_eq!(result.rows[0][2], Value::Text(expected_text.into()), "{expected_type}");
+        assert_eq!(result.rows[0][3], Value::Text(expected_json.into()), "{expected_type}");
+        assert!(
+            tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err(),
+            "{expected_type}"
+        );
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(value))
+                .await
+                .is_err(),
+            "{expected_type}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_json_array_elements_are_explicitly_unsupported() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
