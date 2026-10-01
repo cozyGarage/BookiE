@@ -288,59 +288,7 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         };
     }
     if text != options.null_marker {
-        if driver_id == "postgres"
-            && let Some(value) = postgres_extended_temporal(text, &column.data_type)
-        {
-            return Ok(Value::Text(value));
-        }
-        if driver_id == "postgres"
-            && let Some(value) = postgres_text_temporal(text, &column.data_type)
-        {
-            // PostgreSQL's infinities, timetz offsets and 24:00 value are
-            // exact text in the driver contract. Restore the CSV formula
-            // marker only for recognized native sentinels.
-            return Ok(Value::Text(value.to_owned()));
-        }
-        if driver_id == "duckdb"
-            && let Some(value) = duckdb_formula_safe_interval(text, &column.data_type)
-        {
-            return Ok(Value::Text(value.to_owned()));
-        }
-        if kind == ColumnKind::Text
-            && let Some(value) = sanitized_wide_integer_text(text, &column.data_type)
-        {
-            return Ok(Value::Text(value.to_owned()));
-        }
-        if kind == ColumnKind::Decimal
-            && let Some(value) = sanitized_decimal(text)
-        {
-            return Ok(Value::Decimal(value));
-        }
-        if kind == ColumnKind::Decimal
-            && let Some(value) = wide_decimal_text(text, &column.data_type)
-        {
-            return Ok(Value::Text(value.to_owned()));
-        }
-        return match parse_cell(text, kind) {
-            Ok(value) => {
-                if driver_id == "postgres"
-                    && postgres_temporal_needs_text(&value)
-                    && let Some(era_text) = crate::sql_literal::postgres_temporal_text(&value)
-                {
-                    return Ok(Value::Text(era_text));
-                }
-                Ok(value)
-            }
-            Err(_)
-                if driver_id == "sqlite"
-                    && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) =>
-            {
-                // SQLite affinity is advisory: a NUMERIC/INTEGER/REAL column
-                // may legally store text when the input is not numeric.
-                Ok(Value::Text(text.to_owned()))
-            }
-            Err(error) => Err(error),
-        };
+        return parse_non_null_cell(text, column, kind, driver_id);
     }
     // Every export in this app writes NULL as an empty field, but so is an
     // empty string, and for text the empty string is the reading that loses
@@ -349,6 +297,59 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         return Ok(Value::Text(String::new()));
     }
     Ok(Value::Null)
+}
+
+fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver_id: &str) -> Result<Value, CellError> {
+    if driver_id == "postgres"
+        && let Some(value) = postgres_extended_temporal(text, &column.data_type)
+    {
+        return Ok(Value::Text(value));
+    }
+    if driver_id == "postgres"
+        && let Some(value) = postgres_text_temporal(text, &column.data_type)
+    {
+        // PostgreSQL's infinities, timetz offsets and 24:00 value are
+        // exact text in the driver contract. Restore the CSV formula
+        // marker only for recognized native sentinels.
+        return Ok(Value::Text(value.to_owned()));
+    }
+    if driver_id == "duckdb"
+        && let Some(value) = duckdb_formula_safe_interval(text, &column.data_type)
+    {
+        return Ok(Value::Text(value.to_owned()));
+    }
+    if kind == ColumnKind::Text
+        && let Some(value) = sanitized_wide_integer_text(text, &column.data_type)
+    {
+        return Ok(Value::Text(value.to_owned()));
+    }
+    if kind == ColumnKind::Decimal
+        && let Some(value) = sanitized_decimal(text)
+    {
+        return Ok(Value::Decimal(value));
+    }
+    if kind == ColumnKind::Decimal
+        && let Some(value) = wide_decimal_text(text, &column.data_type)
+    {
+        return Ok(Value::Text(value.to_owned()));
+    }
+    match parse_cell(text, kind) {
+        Ok(value) if driver_id == "postgres" && postgres_temporal_needs_text(&value) => {
+            match crate::sql_literal::postgres_temporal_text(&value) {
+                Some(text) => Ok(Value::Text(text)),
+                None => Ok(value),
+            }
+        }
+        Ok(value) => Ok(value),
+        Err(_)
+            if driver_id == "sqlite" && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) =>
+        {
+            // SQLite affinity is advisory: a NUMERIC/INTEGER/REAL column
+            // may legally store text when the input is not numeric.
+            Ok(Value::Text(text.to_owned()))
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn postgres_temporal_needs_text(value: &Value) -> bool {
