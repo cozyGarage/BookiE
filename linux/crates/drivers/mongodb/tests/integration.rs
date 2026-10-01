@@ -4,6 +4,7 @@ mod server_restart;
 
 use drivers_mongodb::MongodbDriver;
 use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, TlsConfig, Value};
+use testcontainers::core::IntoContainerPort;
 use testcontainers::{ContainerAsync, ImageExt};
 use testcontainers_modules::mongo::Mongo;
 use testcontainers_modules::testcontainers::runners::AsyncRunner;
@@ -75,7 +76,16 @@ async fn wrong_mongodb_credentials_are_classified_as_auth_failed() {
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn a_lost_mongodb_server_is_reported_as_disconnected() {
-    let (container, host, port) = start_mongo().await;
+    let port_probe = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let port = port_probe.local_addr().unwrap().port();
+    drop(port_probe);
+    let container = Mongo::default()
+        .with_tag(MONGO_TAG)
+        .with_mapped_port(port, 27017.tcp())
+        .start()
+        .await
+        .expect("start MongoDB on a stable host port");
+    let host = container.get_host().await.expect("host").to_string();
     let options = opts(&host, port, "appdb");
     let connection = MongodbDriver.connect(options.clone()).await.expect("connect");
     connection
@@ -94,20 +104,12 @@ async fn a_lost_mongodb_server_is_reported_as_disconnected() {
     );
 
     container.start().await.expect("restart MongoDB server");
-    let restarted_host = container.get_host().await.expect("restarted host").to_string();
-    let restarted_port = container
-        .get_host_port_ipv4(27017)
-        .await
-        .expect("restarted MongoDB port");
-    let recovered = server_restart::retry_operation("MongoDB", || {
-        let options = opts(&restarted_host, restarted_port, "appdb");
-        async move {
-            let replacement = MongodbDriver.connect(options).await?;
-            replacement.list_tables().await
-        }
+    let recovered = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+        server_restart::retry_operation("MongoDB", || async { connection.list_tables().await }).await
     })
     .await
-    .expect("MongoDB restarts and accepts collection listing");
+    .expect("MongoDB client recovery must finish within one minute")
+    .expect("the existing MongoDB client reconnects after the server restarts");
     assert!(
         recovered.is_empty(),
         "the restarted test database should have no collections"

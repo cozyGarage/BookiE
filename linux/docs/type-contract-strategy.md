@@ -150,8 +150,10 @@ focused cases passed. MongoDB now has a cursor `getMore` loss test after its
 first batch, and Redis has a browse-page loss test after `SCAN` while reading a
 key. Both require the whole operation to fail as `Disconnected`; Redis also
 verifies that a later browse through the same driver object uses a fresh
-operation-local connection and returns the full row. MongoDB also now tests an
-in-flight cancellation separately: the held-open socket yields
+operation-local connection and returns the full row. MongoDB now pins its
+container to a stable host port and verifies the existing client recovers after
+restart; a focused Docker regression passed. MongoDB also tests an in-flight
+cancellation separately: the held-open socket yields
 `OperationOutcomeUnknown(Cancelled)`, not `Disconnected`. PostgreSQL, MySQL,
 ClickHouse, Redis and SQL Server retain their distinct cancellation and
 post-cancellation connection policies; a single cross-driver session-state

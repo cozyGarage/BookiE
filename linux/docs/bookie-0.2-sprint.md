@@ -104,6 +104,16 @@ strict 168-test value layer, quick gate and all 30 scoped mutants passed. The
 evidence is in the [wide DECIMAL checkpoint](value-contracts.md#mysql-wide-decimal-csv-import-2026-10-01).
 B3 remains open for the other matrix items.
 
+### MongoDB client recovery after server loss — October 1
+
+The existing MongoDB disconnect test proved fresh-client recovery but used a
+random Docker host port, so it did not establish whether an open connection's
+client could recover. The fixture now reserves a stable mapped port, requires
+`Disconnected` while MongoDB is stopped, then retries collection listing through
+the same client after restart. The focused Docker regression passed in 6.84
+seconds. This closes that MongoDB recovery case; the cross-driver cancellation
+and session-state matrix remains open.
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the

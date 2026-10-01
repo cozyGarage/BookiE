@@ -303,8 +303,9 @@ error. A local unused-port test checks server-selection failures remain
 `ConnectionRefused`; a Docker-backed wrong-password test verifies
 `AuthFailed`. The Docker-backed server-loss contract connects and performs an
 operation, stops MongoDB, and requires the next operation to return
-`Disconnected`. It then restarts the same container and verifies a fresh driver
-connection can list collections.
+`Disconnected`. It pins the container to a stable host port, restarts the same
+container, and verifies the existing client can list collections again. The
+stable port ensures recovery exercises the same endpoint.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --lib
@@ -314,7 +315,9 @@ rtk cargo test --locked -p tablepro-driver-mongodb --test integration a_lost_mon
 ```
 
 All 34 MongoDB library tests, the local refused-endpoint test, the Docker
-authentication test and the server-loss classification test passed. The new
+authentication test and the server-loss classification test passed. The initial
+same-client recovery attempt failed with a random mapped port. After reserving
+and mapping a fixed host port, the focused contract passed in 6.84 seconds. The
 server-loss test first failed because an established operation surfaced
 `ConnectionRefused`; operations now map server-selection failures and transport
 refusal to `Disconnected`, while connect-time refusal stays `ConnectionRefused`. The first
