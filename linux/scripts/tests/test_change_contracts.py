@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 from pathlib import Path
 import unittest
@@ -11,6 +12,14 @@ SPEC.loader.exec_module(CHECKER)
 
 
 class ChangeContractTests(unittest.TestCase):
+    def test_exact_test_map_rejects_a_stale_rust_function_name(self):
+        data = copy.deepcopy(CHECKER.load_map())
+        data["exact_tests"]["crates/core/src/sql_dialect.rs"]["tests"][0] = (
+            "sql_dialect::tests::postgres_text_array_updates_cast_through_text_to_a_builtin_array_type"
+        )
+        with self.assertRaisesRegex(ValueError, "exact-test selector has no Rust function"):
+            CHECKER.validate_exact_test_names(data)
+
     def test_row_edit_source_maps_to_its_required_regressions(self):
         actions = CHECKER.select_actions(["crates/app/src/ui/browse_tab/row_ops.rs"], CHECKER.load_map())
         self.assertEqual(len(actions), 1)

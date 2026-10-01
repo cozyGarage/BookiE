@@ -57,7 +57,35 @@ def load_map():
     for row in data["exact_tests"].values():
         if not row.get("package") or not row.get("tests") or len(set(row["tests"])) != len(row["tests"]):
             raise ValueError("invalid exact-test entry in change-test map")
+    validate_exact_test_names(data)
     return data
+
+
+def validate_exact_test_names(data):
+    source_cache = {}
+    for path, row in data["exact_tests"].items():
+        package = row["package"]
+        package_root = (ROOT / path).parent
+        while package_root != ROOT:
+            manifest = package_root / "Cargo.toml"
+            if manifest.is_file():
+                package_info = tomllib.loads(manifest.read_text(encoding="utf-8")).get("package", {})
+                if package_info.get("name") == package:
+                    break
+            package_root = package_root.parent
+        if package_root == ROOT:
+            raise ValueError(f"exact-test package is not a workspace package: {package}")
+        source = source_cache.get(package)
+        if source is None:
+            source = "\n".join(file.read_text(encoding="utf-8") for file in package_root.rglob("*.rs"))
+            source_cache[package] = source
+        for test_name in row["tests"]:
+            function_name = test_name.split("::")[-1]
+            declaration = re.compile(rf"\b(?:async\s+)?fn\s+{re.escape(function_name)}\s*\(")
+            if declaration.search(source) is None:
+                raise ValueError(
+                    f"exact-test selector has no Rust function in {package} ({path}): {test_name}"
+                )
 
 
 def package_from_manifest(path):

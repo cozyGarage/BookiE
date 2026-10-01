@@ -2053,3 +2053,22 @@ with no missing suite. The quick gate then passed after the ignored-test
 inventory was regenerated. Details and reports are in the
 [value-contract ledger](value-contracts.md#postgresql-built-in-array-csv-insert-matrix-2026-10-01).
 B3 remains open for the other type, consumer and driver targets above.
+
+### B3 focused-CI selector repair — 2026-10-01
+
+Hosted Build Linux at `eef09bbd13cf92f21f91d5691ba665eb4ecda24a` failed in
+the focused change-contract step because one selector still used a pre-rename
+PostgreSQL array test name. Cargo ran zero tests for that command; the evidence
+checker correctly rejected the missing exact test and the workflow stayed red.
+The other database integration, TLS and PostgreSQL release jobs passed, while
+the downstream regression aggregate failed because the fast job failed and
+GTK safety was skipped. This was a failed run, not green CI.
+
+The selector now names the actual `value_contract_…` test. The runner checks
+that every mapped function exists in its package before execution, and the
+harness has a regression for stale map entries. The 63-test harness and the
+same change-contract selection used by CI passed; its full core suite ran 493
+tests and all four exact regressions ran once. Evidence:
+[`20261001T032907972866Z-layers/report.json`](../target/quality/20261001T032907972866Z-layers/report.json),
+[`20261001T032917087566Z-change-contracts/report.json`](../target/quality/20261001T032917087566Z-change-contracts/report.json).
+The new selector guard is included in `scripts/run-change-contract-tests.py`.
