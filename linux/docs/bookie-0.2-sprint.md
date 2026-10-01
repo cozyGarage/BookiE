@@ -17,15 +17,15 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
-October 1 audit checkpoint: source
-`b90cb4e38c1a98f41b552e03f739f9c51c67810f`.
-The [B3 review](b3-review-2026-10-01.md) reproduces empty-edit, text-normalization,
-wide-numeric INSERT and BC temporal CSV defects despite 181 passing value
-contracts. R1–R4 have focused regression coverage and native database checks,
-alongside the strict value-layer pass on October 2. Resolve the missing app/server
-gate ownership R5 before expanding B3 scenarios. R6 tracks portable evidence and
-a finite contract board. The review contains the proposed task format and acceptance
-criteria; existing native-support targets and desktop acceptance stay open.
+October 2 audit checkpoint: code fixes through
+`2dcf1cd434fd696603941bfe89cad42bb2dc8786`.
+The [B3 review](b3-review-2026-10-01.md) records R1–R5 as fixed with focused
+regressions, native database checks and hosted test ownership. The latest CI run
+is still in progress. R6 tracks portable evidence and a finite contract board;
+the native-type matrix and session reconnect follow-up remain open. Start with
+B3-P1 to reconcile remaining contracts, then assign one bounded engine/type/
+consumer case using the [agent task template](validation-playbook.md#agent-task-template).
+Keep the existing native-support targets and desktop acceptance visible.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.

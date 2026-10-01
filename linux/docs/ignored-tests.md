@@ -21,10 +21,10 @@ Total: 337 declarations. App server: 9; Driver: 221; GTK: 6; Helper: 2; Keyring:
 | [value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity](../crates/app/tests/support/mongodb_nested_edit_contract.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64](../crates/app/tests/support/mysql_integer_contract.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mysql_spatial_grid_refusal_preserves_native_bytes](../crates/app/tests/support/mysql_spatial_contract.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
+| [postgres_numeric_parser_outputs_round_trip_through_server](../crates/app/tests/support/postgres_numeric_csv.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mongodb_date_grid_edit_preserves_millisecond_instant](../crates/app/tests/support/value_parse.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision](../crates/app/tests/support/value_parse.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [value_contract_mysql_bit_parser_edits_preserve_native_values](../crates/app/tests/support/value_parse.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
-| [postgres_numeric_parser_outputs_round_trip_through_server](../crates/app/tests/support/value_parse.rs) | App server | requires docker | `scripts/run-test-layer.py app-server` |
 | [a_verifying_mode_connects_with_the_fixture_authority](../crates/driver-tls-tests/tests/clickhouse_tls.rs) | TLS | requires the driver tls fixture | `scripts/test-driver-tls.sh` |
 | [verify_full_rejects_an_ip_endpoint_absent_from_the_certificate](../crates/driver-tls-tests/tests/clickhouse_tls.rs) | TLS | requires the driver tls fixture | `scripts/test-driver-tls.sh` |
 | [a_verifying_mode_without_an_authority_is_refused](../crates/driver-tls-tests/tests/clickhouse_tls.rs) | TLS | requires the driver tls fixture | `scripts/test-driver-tls.sh` |
