@@ -3,7 +3,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::value_parse::tests::postgres_numeric_parser_outputs_round_trip_through_server"
+      "ui::browse_tab::value_parse::tests::postgres_numeric_csv::postgres_numeric_parser_outputs_round_trip_through_server"
     ],
     [
       "tablepro-app",
