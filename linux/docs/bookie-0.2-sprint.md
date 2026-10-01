@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`f6ed03a` (source version 0.1.5).
+`b9ebdcf` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -24,8 +24,14 @@ and its evidence. R6 tracks portable evidence and a finite contract board; the
 remaining native-type matrix and session reconnect follow-up stay open. Continue
 B3-P1 to reconcile those contracts, then assign one bounded engine/type/consumer
 case using the [agent task template](validation-playbook.md#agent-task-template).
-The current pushed head has Security green; Build Linux, Flatpak and test-quality
-CI are pending/in progress for the follow-up commits.
+The pushed head has Build Linux, Flatpak and Security green; test-quality is
+still pending. LT-TRUNG passed the full, app-server, values, Docker driver,
+TLS, PostgreSQL release, keyring and security-policy layers on this exact clean
+commit. `cargo deny check` passed; `cargo audit` could not start because
+`cargo-audit` is absent. Widget/UI display layers need Xvfb. The user will
+install both tools; rerun the missing layers after installation. See the
+[validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
+repeatable local gate and retained report.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
@@ -41,8 +47,8 @@ CI are pending/in progress for the follow-up commits.
 ### Local Rust build cache efficiency
 
 The 2026-10-02 checkout uses Rust 1.98.1 with `CARGO_TARGET_DIR` unset and the
-repository-local `linux/target`, but that directory occupies 80 GB: 43 GB in
-`debug/incremental`, 31 GB in `debug/deps`, and 3.8 GB in `release`. The current
+repository-local `linux/target`, which local gates reuse. It occupies 82 GB:
+45 GB in `debug/incremental`, 31 GB in `debug/deps`, and 3.8 GB in `release`. The current
 toolchain guide's approximate 5 GB development-cache estimate does not match
 this machine. Audit repeated profiles, feature sets and incremental artifacts;
 then choose a safe retention/configuration policy that preserves warm rebuild

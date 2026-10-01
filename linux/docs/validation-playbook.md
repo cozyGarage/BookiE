@@ -19,6 +19,32 @@ Keep existing automated Linux checks and record unavailable environments as pend
 Run from `linux/`, using the repository's Rust toolchain. Agents configured with
 RTK should prefix commands with `rtk proxy` so raw diagnostics are retained.
 
+### LT-TRUNG pre-push gate
+
+LT-TRUNG has 16 CPUs, 30 GiB RAM and local Docker. Use its shared `target/`
+directory and run the available hosted-equivalent layers before pushing:
+
+```bash
+python3 scripts/run-test-layer.py full app-server values drivers tls \
+  postgres-release keyring security-policy supply-chain
+```
+
+This runs the fast workspace gate, app-server and cross-driver value contracts,
+Docker driver/TLS/PostgreSQL fixtures, keyring and dependency policy checks.
+The runner saves a commit-pinned report and logs under `target/quality/`.
+The October 2 report is
+[`20261001T232237703877Z-layers/report.json`](../target/quality/20261001T232237703877Z-layers/report.json).
+All selected layers passed except the `cargo audit` step: `cargo-audit` is not
+installed. GTK widget/UI display layers also
+remain unavailable because Xvfb is not installed. Install those two tools to
+include those checks in this local gate. The current `linux/target` already
+reuses compiled artifacts; it was 82 GiB, including 45 GiB of incremental
+state, so preserve it for reuse and review cache cleanup separately.
+
+Run `quick` for a short edit loop. Run the pre-push gate after changes that
+touch shared core/value paths or before handing a B3 slice to review. Keep the
+hosted workflow as the recorded platform/packaging check.
+
 ```bash
 python3 scripts/run-test-layer.py --list
 python3 scripts/run-test-layer.py harness
