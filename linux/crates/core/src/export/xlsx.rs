@@ -111,7 +111,7 @@ fn write_cell(
             sheet.write_number(row, column, *value as f64).map(drop)
         }
         Value::Int(value) => sheet.write_string(row, column, value.to_string()).map(drop),
-        Value::Float(value) if value.is_finite() => sheet.write_number(row, column, *value).map(drop),
+        Value::Float(value) if excel_safe_float_number(*value) => sheet.write_number(row, column, *value).map(drop),
         Value::Decimal(value) => sheet.write_string(row, column, value.to_string()).map(drop),
         Value::Date(value) if (1900..=9999).contains(&value.year()) => {
             sheet.write_with_format(row, column, value, &formats.date).map(drop)
@@ -127,6 +127,32 @@ fn write_cell(
             None => Ok(()),
         },
     }
+}
+
+fn excel_safe_float_number(value: f64) -> bool {
+    if !value.is_finite() {
+        return false;
+    }
+    if value == 0.0 {
+        return !value.is_sign_negative();
+    }
+    let magnitude = value.abs();
+    if !(2.2251e-308..=9.99999999999999e307).contains(&magnitude) {
+        return false;
+    }
+    let decimal = value.to_string();
+    let digits: Vec<_> = decimal
+        .split(['e', 'E'])
+        .next()
+        .unwrap_or(&decimal)
+        .bytes()
+        .filter(u8::is_ascii_digit)
+        .collect();
+    let Some(first) = digits.iter().position(|digit| *digit != b'0') else {
+        return true;
+    };
+    let last = digits.iter().rposition(|digit| *digit != b'0').unwrap_or(first);
+    last - first < 15
 }
 
 #[cfg(test)]
@@ -270,32 +296,39 @@ mod tests {
     }
 
     #[test]
-    fn value_contract_workbook_float_negative_zero_keeps_its_signed_numeric_token() {
-        let (sheet, _) = workbook_parts(&[Value::Float(-0.0)]);
+    fn value_contract_workbook_keeps_excel_precision_risk_floats_as_text() {
+        let values = [
+            -0.0,
+            f64::from_bits(1),
+            f64::from_bits(0x3ff0_0000_0000_0001),
+            1.234_567_890_123_456_7,
+            1.0e-320,
+            f64::MAX,
+        ];
+        let (sheet, strings) = workbook_parts(&values.map(Value::Float));
 
-        assert!(sheet.contains("<c r=\"A2\"><v>-0</v></c>"), "{sheet}");
+        for (index, value) in values.into_iter().enumerate() {
+            let row = index + 2;
+            assert!(sheet.contains(&format!("<c r=\"A{row}\" t=\"s\">")), "{sheet}");
+            assert!(strings.contains(&format!("<t>{value}</t>")), "{strings}");
+        }
     }
 
     #[test]
-    fn value_contract_workbook_float_preserves_subnormal_and_adjacent_value_bits() {
-        let values = [f64::from_bits(1), f64::from_bits(0x3ff0_0000_0000_0001)];
+    fn value_contract_workbook_keeps_excel_safe_floats_numeric() {
+        let values = [
+            0.0,
+            123.5,
+            2.2251e-308,
+            1.0e-100,
+            999_999_999_999_999.0,
+            9.99999999999999e307,
+        ];
         let (sheet, _) = workbook_parts(&values.map(Value::Float));
 
-        for (row, expected) in values.into_iter().enumerate() {
-            let cell_ref = format!("A{}", row + 2);
-            let cell = sheet
-                .split(&format!("<c r=\"{cell_ref}\""))
-                .nth(1)
-                .unwrap_or_else(|| panic!("missing {cell_ref}: {sheet}"));
-            let token = cell
-                .split_once("<v>")
-                .and_then(|(_, value)| value.split_once("</v>"))
-                .map(|(value, _)| value)
-                .unwrap_or_else(|| panic!("missing numeric token for {cell_ref}: {sheet}"));
-            let actual = token
-                .parse::<f64>()
-                .unwrap_or_else(|error| panic!("invalid {cell_ref} token {token:?}: {error}"));
-            assert_eq!(actual.to_bits(), expected.to_bits(), "{cell_ref}: {token}");
+        for (index, expected) in values.into_iter().enumerate() {
+            let row = index + 2;
+            assert!(sheet.contains(&format!("<c r=\"A{row}\"><v>")), "{expected}: {sheet}");
         }
     }
 
