@@ -166,6 +166,18 @@ no missing suites:
 [`20261001T023544965607Z-values/report.json`](../target/quality/20261001T023544965607Z-values/report.json).
 B3 remains open.
 
+### PostgreSQL float8[] CSV INSERT — October 1
+
+A new end-to-end test reproduced SQLSTATE `42804` when PostgreSQL's typed CSV
+import sent `float8[]` text to an array column without a cast. INSERT plans now
+use the fixed `pg_catalog` array cast allowlist. The live round trip confirms
+the imported array's `array_send` bytes match its native oracle. The focused
+test and strict all-driver values layer passed (174 tests, 11 suites, no
+missing suites). Mutation scopes caught all 55 viable SQL/planner changes; 3
+were unviable, with no survivors or timeouts. Evidence and commands are in the
+[value ledger](value-contracts.md#postgresql-float8-typed-csv-insert-2026-10-01).
+B3 remains open.
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a

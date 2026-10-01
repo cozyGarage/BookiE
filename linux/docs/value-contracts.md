@@ -1936,6 +1936,30 @@ rtk cargo mutants --dir linux --package tablepro-core --file crates/core/src/imp
 rtk cargo mutants --dir linux --package tablepro-core --file crates/core/src/import/cell.rs --re 'column_kind' --test-tool cargo --timeout 30 --build-timeout 180 --output linux/target/quality/20260930-csv-import-column-kind-mutants-followup -- --lib a_catalog_type_name_reads_as_the_value_shape_it_stores -- --test-threads=1
 ```
 
+### PostgreSQL float8[] typed CSV INSERT, 2026-10-01
+
+A failing-first extension tested the actual typed INSERT plan after CSV parsing,
+not only parser-to-keyed-update behavior. PostgreSQL rejected the array cell
+with SQLSTATE `42804` because the import bound it as TEXT. Import plans now use
+the same fixed `pg_catalog` allowlist cast as keyed updates for textual array
+parameters. The live PostgreSQL 16 test imports a special-value `float8[]` into
+a separate table and checks exact `array_send` bytes against the source oracle.
+The encompassing contract also retains original and sibling row identities
+through the keyed edit.
+The focused Docker regression passed.
+
+Mutation testing caught 33 viable SQL-dialect mutations (2 unviable) and 22
+viable import-plan mutations (1 unviable), with no survivors or timeouts. The
+strict GTK+DuckDB values layer passed 174 selected tests across all 11 suites,
+with no missing suites:
+[`20261001T024828271108Z-values/report.json`](../target/quality/20261001T024828271108Z-values/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values -- --include-ignored --test-threads=1
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/sql_dialect.rs --re 'postgres_array_cast_type|build_insert_from_draft' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-postgres-array-insert-mutants -- --lib
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/import/plan.rs --re 'insert_statement|bind_rows' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-postgres-array-import-plan-mutants -- --lib import::
+```
+
 ### PostgreSQL IPv6 `inet[]` explicit refusal
 
 A PostgreSQL 16 contract returns an IPv6 `inet[]` containing a host-prefix

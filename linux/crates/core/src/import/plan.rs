@@ -4,7 +4,8 @@ use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{
-    BuildSqlError, IdentError, build_insert_from_draft, postgres_temporal_cast_type, validate_ident,
+    BuildSqlError, IdentError, build_insert_from_draft, postgres_array_cast_type, postgres_temporal_cast_type,
+    validate_ident,
 };
 
 /// Rows committed per transaction. Small enough that a failure loses
@@ -119,7 +120,9 @@ fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result
     let shape_values = shape_columns
         .iter()
         .map(|column| {
-            if postgres_temporal_cast_type(&column.data_type).is_some() {
+            if postgres_array_cast_type(&column.data_type).is_some()
+                || postgres_temporal_cast_type(&column.data_type).is_some()
+            {
                 Value::Text(String::new())
             } else {
                 Value::Int(0)
@@ -309,6 +312,26 @@ mod tests {
         assert_eq!(
             mysql_plan.rows,
             vec![vec![Value::Date(chrono::NaiveDate::from_ymd_opt(2001, 2, 3).unwrap())]]
+        );
+    }
+
+    #[test]
+    fn value_contract_postgres_array_csv_insert_uses_allowlisted_native_cast() {
+        let columns = vec![column("id", "integer"), column("value", "double precision[]")];
+        let mapping = vec![Some(0), Some(1)];
+        let rows = sheet(&[&["4", "{1.0000000000000002,-0,5e-324,NULL}"]], &["id", "value"]);
+        let plan = build_insert_plan(&target(&columns, &mapping), &rows, &CsvImportOptions::default()).unwrap();
+
+        assert_eq!(
+            plan.statement,
+            "INSERT INTO \"people\" (\"id\", \"value\") VALUES ($1, $2::text::pg_catalog.float8[])"
+        );
+        assert_eq!(
+            plan.rows,
+            vec![vec![
+                Value::Int(4),
+                Value::Text("{1.0000000000000002,-0,5e-324,NULL}".into())
+            ]]
         );
     }
 

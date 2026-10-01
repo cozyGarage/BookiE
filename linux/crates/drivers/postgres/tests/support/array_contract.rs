@@ -552,6 +552,50 @@ async fn assert_float8_array_csv_round_trip(
         tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &columns, &options, 2).unwrap();
     assert_eq!(imported, row, "CSV import must retain the array as exact text");
 
+    connection
+        .execute("CREATE TABLE float8_array_csv_import (id integer PRIMARY KEY, value float8[])")
+        .await
+        .unwrap();
+    let import_columns = connection.fetch_columns(None, "float8_array_csv_import").await.unwrap();
+    let import_mapping = [Some(0), Some(1)];
+    let mut import_row = row.clone();
+    import_row[0] = Value::Int(4);
+    let import_csv = tablepro_core::export::render_csv(
+        &columns,
+        std::slice::from_ref(&import_row),
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let import_sheet = tablepro_core::import::read_csv(import_csv.as_bytes(), &options, None).unwrap();
+    let insert_plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "float8_array_csv_import",
+            columns: &import_columns,
+            mapping: &import_mapping,
+        },
+        &import_sheet,
+        &options,
+    )
+    .expect("float8[] CSV should build an import plan");
+    connection
+        .execute_params(&insert_plan.statement, &insert_plan.rows[0])
+        .await
+        .expect("typed float8[] CSV import must cast array text to the native column type");
+    let csv_restored = connection
+        .query("SELECT id, value::text, encode(array_send(value), 'hex') FROM float8_array_csv_import")
+        .await
+        .unwrap();
+    assert_eq!(
+        csv_restored.rows,
+        vec![vec![
+            Value::Int(4),
+            Value::Text(native_text.into()),
+            result.rows[0][3].clone(),
+        ]],
+        "CSV import must preserve PostgreSQL array text and native wire bytes"
+    );
+
     let mut update_columns = columns;
     update_columns[0].primary_key = true;
     let update = tablepro_core::sql_dialect::build_keyed_update(

@@ -262,7 +262,8 @@ pub fn build_insert_from_draft(
         col_idents.push(quote_ident(driver_id, &col.name));
         let placeholder = placeholder_for(driver_id, params.len());
         let value_sql = if driver_id == "postgres" && matches!(values[i], Value::Text(_)) {
-            postgres_temporal_cast_type(&col.data_type)
+            postgres_array_cast_type(&col.data_type)
+                .or_else(|| postgres_temporal_cast_type(&col.data_type))
                 .map(|type_name| format!("{placeholder}::text::{type_name}"))
                 .unwrap_or(placeholder)
         } else {
@@ -326,7 +327,7 @@ pub fn build_keyed_update(
     Ok((sql, params))
 }
 
-fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> {
+pub(crate) fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> {
     let lowered = data_type.trim().to_ascii_lowercase();
     let element = lowered.strip_suffix("[]")?;
     let element = if let Some((base, modifier)) = element.split_once('(') {
@@ -948,7 +949,7 @@ mod tests {
     }
 
     #[test]
-    fn postgres_text_array_updates_cast_through_text_to_a_builtin_array_type() {
+    fn value_contract_postgres_text_array_updates_cast_through_text_to_a_builtin_array_type() {
         let mut columns = [col("id", true), col("value", false)];
         columns[1].data_type = "integer[]".into();
         let (sql, params) = build_keyed_update(
@@ -966,6 +967,26 @@ mod tests {
             r#"UPDATE "t" SET "value" = $1::text::pg_catalog.int4[] WHERE "id" = $2"#
         );
         assert_eq!(params, vec![Value::Text("{3,NULL,5}".into()), Value::Int(1)]);
+
+        let mut insert_columns = [col("value", false)];
+        insert_columns[0].data_type = "float8[]".into();
+        let (sql, params) = build_insert_from_draft(
+            "postgres",
+            None,
+            "t",
+            &insert_columns,
+            &[Value::Text("{3,NULL,5}".into())],
+        )
+        .unwrap();
+        assert_eq!(
+            sql,
+            r#"INSERT INTO "t" ("value") VALUES ($1::text::pg_catalog.float8[])"#
+        );
+        assert_eq!(params, vec![Value::Text("{3,NULL,5}".into())]);
+
+        let (sql, _) =
+            build_insert_from_draft("mysql", None, "t", &insert_columns, &[Value::Text("{3,NULL,5}".into())]).unwrap();
+        assert_eq!(sql, "INSERT INTO `t` (`value`) VALUES (?)");
     }
 
     #[test]
