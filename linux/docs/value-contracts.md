@@ -3500,8 +3500,10 @@ The native-backed consumer contract now also covers
 high-precision decimal and a NULL map value. The same test verifies the driver
 result and parsed JSON/CSV against `toTypeName` and `toJSONString`, refuses SQL
 literal, binding and grid writes without native type metadata, and confirms the
-stored MergeTree row is unchanged. The focused Docker contract passed. This
-adds an eleventh nested shape; other nested combinations and broader consumer
+stored MergeTree row is unchanged. It now also covers
+`Array(Map(String, Nullable(Decimal(38, 9))))` with the same decimal and NULL
+values through those consumers. The focused Docker contract passed after both
+shapes were added. This adds the twelfth nested shape; other nested combinations and broader consumer
 parity remain open.
 
 ```sh

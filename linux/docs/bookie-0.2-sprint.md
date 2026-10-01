@@ -88,11 +88,11 @@ refusals preserve the stored row. Other nested combinations remain open; see
 the [type matrix](type-contract-strategy.md#current-evidence-and-next-targets)
 and [value evidence](value-contracts.md#clickhouse-nested-map-of-tuple-arrays-2026-10-01).
 
-A further nested case adds `Tuple(String, Map(String, Nullable(Decimal(38, 9))))`
-with an exact decimal and a NULL entry. The focused test checks native type and
-JSON oracles, JSON/CSV consumers, explicit refusal by type-less SQL consumers,
-and unchanged row contents after grid refusal. The Docker contract passed; B3
-remains open for other nested combinations and remaining matrix targets.
+Two further nested cases add tuple- and array-nested maps of nullable decimals,
+each with an exact high-precision decimal and a NULL entry. The focused test
+checks native type and JSON oracles, JSON/CSV consumers, explicit refusal by
+type-less SQL consumers, and unchanged row contents after grid refusal. Both
+cases passed; B3 remains open for other nested combinations and matrix targets.
 
 B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
 survivors against the current test set: 16/16 viable ClickHouse mutants and
