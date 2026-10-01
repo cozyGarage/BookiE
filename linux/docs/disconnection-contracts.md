@@ -56,3 +56,14 @@ rtk cargo test --locked -p tablepro-driver-mongodb --test integration a_cancelle
 These suites are separate from the strict shared value-contract filter. A green
 value layer alone does not prove disconnect, cancellation, or reconnect
 behavior.
+
+### October 1 full-layer verification
+
+The complete `drivers` layer passed at source commit
+`eef09bbd13cf92f21f91d5691ba665eb4ecda24a` in 969.9 seconds. It executed 223
+tests across PostgreSQL, MySQL, SQL Server, ClickHouse, MongoDB, Redis, MCP,
+socket and SSH suites: zero failures and zero ignored tests among executed
+tests. This includes each remote driver's established-loss and refusal
+distinction, its mid-stream or page-loss case where applicable, and its
+documented recovery path. The report was recorded against a clean tracked tree:
+[`20261001T025640026732Z-layers/report.json`](../target/quality/20261001T025640026732Z-layers/report.json).

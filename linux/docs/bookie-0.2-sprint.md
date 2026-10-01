@@ -2034,3 +2034,22 @@ The quick layer also passed:
 ```sh
 rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
 ```
+
+### B3 typed-array import and disconnect verification — 2026-10-01
+
+The disconnect audit reran the full `drivers` layer at clean commit
+`eef09bbd13cf92f21f91d5691ba665eb4ecda24a`: 223 tests passed, with zero
+failures and zero ignored executed tests in 969.9 seconds. All six remote
+drivers exercised established loss and reconnect/refusal distinctions; the
+per-driver mid-stream and cancellation expectations are recorded in
+[disconnect contracts](disconnection-contracts.md).
+
+The same audit found that PostgreSQL's static array cast allowlist had only one
+end-to-end typed CSV INSERT test. A new live-server contract now covers all 20
+allowlisted built-in array families and compares both exact native array text
+and `array_send` bytes after import. The focused Docker test and strict
+GTK+DuckDB value layer passed; the latter ran 175 tests across all 11 suites
+with no missing suite. The quick gate then passed after the ignored-test
+inventory was regenerated. Details and reports are in the
+[value-contract ledger](value-contracts.md#postgresql-built-in-array-csv-insert-matrix-2026-10-01).
+B3 remains open for the other type, consumer and driver targets above.

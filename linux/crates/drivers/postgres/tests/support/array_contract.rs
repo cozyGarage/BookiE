@@ -620,6 +620,132 @@ async fn assert_float8_array_csv_round_trip(
     assert_eq!(restored.rows[2][2], result.rows[2][3]);
 }
 
+async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
+    let cases = [
+        ("bool[]", "ARRAY[true,false,NULL]::bool[]"),
+        ("bytea[]", "ARRAY[decode('00ff275c','hex'),decode('','hex'),NULL]"),
+        ("name[]", "ARRAY['alpha','','',NULL]::name[]"),
+        ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),
+        ("int4[]", "ARRAY[-2147483648,0,2147483647]::int4[]"),
+        ("int8[]", "ARRAY[-9223372036854775808,0,9223372036854775807]::int8[]"),
+        ("oid[]", "ARRAY[0,4294967295,NULL]::oid[]"),
+        ("text[]", "ARRAY[NULL,'NULL','','a,b','漢字 😀',E'line\\nnext']::text[]"),
+        (
+            "float4[]",
+            "ARRAY[0.1,'-0','1e-45','NaN','Infinity','-Infinity',NULL]::float4[]",
+        ),
+        (
+            "float8[]",
+            "ARRAY[1e-200,1.0000000000000002,'-0','5e-324','NaN','Infinity','-Infinity',NULL]::float8[]",
+        ),
+        ("varchar[]", "ARRAY['x','',NULL]::varchar[]"),
+        ("char(3)[]", "ARRAY['x',' y',NULL]::char(3)[]"),
+        (
+            "numeric[]",
+            "ARRAY[1234567890123456789012345678901234567890,1.2300,'NaN'::numeric,'Infinity'::numeric,NULL]",
+        ),
+        ("uuid[]", "ARRAY['12345678-1234-5678-90ab-1234567890ab',NULL]::uuid[]"),
+        (
+            "date[]",
+            "ARRAY['0002-12-31 BC','10000-01-01','infinity','-infinity',NULL]::date[]",
+        ),
+        ("time[]", "ARRAY['00:00:00','24:00:00','23:59:59.999999',NULL]::time[]"),
+        (
+            "timetz[]",
+            "ARRAY['00:00:00+15:59:59','24:00:00-15:59:59',NULL]::timetz[]",
+        ),
+        (
+            "timestamp[]",
+            "ARRAY['0001-01-01 00:00:00.000001 BC','10000-01-01 23:59:59.999999','infinity','-infinity',NULL]::timestamp[]",
+        ),
+        (
+            "timestamptz[]",
+            "ARRAY['2024-11-03 01:30:00-04','2024-11-03 01:30:00-05','infinity','-infinity',NULL]::timestamptz[]",
+        ),
+        (
+            "interval[]",
+            "ARRAY['-1 month +2 days +0.000001 seconds','+1 month -2 days -0.000001 seconds',NULL]::interval[]",
+        ),
+    ];
+    let definitions = cases
+        .iter()
+        .enumerate()
+        .map(|(index, (kind, _))| format!("value_{index} {kind}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let expressions = cases
+        .iter()
+        .enumerate()
+        .map(|(index, (_, expression))| format!("({expression}) AS value_{index}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    connection
+        .execute(&format!("CREATE TABLE array_csv_source AS SELECT {expressions}"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("CREATE TABLE array_csv_target ({definitions})"))
+        .await
+        .unwrap();
+
+    let source = connection.query("SELECT * FROM array_csv_source").await.unwrap();
+    let wire_columns = cases
+        .iter()
+        .enumerate()
+        .map(|(index, _)| format!("encode(array_send(value_{index}), 'hex')"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let source_wire = connection
+        .query(&format!("SELECT {wire_columns} FROM array_csv_source"))
+        .await
+        .unwrap();
+    let csv_text = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
+    let columns = connection.fetch_columns(None, "array_csv_target").await.unwrap();
+    let mapping = (0..columns.len()).map(Some).collect::<Vec<_>>();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "array_csv_target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &options,
+    )
+    .expect("every allowlisted built-in array should produce a typed CSV INSERT plan");
+    assert_eq!(plan.rows, source.rows, "array CSV parsing preserves exact text cells");
+    connection
+        .execute_params(&plan.statement, &plan.rows[0])
+        .await
+        .expect("typed PostgreSQL array CSV INSERT must cast every text cell to its array type");
+
+    let target_wire = connection
+        .query(&format!("SELECT {wire_columns} FROM array_csv_target"))
+        .await
+        .unwrap();
+    let target = connection.query("SELECT * FROM array_csv_target").await.unwrap();
+    assert_eq!(
+        target_wire.rows, source_wire.rows,
+        "native array_send bytes after CSV INSERT"
+    );
+    assert_eq!(target.rows, source.rows, "native array text after CSV INSERT");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_builtin_array_families_survive_typed_csv_insert() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    assert_array_csv_insert_contract(connection.as_ref()).await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values() {

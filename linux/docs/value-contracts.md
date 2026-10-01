@@ -3635,3 +3635,31 @@ the retained in-place run reused the workspace target:
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit -- --include-ignored --test-threads=1
 ```
+
+## PostgreSQL built-in array CSV INSERT matrix, 2026-10-01
+
+The typed CSV INSERT path now has a live PostgreSQL round trip for all 20
+array families in its static cast allowlist: boolean, bytea, name, integer
+widths, oid, text, float, character types, numeric, UUID, date/time variants,
+timestamps and intervals. The CSV is rendered and parsed through the shared
+consumers, then `build_insert_plan` binds the exact array text through its
+catalog-derived casts. Every target array is checked against both its native
+text and `array_send` wire bytes. The fixtures include NULL and empty elements,
+binary bytes, Unicode/newlines, numeric scale and specials, float subnormals,
+temporal infinities/offsets, extended dates and mixed-sign intervals.
+
+The focused Docker test passed one test with 64 filtered. The strict GTK+DuckDB
+value runner passed 175 tests across all 11 suites, with no missing suites;
+the PostgreSQL suite ran 37 selected tests, including this case. The full
+disconnect/driver layer also passed 223 tests on the clean base commit before
+this test-only addition. Evidence:
+[`20261001T031547325812Z-layers/report.json`](../target/quality/20261001T031547325812Z-layers/report.json),
+[`20261001T025640026732Z-layers/report.json`](../target/quality/20261001T025640026732Z-layers/report.json).
+After adding the Docker case to the ignored-test inventory, the quick gate
+passed as well:
+[`20261001T032311403470Z-layers/report.json`](../target/quality/20261001T032311403470Z-layers/report.json).
+
+The production cast mapping did not change in this checkpoint; its earlier
+scoped mutation run caught all 26 generated mutations. The new live-server
+matrix closes the gap that mapping tests could not prove: each static cast
+actually inserts the driver's exported text as the correct PostgreSQL array.
