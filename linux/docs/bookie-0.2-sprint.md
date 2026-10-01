@@ -122,6 +122,15 @@ The quick layer also passed with Redis cancellation executed explicitly; see
 [its report](../target/quality/20261001T011619474080Z-layers/report.json).
 Hosted checks for the new source revision are reported separately.
 
+The MySQL session-mode audit added a live `PAD_CHAR_TO_FULL_LENGTH` contract:
+fixed-width `CHAR(5)` trailing spaces survive result decoding, CSV export and
+typed import, bound writes, and SQL-literal writes. Native length and byte
+checks verify every path. The focused Docker test and integration Clippy check
+passed. The strict GTK+DuckDB values layer then passed 169 selected tests over
+all 11 suites, including eight MySQL scenarios; report:
+[`20261001T013200347651Z-values/report.json`](../target/quality/20261001T013200347651Z-values/report.json).
+Other SQL-mode and DDL-session combinations remain open, so B3 is still open.
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a

@@ -315,6 +315,75 @@ async fn value_contract_mariadb_text_exports_survive_with_and_without_backslash_
     assert_text_exports_survive_both_backslash_modes(options).await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_and_writes() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect_in_sql_mode(&options, "PAD_CHAR_TO_FULL_LENGTH").await;
+    for table in ["pad_char_source", "pad_char_bound", "pad_char_literal"] {
+        connection
+            .execute(&format!("CREATE TABLE {table} (value CHAR(5) NOT NULL)"))
+            .await
+            .unwrap();
+    }
+    connection
+        .execute("INSERT INTO pad_char_source VALUES ('x')")
+        .await
+        .unwrap();
+
+    let source = connection
+        .query("SELECT value, CHAR_LENGTH(value), HEX(value) FROM pad_char_source")
+        .await
+        .unwrap();
+    assert_eq!(
+        source.rows,
+        vec![vec![
+            Value::Text("x    ".into()),
+            Value::Int(5),
+            Value::Text("7820202020".into())
+        ]],
+        "PAD_CHAR_TO_FULL_LENGTH must expose the native five-byte CHAR value"
+    );
+
+    let csv = tablepro_core::export::render_csv(
+        &source.columns[..1],
+        &[source.rows[0][..1].to_vec()],
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let columns = connection.fetch_columns(None, "pad_char_bound").await.unwrap();
+    let imported = tablepro_core::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    assert_eq!(imported, vec![Value::Text("x    ".into())]);
+    connection
+        .execute_params("INSERT INTO pad_char_bound VALUES (?)", &imported)
+        .await
+        .unwrap();
+
+    let literal_columns = connection.fetch_columns(None, "pad_char_literal").await.unwrap();
+    let literal = tablepro_core::sql_literal::build_insert_literal(
+        "mysql",
+        None,
+        "pad_char_literal",
+        &literal_columns,
+        &imported,
+    )
+    .unwrap();
+    connection.execute(&literal).await.unwrap();
+
+    for table in ["pad_char_bound", "pad_char_literal"] {
+        let persisted = connection
+            .query(&format!("SELECT CHAR_LENGTH(value), HEX(value) FROM {table}"))
+            .await
+            .unwrap();
+        assert_eq!(
+            persisted.rows,
+            vec![vec![Value::Int(5), Value::Text("7820202020".into())]],
+            "CSV, bound and SQL-literal writes must retain CHAR padding in {table}"
+        );
+    }
+}
+
 const PACKED_DEFINITION: &str = "(id INT PRIMARY KEY, flags BIT(8), wide BIT(64), tiny BIT(1), \
      mood ENUM('happy', 'it''s ok', 'ünï', ''), perms SET('read', 'write', 'ëx'), shape GEOMETRY, \
      pin POINT SRID 4326)";

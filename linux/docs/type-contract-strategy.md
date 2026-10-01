@@ -83,8 +83,10 @@ support. Applied across drivers, the live status is: PostgreSQL has exact
 scalar/array/temporal coverage plus explicit refusal or SQLx metadata blockage
 for several advanced families; DuckDB has exact text fallbacks, grid-edit and
 filter refusals for sub-microsecond values targeting lower-precision temporal
-columns, with native sub-microsecond bindings still unsupported; MySQL has exact temporal/BIT and session-mode
-contracts but broader SQL-mode and DDL-session cases open; SQL Server safely
+columns, with native sub-microsecond bindings still unsupported; MySQL now has
+live contracts for `PAD_CHAR_TO_FULL_LENGTH`, `STRICT_TRANS_TABLES`, permissive
+unsigned clamping, and both backslash modes, while other SQL-mode and
+DDL-session cases remain open; SQL Server safely
 refuses inexact legacy datetime ticks, money and sql_variant pending exact representations;
 ClickHouse has explicit finite-range/DST behavior and now selects a lower exact
 DateTime64 precision for values beyond the scale-9 Int64 ceiling, while more

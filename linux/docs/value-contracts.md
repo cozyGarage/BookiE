@@ -146,6 +146,22 @@ formatting, Clippy, sandbox tests and the standalone Redis cancellation target:
 The earlier 30-mutant report is
 [`20261001-wide-decimal-csv-mutants-final3`](../target/quality/20261001-wide-decimal-csv-mutants-final3/mutants.out/outcomes.json).
 
+## MySQL PAD_CHAR_TO_FULL_LENGTH fixed-width text, 2026-10-01
+
+A live MySQL contract now runs with `PAD_CHAR_TO_FULL_LENGTH` enabled and
+checks that a `CHAR(5)` value returns all five characters, including trailing
+spaces. It verifies the native `CHAR_LENGTH` and `HEX` values, CSV export and
+typed CSV import, then repeats the write through both bound parameters and SQL
+literal insertion. Each destination is compared with the source using native
+length and byte oracles. The focused Docker contract and MySQL integration
+Clippy check passed. The strict GTK+DuckDB value layer passed 169 selected tests
+across all 11 suites, including eight MySQL scenarios and this contract:
+[`20261001T013200347651Z-values/report.json`](../target/quality/20261001T013200347651Z-values/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_and_writes -- --ignored --test-threads=1
+```
+
 ```sh
 rtk cargo test --locked -p tablepro-core --lib value_contract_wide_decimal_csv_cells_remain_exact_text_when_decimal_cannot_hold_them
 rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_all_digits -- --ignored --exact --test-threads=1
