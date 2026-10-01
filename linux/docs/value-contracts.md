@@ -3743,3 +3743,28 @@ Harness and quick also passed. Reports:
 rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles -- --ignored --exact --test-threads=1
 rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
 ```
+
+
+## PostgreSQL built-in array OID census, 2026-10-01
+
+A live catalog census now visits built-in array types, checks PostgreSQL's
+`pg_typeof`, array text, and `array_to_json` oracles, then compares directly
+decodable arrays against the decoder allowlist and checks SQL-consumer behavior.
+It records 22 exact driver-level blockers instead of silently skipping them:
+composite catalog arrays fail SQLx metadata decoding (`typcategory`, code 90),
+multirange arrays fail SQLx type decoding (`typtype`, code 109), and
+`aclitem[]`/`gtsvector[]` fail with PostgreSQL SQLSTATE 42883 because no binary
+output function exists. Each blocker has server-side native oracles. The known
+set is asserted exactly so new driver errors fail the census. `name[]` is checked
+separately because its catalog row does not appear in this array enumeration.
+This establishes refusal/blocker evidence; it does not add support for these
+arrays or resolve the SQLx/PostgreSQL binary-protocol limitations.
+The focused test passed against the local Docker PostgreSQL fixture. The full
+PostgreSQL integration target passed 68 tests; harness/quick passed, and strict
+GTK+DuckDB value validation passed 179 tests across all 11 suites with no missing
+suites. Reports: [`20261001T064515312579Z-values/report.json`](../target/quality/20261001T064515312579Z-values/report.json),
+[`20261001T064121314717Z-layers/report.json`](../target/quality/20261001T064121314717Z-layers/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist -- --ignored --exact --test-threads=1
+```

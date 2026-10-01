@@ -2146,3 +2146,21 @@ across all 11 suites with no missing suite. Harness and quick passed. These
 arrays remain unsupported; other unlisted element OIDs still require audit.
 See the
 [value ledger](value-contracts.md#postgresql-unlisted-built-in-array-refusal-matrix-2026-10-01).
+
+
+### B3 PostgreSQL built-in array OID census — October 1
+
+The array allowlist audit now enumerates built-in PostgreSQL array types and
+compares each directly returned value with the allowlist, while requiring native
+type, text, and JSON oracles for every array. It records 22 exact driver-level
+blockers: SQLx metadata decoding failures for catalog composite and multirange
+arrays, and PostgreSQL SQLSTATE 42883 for `aclitem[]` and `gtsvector[]`, which
+have no binary output function. `name[]` is asserted separately because it is
+not returned by the catalog census query. The focused Docker census passes and
+will fail on any new or changed blocker. This makes the built-in array boundary
+explicit; it does not claim support for the blocked types or close B3. The full
+PostgreSQL integration target passed 68 tests, harness/quick passed, and strict
+GTK+DuckDB value validation passed 179 tests across all 11 suites with no missing
+suites. See the
+[value ledger](value-contracts.md#postgresql-built-in-array-oid-census-2026-10-01)
+for the report links and reproduction command.

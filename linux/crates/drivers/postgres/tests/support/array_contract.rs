@@ -170,6 +170,158 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let catalog = connection
+        .query(
+            "SELECT oid::bigint, format_type(typarray, NULL) \
+             FROM pg_catalog.pg_type \
+             WHERE typnamespace = 'pg_catalog'::regnamespace \
+               AND typelem = 0 AND typarray <> 0 AND typisdefined \
+               AND typtype IN ('b', 'c', 'd', 'e', 'm', 'r') \
+             ORDER BY oid",
+        )
+        .await
+        .expect("enumerate built-in array element OIDs");
+    let supported_oids = [
+        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1700, 2950,
+    ];
+    let mut seen_supported = Vec::new();
+    let mut refused = 0;
+    let mut blocked = Vec::new();
+
+    for row in catalog.rows {
+        let Value::Int(oid) = row[0] else {
+            panic!("unexpected catalog OID: {:?}", row[0])
+        };
+        let Value::Text(array_type) = &row[1] else {
+            panic!("unexpected array type: {:?}", row[1])
+        };
+        let expression = format!("ARRAY[NULL]::{array_type}");
+        let oracle = connection
+            .query(&format!(
+                "SELECT pg_typeof({expression})::text, {expression}::text, \
+                 array_to_json({expression})::text"
+            ))
+            .await
+            .unwrap_or_else(|error| panic!("native {array_type} oracle (element OID {oid}): {error:?}"));
+        assert_eq!(oracle.rows[0][0], Value::Text(array_type.clone()), "OID {oid}");
+        assert_eq!(oracle.rows[0][1], Value::Text("{NULL}".into()), "OID {oid}");
+        assert_eq!(oracle.rows[0][2], Value::Text("[null]".into()), "OID {oid}");
+
+        let direct = connection.query(&format!("SELECT {expression} AS value")).await;
+        let result = match direct {
+            Ok(result) => result,
+            Err(error) => {
+                let details = format!("{error:?}");
+                let known_metadata_failure = details.contains("typcategory") && details.contains("category code 90");
+                let known_no_binary_output = details.contains("no binary output function available");
+                let known_multirange_metadata_failure = details.contains("unknown type code 109");
+                assert!(
+                    known_metadata_failure || known_no_binary_output || known_multirange_metadata_failure,
+                    "{array_type} (element OID {oid}) unexpected error: {details}"
+                );
+                blocked.push((array_type.clone(), details));
+                continue;
+            }
+        };
+        let value = &result.rows[0][0];
+        if supported_oids.contains(&(oid as u32)) {
+            seen_supported.push(oid as u32);
+            assert_eq!(value, &Value::Text("{NULL}".into()), "supported {array_type}");
+            assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_ok());
+        } else {
+            refused += 1;
+            assert!(matches!(value, Value::Undecodable(_)), "{array_type}: {value:?}");
+            assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+            assert!(
+                connection
+                    .query_params("SELECT $1", std::slice::from_ref(value))
+                    .await
+                    .is_err()
+            );
+        }
+    }
+
+    seen_supported.sort_unstable();
+    let catalog_supported_oids: Vec<_> = supported_oids.iter().copied().filter(|oid| *oid != 19).collect();
+    assert_eq!(
+        seen_supported, catalog_supported_oids,
+        "the catalog must cover all allowlisted built-in arrays except name[]"
+    );
+    let name_array = connection
+        .query("SELECT ARRAY[NULL]::name[]")
+        .await
+        .expect("name[] decoder allowlist contract");
+    assert_eq!(name_array.rows[0][0], Value::Text("{NULL}".into()));
+    assert!(
+        refused >= 7,
+        "the catalog census should cover the explicit unlisted-array contract set"
+    );
+    let blocked_names: Vec<_> = blocked.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        blocked_names,
+        [
+            "pg_type[]",
+            "pg_proc[]",
+            "pg_class[]",
+            "aclitem[]",
+            "gtsvector[]",
+            "int4multirange[]",
+            "nummultirange[]",
+            "tsmultirange[]",
+            "tstzmultirange[]",
+            "datemultirange[]",
+            "int8multirange[]",
+            "pg_attrdef[]",
+            "pg_constraint[]",
+            "pg_index[]",
+            "pg_statistic_ext[]",
+            "pg_statistic_ext_data[]",
+            "pg_rewrite[]",
+            "pg_trigger[]",
+            "pg_policy[]",
+            "pg_partitioned_table[]",
+            "pg_publication_rel[]",
+            "pg_stats_ext[]",
+        ],
+        "every driver-level blocker must be explicit and stable: {blocked:?}"
+    );
+    assert!(
+        blocked
+            .iter()
+            .filter(|(_, error)| error.contains("category code 90"))
+            .all(|(name, _)| { name.ends_with("[]") && !name.contains("multirange") })
+    );
+    assert!(
+        blocked
+            .iter()
+            .filter(|(_, error)| error.contains("no binary output function available"))
+            .all(|(name, _)| { matches!(name.as_str(), "aclitem[]" | "gtsvector[]") })
+    );
+    assert!(
+        blocked
+            .iter()
+            .filter(|(_, error)| error.contains("unknown type code 109"))
+            .all(|(name, _)| { name.contains("multirange") })
+    );
+    for (name, error) in &blocked {
+        if matches!(name.as_str(), "aclitem[]" | "gtsvector[]") {
+            assert!(error.contains("no binary output function available"), "{name}: {error}");
+        } else if name.contains("multirange") {
+            assert!(error.contains("unknown type code 109"), "{name}: {error}");
+        } else {
+            assert!(
+                error.contains("typcategory") && error.contains("category code 90"),
+                "{name}: {error}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_json_array_elements_are_explicitly_unsupported() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
