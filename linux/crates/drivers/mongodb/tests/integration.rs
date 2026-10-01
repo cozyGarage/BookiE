@@ -168,6 +168,90 @@ async fn connection_loss_during_cursor_get_more_fails_the_whole_query() {
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_cancelled_mongodb_read_leaves_the_client_usable() {
+    use mongodb::bson::doc;
+
+    let container = Mongo::default()
+        .with_tag(MONGO_TAG)
+        .with_cmd(["mongod", "--setParameter", "enableTestCommands=1", "--bind_ip_all"])
+        .start()
+        .await
+        .expect("start MongoDB with test failpoints enabled");
+    let host = container.get_host().await.expect("host").to_string();
+    let port = container.get_host_port_ipv4(27017).await.expect("port");
+    let connection: std::sync::Arc<dyn tablepro_core::Connection> = MongodbDriver
+        .connect(opts(&host, port, "appdb"))
+        .await
+        .expect("connect")
+        .into();
+    let native = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("native MongoDB client");
+    native
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "times": 1 },
+            "data": {
+                "failCommands": ["listCollections"],
+                "blockConnection": true,
+                "blockTimeMS": 5_000
+            }
+        })
+        .await
+        .expect("block one listCollections response");
+
+    let token = tokio_util::sync::CancellationToken::new();
+    let control = tablepro_core::OperationControl::new(token.clone(), None);
+    let running = connection.clone();
+    let task = tokio::spawn(async move { running.list_tables_controlled(&control).await });
+    let mut blocked_on_server = false;
+    for _ in 0..100 {
+        let current = native
+            .database("admin")
+            .run_command(doc! { "currentOp": 1, "$all": true })
+            .await
+            .expect("inspect in-flight listCollections operation");
+        blocked_on_server = current
+            .get_array("inprog")
+            .expect("currentOp returns active operations")
+            .iter()
+            .filter_map(|operation| operation.as_document())
+            .filter_map(|operation| operation.get_document("command").ok())
+            .any(|command| command.contains_key("listCollections"));
+        if blocked_on_server {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(
+        blocked_on_server,
+        "the MongoDB failpoint must hold listCollections before cancellation"
+    );
+    token.cancel();
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(2), task)
+        .await
+        .expect("cancelled MongoDB operation must return promptly")
+        .expect("operation task")
+        .expect_err("the blocked operation must be cancelled");
+    assert!(
+        matches!(error, DriverError::OperationOutcomeUnknown { ref source } if matches!(**source, DriverError::Cancelled)),
+        "cancelling an in-flight read must remain distinct from disconnect: {error:?}"
+    );
+
+    let tables = tokio::time::timeout(std::time::Duration::from_secs(10), connection.list_tables())
+        .await
+        .expect("later MongoDB operation must not hang")
+        .expect("the same MongoDB client remains usable after cancellation");
+    assert!(
+        tables.is_empty(),
+        "the test database starts with no collections: {tables:?}"
+    );
+}
+
 async fn seeded_connection(host: &str, port: u16) -> Box<dyn tablepro_core::Connection> {
     let conn = MongodbDriver.connect(opts(host, port, "appdb")).await.expect("connect");
     conn.execute(r#"db.people.insertOne({"name": "ada", "team": "core"})"#)

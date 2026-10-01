@@ -111,8 +111,18 @@ random Docker host port, so it did not establish whether an open connection's
 client could recover. The fixture now reserves a stable mapped port, requires
 `Disconnected` while MongoDB is stopped, then retries collection listing through
 the same client after restart. The focused Docker regression passed in 6.84
-seconds. This closes that MongoDB recovery case; the cross-driver cancellation
-and session-state matrix remains open.
+seconds. This closes that MongoDB recovery case.
+
+MongoDB cancellation now has a separate regression that proves the server has
+received the in-flight `listCollections` command before cancellation, requires
+`OperationOutcomeUnknown(Cancelled)`, then uses the same client successfully.
+The focused Docker test passed. This distinguishes cancellation from server
+loss and confirms later operations remain available. The cross-driver loss,
+cancellation and recovery expectations are now indexed in
+[disconnect contracts](disconnection-contracts.md), with each case mapped to
+its automated runner. The sandbox layer passed in 65.12 seconds, including the
+standalone Redis cancellation test; evidence is linked from the matrix. B3
+remains open for native-type and consumer targets.
 
 ### B4 next order
 

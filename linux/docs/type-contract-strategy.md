@@ -156,10 +156,18 @@ restart; a focused Docker regression passed. MongoDB also tests an in-flight
 cancellation separately: the held-open socket yields
 `OperationOutcomeUnknown(Cancelled)`, not `Disconnected`. PostgreSQL, MySQL,
 ClickHouse, Redis and SQL Server retain their distinct cancellation and
-post-cancellation connection policies; a single cross-driver session-state
-matrix remains open. Native-type and consumer targets in this matrix remain
-open. Passing the server-loss and explicit reconnect cases does not close those
-other gaps.
+post-cancellation connection policies. The tested expectations and runner
+ownership are consolidated in [disconnect contracts](disconnection-contracts.md).
+Native-type and consumer targets in this matrix remain open. Passing the
+server-loss and explicit reconnect cases does not close those other gaps.
+
+The MongoDB cancellation cell now has a Docker regression: `currentOp` confirms
+`listCollections` is active before cancellation, the outcome is
+`OperationOutcomeUnknown(Cancelled)`, and the same client successfully performs
+a later collection listing. This completes the consolidated disconnect and
+cancellation index; its per-driver test ownership and remaining post-cancellation
+limits are in [disconnect contracts](disconnection-contracts.md). Native-type
+and consumer targets in this type matrix remain open.
 
 The strict combined values layer also passed against source SHA `636584f` on
 September 30 in 219.9 seconds, with all selected suites exiting 0. Its report is

@@ -329,6 +329,20 @@ mutation runs caught the authentication and server-selection mutants. Reports:
 `target/quality/20260930-mongodb-auth-map-mutant/mutants.out/outcomes.json`, and
 `target/quality/20260930-mongodb-selection-map-mutant/mutants.out/outcomes.json`.
 
+### MongoDB cancellation preserves client usability, 2026-10-01
+
+A MongoDB 7 `failCommand` fixture blocks one `listCollections` command. The
+test polls `currentOp` and confirms the command is active before cancelling,
+then requires `OperationOutcomeUnknown(Cancelled)` and successfully lists
+collections again through the same client. This verifies cancellation stays
+distinct from disconnect and does not strand later operations.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-mongodb --test integration a_cancelled_mongodb_read_leaves_the_client_usable -- --ignored --exact --test-threads=1
+```
+
+The focused Docker contract passed: 1 test, 26 filtered, in 0.92 seconds.
+
 ## Redis disconnect classification, 2026-09-30
 
 A Docker-backed regression first connected and completed `PING`, stopped the
