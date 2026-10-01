@@ -103,6 +103,87 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_wide_numeric_csv_round_trips_through_native_insert_plan() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let wide = "1234567890123456789012345678901234567890";
+    connection
+        .execute(
+            "CREATE TABLE numeric_csv_source (id integer PRIMARY KEY, amount numeric(65, 0), marker text NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO numeric_csv_source VALUES (1, 12, 'narrow'), (2, {wide}, 'wide'), (3, NULL, 'null')"
+        ))
+        .await
+        .unwrap();
+    let source = connection
+        .query("SELECT amount, marker FROM numeric_csv_source ORDER BY id")
+        .await
+        .unwrap();
+    let csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let sheet = tablepro_core::import::read_csv(
+        csv.as_bytes(),
+        &tablepro_core::import::CsvImportOptions::default(),
+        None,
+    )
+    .unwrap();
+
+    connection
+        .execute(
+            "CREATE TABLE numeric_csv_target (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, amount numeric(65, 0), marker text NOT NULL)",
+        )
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "numeric_csv_target").await.unwrap();
+    let mapping = [None, Some(0), Some(1)];
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "numeric_csv_target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &tablepro_core::import::CsvImportOptions::default(),
+    )
+    .unwrap();
+    assert!(plan.statement.contains("$1::text::pg_catalog.numeric"));
+    assert_eq!(
+        plan.rows,
+        vec![
+            vec![Value::Text("12".into()), Value::Text("narrow".into())],
+            vec![Value::Text(wide.into()), Value::Text("wide".into())],
+            vec![Value::Null, Value::Text("null".into())],
+        ]
+    );
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query("SELECT amount::text, marker FROM numeric_csv_target ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("12".into()), Value::Text("narrow".into())],
+            vec![Value::Text(wide.into()), Value::Text("wide".into())],
+            vec![Value::Null, Value::Text("null".into())],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_postgres_money_is_refused_with_exact_server_oracle() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

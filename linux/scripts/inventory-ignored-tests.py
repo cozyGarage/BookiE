@@ -99,6 +99,10 @@ for path in sorted((root / "crates").rglob("*.rs")):
             if path.stem not in targets:
                 raise RuntimeError(f"unmapped Docker SSH target: {path.stem}")
             tier, enable = "Driver", "bash scripts/test-ssh.sh (CI integration)"
+        elif "docker" in reason.lower() and relative.startswith("crates/app/"):
+            if name not in mapped:
+                raise RuntimeError(f"unowned app Docker contract: {name}")
+            tier, enable = "App server", "scripts/run-test-layer.py app-server"
         elif "docker" in reason.lower():
             tier, enable = "Driver", docker_activation(path, name, packages)
         else:

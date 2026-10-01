@@ -95,7 +95,8 @@ class LayerRunnerTests(unittest.TestCase):
             check=True,
         )
         self.assertIn("../crates/app/tests/support/value_parse.rs)", result.stdout)
-        self.assertIn("cargo test -p tablepro-app --lib value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision", result.stdout)
+        self.assertIn("value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision", result.stdout)
+        self.assertIn("App server", result.stdout)
 
     def test_linux_workflows_are_all_registered_for_lint(self):
         workflows = ROOT.parent / ".github/workflows"

@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use thiserror::Error;
 use uuid::Uuid;
@@ -289,6 +289,11 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
     }
     if text != options.null_marker {
         if driver_id == "postgres"
+            && let Some(value) = postgres_extended_temporal(text, &column.data_type)
+        {
+            return Ok(Value::Text(value));
+        }
+        if driver_id == "postgres"
             && let Some(value) = postgres_text_temporal(text, &column.data_type)
         {
             // PostgreSQL's infinities, timetz offsets and 24:00 value are
@@ -317,7 +322,15 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
             return Ok(Value::Text(value.to_owned()));
         }
         return match parse_cell(text, kind) {
-            Ok(value) => Ok(value),
+            Ok(value) => {
+                if driver_id == "postgres"
+                    && postgres_temporal_needs_text(&value)
+                    && let Some(era_text) = crate::sql_literal::postgres_temporal_text(&value)
+                {
+                    return Ok(Value::Text(era_text));
+                }
+                Ok(value)
+            }
             Err(_)
                 if driver_id == "sqlite"
                     && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) =>
@@ -338,6 +351,16 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
     Ok(Value::Null)
 }
 
+fn postgres_temporal_needs_text(value: &Value) -> bool {
+    let year = match value {
+        Value::Date(value) => value.year(),
+        Value::DateTime(value) => value.year(),
+        Value::TimestampTz(value) => value.year(),
+        _ => return false,
+    };
+    !(1..=9999).contains(&year)
+}
+
 fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
     let kind = data_type.trim().to_ascii_lowercase();
     if matches!(kind.as_str(), "timetz" | "time with time zone") {
@@ -356,6 +379,22 @@ fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str>
         }
     }
     None
+}
+
+fn postgres_extended_temporal(text: &str, data_type: &str) -> Option<String> {
+    let kind = data_type.trim().to_ascii_lowercase();
+    if !matches!(
+        kind.as_str(),
+        "date" | "timestamp" | "timestamp without time zone" | "timestamptz" | "timestamp with time zone"
+    ) {
+        return None;
+    }
+    let value = text.strip_prefix('\'').unwrap_or(text);
+    let year = value.split_once('-')?.0.strip_prefix('+')?;
+    if year.len() <= 4 || !year.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    Some(value.strip_prefix('+').unwrap_or(value).replace('T', " "))
 }
 
 fn duckdb_formula_safe_interval<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
@@ -869,6 +908,22 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text() {
+        let date = column("value", "date");
+        let values = row_to_values_for_driver(
+            &["0000-01-02".into()],
+            &[Some(0)],
+            &[date],
+            &CsvImportOptions::default(),
+            2,
+            "postgres",
+        )
+        .expect("year zero is PostgreSQL 1 BC");
+
+        assert_eq!(values, vec![Value::Text("0001-01-02 BC".into())]);
     }
 
     #[test]

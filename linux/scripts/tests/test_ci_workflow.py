@@ -27,15 +27,32 @@ class CiWorkflowTests(unittest.TestCase):
         for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "linux/scripts/isolated-tests.json").read_text())
-        self.assertEqual(registry["app-server"], [["tablepro-app", "--lib", "ui::browse_tab::value_parse::tests::postgres_numeric_parser_outputs_round_trip_through_server"]])
+        self.assertEqual(
+            {entry[2].split("::")[-1] for entry in registry["app-server"]},
+            {
+                "postgres_numeric_parser_outputs_round_trip_through_server",
+                "value_contract_mongodb_int32_grid_edit_preserves_integer_width",
+                "value_contract_mongodb_date_grid_edit_preserves_millisecond_instant",
+                "value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision",
+                "value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity",
+                "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
+                "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
+                "value_contract_mysql_bit_parser_edits_preserve_native_values",
+                "value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit",
+            },
+        )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
         fast = workflow.split("  fast:\n", 1)[1].split("  gtk-safety:\n", 1)[0]
         for required in ["run-test-layer.py app-server", "/var/run/docker.sock:/var/run/docker.sock"]:
             self.assertIn(required, fast)
+        self.assertIn(
+            "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb",
+            workflow,
+        )
         ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
         for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
             self.assertIn(f"-p {package} --test {target}", ledger)
-        self.assertIn("-p tablepro-app --lib postgres_numeric_parser", ledger)
+        self.assertIn("scripts/run-test-layer.py app-server", ledger)
         self.assertNotIn("tablepro-driver-tests", ledger)
         self.assertNotIn("tablepro-driver-src", ledger)
 

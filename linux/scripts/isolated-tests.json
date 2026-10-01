@@ -4,6 +4,46 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::value_parse::tests::postgres_numeric_parser_outputs_round_trip_through_server"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::tests::value_contract_mongodb_date_grid_edit_preserves_millisecond_instant"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mongodb_nested_edit_contract::value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mysql_integer_contract::value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mysql_spatial_contract::value_contract_mysql_spatial_grid_refusal_preserves_native_bytes"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::tests::value_contract_mysql_bit_parser_edits_preserve_native_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::tests::value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit"
     ]
   ],
   "gtk": [

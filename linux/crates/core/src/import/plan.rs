@@ -4,8 +4,8 @@ use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{
-    BuildSqlError, IdentError, build_insert_from_draft, postgres_array_cast_type, postgres_temporal_cast_type,
-    validate_ident,
+    BuildSqlError, IdentError, build_insert_from_draft, postgres_array_cast_type, postgres_numeric_cast_type,
+    postgres_temporal_cast_type, validate_ident,
 };
 
 /// Rows committed per transaction. Small enough that a failure loses
@@ -121,6 +121,7 @@ fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result
         .iter()
         .map(|column| {
             if postgres_array_cast_type(&column.data_type).is_some()
+                || postgres_numeric_cast_type(&column.data_type).is_some()
                 || postgres_temporal_cast_type(&column.data_type).is_some()
             {
                 Value::Text(String::new())
@@ -332,6 +333,28 @@ mod tests {
                 Value::Int(4),
                 Value::Text("{1.0000000000000002,-0,5e-324,NULL}".into())
             ]]
+        );
+    }
+
+    #[test]
+    fn value_contract_postgres_wide_numeric_csv_rows_share_text_cast_parameters() {
+        let columns = vec![column("amount", "numeric(65,0)")];
+        let mapping = vec![Some(0)];
+        let wide = "1234567890123456789012345678901234567890";
+        let rows = sheet(&[&["12"], &[wide], &[""]], &["amount"]);
+        let plan = build_insert_plan(&target(&columns, &mapping), &rows, &CsvImportOptions::default()).unwrap();
+
+        assert_eq!(
+            plan.statement,
+            "INSERT INTO \"people\" (\"amount\") VALUES ($1::text::pg_catalog.numeric)"
+        );
+        assert_eq!(
+            plan.rows,
+            vec![
+                vec![Value::Text("12".into())],
+                vec![Value::Text(wide.into())],
+                vec![Value::Null],
+            ]
         );
     }
 

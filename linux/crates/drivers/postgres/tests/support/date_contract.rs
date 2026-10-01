@@ -110,3 +110,109 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
         Err(DriverError::Unsupported(_))
     ));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_bc_dates_survive_default_csv_import() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let options = tablepro_core::import::CsvImportOptions::default();
+    for (kind, send_fn, bc, ad, last, beyond) in [
+        (
+            "date",
+            "date_send",
+            "0001-12-31 BC",
+            "0001-01-01",
+            "9999-12-31",
+            "10000-01-01",
+        ),
+        (
+            "timestamp",
+            "timestamp_send",
+            "0001-12-31 23:59:59.999999 BC",
+            "0001-01-01 00:00:00.000001",
+            "9999-12-31 23:59:59.999999",
+            "10000-01-01 00:00:00.000001",
+        ),
+        (
+            "timestamptz",
+            "timestamptz_send",
+            "0001-12-31 23:59:59.999999+00 BC",
+            "0001-01-01 00:00:00.000001+00",
+            "9999-12-31 23:59:59.999999+00",
+            "10000-01-01 00:00:00.000001+00",
+        ),
+    ] {
+        let source_table = format!("era_csv_source_{kind}");
+        let target_table = format!("era_csv_target_{kind}");
+        connection
+            .execute(&format!(
+                "CREATE TABLE {source_table} (id integer PRIMARY KEY, value {kind})"
+            ))
+            .await
+            .unwrap();
+        connection
+            .execute(&format!(
+                "INSERT INTO {source_table} VALUES (1, '{bc}'::{kind}), (2, '{ad}'::{kind}), (3, '{last}'::{kind}), (4, '{beyond}'::{kind}), (5, NULL)"
+            ))
+            .await
+            .unwrap();
+        let source = connection
+            .query(&format!(
+                "SELECT id, value, encode({send_fn}(value), 'hex') AS wire FROM {source_table} ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let csv_columns = &source.columns[..2];
+        let csv_rows: Vec<_> = source.rows.iter().map(|row| row[..2].to_vec()).collect();
+        let csv =
+            tablepro_core::export::render_csv(csv_columns, &csv_rows, &tablepro_core::export::CsvOptions::default());
+        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+
+        connection
+            .execute(&format!(
+                "CREATE TABLE {target_table} (id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY, value {kind})"
+            ))
+            .await
+            .unwrap();
+        let columns = connection.fetch_columns(None, &target_table).await.unwrap();
+        let mapping = [None, Some(1)];
+        let plan = tablepro_core::import::build_insert_plan(
+            &tablepro_core::import::ImportTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: &target_table,
+                columns: &columns,
+                mapping: &mapping,
+            },
+            &sheet,
+            &options,
+        )
+        .unwrap();
+        assert!(
+            matches!(&plan.rows[0][0], Value::Text(text) if text.ends_with(" BC")),
+            "{kind}: {:?}",
+            plan.rows
+        );
+        assert_eq!(plan.rows[4], vec![Value::Null]);
+        for row in &plan.rows {
+            connection.execute_params(&plan.statement, row).await.unwrap();
+        }
+        let restored = connection
+            .query(&format!(
+                "SELECT value::text, encode({send_fn}(value), 'hex') AS wire FROM {target_table} ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            restored.rows.iter().map(|row| &row[1]).collect::<Vec<_>>(),
+            source.rows.iter().map(|row| &row[2]).collect::<Vec<_>>(),
+            "{kind} native bytes changed through CSV"
+        );
+        assert!(
+            matches!(&restored.rows[0][0], Value::Text(text) if text.ends_with(" BC")),
+            "{kind}: {:?}",
+            restored.rows
+        );
+    }
+}

@@ -467,6 +467,8 @@ jobs:
         run: cargo test --locked -p tablepro-driver-duckdb
       - name: Build the GTK application with DuckDB
         run: cargo build --locked -p tablepro-app --features duckdb
+      - name: Run app DuckDB value contracts
+        run: cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb
 
   regression-gate:
     name: Linux regression gate

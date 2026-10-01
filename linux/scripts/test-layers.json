@@ -154,7 +154,7 @@
       ]
     },
     "app-server": {
-      "purpose": "App numeric parser writes and PostgreSQL server round trips",
+      "purpose": "App parser and grid edit contracts against PostgreSQL, MongoDB, and MySQL servers",
       "prerequisites": "Rust 1.98; GNOME 50 development stack; Docker",
       "hosted_gate": "Build Linux / fast",
       "steps": [

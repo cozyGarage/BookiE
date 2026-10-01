@@ -264,6 +264,7 @@ pub fn build_insert_from_draft(
         let value_sql = if driver_id == "postgres" && matches!(values[i], Value::Text(_)) {
             postgres_array_cast_type(&col.data_type)
                 .or_else(|| postgres_temporal_cast_type(&col.data_type))
+                .or_else(|| postgres_numeric_cast_type(&col.data_type))
                 .map(|type_name| format!("{placeholder}::text::{type_name}"))
                 .unwrap_or(placeholder)
         } else {
@@ -368,7 +369,7 @@ pub(crate) fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> 
     })
 }
 
-fn postgres_numeric_cast_type(data_type: &str) -> Option<&'static str> {
+pub(crate) fn postgres_numeric_cast_type(data_type: &str) -> Option<&'static str> {
     if data_type.len() > 64 {
         return None;
     }
@@ -1080,6 +1081,21 @@ mod tests {
                 Value::Int(7)
             ]
         );
+    }
+
+    #[test]
+    fn postgres_wide_numeric_inserts_cast_text_to_the_builtin_numeric_type() {
+        let mut columns = [col("amount", false)];
+        columns[0].data_type = "numeric(65, 0)".into();
+        let wide = "1234567890123456789012345678901234567890";
+        let (sql, params) =
+            build_insert_from_draft("postgres", None, "ledger", &columns, &[Value::Text(wide.into())]).unwrap();
+
+        assert_eq!(
+            sql,
+            r#"INSERT INTO "ledger" ("amount") VALUES ($1::text::pg_catalog.numeric)"#
+        );
+        assert_eq!(params, vec![Value::Text(wide.into())]);
     }
 
     #[test]
