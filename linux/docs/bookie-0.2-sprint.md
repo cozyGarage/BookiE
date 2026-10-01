@@ -96,6 +96,14 @@ is observably equivalent to the existing fallback. The regression now asserts
 SQL NULL and text `"null"` separately. Details and retained reports are in the
 [mutation audit](value-contracts.md#b3-mutation-survivor-re-audit-2026-10-01).
 
+A failing-first MySQL CSV contract found high-precision decimal cells were
+rejected even though MySQL returns them as exact text. Import now preserves
+numeric text beyond Rust `Decimal` only when the destination declares a
+precision/scale that contains the value. The MySQL bound and literal round trips,
+strict 168-test value layer, quick gate and all 30 scoped mutants passed. The
+evidence is in the [wide DECIMAL checkpoint](value-contracts.md#mysql-wide-decimal-csv-import-2026-10-01).
+B3 remains open for the other matrix items.
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the

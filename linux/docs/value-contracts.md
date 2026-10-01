@@ -106,6 +106,36 @@ Reports:
 [`CSV type classifier`](../target/quality/20261001-csv-column-kind-mutants/mutants.out/outcomes.json),
 [`JSON exporter`](../target/quality/20261001-json-value-to-json-mutants-final/mutants.out/outcomes.json).
 
+## MySQL wide DECIMAL CSV import, 2026-10-01
+
+A failing-first core test reproduced that a valid `DECIMAL(65,30)` CSV value
+was rejected as `NotANumber`, although MySQL results preserve values outside
+Rust `Decimal` as exact text. Typed import now uses the destination's declared
+precision and scale to permit a plain numeric text fallback only when that
+value fits the declared type and Rust `Decimal` cannot represent it. Invalid
+numeric tokens, malformed type metadata, values beyond the destination's
+precision/scale, and high-precision values for unspecified `decimal` metadata
+remain errors. A valid `DECIMAL(30,30)` with no integer digits remains accepted.
+
+The MySQL 8 Docker contract covers a 65-digit integer and a negative
+`DECIMAL(65,30)` with formula-safe CSV output. It compares exact JSON strings,
+imports CSV using destination catalog metadata, writes the values through
+bound parameters and SQL literals, then compares `HEX(CAST(value AS CHAR))`
+with the source for both rows. Focused core tests and the live contract passed.
+The scoped mutation run caught all 30 generated mutations, with no misses,
+timeouts, or unviable cases. The strict GTK+DuckDB values layer passed 168
+selected tests across 11 suites:
+[`20261001T002624272378Z-values/report.json`](../target/quality/20261001T002624272378Z-values/report.json).
+The quick layer also passed:
+[`20261001T003205886474Z-layers/report.json`](../target/quality/20261001T003205886474Z-layers/report.json).
+The mutation report is
+[`20261001-wide-decimal-csv-mutants-final3`](../target/quality/20261001-wide-decimal-csv-mutants-final3/mutants.out/outcomes.json).
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib value_contract_wide_decimal_csv_cells_remain_exact_text_when_decimal_cannot_hold_them
+rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_all_digits -- --ignored --exact --test-threads=1
+```
+
 ## SQL Server datetimeoffset CSV import, 2026-10-01
 
 A failing-first extension to the live `datetimeoffset(7)` contract reproduced a

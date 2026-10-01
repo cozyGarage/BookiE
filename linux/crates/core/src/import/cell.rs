@@ -283,6 +283,11 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
         {
             return Ok(Value::Decimal(value));
         }
+        if kind == ColumnKind::Decimal
+            && let Some(value) = wide_decimal_text(text, &column.data_type)
+        {
+            return Ok(Value::Text(value.to_owned()));
+        }
         return match parse_cell(text, kind) {
             Ok(value) => Ok(value),
             Err(_)
@@ -321,6 +326,48 @@ fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a
 
 fn sanitized_decimal(text: &str) -> Option<Decimal> {
     Decimal::from_str_exact(text.strip_prefix('\'')?).ok()
+}
+
+fn wide_decimal_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
+    let value = text.strip_prefix('\'').unwrap_or(text);
+    if text.starts_with('\'') && !value.starts_with(['+', '-']) {
+        return None;
+    }
+    let (precision, scale) = decimal_type_limits(data_type)?;
+    if precision <= 28 && scale <= 28 {
+        return None;
+    }
+
+    let unsigned = value.strip_prefix(['+', '-']).unwrap_or(value);
+    let (integer, fraction) = unsigned.split_once('.').unwrap_or((unsigned, ""));
+    if integer.is_empty() && fraction.is_empty()
+        || !integer.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+        || fraction.len() > scale
+    {
+        return None;
+    }
+    let significant_integer_digits = integer.trim_start_matches('0').len();
+    if significant_integer_digits > precision.saturating_sub(scale) {
+        return None;
+    }
+    Some(value)
+}
+
+fn decimal_type_limits(data_type: &str) -> Option<(usize, usize)> {
+    let lowered = data_type.trim().to_ascii_lowercase();
+    let base = lowered.split('(').next()?.trim();
+    if !matches!(base, "decimal" | "numeric" | "dec") {
+        return None;
+    }
+    let arguments = lowered.split_once('(')?.1.split_once(')')?.0;
+    let mut parts = arguments.split(',').map(str::trim);
+    let precision = parts.next()?.parse().ok()?;
+    let scale = parts.next().map_or(Some(0), |part| part.parse().ok())?;
+    if parts.next().is_some() || scale > precision {
+        return None;
+    }
+    Some((precision, scale))
 }
 
 #[cfg(test)]
@@ -429,6 +476,120 @@ mod tests {
         let values = row_to_values(&row, &[Some(0)], &columns, &CsvImportOptions::default(), 2).unwrap();
 
         assert_eq!(values, vec![Value::Text(original.into())]);
+    }
+
+    #[test]
+    fn value_contract_wide_decimal_csv_cells_remain_exact_text_when_decimal_cannot_hold_them() {
+        let columns = vec![column("amount", "decimal(65,30)")];
+        let original = "12345678901234567890123456789012345.123456789012345678901234567890";
+        let values = row_to_values(
+            &[original.to_owned()],
+            &[Some(0)],
+            &columns,
+            &CsvImportOptions::default(),
+            2,
+        )
+        .expect("a valid native DECIMAL value must not be rejected because Rust Decimal is narrower");
+
+        assert_eq!(values, vec![Value::Text(original.into())]);
+    }
+
+    #[test]
+    fn value_contract_wide_integer_decimal_csv_cells_use_declared_precision_for_text_fallback() {
+        let columns = vec![column("amount", "decimal(65,0)")];
+        let original = "12345678901234567890123456789012345678901234567890123456789012345";
+        let values = row_to_values(
+            &[original.to_owned()],
+            &[Some(0)],
+            &columns,
+            &CsvImportOptions::default(),
+            2,
+        )
+        .expect("65 integer digits must remain exact text beyond Rust Decimal's range");
+
+        assert_eq!(values, vec![Value::Text(original.into())]);
+    }
+
+    #[test]
+    fn declared_decimal_scale_can_equal_precision_when_all_digits_are_fractional() {
+        let columns = vec![column("amount", "decimal(30,30)")];
+        let original = format!("0.{}", "1".repeat(30));
+        let values = row_to_values(
+            std::slice::from_ref(&original),
+            &[Some(0)],
+            &columns,
+            &CsvImportOptions::default(),
+            2,
+        )
+        .expect("DECIMAL(30,30) can store thirty fractional digits and no integer digits");
+
+        assert_eq!(values, vec![Value::Text(original)]);
+    }
+
+    #[test]
+    fn wide_decimal_text_fallback_refuses_values_outside_declared_precision_and_scale() {
+        let too_many_integer_digits = format!("{}.{}", "9".repeat(36), "1".repeat(30));
+        let too_many_fractional_digits = format!("0.{}", "1".repeat(31));
+        for (data_type, value) in [
+            ("decimal(65,30)", too_many_integer_digits.as_str()),
+            ("decimal(65,30)", too_many_fractional_digits.as_str()),
+            (
+                "decimal(65,30,1)",
+                "12345678901234567890123456789012345.123456789012345678901234567890",
+            ),
+            ("decimal(30,31)", "0.1234567890123456789012345678901"),
+        ] {
+            let columns = vec![column("amount", data_type)];
+            assert_eq!(
+                row_to_values(
+                    &[value.to_owned()],
+                    &[Some(0)],
+                    &columns,
+                    &CsvImportOptions::default(),
+                    2,
+                )
+                .unwrap_err()
+                .reason,
+                CellError::NotANumber,
+                "out-of-range value or malformed precision metadata must be refused for {data_type}"
+            );
+        }
+    }
+
+    #[test]
+    fn wide_decimal_text_fallback_rejects_malformed_numeric_tokens() {
+        let columns = vec![column("amount", "decimal(65,30)")];
+        for malformed in ["+", ".", "--1", "1e", "1.2.3", "1,000", "'--1"] {
+            assert_eq!(
+                row_to_values(
+                    &[malformed.to_owned()],
+                    &[Some(0)],
+                    &columns,
+                    &CsvImportOptions::default(),
+                    2,
+                )
+                .unwrap_err()
+                .reason,
+                CellError::NotANumber,
+                "malformed numeric cell must not use the exact-text fallback: {malformed:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn formula_safe_wide_decimal_import_removes_only_its_marker() {
+        let columns = vec![column("amount", "decimal(65,30)")];
+        let value = "-12345678901234567890123456789012345.123456789012345678901234567890";
+        let imported = row_to_values(
+            &[format!("'{value}")],
+            &[Some(0)],
+            &columns,
+            &CsvImportOptions::default(),
+            2,
+        )
+        .unwrap();
+
+        assert_eq!(imported, vec![Value::Text(value.into())]);
     }
 
     #[test]

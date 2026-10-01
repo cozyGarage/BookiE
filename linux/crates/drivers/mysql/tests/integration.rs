@@ -1060,3 +1060,13 @@ async fn decimal_results_preserve_all_fractional_digits() {
 
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
+#[path = "support/wide_decimal_csv.rs"]
+mod wide_decimal_csv;
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_all_digits() {
+    let (_container, options) = start_mysql().await;
+    let connection = connect(options).await;
+    wide_decimal_csv::assert_csv_bound_and_literal_round_trips(connection.as_ref()).await;
+}
