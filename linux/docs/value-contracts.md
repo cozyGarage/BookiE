@@ -3493,6 +3493,21 @@ closing the broader nested-type audit. The strict values runner passed all 165
 selected tests across 11 suites, including the expanded ClickHouse contract:
 [`20260930T231755592573Z-values/report.json`](../target/quality/20260930T231755592573Z-values/report.json).
 
+### ClickHouse tuple containing a nullable-decimal map, 2026-10-01
+
+The native-backed consumer contract now also covers
+`Tuple(String, Map(String, Nullable(Decimal(38, 9))))`, including one exact
+high-precision decimal and a NULL map value. The same test verifies the driver
+result and parsed JSON/CSV against `toTypeName` and `toJSONString`, refuses SQL
+literal, binding and grid writes without native type metadata, and confirms the
+stored MergeTree row is unchanged. The focused Docker contract passed. This
+adds an eleventh nested shape; other nested combinations and broader consumer
+parity remain open.
+
+```sh
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --test-threads=1
+```
+
 ## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
 
 The first 50 documents declare a field as string; the next fetched page contains

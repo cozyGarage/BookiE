@@ -80,13 +80,19 @@ contract checks the stored instant and offset against SQL Server. See the
 [value-contract evidence](value-contracts.md#sql-server-datetimeoffset-csv-import-2026-10-01).
 The full strict values layer and quick gate passed; B3 remains open.
 
-The next bounded B3 case extends ClickHouse nested consumer coverage with
+The completed ClickHouse nested consumer follow-up added
 `Map(String, Array(Tuple(String, Nullable(Decimal(38, 9)))))`. The focused
 server test and strict 165-test, 11-suite value runner passed. Exact JSON/CSV
 matches the native `toJSONString` oracle; SQL literal, binding and grid edit
 refusals preserve the stored row. Other nested combinations remain open; see
 the [type matrix](type-contract-strategy.md#current-evidence-and-next-targets)
 and [value evidence](value-contracts.md#clickhouse-nested-map-of-tuple-arrays-2026-10-01).
+
+A further nested case adds `Tuple(String, Map(String, Nullable(Decimal(38, 9))))`
+with an exact decimal and a NULL entry. The focused test checks native type and
+JSON oracles, JSON/CSV consumers, explicit refusal by type-less SQL consumers,
+and unchanged row contents after grid refusal. The Docker contract passed; B3
+remains open for other nested combinations and remaining matrix targets.
 
 B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
 survivors against the current test set: 16/16 viable ClickHouse mutants and
