@@ -3663,3 +3663,33 @@ The production cast mapping did not change in this checkpoint; its earlier
 scoped mutation run caught all 26 generated mutations. The new live-server
 matrix closes the gap that mapping tests could not prove: each static cast
 actually inserts the driver's exported text as the correct PostgreSQL array.
+
+## DuckDB interval CSV import, 2026-10-01
+
+A failing-first embedded DuckDB contract found two importer bugs. The shared
+catalog classifier treated `INTERVAL` as an integer because its name contains
+`int`; after preserving interval cells as text, formula-safe CSV still prefixed
+negative interval text, and an empty interval cell was mistaken for empty text
+instead of SQL NULL. The importer now restores the leading marker only for
+canonical DuckDB interval text with valid singular/plural units. With the
+default empty null marker, an empty interval field becomes NULL; with a custom
+marker, an empty interval literal is rejected. The classifier also keeps the
+unrelated `POINT` catalog type as text.
+
+The live CSV export/parse/`build_insert_plan`/INSERT test covers all eight
+month/day/microsecond sign combinations, the month/day/microsecond carrier
+extrema, zero and NULL. It compares exact imported values, `typeof`, native
+`VARCHAR`, and independent `date_part` results for months, days and
+microseconds. The focused contract passed. The strict GTK+DuckDB runner passed
+176 tests across all 11 suites, with no missing suites; quick passed as well.
+Mutation testing initially found three untested invalid unit spellings. After
+adding them, the final scoped run caught 29/30 mutants, with one unviable and
+none missed or timed out. Evidence:
+[`20261001T040526500083Z-layers/report.json`](../target/quality/20261001T040526500083Z-layers/report.json),
+[`20261001T041008834602Z-layers/report.json`](../target/quality/20261001T041008834602Z-layers/report.json),
+[`outcomes.json`](../target/quality/20261001-duckdb-interval-csv-mutants-final/mutants.out/outcomes.json).
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib import::cell::tests -- --test-threads=1
+rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_csv_import_preserves_native_components -- --test-threads=1
+```

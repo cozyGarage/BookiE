@@ -3,6 +3,8 @@
 use drivers_duckdb::DuckdbDriver;
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 
+#[path = "support/interval_csv_import.rs"]
+mod interval_csv_import;
 #[path = "support/submicro_parameter_expression.rs"]
 mod submicro_parameter_expression;
 #[path = "../../../core/tests/support/value_contract.rs"]

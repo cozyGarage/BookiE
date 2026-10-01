@@ -2072,3 +2072,18 @@ tests and all four exact regressions ran once. Evidence:
 [`20261001T032907972866Z-layers/report.json`](../target/quality/20261001T032907972866Z-layers/report.json),
 [`20261001T032917087566Z-change-contracts/report.json`](../target/quality/20261001T032917087566Z-change-contracts/report.json).
 The new selector guard is included in `scripts/run-change-contract-tests.py`.
+
+### B3 DuckDB interval CSV delivery — 2026-10-01
+
+A failing-first CSV contract found that the shared importer parsed DuckDB's
+`INTERVAL` type as an integer, then lost negative interval values to formula
+protection and conflated an empty NULL field with empty text. The parser now
+preserves intervals as exact text, restores only validated formula markers,
+and maps the default empty interval field to SQL NULL. The embedded-engine
+round trip checks all eight component-sign combinations, carrier extrema, zero
+and NULL against native text and independent month/day/microsecond fields.
+The strict GTK+DuckDB layer passed 176 selected tests across all 11 suites, the
+quick layer passed, and scoped mutation testing caught 29/30 changes with one
+unviable and no missed or timed-out mutants. See the
+[value ledger](value-contracts.md#duckdb-interval-csv-import-2026-10-01).
+B3 remains open for the remaining types and consumers.

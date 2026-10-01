@@ -28,6 +28,8 @@ pub enum CellError {
     NotJson,
     #[error("not hexadecimal bytes")]
     NotBytes,
+    #[error("not an interval")]
+    NotAnInterval,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -89,6 +91,12 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     let base = lowered.split(['(', '[']).next().unwrap_or("").trim().to_owned();
     if let Some(kind) = temporal_kind(&base, &lowered) {
         return kind;
+    }
+    // These catalog names contain the substring `int` but are not integer
+    // types. Keep them as exact text for native consumers such as DuckDB's
+    // INTERVAL insert and PostgreSQL's unsupported geometric point values.
+    if matches!(base.as_str(), "interval" | "point") {
+        return ColumnKind::Text;
     }
     if base.contains("bool") || base == "bit" {
         return ColumnKind::Bool;
@@ -272,6 +280,13 @@ pub(crate) fn row_to_values_for_driver(
 
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
+    if driver_id == "duckdb" && column.data_type.trim().eq_ignore_ascii_case("interval") && text.is_empty() {
+        return if options.null_marker.is_empty() {
+            Ok(Value::Null)
+        } else {
+            Err(CellError::NotAnInterval)
+        };
+    }
     if text != options.null_marker {
         if driver_id == "postgres"
             && let Some(value) = postgres_text_temporal(text, &column.data_type)
@@ -279,6 +294,11 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
             // PostgreSQL's infinities, timetz offsets and 24:00 value are
             // exact text in the driver contract. Restore the CSV formula
             // marker only for recognized native sentinels.
+            return Ok(Value::Text(value.to_owned()));
+        }
+        if driver_id == "duckdb"
+            && let Some(value) = duckdb_formula_safe_interval(text, &column.data_type)
+        {
             return Ok(Value::Text(value.to_owned()));
         }
         if kind == ColumnKind::Text
@@ -336,6 +356,48 @@ fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str>
         }
     }
     None
+}
+
+fn duckdb_formula_safe_interval<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
+    if !data_type.trim().eq_ignore_ascii_case("interval") {
+        return None;
+    }
+    let value = text.strip_prefix('\'')?;
+    if !valid_duckdb_interval_text(value) {
+        return None;
+    }
+    Some(value)
+}
+
+fn valid_duckdb_interval_text(value: &str) -> bool {
+    let mut fields = value.split_whitespace();
+    let Some(months) = fields.next().and_then(|value| value.parse::<i32>().ok()) else {
+        return false;
+    };
+    let Some(month_unit) = fields.next() else {
+        return false;
+    };
+    let Some(days) = fields.next().and_then(|value| value.parse::<i32>().ok()) else {
+        return false;
+    };
+    let Some(day_unit) = fields.next() else {
+        return false;
+    };
+    let Some(microseconds) = fields.next().and_then(|value| value.parse::<i64>().ok()) else {
+        return false;
+    };
+    let Some(microsecond_unit) = fields.next() else {
+        return false;
+    };
+    fields.next().is_none()
+        && month_unit == if months.unsigned_abs() == 1 { "month" } else { "months" }
+        && day_unit == if days.unsigned_abs() == 1 { "day" } else { "days" }
+        && microsecond_unit
+            == if microseconds.unsigned_abs() == 1 {
+                "microsecond"
+            } else {
+                "microseconds"
+            }
 }
 
 fn sanitized_wide_integer_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
@@ -472,6 +534,8 @@ mod tests {
         assert_eq!(column_kind("Int128"), ColumnKind::Text);
         assert_eq!(column_kind("UInt128"), ColumnKind::Text);
         assert_eq!(column_kind("bigserial"), ColumnKind::Int);
+        assert_eq!(column_kind("INTERVAL"), ColumnKind::Text);
+        assert_eq!(column_kind("point"), ColumnKind::Text);
         assert_eq!(column_kind("VARCHAR(255)"), ColumnKind::Text);
         assert_eq!(column_kind("numeric(10,2)"), ColumnKind::Decimal);
         assert_eq!(column_kind("integer[]"), ColumnKind::Text);
@@ -493,6 +557,49 @@ mod tests {
         assert_eq!(column_kind("BINARY(16)"), ColumnKind::Bytes);
         assert_eq!(column_kind("VARBINARY(32)"), ColumnKind::Bytes);
         assert_eq!(column_kind("IMAGE"), ColumnKind::Bytes);
+    }
+
+    #[test]
+    fn duckdb_interval_restores_only_formula_marked_canonical_text() {
+        let options = CsvImportOptions::default();
+        let interval = column("span", "INTERVAL");
+        assert_eq!(
+            value_for("'-1 month -2 days -3 microseconds", &interval, &options, "duckdb"),
+            Ok(Value::Text("-1 month -2 days -3 microseconds".into()))
+        );
+        assert_eq!(
+            value_for(
+                "'-1 month -2 days -3 microseconds",
+                &column("note", "TEXT"),
+                &options,
+                "duckdb"
+            ),
+            Ok(Value::Text("'-1 month -2 days -3 microseconds".into()))
+        );
+        assert_eq!(
+            value_for("'-1 month 2 days", &interval, &options, "duckdb"),
+            Ok(Value::Text("'-1 month 2 days".into()))
+        );
+        for malformed in [
+            "'-1 months -2 days -3 microseconds",
+            "'-1 month -2 day -3 microseconds",
+            "'-1 month -2 days -3 microsecond",
+        ] {
+            assert_eq!(
+                value_for(malformed, &interval, &options, "duckdb"),
+                Ok(Value::Text(malformed.into())),
+                "an invalid unit spelling must not lose its formula marker: {malformed}"
+            );
+        }
+        assert_eq!(value_for("", &interval, &options, "duckdb"), Ok(Value::Null));
+        let marked_options = CsvImportOptions {
+            null_marker: "NULL".into(),
+            ..options
+        };
+        assert_eq!(
+            value_for("", &interval, &marked_options, "duckdb"),
+            Err(CellError::NotAnInterval)
+        );
     }
 
     #[test]

@@ -255,10 +255,20 @@ in [value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-
 | XLSX / wide numeric, temporal, nested BSON | Wide integers and exact decimals use text cells; temporal values use native cells only when exact, otherwise text; an offset-origin nine-digit `TIMESTAMP WITH TIME ZONE` is emitted as its exact canonical UTC instant; nested BSON markers are retained; negative zero, the smallest positive subnormal and the adjacent representable value above 1.0 are checked as numeric cells with IEEE-754 bit oracles | Spreadsheet-application re-import and remaining XLSX precision/format limitations remain per the checkpoint entries below. |
 
 The October 1 PostgreSQL array import follow-up closes the INSERT side of the
-CSV consumer contract for allowlisted built-in array types: a real float8[] CSV
-import now casts its exact text parameter through a fixed `pg_catalog.float8[]`
-type and compares native `array_send` bytes. Other supported-array types remain
-covered for typed values, SQL literals, JSON and grid editing as detailed above.
+CSV consumer contract for all 20 allowlisted built-in array families. A real
+server test renders and parses the arrays through the shared CSV consumers,
+executes `build_insert_plan`, then compares each imported value's exact native
+text and `array_send` bytes. `float8[]` also retains its extra grid-edit, keyed
+re-edit and CSV export checks described above. Automatic typing beyond the
+static allowlist, unsupported element OIDs, and other consumer parity targets
+remain open.
+
+DuckDB `INTERVAL` now has an embedded-engine CSV export/import contract for all
+eight component-sign combinations, carrier extrema, zero and NULL. Import keeps
+interval text exact, reverses the formula-safety prefix only for the driver's
+canonical interval grammar, and compares native `typeof`, `VARCHAR`, and
+independent `date_part` fields. The failing-first case also corrected the
+shared classifier's `INTERVAL`/`POINT` substring collision with `int`.
 
 ### DuckDB nested UHUGEINT refusal coverage — September 30
 
