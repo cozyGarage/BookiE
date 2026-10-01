@@ -79,6 +79,33 @@ restart/reconnect paths. Evidence:
 and [`drivers-1.log`](../target/quality/20260930T232244336622Z-layers/drivers-1.log).
 The layer took 984 seconds, reflecting the Docker-backed end-to-end coverage.
 
+## B3 mutation survivor re-audit, 2026-10-01
+
+I reran two old survivor groups against the current source and test set. The
+ClickHouse `clickhouse_datetime64_fits_precision` scope caught all 16 viable
+mutations; the former `precision > 9` to `precision >= 9` survivor is now
+caught by the exact scale-9 boundary assertion. The core CSV `column_kind`
+scope caught 13 of 14 mutations; one was unviable, with no misses or timeouts.
+This supersedes older CSV classifier reports whose tests predated the current
+type-name matrix.
+
+The JSON exporter scope caught 6 of 7 mutations. Its sole survivor deletes the
+explicit `Value::Null` match arm, but that is behaviorally equivalent: the
+fallback `value_to_text(Value::Null)` returns `None`, which `value_to_json`
+also maps to JSON null. Existing exporter contracts separately assert SQL NULL
+as JSON null and text `"null"` as JSON string. This is classified as an
+equivalent mutant, not a missed behavior assertion. The focused contract
+`value_contract_json_keeps_null_and_booleans_distinct_from_text` passed with
+both SQL NULL and text `"null"`. The full strict GTK+DuckDB value runner also
+passed all 165 selected tests across 11 suites on the updated working tree:
+[`20260930T235608800228Z-values/report.json`](../target/quality/20260930T235608800228Z-values/report.json).
+The quick layer passed after this change:
+[`20261001T000036771872Z-layers/report.json`](../target/quality/20261001T000036771872Z-layers/report.json).
+Reports:
+[`clickhouse precision`](../target/quality/20261001-clickhouse-datetime64-precision-mutants/mutants.out/outcomes.json),
+[`CSV type classifier`](../target/quality/20261001-csv-column-kind-mutants/mutants.out/outcomes.json),
+[`JSON exporter`](../target/quality/20261001-json-value-to-json-mutants-final/mutants.out/outcomes.json).
+
 ## SQL Server datetimeoffset CSV import, 2026-10-01
 
 A failing-first extension to the live `datetimeoffset(7)` contract reproduced a

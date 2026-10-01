@@ -149,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn value_contract_json_keeps_booleans_distinct_from_text_and_null() {
+    fn value_contract_json_keeps_null_and_booleans_distinct_from_text() {
         let columns = vec![column("value")];
         let rows = vec![
             vec![Value::Bool(true)],
@@ -157,6 +157,7 @@ mod tests {
             vec![Value::Bool(false)],
             vec![Value::Text("false".into())],
             vec![Value::Null],
+            vec![Value::Text("null".into())],
         ];
         let output: serde_json::Value = serde_json::from_str(&render_json(&columns, &rows)).unwrap();
 
@@ -167,7 +168,8 @@ mod tests {
                 {"value": "true"},
                 {"value": false},
                 {"value": "false"},
-                {"value": null}
+                {"value": null},
+                {"value": "null"}
             ])
         );
     }

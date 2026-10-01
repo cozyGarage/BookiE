@@ -88,6 +88,14 @@ refusals preserve the stored row. Other nested combinations remain open; see
 the [type matrix](type-contract-strategy.md#current-evidence-and-next-targets)
 and [value evidence](value-contracts.md#clickhouse-nested-map-of-tuple-arrays-2026-10-01).
 
+B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
+survivors against the current test set: 16/16 viable ClickHouse mutants and
+13/13 viable CSV classifier mutants were caught; one additional CSV mutation
+was unviable. The only current JSON exporter survivor deletes a NULL arm that
+is observably equivalent to the existing fallback. The regression now asserts
+SQL NULL and text `"null"` separately. Details and retained reports are in the
+[mutation audit](value-contracts.md#b3-mutation-survivor-re-audit-2026-10-01).
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the
