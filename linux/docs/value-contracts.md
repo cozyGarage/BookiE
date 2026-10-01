@@ -3693,3 +3693,24 @@ none missed or timed out. Evidence:
 rtk cargo test --locked -p tablepro-core --lib import::cell::tests -- --test-threads=1
 rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_interval_csv_import_preserves_native_components -- --test-threads=1
 ```
+
+## ClickHouse Int128/UInt128 XLSX preservation, 2026-10-01
+
+The ClickHouse wide-integer contract already verifies signed `Int128` minimum
+and maximum plus `UInt128` maximum through native results, SQL literals,
+parameters, CSV and grid edits. The shared XLSX writer test now includes these
+three values as `Value::Text` and inspects the workbook XML to require exact
+shared-string cells, preventing spreadsheet numeric conversion from losing
+digits. The focused core test passed. Scoped mutation testing of `write_cell`
+and this contract caught all 15 generated mutants, with no misses, timeouts or
+unviable mutations. The report is
+[`outcomes.json`](../target/quality/20261001-clickhouse-int128-xlsx-mutants/mutants.out/outcomes.json).
+The strict GTK+DuckDB value layer passed 176 tests across all 11 suites, with no
+missing suites, and the quick layer passed. Reports:
+[`20261001T054124079751Z-values/report.json`](../target/quality/20261001T054124079751Z-values/report.json),
+[`20261001T054630430028Z-layers/report.json`](../target/quality/20261001T054630430028Z-layers/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-core --lib export::xlsx::tests::value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text -- --exact --test-threads=1
+rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutants --package tablepro-core --file crates/core/src/export/xlsx.rs --re 'write_cell|value_contract_workbook_preserves_wide_integers_and_exact_decimals_as_text' --test-tool cargo --timeout 30 --build-timeout 180 --output target/quality/20261001-clickhouse-int128-xlsx-mutants -- --lib -- --test-threads=1
+```

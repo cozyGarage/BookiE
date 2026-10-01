@@ -170,6 +170,11 @@ mod tests {
         )))
         .unwrap();
         let mut values = vec![Value::Int(1_000_000_000_000_000), Value::Int(-1_000_000_000_000_000)];
+        values.extend([
+            Value::Text("-170141183460469231731687303715884105728".into()),
+            Value::Text("170141183460469231731687303715884105727".into()),
+            Value::Text("340282366920938463463374607431768211455".into()),
+        ]);
         for text in corpus["integers"].as_array().unwrap() {
             let value: i64 = text.as_str().unwrap().parse().unwrap();
             if value.unsigned_abs() > 999_999_999_999_999 {

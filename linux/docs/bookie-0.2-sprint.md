@@ -2117,3 +2117,17 @@ quick layer passed, and scoped mutation testing caught 29/30 changes with one
 unviable and no missed or timed-out mutants. See the
 [value ledger](value-contracts.md#duckdb-interval-csv-import-2026-10-01).
 B3 remains open for the remaining types and consumers.
+
+### B3 ClickHouse wide integers in XLSX — October 1
+
+The consumer audit found that ClickHouse `Int128`/`UInt128` had exact live
+result, SQL, CSV and grid contracts but no workbook-cell assertion. The shared
+XLSX writer contract now includes both `Int128` extremes and `UInt128` maximum,
+and inspects workbook XML to require exact string cells. The focused core test
+passed; the scoped `write_cell` mutation run caught all 15 generated mutants,
+with no misses, timeouts or unviable cases. The strict GTK+DuckDB layer passed
+176 tests over all 11 suites with no missing suite, and quick passed. Reports:
+[`20261001T054124079751Z-values/report.json`](../target/quality/20261001T054124079751Z-values/report.json),
+[`20261001T054630430028Z-layers/report.json`](../target/quality/20261001T054630430028Z-layers/report.json).
+B3 remains open for the other matrix targets; evidence and commands are in the
+[value ledger](value-contracts.md#clickhouse-int128uint128-xlsx-preservation-2026-10-01).
