@@ -65,7 +65,11 @@ impl tablepro_core::Session for MysqlSession {
         let timestamp_is_utc = match run_controlled_setup(timezone_is_utc(&mut *connection), control).await {
             Ok(Ok(timestamp_is_utc)) => timestamp_is_utc,
             Ok(Err(error)) | Err(error) => {
-                self.connection = Some(connection);
+                if matches!(error, DriverError::Disconnected) {
+                    let _ = connection.close().await;
+                } else {
+                    self.connection = Some(connection);
+                }
                 return Err(error);
             }
         };
@@ -90,6 +94,10 @@ impl tablepro_core::Session for MysqlSession {
         }
         if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
             let _ = connection.detach().close_hard().await;
+        } else if matches!(result, Err(DriverError::Disconnected)) {
+            // Do not let the one-slot pool reconnect behind this session
+            // handle after its server-side state has disappeared.
+            let _ = connection.close().await;
         } else {
             self.connection = Some(connection);
         }

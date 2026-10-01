@@ -42,8 +42,10 @@ impl tablepro_core::Session for MssqlSession {
             }
         };
         let result = run_server_cancellable(execution, async { Ok(()) }, |_| false, control).await;
-        if !matches!(result, Err(DriverError::OperationOutcomeUnknown { .. }))
-            && !result.as_ref().is_err_and(is_unsupported_result)
+        if !matches!(
+            result,
+            Err(DriverError::OperationOutcomeUnknown { .. } | DriverError::Disconnected)
+        ) && !result.as_ref().is_err_and(is_unsupported_result)
         {
             self.client = Some(client);
         }

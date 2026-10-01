@@ -30,6 +30,14 @@ state are gone. The regression
 terminates the session backend, requires `Disconnected`, verifies that session
 handle is unusable, and checks the ordinary shared pool can still recover.
 
+MySQL and SQL Server sessions follow the same rule. MySQL must not reacquire a
+replacement backend from its one-slot pool after `KILL CONNECTION`; SQL Server
+must discard its client after the server disappears. Their regressions are
+`a_disconnected_session_is_retired_without_affecting_the_shared_pool` in the
+MySQL integration suite and `a_disconnected_session_is_retired_after_server_loss`
+in the SQL Server integration suite. Each test first observed the old behavior
+with a failing assertion, then passed after the lifecycle fix.
+
 ## Test ownership
 
 Run the six Docker-backed driver suites, including ignored fixtures, with:
@@ -85,3 +93,11 @@ separate shared-pool query succeeds. The report is
 [`20261001T042714823272Z-layers/report.json`](../target/quality/20261001T042714823272Z-layers/report.json).
 The `quick` layer and test harness also passed after the ignored-test inventory
 was regenerated.
+
+On October 1, the `drivers` layer passed again in 998.4 seconds against the
+working tree based on `31d4ed081b9daa263bfb7065e259db73c66012b4`. It executed 228
+tests across the six drivers, MCP, socket and SSH suites, with zero failures and
+zero ignored tests among executed tests. This includes the MySQL loss-during-
+query and loss-before-next-statement cases, plus the PostgreSQL and SQL Server
+session-retirement tests. The report is
+[`20261001T051127401608Z-layers/report.json`](../target/quality/20261001T051127401608Z-layers/report.json).

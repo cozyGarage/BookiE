@@ -18,6 +18,8 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 mod connect_refusal;
 #[path = "support/datetimeoffset_csv.rs"]
 mod datetimeoffset_csv;
+#[path = "support/disconnection.rs"]
+mod disconnection;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
 

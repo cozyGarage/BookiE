@@ -214,6 +214,20 @@ explicitly registered. See [disconnect contracts](disconnection-contracts.md)
 for the exact test and execution command. B3 remains open for the remaining
 native-type and consumer targets.
 
+The disconnect audit then reproduced the same stale-session state in MySQL and
+SQL Server. MySQL's focused Docker test killed the active session backend and
+failed on the original `is_usable()` result; retiring the one-slot pool
+connection made it pass while the shared pool recovered. SQL Server's test
+stopped the server during a session `WAITFOR`, likewise caught a still-usable
+client, and now confirms the lost session is retired. Both regressions passed
+after their fixes. A second failing-first MySQL case killed an idle session
+between statements and caught the timezone preflight returning a stale handle;
+that path now closes the connection too. The ignored-test inventory has been
+refreshed. The final full drivers layer passed 228 tests across the six drivers,
+MCP, socket and SSH suites, with zero failures or ignored tests among those
+executed. See [disconnect contracts](disconnection-contracts.md) for report and
+commands.
+
 ### B4 next order
 
 Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the

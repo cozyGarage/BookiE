@@ -124,6 +124,106 @@ async fn server_terminated_query_reports_disconnection_and_pool_recovers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_disconnected_session_is_retired_without_affecting_the_shared_pool() {
+    let (_container, opts) = start_mysql().await;
+    let connection = MysqlDriver.connect(opts.clone()).await.expect("connect");
+    let observer = connect(opts).await;
+    let mut session = connection.open_session().await.expect("open session");
+    let tag = "tablepro_mysql_session_backend_termination";
+    let query = tokio::spawn(async move {
+        let result = session
+            .query_params_controlled(
+                &format!("SELECT SLEEP(30) /* {tag} */"),
+                &[],
+                &OperationControl::with_timeout(std::time::Duration::from_secs(40)),
+            )
+            .await;
+        (session, result)
+    });
+
+    let mut connection_id = None;
+    for _ in 0..100 {
+        let result = observer
+            .query(&format!(
+                "SELECT ID FROM information_schema.PROCESSLIST WHERE INFO LIKE '%{tag}%' AND ID <> CONNECTION_ID()"
+            ))
+            .await
+            .expect("inspect active session query");
+        connection_id = result.rows.first().and_then(|row| match row.first() {
+            Some(Value::Int(id)) => Some(*id),
+            _ => None,
+        });
+        if connection_id.is_some() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    let connection_id = connection_id.expect("tagged session query must reach MySQL");
+    observer
+        .execute(&format!("KILL CONNECTION {connection_id}"))
+        .await
+        .expect("terminate session backend");
+
+    let (mut session, result) = tokio::time::timeout(std::time::Duration::from_secs(5), query)
+        .await
+        .expect("terminated session query must not hang")
+        .expect("session query task");
+    let error = result.expect_err("a terminated session query must not succeed");
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable(), "a lost session must be retired");
+    assert!(matches!(
+        session
+            .query_params_controlled(
+                "SELECT 1",
+                &[],
+                &OperationControl::with_timeout(std::time::Duration::from_secs(5)),
+            )
+            .await,
+        Err(DriverError::Internal(_))
+    ));
+    assert_eq!(
+        connection.query("SELECT 1").await.unwrap().rows,
+        vec![vec![Value::Int(1)]]
+    );
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_detects_backend_loss_before_the_next_statement() {
+    let (_container, opts) = start_mysql().await;
+    let connection = MysqlDriver.connect(opts.clone()).await.expect("connect");
+    let observer = connect(opts).await;
+    let mut session = connection.open_session().await.expect("open session");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(5));
+    let result = session
+        .query_params_controlled("SELECT CONNECTION_ID()", &[], &control)
+        .await
+        .expect("read session connection id");
+    let connection_id = match result.rows[0][0] {
+        Value::Int(id) => id,
+        ref value => panic!("unexpected MySQL connection id: {value:?}"),
+    };
+    observer
+        .execute(&format!("KILL CONNECTION {connection_id}"))
+        .await
+        .expect("terminate idle session backend");
+
+    let error = session
+        .query_params_controlled("SELECT 1", &[], &control)
+        .await
+        .expect_err("a statement after backend loss must not masquerade as the old session");
+    assert!(matches!(error, DriverError::Disconnected), "{error:?}");
+    assert!(!session.is_usable(), "the lost session must be retired");
+    assert_eq!(
+        connection.query("SELECT 1").await.unwrap().rows,
+        vec![vec![Value::Int(1)]]
+    );
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn backend_loss_during_row_stream_fails_the_whole_query_as_disconnected() {
     let (_container, opts) = start_mysql().await;
     let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.expect("connect").into();
