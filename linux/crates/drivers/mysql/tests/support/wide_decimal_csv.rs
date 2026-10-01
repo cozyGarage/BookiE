@@ -5,7 +5,7 @@ pub(super) async fn assert_csv_bound_and_literal_round_trips(connection: &dyn Co
     const WIDE_SCALE: &str = "-12345678901234567890123456789012345.123456789012345678901234567890";
 
     connection
-        .execute("CREATE TABLE wide_decimal_source (id INT PRIMARY KEY, whole DECIMAL(65,0), scaled DECIMAL(65,30))")
+        .execute("CREATE TABLE wide_decimal_source (id INT PRIMARY KEY, whole DECIMAL(65,0) UNSIGNED, scaled DECIMAL(65,30))")
         .await
         .unwrap();
     connection

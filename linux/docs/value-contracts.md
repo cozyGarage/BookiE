@@ -116,19 +116,34 @@ value fits the declared type and Rust `Decimal` cannot represent it. Invalid
 numeric tokens, malformed type metadata, values beyond the destination's
 precision/scale, and high-precision values for unspecified `decimal` metadata
 remain errors. A valid `DECIMAL(30,30)` with no integer digits remains accepted.
+The metadata parser allows MySQL's `UNSIGNED` and `ZEROFILL` modifiers but
+rejects unknown and repeated suffixes; this prevents malformed column metadata
+from enabling the text fallback.
 
 The MySQL 8 Docker contract covers a 65-digit integer and a negative
 `DECIMAL(65,30)` with formula-safe CSV output. It compares exact JSON strings,
 imports CSV using destination catalog metadata, writes the values through
 bound parameters and SQL literals, then compares `HEX(CAST(value AS CHAR))`
 with the source for both rows. Focused core tests and the live contract passed.
-The scoped mutation run caught all 30 generated mutations, with no misses,
-timeouts, or unviable cases. The strict GTK+DuckDB values layer passed 168
+The initial scoped mutation run caught all 30 generated mutations, with no
+misses, timeouts, or unviable cases. A follow-up metadata audit added
+`DECIMAL(65,0) UNSIGNED` to the live fixture and malformed suffix cases to core
+tests; all 489 core tests and the MySQL live contract passed. The latest scoped
+run caught all 36 generated mutations, with no misses, timeouts, or unviable
+cases:
+[`20261001-wide-decimal-metadata-mutants-full-core`](../target/quality/20261001-wide-decimal-metadata-mutants-full-core/mutants.out/outcomes.json).
+The strict GTK+DuckDB values layer passed 168
 selected tests across 11 suites:
 [`20261001T002624272378Z-values/report.json`](../target/quality/20261001T002624272378Z-values/report.json).
+After the metadata-suffix change, it passed again with 168 selected tests across
+all 11 suites and no missing suites:
+[`20261001T011112385634Z-values/report.json`](../target/quality/20261001T011112385634Z-values/report.json).
 The quick layer also passed:
 [`20261001T003205886474Z-layers/report.json`](../target/quality/20261001T003205886474Z-layers/report.json).
-The mutation report is
+After the suffix-validation change, the quick layer passed again, including
+formatting, Clippy, sandbox tests and the standalone Redis cancellation target:
+[`20261001T011619474080Z-layers/report.json`](../target/quality/20261001T011619474080Z-layers/report.json).
+The earlier 30-mutant report is
 [`20261001-wide-decimal-csv-mutants-final3`](../target/quality/20261001-wide-decimal-csv-mutants-final3/mutants.out/outcomes.json).
 
 ```sh

@@ -360,7 +360,16 @@ fn decimal_type_limits(data_type: &str) -> Option<(usize, usize)> {
     if !matches!(base, "decimal" | "numeric" | "dec") {
         return None;
     }
-    let arguments = lowered.split_once('(')?.1.split_once(')')?.0;
+    let (arguments, suffix) = lowered.split_once('(')?.1.split_once(')')?;
+    let mut saw_unsigned = false;
+    let mut saw_zerofill = false;
+    for modifier in suffix.split_whitespace() {
+        match modifier {
+            "unsigned" if !saw_unsigned => saw_unsigned = true,
+            "zerofill" if !saw_zerofill => saw_zerofill = true,
+            _ => return None,
+        }
+    }
     let mut parts = arguments.split(',').map(str::trim);
     let precision = parts.next()?.parse().ok()?;
     let scale = parts.next().map_or(Some(0), |part| part.parse().ok())?;
@@ -554,6 +563,13 @@ mod tests {
                 "out-of-range value or malformed precision metadata must be refused for {data_type}"
             );
         }
+
+        assert_eq!(decimal_type_limits("decimal(65,30) garbage"), None);
+        assert_eq!(decimal_type_limits("decimal(65,30) unsigned"), Some((65, 30)));
+        assert_eq!(decimal_type_limits("decimal(65,30) unsigned zerofill"), Some((65, 30)));
+        assert_eq!(decimal_type_limits("decimal(65,30) unsigned garbage"), None);
+        assert_eq!(decimal_type_limits("decimal(65,30) unsigned unsigned"), None);
+        assert_eq!(decimal_type_limits("decimal(65,30) zerofill zerofill"), None);
     }
 
     #[test]

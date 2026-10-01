@@ -104,6 +104,18 @@ strict 168-test value layer, quick gate and all 30 scoped mutants passed. The
 evidence is in the [wide DECIMAL checkpoint](value-contracts.md#mysql-wide-decimal-csv-import-2026-10-01).
 B3 remains open for the other matrix items.
 
+The wide-decimal metadata audit also confirmed that MySQL's catalog
+`UNSIGNED`/`ZEROFILL` suffixes are accepted while unknown/repeated suffixes are
+refused. The live fixture now imports from an actual `DECIMAL(65,0) UNSIGNED`
+column. All 489 core tests, the live MySQL contract and all 36 scoped metadata
+mutants passed. The full GTK+DuckDB value layer evidence above predates this
+small follow-up. The strict 168-test, 11-suite GTK+DuckDB values layer has now
+passed on the updated source; see
+[the retained report](../target/quality/20261001T011112385634Z-values/report.json).
+The quick layer also passed with Redis cancellation executed explicitly; see
+[its report](../target/quality/20261001T011619474080Z-layers/report.json).
+Hosted checks for the new source revision are reported separately.
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a
