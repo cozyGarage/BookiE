@@ -3054,6 +3054,19 @@ passed. Reports are in `target/quality/20260927T180959352277Z-layers/`,
 `target/quality/20260927T181245187611Z-layers/`, and
 `target/quality/20260927T181435128973Z-layers/`.
 
+The named-timezone contract now also checks `Asia/Kathmandu` at
+`DateTime64(9)`, with a local time shortly after midnight mapping to the prior
+UTC date. The expected instant is fixed independently as
+`2026-09-26T18:30:00.123456789Z`; result decoding, typed binding and SQL-literal
+round trips all retain nine digits. The focused Docker regression passed. The
+strict GTK+DuckDB values layer also passed 169 selected tests across all 11
+suites after this expansion:
+[`20261001T014227751433Z-values/report.json`](../target/quality/20261001T014227751433Z-values/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_datetime64_named_timezone_preserves_the_instant -- --ignored --exact --test-threads=1
+```
+
 A second Docker regression covers the New York fall-back `DateTime64(3)` local
 time `2024-11-03 01:30:00.000`. The server confirms the exact local text and
 reports an epoch in one of the two valid fold instants. Because the result wire

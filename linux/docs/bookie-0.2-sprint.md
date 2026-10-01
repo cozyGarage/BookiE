@@ -131,6 +131,12 @@ all 11 suites, including eight MySQL scenarios; report:
 [`20261001T013200347651Z-values/report.json`](../target/quality/20261001T013200347651Z-values/report.json).
 Other SQL-mode and DDL-session combinations remain open, so B3 is still open.
 
+ClickHouse named-timezone coverage now includes Kathmandu's `+05:45` offset and
+a fractional timestamp crossing into the previous UTC date. A live Docker test
+checks the fixed expected instant through result decoding, bound parameters and
+SQL literals; all nine fractional digits survive. The focused regression passed.
+Other time-zone boundaries and native-type/consumer targets remain open.
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a

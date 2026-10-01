@@ -584,39 +584,58 @@ async fn value_contract_datetime64_precision_0_through_9_is_exact() {
 async fn value_contract_datetime64_named_timezone_preserves_the_instant() {
     let (_container, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
-    let result = conn
-        .query("SELECT toDateTime64('2026-09-27 12:34:56.123456', 6, 'Asia/Tokyo') AS stamp")
-        .await
-        .unwrap();
-    let instant = chrono::DateTime::parse_from_rfc3339("2026-09-27T03:34:56.123456Z")
-        .unwrap()
-        .to_utc();
-    assert_eq!(
-        result.rows,
-        vec![vec![Value::TimestampTz(instant)]],
-        "DateTime64 timezone metadata must be applied to the displayed local clock",
-    );
+    for (local, scale, timezone, utc) in [
+        (
+            "2026-09-27 12:34:56.123456",
+            6,
+            "Asia/Tokyo",
+            "2026-09-27T03:34:56.123456Z",
+        ),
+        (
+            "2026-09-27 00:15:00.123456789",
+            9,
+            "Asia/Kathmandu",
+            "2026-09-26T18:30:00.123456789Z",
+        ),
+    ] {
+        let result = conn
+            .query(&format!(
+                "SELECT toDateTime64('{local}', {scale}, '{timezone}') AS stamp"
+            ))
+            .await
+            .unwrap();
+        let instant = chrono::DateTime::parse_from_rfc3339(utc).unwrap().to_utc();
+        assert_eq!(
+            result.rows,
+            vec![vec![Value::TimestampTz(instant)]],
+            "DateTime64 {timezone} metadata must be applied to the displayed local clock"
+        );
 
-    let expected = Value::TimestampTz(instant);
-    let bound = conn
-        .query_params(
-            "SELECT CAST(? AS DateTime64(6, 'Asia/Tokyo'))",
-            std::slice::from_ref(&expected),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        bound.rows,
-        vec![vec![expected.clone()]],
-        "bound timestamp timezone round trip"
-    );
+        let expected = Value::TimestampTz(instant);
+        let bound = conn
+            .query_params(
+                &format!("SELECT CAST(? AS DateTime64({scale}, '{timezone}'))"),
+                std::slice::from_ref(&expected),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            bound.rows,
+            vec![vec![expected.clone()]],
+            "bound timestamp timezone round trip for {timezone}"
+        );
 
-    let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
-    let exported = conn
-        .query(&format!("SELECT CAST({literal} AS DateTime64(6, 'Asia/Tokyo'))"))
-        .await
-        .unwrap();
-    assert_eq!(exported.rows, vec![vec![expected]], "SQL literal timezone round trip");
+        let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &expected).unwrap();
+        let exported = conn
+            .query(&format!("SELECT CAST({literal} AS DateTime64({scale}, '{timezone}'))"))
+            .await
+            .unwrap();
+        assert_eq!(
+            exported.rows,
+            vec![vec![expected]],
+            "SQL literal timezone round trip for {timezone}"
+        );
+    }
 }
 
 #[tokio::test]
