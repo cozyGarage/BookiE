@@ -749,6 +749,59 @@ async fn postgres_numeric_parser_outputs_round_trip_through_server() {
         }
     }
 
+    connection
+        .execute_controlled(
+            "CREATE TABLE parser_text_array_edit (id integer PRIMARY KEY, value text[] NOT NULL)",
+            &control,
+        )
+        .await
+        .unwrap();
+    connection
+        .execute_controlled(
+            "INSERT INTO parser_text_array_edit VALUES (1, ARRAY['initial']), (2, ARRAY['sibling'])",
+            &control,
+        )
+        .await
+        .unwrap();
+    let columns = connection
+        .fetch_columns_controlled(None, "parser_text_array_edit", &control)
+        .await
+        .unwrap();
+    let value = columns.iter().position(|column| column.name == "value").unwrap();
+    let literal = r#"{"a  b"," c "}"#;
+    let normalized = normalize_single_line_input(literal);
+    let parsed = parse_input_for_driver(&normalized, Some(&columns[value]), "postgres").unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "parser_text_array_edit",
+        &columns,
+        &[(value, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(
+        connection
+            .execute_in_transaction_controlled(&[update], &control)
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let saved = connection
+        .query_controlled(
+            "SELECT id, value::text FROM parser_text_array_edit ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        saved.rows,
+        vec![
+            vec![Value::Int(1), Value::Text(literal.into())],
+            vec![Value::Int(2), Value::Text("{sibling}".into())],
+        ]
+    );
+
     let fraction = format!("{}123", "1234567890".repeat(1638));
     assert_eq!(fraction.len(), 16_383);
     let maximum_scale_value = format!("0.{fraction}");
@@ -896,17 +949,34 @@ fn normalize_single_line_leaves_plain_text_untouched() {
 fn normalize_single_line_collapses_a_multiline_paste_into_one_line() {
     assert_eq!(
         normalize_single_line_input("first\nsecond\r\nthird"),
-        "first second third"
+        "first second  third"
     );
 }
 
 #[test]
-fn normalize_single_line_squashes_runs_of_whitespace_left_by_the_collapse() {
-    assert_eq!(normalize_single_line_input("a\n\n\nb"), "a b");
-    assert_eq!(
-        normalize_single_line_input("  leading and trailing  "),
-        "leading and trailing"
-    );
+fn normalize_single_line_preserves_other_whitespace_and_array_literals() {
+    let text = "  padded  CHAR  ";
+    assert_eq!(normalize_single_line_input(text), text);
+
+    let literal = r#"{"a  b", " c "}"#;
+    let normalized = normalize_single_line_input(literal);
+    assert_eq!(normalized, literal);
+    let column = col("text[]", true);
+    let parsed = parse_input_for_driver(&normalized, Some(&column), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let mut columns = vec![col("integer", false), column];
+    columns[0].primary_key = true;
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "whitespace_contract",
+        &columns,
+        &[(1, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(sql.contains("$1::text::pg_catalog.text[]"));
+    assert_eq!(params[0], Value::Text(literal.into()));
 }
 
 fn col(data_type: &str, nullable: bool) -> ColumnInfo {

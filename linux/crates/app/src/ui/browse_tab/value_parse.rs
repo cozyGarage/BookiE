@@ -1,19 +1,16 @@
 use chrono::Timelike;
 use tablepro_core::{ColumnInfo, Value};
 
-/// Collapse newlines / carriage returns to spaces, then squash any
-/// resulting consecutive whitespace runs to a single space. Applied
-/// at cell-edit commit time for non-JSON columns so a multi-line
+/// Replace newlines / carriage returns with spaces. Applied at
+/// cell-edit commit time for non-JSON columns so a multi-line
 /// clipboard paste into a single-line cell never reaches the SQL
 /// layer with embedded `\n` — driver behaviour for that case is
 /// type-specific (text columns store literally; numeric / date
-/// columns parse-fail) and worth normalising up front.
+/// columns parse-fail). Preserve all other text exactly.
 pub(super) fn normalize_single_line_input(text: &str) -> String {
-    let replaced: String = text
-        .chars()
+    text.chars()
         .map(|c| if matches!(c, '\n' | '\r') { ' ' } else { c })
-        .collect();
-    replaced.split_whitespace().collect::<Vec<_>>().join(" ")
+        .collect()
 }
 
 pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Value, String> {

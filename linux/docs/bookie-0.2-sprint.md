@@ -21,10 +21,10 @@ October 1 audit checkpoint: source
 `b90cb4e38c1a98f41b552e03f739f9c51c67810f`.
 The [B3 review](b3-review-2026-10-01.md) reproduces empty-edit, text-normalization,
 wide-numeric INSERT and BC temporal CSV defects despite 181 passing value
-contracts. R1 was fixed and passed its focused plus strict value-layer checks
-on October 2. Resolve R2–R4 and the missing app/server gate ownership R5 before
-expanding B3 scenarios. R6 tracks portable evidence and a finite
-contract board. The review contains the proposed task format and acceptance
+contracts. R1 and R2 were fixed and passed focused app, native database, and
+strict value-layer checks on October 2. Resolve R3–R4 and the missing app/server
+gate ownership R5 before expanding B3 scenarios. R6 tracks portable evidence and
+a finite contract board. The review contains the proposed task format and acceptance
 criteria; existing native-support targets and desktop acceptance stay open.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
