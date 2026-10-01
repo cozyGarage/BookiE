@@ -2129,8 +2129,23 @@ instants of a repeated DST hour. Direct/session values, type metadata, typed
 bindings, SQL literals and generated INSERTs are compared with server wire bytes.
 The integration test is `value_contract_dates_preserve_eras_large_years_and_instants`;
 its lowest-tier regression is in core's SQL literal tests. Dates outside chrono's
-range, infinities, mixed intervals, temporal arrays and non-SQL consumer/editing
+range now have native text/wire oracles, visible JSON/CSV refusal markers, and
+explicit SQL-literal/parameter refusal. They still lack exact application value
+support. Infinities, mixed intervals, temporal arrays and non-SQL consumer/editing
 acceptance remain open.
+
+The extended-calendar contract now parses the DATE and TIMESTAMP exports back
+through the CSV reader and checks their visible `<undecodable DATE>` and
+`<undecodable TIMESTAMP>` markers; JSON output is checked as structured JSON.
+This prevents either consumer from silently presenting these native values as
+empty cells or SQL NULL. The focused PostgreSQL Docker test passed. The strict
+GTK+DuckDB values layer passed 169 selected tests across all 11 suites with no
+missing suites:
+[`20261001T015111955335Z-values/report.json`](../target/quality/20261001T015111955335Z-values/report.json).
+
+```sh
+rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --ignored --test-threads=1
+```
 
 The [CI audit](ci-audit-2026-09-27.md) found nine survivors in the broader hosted
 PostgreSQL mutation run. New regressions use an independent 16,777,216-byte limit,

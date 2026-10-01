@@ -137,6 +137,14 @@ checks the fixed expected instant through result decoding, bound parameters and
 SQL literals; all nine fractional digits survive. The focused regression passed.
 Other time-zone boundaries and native-type/consumer targets remain open.
 
+PostgreSQL's extended-calendar refusal case now also checks JSON and CSV
+consumers: DATE year 1,000,000 and upper-range TIMESTAMP retain visible typed
+markers, while the independent server text/wire oracles remain exact and
+parameter/SQL-literal consumers refuse the values. The focused Docker test
+passed. The strict GTK+DuckDB values layer then passed 169 selected tests
+across all 11 suites with no missing suites; report:
+[`20261001T015111955335Z-values/report.json`](../target/quality/20261001T015111955335Z-values/report.json).
+
 ### MongoDB client recovery after server loss — October 1
 
 The existing MongoDB disconnect test proved fresh-client recovery but used a

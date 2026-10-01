@@ -3,6 +3,23 @@
 use tablepro_core::{Connection, DriverError, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
+fn assert_undecodable_temporal_exports(result: &tablepro_core::QueryResult, type_name: &str) {
+    let value = result.rows[0][0].clone();
+    let rows = vec![vec![value]];
+    let columns = &result.columns[..1];
+    let json = tablepro_core::export::render_json(columns, &rows);
+    let parsed_json: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        parsed_json,
+        serde_json::json!([{"value": format!("<undecodable {type_name}>")}])
+    );
+
+    let options = tablepro_core::export::CsvOptions::default();
+    let csv = tablepro_core::export::render_csv(columns, &rows, &options);
+    let parsed_csv = tablepro_core::import::read_csv(csv.as_bytes(), &Default::default(), None).unwrap();
+    assert_eq!(parsed_csv.rows[0][0], format!("<undecodable {type_name}>"));
+}
+
 pub async fn assert_date_contract(connection: &dyn Connection) {
     let control = OperationControl::new(CancellationToken::new(), None);
     let mut session = connection.open_session().await.unwrap();
@@ -63,6 +80,7 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
     assert_eq!(result.rows[0][0], Value::Undecodable("DATE".into()));
     assert_eq!(result.rows[0][1], Value::Text("1000000-01-01".into()));
     assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
+    assert_undecodable_temporal_exports(&result, "DATE");
     assert_eq!(
         tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
         Err(tablepro_core::sql_literal::LiteralError::Undecodable)
@@ -80,6 +98,7 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
     assert_eq!(result.rows[0][0], Value::Undecodable("TIMESTAMP".into()));
     assert_eq!(result.rows[0][1], Value::Text("294276-12-31 23:59:59.999999".into()));
     assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
+    assert_undecodable_temporal_exports(&result, "TIMESTAMP");
     assert_eq!(
         tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
         Err(tablepro_core::sql_literal::LiteralError::Undecodable)
