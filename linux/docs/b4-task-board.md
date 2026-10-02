@@ -6,7 +6,7 @@ separate agents can take in parallel.
 
 ## B4 continuation status (October 3)
 
-Latest integrated base: `4b7814f5e` on `linux`. The main checkout still has
+Latest integrated base: `573435766` on `linux`. The main checkout still has
 uncommitted B3 work; this status update and B4 implementation use isolated
 worktrees. Keep B4 open until the remaining tasks and installed Arch/Debian
 acceptance are complete.
@@ -15,8 +15,9 @@ acceptance are complete.
 | --- | --- | --- |
 | E1, E2, G3, F1, F2, F3 | Merged to `linux` in PRs #16–#18 | Hosted required checks passed; see the linked PRs for packet details. |
 | F5 | Merged to `linux` by [PR #19](https://github.com/cozyGarage/BookiE/pull/19) as `4b7814f5e` | Local focused tests and `full` passed; hosted Build Linux, Linux Security, and both Flatpak jobs passed. Scheduled current-stable Clippy was skipped by workflow schedule. |
-| F4 + F9 | Implemented and locally validated on `codex-b4-f4f9` at `faed59fc5`, based on `4b7814f5e` | `full`, `ssh`, and `postgres-release` passed in `/tmp/tablepro-b4-f5/linux/linux/target/quality/20261002T225224078495Z-layers/report.json`, including `ssh_reconnect_replaces_the_tunnel_and_the_session`. Open PR and hosted review checks next. |
+| F4 + F9 | Merged in [PR #20](https://github.com/cozyGarage/BookiE/pull/20) as `573435766`; implementation commit `ecadbe204` | Local `full`, `ssh`, and `postgres-release` passed in `/tmp/tablepro-b4-f5/linux/linux/target/quality/20261002T225224078495Z-layers/report.json`, including `ssh_reconnect_replaces_the_tunnel_and_the_session`. Build Linux and Flatpak checks were still running at this update; Linux Security had passed. |
 | Remaining | F6, F8, C6 MySQL/SQL Server, G5, I2, I5, F7, I3, native Arch acceptance, I1/Debian | Follow the dependencies and evidence requirements in the packets below. B3 completion remains the sprint prerequisite. |
+
 ## October 3 integration checkpoint
 
 Reviewed `linux` at `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. The isolated-worktree progress below is historical; do not reapply those patches as unmerged work. Main-branch history now includes F1/F3 (`7054a7867`, #13), daemon cache refusal (`d80bade4c` / `768188734`, #14/#17), shared transaction policy (`ad807c61b`, #18), awaited editor cleanup (`7b08dd478`, #16), and editor retirement (`4b7814f5e`, #19). The current retirement path refuses further session dispatch and requires reopening Session. This checkpoint traces source integration; it does not rerun the older branch reports or certify hosted/installed acceptance. F4/F9, F8 and wider B4 acceptance stay open.
