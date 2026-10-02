@@ -33,6 +33,10 @@ use schema::{apply_editor_font_size, apply_editor_scheme};
 use sql_text::toggle_line_comment;
 use statement_cursor::{cursor_byte_offset, script_statements, statement_at_cursor};
 
+fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
+    running && supports_server_cancellation
+}
+
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
@@ -637,7 +641,9 @@ impl SimpleComponent for SqlEditor {
             }
 
             SqlEditorInput::Cancel => {
-                if let Some(token) = self.cancel_token.take() {
+                if self.cancel_button.is_visible()
+                    && let Some(token) = self.cancel_token.take()
+                {
                     token.cancel();
                 }
             }
@@ -890,7 +896,7 @@ impl SqlEditor {
         let token = CancellationToken::new();
         self.cancel_token = Some(token.clone());
 
-        self.set_running(true, &sender);
+        self.set_running(true, conn.supports_server_cancellation(), &sender);
         self.status.set_label(&crate::tr!("Running…"));
         clear_box(&self.results_holder);
 
@@ -964,9 +970,10 @@ impl SqlEditor {
         });
     }
 
-    fn set_running(&self, running: bool, sender: &ComponentSender<Self>) {
+    fn set_running(&self, running: bool, supports_server_cancellation: bool, sender: &ComponentSender<Self>) {
         self.run_button.set_sensitive(!running);
-        self.cancel_button.set_visible(running);
+        self.cancel_button
+            .set_visible(show_cancel_button(running, supports_server_cancellation));
         self.running_spinner.set_visible(running);
         let _ = sender.output(SqlEditorOutput::RunStateChanged(running));
     }
@@ -979,7 +986,7 @@ impl SqlEditor {
         let terminal = self.run_generation.finish(generation)?;
         let context = self.executions.remove(&generation)?;
         if terminal.became_idle {
-            self.set_running(false, sender);
+            self.set_running(false, false, sender);
             if let Ok(elapsed) = context.started_at.elapsed() {
                 finish_notice::notify_if_unattended(&self.source_view, elapsed);
             }
@@ -1073,7 +1080,7 @@ fn build_completion_refresh(
 
 #[cfg(test)]
 mod tests {
-    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text};
+    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text, show_cancel_button};
     use std::io::Write;
 
     #[test]
@@ -1107,6 +1114,13 @@ mod tests {
         let first_terminal = generations.finish(first).unwrap();
         assert!(!first_terminal.replace_ui);
         assert!(first_terminal.became_idle);
+    }
+
+    #[test]
+    fn stop_is_visible_only_for_running_server_cancellable_queries() {
+        assert!(show_cancel_button(true, true));
+        assert!(!show_cancel_button(true, false));
+        assert!(!show_cancel_button(false, true));
     }
 
     #[test]
