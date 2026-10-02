@@ -230,6 +230,11 @@ array text and safe refusal by the result, SQL-literal and binding paths. The
 clean strict layer passed it on `6c2e61f`; other nested unsigned collection
 shapes remain open.
 
+The ClickHouse nested consumer contract now includes a numeric-key
+`Map(UInt8, Nullable(UInt128))`, checking exact server oracles, JSON/CSV
+preservation and safe refusal across type-less write consumers. The matrix has
+thirteen nested shapes; other nested combinations remain open.
+
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,
 `crates/driver-tls-tests/tests/`, `crates/mcp/tests/enforce_policy.rs`.

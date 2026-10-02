@@ -3642,6 +3642,22 @@ values through those consumers. The focused Docker contract passed after both
 shapes were added. This adds the twelfth nested shape; other nested combinations and broader consumer
 parity remain open.
 
+### ClickHouse numeric-key nullable map, 2026-10-02
+
+The same server-backed contract now covers
+`Map(UInt8, Nullable(UInt128))`, with key `255` mapped to NULL and key `1` mapped
+to `18446744073709551616`. It checks ClickHouse's native type and JSON oracles,
+the driver and parsed JSON/CSV consumers, and refusal by SQL literal, parameter
+binding and keyed grid edit while confirming the MergeTree row is unchanged.
+The focused Docker test and strict GTK+DuckDB value layer passed; the layer ran
+186 tests across all 11 suites, including this contract. The report is
+[`20261002T004142618874Z-values/report.json`](../target/quality/20261002T004142618874Z-values/report.json).
+This is the thirteenth nested shape, and other nested combinations remain open.
+
+```sh
+rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
+```
+
 ```sh
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --test-threads=1
 ```

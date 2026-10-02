@@ -126,6 +126,13 @@ checks native type and JSON oracles, JSON/CSV consumers, explicit refusal by
 type-less SQL consumers, and unchanged row contents after grid refusal. Both
 cases passed; B3 remains open for other nested combinations and matrix targets.
 
+The next ClickHouse nested slice adds `Map(UInt8, Nullable(UInt128))` with a
+value above `u64::MAX` and a NULL entry. The focused server contract passed;
+the shared consumer checks JSON/CSV and refuses type-less SQL, binding and grid
+edits. The strict GTK+DuckDB value layer passed 186 tests across 11 suites at
+code commit `0970896`; hosted CI is pending. See the
+[value evidence](value-contracts.md#clickhouse-numeric-key-nullable-map-2026-10-02).
+
 B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
 survivors against the current test set: 16/16 viable ClickHouse mutants and
 13/13 viable CSV classifier mutants were caught; one additional CSV mutation

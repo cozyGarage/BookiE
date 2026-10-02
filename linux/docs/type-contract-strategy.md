@@ -135,6 +135,14 @@ This closes that shape's behavior contract, not nested-array support. Other
 nested unsigned collection shapes remain open. The clean strict GTK+DuckDB
 value layer passed 186 tests on `6c2e61f`, including all 24 DuckDB contracts.
 
+The ClickHouse nested contract now covers thirteen Array/Map/Tuple shapes,
+including `Map(UInt8, Nullable(UInt128))` with a wide unsigned value and NULL.
+It uses native type and JSON oracles and checks JSON/CSV preservation plus
+type-less SQL, binding and edit refusal. Other nested combinations remain open;
+the strict 186-test, 11-suite value layer passed at code commit `0970896`.
+See the [value ledger](value-contracts.md#clickhouse-numeric-key-nullable-map-2026-10-02)
+for the report.
+
 ### Connection-loss contract update — September 30
 
 Docker-backed tests stop each remote server after a successful request and
