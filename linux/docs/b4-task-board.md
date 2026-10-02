@@ -107,14 +107,22 @@ not replace the final combined layers or installed Arch/Debian acceptance.
 
 The current `linux` tip has advanced to `d7007a6a6`. E1 and F2 were implemented
 in isolated worktrees, rebased onto that tip, and pushed as separate review
-branches. They remain open until reviewed, merged and validated on the combined
-tree. Direct pushes to these feature branches do not trigger the Linux workflows;
-open PRs targeting `linux` or dispatch a workflow with the branch ref.
+branches. A temporary integration tree passed the combined affected layers;
+the packets remain open until integrated into `linux` and hosted review checks
+finish. Direct pushes to these feature branches do not trigger the Linux
+workflows; PRs targeting `linux` or manual dispatch by ref do.
 
 | Task | Worktree / branch / commit | Evidence and remaining acceptance |
 | --- | --- | --- |
 | E1 | `/tmp/tablepro-b4-e1/linux`, `codex-b4-e1`, `3c165a0d7` | The dialect-aware shared policy gate refuses MySQL XA start and autocommit-off and SQL Server implicit transactions before approval/dispatch; tokens in comments/literals are ignored and safe neighboring statements remain allowed. Exact-tip report `target/quality/20261002T202739203539Z-layers/report.json`: `quick` and `security-policy` passed; policy lib: 165 passed. E2 is the next policy packet but depends on E1 review/integration. |
-| F2 | `/tmp/tablepro-b4-f1`, `codex-b4-f2`, `495c39931` | Editor teardown cancels/drains runs, joins opens, and awaits one close before tab/window/connection destruction; rollback failures stay visible and audited as unknown. Exact-tip report `target/quality/20261002T202523816125Z-layers/report.json`: `full`, `widgets`, `postgres-release` passed; app lib: 425 passed, 15 ignored. Real PostgreSQL selector `closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgres` passed (1/1), verifying fresh-connection row state and rollback audit. Route order was fixed so pending saves/discards precede a tab's rollback prompt. |
+| F2 | `/tmp/tablepro-b4-f1`, `codex-b4-f2`, `495c39931` | Editor teardown cancels/drains runs, joins opens, and awaits one close before tab/window/connection destruction; rollback failures stay visible and audited as unknown. Exact-tip report `target/quality/20261002T202523816125Z-layers/report.json`: `full`, `widgets`, `postgres-release` passed; app lib: 425 passed, 15 ignored. Real PostgreSQL selector `closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgres` passed (1/1), verifying fresh-connection row state and rollback audit. Route order ensures pending saves/discards precede a tab's rollback prompt. |
+
+Combined validation: temporary worktree `/tmp/tablepro-b4-integration`, merge
+commit `b9e75ac26` (base `d7007a6a6`), report
+`target/quality/20261002T203352934307Z-layers/report.json`. `quick`,
+`security-policy`, `full`, `widgets` and `postgres-release` all passed on the
+combined E1+F2 tree. The real PostgreSQL rollback/audit selector also passed on
+that tree (1/1).
 
 F2 route trace at the pushed branch:
 
