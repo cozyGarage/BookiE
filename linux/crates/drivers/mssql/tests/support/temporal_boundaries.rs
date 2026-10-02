@@ -1,15 +1,13 @@
 use super::{connect, start_mssql};
 use chrono::{NaiveDate, NaiveDateTime};
-use tablepro_core::Value;
+use tablepro_core::{Connection, OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_supported_temporal_calendar_edges_match_native_text_and_bind_exactly() {
     let (_container, options) = start_mssql().await;
     let connection = connect(options).await;
-    let boundaries = connection
-        .query(
-            "SELECT CAST('0001-01-01' AS date), CONVERT(varchar(10), CAST('0001-01-01' AS date), 23), \
+    let boundary_sql = "SELECT CAST('0001-01-01' AS date), CONVERT(varchar(10), CAST('0001-01-01' AS date), 23), \
              CAST('9999-12-31' AS date), CONVERT(varchar(10), CAST('9999-12-31' AS date), 23), \
              CAST('0001-01-01T00:00:00.0000001' AS datetime2(7)), \
              CONVERT(varchar(27), CAST('0001-01-01T00:00:00.0000001' AS datetime2(7)), 126), \
@@ -18,11 +16,20 @@ async fn value_contract_supported_temporal_calendar_edges_match_native_text_and_
              CAST('00:00:00.0000001' AS time(7)), \
              CONVERT(varchar(16), CAST('00:00:00.0000001' AS time(7)), 126), \
              CAST('23:59:59.9999999' AS time(7)), \
-             CONVERT(varchar(16), CAST('23:59:59.9999999' AS time(7)), 126)",
-        )
+             CONVERT(varchar(16), CAST('23:59:59.9999999' AS time(7)), 126)";
+    let boundaries = connection
+        .query(boundary_sql)
         .await
         .expect("query native temporal boundaries");
     assert_eq!(boundaries.rows.len(), 1);
+    let mut session = connection.open_session().await.expect("open SQL Server session");
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let session_boundaries = session
+        .query_params_controlled(boundary_sql, &[], &control)
+        .await
+        .expect("query temporal boundaries through the session batch path");
+    assert_eq!(session_boundaries.rows, boundaries.rows);
+    session.close().await.expect("close SQL Server session");
     assert_eq!(
         boundaries.rows[0],
         vec![
