@@ -108,23 +108,23 @@ live integration contract checks DATE, TIME, TIMETZ, TIMESTAMP and TIMESTAMPTZ
 against exact server text after import; see the
 [value ledger](value-contracts.md#postgresql-era-and-mutation-checkpoint).
 
-### B3-P1 selected next case — PostgreSQL scalar custom enum — October 2
+### B3-P1 completed case — PostgreSQL scalar custom enum — October 2
 
-The existing scalar enum contract proves exact `enum::text`, SQL-literal and
-typed-text behavior against `pg_typeof`, but it does not permanently exercise
-the direct enum projection. A manual direct projection reached SQLx metadata
-resolution and returned `enum_labels: unexpected NULL`; the equivalent enum
-array metadata boundary already has a regression. The smallest next task is to
-extend the existing scalar contract so direct projection either returns every
-label and SQL NULL exactly or reproduces that specific metadata error. Keep the
-independent server type/text oracle and text-consumer checks.
+The scalar enum contract now permanently exercises the direct projection as
+well as exact `enum::text`, SQL-literal and typed-text behavior against
+`pg_typeof`. With pinned SQLx, direct projection returns
+`enum_labels: unexpected NULL` during metadata resolution. The test pins that
+boundary; if direct decoding becomes available, it checks all labels and SQL
+NULL exactly. The equivalent enum-array metadata boundary has its own
+regression. Neither metadata error is a BookiE `Undecodable` value.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contracts::value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
 ```
 
-Until the decoder supports the native result type, record this as a tested
-SQLx boundary, not exact typed support or a BookiE `Undecodable` value.
+The [value ledger](value-contracts.md#postgresql-scalar-enum-label-text-projection)
+records the passing PostgreSQL 16 contract. Direct native enum decoding remains
+unsupported; B3 still has the other named matrix targets above.
 
 ### Connection-loss contract update — September 30
 

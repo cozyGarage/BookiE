@@ -1583,12 +1583,19 @@ unexpected NULL), so direct enum result decoding remains open; this contract
 does not claim it is supported.
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contracts::value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
 ```
 
-The text-projection and consumer round-trip contract passed against PostgreSQL
-16. The direct enum projection attempt failed before assertions in SQLx metadata
-resolution and is recorded as an open boundary, not a passing result contract.
+The strict value layer passed this contract against PostgreSQL 16. It now
+exercises direct projection as well: with the pinned SQLx version, the query
+returns `enum_labels: unexpected NULL` during metadata resolution. The test
+asserts that exact failure boundary; if SQLx begins decoding the type, it instead
+requires all three labels and SQL NULL to arrive exactly. This is a tested
+metadata boundary, not exact typed support or a BookiE `Undecodable` value.
+The GTK+DuckDB value runner passed 185 selected tests across 11 suites with no
+missing suites; its [layer report](../target/quality/20261002T001114559521Z-layers/report.json)
+and [suite details](../target/quality/20261002T001114623221Z-values/report.json)
+record this regression.
 
 ### PostgreSQL custom enum array metadata boundary
 

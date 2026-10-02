@@ -944,6 +944,30 @@ async fn value_contract_scalar_enum_labels_preserve_exact_text() {
         .unwrap();
     assert_eq!(null.rows, vec![vec![Value::Null, Value::Null]]);
 
+    let direct_projection = connection
+        .query(
+            "SELECT label FROM (VALUES \
+             ('NULL'::value_contract_label), ('東京'::value_contract_label), \
+             ('o''brien'::value_contract_label), (NULL::value_contract_label)) AS labels(label)",
+        )
+        .await;
+    match direct_projection {
+        Ok(result) => assert_eq!(
+            result.rows,
+            vec![
+                vec![Value::Text("NULL".into())],
+                vec![Value::Text("東京".into())],
+                vec![Value::Text("o'brien".into())],
+                vec![Value::Null],
+            ]
+        ),
+        Err(error) => {
+            let detail = format!("{error:?}").to_ascii_lowercase();
+            assert!(detail.contains("enum_labels"), "{detail}");
+            assert!(detail.contains("unexpected null"), "{detail}");
+        }
+    }
+
     for value in ["NULL", "東京", "o'brien"] {
         let input = Value::Text(value.into());
         let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &input).unwrap();
