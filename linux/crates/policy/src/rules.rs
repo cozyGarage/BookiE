@@ -4,7 +4,7 @@ use tablepro_core::Environment;
 use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
 use crate::principal::Principal;
-use crate::transaction_control::has_implicit_transaction_starter;
+use crate::transaction_control::{TransactionControl, has_implicit_transaction_starter, transaction_control};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -50,6 +50,7 @@ pub fn evaluate(
 pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
     if (facts.class == StatementClass::Transaction && !facts.is_multi_statement)
         || has_implicit_transaction_starter(sql, driver_id)
+        || has_unclosed_shared_transaction(sql, driver_id)
     {
         return Some(Decision::Deny {
             rule: "transaction_control_needs_session".into(),
@@ -60,6 +61,35 @@ pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &Sta
         });
     }
     None
+}
+
+fn has_unclosed_shared_transaction(sql: &str, driver_id: &str) -> bool {
+    let statements = tablepro_core::sql_lex::split_statements(sql, driver_id);
+    if statements.len() < 2 {
+        return false;
+    }
+
+    let mut open = false;
+    for statement in statements {
+        match transaction_control(&statement, driver_id) {
+            Some(TransactionControl::Begin) if open => return true,
+            Some(TransactionControl::Begin) => open = true,
+            Some(TransactionControl::Commit { chain } | TransactionControl::Rollback { chain }) => {
+                if !open || chain {
+                    return true;
+                }
+                open = false;
+            }
+            None if open => {
+                let facts = crate::classify::classify(&statement, driver_id);
+                if facts.class == StatementClass::Unparseable || (driver_id == "mysql" && facts.contains_ddl) {
+                    return true;
+                }
+            }
+            None => {}
+        }
+    }
+    open
 }
 
 pub(crate) fn evaluate_categorical(
@@ -380,6 +410,38 @@ mod tests {
             .is_none()
         );
         assert!(shared_connection_decision("SELECT 1", "postgres", &classify("SELECT 1", "postgres")).is_none());
+    }
+
+    #[test]
+    fn shared_batches_must_not_leave_an_explicit_transaction_open() {
+        let cases = [
+            ("BEGIN; UPDATE items SET v = 1 WHERE id = 1", "postgres", true),
+            ("BEGIN; SELECT 1", "postgres", true),
+            ("BEGIN; UPDATE items SET v = 1 WHERE id = 1; COMMIT", "postgres", false),
+            (
+                "BEGIN; UPDATE items SET v = 1 WHERE id = 1; ROLLBACK",
+                "postgres",
+                false,
+            ),
+            ("BEGIN; SELECT 1; COMMIT AND CHAIN", "postgres", true),
+            (
+                "BEGIN; UPDATE items SET v = 1 WHERE id = 1; BEGIN; COMMIT",
+                "postgres",
+                true,
+            ),
+            ("UPDATE items SET v = 1 WHERE id = 1; COMMIT", "postgres", true),
+            ("BEGIN; SELECT 'COMMIT; BEGIN'; COMMIT", "postgres", false),
+            ("BEGIN; /* COMMIT */ SELECT 1; COMMIT", "postgres", false),
+            (
+                "START TRANSACTION; CREATE TABLE transaction_ddl (id INT); COMMIT",
+                "mysql",
+                true,
+            ),
+        ];
+        for (sql, driver, denied) in cases {
+            let decision = shared_connection_decision(sql, driver, &classify(sql, driver));
+            assert_eq!(decision.is_some(), denied, "{driver}: {sql}");
+        }
     }
 
     #[test]
