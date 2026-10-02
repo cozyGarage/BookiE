@@ -1,6 +1,49 @@
 {
   "source_revision": "b90cb4e38c1a98f41b552e03f739f9c51c67810f",
   "inventory_baseline": "f142d3fea",
+  "follow_up_evidence": [
+    {
+      "source_revision": "19c5b6a4178d48c6d3c565af4de7fb5de3991c17",
+      "source_clean": true,
+      "contracts": [
+        {
+          "id": "clickhouse-numeric-key-nullable-map",
+          "source_revision": "09708965f60ad461b63effd24cdf9853d6f70b78",
+          "test": "crates/drivers/clickhouse/tests/support/nested_values.rs::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers",
+          "command": "cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "ClickHouse toTypeName and toJSONString",
+          "consumers": ["driver", "JSON export", "CSV export/import", "SQL literal refusal", "parameter refusal", "MergeTree edit refusal with unchanged row"]
+        },
+        {
+          "id": "duckdb-nested-ubigint-array",
+          "source_revision": "6c1da5896de936f40c78522f7f34ce571551bb27",
+          "test": "crates/drivers/duckdb/tests/support/ubigint_array.rs::value_contract_nested_ubigint_array_refuses_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration bigint_array::value_contract_nested_ubigint_array_refuses_lossy_consumers -- --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "DuckDB typeof and VARCHAR",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        },
+        {
+          "id": "duckdb-nested-ubigint-struct",
+          "source_revision": "19c5b6a4178d48c6d3c565af4de7fb5de3991c17",
+          "test": "crates/drivers/duckdb/tests/support/ubigint_struct.rs::value_contract_nested_ubigint_struct_refuses_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration bigint_struct::value_contract_nested_ubigint_struct_refuses_lossy_consumers -- --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "DuckDB typeof and VARCHAR for values above i64::MAX, u64::MAX, and NULL",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 187,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report": "target/quality/20261002T005849903174Z-values/report.json"
+      }
+    }
+  ],
   "commit_count_in_inventory": 197,
   "changed_file_count": 133,
   "inventory_is_not_exhaustive_review_certification": true,
