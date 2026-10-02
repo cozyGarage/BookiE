@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use futures::future::join_all;
 use relm4::adw::prelude::*;
 use relm4::{ComponentController, ComponentSender};
 use uuid::Uuid;
@@ -12,28 +11,29 @@ use super::{App, AppMsg, SessionTeardownAction, WorkspaceTab};
 async fn await_editor_sessions(
     replies: Vec<(Uuid, tokio::sync::oneshot::Receiver<Result<(), String>>)>,
 ) -> Result<(), String> {
-    match tokio::time::timeout(
-        Duration::from_secs(20),
-        join_all(replies.into_iter().map(|(id, reply)| async move { (id, reply.await) })),
-    )
-    .await
-    {
-        Err(_) => Err("Timed out waiting for editor sessions to finish cleanup.".to_string()),
-        Ok(replies) => {
-            let mut failures = Vec::new();
-            for (id, reply) in replies {
-                match reply {
-                    Ok(Ok(())) => {}
-                    Ok(Err(message)) => failures.push(format!("Editor {id}: {message}")),
-                    Err(_) => failures.push(format!("Editor {id} closed before cleanup completed.")),
-                }
-            }
-            if failures.is_empty() {
-                Ok(())
-            } else {
-                Err(failures.join("\n"))
+    let cleanup = async {
+        let mut pending = tokio::task::JoinSet::new();
+        for (id, reply) in replies {
+            pending.spawn(async move { (id, reply.await) });
+        }
+        let mut failures = Vec::new();
+        while let Some(result) = pending.join_next().await {
+            match result {
+                Ok((_, Ok(Ok(())))) => {}
+                Ok((id, Ok(Err(message)))) => failures.push(format!("Editor {id}: {message}")),
+                Ok((id, Err(_))) => failures.push(format!("Editor {id} closed before cleanup completed.")),
+                Err(error) => failures.push(format!("Editor cleanup task failed: {error}")),
             }
         }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures.join("\n"))
+        }
+    };
+    match tokio::time::timeout(Duration::from_secs(20), cleanup).await {
+        Err(_) => Err("Timed out waiting for editor sessions to finish cleanup.".to_string()),
+        Ok(result) => result,
     }
 }
 
