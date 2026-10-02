@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`b9ebdcf` (source version 0.1.5).
+`8e7766c` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -24,14 +24,14 @@ and its evidence. R6 tracks portable evidence and a finite contract board; the
 remaining native-type matrix and session reconnect follow-up stay open. Continue
 B3-P1 to reconcile those contracts, then assign one bounded engine/type/consumer
 case using the [agent task template](validation-playbook.md#agent-task-template).
-The pushed head has Build Linux, Flatpak and Security green; test-quality is
-still pending. LT-TRUNG passed the full, app-server, values, Docker driver,
-TLS, PostgreSQL release, keyring and security-policy layers on this exact clean
-commit. `cargo deny check` passed; `cargo audit` could not start because
-`cargo-audit` is absent. Widget/UI display layers need Xvfb. The user will
-install both tools; rerun the missing layers after installation. See the
+The pushed head passed the clean LT-TRUNG full gate; the remaining selected
+local layers also passed after installing Xvfb, `cargo-audit`, `python-atspi`
+and `dpkg`. Docker driver/value reports were captured on the preceding
+production tree; `8e7766c` changes only XLSX precision-boundary assertions and
+review documentation. Current hosted CI for this head has Security and Flatpak
+in progress, with Build Linux and test-quality pending. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
-repeatable local gate and retained report.
+repeatable local gate and retained reports.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
@@ -47,14 +47,15 @@ repeatable local gate and retained report.
 ### Local Rust build cache efficiency
 
 The 2026-10-02 checkout uses Rust 1.98.1 with `CARGO_TARGET_DIR` unset and the
-repository-local `linux/target`, which local gates reuse. It occupies 82 GB:
-45 GB in `debug/incremental`, 31 GB in `debug/deps`, and 3.8 GB in `release`. The current
-toolchain guide's approximate 5 GB development-cache estimate does not match
-this machine. Audit repeated profiles, feature sets and incremental artifacts;
-then choose a safe retention/configuration policy that preserves warm rebuild
-speed while bounding disk use. Record cold and warm build times, target size
-before/after, and exact commands. Do not add cache pruning to normal test runs
-until it proves it keeps active builds reusable.
+repository-local `linux/target`; repeated local gates reused this target
+successfully. It occupies 82 GiB: 45 GiB in `debug/incremental`, 31 GiB in
+`debug/deps`, and 3.8 GiB in `release`. The current toolchain guide's
+approximate 5 GiB development-cache estimate does not match this machine. Keep
+target reuse enabled. Audit repeated profiles, feature sets and incremental
+artifacts; then choose a safe retention/configuration policy that preserves
+warm rebuild speed while bounding disk use. Record cold and warm build times,
+target size before/after, and exact commands. Do not add cache pruning to
+normal test runs until it proves it keeps active builds reusable.
 
 GTK/libadwaita and the already integrated GNOME 50 API/library requirements remain
 part of the build on Arch. The GNOME/Debian phase follows Arch in the same plan.
