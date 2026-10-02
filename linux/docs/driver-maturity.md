@@ -2,7 +2,7 @@
 
 Every registered driver reports a `DriverMaturity` (`Stable` or
 `Experimental`). The Connect dialog shows Experimental as a subtitle so
-users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see [current verification](bug-consistency-2026-09.md).
+users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see [current acceptance](bookie-0.2-sprint.md).
 
 | Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
 |---|---|---|---|---|---|---|---|---|

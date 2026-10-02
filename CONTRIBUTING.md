@@ -6,7 +6,7 @@ Every shipped feature must remain available without an account, license key, sub
 
 ## Development setup
 
-The workspace requires Rust 1.93. Install GTK4 4.14+, libadwaita 1.6+, GtkSourceView 5.12+, OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`linux/README.md`](linux/README.md).
+The workspace requires Rust 1.98. Install GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+, OpenSSL, Secret Service, Kerberos, Clang, `pkg-config`, and standard build tools. Distro-specific package commands are in [`linux/README.md`](linux/README.md).
 
 ```bash
 git clone https://github.com/<your-name>/TablePro.git
@@ -40,7 +40,7 @@ Read [`linux/ARCHITECTURE.md`](linux/ARCHITECTURE.md) before changing crate boun
 
 `linux/rustfmt.toml` and `linux/clippy.toml` define formatting and lint settings.
 
-- Use Rust edition 2024 and Rust 1.93.
+- Use Rust edition 2024 and Rust 1.98.
 - Keep lines at or below 120 characters where practical.
 - Do not add comments. Use names, types, functions, and tests to express intent.
 - Prefer small functions and early returns.
@@ -86,7 +86,7 @@ cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-dri
 cargo test --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --lib --bins
 cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test enforce_policy
 cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test timeout_audit
-cargo deny check --manifest-path linux/Cargo.toml
+(cd linux && cargo deny check)
 ```
 
 Driver integration tests require Docker or a compatible Podman socket. See [`linux/docs/testing.md`](linux/docs/testing.md).

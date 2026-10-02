@@ -4,6 +4,17 @@ This file preserves an external review that helped shape the Linux plan. It is a
 
 Useful recommendations already reflected in the active plan include schema-aware completion, SQL favorites, file workflows, connection organization, true result streaming, measured release optimization, PostgreSQL TLS over SSH verification, targeted GTK safety tests, and internal-Arch-first packaging.
 
+## Superseded advice: read before using this archive
+
+This preserved review is not an implementation plan. The following recommendations were rejected or superseded:
+
+- **Do not set `panic = "abort"`.** ADR 0006 requires unwind containment; optimization needs measurement and must preserve that boundary. The old speed/RSS targets below are goals, not measured results.
+- Use the existing Relm4 command/message bridge. `glib::MainContext::channel` is obsolete for this stack.
+- Keep static drivers and shared transport/policy assembly. Tauri pool extraction and automatic per-database pool creation are not approved architecture changes; they need lifecycle, identity and audit review first.
+- Current delivery order is B3 → B4 → installed Arch/Wayland → Debian/GNOME, as specified by the active sprint. Historic week estimates and Ubuntu 25.10 assumptions below do not override it.
+
+See [the October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) for current source risks. The original text below is retained as historical planning evidence.
+
 ## Executive Summary
 
 The goal is to build a lightweight, native Linux database client matching the visual polish of **TablePro** and the backend stability of **Tablio/Beekeeper Studio**, using **Rust** for the engine and **GTK4/Libadwaita** for a 100% native Linux GUI. Instead of writing database drivers from scratch, the strategy relies on extracting open-source connection logic from **Tablio (MIT)** to accelerate development.

@@ -14,6 +14,10 @@ Every shipped feature must be available without an account, license key, subscri
 
 The root [LICENSE](LICENSE) applies to the repository. User-facing changes are recorded in [linux/CHANGELOG.md](linux/CHANGELOG.md).
 
+## Document authority
+
+Accepted ADRs constrain architecture. `linux/docs/bookie-0.2-sprint.md` owns delivery sequencing and acceptance; B3 case ledgers and the B4 board refine it. `PLAN.md` is the capability backlog and entry point; `linux/ROADMAP.md` summarizes status. Dated audits and external references establish only their recorded source/scope. Read [the October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) and [older app-release review](linux/docs/upstream-older-releases-review-2026-10-03.md) before adopting historical advice.
+
 ## Principles
 
 1. Security comes first. Validate input at system boundaries and deny unsafe operations by default.
@@ -32,7 +36,7 @@ The workspace manifest is `linux/Cargo.toml`.
 - `linux/crates/core`: domain types, driver traits, query results, filters, transactions, and the driver registry. It has no dependency on another workspace crate.
 - `linux/crates/policy`: statement classification, rules, approvals, masking, blast-radius checks, and audit types. It depends on `core` only.
 - `linux/crates/storage`: saved connections, Secret Service access, query history, and the audit journal.
-- `linux/crates/ssh`: SSH tunnels through `russh`.
+- `linux/crates/ssh`: SSH tunnels through built-in `russh` or the optional system OpenSSH backend.
 - `linux/crates/transport`: connection assembly. Turns a saved connection into driver options, resolves its SSH chain, opens the tunnel, and preserves the service endpoint used for certificate verification. The GUI and `agentd` both connect through it.
 - `linux/crates/mcp`: MCP authentication, scopes, connection allowlists, rate limits, tools, and transport.
 - `linux/crates/agentd`: headless MCP process and composition root without GTK.
