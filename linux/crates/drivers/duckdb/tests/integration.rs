@@ -15,6 +15,8 @@ mod fixed_uhugeint_array;
 mod interval_csv_import;
 #[path = "support/submicro_parameter_expression.rs"]
 mod submicro_parameter_expression;
+#[path = "support/uhugeint_union.rs"]
+mod uhugeint_union;
 #[path = "../../../core/tests/support/value_contract.rs"]
 mod value_contract;
 
