@@ -33,6 +33,13 @@ impl Tunnel {
             },
         }
     }
+
+    pub fn is_closed(&self) -> bool {
+        match self {
+            Self::Builtin(tunnel) => tunnel.is_closed(),
+            Self::OpenSsh(forward) => forward.session().is_closed(),
+        }
+    }
 }
 
 #[derive(Clone)]
