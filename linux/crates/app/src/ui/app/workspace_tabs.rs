@@ -571,10 +571,6 @@ impl App {
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
         };
-        if self.confirm_close_with_open_transaction(id, &tab_view, sender.clone()) {
-            return;
-        }
-
         // If this is a Browse tab with pending changeset, intercept the
         // close with an AdwAlertDialog (Discard / Cancel). The user can
         // also cancel close, save manually, then close — no Save-and-
@@ -698,6 +694,9 @@ impl App {
             return;
         }
 
+        if self.confirm_close_with_open_transaction(id, &tab_view, sender.clone()) {
+            return;
+        }
         self.finish_close_workspace_tab(id, &tab_view, sender);
     }
 

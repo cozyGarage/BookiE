@@ -90,6 +90,15 @@ fn apply_transaction_state(session: &mut EditorSession, callback_id: Uuid, trans
     true
 }
 
+fn can_start_session_close(
+    teardown_active: bool,
+    close_running: bool,
+    open_running: bool,
+    query_running: bool,
+) -> bool {
+    teardown_active && !close_running && !open_running && !query_running
+}
+
 pub(crate) fn session_label(transaction_open: bool) -> String {
     if transaction_open {
         crate::tr!("Session · transaction open")
@@ -214,11 +223,12 @@ impl SqlEditor {
     }
 
     pub(super) fn try_start_session_teardown(&mut self, sender: &ComponentSender<Self>) {
-        if !self.session_teardown_active
-            || self.session_teardown_running
-            || self.session_open_in_flight
-            || !self.run_generation.active.is_empty()
-        {
+        if !can_start_session_close(
+            self.session_teardown_active,
+            self.session_teardown_running,
+            self.session_open_in_flight,
+            !self.run_generation.active.is_empty(),
+        ) {
             return;
         }
         if let Some(session) = self.session.take() {
@@ -413,6 +423,14 @@ fn session_open_message(error: &DriverError) -> String {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn a_running_query_or_open_session_delays_teardown() {
+        assert!(!can_start_session_close(true, false, false, true));
+        assert!(!can_start_session_close(true, false, true, false));
+        assert!(!can_start_session_close(true, true, false, false));
+        assert!(can_start_session_close(true, false, false, false));
+    }
 
     struct FailFirstCommit(bool);
 
