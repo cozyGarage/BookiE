@@ -9,6 +9,8 @@ use tablepro_transport::Tunnel;
 
 use super::connection_service;
 use super::database_service::{ConnectionHealth, EntryInner, ReconnectParams};
+#[cfg(test)]
+use tablepro_policy::AuditState;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 const TUNNEL_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -163,6 +165,7 @@ fn swap_connection(
     if let Ok(mut g) = inner.lock() {
         g.connection = arc;
         g.tunnel = tunnel;
+        g.audit_state = Arc::new(g.audit_state.new_connection_generation());
     }
 }
 
@@ -195,6 +198,36 @@ mod tests {
             .await
             .expect("closed tunnel poll is bounded")
             .expect("watcher task completes");
+    }
+
+    #[test]
+    fn reconnect_advances_audit_generation_without_clearing_global_lockdown() {
+        let journal = Arc::new(AuditState::with_governed_writes_disabled());
+        let old_state = Arc::new(journal.new_connection_generation());
+        let inner = Arc::new(Mutex::new(EntryInner {
+            connection: Arc::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
+            }) as Arc<dyn Connection>,
+            tunnel: None,
+            health: ConnectionHealth::Healthy,
+            audit_state: old_state.clone(),
+        }));
+
+        swap_connection(
+            &inner,
+            Box::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
+            }),
+            None,
+            &Arc::new(Notify::new()),
+        );
+
+        let new_state = inner.lock().unwrap().audit_state.clone();
+        assert!(!Arc::ptr_eq(&old_state, &new_state));
+        assert!(old_state.governed_writes_disabled());
+        assert!(new_state.governed_writes_disabled());
     }
 
     struct CountingDriver {
@@ -314,6 +347,7 @@ mod tests {
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(AuditState::new()),
         }));
         let params = ReconnectParams {
             driver: Arc::new(CountingDriver {
@@ -354,6 +388,7 @@ mod tests {
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(AuditState::new()),
         }));
         let params = ReconnectParams {
             driver: Arc::new(ReconnectingDriver {

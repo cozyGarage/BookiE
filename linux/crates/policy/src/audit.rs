@@ -157,7 +157,8 @@ impl AuditSink for NullAuditSink {
 
 #[derive(Debug, Default)]
 pub struct AuditState {
-    governed_writes_disabled: AtomicBool,
+    globally_disabled: std::sync::Arc<AtomicBool>,
+    connection_uncertain: AtomicBool,
 }
 
 impl AuditState {
@@ -166,17 +167,31 @@ impl AuditState {
     }
 
     pub fn with_governed_writes_disabled() -> Self {
-        Self {
-            governed_writes_disabled: AtomicBool::new(true),
-        }
+        let state = Self::new();
+        state.disable_globally();
+        state
     }
 
     pub fn governed_writes_disabled(&self) -> bool {
-        self.governed_writes_disabled.load(Ordering::Acquire)
+        self.globally_disabled.load(Ordering::Acquire) || self.connection_uncertain.load(Ordering::Acquire)
     }
 
     pub(crate) fn disable_governed_writes(&self) {
-        self.governed_writes_disabled.store(true, Ordering::Release);
+        self.connection_uncertain.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn disable_globally(&self) {
+        self.globally_disabled.store(true, Ordering::Release);
+    }
+
+    /// Share journal-wide failure state with a clean connection generation.
+    /// Call only after establishing a replacement connection; old guards keep
+    /// their original state and cannot disable the replacement later.
+    pub fn new_connection_generation(&self) -> Self {
+        Self {
+            globally_disabled: self.globally_disabled.clone(),
+            connection_uncertain: AtomicBool::new(false),
+        }
     }
 
     pub(crate) fn pending_write(&self) -> PendingWrite<'_> {
@@ -203,5 +218,29 @@ impl Drop for PendingWrite<'_> {
         if self.armed {
             self.state.disable_governed_writes();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uncertainty_is_scoped_to_a_connection_generation_but_journal_failure_is_global() {
+        let journal = AuditState::new();
+        let connection_a = journal.new_connection_generation();
+        let connection_b = journal.new_connection_generation();
+
+        connection_a.disable_governed_writes();
+        assert!(connection_a.governed_writes_disabled());
+        assert!(!connection_b.governed_writes_disabled());
+
+        let replacement_a = connection_a.new_connection_generation();
+        connection_a.disable_governed_writes(); // A late callback from the retired generation.
+        assert!(!replacement_a.governed_writes_disabled());
+
+        journal.disable_globally();
+        assert!(connection_b.governed_writes_disabled());
+        assert!(replacement_a.governed_writes_disabled());
     }
 }

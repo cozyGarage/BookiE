@@ -403,7 +403,11 @@ impl App {
 
         if self.connection_transition == ConnectionTransition::WaitingForRuns {
             let was_disabled = self.switch_cancel_audit_was_disabled.take().unwrap_or(false);
-            if !was_disabled && self.database.governed_writes_disabled() {
+            if !was_disabled
+                && self
+                    .connection_id
+                    .is_some_and(|id| self.database.governed_writes_disabled(id))
+            {
                 self.prepared_connection = None;
                 self.switch_saves_pending.clear();
                 self.connection_transition = ConnectionTransition::Idle;
@@ -483,7 +487,10 @@ impl App {
                 self.show_toast(&crate::tr!("Connection switch cancelled."));
             }
             SwitchDecision::CancelRuns => {
-                self.switch_cancel_audit_was_disabled = Some(self.database.governed_writes_disabled());
+                self.switch_cancel_audit_was_disabled = Some(
+                    self.connection_id
+                        .is_some_and(|id| self.database.governed_writes_disabled(id)),
+                );
                 self.connection_transition = ConnectionTransition::WaitingForRuns;
                 self.cancel_all_editor_runs();
                 self.continue_connection_switch(sender);

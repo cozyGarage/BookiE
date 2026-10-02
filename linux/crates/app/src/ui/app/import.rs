@@ -99,7 +99,10 @@ impl App {
                 "The policy rules could not be loaded, so writes are not permitted."
             ));
         }
-        if self.database.governed_writes_disabled() {
+        if self
+            .connection_id
+            .is_some_and(|id| self.database.governed_writes_disabled(id))
+        {
             return Some(crate::tr!(
                 "A previous operation's audit record could not be written, so writes are not permitted."
             ));
