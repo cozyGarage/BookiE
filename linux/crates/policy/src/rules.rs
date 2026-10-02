@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use tablepro_core::Environment;
 
-use crate::classify::{StatementClass, StatementFacts, has_implicit_transaction_starter};
+use crate::classify::{StatementClass, StatementFacts};
 use crate::config::EnvPolicy;
 use crate::principal::Principal;
+use crate::transaction_control::has_implicit_transaction_starter;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
