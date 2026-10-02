@@ -1012,6 +1012,7 @@ async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() 
         .query_params_controlled(sql, &[], &control)
         .await
         .expect("read inexact legacy datetime through the session batch path");
+    assert_eq!(session_result.columns, result.columns);
     assert_eq!(session_result.rows, result.rows);
     session.close().await.unwrap();
     let expected_server_text = [
@@ -1153,10 +1154,17 @@ async fn value_contract_datetimeoffset_keeps_its_offset_through_results_paramete
             .await
             .unwrap();
     }
-    let source = conn
-        .query("SELECT id, zoned FROM zoned_source ORDER BY id")
+    let select = "SELECT id, zoned FROM zoned_source ORDER BY id";
+    let source = conn.query(select).await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let session_source = session
+        .query_params_controlled(select, &[], &control)
         .await
-        .unwrap();
+        .expect("read datetimeoffset values through the session batch path");
+    assert_eq!(session_source.columns, source.columns);
+    assert_eq!(session_source.rows, source.rows);
+    session.close().await.unwrap();
     let rows = source.rows.clone();
     let decoded: Vec<Value> = rows.iter().map(|row| row[1].clone()).collect();
     let expected: Vec<Value> = ZONED_STAMPS.iter().map(|stamp| Value::Text((*stamp).into())).collect();

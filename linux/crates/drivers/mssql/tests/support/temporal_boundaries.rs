@@ -28,6 +28,7 @@ async fn value_contract_supported_temporal_calendar_edges_match_native_text_and_
         .query_params_controlled(boundary_sql, &[], &control)
         .await
         .expect("query temporal boundaries through the session batch path");
+    assert_eq!(session_boundaries.columns, boundaries.columns);
     assert_eq!(session_boundaries.rows, boundaries.rows);
     session.close().await.expect("close SQL Server session");
     assert_eq!(
