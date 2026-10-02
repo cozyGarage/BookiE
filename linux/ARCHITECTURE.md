@@ -109,6 +109,12 @@ Workspace state is persisted per connection. Unknown persisted tab kinds deseria
 
 Each driver exports a type that implements `tablepro_core::DatabaseDriver`. A successful connection returns a boxed `Connection` trait object. The connection trait covers query execution, parameterized operations, schema inspection, transactions, server activity, and controlled cancellation where supported.
 
+[ADR 0007](docs/decisions/0007-type-and-value-preservation.md) owns type/value
+semantics across these methods and their consumers. [ADR 0008](docs/decisions/0008-connection-and-session-ownership.md)
+owns live handle/session trust and uncertainty; [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md)
+owns durable identity and storage evolution. Their acceptance does not close
+the remaining source/runtime gaps recorded on the owning boards.
+
 `OperationControl` carries a cancellation token and an optional deadline. PostgreSQL controlled operations send a server cancellation request through a separate control pool, wait for the original operation to finish, and only return a connection to the pool when it is safe to reuse. Real PostgreSQL integration tests verify that cancelled and timed-out queries leave `pg_stat_activity` and that later queries still work.
 
 See [docs/adding-drivers.md](docs/adding-drivers.md) for registration and test steps.

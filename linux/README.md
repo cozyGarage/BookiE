@@ -133,6 +133,8 @@ The helper archives that commit, verifies a real checksum, and does not publish 
 
 ## Documentation
 
+Start with [the documentation entry point](docs/README.md), then the active sprint and relevant ADR. Use the value evidence index to read a case instead of loading the full historical ledger.
+
 | Topic | File |
 |---|---|
 | Architecture and crate boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |

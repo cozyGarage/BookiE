@@ -6,9 +6,9 @@ separate agents can take in parallel.
 
 ## B4 continuation status (October 3)
 
-Latest integrated base: `573435766` on `linux`. The main checkout still has
-uncommitted B3 work; this status update and B4 implementation use isolated
-worktrees. Keep B4 open until the remaining tasks and installed Arch/Debian
+Latest integrated base: `573435766` on `linux`. These B4 reports originated in
+isolated worktrees while B3 work was concurrent. Recheck current checkout
+status; that observation does not assert a dirty tree in later sessions. Keep B4 open until the remaining tasks and installed Arch/Debian
 acceptance are complete.
 
 | Task | Current state | Evidence / next step |
@@ -19,6 +19,9 @@ acceptance are complete.
 | Remaining | F6, F8, C6 MySQL/SQL Server, G5, I2, I5, F7, I3, native Arch acceptance, I1/Debian | Follow the dependencies and evidence requirements in the packets below. B3 completion remains the sprint prerequisite. |
 
 ## October 3 integration checkpoint
+
+Historical checkpoint at `4b7814f5e`; the continuation status above supersedes
+its F4/F9 open-state wording after PR #20 merged. Retain its recorded evidence scope.
 
 Reviewed `linux` at `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. The isolated-worktree progress below is historical; do not reapply those patches as unmerged work. Main-branch history now includes F1/F3 (`7054a7867`, #13), daemon cache refusal (`d80bade4c` / `768188734`, #14/#17), shared transaction policy (`ad807c61b`, #18), awaited editor cleanup (`7b08dd478`, #16), and editor retirement (`4b7814f5e`, #19). The current retirement path refuses further session dispatch and requires reopening Session. This checkpoint traces source integration; it does not rerun the older branch reports or certify hosted/installed acceptance. F4/F9, F8 and wider B4 acceptance stay open.
 
@@ -514,17 +517,20 @@ A task that names a decision follows the recorded decision.
 
 ## Decisions
 
-Decided on 2026-09-27.
+The seven September 27 decisions are now recorded in
+[ADR 0008](decisions/0008-connection-and-session-ownership.md). The stable numbers
+below preserve task references; the ADR owns the rules and this board owns
+implementation/acceptance. Accepted architecture is not a runtime pass.
 
-| # | Question | Decision |
-|---|---|---|
-| 1 | The GUI built-in SSH client trusts an unknown host key without asking (`UnknownHostKey::Learn` in `app/src/services/database_service.rs:179` and `connection_monitor.rs:210`). agentd refuses. | The GUI asks before trusting a new host key, as the OpenSSH path does. |
-| 2 | With "Use system OpenSSH" inside Flatpak, the sprint doc says the app falls back to the built-in client, `connections.md` says it fails, and the code does neither. | Refuse with a clear message. Both docs describe that behavior. |
-| 3 | One unknown write outcome turns off governed writes for every connection until restart. | Turn off governed writes only for the affected connection, restore them when that connection restarts, and document the rule. |
-| 4 | `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON` and `XA START` are not treated as transaction control. | Refuse them on shared connections. Session handling is unchanged for now. |
-| 5 | A batch such as `BEGIN; UPDATE ...` without COMMIT is allowed on a shared connection. | Refuse unterminated batches on shared connections for now. |
-| 6 | Tunnel setup and host-key refusal write no audit record. | Write audit records for both. |
-| 7 | agentd reuses a cached connection when it cannot verify the SSH key material (`agentd/src/lib.rs:312`). | Refuse it as a weaker fallback. |
+| Legacy decision | ADR section | Owning implementation |
+| --- | --- | --- |
+| 1: built-in host-key consent | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | F6 |
+| 2: unavailable Flatpak OpenSSH route | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I2 |
+| 3: connection uncertainty scope | [Uncertainty scope](decisions/0008-connection-and-session-ownership.md#uncertainty-scope) | F8; journal-wide failures remain fail-closed |
+| 4: implicit shared transaction starters | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E1 |
+| 5: unterminated shared transaction batches | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E2 |
+| 6: transport/trust audit records | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I5 |
+| 7: verified daemon cache reuse | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | G3/G5 |
 
 ## Lane A: built-in SSH — implementation delivered; A5 monitor follow-up open
 

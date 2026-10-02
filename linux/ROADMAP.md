@@ -169,7 +169,7 @@ Phase 10 is in progress. Slice 10.2 added connection organisation: groups, tags,
 
 ## Next implementation target
 
-Follow the [September 28 continuation plan](docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28):
+Follow the [current continuation plan](docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-03):
 finish **B3 value/consumer contracts**, then **B4 transport, policy and session
 integration**, then verify the UI on **Arch/Omarchy/Hyprland native Wayland**.
 The [117-commit archive](docs/sprint-review-2026-09-28.md) records recent delivery;

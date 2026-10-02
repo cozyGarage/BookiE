@@ -6,6 +6,8 @@ The capability backlog and historical evidence below remain reference material.
 
 Last updated: 2026-10-03
 
+Start with the compact [documentation entry point](linux/docs/README.md). Type/value semantics are defined once in [ADR 0007](linux/docs/decisions/0007-type-and-value-preservation.md); plans and historical evidence apply that standard.
+
 This plan is the capability backlog and entry point for the Linux application. Accepted architecture decisions constrain changes; the active sprint owns sequencing and acceptance. The [October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) defines the document authority order. This plan separates:
 
 1. Implemented code from release-verified behavior
@@ -22,7 +24,7 @@ maps new upstream fixes to the Linux source and defines U1–U6 work packets wit
 regression acceptance. Use it alongside the current sprint and B4 task board;
 U1 is implemented in `6822efa42` with [native evidence](linux/docs/upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [older app-release review](linux/docs/upstream-older-releases-review-2026-10-03.md) extends the screen to all 128 published app releases, including pre-0.62 history and 0.73/0.74.
 
-Work on **`linux`**. The [October 2 continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-02)
+Work on **`linux`**. The [current continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
 orders **B3 → B4 → Arch/Omarchy/Hyprland native Wayland UI** and includes bounded
 Luna handoffs. GNOME desktop on Debian is the required next phase after the Arch
 pass, within the same continuation plan.

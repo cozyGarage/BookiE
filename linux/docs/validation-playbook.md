@@ -9,7 +9,7 @@ owns B3 and B4–B6 completion. A green layer certifies only its named scope.
 
 ## Current desktop target
 
-The [October 2 continuation](bookie-0.2-sprint.md#current-continuation-plan-2026-10-02)
+The [current continuation](bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
 orders B3, B4, then Arch/Omarchy/Hyprland native Wayland UI acceptance.
 GNOME desktop on Debian is the required installed/package phase after Arch;
 current B3/B4 implementation does not require that VM. GNOME 50 in the layer catalog

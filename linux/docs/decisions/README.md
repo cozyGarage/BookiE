@@ -41,6 +41,13 @@ Other options and why they were rejected.
 | [0004](0004-libsecret-secret-storage.md) | Secret Service through oo7 | Accepted | Credentials stay in the desktop keyring. |
 | [0005](0005-server-side-cancellation.md) | Cancellation must reach the database | Accepted | Stop and timeouts abort the statement server-side, and only the engine's own abort error is terminal. |
 | [0006](0006-driver-panic-containment.md) | A driver panic is contained, not trusted away | Accepted | The guard turns a driver panic into a failed operation and the connection is replaced. |
+| [0007](0007-type-and-value-preservation.md) | Native type and value preservation | Accepted | One outcome, conversion and proof standard across every driver and consumer. |
+| [0008](0008-connection-and-session-ownership.md) | Connection/session ownership and trust | Accepted | Distinct live identities, no pool/replay/security fallback, and scoped uncertainty with durable audit obligations. |
+| [0009](0009-persistence-and-identity-compatibility.md) | Durable identity and recoverable state | Accepted | Stable identifiers, compatible adapters, recoverable migrations and distinct persistence writer contracts. |
+
+Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted
+means the architecture choice is recorded; implementation and runtime acceptance
+remain on the [active sprint](../bookie-0.2-sprint.md) and owning boards.
 
 ## Adding a decision
 
