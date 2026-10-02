@@ -33,6 +33,10 @@ use schema::{apply_editor_font_size, apply_editor_scheme};
 use sql_text::toggle_line_comment;
 use statement_cursor::{cursor_byte_offset, script_statements, statement_at_cursor};
 
+fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
+    running && supports_server_cancellation
+}
+
 pub struct SqlEditor {
     catalog_changes: crate::services::catalog::CatalogChanges,
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
@@ -41,7 +45,8 @@ pub struct SqlEditor {
     run_button: gtk::Button,
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
-    session_ending: bool,
+    opening_session_id: Option<Uuid>,
+    ending_session_id: Option<Uuid>,
     cancel_button: gtk::Button,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
@@ -129,13 +134,21 @@ pub enum SqlEditorInput {
     SessionToggled(bool),
     SessionOpened {
         connection_id: Uuid,
+        session_id: Uuid,
         result: Result<session_mode::OpenedSession, String>,
     },
-    SessionState(bool),
+    SessionState {
+        session_id: Uuid,
+        transaction_open: bool,
+    },
     SessionEnd {
+        session_id: Uuid,
         commit: bool,
     },
-    SessionCommitFinished(Result<(), String>),
+    SessionCommitFinished {
+        session_id: Uuid,
+        result: Result<(), String>,
+    },
 }
 
 #[derive(Debug)]
@@ -519,7 +532,8 @@ impl SimpleComponent for SqlEditor {
             run_button: widgets.run_button.clone(),
             session_button: widgets.session_button.clone(),
             session: None,
-            session_ending: false,
+            opening_session_id: None,
+            ending_session_id: None,
             cancel_button: widgets.cancel_button.clone(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
@@ -572,11 +586,26 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::Grid(_) => {}
             SqlEditorInput::SessionToggled(enabled) => self.on_session_toggled(enabled, &sender),
-            SqlEditorInput::SessionOpened { connection_id, result } => self.on_session_opened(connection_id, result),
-            SqlEditorInput::SessionState(open) => self.on_session_state(open),
-            SqlEditorInput::SessionEnd { commit: true } => self.commit_and_end(&sender),
-            SqlEditorInput::SessionEnd { commit: false } => self.end_session(),
-            SqlEditorInput::SessionCommitFinished(result) => self.on_session_commit_finished(result),
+            SqlEditorInput::SessionOpened {
+                connection_id,
+                session_id,
+                result,
+            } => self.on_session_opened(connection_id, session_id, result),
+            SqlEditorInput::SessionState {
+                session_id,
+                transaction_open,
+            } => self.on_session_state(session_id, transaction_open),
+            SqlEditorInput::SessionEnd { session_id, commit } if commit => {
+                self.commit_and_end(session_id, &sender);
+            }
+            SqlEditorInput::SessionEnd { session_id, .. } => {
+                if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
+                    self.end_session();
+                }
+            }
+            SqlEditorInput::SessionCommitFinished { session_id, result } => {
+                self.on_session_commit_finished(session_id, result);
+            }
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -637,7 +666,9 @@ impl SimpleComponent for SqlEditor {
             }
 
             SqlEditorInput::Cancel => {
-                if let Some(token) = self.cancel_token.take() {
+                if self.cancel_button.is_visible()
+                    && let Some(token) = self.cancel_token.take()
+                {
                     token.cancel();
                 }
             }
@@ -864,7 +895,7 @@ impl SqlEditor {
         if !self.run_generation.accepts(generation) {
             return;
         }
-        if self.session_ending {
+        if self.session_ending() {
             self.status.set_label(&crate::tr!("Waiting for session commit"));
             return;
         }
@@ -890,7 +921,7 @@ impl SqlEditor {
         let token = CancellationToken::new();
         self.cancel_token = Some(token.clone());
 
-        self.set_running(true, &sender);
+        self.set_running(true, conn.supports_server_cancellation(), &sender);
         self.status.set_label(&crate::tr!("Running…"));
         clear_box(&self.results_holder);
 
@@ -955,8 +986,11 @@ impl SqlEditor {
                             SqlEditorInput::ShowOutcomes { generation, outcomes }
                         }
                     };
-                    if let Some(open) = target.transaction_open().await {
-                        sender_clone.input(SqlEditorInput::SessionState(open));
+                    if let Some((session_id, open)) = target.transaction_state().await {
+                        sender_clone.input(SqlEditorInput::SessionState {
+                            session_id,
+                            transaction_open: open,
+                        });
                     }
                     sender_clone.input(msg);
                 })
@@ -964,9 +998,10 @@ impl SqlEditor {
         });
     }
 
-    fn set_running(&self, running: bool, sender: &ComponentSender<Self>) {
+    fn set_running(&self, running: bool, supports_server_cancellation: bool, sender: &ComponentSender<Self>) {
         self.run_button.set_sensitive(!running);
-        self.cancel_button.set_visible(running);
+        self.cancel_button
+            .set_visible(show_cancel_button(running, supports_server_cancellation));
         self.running_spinner.set_visible(running);
         let _ = sender.output(SqlEditorOutput::RunStateChanged(running));
     }
@@ -979,7 +1014,7 @@ impl SqlEditor {
         let terminal = self.run_generation.finish(generation)?;
         let context = self.executions.remove(&generation)?;
         if terminal.became_idle {
-            self.set_running(false, sender);
+            self.set_running(false, false, sender);
             if let Ok(elapsed) = context.started_at.elapsed() {
                 finish_notice::notify_if_unattended(&self.source_view, elapsed);
             }
@@ -1073,7 +1108,7 @@ fn build_completion_refresh(
 
 #[cfg(test)]
 mod tests {
-    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text};
+    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text, show_cancel_button};
     use std::io::Write;
 
     #[test]
@@ -1107,6 +1142,13 @@ mod tests {
         let first_terminal = generations.finish(first).unwrap();
         assert!(!first_terminal.replace_ui);
         assert!(first_terminal.became_idle);
+    }
+
+    #[test]
+    fn stop_is_visible_only_for_running_server_cancellable_queries() {
+        assert!(show_cancel_button(true, true));
+        assert!(!show_cancel_button(true, false));
+        assert!(!show_cancel_button(false, true));
     }
 
     #[test]
