@@ -133,8 +133,13 @@ array text and records the current `Undecodable` result plus SQL-literal/bind re
 This closes that shape's behavior contract, not nested-array support. A second
 contract covers `STRUCT` fields with `UBIGINT` values above the signed boundary,
 `u64::MAX` and NULL; native `typeof`/`VARCHAR` and explicit result/literal/bind
-refusal passed in the clean 187-test strict layer at `19c5b6a`. Other nested
-unsigned collection shapes remain open.
+refusal passed in the clean 187-test strict layer at `19c5b6a`. A third
+contract covers `MAP(VARCHAR, UBIGINT)` with the same wide boundaries and NULL.
+Exact native oracles and result/literal/bind refusal passed in the clean
+188-test strict layer at `efcbec7`. A fixed-size `UHUGEINT[2]` case also pins
+the >`u64::MAX` value and SQL NULL, with explicit result/literal/bind refusal.
+Its focused test, strict 189-test layer and quick gate passed on `98611db`.
+Other nested unsigned collection shapes remain open.
 
 The ClickHouse nested contract now covers thirteen Array/Map/Tuple shapes,
 including `Map(UInt8, Nullable(UInt128))` with a wide unsigned value and NULL.

@@ -3544,6 +3544,43 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test
 The report is
 [`20261002T005849903174Z-values/report.json`](../target/quality/20261002T005849903174Z-values/report.json).
 
+## DuckDB nested UBIGINT map refusal, 2026-10-02
+
+The native map contract now also covers `MAP(VARCHAR, UBIGINT)` with
+`i64::MAX + 1`, `u64::MAX` and SQL NULL. DuckDB's independent `typeof` and
+`VARCHAR` projections pin the type and exact `{key=value}` representation;
+BookiE returns `Undecodable`, and SQL-literal and bound-parameter consumers
+refuse the value. The focused test, clean strict GTK+DuckDB layer (188 tests,
+11 suites, 26 DuckDB contracts) and local quick CI gate passed on `efcbec7`.
+Other nested unsigned shapes remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration bigint_map::value_contract_nested_ubigint_map_refuses_lossy_consumers -- --exact --test-threads=1
+```
+
+The strict report is
+[`20261002T072337041331Z-values/report.json`](../target/quality/20261002T072337041331Z-values/report.json),
+and the quick-gate report is
+[`20261002T072915341877Z-quick/report.json`](../target/quality/20261002T072915341877Z-quick/report.json).
+
+## DuckDB nested UHUGEINT fixed-array refusal, 2026-10-02
+
+The fixed-size array boundary now has a wide-value contract for
+`UHUGEINT[2]`, containing `18446744073709551616` and SQL NULL. Native
+`typeof`/`VARCHAR` projections pin the fixed-array type and exact text; BookiE
+returns `Undecodable` and SQL-literal/bound-parameter consumers refuse it. The
+focused test passed. The strict GTK+DuckDB layer passed 189 tests across all 11
+suites, including 27 DuckDB contracts, and local quick CI passed on `98611db`.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration fixed_uhugeint_array::value_contract_nested_uhugeint_fixed_array_refuses_lossy_consumers -- --exact --test-threads=1
+```
+
+The strict report is
+[`20261002T074300432752Z-values/report.json`](../target/quality/20261002T074300432752Z-values/report.json),
+and the quick-gate report is
+[`20261002T074833600560Z-quick/report.json`](../target/quality/20261002T074833600560Z-quick/report.json).
+
 ## MySQL spatial grid edit refusal, 2026-09-30
 
 The grid's GTK path rendered spatial bytes read-only, but direct driver-aware

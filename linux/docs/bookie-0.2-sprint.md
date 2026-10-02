@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`19c5b6a` (source version 0.1.5).
+`98611db` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -26,14 +26,16 @@ evidence and a finite contract board; the remaining native-type matrix and
 session reconnect follow-up stay open. Continue with one bounded
 engine/type/consumer case at a time using the
 [agent task template](validation-playbook.md#agent-task-template).
-The clean LT-TRUNG full gate passed on `8e7766c`; the clean strict GTK+DuckDB
-values layer passed 187 tests across 11 suites, including 25 DuckDB contracts,
-on code commit `19c5b6a`. The runner reused 746 fresh artifacts and rebuilt
-only the DuckDB test package. Drivers, TLS, PostgreSQL release, keyring,
-security-policy, GTK, workflow, harness, packaging and change-contract layers
-also passed after installing the local prerequisites. At the last hosted
-checkpoint `6c1da58`, Build preflight, Security and Flatpak passed; the GTK and
-driver integration jobs were still running. See the
+The clean LT-TRUNG full gate passed on `8e7766c`; the strict GTK+DuckDB
+values layer passed 189 tests across 11 suites, including 27 DuckDB contracts,
+on code commit `98611db`. The runner reused 746 fresh artifacts and rebuilt
+only the DuckDB test package. The local quick gate passed on the same code SHA.
+Drivers, TLS, PostgreSQL release, keyring, security-policy, GTK, workflow,
+harness, packaging and change-contract layers also passed after installing the
+local prerequisites. Hosted CI on `7afc416` and `efcbec7` passed all configured
+jobs. The latest completed hosted evidence before `98611db` is `efcbec7`; see
+its Actions run `36978991642` (Build) and `36978991743` (Security), plus
+Flatpak run `36978991671`. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
@@ -138,6 +140,17 @@ The DuckDB nested unsigned follow-up adds a STRUCT containing `i64::MAX + 1`,
 `u64::MAX` and NULL. Native `typeof`/`VARCHAR` oracles and explicit result,
 literal and bind refusal passed; the clean 187-test strict layer on `19c5b6a`
 includes this contract. The contract is recorded in the [value ledger](value-contracts.md#duckdb-nested-ubigint-struct-refusal-2026-10-02).
+
+The follow-up also covers `MAP(VARCHAR, UBIGINT)` with both unsigned
+boundaries and NULL. Native `typeof`/`VARCHAR`, result, literal and bind checks
+passed; the clean 188-test strict layer and quick gate passed on `efcbec7`.
+See the [value evidence](value-contracts.md#duckdb-nested-ubigint-map-refusal-2026-10-02).
+
+DuckDB fixed-size `UHUGEINT[2]` now has an explicit refusal contract for a
+value above `u64::MAX` and NULL, checked against native `typeof`/`VARCHAR`
+oracles. The focused test, 189-test strict values layer and local quick gate
+passed on `98611db`; hosted CI is pending. See the
+[value evidence](value-contracts.md#duckdb-nested-uhugeint-fixed-array-refusal-2026-10-02).
 
 B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
 survivors against the current test set: 16/16 viable ClickHouse mutants and

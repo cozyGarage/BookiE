@@ -42,6 +42,62 @@
         "missing_suites": 0,
         "report": "target/quality/20261002T005849903174Z-values/report.json"
       }
+    },
+    {
+      "source_revision": "efcbec7514046641ed403512b05361cb0bdcbf4c",
+      "source_clean": true,
+      "contracts": [
+        {
+          "id": "duckdb-nested-ubigint-map",
+          "test": "crates/drivers/duckdb/tests/support/ubigint_map.rs::value_contract_nested_ubigint_map_refuses_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration bigint_map::value_contract_nested_ubigint_map_refuses_lossy_consumers -- --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "DuckDB typeof MAP(VARCHAR, UBIGINT) and exact VARCHAR map text containing i64::MAX + 1, u64::MAX, and NULL",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 188,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report": "target/quality/20261002T072337041331Z-values/report.json"
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "report": "target/quality/20261002T072915341877Z-quick/report.json"
+      }
+    },
+    {
+      "source_revision": "98611db506107288d4413c7c48692b4aa0af4044",
+      "source_clean": true,
+      "contracts": [
+        {
+          "id": "duckdb-nested-uhugeint-fixed-array",
+          "test": "crates/drivers/duckdb/tests/support/uhugeint_fixed_array.rs::value_contract_nested_uhugeint_fixed_array_refuses_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration fixed_uhugeint_array::value_contract_nested_uhugeint_fixed_array_refuses_lossy_consumers -- --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "DuckDB typeof UHUGEINT[2] and exact VARCHAR for a value above u64::MAX and NULL",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 189,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report": "target/quality/20261002T074300432752Z-values/report.json",
+        "worktree_dirty": true,
+        "dirty_scope": "documentation only"
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "report": "target/quality/20261002T074833600560Z-quick/report.json"
+      }
     }
   ],
   "commit_count_in_inventory": 197,

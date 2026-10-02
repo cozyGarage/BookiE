@@ -246,6 +246,16 @@ DuckDB now has separate native-oracle refusal contracts for `UBIGINT[]` and a
 included in the clean 187-test, 11-suite value run on `19c5b6a`; other nested
 unsigned combinations remain open.
 
+The next DuckDB nested slice covers a `MAP(VARCHAR, UBIGINT)` with both unsigned
+boundaries and NULL. Exact `typeof`/`VARCHAR` plus result/literal/bind refusal
+passed in the clean 188-test strict layer and the quick local CI gate on
+`efcbec7`.
+
+The fixed-size DuckDB array contract now includes `UHUGEINT[2]` with a value
+above `u64::MAX` and NULL. Native type/text oracles and result/literal/bind
+refusal passed in the strict 189-test, 11-suite run and local quick gate on
+`98611db`.
+
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,
 `crates/driver-tls-tests/tests/`, `crates/mcp/tests/enforce_policy.rs`.
