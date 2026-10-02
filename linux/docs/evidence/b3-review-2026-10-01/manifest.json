@@ -130,6 +130,16 @@
         "report_revision": "2bf34ab9803fc5037cdfa4691a8944e12a808195",
         "report_dirty": true,
         "report": "target/quality/20261002T111624439672Z-quick/report.json"
+      },
+      "hosted_ci": {
+        "tested_source_revision": "5fb63afa1cadbf1b4c595d71803a9093f13ca154",
+        "tested_docs_revision": "6e45fbf7f44da29a7e087025fc8ce75820311f20",
+        "result": "passed",
+        "workflows": [
+          {"name": "Build Linux", "run_id": "37002408769", "result": "passed"},
+          {"name": "Linux Security", "run_id": "37002408772", "result": "passed"},
+          {"name": "Flatpak Linux (packaging only)", "run_id": "37002408794", "result": "passed"}
+        ]
       }
     }
   ],

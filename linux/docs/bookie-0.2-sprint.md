@@ -33,9 +33,9 @@ only the DuckDB test package. The local quick gate passed on the same code state
 Drivers, TLS, PostgreSQL release, keyring, security-policy, GTK, workflow,
 harness, packaging and change-contract layers also passed after installing the
 local prerequisites. Hosted CI on `7afc416` and `efcbec7` passed all configured
-jobs. The latest completed hosted evidence before `5fb63af` is `2bf34ab`; see
-its Actions runs `36981007759` (Build), `36981007778` (Security) and
-`36981007761` (Flatpak). Hosted CI for `5fb63af` is pending. See the
+jobs. The code and evidence at `5fb63af` passed hosted CI on docs tip `6e45fbf`:
+Build run `37002408769`, Security run `37002408772`, and Flatpak run
+`37002408794` all completed successfully. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 

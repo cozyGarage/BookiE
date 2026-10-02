@@ -3599,6 +3599,7 @@ The strict report is
 [`20261002T080301493778Z-values/report.json`](../target/quality/20261002T080301493778Z-values/report.json),
 and the quick-gate report is
 [`20261002T111624439672Z-quick/report.json`](../target/quality/20261002T111624439672Z-quick/report.json).
+Hosted Build, Security and Flatpak workflows passed on docs tip `6e45fbf`.
 
 ## MySQL spatial grid edit refusal, 2026-09-30
 
