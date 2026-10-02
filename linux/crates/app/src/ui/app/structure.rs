@@ -240,7 +240,7 @@ impl App {
             }
         }
         for id in targets {
-            self.finish_close_workspace_tab(id, &tab_view);
+            self.finish_close_workspace_tab_now(id, &tab_view);
         }
     }
 
@@ -410,7 +410,7 @@ impl App {
         match kind {
             SaveKind::PromoteNewToTable(schema, name) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
-                    self.finish_close_workspace_tab(tab_id, &tab_view);
+                    self.finish_close_workspace_tab_now(tab_id, &tab_view);
                 }
                 // After the CREATE TABLE lands, drop the user into a
                 // Browse tab on the freshly-created table — they just

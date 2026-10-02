@@ -46,7 +46,11 @@ pub struct SqlEditor {
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
     opening_session_id: Option<Uuid>,
+    session_open_in_flight: bool,
     ending_session_id: Option<Uuid>,
+    session_teardown_active: bool,
+    session_teardown_running: bool,
+    session_teardown_waiters: Vec<tokio::sync::oneshot::Sender<Result<(), String>>>,
     cancel_button: gtk::Button,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
@@ -149,6 +153,8 @@ pub enum SqlEditorInput {
         session_id: Uuid,
         result: Result<(), String>,
     },
+    PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
+    SessionTeardownFinished(Result<(), String>),
 }
 
 #[derive(Debug)]
@@ -533,7 +539,11 @@ impl SimpleComponent for SqlEditor {
             session_button: widgets.session_button.clone(),
             session: None,
             opening_session_id: None,
+            session_open_in_flight: false,
             ending_session_id: None,
+            session_teardown_active: false,
+            session_teardown_running: false,
+            session_teardown_waiters: Vec::new(),
             cancel_button: widgets.cancel_button.clone(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
@@ -552,7 +562,9 @@ impl SimpleComponent for SqlEditor {
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         self.diagnostics.stop();
-        self.end_session();
+        if let Some(session) = self.session.take() {
+            session_mode::close_detached(session.shared);
+        }
         if let Some(handler) = self.dark_notify_handler.take() {
             adw::StyleManager::default().disconnect(handler);
         }
@@ -590,7 +602,7 @@ impl SimpleComponent for SqlEditor {
                 connection_id,
                 session_id,
                 result,
-            } => self.on_session_opened(connection_id, session_id, result),
+            } => self.on_session_opened(connection_id, session_id, result, &sender),
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,
@@ -600,12 +612,14 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::SessionEnd { session_id, .. } => {
                 if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
-                    self.end_session();
+                    self.end_session(&sender);
                 }
             }
             SqlEditorInput::SessionCommitFinished { session_id, result } => {
-                self.on_session_commit_finished(session_id, result);
+                self.on_session_commit_finished(session_id, result, &sender);
             }
+            SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
+            SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -832,6 +846,9 @@ impl SqlEditor {
     }
 
     fn begin_run(&mut self, sql: String, single_statement: bool, sender: ComponentSender<Self>) {
+        if self.session_teardown_active {
+            return;
+        }
         if let Some(token) = self.cancel_token.take() {
             token.cancel();
         }
@@ -999,7 +1016,7 @@ impl SqlEditor {
     }
 
     fn set_running(&self, running: bool, supports_server_cancellation: bool, sender: &ComponentSender<Self>) {
-        self.run_button.set_sensitive(!running);
+        self.run_button.set_sensitive(!running && !self.session_teardown_active);
         self.cancel_button
             .set_visible(show_cancel_button(running, supports_server_cancellation));
         self.running_spinner.set_visible(running);
@@ -1018,6 +1035,7 @@ impl SqlEditor {
             if let Ok(elapsed) = context.started_at.elapsed() {
                 finish_notice::notify_if_unattended(&self.source_view, elapsed);
             }
+            self.try_start_session_teardown(sender);
         }
         Some((terminal, context))
     }

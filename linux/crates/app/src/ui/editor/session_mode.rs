@@ -12,6 +12,14 @@ pub(crate) type SharedSession = Arc<tokio::sync::Mutex<Option<Box<dyn Session>>>
 
 pub struct OpenedSession(pub(crate) SharedSession);
 
+pub(crate) async fn close_for_teardown(shared: SharedSession) -> Result<(), DriverError> {
+    let session = shared.lock().await.take();
+    match session {
+        Some(session) => session.close().await,
+        None => Ok(()),
+    }
+}
+
 impl std::fmt::Debug for OpenedSession {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("OpenedSession")
@@ -52,7 +60,7 @@ impl StatementTarget {
 
 pub(crate) struct EditorSession {
     pub(super) id: Uuid,
-    shared: SharedSession,
+    pub(super) shared: SharedSession,
     connection_id: Uuid,
     transaction_open: bool,
 }
@@ -106,6 +114,9 @@ impl SqlEditor {
     }
 
     pub(super) fn on_session_toggled(&mut self, enabled: bool, sender: &ComponentSender<Self>) {
+        if self.session_teardown_active {
+            return;
+        }
         if self.session_ending() {
             return;
         }
@@ -113,7 +124,7 @@ impl SqlEditor {
             (true, None) => self.open_session(sender),
             (false, None) => self.opening_session_id = None,
             (false, Some(session)) if session.transaction_open => self.confirm_session_end(sender),
-            (false, Some(_)) => self.end_session(),
+            (false, Some(_)) => self.end_session(sender),
             _ => {}
         }
     }
@@ -130,6 +141,7 @@ impl SqlEditor {
         };
         let session_id = Uuid::new_v4();
         self.opening_session_id = Some(session_id);
+        self.session_open_in_flight = true;
         let sender = sender.clone();
         relm4::spawn(async move {
             let result = connection
@@ -150,11 +162,15 @@ impl SqlEditor {
         connection_id: Uuid,
         session_id: Uuid,
         result: Result<OpenedSession, String>,
+        sender: &ComponentSender<Self>,
     ) {
+        self.session_open_in_flight = false;
         let is_current = open_callback_matches(session_id, self.opening_session_id, connection_id, self.connection_id);
         if !is_current {
             if let Ok(OpenedSession(shared)) = result {
-                close_detached(shared);
+                self.close_session_for_teardown(shared, sender);
+            } else {
+                self.try_start_session_teardown(sender);
             }
             return;
         }
@@ -169,11 +185,79 @@ impl SqlEditor {
                 });
                 self.session_button.set_label(&session_label(false));
             }
-            Ok(OpenedSession(shared)) => close_detached(shared),
+            Ok(OpenedSession(shared)) => self.close_session_for_teardown(shared, sender),
             Err(message) => {
                 self.session_button.set_active(false);
                 self.status.set_label(&message);
             }
+        }
+        self.try_start_session_teardown(sender);
+    }
+
+    pub(super) fn prepare_for_teardown(
+        &mut self,
+        reply: tokio::sync::oneshot::Sender<Result<(), String>>,
+        sender: &ComponentSender<Self>,
+    ) {
+        self.session_teardown_waiters.push(reply);
+        if !self.session_teardown_active {
+            self.session_teardown_active = true;
+            self.opening_session_id = None;
+            self.session_button.set_sensitive(false);
+            self.run_button.set_sensitive(false);
+            self.status.set_label(&crate::tr!("Rolling back and closing session…"));
+            if let Some(token) = self.cancel_token.take() {
+                token.cancel();
+            }
+        }
+        self.try_start_session_teardown(sender);
+    }
+
+    pub(super) fn try_start_session_teardown(&mut self, sender: &ComponentSender<Self>) {
+        if !self.session_teardown_active
+            || self.session_teardown_running
+            || self.session_open_in_flight
+            || !self.run_generation.active.is_empty()
+        {
+            return;
+        }
+        if let Some(session) = self.session.take() {
+            self.close_session_for_teardown(session.shared, sender);
+        } else {
+            self.finish_session_teardown(Ok(()));
+        }
+    }
+
+    fn close_session_for_teardown(&mut self, shared: SharedSession, sender: &ComponentSender<Self>) {
+        self.session_teardown_active = true;
+        self.session_teardown_running = true;
+        self.session_button.set_sensitive(false);
+        self.run_button.set_sensitive(false);
+        self.status.set_label(&crate::tr!("Closing session…"));
+        self.session_button.set_label(&session_label(false));
+        self.session_button.remove_css_class("warning");
+        if self.session_button.is_active() {
+            self.session_button.set_active(false);
+        }
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let result = close_for_teardown(shared)
+                .await
+                .map_err(|error| crate::ui::error_text::driver_message(&error));
+            sender.input(super::SqlEditorInput::SessionTeardownFinished(result));
+        });
+    }
+
+    pub(super) fn finish_session_teardown(&mut self, result: Result<(), String>) {
+        self.session_teardown_active = false;
+        self.session_teardown_running = false;
+        self.session_button.set_sensitive(true);
+        self.run_button.set_sensitive(self.run_generation.active.is_empty());
+        if let Err(message) = &result {
+            self.status.set_label(message);
+        }
+        for reply in self.session_teardown_waiters.drain(..) {
+            let _ = reply.send(result.clone());
         }
     }
 
@@ -192,18 +276,17 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn end_session(&mut self) {
+    pub(super) fn end_session(&mut self, sender: &ComponentSender<Self>) {
         self.opening_session_id = None;
         self.session_button.set_label(&session_label(false));
         self.session_button.remove_css_class("warning");
-        if self.session_button.is_active() {
-            self.session_button.set_active(false);
-        }
         if let Some(session) = self.session.take() {
             if self.ending_session_id == Some(session.id) {
                 self.ending_session_id = None;
             }
-            close_detached(session.shared);
+            self.close_session_for_teardown(session.shared, sender);
+        } else if self.session_button.is_active() {
+            self.session_button.set_active(false);
         }
     }
 
@@ -237,7 +320,12 @@ impl SqlEditor {
         });
     }
 
-    pub(super) fn on_session_commit_finished(&mut self, session_id: Uuid, result: Result<(), String>) {
+    pub(super) fn on_session_commit_finished(
+        &mut self,
+        session_id: Uuid,
+        result: Result<(), String>,
+        sender: &ComponentSender<Self>,
+    ) {
         if !commit_callback_matches(
             session_id,
             self.session.as_ref().map(|session| session.id),
@@ -249,7 +337,7 @@ impl SqlEditor {
         self.session_button.set_sensitive(true);
         match result {
             Ok(()) => {
-                self.end_session();
+                self.end_session(sender);
                 self.status.set_label(&crate::tr!("Session committed"));
             }
             Err(message) => {
@@ -324,8 +412,70 @@ fn session_open_message(error: &DriverError) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct FailFirstCommit(bool);
+
+    struct DelayedClose {
+        started: tokio::sync::oneshot::Sender<()>,
+        release: tokio::sync::oneshot::Receiver<()>,
+    }
+
+    struct CountedClose {
+        calls: Arc<AtomicUsize>,
+        result: Result<(), DriverError>,
+    }
+
+    #[async_trait::async_trait]
+    impl Session for DelayedClose {
+        async fn query_params_controlled(
+            &mut self,
+            _: &str,
+            _: &[Value],
+            _: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+
+        fn is_usable(&self) -> bool {
+            true
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            let _ = self.started.send(());
+            let _ = self.release.await;
+            Ok(())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Session for CountedClose {
+        async fn query_params_controlled(
+            &mut self,
+            _: &str,
+            _: &[Value],
+            _: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+
+        fn is_usable(&self) -> bool {
+            true
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.result
+        }
+    }
 
     #[async_trait::async_trait]
     impl Session for FailFirstCommit {
@@ -362,6 +512,41 @@ mod tests {
         assert!(matches!(commit_session(&shared).await, Err(DriverError::TimedOut)));
         assert!(shared.lock().await.is_some());
         commit_session(&shared).await.expect("retry commit");
+    }
+
+    #[tokio::test]
+    async fn teardown_waits_for_delayed_session_close_before_completing() {
+        let (started, did_start) = tokio::sync::oneshot::channel();
+        let (release, wait) = tokio::sync::oneshot::channel();
+        let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(DelayedClose {
+            started,
+            release: wait,
+        }))));
+        let closing = tokio::spawn(close_for_teardown(shared.clone()));
+
+        did_start.await.expect("close started");
+        assert!(shared.lock().await.is_none());
+        assert!(!closing.is_finished(), "teardown must wait for close to return");
+        release.send(()).expect("release close");
+        closing.await.expect("close task").expect("close succeeds");
+    }
+
+    #[tokio::test]
+    async fn teardown_propagates_close_errors_and_takes_the_session_once() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(CountedClose {
+            calls: calls.clone(),
+            result: Err(DriverError::TimedOut),
+        }))));
+
+        assert!(matches!(
+            close_for_teardown(shared.clone()).await,
+            Err(DriverError::TimedOut)
+        ));
+        close_for_teardown(shared)
+            .await
+            .expect("repeated cleanup is idempotent");
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 
     #[test]

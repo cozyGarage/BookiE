@@ -280,6 +280,34 @@ async fn closing_a_session_with_an_open_transaction_rolls_it_back_and_audits_it(
 }
 
 #[tokio::test]
+async fn closing_after_a_failed_rollback_surfaces_and_audits_unknown_outcome() {
+    let h = harness(
+        SessionScript {
+            fail_once_on: Some("ROLLBACK"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 2 WHERE id = 1")
+        .await
+        .expect("write");
+
+    let error = session.close().await.expect_err("rollback failure must be reported");
+    assert!(matches!(error, DriverError::TimedOut));
+    assert_eq!(
+        h.script.sent.lock().expect("sent lock").last().map(String::as_str),
+        Some("ROLLBACK")
+    );
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 2);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Pending);
+    assert_eq!(rollbacks[1].transaction_outcome, AuditTransactionOutcome::Unknown);
+    assert!(h.audit_state.governed_writes_disabled());
+}
+
+#[tokio::test]
 async fn a_session_lost_mid_transaction_after_a_write_records_an_unknown_outcome() {
     let h = harness(
         SessionScript {

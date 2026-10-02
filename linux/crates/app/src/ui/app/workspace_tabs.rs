@@ -698,12 +698,32 @@ impl App {
             return;
         }
 
-        self.finish_close_workspace_tab(id, &tab_view);
+        self.finish_close_workspace_tab(id, &tab_view, sender);
     }
 
     /// Tear down a tab without prompting. Internal helper called once
     /// the close-with-pending dialog (if any) has resolved.
-    pub(super) fn finish_close_workspace_tab(&mut self, id: Uuid, tab_view: &adw::TabView) {
+    pub(super) fn finish_close_workspace_tab(
+        &mut self,
+        id: Uuid,
+        tab_view: &adw::TabView,
+        sender: ComponentSender<Self>,
+    ) {
+        if matches!(self.workspace_tabs.borrow().get(&id), Some(WorkspaceTab::Editor(_))) {
+            if let Some(page) = self.workspace_tabs.borrow().get(&id).map(|tab| match tab {
+                WorkspaceTab::Editor(slot) => slot.page.clone(),
+                WorkspaceTab::Structure(slot) => slot.page.clone(),
+                WorkspaceTab::Table(slot) => slot.page.clone(),
+            }) {
+                tab_view.close_page_finish(&page, false);
+            }
+            self.close_tab_after_session_cleanup(id, sender);
+            return;
+        }
+        self.finish_close_workspace_tab_now(id, tab_view);
+    }
+
+    pub(super) fn finish_close_workspace_tab_now(&mut self, id: Uuid, tab_view: &adw::TabView) {
         let removed = self.workspace_tabs.borrow_mut().remove(&id);
         let Some(removed) = removed else {
             return;
