@@ -1592,9 +1592,10 @@ returns `enum_labels: unexpected NULL` during metadata resolution. The test
 asserts that exact failure boundary; if SQLx begins decoding the type, it instead
 requires all three labels and SQL NULL to arrive exactly. This is a tested
 metadata boundary, not exact typed support or a BookiE `Undecodable` value.
-The GTK+DuckDB value runner passed 185 selected tests across 11 suites with no
-missing suites; its [layer report](../target/quality/20261002T001114559521Z-layers/report.json)
-and [suite details](../target/quality/20261002T001114623221Z-values/report.json)
+The clean GTK+DuckDB value runner passed 185 selected tests across 11 suites
+with no missing suites on `e704831`; its
+[layer report](../target/quality/20261002T001913901283Z-layers/report.json)
+and [suite details](../target/quality/20261002T001913960449Z-values/report.json)
 record this regression.
 
 ### PostgreSQL custom enum array metadata boundary

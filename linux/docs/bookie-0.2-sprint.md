@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`8e7766c` (source version 0.1.5).
+`e704831` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -19,17 +19,19 @@ This section supersedes their next-task order and desktop-target requirements.
 
 October 2 audit checkpoint: R1–R5 and R7 have focused fixes, regressions and
 native/consumer evidence; R5 also has hosted test ownership. R7 protects XLSX
-floats from Excel's precision and range limits. See the [B3 review](b3-review-2026-10-01.md)
-and its evidence. R6 tracks portable evidence and a finite contract board; the
-remaining native-type matrix and session reconnect follow-up stay open. Continue
-B3-P1 to reconcile those contracts, then assign one bounded engine/type/consumer
-case using the [agent task template](validation-playbook.md#agent-task-template).
-The pushed head passed the clean LT-TRUNG full gate; the remaining selected
-local layers also passed after installing Xvfb, `cargo-audit`, `python-atspi`
-and `dpkg`. Docker driver/value reports were captured on the preceding
-production tree; `8e7766c` changes only XLSX precision-boundary assertions and
-review documentation. Current hosted CI for this head has Security and Flatpak
-in progress, with Build Linux and test-quality pending. See the
+floats from Excel's precision and range limits. The B3-P1 scalar-enum metadata
+boundary now has a permanent regression and exact runnable selector. See the
+[B3 review](b3-review-2026-10-01.md) and its evidence. R6 tracks portable
+evidence and a finite contract board; the remaining native-type matrix and
+session reconnect follow-up stay open. Continue with one bounded
+engine/type/consumer case at a time using the
+[agent task template](validation-playbook.md#agent-task-template).
+The clean LT-TRUNG full gate passed on `8e7766c`; the clean strict GTK+DuckDB
+values layer passed 185 tests across 11 suites on current head `e704831`.
+Drivers, TLS, PostgreSQL release, keyring, security-policy, GTK, workflow,
+harness, packaging and change-contract layers also passed after installing the
+local prerequisites. Current hosted CI for `e704831` has Flatpak running,
+Security in progress, and Build Linux/test-quality pending. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
@@ -85,7 +87,7 @@ carry detailed native-type targets. Do not rebuild completed scalar/BSON/export 
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
 | --- | --- | --- |
-| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, `docs/b3-test-scenario-survey.md`, `docs/value-contracts.md`; inspect corresponding tests | Map each remaining type/consumer to exact support, exact text, refusal or untested. Include September 27–28 MongoDB top-level edits and nested numeric/text cases. Name one smallest uncovered case and its runnable command. Documentation only; no broad feature implementation. |
+| B3-P1: reconcile coverage | `docs/type-contract-strategy.md`, `docs/b3-test-scenario-survey.md`, `docs/value-contracts.md`; inspect corresponding tests | October 2 pass selected direct PostgreSQL scalar-enum projection as the smallest missing permanent boundary assertion; the exact test and SQLx outcome are recorded in the type/value ledgers. Keep reconciling the remaining rows as bounded cases close. |
 | B3-P2: PostgreSQL boundary | `crates/drivers/postgres/{src,tests}`, affected core literal/parser path only | One calendar/array/native-type gap from P1, with an independent native wire/server oracle and a consumer round trip. Record baseline failure or already-covered result; add no type abstraction without a caller. |
 | B3-P3: consumer parity | One format in `crates/core/src/export/`, affected driver test and existing value corpus | One missing empty/NULL, float/subnormal, delimiter/newline, temporal or nested case. Parse output and compare exact value/type; verify destination preservation on refusal. |
 | B3-P4: grid edit / bind | One driver plus `crates/app/src/ui/browse_tab/value_parse.rs` and existing edit/parser tests as needed | One mixed-storage/BSON or exact numeric edit gap. Assert original row identity and native persisted value. Ranges beyond safe support must refuse visibly without a lossy write. |

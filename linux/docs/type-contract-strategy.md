@@ -123,8 +123,9 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 ```
 
 The [value ledger](value-contracts.md#postgresql-scalar-enum-label-text-projection)
-records the passing PostgreSQL 16 contract. Direct native enum decoding remains
-unsupported; B3 still has the other named matrix targets above.
+records the passing PostgreSQL 16 contract and clean 185-test value run on
+`e704831`. Direct native enum decoding remains unsupported; B3 still has the
+other named matrix targets above.
 
 ### Connection-loss contract update — September 30
 
