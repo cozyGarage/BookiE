@@ -997,19 +997,23 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
 async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
-    let result = conn
-        .query(
-            "SELECT value, CONVERT(varchar(23), value, 126) AS server_text \
+    let sql = "SELECT value, CONVERT(varchar(23), value, 126) AS server_text \
              FROM (VALUES \
              (1, CAST('2024-01-02T03:04:05.001' AS datetime)), \
              (2, CAST('2024-01-02T03:04:05.002' AS datetime)), \
              (3, CAST('2024-01-02T03:04:05.004' AS datetime)), \
              (4, CAST('2024-01-02T03:04:05.005' AS datetime)), \
              (5, CAST('2024-01-02T03:04:05.008' AS datetime)) \
-             ) AS samples(id, value) ORDER BY id",
-        )
+             ) AS samples(id, value) ORDER BY id";
+    let result = conn.query(sql).await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let session_result = session
+        .query_params_controlled(sql, &[], &control)
         .await
-        .unwrap();
+        .expect("read inexact legacy datetime through the session batch path");
+    assert_eq!(session_result.rows, result.rows);
+    session.close().await.unwrap();
     let expected_server_text = [
         "2024-01-02T03:04:05",
         "2024-01-02T03:04:05.003",
