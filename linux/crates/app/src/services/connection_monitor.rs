@@ -156,6 +156,7 @@ mod tests {
 
     struct IdleConn {
         attached: Arc<Mutex<Option<Arc<Notify>>>>,
+        pings: Arc<AtomicUsize>,
     }
 
     #[async_trait]
@@ -192,6 +193,7 @@ mod tests {
         }
 
         async fn ping(&self) -> Result<(), DriverError> {
+            self.pings.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
 
@@ -207,6 +209,7 @@ mod tests {
     struct ReconnectingDriver {
         attempts: Arc<AtomicUsize>,
         attached: Arc<Mutex<Option<Arc<Notify>>>>,
+        pings: Arc<AtomicUsize>,
     }
 
     #[async_trait]
@@ -227,6 +230,7 @@ mod tests {
             self.attempts.fetch_add(1, Ordering::SeqCst);
             Ok(Box::new(IdleConn {
                 attached: self.attached.clone(),
+                pings: self.pings.clone(),
             }))
         }
     }
@@ -239,6 +243,7 @@ mod tests {
         let inner = Arc::new(Mutex::new(EntryInner {
             connection: Arc::new(IdleConn {
                 attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
@@ -274,9 +279,11 @@ mod tests {
     async fn a_reconnected_connection_reports_faults_before_its_next_ping() {
         let attempts = Arc::new(AtomicUsize::new(0));
         let attached = Arc::new(Mutex::new(None));
+        let pings = Arc::new(AtomicUsize::new(0));
         let inner = Arc::new(Mutex::new(EntryInner {
             connection: Arc::new(IdleConn {
                 attached: Arc::new(Mutex::new(None)),
+                pings: pings.clone(),
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
@@ -285,6 +292,7 @@ mod tests {
             driver: Arc::new(ReconnectingDriver {
                 attempts: attempts.clone(),
                 attached: attached.clone(),
+                pings: pings.clone(),
             }),
             opts: ConnectOptions::default(),
             ssh: None,
@@ -319,6 +327,7 @@ mod tests {
             tokio::task::yield_now().await;
         }
         assert_eq!(attempts.load(Ordering::SeqCst), 2);
+        assert_eq!(pings.load(Ordering::SeqCst), 0);
 
         assert!(matches!(
             inner.lock().expect("entry lock").health,
