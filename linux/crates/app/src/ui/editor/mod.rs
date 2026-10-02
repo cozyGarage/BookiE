@@ -45,6 +45,7 @@ pub struct SqlEditor {
     run_button: gtk::Button,
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
+    retired_session_connection_id: Option<(Uuid, Uuid)>,
     opening_session_id: Option<Uuid>,
     session_open_in_flight: bool,
     ending_session_id: Option<Uuid>,
@@ -144,6 +145,7 @@ pub enum SqlEditorInput {
     SessionState {
         session_id: Uuid,
         transaction_open: bool,
+        usable: bool,
     },
     SessionEnd {
         session_id: Uuid,
@@ -538,6 +540,7 @@ impl SimpleComponent for SqlEditor {
             run_button: widgets.run_button.clone(),
             session_button: widgets.session_button.clone(),
             session: None,
+            retired_session_connection_id: None,
             opening_session_id: None,
             session_open_in_flight: false,
             ending_session_id: None,
@@ -606,7 +609,8 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,
-            } => self.on_session_state(session_id, transaction_open),
+                usable,
+            } => self.on_session_state(session_id, transaction_open, usable, &sender),
             SqlEditorInput::SessionEnd { session_id, commit } if commit => {
                 self.commit_and_end(session_id, &sender);
             }
@@ -1003,13 +1007,14 @@ impl SqlEditor {
                             SqlEditorInput::ShowOutcomes { generation, outcomes }
                         }
                     };
-                    if let Some((session_id, open)) = target.transaction_state().await {
+                    sender_clone.input(msg);
+                    if let Some((session_id, open, usable)) = target.session_state().await {
                         sender_clone.input(SqlEditorInput::SessionState {
                             session_id,
                             transaction_open: open,
+                            usable,
                         });
                     }
-                    sender_clone.input(msg);
                 })
                 .drop_on_shutdown()
         });

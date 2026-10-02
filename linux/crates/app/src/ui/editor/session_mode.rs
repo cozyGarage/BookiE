@@ -30,6 +30,7 @@ impl std::fmt::Debug for OpenedSession {
 pub(crate) enum StatementTarget {
     Pool(Arc<dyn Connection>),
     Session { id: Uuid, shared: SharedSession },
+    Retired { id: Uuid },
 }
 
 impl StatementTarget {
@@ -42,20 +43,35 @@ impl StatementTarget {
         match self {
             Self::Pool(connection) => connection.query_params_controlled(sql, params, control).await,
             Self::Session { shared, .. } => match shared.lock().await.as_mut() {
-                Some(session) => session.query_params_controlled(sql, params, control).await,
+                Some(session) if session.is_usable() => session.query_params_controlled(sql, params, control).await,
+                Some(_) => Err(retired_session_error()),
                 None => Err(DriverError::Unsupported("the session was closed".into())),
             },
+            Self::Retired { .. } => Err(retired_session_error()),
         }
     }
 
-    pub(crate) async fn transaction_state(&self) -> Option<(Uuid, bool)> {
+    pub(crate) async fn session_state(&self) -> Option<(Uuid, bool, bool)> {
         match self {
             Self::Pool(_) => None,
+            Self::Retired { id } => Some((*id, false, false)),
             Self::Session { id, shared } => {
-                Some((*id, shared.lock().await.as_ref().is_some_and(|s| s.transaction_open())))
+                let session = shared.lock().await;
+                Some(match session.as_ref() {
+                    Some(session) => (*id, session.transaction_open(), session.is_usable()),
+                    None => (*id, false, false),
+                })
             }
         }
     }
+}
+
+fn retired_session_error() -> DriverError {
+    DriverError::Unsupported("the editor session was retired; reopen Session before running more SQL".into())
+}
+
+fn retired_connection_matches(retired: Option<(Uuid, Uuid)>, active: Option<Uuid>) -> bool {
+    active.is_some_and(|active| retired.is_some_and(|(connection, _)| connection == active))
 }
 
 pub(crate) struct EditorSession {
@@ -114,6 +130,13 @@ impl SqlEditor {
                 id: session.id,
                 shared: session.shared.clone(),
             },
+            _ if retired_connection_matches(self.retired_session_connection_id, self.connection_id) => {
+                StatementTarget::Retired {
+                    id: self
+                        .retired_session_connection_id
+                        .map_or(Uuid::nil(), |(_, session)| session),
+                }
+            }
             _ => StatementTarget::Pool(pooled),
         }
     }
@@ -186,6 +209,7 @@ impl SqlEditor {
         self.opening_session_id = None;
         match result {
             Ok(OpenedSession(shared)) if self.session_button.is_active() => {
+                self.retired_session_connection_id = None;
                 self.session = Some(EditorSession {
                     id: session_id,
                     shared,
@@ -271,11 +295,28 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn on_session_state(&mut self, session_id: Uuid, transaction_open: bool) {
+    pub(super) fn on_session_state(
+        &mut self,
+        session_id: Uuid,
+        transaction_open: bool,
+        usable: bool,
+        sender: &ComponentSender<Self>,
+    ) {
         let Some(session) = self.session.as_mut() else {
             return;
         };
         if !apply_transaction_state(session, session_id, transaction_open) {
+            return;
+        }
+        if !usable {
+            let Some(session) = self.session.take() else {
+                return;
+            };
+            self.retired_session_connection_id = Some((session.connection_id, session.id));
+            self.close_session_for_teardown(session.shared, sender);
+            self.status.set_label(&crate::tr!(
+                "This editor session was retired after a connection failure. Reopen Session before running more SQL."
+            ));
             return;
         }
         self.session_button.set_label(&session_label(transaction_open));
@@ -422,7 +463,7 @@ fn session_open_message(error: &DriverError) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     #[test]
     fn a_running_query_or_open_session_delays_teardown() {
@@ -442,6 +483,12 @@ mod tests {
     struct CountedClose {
         calls: Arc<AtomicUsize>,
         result: Result<(), DriverError>,
+    }
+
+    struct HealthSession {
+        usable: Arc<AtomicBool>,
+        queries: Arc<AtomicUsize>,
+        fail_query: bool,
     }
 
     #[async_trait::async_trait]
@@ -524,6 +571,35 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl Session for HealthSession {
+        async fn query_params_controlled(
+            &mut self,
+            _: &str,
+            _: &[Value],
+            _: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            self.queries.fetch_add(1, Ordering::SeqCst);
+            if self.fail_query {
+                Err(DriverError::Unsupported("ordinary statement error".into()))
+            } else {
+                Ok(QueryResult {
+                    columns: Vec::new(),
+                    rows: Vec::new(),
+                    truncated: false,
+                })
+            }
+        }
+
+        fn is_usable(&self) -> bool {
+            self.usable.load(Ordering::SeqCst)
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            Ok(())
+        }
+    }
+
     #[tokio::test]
     async fn a_failed_commit_leaves_the_session_available_for_retry() {
         let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailFirstCommit(true)))));
@@ -585,7 +661,61 @@ mod tests {
         let error = target.query("SELECT 1", &[], &control).await.unwrap_err();
 
         assert!(matches!(error, DriverError::Unsupported(_)));
-        assert_eq!(target.transaction_state().await, Some((id, false)));
+        assert_eq!(target.session_state().await, Some((id, false, false)));
+    }
+
+    #[tokio::test]
+    async fn a_retired_session_reports_its_identity_and_never_dispatches_again() {
+        let id = Uuid::new_v4();
+        let queries = Arc::new(AtomicUsize::new(0));
+        let target = StatementTarget::Session {
+            id,
+            shared: Arc::new(tokio::sync::Mutex::new(Some(Box::new(HealthSession {
+                usable: Arc::new(AtomicBool::new(false)),
+                queries: queries.clone(),
+                fail_query: false,
+            })))),
+        };
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
+
+        assert_eq!(target.session_state().await, Some((id, false, false)));
+        assert!(matches!(
+            target.query("SELECT 1", &[], &control).await,
+            Err(DriverError::Unsupported(_))
+        ));
+        assert_eq!(queries.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn an_ordinary_statement_error_keeps_a_usable_session() {
+        let id = Uuid::new_v4();
+        let queries = Arc::new(AtomicUsize::new(0));
+        let target = StatementTarget::Session {
+            id,
+            shared: Arc::new(tokio::sync::Mutex::new(Some(Box::new(HealthSession {
+                usable: Arc::new(AtomicBool::new(true)),
+                queries: queries.clone(),
+                fail_query: true,
+            })))),
+        };
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
+
+        assert!(target.query("SELECT invalid", &[], &control).await.is_err());
+        assert_eq!(target.session_state().await, Some((id, false, true)));
+        assert_eq!(queries.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_retired_session_only_blocks_the_connection_that_lost_it() {
+        let retired_connection = Uuid::new_v4();
+        assert!(retired_connection_matches(
+            Some((retired_connection, Uuid::new_v4())),
+            Some(retired_connection)
+        ));
+        assert!(!retired_connection_matches(
+            Some((retired_connection, Uuid::new_v4())),
+            Some(Uuid::new_v4())
+        ));
     }
 
     #[test]
