@@ -3508,6 +3508,22 @@ GTK+DuckDB runner passed all 160 selected tests across 11 suites, including 21
 DuckDB contracts:
 [`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).
 
+## DuckDB nested UBIGINT array refusal, 2026-10-02
+
+The scalar decoder preserves `UBIGINT` values above `i64::MAX`, but the nested
+unsigned matrix did not include a `UBIGINT[]`. This contract uses
+`i64::MAX + 1`, `u64::MAX` and SQL NULL. DuckDB `typeof` and `VARCHAR` projections
+pin the native type and exact array text; BookiE marks the result `Undecodable`,
+and SQL-literal and bound-parameter consumers refuse it. This records the
+current safe boundary without claiming nested-array support.
+
+```sh
+rtk cargo test -p tablepro-driver-duckdb --test integration value_contract_nested_ubigint_array_refuses_lossy_consumers -- --exact --test-threads=1
+```
+
+The focused embedded-DuckDB contract passed. Other nested unsigned shapes remain
+open; the strict GTK+DuckDB layer result is recorded below after the clean run.
+
 ## MySQL spatial grid edit refusal, 2026-09-30
 
 The grid's GTK path rendered spatial bytes read-only, but direct driver-aware

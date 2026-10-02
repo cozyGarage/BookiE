@@ -127,6 +127,13 @@ records the passing PostgreSQL 16 contract and clean 185-test value run on
 `e704831`. Direct native enum decoding remains unsupported; B3 still has the
 other named matrix targets above.
 
+The next DuckDB nested-unsigned slice is `UBIGINT[]` above the signed boundary.
+Its focused contract compares exact native array text and records the current
+`Undecodable` result plus SQL-literal/bind refusal; see the
+[value ledger](value-contracts.md#duckdb-nested-ubigint-array-refusal-2026-10-02).
+This closes that shape's behavior contract, not nested-array support. Other
+nested unsigned collection shapes remain open.
+
 ### Connection-loss contract update — September 30
 
 Docker-backed tests stop each remote server after a successful request and
