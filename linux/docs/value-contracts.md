@@ -3581,6 +3581,25 @@ The strict report is
 and the quick-gate report is
 [`20261002T074833600560Z-quick/report.json`](../target/quality/20261002T074833600560Z-quick/report.json).
 
+## DuckDB nested UHUGEINT UNION refusal, 2026-10-02
+
+The nested unsigned boundary now covers `UNION(value := 18446744073709551616::UHUGEINT)`.
+DuckDB's native `typeof` and `VARCHAR` projections pin the result as
+`UNION("value" UHUGEINT)` with exact decimal text. BookiE returns `Undecodable`,
+and SQL-literal and bound-parameter consumers refuse it. The focused regression,
+strict GTK+DuckDB layer (190 tests, 11 suites, no missing suites) and local
+quick gate passed. The strict run reused 746 artifacts and rebuilt only the
+DuckDB package.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration uhugeint_union::value_contract_nested_uhugeint_union_refuses_lossy_consumers -- --exact --test-threads=1
+```
+
+The strict report is
+[`20261002T080301493778Z-values/report.json`](../target/quality/20261002T080301493778Z-values/report.json),
+and the quick-gate report is
+[`20261002T111624439672Z-quick/report.json`](../target/quality/20261002T111624439672Z-quick/report.json).
+
 ## MySQL spatial grid edit refusal, 2026-09-30
 
 The grid's GTK path rendered spatial bytes read-only, but direct driver-aware

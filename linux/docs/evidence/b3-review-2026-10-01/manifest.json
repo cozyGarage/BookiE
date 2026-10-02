@@ -98,6 +98,39 @@
         "result": "passed",
         "report": "target/quality/20261002T074833600560Z-quick/report.json"
       }
+    },
+    {
+      "source_revision": "5fb63afa1cadbf1b4c595d71803a9093f13ca154",
+      "source_clean": false,
+      "validation_note": "The strict test report used base revision 2bf34ab with the new test files present as worktree changes; commit 5fb63af contains those files. The quick gate also passed on that code state after module ordering was formatted.",
+      "contracts": [
+        {
+          "id": "duckdb-nested-uhugeint-union",
+          "test": "crates/drivers/duckdb/tests/support/uhugeint_union.rs::value_contract_nested_uhugeint_union_refuses_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration uhugeint_union::value_contract_nested_uhugeint_union_refuses_lossy_consumers -- --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "DuckDB typeof UNION(\"value\" UHUGEINT) and exact VARCHAR 18446744073709551616",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 190,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report_revision": "2bf34ab9803fc5037cdfa4691a8944e12a808195",
+        "report_dirty": true,
+        "report": "target/quality/20261002T080301493778Z-values/report.json"
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "exit_code": 0,
+        "report_revision": "2bf34ab9803fc5037cdfa4691a8944e12a808195",
+        "report_dirty": true,
+        "report": "target/quality/20261002T111624439672Z-quick/report.json"
+      }
     }
   ],
   "commit_count_in_inventory": 197,

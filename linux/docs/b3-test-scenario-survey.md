@@ -256,6 +256,11 @@ above `u64::MAX` and NULL. Native type/text oracles and result/literal/bind
 refusal passed in the strict 189-test, 11-suite run and local quick gate on
 `98611db`.
 
+A native DuckDB UNION now has the corresponding nested unsigned boundary:
+`UNION("value" UHUGEINT)` retains its exact native type and decimal text oracle,
+while result, SQL-literal and parameter consumers refuse it. The strict
+190-test, 11-suite layer and local quick gate passed on `5fb63af`.
+
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,
 `crates/driver-tls-tests/tests/`, `crates/mcp/tests/enforce_policy.rs`.
