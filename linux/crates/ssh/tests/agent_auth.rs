@@ -1,8 +1,11 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use secrecy::SecretString;
+use tablepro_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 use tablepro_ssh::{SshAuth, SshConfig, SshError, SshTunnel, UnknownHostKey};
 use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
@@ -95,6 +98,24 @@ fn config(host: &str, port: u16) -> SshConfig {
         port,
         username: "deploy".into(),
         auth: SshAuth::Agent,
+    }
+}
+
+struct AnswerHostKeys {
+    accept: bool,
+    calls: AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl Prompter for AnswerHostKeys {
+    async fn answer(&self, prompt: &AskpassPrompt) -> PromptAnswer {
+        assert!(matches!(prompt, AskpassPrompt::HostKeyConfirmation { .. }));
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.accept {
+            PromptAnswer::Accept
+        } else {
+            PromptAnswer::Decline
+        }
     }
 }
 
@@ -333,6 +354,52 @@ async fn start_first_hop_sshd(name: &str, network: &str) -> (ContainerAsync<Gene
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn declining_a_built_in_host_key_does_not_learn_it() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let key_path = temp.path().join("id_ed25519");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", "", "-f"])
+        .arg(&key_path)
+        .status()
+        .unwrap();
+    assert!(generated.success());
+    let public = std::fs::read_to_string(key_path.with_extension("pub")).unwrap();
+    let (_container, host, port) = start_password_sshd(public.trim()).await;
+    let config = SshConfig {
+        host,
+        port,
+        username: "deploy".into(),
+        auth: SshAuth::PrivateKey {
+            path: key_path,
+            passphrase: None,
+        },
+    };
+    let prompter = Arc::new(AnswerHostKeys {
+        accept: false,
+        calls: AtomicUsize::new(0),
+    });
+    let hops = [config];
+
+    let result = SshTunnel::open_chain_prompted(
+        &hops,
+        "127.0.0.1".into(),
+        2222,
+        UnknownHostKey::Refuse,
+        prompter.clone(),
+    )
+    .await;
+
+    assert!(matches!(result, Err(SshError::UnknownHostKey { .. })));
+    assert_eq!(prompter.calls.load(Ordering::SeqCst), 1);
+    assert!(
+        !tablepro_ssh::default_known_hosts_path().unwrap().exists(),
+        "declining must leave the known_hosts file untouched"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_two_hop_chain_reaches_the_final_host() {
     let temp = tempfile::tempdir().unwrap();
     isolate_known_hosts(temp.path());
@@ -349,9 +416,24 @@ async fn a_two_hop_chain_reaches_the_final_host() {
         password_config(&hop1_name, 2222, "s3cret"),
     ];
 
-    let tunnel = SshTunnel::open_chain(&hops, "127.0.0.1".into(), 2222, UnknownHostKey::Learn)
-        .await
-        .unwrap();
+    let prompter = Arc::new(AnswerHostKeys {
+        accept: true,
+        calls: AtomicUsize::new(0),
+    });
+    let tunnel = SshTunnel::open_chain_prompted(
+        &hops,
+        "127.0.0.1".into(),
+        2222,
+        UnknownHostKey::Refuse,
+        prompter.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        prompter.calls.load(Ordering::SeqCst),
+        2,
+        "each unknown hop needs explicit trust"
+    );
 
     let mut stream = tokio::net::TcpStream::connect(("127.0.0.1", tunnel.local_port()))
         .await

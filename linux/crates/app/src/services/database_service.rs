@@ -202,7 +202,7 @@ impl DatabaseService {
             policy_available,
             audit_state: audit.state,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
-            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn)),
+            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse)),
             #[cfg(test)]
             _audit_temp_dir: audit_temp_dir,
         }
@@ -229,6 +229,13 @@ impl DatabaseService {
 
     pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
         self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
+    }
+
+    pub fn enable_builtin_ssh_prompter(&self, prompter: Arc<dyn tablepro_ssh::openssh::Prompter>) {
+        self.ssh_environment
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .set_builtin_prompter(prompter);
     }
 
     pub fn set_approval_sink(&self, sink: Arc<dyn tablepro_policy::ApprovalSink>) {

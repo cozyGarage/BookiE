@@ -176,9 +176,16 @@ async fn open_builtin(
         return Err(TransportError::Ssh("jump chain is empty".into()));
     }
     let unknown = environment.unknown_host_key;
-    match &socket_name {
-        Some(name) => SshTunnel::open_chain_socket(hops, remote.0.clone(), remote.1, name, unknown).await,
-        None => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
+    match (&socket_name, &environment.builtin_prompter) {
+        (Some(name), Some(prompter)) => {
+            SshTunnel::open_chain_socket_prompted(hops, remote.0.clone(), remote.1, name, unknown, prompter.clone())
+                .await
+        }
+        (None, Some(prompter)) => {
+            SshTunnel::open_chain_prompted(hops, remote.0.clone(), remote.1, unknown, prompter.clone()).await
+        }
+        (Some(name), None) => SshTunnel::open_chain_socket(hops, remote.0.clone(), remote.1, name, unknown).await,
+        (None, None) => SshTunnel::open_chain(hops, remote.0.clone(), remote.1, unknown).await,
     }
     .map_err(|e| TransportError::Ssh(e.to_string()))
 }
