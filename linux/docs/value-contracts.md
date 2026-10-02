@@ -3518,7 +3518,7 @@ and SQL-literal and bound-parameter consumers refuse it. This records the
 current safe boundary without claiming nested-array support.
 
 ```sh
-rtk cargo test -p tablepro-driver-duckdb --test integration value_contract_nested_ubigint_array_refuses_lossy_consumers -- --exact --test-threads=1
+rtk cargo test -p tablepro-driver-duckdb --test integration bigint_array::value_contract_nested_ubigint_array_refuses_lossy_consumers -- --exact --test-threads=1
 ```
 
 The clean strict GTK+DuckDB layer passed 186 selected tests across 11 suites,
