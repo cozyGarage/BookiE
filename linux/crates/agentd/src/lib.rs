@@ -309,19 +309,7 @@ impl DaemonProvider {
         let _open = session_lock.lock_owned().await;
         let material = match tablepro_transport::session_material_digest(saved).await {
             Ok(material) => material,
-            Err(error) => {
-                if let Some(connection) = self.any_cached_connection(saved.id)?
-                    && ping_is_healthy(connection.ping(), SESSION_PING_TIMEOUT).await
-                {
-                    tracing::warn!(
-                        id = %saved.id,
-                        %error,
-                        "session material could not be verified; reusing the existing connection"
-                    );
-                    return Ok(connection);
-                }
-                return Err(error.to_string());
-            }
+            Err(error) => return Err(error.to_string()),
         };
         let key = SessionKey::from_saved(saved, material);
         let cached = self.cached_connection(saved.id, &key)?;
@@ -334,10 +322,14 @@ impl DaemonProvider {
         }
 
         let connection = self.connect_session(saved).await?;
-        let key = match tablepro_transport::session_material_digest(saved).await {
-            Ok(material) => SessionKey::from_saved(saved, material),
-            Err(_) => key,
+        let material = match tablepro_transport::session_material_digest(saved).await {
+            Ok(material) => material,
+            Err(error) => {
+                drop(connection);
+                return Err(error.to_string());
+            }
         };
+        let key = SessionKey::from_saved(saved, material);
         self.sessions
             .lock()
             .map_err(|_| "session cache unavailable".to_string())?
@@ -385,14 +377,6 @@ impl DaemonProvider {
         let connection = sessions.get(&id).map(|session| session.connection.clone());
         drop(stale);
         Ok(connection)
-    }
-
-    fn any_cached_connection(&self, id: Uuid) -> Result<Option<Arc<dyn Connection>>, String> {
-        let sessions = self
-            .sessions
-            .lock()
-            .map_err(|_| "session cache unavailable".to_string())?;
-        Ok(sessions.get(&id).map(|session| session.connection.clone()))
     }
 
     fn session_is_current(&self, id: Uuid, key: &SessionKey, connection: &Arc<dyn Connection>) -> Result<bool, String> {
@@ -444,6 +428,7 @@ async fn ping_is_healthy(
 mod tests {
     use super::*;
     use drivers_sqlite::SqliteDriver;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, Environment};
     use tablepro_policy::{DenyApprovalSink, NullAuditSink};
     use tablepro_storage::SavedSshAuth;
@@ -473,6 +458,63 @@ mod tests {
             last_opened_at: None,
             connect_timeout_secs: None,
             query_timeout_secs: None,
+        }
+    }
+
+    struct ProbeConnection {
+        queries: Arc<AtomicUsize>,
+        drops: Arc<AtomicUsize>,
+    }
+
+    impl Drop for ProbeConnection {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    #[async_trait]
+    impl Connection for ProbeConnection {
+        async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
+            Ok(Vec::new())
+        }
+
+        async fn fetch_columns(&self, _schema: Option<&str>, _table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
+            Ok(Vec::new())
+        }
+
+        async fn fetch_rows(
+            &self,
+            _schema: Option<&str>,
+            _table: &str,
+            _offset: u64,
+            _limit: u64,
+        ) -> Result<QueryResult, DriverError> {
+            Err(DriverError::Internal("unused probe operation".into()))
+        }
+
+        async fn query(&self, _sql: &str) -> Result<QueryResult, DriverError> {
+            self.queries.fetch_add(1, Ordering::SeqCst);
+            Err(DriverError::Internal("probe query dispatched".into()))
+        }
+
+        async fn execute(&self, _sql: &str) -> Result<ExecResult, DriverError> {
+            Err(DriverError::Internal("unused probe operation".into()))
+        }
+
+        async fn execute_params(&self, _sql: &str, _params: &[Value]) -> Result<ExecResult, DriverError> {
+            Err(DriverError::Internal("unused probe operation".into()))
+        }
+
+        async fn execute_in_transaction(&self, _statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+            Err(DriverError::Internal("unused probe operation".into()))
+        }
+
+        async fn ping(&self) -> Result<(), DriverError> {
+            Ok(())
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            Ok(())
         }
     }
 
@@ -662,7 +704,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_transient_material_lookup_failure_reuses_a_healthy_cached_connection() {
+    async fn a_material_lookup_failure_does_not_reuse_a_healthy_cached_connection() {
         let mut saved = saved_connection();
         saved.driver_id = "sqlite".into();
         saved.ssh = Some(SavedSshConfig {
@@ -678,6 +720,110 @@ mod tests {
             agent: false,
         });
         let key = SessionKey::from_saved(&saved, [0; 32]);
+        let queries = Arc::new(AtomicUsize::new(0));
+        let drops = Arc::new(AtomicUsize::new(0));
+        let connection: Arc<dyn Connection> = Arc::new(ProbeConnection {
+            queries: queries.clone(),
+            drops: drops.clone(),
+        });
+        let provider = DaemonProvider::new(
+            Arc::new(DriverRegistry::new()),
+            Arc::new(PolicyConfig::default()),
+            Arc::new(NullAuditSink),
+            Arc::new(AuditState::new()),
+            Arc::new(DenyApprovalSink),
+        );
+        provider.sessions.lock().expect("sessions").insert(
+            saved.id,
+            OpenSession {
+                key,
+                connection: connection.clone(),
+            },
+        );
+
+        let result = provider.open_session(&saved).await;
+        if let Ok(connection) = &result {
+            let _ = connection.query("SELECT 1").await;
+        }
+        assert!(result.is_err());
+        assert_eq!(queries.load(Ordering::SeqCst), 0);
+        assert!(provider.sessions.lock().expect("sessions").contains_key(&saved.id));
+    }
+
+    struct RemovingCaDriver {
+        ca_path: PathBuf,
+        queries: Arc<AtomicUsize>,
+        drops: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for RemovingCaDriver {
+        fn id(&self) -> &'static str {
+            "sqlite"
+        }
+
+        fn display_name(&self) -> &'static str {
+            "Removing CA test driver"
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            std::fs::remove_file(&self.ca_path).expect("remove ca material during connect");
+            let _ = opts;
+            Ok(Box::new(ProbeConnection {
+                queries: self.queries.clone(),
+                drops: self.drops.clone(),
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_material_lookup_failure_after_connect_discards_the_new_connection() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let ca_path = directory.path().join("ca.pem");
+        std::fs::write(&ca_path, b"material-before-connect").expect("write initial ca material");
+        let mut saved = saved_connection();
+        saved.driver_id = "sqlite".into();
+        saved.database = ":memory:".into();
+        saved.tls_root_cert = Some(ca_path.clone());
+        saved.ssh = None;
+
+        let mut registry = DriverRegistry::new();
+        let queries = Arc::new(AtomicUsize::new(0));
+        let drops = Arc::new(AtomicUsize::new(0));
+        registry.register(Arc::new(RemovingCaDriver {
+            ca_path,
+            queries: queries.clone(),
+            drops: drops.clone(),
+        }));
+        let provider = DaemonProvider::new(
+            Arc::new(registry),
+            Arc::new(PolicyConfig::default()),
+            Arc::new(NullAuditSink),
+            Arc::new(AuditState::new()),
+            Arc::new(DenyApprovalSink),
+        );
+
+        assert!(provider.open_session(&saved).await.is_err());
+        assert_eq!(queries.load(Ordering::SeqCst), 0);
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        assert!(provider.sessions.lock().expect("sessions").get(&saved.id).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_healthy_cached_connection_is_reused_when_material_is_verified() {
+        let mut saved = saved_connection();
+        saved.driver_id = "sqlite".into();
+        saved.database = ":memory:".into();
+        saved.tls_root_cert = None;
+        saved.ssh = None;
+        let material = tablepro_transport::session_material_digest(&saved)
+            .await
+            .expect("digest valid material");
+        let key = SessionKey::from_saved(&saved, material);
         let mut opts = ConnectOptions {
             database: ":memory:".into(),
             ..Default::default()
@@ -702,7 +848,7 @@ mod tests {
         let reused = provider
             .open_session(&saved)
             .await
-            .expect("a healthy cached connection is reused despite the material lookup failure");
+            .expect("verified healthy connection is reusable");
         assert!(Arc::ptr_eq(&reused, &connection));
     }
 }
