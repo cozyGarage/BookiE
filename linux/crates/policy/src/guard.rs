@@ -526,7 +526,7 @@ impl PolicyGuard {
         let Err(error) = result else {
             return Ok(());
         };
-        self.ctx.audit_state.disable_governed_writes();
+        self.ctx.audit_state.disable_globally();
         Err(DriverError::Internal(format!(
             "audit outcome could not be persisted; the operation may have succeeded and further governed writes are disabled: {error}"
         )))

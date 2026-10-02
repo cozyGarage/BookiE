@@ -6,7 +6,7 @@ separate agents can take in parallel.
 
 ## B4 continuation status (October 3)
 
-Latest integrated base: `d5968c6ff` on `linux`. These B4 reports originated in
+Latest integrated base: `d1434438e` on `linux`. These B4 reports originated in
 isolated worktrees while B3 work was concurrent. Recheck current checkout
 status; that observation does not assert a dirty tree in later sessions. Keep B4 open until the remaining tasks and installed Arch/Debian
 acceptance are complete.
@@ -16,8 +16,8 @@ acceptance are complete.
 | E1, E2, G3, F1, F2, F3 | Merged to `linux` in PRs #16–#18 | Hosted required checks passed; see the linked PRs for packet details. |
 | F5 | Merged to `linux` by [PR #19](https://github.com/cozyGarage/BookiE/pull/19) as `4b7814f5e` | Local focused tests and `full` passed; hosted Build Linux, Linux Security, and both Flatpak jobs passed. Scheduled current-stable Clippy was skipped by workflow schedule. |
 | F4 + F9 | Merged in [PR #20](https://github.com/cozyGarage/BookiE/pull/20) as `573435766`; implementation commit `ecadbe204` | Local `full`, `ssh`, and `postgres-release` passed in `/tmp/tablepro-b4-f5/linux/linux/target/quality/20261002T225224078495Z-layers/report.json`, including `ssh_reconnect_replaces_the_tunnel_and_the_session`. Build Linux and Flatpak checks were still running at this update; Linux Security had passed. |
-| F6 | Pushed as `codex-b4-f6`; 86 SSH unit tests, 2 prompt UI tests, affected-crate Clippy and ignored-test inventory passed | PR and hosted checks remain unverified because GitHub CLI could not reach the API. Branch is ready for manual review and merge. |
-| F8 | Implementation in progress on `codex-b4-f8`: uncertain writes are scoped to a connection generation; journal failures remain shared | 169 policy tests, 9 database-service tests, reconnect-state test, targeted isolation test, Clippy, `security-policy`, and `postgres-release` passed. First `full` attempt stopped at the test-size guardrail; after shortening the test, today’s rerun was cancelled. Rerun `full`, then review and push. Evidence: `/tmp/tablepro-b4-f8/linux/target/quality/20261002T233919000183Z-layers/report.json` and `/tmp/tablepro-b4-f8/linux/target/quality/20261002T234132582041Z-layers/report.json`. |
+| F6 | Merged in PR #22 as `d1434438e`; 86 SSH unit tests, 2 prompt UI tests, affected-crate Clippy and ignored-test inventory passed | Hosted check results were not verified in this session. Docker-backed trust and multi-hop tests are registered in the SSH CI layer. |
+| F8 | Implemented on `codex-b4-f8` at `5b69480d`; connection-generation uncertainty is isolated while journal failures remain shared | `full`, `security-policy`, and `postgres-release` passed in `/tmp/tablepro-b4-f8/linux/target/quality/20261002T234851138407Z-layers/report.json`; affected-crate Clippy and focused connection/isolation tests passed. Push completed locally; hosted checks and merge pending. |
 | Remaining | C6 MySQL/SQL Server, G5, I2, I5, F7, I3, native Arch acceptance, I1/Debian | Follow the dependencies and evidence requirements in the packets below. B3 completion remains the sprint prerequisite. |
 
 ## October 3 integration checkpoint

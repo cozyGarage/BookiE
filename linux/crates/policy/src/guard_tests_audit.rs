@@ -1,5 +1,19 @@
 use super::*;
 
+fn gui_guard(connection: Arc<dyn Connection>, audit: Arc<SequenceAuditSink>, state: Arc<AuditState>) -> PolicyGuard {
+    PolicyGuard::new(
+        connection,
+        context(
+            Principal::human_gui(),
+            Environment::Prod,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit,
+            state,
+        ),
+    )
+}
+
 #[tokio::test]
 async fn post_execution_audit_failure_poisons_shared_state() {
     let executes = Arc::new(AtomicUsize::new(0));
@@ -190,6 +204,68 @@ async fn controlled_unknown_outcome_records_unknown_and_poisons_state() {
     let outcome = events.last().expect("outcome event");
     assert_eq!(outcome.terminal_status, AuditTerminalStatus::Unknown);
     assert_eq!(outcome.error_category, Some(AuditErrorCategory::Unknown));
+}
+
+#[tokio::test]
+async fn an_unknown_write_blocks_only_its_connection_and_generation() {
+    let journal = Arc::new(AuditState::new());
+    let state_a = Arc::new(journal.new_connection_generation());
+    let state_b = Arc::new(journal.new_connection_generation());
+    let audit_a = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard_a = gui_guard(
+        Arc::new(ControlledWriteConn { outcome_unknown: true }),
+        audit_a.clone(),
+        state_a.clone(),
+    );
+    let executes_b = Arc::new(AtomicUsize::new(0));
+    let audit_b = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard_b = gui_guard(
+        connection(executes_b.clone(), Arc::new(AtomicUsize::new(0))),
+        audit_b.clone(),
+        state_b.clone(),
+    );
+
+    guard_a
+        .execute_controlled(
+            "INSERT INTO jobs(id) VALUES (1)",
+            &OperationControl::new(Default::default(), None),
+        )
+        .await
+        .expect_err("uncertain write must surface");
+    assert!(state_a.governed_writes_disabled());
+    assert!(!state_b.governed_writes_disabled());
+    assert_eq!(
+        audit_a.events.lock().unwrap().last().unwrap().terminal_status,
+        AuditTerminalStatus::Unknown
+    );
+
+    guard_b
+        .execute("INSERT INTO jobs(id) VALUES (2)")
+        .await
+        .expect("another connection remains writable");
+    assert_eq!(executes_b.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        audit_b.events.lock().unwrap().last().unwrap().terminal_status,
+        AuditTerminalStatus::Succeeded
+    );
+
+    let replacement_a_state = Arc::new(state_a.new_connection_generation());
+    state_a.disable_governed_writes(); // A late failure from the retired generation.
+    let audit_replacement = Arc::new(SequenceAuditSink::new(vec![]));
+    let replacement_a = gui_guard(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        audit_replacement.clone(),
+        replacement_a_state.clone(),
+    );
+    replacement_a
+        .execute("INSERT INTO jobs(id) VALUES (3)")
+        .await
+        .expect("fresh connection generation restores writes");
+    assert!(!replacement_a_state.governed_writes_disabled());
+    assert_eq!(
+        audit_replacement.events.lock().unwrap().last().unwrap().terminal_status,
+        AuditTerminalStatus::Succeeded
+    );
 }
 
 #[tokio::test]
