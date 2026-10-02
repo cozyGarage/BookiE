@@ -208,6 +208,62 @@ pub(crate) fn dialect_for(driver_id: &str) -> Box<dyn Dialect> {
     }
 }
 
+/// Recognize transaction modes that can leave a pooled connection inside a
+/// transaction without an explicit BEGIN. Tokenization ignores comments and
+/// keeps string literals distinct from keywords, even when the SQL parser does
+/// not understand the dialect-specific statement.
+pub(crate) fn has_implicit_transaction_starter(sql: &str, driver_id: &str) -> bool {
+    if !matches!(driver_id, "mysql" | "mssql") {
+        return false;
+    }
+    let dialect = dialect_for(driver_id);
+    let Ok(tokens) = Tokenizer::new(dialect.as_ref(), sql).tokenize() else {
+        return false;
+    };
+    let tokens = tokens
+        .into_iter()
+        .filter(|token| !matches!(token, Token::Whitespace(_)))
+        .collect::<Vec<_>>();
+
+    tokens
+        .split(|token| matches!(token, Token::SemiColon))
+        .any(|statement| match driver_id {
+            "mssql" => {
+                is_word(statement.first(), "SET")
+                    && is_word(statement.get(1), "IMPLICIT_TRANSACTIONS")
+                    && is_word(statement.get(2), "ON")
+            }
+            "mysql" => mysql_implicit_transaction_statement(statement),
+            _ => false,
+        })
+}
+
+fn mysql_implicit_transaction_statement(tokens: &[Token]) -> bool {
+    if is_word(tokens.first(), "XA") && (is_word(tokens.get(1), "START") || is_word(tokens.get(1), "BEGIN")) {
+        return true;
+    }
+    if !is_word(tokens.first(), "SET") {
+        return false;
+    }
+    tokens.iter().enumerate().any(|(index, token)| {
+        let is_autocommit = matches!(token, Token::Word(word)
+            if word.value.eq_ignore_ascii_case("autocommit")
+                || word.value.eq_ignore_ascii_case("@@autocommit"));
+        if !is_autocommit || !matches!(tokens.get(index + 1), Some(Token::Eq | Token::Assignment)) {
+            return false;
+        }
+        let enabled = matches!(tokens.get(index + 2), Some(Token::Number(value, _)) if value == "1")
+            || is_word(tokens.get(index + 2), "ON")
+            || is_word(tokens.get(index + 2), "TRUE");
+        let complete_value = tokens.get(index + 3).is_none_or(|next| matches!(next, Token::Comma));
+        !enabled || !complete_value
+    })
+}
+
+fn is_word(token: Option<&Token>, expected: &str) -> bool {
+    matches!(token, Some(Token::Word(word)) if word.value.eq_ignore_ascii_case(expected))
+}
+
 fn classify_statement(stmt: &Statement) -> StatementFacts {
     match stmt {
         Statement::Query(q) => classify_query(q),
@@ -851,6 +907,38 @@ mod tests {
         assert!(!f.writes);
         assert_eq!(f.class, StatementClass::Select);
         assert!(f.tables.iter().any(|t| t.contains("users")));
+    }
+
+    #[test]
+    fn implicit_transaction_starters_are_dialect_aware_and_ignore_literals_and_comments() {
+        for (sql, driver) in [
+            ("SET autocommit = 0", "mysql"),
+            ("set /* connection scope */ session autocommit := OFF", "mysql"),
+            ("SET @@autocommit = 0", "mysql"),
+            ("SET @@session.autocommit = 0", "mysql"),
+            ("SELECT 1; XA START 'branch-1'", "mysql"),
+            ("XA BEGIN 'branch-2'", "mysql"),
+            ("SET autocommit = FALSE", "mysql"),
+            ("SET autocommit = 1 - 1", "mysql"),
+            ("SET autocommit = ON - 1", "mysql"),
+            ("SET sql_mode = 'STRICT_ALL_TABLES', autocommit = 0", "mysql"),
+            ("SET autocommit = @wanted", "mysql"),
+            ("SET IMPLICIT_TRANSACTIONS ON", "mssql"),
+        ] {
+            assert!(has_implicit_transaction_starter(sql, driver), "{driver}: {sql}");
+        }
+        for (sql, driver) in [
+            ("SELECT 'SET autocommit = 0'", "mysql"),
+            ("SELECT 1 /* SET IMPLICIT_TRANSACTIONS ON */", "mssql"),
+            ("SET @autocommit = 0", "mysql"),
+            ("SET sql_mode = 'STRICT_ALL_TABLES'", "mysql"),
+            ("SET autocommit = 1", "mysql"),
+            ("SET SESSION autocommit = ON", "mysql"),
+            ("SET IMPLICIT_TRANSACTIONS OFF", "mssql"),
+            ("SET autocommit = 0", "postgres"),
+        ] {
+            assert!(!has_implicit_transaction_starter(sql, driver), "{driver}: {sql}");
+        }
     }
 
     #[test]

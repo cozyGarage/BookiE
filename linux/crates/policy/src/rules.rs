@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tablepro_core::Environment;
 
-use crate::classify::{StatementClass, StatementFacts};
+use crate::classify::{StatementClass, StatementFacts, has_implicit_transaction_starter};
 use crate::config::EnvPolicy;
 use crate::principal::Principal;
 
@@ -46,8 +46,10 @@ pub fn evaluate(
         .unwrap_or_else(|| evaluate_eligible_write(principal, environment, facts, env_policy, estimated_rows))
 }
 
-pub(crate) fn shared_connection_decision(facts: &StatementFacts) -> Option<Decision> {
-    if facts.class == StatementClass::Transaction && !facts.is_multi_statement {
+pub(crate) fn shared_connection_decision(sql: &str, driver_id: &str, facts: &StatementFacts) -> Option<Decision> {
+    if (facts.class == StatementClass::Transaction && !facts.is_multi_statement)
+        || has_implicit_transaction_starter(sql, driver_id)
+    {
         return Some(Decision::Deny {
             rule: "transaction_control_needs_session".into(),
             message: "BEGIN, COMMIT and ROLLBACK cannot run on a shared connection, because the transaction would not \
@@ -357,7 +359,7 @@ mod tests {
             ("ROLLBACK", "sqlite"),
             ("BEGIN TRANSACTION", "mssql"),
         ] {
-            let decision = shared_connection_decision(&classify(sql, driver));
+            let decision = shared_connection_decision(sql, driver, &classify(sql, driver));
             assert_eq!(
                 decision.map(|d| d.rule_name().to_string()).as_deref(),
                 Some("transaction_control_needs_session"),
@@ -368,8 +370,15 @@ mod tests {
             "BEGIN TRANSACTION; UPDATE items SET v = 1 WHERE id = 1; ROLLBACK",
             "mssql",
         );
-        assert!(shared_connection_decision(&batch).is_none());
-        assert!(shared_connection_decision(&classify("SELECT 1", "postgres")).is_none());
+        assert!(
+            shared_connection_decision(
+                "BEGIN TRANSACTION; UPDATE items SET v = 1 WHERE id = 1; ROLLBACK",
+                "mssql",
+                &batch
+            )
+            .is_none()
+        );
+        assert!(shared_connection_decision("SELECT 1", "postgres", &classify("SELECT 1", "postgres")).is_none());
     }
 
     #[test]
