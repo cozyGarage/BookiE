@@ -46,7 +46,11 @@ pub struct SqlEditor {
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
     opening_session_id: Option<Uuid>,
+    session_open_in_flight: bool,
     ending_session_id: Option<Uuid>,
+    session_teardown_active: bool,
+    session_teardown_running: bool,
+    session_teardown_waiters: Vec<tokio::sync::oneshot::Sender<Result<(), String>>>,
     cancel_button: gtk::Button,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
@@ -149,6 +153,8 @@ pub enum SqlEditorInput {
         session_id: Uuid,
         result: Result<(), String>,
     },
+    PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
+    SessionTeardownFinished(Result<(), String>),
 }
 
 #[derive(Debug)]
@@ -533,7 +539,11 @@ impl SimpleComponent for SqlEditor {
             session_button: widgets.session_button.clone(),
             session: None,
             opening_session_id: None,
+            session_open_in_flight: false,
             ending_session_id: None,
+            session_teardown_active: false,
+            session_teardown_running: false,
+            session_teardown_waiters: Vec::new(),
             cancel_button: widgets.cancel_button.clone(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
@@ -552,7 +562,9 @@ impl SimpleComponent for SqlEditor {
 
     fn shutdown(&mut self, _widgets: &mut Self::Widgets, _output: relm4::Sender<Self::Output>) {
         self.diagnostics.stop();
-        self.end_session();
+        if let Some(session) = self.session.take() {
+            session_mode::close_detached(session.shared);
+        }
         if let Some(handler) = self.dark_notify_handler.take() {
             adw::StyleManager::default().disconnect(handler);
         }
@@ -590,7 +602,7 @@ impl SimpleComponent for SqlEditor {
                 connection_id,
                 session_id,
                 result,
-            } => self.on_session_opened(connection_id, session_id, result),
+            } => self.on_session_opened(connection_id, session_id, result, &sender),
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,
@@ -600,12 +612,14 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::SessionEnd { session_id, .. } => {
                 if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
-                    self.end_session();
+                    self.end_session(&sender);
                 }
             }
             SqlEditorInput::SessionCommitFinished { session_id, result } => {
-                self.on_session_commit_finished(session_id, result);
+                self.on_session_commit_finished(session_id, result, &sender);
             }
+            SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
+            SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -832,6 +846,9 @@ impl SqlEditor {
     }
 
     fn begin_run(&mut self, sql: String, single_statement: bool, sender: ComponentSender<Self>) {
+        if self.session_teardown_active {
+            return;
+        }
         if let Some(token) = self.cancel_token.take() {
             token.cancel();
         }
@@ -999,7 +1016,7 @@ impl SqlEditor {
     }
 
     fn set_running(&self, running: bool, supports_server_cancellation: bool, sender: &ComponentSender<Self>) {
-        self.run_button.set_sensitive(!running);
+        self.run_button.set_sensitive(!running && !self.session_teardown_active);
         self.cancel_button
             .set_visible(show_cancel_button(running, supports_server_cancellation));
         self.running_spinner.set_visible(running);
@@ -1018,6 +1035,7 @@ impl SqlEditor {
             if let Ok(elapsed) = context.started_at.elapsed() {
                 finish_notice::notify_if_unattended(&self.source_view, elapsed);
             }
+            self.try_start_session_teardown(sender);
         }
         Some((terminal, context))
     }
@@ -1107,80 +1125,4 @@ fn build_completion_refresh(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{DropGeneration, RunGeneration, export_name_for_query, read_sql_text, show_cancel_button};
-    use std::io::Write;
-
-    #[test]
-    fn stale_run_generations_cannot_finish_newer_runs() {
-        let mut generations = RunGeneration::default();
-        let first = generations.begin();
-        assert!(generations.start(first));
-        let second = generations.begin();
-        assert!(generations.start(second));
-
-        let first_terminal = generations.finish(first).unwrap();
-        assert!(!first_terminal.replace_ui);
-        assert!(!first_terminal.became_idle);
-        assert!(generations.accepts(second));
-        let second_terminal = generations.finish(second).unwrap();
-        assert!(second_terminal.replace_ui);
-        assert!(second_terminal.became_idle);
-    }
-
-    #[test]
-    fn newer_run_can_finish_ui_without_reporting_idle_before_superseded_run() {
-        let mut generations = RunGeneration::default();
-        let first = generations.begin();
-        assert!(generations.start(first));
-        let second = generations.begin();
-        assert!(generations.start(second));
-
-        let second_terminal = generations.finish(second).unwrap();
-        assert!(second_terminal.replace_ui);
-        assert!(!second_terminal.became_idle);
-        let first_terminal = generations.finish(first).unwrap();
-        assert!(!first_terminal.replace_ui);
-        assert!(first_terminal.became_idle);
-    }
-
-    #[test]
-    fn stop_is_visible_only_for_running_server_cancellable_queries() {
-        assert!(show_cancel_button(true, true));
-        assert!(!show_cancel_button(true, false));
-        assert!(!show_cancel_button(false, true));
-    }
-
-    #[test]
-    fn export_name_is_stable_and_safe_for_files() {
-        assert_eq!(
-            export_name_for_query("SELECT * FROM sales.order_items"),
-            "select-from-sales-order-item"
-        );
-        assert_eq!(export_name_for_query("  \n\t"), "query-results");
-    }
-
-    #[test]
-    fn dropped_sql_completion_requires_latest_drop_and_unchanged_editor() {
-        let generations = DropGeneration::default();
-        let first = generations.begin();
-        let second = generations.begin();
-        assert!(!generations.accepts(first));
-        assert!(generations.accepts(second));
-
-        generations.changed();
-        assert!(!generations.accepts(second));
-    }
-
-    #[test]
-    fn dropped_sql_reader_enforces_the_exact_byte_limit() {
-        let path = std::env::temp_dir().join(format!("tablepro-drop-{}.sql", uuid::Uuid::new_v4()));
-        let mut file = std::fs::File::create(&path).unwrap();
-        file.write_all(b"SELECT 1;").unwrap();
-        drop(file);
-
-        assert_eq!(read_sql_text(&path, 9).unwrap(), "SELECT 1;");
-        assert!(read_sql_text(&path, 8).is_err());
-        std::fs::remove_file(path).unwrap();
-    }
-}
+mod tests;

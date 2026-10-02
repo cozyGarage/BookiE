@@ -267,7 +267,7 @@ async fn closing_a_session_with_an_open_transaction_rolls_it_back_and_audits_it(
         .await
         .expect("write");
 
-    session.close().await.expect("close");
+    session.close().await.expect("rollback and close");
 
     assert_eq!(
         h.script.sent.lock().expect("sent lock").last().map(String::as_str),
@@ -277,6 +277,34 @@ async fn closing_a_session_with_an_open_transaction_rolls_it_back_and_audits_it(
     assert_eq!(rollbacks.len(), 1);
     assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::RolledBack);
     assert!(!h.audit_state.governed_writes_disabled());
+}
+
+#[tokio::test]
+async fn closing_after_a_failed_rollback_surfaces_and_audits_unknown_outcome() {
+    let h = harness(
+        SessionScript {
+            fail_once_on: Some("ROLLBACK"),
+            ..SessionScript::default()
+        },
+        false,
+    );
+    let mut session = h.guard.open_session().await.expect("open session");
+    run(&mut session, "BEGIN").await.expect("begin");
+    run(&mut session, "UPDATE items SET v = 2 WHERE id = 1")
+        .await
+        .expect("write");
+
+    let error = session.close().await.expect_err("rollback failure must be reported");
+    assert!(matches!(error, DriverError::TimedOut));
+    assert_eq!(
+        h.script.sent.lock().expect("sent lock").last().map(String::as_str),
+        Some("ROLLBACK")
+    );
+    let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
+    assert_eq!(rollbacks.len(), 2);
+    assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Pending);
+    assert_eq!(rollbacks[1].transaction_outcome, AuditTransactionOutcome::Unknown);
+    assert!(h.audit_state.governed_writes_disabled());
 }
 
 #[tokio::test]
@@ -296,7 +324,8 @@ async fn a_session_lost_mid_transaction_after_a_write_records_an_unknown_outcome
     let _ = run(&mut session, "SELECT pg_sleep(60)").await;
     assert!(!session.is_usable());
 
-    session.close().await.expect("close");
+    let close = session.close().await.expect_err("unknown outcome must be reported");
+    assert!(matches!(close, DriverError::OperationOutcomeUnknown { .. }));
 
     let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
     assert_eq!(rollbacks.len(), 1);
@@ -350,7 +379,8 @@ async fn a_disconnected_error_retires_the_session_even_when_the_driver_reports_i
         .expect_err("retired session refuses");
     assert!(matches!(refused, DriverError::PolicyDenied(_)), "{refused:?}");
 
-    session.close().await.expect("close");
+    let close = session.close().await.expect_err("unknown outcome must be reported");
+    assert!(matches!(close, DriverError::OperationOutcomeUnknown { .. }));
     let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
     assert_eq!(rollbacks.len(), 1);
     assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Unknown);
@@ -469,7 +499,8 @@ async fn a_disconnected_commit_writes_an_unknown_terminal_state_and_retires_the_
     assert_eq!(commits[0].transaction_outcome, AuditTransactionOutcome::Unknown);
     assert!(h.audit_state.governed_writes_disabled());
 
-    session.close().await.expect("close");
+    let close = session.close().await.expect_err("unknown outcome must be reported");
+    assert!(matches!(close, DriverError::OperationOutcomeUnknown { .. }));
     let rollbacks = outcomes_of(&h.audit, AuditOperationClass::TransactionRollback);
     assert_eq!(rollbacks.len(), 1);
     assert_eq!(rollbacks[0].transaction_outcome, AuditTransactionOutcome::Unknown);

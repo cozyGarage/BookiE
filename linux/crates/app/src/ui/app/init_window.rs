@@ -17,6 +17,8 @@ pub(super) struct WindowLifecycleHandles {
     pub(super) close_after_save: Rc<RefCell<HashMap<Uuid, u32>>>,
     pub(super) close_window_after_save: Rc<Cell<bool>>,
     pub(super) in_flight_saves: Rc<Cell<usize>>,
+    pub(super) session_teardown_ready: Rc<Cell<bool>>,
+    pub(super) session_teardown_pending: Rc<Cell<bool>>,
 }
 
 pub(super) fn install_window_lifecycle(
@@ -44,12 +46,18 @@ pub(super) fn install_window_lifecycle(
     let close_after_save_for_close: Rc<RefCell<HashMap<Uuid, u32>>> = Rc::new(RefCell::new(HashMap::new()));
     let close_window_after_save_for_close: Rc<Cell<bool>> = Rc::new(Cell::new(false));
     let in_flight_saves: Rc<Cell<usize>> = Rc::new(Cell::new(0));
+    let session_teardown_ready = Rc::new(Cell::new(false));
+    let session_teardown_pending = Rc::new(Cell::new(false));
     let handles = WindowLifecycleHandles {
         close_after_save: close_after_save_for_close.clone(),
         close_window_after_save: close_window_after_save_for_close.clone(),
         in_flight_saves: in_flight_saves.clone(),
+        session_teardown_ready: session_teardown_ready.clone(),
+        session_teardown_pending: session_teardown_pending.clone(),
     };
     let in_flight_saves_for_close = in_flight_saves.clone();
+    let session_teardown_ready_for_close = session_teardown_ready.clone();
+    let session_teardown_pending_for_close = session_teardown_pending.clone();
     let close_request_input_sender = sender.input_sender().clone();
     let workspace_for_close = workspace.clone();
     window.connect_close_request(move |w| {
@@ -216,6 +224,13 @@ pub(super) fn install_window_lifecycle(
             );
             return glib::Propagation::Stop;
         }
+        if !session_teardown_ready_for_close.replace(false) {
+            if !session_teardown_pending_for_close.replace(true) {
+                let _ = close_request_input_sender.send(AppMsg::PrepareWindowClose);
+            }
+            return glib::Propagation::Stop;
+        }
+        session_teardown_pending_for_close.set(false);
         glib::Propagation::Proceed
     });
 

@@ -9,6 +9,7 @@ use crate::services::connection_service;
 use crate::services::database_service::{ConnectionHealth, ConnectionMetadata};
 use crate::ui::connect_dialog::{ConnectDialog, ConnectDialogInit, ConnectDialogOutput};
 
+use super::SessionTeardownAction;
 use super::{App, AppMsg, ConnectionTransition, SwitchDecision};
 
 impl App {
@@ -145,7 +146,19 @@ impl App {
             dialog.present(Some(&self.window));
             return;
         }
-        self.do_disconnect(sender);
+        self.request_disconnect(sender);
+    }
+
+    pub(super) fn request_disconnect(&mut self, sender: ComponentSender<Self>) {
+        if !self.confirm_session_teardown(
+            sender.clone(),
+            SessionTeardownAction::Disconnect,
+            &crate::tr!("Disconnect with an open session transaction?"),
+            &crate::tr!("The open transaction will be rolled back before disconnecting."),
+            &crate::tr!("Roll Back and Disconnect"),
+        ) {
+            self.do_disconnect(sender);
+        }
     }
 
     /// Skip the dirty check and tear the connection down. Reachable
@@ -153,6 +166,10 @@ impl App {
     /// or from a clean `Disconnect` when no tracker has pending
     /// changes.
     pub(super) fn do_disconnect(&mut self, sender: ComponentSender<Self>) {
+        self.prepare_editor_sessions(SessionTeardownAction::Disconnect, sender);
+    }
+
+    pub(super) fn finish_disconnect(&mut self, sender: ComponentSender<Self>) {
         // Invalidate any candidate left behind by a stale dialog callback.
         // A late preparation result is rejected unless the transition is
         // still `Connecting`, so it cannot reconnect after this teardown.
@@ -495,6 +512,22 @@ impl App {
     }
 
     fn activate_prepared_connection(&mut self, sender: ComponentSender<Self>) {
+        if self.connected {
+            if !self.confirm_session_teardown(
+                sender.clone(),
+                SessionTeardownAction::ConnectionSwitch,
+                &crate::tr!("Switch with an open session transaction?"),
+                &crate::tr!("The open transaction will be rolled back before switching connections."),
+                &crate::tr!("Roll Back and Switch"),
+            ) {
+                self.prepare_editor_sessions(SessionTeardownAction::ConnectionSwitch, sender);
+            }
+        } else {
+            self.finish_activate_prepared_connection(sender);
+        }
+    }
+
+    pub(super) fn finish_activate_prepared_connection(&mut self, sender: ComponentSender<Self>) {
         let Some(prepared) = self.prepared_connection.take() else {
             return;
         };

@@ -2,10 +2,59 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentSender, adw};
 use uuid::Uuid;
 
-use super::types::{WorkspaceTab, read_workspace_tab_id};
-use super::{App, AppMsg};
+use super::types::read_workspace_tab_id;
+use super::{App, AppMsg, SessionTeardownAction, WorkspaceTab};
 
 impl App {
+    pub(super) fn confirm_session_teardown(
+        &self,
+        sender: ComponentSender<Self>,
+        action: SessionTeardownAction,
+        heading: &str,
+        body: &str,
+        accept_label: &str,
+    ) -> bool {
+        let has_open_transaction = self.workspace_tabs.borrow().values().any(|tab| match tab {
+            WorkspaceTab::Editor(slot) => {
+                relm4::ComponentController::model(&slot.controller).session_transaction_open()
+            }
+            _ => false,
+        });
+        if !has_open_transaction {
+            return false;
+        }
+
+        let dialog = adw::AlertDialog::new(Some(heading), Some(body));
+        dialog.add_response("cancel", &crate::tr!("Cancel"));
+        dialog.add_response("confirm", accept_label);
+        dialog.set_response_appearance("confirm", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        let sender = sender.clone();
+        dialog.connect_response(None, move |_, response| {
+            let message = if response == "confirm" {
+                AppMsg::ConfirmSessionTeardown(action)
+            } else {
+                AppMsg::CancelSessionTeardown(action)
+            };
+            sender.input(message);
+        });
+        dialog.present(Some(&self.window));
+        true
+    }
+
+    pub(super) fn prepare_window_close(&mut self, sender: ComponentSender<Self>) {
+        if !self.confirm_session_teardown(
+            sender.clone(),
+            SessionTeardownAction::WindowClose,
+            &crate::tr!("Close with open session transactions?"),
+            &crate::tr!("Open transactions will be rolled back before the window closes."),
+            &crate::tr!("Roll Back and Close"),
+        ) {
+            self.prepare_editor_sessions(SessionTeardownAction::WindowClose, sender);
+        }
+    }
+
     pub(super) fn close_active_workspace_tab(&mut self, sender: ComponentSender<Self>) {
         let Some(tab_view) = self.workspace_tab_view.as_ref() else {
             self.window.close();
