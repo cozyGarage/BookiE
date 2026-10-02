@@ -219,6 +219,13 @@ remaining temporal/nested combinations, unverified consumers and explicit
 unsupported boundaries listed in `type-contract-strategy.md`; these updates do
 not close those open targets.
 
+The next smallest contract selected by the October 2 reconciliation is direct
+PostgreSQL scalar-enum projection. The existing test proves the exact text
+fallback but leaves the documented SQLx metadata failure as a manual probe.
+Add a permanent assertion for either exact native decoding or that specific
+metadata boundary before expanding to another custom type; see the runnable
+selector in the [type strategy](type-contract-strategy.md).
+
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,
 `crates/driver-tls-tests/tests/`, `crates/mcp/tests/enforce_policy.rs`.

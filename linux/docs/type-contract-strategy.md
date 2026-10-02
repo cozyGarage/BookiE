@@ -108,6 +108,24 @@ live integration contract checks DATE, TIME, TIMETZ, TIMESTAMP and TIMESTAMPTZ
 against exact server text after import; see the
 [value ledger](value-contracts.md#postgresql-era-and-mutation-checkpoint).
 
+### B3-P1 selected next case — PostgreSQL scalar custom enum — October 2
+
+The existing scalar enum contract proves exact `enum::text`, SQL-literal and
+typed-text behavior against `pg_typeof`, but it does not permanently exercise
+the direct enum projection. A manual direct projection reached SQLx metadata
+resolution and returned `enum_labels: unexpected NULL`; the equivalent enum
+array metadata boundary already has a regression. The smallest next task is to
+extend the existing scalar contract so direct projection either returns every
+label and SQL NULL exactly or reproduces that specific metadata error. Keep the
+independent server type/text oracle and text-consumer checks.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
+```
+
+Until the decoder supports the native result type, record this as a tested
+SQLx boundary, not exact typed support or a BookiE `Undecodable` value.
+
 ### Connection-loss contract update — September 30
 
 Docker-backed tests stop each remote server after a successful request and
