@@ -2,6 +2,8 @@
 
 TablePro is a Linux-only Rust workspace rooted in `linux/`. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
 
+Reviewed against Linux `4b7814f5e` on 2026-10-03. See the [cross-session consistency review](docs/architecture-consistency-review-2026-10-03.md) for document authority, evidence limits and remaining source risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing.
+
 ## Workspace layout
 
 ```text
@@ -14,12 +16,14 @@ linux/
 │   ├── policy/              SQL classification, approval, masking, and audit rules
 │   ├── mcp/                 MCP transport, tokens, allowlists, and rate limits
 │   ├── storage/             connections, secrets, query history, and audit journal
+│   ├── transport/           saved connection assembly and shared route ownership
+│   ├── driver-tls-tests/    test-only cross-driver certificate fixtures
 │   ├── ssh/                 SSH tunnels and jump chains
 │   ├── release-tests/       deterministic release checks against the PostgreSQL fixture
 │   └── drivers/             one crate per database engine
 ├── tests/fixtures/          container fixtures for release checks
 ├── packaging/               Arch and Debian GitHub Release files
-├── flatpak/                 later Flatpak packaging work
+├── flatpak/                 GNOME 50 packaging and CI; publication unqualified
 └── scripts/                 local checks, integration tests, and package helpers
 ```
 
@@ -29,13 +33,13 @@ The workspace currently has these driver crates: PostgreSQL, MySQL, SQLite, SQL 
 
 `tablepro-core` defines shared connection options, values, errors, operation control, and driver traits. It does not depend on another workspace crate.
 
-Driver crates implement the core traits. They do not depend on GTK. `tablepro-policy` applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients.
+Driver crates implement the core traits. They do not depend on GTK. `tablepro-policy` applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal; it depends on core, policy audit types, and SSH configuration types. `tablepro-transport` depends on core, SSH and storage to assemble saved credentials and establish routes. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients.
 
 `tablepro-app` and `tablepro-agentd` are composition roots. They register drivers and assemble policy, storage, transport, and connection services for their process. `tablepro-release-tests` is a test-only consumer that assembles core, policy, SSH, storage, and the PostgreSQL driver against the release fixture.
 
 ## Transport and service identity
 
-`ConnectOptions` separates the address a driver dials from the service identity TLS must verify. A direct connection dials its own host. An SSH tunnel keeps the saved host and port as the service identity and supplies the local endpoint separately: a loopback TCP port for modes that do not verify certificates, or a Unix socket in a private directory when the driver reports a forwarded socket name. The socket form is what lets a verifying PostgreSQL connection check the certificate against the original database hostname while the bytes travel through the tunnel. A driver that reports no socket name only ever receives a TCP endpoint, and verification then fails rather than accepting the local address.
+`ConnectOptions` separates the address a driver dials from the service identity TLS must verify. A direct connection dials its own host. An SSH tunnel keeps the saved host and port as the service identity and supplies the local endpoint separately: a loopback TCP port for modes that do not verify certificates, or a Unix socket in a private directory when the driver reports a forwarded socket name. The socket form is what lets a verifying PostgreSQL connection check the certificate against the original database hostname while the bytes travel through the tunnel. Drivers without a forwarded socket name receive TCP. Verification depends on the driver's ability to separate the dial endpoint from the service identity: SQL Server and ClickHouse have explicit identity handling; PostgreSQL uses the socket path. Unsupported combinations must fail closed. A socket capability alone does not establish TLS readiness; consult the per-engine fixture evidence and B4 C6 acceptance.
 
 ```mermaid
 graph TD
@@ -44,14 +48,24 @@ graph TD
     App --> Storage[tablepro-storage]
     App --> MCP[tablepro-mcp]
     App --> SSH[tablepro-ssh]
+    App --> Transport[tablepro-transport]
     App --> Drivers[driver crates]
-    Agent[tablepro-agentd] --> MCP
+    Agent[tablepro-agentd] --> Core
+    Agent --> SSH
+    Agent --> Transport
+    Agent --> MCP
     Agent --> Policy
     Agent --> Storage
     Agent --> Drivers
     MCP --> Core
     MCP --> Policy
     MCP --> Storage
+    Transport --> Core
+    Transport --> SSH
+    Transport --> Storage
+    Storage --> Core
+    Storage --> Policy
+    Storage --> SSH
     Policy --> Core
     Drivers --> Core
 ```
@@ -71,7 +85,7 @@ A token scope never bypasses `PolicyGuard`. Policy approval never bypasses a tok
 
 Writes record an audit intent before driver execution and a terminal outcome afterward. Required audit failures deny governed writes. Recovered unresolved outcomes also keep governed writes disabled until they are handled.
 
-A driver that panics is contained at the guard rather than lost with its task. The guard catches the unwind at every forwarded call and turns it into a `DriverError`: reads become `Internal`, and writes become `OperationOutcomeUnknown`, because a driver that stopped mid-statement cannot tell us whether the server applied it. The surrounding audit path then sees an ordinary error and records the required terminal state, so containment does not create a gap in the journal. The panic payload reaches `tracing` only; it never enters the returned error, the audit fields, or the interface.
+A driver that panics is contained at the guard rather than lost with its task. The guard catches the unwind at every forwarded call and turns it into a `DriverError`: reads become `Internal`, and writes become `OperationOutcomeUnknown`, because a driver that stopped mid-statement cannot tell us whether the server applied it. The surrounding audit path then sees an ordinary error and records the required terminal state, so containment does not create a gap in the journal. The caught panic payload currently reaches `tracing`; it is omitted from the returned error, audit fields and interface. This is an implementation description, not a privacy guarantee: the payload and the default panic hook may expose sensitive data. The [privacy follow-up](docs/architecture-consistency-review-2026-10-03.md#remaining-source-risks) remains open. Keep the unwinding panic strategy required by ADR 0006.
 
 Because a panic leaves the connection's protocol state unverified, the guard also reports the fault through the optional `ConnectionFaultSink` its owner installs. `app::services::database_service` implements that sink and wakes the connection monitor, which replaces the connection instead of waiting for the next ping. A desynchronised connection can still answer a ping, so the fault path deliberately skips the ping and reconnects. `tablepro-mcp` and `tablepro-agentd` install no sink and keep the error conversion alone.
 
@@ -104,8 +118,8 @@ See [docs/adding-drivers.md](docs/adding-drivers.md) for registration and test s
 | Data | Backend | Default location |
 |---|---|---|
 | Saved connections | Versioned JSON | `$XDG_CONFIG_HOME/tablepro/connections.json` |
-| Preferences | JSON | `$XDG_CONFIG_HOME/tablepro/preferences.json` |
-| Window state | JSON | `$XDG_CONFIG_HOME/tablepro/window.json` |
+| Preferences | GSettings with JSON rollback mirror | `$XDG_CONFIG_HOME/tablepro/preferences.json` |
+| Window state | GSettings geometry with JSON rollback mirror | `$XDG_CONFIG_HOME/tablepro/window.json` |
 | Workspace tabs | JSON | `$XDG_CONFIG_HOME/tablepro/workspace_state.json` |
 | Column widths | JSON | `$XDG_CONFIG_HOME/tablepro/column_widths.json` |
 | Table filters | JSON | `$XDG_CONFIG_HOME/tablepro/filter_settings.json` |
@@ -113,7 +127,7 @@ See [docs/adding-drivers.md](docs/adding-drivers.md) for registration and test s
 | Audit records | Hash-chained JSONL | `$XDG_DATA_HOME/tablepro/audit.jsonl` |
 | Passwords and SSH secrets | Secret Service through `oo7` | Desktop keyring |
 
-When an XDG variable is unset, config files fall back to `~/.config/tablepro/` and the audit journal falls back to `~/.local/share/tablepro/`.
+Preferences and geometry use the `com.tablepro.linux` GSettings schema when available; JSON remains the fallback and rollback mirror. The last connection id stays in `window.json`. Development builds use the separate `.Devel` schema and `tablepro-devel` paths. When an XDG variable is unset, config files fall back to `~/.config/tablepro/` and the audit journal falls back to `~/.local/share/tablepro/`.
 
 See [docs/storage.md](docs/storage.md) for details verified against the current implementation.
 
@@ -126,7 +140,7 @@ cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D wa
 cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 ```
 
-CI runs GTK checks in an Ubuntu 25.10 container because the selected libadwaita and Relm4 features require a newer GLib than the Ubuntu 24.04 host provides. Driver integration tests run separately against Docker services.
+CI runs GTK build, widget and soak checks in Debian testing containers for the GNOME 50 library baseline. Flatpak CI uses the GNOME 50 builder image. The Ubuntu 24.04 runner host is not the application's runtime baseline; Ubuntu 24.04/25.10 packages lack the required libraries. Driver integration tests run separately against Docker services.
 
 ## Deliberate limits
 
@@ -134,7 +148,7 @@ CI runs GTK checks in an Ubuntu 25.10 container because the selected libadwaita 
 - Drivers are statically linked.
 - There is no embedded browser UI.
 - There is no in-process user scripting runtime.
-- GitHub Release packages are Arch x86_64 and Ubuntu 25.10 amd64. Public AUR and Flathub publication come later.
+- Packaging targets Arch x86_64 first and Debian/GNOME amd64 next. Current 0.2 installed upgrade, rollback and native Wayland qualification remains open. A recipe or CI build is not publication approval; AUR and Flathub remain deferred.
 
 ## Browse query planning and asynchronous identity
 

@@ -5,6 +5,8 @@ The original review changed documentation only. The later
 [U1 implementation handoff](upstream-u1-sql-server-2026-10-03.md) records the
 bounded SQL Server metadata fix and its native regression evidence separately.
 
+The [older app-release follow-up](upstream-older-releases-review-2026-10-03.md) and [architecture consistency review](architecture-consistency-review-2026-10-03.md) extend this dated source review.
+
 ## Evidence and scope
 
 - Upstream: [TableProApp/TablePro main](https://github.com/TableProApp/TablePro/commit/5c2df3b60cd40c25ba86c57e3d1c87499340cb3c),
@@ -46,8 +48,8 @@ Reference: [#3231](https://github.com/TableProApp/TablePro/commit/ff80b43a9d).
 Its SQL Server catalog patch recognizes `timestamp`/rowversion and generated
 always period/ledger columns as server-owned, in addition to computed columns.
 
-Linux `crates/drivers/mssql/src/lib.rs::fetch_columns` selects `c.is_computed`;
-`parse_column_row` maps only that flag to `ColumnInfo.is_generated`.
+At the original review baseline, Linux `crates/drivers/mssql/src/lib.rs::fetch_columns` selected `c.is_computed`;
+`parse_column_row` mapped only that flag to `ColumnInfo.is_generated`.
 The grid and INSERT builders already trust `is_generated`, so incomplete
 metadata can offer edits or emit INSERT values the server refuses.
 

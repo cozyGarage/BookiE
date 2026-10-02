@@ -3,6 +3,10 @@
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
+## October 3 review handoff
+
+Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The [older app-release review](upstream-older-releases-review-2026-10-03.md) screens all 128 app releases and adds O1–O3 reproduction candidates under existing B3/B4 ownership. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [B4 integration checkpoint](b4-task-board.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
+
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
@@ -19,7 +23,7 @@ This section supersedes their next-task order and desktop-target requirements.
 
 The [October 3 macOS main review](upstream-main-review-2026-10-03.md)
 adds bounded correctness packets U1–U6 for the current B3/B4 lanes. Start with
-SQL Server server-owned metadata and identity Copy as SQL, then resolve qualified
+remaining identity Copy as SQL work after the implemented U1 metadata fix, then resolve qualified
 autocomplete identity. Coordinate reconnect and client-certificate work with
 the B4 board; MongoDB collection-wide export coverage reuses the open B3 scope.
 These are source-review findings and reproduction tasks, with no new runtime
