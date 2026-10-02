@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`6c2e61f` (source version 0.1.5).
+`19c5b6a` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -27,12 +27,13 @@ session reconnect follow-up stay open. Continue with one bounded
 engine/type/consumer case at a time using the
 [agent task template](validation-playbook.md#agent-task-template).
 The clean LT-TRUNG full gate passed on `8e7766c`; the clean strict GTK+DuckDB
-values layer passed 186 tests across 11 suites, including 24 DuckDB contracts,
-on current head `6c2e61f`. Drivers, TLS, PostgreSQL release, keyring,
+values layer passed 187 tests across 11 suites, including 25 DuckDB contracts,
+on code commit `19c5b6a`. The runner reused 746 fresh artifacts and rebuilt
+only the DuckDB test package. Drivers, TLS, PostgreSQL release, keyring,
 security-policy, GTK, workflow, harness, packaging and change-contract layers
-also passed after installing the local prerequisites. Current hosted CI for
-`6c2e61f` has Flatpak and Security in progress, with Build Linux and
-test-quality pending. See the
+also passed after installing the local prerequisites. At the last hosted
+checkpoint `6c1da58`, Build preflight, Security and Flatpak passed; the GTK and
+driver integration jobs were still running. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
@@ -132,6 +133,11 @@ the shared consumer checks JSON/CSV and refuses type-less SQL, binding and grid
 edits. The strict GTK+DuckDB value layer passed 186 tests across 11 suites at
 code commit `0970896`; hosted CI is pending. See the
 [value evidence](value-contracts.md#clickhouse-numeric-key-nullable-map-2026-10-02).
+
+The DuckDB nested unsigned follow-up adds a STRUCT containing `i64::MAX + 1`,
+`u64::MAX` and NULL. Native `typeof`/`VARCHAR` oracles and explicit result,
+literal and bind refusal passed; the clean 187-test strict layer on `19c5b6a`
+includes this contract. The contract is recorded in the [value ledger](value-contracts.md#duckdb-nested-ubigint-struct-refusal-2026-10-02).
 
 B3-P6 triage re-audited old ClickHouse DateTime64 and CSV `column_kind`
 survivors against the current test set: 16/16 viable ClickHouse mutants and

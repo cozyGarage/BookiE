@@ -3527,6 +3527,23 @@ including 24 DuckDB contracts, with no missing suites on `6c2e61f`. See the
 and [suite details](../target/quality/20261002T003010044333Z-values/report.json).
 Other nested unsigned shapes remain open.
 
+## DuckDB nested UBIGINT struct refusal, 2026-10-02
+
+This contract extends the nested unsigned boundary to a STRUCT with
+`i64::MAX + 1`, `u64::MAX` and a NULL field. DuckDB `typeof` and `VARCHAR`
+provide independent type and exact-value oracles. BookiE returns
+`Undecodable`, and SQL-literal and bound-parameter consumers refuse the value.
+The focused embedded-engine test and clean strict GTK+DuckDB value layer passed
+on `19c5b6a`: 187 tests across all 11 suites, including 25 DuckDB contracts.
+Other nested unsigned shapes remain open.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-duckdb --test integration bigint_struct::value_contract_nested_ubigint_struct_refuses_lossy_consumers -- --exact --test-threads=1
+```
+
+The report is
+[`20261002T005849903174Z-values/report.json`](../target/quality/20261002T005849903174Z-values/report.json).
+
 ## MySQL spatial grid edit refusal, 2026-09-30
 
 The grid's GTK path rendered spatial bytes read-only, but direct driver-aware
