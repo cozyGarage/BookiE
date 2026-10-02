@@ -17,6 +17,14 @@ This section supersedes their next-task order and desktop-target requirements.
 
 ### Priority and desktop scope
 
+The [October 3 macOS main review](upstream-main-review-2026-10-03.md)
+adds bounded correctness packets U1–U6 for the current B3/B4 lanes. Start with
+SQL Server server-owned metadata and identity Copy as SQL, then resolve qualified
+autocomplete identity. Coordinate reconnect and client-certificate work with
+the B4 board; MongoDB collection-wide export coverage reuses the open B3 scope.
+These are source-review findings and reproduction tasks, with no new runtime
+acceptance or milestone closure.
+
 October 2 audit checkpoint: R1–R5 and R7 have focused fixes, regressions and
 native/consumer evidence; R5 also has hosted test ownership. R7 protects XLSX
 floats from Excel's precision and range limits. The B3-P1 scalar-enum metadata

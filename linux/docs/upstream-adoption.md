@@ -2,6 +2,8 @@
 
 Historical matrix below. For later main-branch decisions and implemented fixes,
 see the [September 14 Linux sprint](sprint-2026-09-14.md).
+For the October 2 macOS main tip, see the
+[October 3 applicability review](upstream-main-review-2026-10-03.md).
 
 Reviewed: 2026-09-07. Linux baseline: `7d8288132` plus the stabilization changes described in the [historical sprint audit](stabilization-2026-09.md).
 

@@ -3,6 +3,18 @@
 The approved [BookiE convergence sprint](bookie-0.2-sprint.md) now includes shared
 Rust/Linux foundations as well as behavior review. Apple source trees remain excluded.
 
+## 2026-10-03: macOS main applicability review
+
+Reviewed macOS main at `5c2df3b60cd40c25ba86c57e3d1c87499340cb3c` against
+BookiE `linux` at `7b08dd4786db22ac38bc341f29d0f350412af82d`.
+The [review and agent work packets](upstream-main-review-2026-10-03.md)
+identify SQL Server server-owned columns and identity copying, qualified
+autocomplete keys, reconnect failure handling, client-certificate integration
+and MongoDB export coverage. Its inventory distinguishes subject screening
+from inspected diffs, and the review separates source gaps from cases still
+needing a reproduction. Existing policy and cancellation protections are retained.
+This entry records a documentation handoff; no behavior was ported or tested.
+
 ## 2026-09-25: system OpenSSH transport
 
 `crates/ssh/src/openssh/` ports upstream's system OpenSSH transport as a second

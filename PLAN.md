@@ -4,7 +4,7 @@ Active delivery sequencing and acceptance are now in the approved
 [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
 The capability backlog and historical evidence below remain reference material.
 
-Last updated: 2026-09-28
+Last updated: 2026-10-03
 
 This plan is the source of truth for the Linux application. It separates:
 
@@ -17,7 +17,12 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 
 ## Current continuation
 
-Work on **`linux`**. The [September 28 continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28)
+The [October 3 macOS main review](linux/docs/upstream-main-review-2026-10-03.md)
+maps new upstream fixes to the Linux source and defines U1–U6 work packets with
+regression acceptance. Use it alongside the current sprint and B4 task board;
+it records future work, not implemented fixes.
+
+Work on **`linux`**. The [October 2 continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-02)
 orders **B3 → B4 → Arch/Omarchy/Hyprland native Wayland UI** and includes bounded
 Luna handoffs. GNOME desktop on Debian is the required next phase after the Arch
 pass, within the same continuation plan.
