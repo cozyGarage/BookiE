@@ -6,6 +6,14 @@ use tablepro_ssh::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 
 pub(crate) struct GtkPrompter;
 
+struct CancelPromptOnDrop(tokio_util::sync::CancellationToken);
+
+impl Drop for CancelPromptOnDrop {
+    fn drop(&mut self) {
+        self.0.cancel();
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Reply {
     Confirm,
@@ -27,7 +35,9 @@ impl Prompter for GtkPrompter {
             return PromptAnswer::Decline;
         };
         let (sender, receiver) = tokio::sync::oneshot::channel();
-        glib::MainContext::default().invoke(move || ask(question, sender));
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let _cancel_prompt_on_drop = CancelPromptOnDrop(cancel.clone());
+        glib::MainContext::default().invoke(move || ask(question, sender, cancel));
         receiver.await.unwrap_or(PromptAnswer::Decline)
     }
 
@@ -79,8 +89,17 @@ fn question_for(prompt: &AskpassPrompt) -> Option<Question> {
     })
 }
 
-fn ask(question: Question, sender: tokio::sync::oneshot::Sender<PromptAnswer>) {
+fn ask(
+    question: Question,
+    sender: tokio::sync::oneshot::Sender<PromptAnswer>,
+    cancel: tokio_util::sync::CancellationToken,
+) {
     let dialog = adw::AlertDialog::new(Some(&question.heading), Some(&question.body));
+    let dialog_for_cancel = dialog.clone();
+    glib::MainContext::default().spawn_local(async move {
+        cancel.cancelled().await;
+        dialog_for_cancel.close();
+    });
     dialog.add_response("cancel", &crate::tr!("Cancel"));
     dialog.add_response("accept", &question.accept);
     dialog.set_default_response(Some(if question.reply == Reply::Secret {

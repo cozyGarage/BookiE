@@ -51,6 +51,7 @@ pub struct OpenSshEnvironment {
 #[derive(Clone)]
 pub struct SshEnvironment {
     pub unknown_host_key: UnknownHostKey,
+    pub builtin_prompter: Option<Arc<dyn Prompter>>,
     pub openssh: Option<OpenSshEnvironment>,
 }
 
@@ -58,8 +59,13 @@ impl SshEnvironment {
     pub fn builtin(unknown_host_key: UnknownHostKey) -> Self {
         Self {
             unknown_host_key,
+            builtin_prompter: None,
             openssh: None,
         }
+    }
+
+    pub fn set_builtin_prompter(&mut self, prompter: Arc<dyn Prompter>) {
+        self.builtin_prompter = Some(prompter);
     }
 }
 
@@ -221,6 +227,7 @@ exec sleep 300
         };
         let environment = SshEnvironment {
             unknown_host_key: tablepro_ssh::UnknownHostKey::Refuse,
+            builtin_prompter: None,
             openssh: Some(OpenSshEnvironment {
                 context,
                 prompter: Arc::new(tablepro_ssh::openssh::UnattendedPrompter),

@@ -130,6 +130,7 @@ fn build_registry() -> DriverRegistry {
 }
 
 fn enable_system_openssh(database: Arc<services::database_service::DatabaseService>) {
+    database.enable_builtin_ssh_prompter(Arc::new(ui::GtkPrompter));
     relm4::spawn(async move {
         match tablepro_transport::system_openssh(Arc::new(ui::GtkPrompter)).await {
             Ok(openssh) => database.enable_system_openssh(openssh),
