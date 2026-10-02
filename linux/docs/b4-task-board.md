@@ -4,6 +4,20 @@ Surveyed on 2026-09-27 at `5fac54059` (source version 0.1.5). This board splits
 the open B4 work in [the 0.2 sprint](bookie-0.2-sprint.md) into small tasks that
 separate agents can take in parallel.
 
+## B4 continuation status (October 3)
+
+Latest integrated base: `4b7814f5e` on `linux`. The main checkout still has
+uncommitted B3 work; this status update and B4 implementation use isolated
+worktrees. Keep B4 open until the remaining tasks and installed Arch/Debian
+acceptance are complete.
+
+| Task | Current state | Evidence / next step |
+| --- | --- | --- |
+| E1, E2, G3, F1, F2, F3 | Merged to `linux` in PRs #16–#18 | Hosted required checks passed; see the linked PRs for packet details. |
+| F5 | Merged to `linux` by [PR #19](https://github.com/cozyGarage/BookiE/pull/19) as `4b7814f5e` | Local focused tests and `full` passed; hosted Build Linux, Linux Security, and both Flatpak jobs passed. Scheduled current-stable Clippy was skipped by workflow schedule. |
+| F4 + F9 | Implemented and locally validated on `codex-b4-f4f9` at `faed59fc5`, based on `4b7814f5e` | `full`, `ssh`, and `postgres-release` passed in `/tmp/tablepro-b4-f5/linux/linux/target/quality/20261002T225224078495Z-layers/report.json`, including `ssh_reconnect_replaces_the_tunnel_and_the_session`. Open PR and hosted review checks next. |
+| Remaining | F6, F8, C6 MySQL/SQL Server, G5, I2, I5, F7, I3, native Arch acceptance, I1/Debian | Follow the dependencies and evidence requirements in the packets below. B3 completion remains the sprint prerequisite. |
+
 ## October 2 review and dispatch plan
 
 Reviewed source checkpoint: `e6e5c34d0ba918aef8cb937b3cbc2741b3f27d64` on
