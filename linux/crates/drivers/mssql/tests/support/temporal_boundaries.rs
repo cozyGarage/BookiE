@@ -1,6 +1,6 @@
 use super::{connect, start_mssql};
 use chrono::{NaiveDate, NaiveDateTime};
-use tablepro_core::{Connection, OperationControl, Value};
+use tablepro_core::{OperationControl, Value};
 
 #[tokio::test]
 #[ignore = "requires docker"]
