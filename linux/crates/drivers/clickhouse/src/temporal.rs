@@ -110,6 +110,11 @@ mod tests {
                 "ambiguous or nonexistent",
             ),
             (
+                "2024-04-07 01:45:00",
+                "DateTime('Australia/Lord_Howe')",
+                "ambiguous or nonexistent",
+            ),
+            (
                 "2024-01-01 12:00:00",
                 "DateTime('Not/A_Real_Zone')",
                 "unknown ClickHouse timezone",

@@ -667,6 +667,30 @@ async fn value_contract_ambiguous_datetime64_local_time_is_refused() {
             .await
             .is_err()
     );
+
+    let lord_howe = conn
+        .query(
+            "SELECT stamp, toString(stamp) AS local_text, toUnixTimestamp64Milli(stamp) AS epoch_ms \
+             FROM (SELECT toDateTime64('2024-04-07 01:45:00', 3, 'Australia/Lord_Howe') AS stamp)",
+        )
+        .await
+        .unwrap();
+    let value = &lord_howe.rows[0][0];
+    assert!(
+        matches!(value, Value::Undecodable(reason) if reason.contains("ambiguous or nonexistent local time")),
+        "{value:?}"
+    );
+    assert_eq!(lord_howe.rows[0][1], Value::Text("2024-04-07 01:45:00.000".into()));
+    assert!(matches!(
+        lord_howe.rows[0][2],
+        Value::Int(1_712_414_700_000 | 1_712_416_500_000)
+    ));
+    assert!(tablepro_core::sql_literal::render_sql_literal("clickhouse", value).is_err());
+    assert!(
+        conn.query_params("SELECT ?", std::slice::from_ref(value))
+            .await
+            .is_err()
+    );
 }
 
 #[tokio::test]
