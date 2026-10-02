@@ -206,6 +206,46 @@
         "report_dirty": true,
         "report": "target/quality/20261002T125842206487Z-quick/report.json"
       }
+    },
+    {
+      "source_revision": "b4fd0e79c9a495e3a3a5fc1ddb442843eff3f632",
+      "source_clean": false,
+      "validation_note": "Focused unit/server tests, strict values and quick gate ran on base 8b5edca with the Lord Howe regression in the worktree; the code commit contains the tested changes. The named layer wrapper could not acquire the checkout lock, so its exact configured values command was run directly and passed.",
+      "contracts": [
+        {
+          "id": "clickhouse-lord-howe-half-hour-dst-fold",
+          "tests": [
+            "crates/drivers/clickhouse/src/temporal.rs::tests::named_datetime_zones_decode_instants_and_refuse_dst_ambiguity",
+            "crates/drivers/clickhouse/tests/integration.rs::value_contract_ambiguous_datetime64_local_time_is_refused"
+          ],
+          "commands": [
+            "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --lib temporal::tests::named_datetime_zones_decode_instants_and_refuse_dst_ambiguity -- --exact --test-threads=1",
+            "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_ambiguous_datetime64_local_time_is_refused -- --include-ignored --exact --test-threads=1"
+          ],
+          "result": "passed",
+          "oracle": "ClickHouse local text plus either valid fold epoch for 2024-04-07 01:45:00 in Australia/Lord_Howe",
+          "consumers": ["Undecodable result", "SQL literal refusal", "parameter refusal"]
+        }
+      ],
+      "strict_values": {
+        "command": "bash scripts/test-value-contracts.sh --gtk --duckdb",
+        "result": "passed",
+        "test_count": 190,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report_revision": "8b5edcafc80952ff8dcabbcaa6f15d5fc88ae0e7",
+        "report_dirty": true,
+        "report": "target/quality/20261002T145203793348Z-values/report.json",
+        "fresh_artifacts": 747,
+        "rebuilt_packages": []
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "report_revision": "8b5edcafc80952ff8dcabbcaa6f15d5fc88ae0e7",
+        "report_dirty": true,
+        "report": "target/quality/20261002T170649834681Z-quick/report.json"
+      }
     }
   ],
   "commit_count_in_inventory": 197,

@@ -74,6 +74,11 @@ Detailed checkpoint evidence is in [value contracts](value-contracts.md).
 | Redis | Integer/text/NULL protocol contracts; RESP3 hash maps retain key/value rows and invalid UTF-8 bulk values as bytes; XREAD stream replies preserve nested arrays and binary markers; a local RESP3 TCP fixture proves attribute wire frames survive the redis client and become tagged JSON; nested arrays, maps, sets and binary leaves retain JSON structure with explicit tags; BigNumber replies retain exact decimal digits as text, including inside nested arrays; map row caps set `truncated`; Pub/Sub subscribe/unsubscribe, MONITOR and CLIENT TRACKING ON are explicitly refused by the one-shot query interface and verified against Redis 7.4; tracking refusal covers BCAST, OPTIN, NOLOOP, REDIRECT and mixed-case command spellings | Consuming asynchronous push frames remains open; SQL date types are not applicable |
 | SQLite | Shared scalar/binary contracts; NUMERIC affinity text, real, integer, blob and NULL transitions survive bound edits, SQL-literal re-import and policy-guarded CSV import; the app parser plus keyed-update contract verifies `42.50` becomes SQLite REAL `42.5` | Installed GTK/package acceptance across storage-class transitions; fixed-decimal storage is not applicable |
 
+ClickHouse's temporal boundary evidence now includes both a one-hour New York
+fall-back and Lord Howe's 30-minute fall-back; both ambiguous local values are
+refused by result and type-less write consumers. This adds two named folds, not
+an exhaustive IANA transition matrix.
+
 ### B3-P1 consumer audit result — September 29
 
 The remaining-column entries above are classified as untested combinations or

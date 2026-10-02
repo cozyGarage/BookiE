@@ -3177,6 +3177,21 @@ for the supplied expression; it does not preserve the nonexistent civil input.
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_nonexistent_datetime64_input_matches_server_normalization -- --include-ignored --exact --test-threads=1
 ```
 
+The fall-back contract now also covers Lord Howe Island's 30-minute transition
+with `2024-04-07 01:45:00` in `Australia/Lord_Howe`. The unit case requires an
+ambiguous-time refusal. ClickHouse's local text and either valid fold epoch are
+checked independently; result decoding, SQL literal and parameter consumers
+refuse the ambiguous value. The focused unit and Docker contracts passed, then
+the strict GTK+DuckDB values layer passed all 190 tests across 11 suites and the
+local quick gate passed. The run reused all 747 Cargo artifacts. See the
+[review manifest](evidence/b3-review-2026-10-01/manifest.json) for reports and
+hosted CI status.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --lib temporal::tests::named_datetime_zones_decode_instants_and_refuse_dst_ambiguity -- --exact --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration value_contract_ambiguous_datetime64_local_time_is_refused -- --include-ignored --exact --test-threads=1
+```
+
 Run the focused checks locally with:
 
 ```sh

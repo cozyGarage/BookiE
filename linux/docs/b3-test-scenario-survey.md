@@ -100,6 +100,11 @@ Inventory status below comes from current local code/tests, not new executions.
 
 ### B3-P1 current coverage verdict — September 30
 
+Temporal follow-up (2026-10-02): ClickHouse now checks both a one-hour New York
+fall-back and Lord Howe's 30-minute fall-back against server local-text and
+epoch oracles. BookiE refuses ambiguous values. Other zones and transitions
+remain untested and need a contract or an explicit 0.2.0 scope decision.
+
 Read the driver matrix in `type-contract-strategy.md` as four separate states:
 exact typed support, exact text fallback, explicit refusal, and untested. The
 current rows contain examples of all four. PostgreSQL range/multirange,
