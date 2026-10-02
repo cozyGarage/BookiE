@@ -45,7 +45,8 @@ pub struct SqlEditor {
     run_button: gtk::Button,
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
-    session_ending: bool,
+    opening_session_id: Option<Uuid>,
+    ending_session_id: Option<Uuid>,
     cancel_button: gtk::Button,
     running_spinner: gtk::Spinner,
     results_holder: gtk::Box,
@@ -133,13 +134,21 @@ pub enum SqlEditorInput {
     SessionToggled(bool),
     SessionOpened {
         connection_id: Uuid,
+        session_id: Uuid,
         result: Result<session_mode::OpenedSession, String>,
     },
-    SessionState(bool),
+    SessionState {
+        session_id: Uuid,
+        transaction_open: bool,
+    },
     SessionEnd {
+        session_id: Uuid,
         commit: bool,
     },
-    SessionCommitFinished(Result<(), String>),
+    SessionCommitFinished {
+        session_id: Uuid,
+        result: Result<(), String>,
+    },
 }
 
 #[derive(Debug)]
@@ -523,7 +532,8 @@ impl SimpleComponent for SqlEditor {
             run_button: widgets.run_button.clone(),
             session_button: widgets.session_button.clone(),
             session: None,
-            session_ending: false,
+            opening_session_id: None,
+            ending_session_id: None,
             cancel_button: widgets.cancel_button.clone(),
             running_spinner: widgets.running_spinner.clone(),
             results_holder: widgets.results_holder.clone(),
@@ -576,11 +586,26 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::Grid(_) => {}
             SqlEditorInput::SessionToggled(enabled) => self.on_session_toggled(enabled, &sender),
-            SqlEditorInput::SessionOpened { connection_id, result } => self.on_session_opened(connection_id, result),
-            SqlEditorInput::SessionState(open) => self.on_session_state(open),
-            SqlEditorInput::SessionEnd { commit: true } => self.commit_and_end(&sender),
-            SqlEditorInput::SessionEnd { commit: false } => self.end_session(),
-            SqlEditorInput::SessionCommitFinished(result) => self.on_session_commit_finished(result),
+            SqlEditorInput::SessionOpened {
+                connection_id,
+                session_id,
+                result,
+            } => self.on_session_opened(connection_id, session_id, result),
+            SqlEditorInput::SessionState {
+                session_id,
+                transaction_open,
+            } => self.on_session_state(session_id, transaction_open),
+            SqlEditorInput::SessionEnd { session_id, commit } if commit => {
+                self.commit_and_end(session_id, &sender);
+            }
+            SqlEditorInput::SessionEnd { session_id, .. } => {
+                if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
+                    self.end_session();
+                }
+            }
+            SqlEditorInput::SessionCommitFinished { session_id, result } => {
+                self.on_session_commit_finished(session_id, result);
+            }
             SqlEditorInput::Run => {
                 let buffer = self.source_view.buffer();
                 let (start, end) = buffer.bounds();
@@ -870,7 +895,7 @@ impl SqlEditor {
         if !self.run_generation.accepts(generation) {
             return;
         }
-        if self.session_ending {
+        if self.session_ending() {
             self.status.set_label(&crate::tr!("Waiting for session commit"));
             return;
         }
@@ -961,8 +986,11 @@ impl SqlEditor {
                             SqlEditorInput::ShowOutcomes { generation, outcomes }
                         }
                     };
-                    if let Some(open) = target.transaction_open().await {
-                        sender_clone.input(SqlEditorInput::SessionState(open));
+                    if let Some((session_id, open)) = target.transaction_state().await {
+                        sender_clone.input(SqlEditorInput::SessionState {
+                            session_id,
+                            transaction_open: open,
+                        });
                     }
                     sender_clone.input(msg);
                 })

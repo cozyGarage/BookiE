@@ -21,7 +21,7 @@ impl std::fmt::Debug for OpenedSession {
 #[derive(Clone)]
 pub(crate) enum StatementTarget {
     Pool(Arc<dyn Connection>),
-    Session(SharedSession),
+    Session { id: Uuid, shared: SharedSession },
 }
 
 impl StatementTarget {
@@ -33,25 +33,53 @@ impl StatementTarget {
     ) -> Result<QueryResult, DriverError> {
         match self {
             Self::Pool(connection) => connection.query_params_controlled(sql, params, control).await,
-            Self::Session(shared) => match shared.lock().await.as_mut() {
+            Self::Session { shared, .. } => match shared.lock().await.as_mut() {
                 Some(session) => session.query_params_controlled(sql, params, control).await,
                 None => Err(DriverError::Unsupported("the session was closed".into())),
             },
         }
     }
 
-    pub(crate) async fn transaction_open(&self) -> Option<bool> {
+    pub(crate) async fn transaction_state(&self) -> Option<(Uuid, bool)> {
         match self {
             Self::Pool(_) => None,
-            Self::Session(shared) => Some(shared.lock().await.as_ref().is_some_and(|s| s.transaction_open())),
+            Self::Session { id, shared } => {
+                Some((*id, shared.lock().await.as_ref().is_some_and(|s| s.transaction_open())))
+            }
         }
     }
 }
 
 pub(crate) struct EditorSession {
+    pub(super) id: Uuid,
     shared: SharedSession,
     connection_id: Uuid,
     transaction_open: bool,
+}
+
+pub(super) fn session_callback_matches(callback_id: Uuid, current_id: Option<Uuid>) -> bool {
+    current_id == Some(callback_id)
+}
+
+fn open_callback_matches(
+    callback_id: Uuid,
+    pending_id: Option<Uuid>,
+    callback_connection_id: Uuid,
+    current_connection_id: Option<Uuid>,
+) -> bool {
+    session_callback_matches(callback_id, pending_id) && Some(callback_connection_id) == current_connection_id
+}
+
+fn commit_callback_matches(callback_id: Uuid, current_id: Option<Uuid>, ending_id: Option<Uuid>) -> bool {
+    session_callback_matches(callback_id, current_id) && Some(callback_id) == ending_id
+}
+
+fn apply_transaction_state(session: &mut EditorSession, callback_id: Uuid, transaction_open: bool) -> bool {
+    if !session_callback_matches(callback_id, Some(session.id)) {
+        return false;
+    }
+    session.transaction_open = transaction_open;
+    true
 }
 
 pub(crate) fn session_label(transaction_open: bool) -> String {
@@ -65,9 +93,10 @@ pub(crate) fn session_label(transaction_open: bool) -> String {
 impl SqlEditor {
     pub(super) fn statement_target(&self, pooled: Arc<dyn Connection>) -> StatementTarget {
         match &self.session {
-            Some(session) if Some(session.connection_id) == self.connection_id => {
-                StatementTarget::Session(session.shared.clone())
-            }
+            Some(session) if Some(session.connection_id) == self.connection_id => StatementTarget::Session {
+                id: session.id,
+                shared: session.shared.clone(),
+            },
             _ => StatementTarget::Pool(pooled),
         }
     }
@@ -77,11 +106,12 @@ impl SqlEditor {
     }
 
     pub(super) fn on_session_toggled(&mut self, enabled: bool, sender: &ComponentSender<Self>) {
-        if self.session_ending {
+        if self.session_ending() {
             return;
         }
         match (enabled, &self.session) {
             (true, None) => self.open_session(sender),
+            (false, None) => self.opening_session_id = None,
             (false, Some(session)) if session.transaction_open => self.confirm_session_end(sender),
             (false, Some(_)) => self.end_session(),
             _ => {}
@@ -93,10 +123,13 @@ impl SqlEditor {
             self.connection_id,
             self.connection_id.and_then(|id| self.database.get(id)),
         ) else {
+            self.opening_session_id = None;
             self.session_button.set_active(false);
             self.status.set_label(&crate::tr!("no active connection"));
             return;
         };
+        let session_id = Uuid::new_v4();
+        self.opening_session_id = Some(session_id);
         let sender = sender.clone();
         relm4::spawn(async move {
             let result = connection
@@ -104,16 +137,32 @@ impl SqlEditor {
                 .await
                 .map(|session| OpenedSession(Arc::new(tokio::sync::Mutex::new(Some(session)))))
                 .map_err(|error| session_open_message(&error));
-            sender.input(SqlEditorInput::SessionOpened { connection_id, result });
+            sender.input(SqlEditorInput::SessionOpened {
+                connection_id,
+                session_id,
+                result,
+            });
         });
     }
 
-    pub(super) fn on_session_opened(&mut self, connection_id: Uuid, result: Result<OpenedSession, String>) {
+    pub(super) fn on_session_opened(
+        &mut self,
+        connection_id: Uuid,
+        session_id: Uuid,
+        result: Result<OpenedSession, String>,
+    ) {
+        let is_current = open_callback_matches(session_id, self.opening_session_id, connection_id, self.connection_id);
+        if !is_current {
+            if let Ok(OpenedSession(shared)) = result {
+                close_detached(shared);
+            }
+            return;
+        }
+        self.opening_session_id = None;
         match result {
-            Ok(OpenedSession(shared))
-                if Some(connection_id) == self.connection_id && self.session_button.is_active() =>
-            {
+            Ok(OpenedSession(shared)) if self.session_button.is_active() => {
                 self.session = Some(EditorSession {
+                    id: session_id,
                     shared,
                     connection_id,
                     transaction_open: false,
@@ -128,11 +177,13 @@ impl SqlEditor {
         }
     }
 
-    pub(super) fn on_session_state(&mut self, transaction_open: bool) {
+    pub(super) fn on_session_state(&mut self, session_id: Uuid, transaction_open: bool) {
         let Some(session) = self.session.as_mut() else {
             return;
         };
-        session.transaction_open = transaction_open;
+        if !apply_transaction_state(session, session_id, transaction_open) {
+            return;
+        }
         self.session_button.set_label(&session_label(transaction_open));
         if transaction_open {
             self.session_button.add_css_class("warning");
@@ -142,24 +193,38 @@ impl SqlEditor {
     }
 
     pub(super) fn end_session(&mut self) {
+        self.opening_session_id = None;
         self.session_button.set_label(&session_label(false));
         self.session_button.remove_css_class("warning");
         if self.session_button.is_active() {
             self.session_button.set_active(false);
         }
         if let Some(session) = self.session.take() {
+            if self.ending_session_id == Some(session.id) {
+                self.ending_session_id = None;
+            }
             close_detached(session.shared);
         }
     }
 
-    pub(super) fn commit_and_end(&mut self, sender: &ComponentSender<Self>) {
-        let Some(session) = self.session.as_ref() else {
+    pub(super) fn session_ending(&self) -> bool {
+        self.session
+            .as_ref()
+            .is_some_and(|session| self.ending_session_id == Some(session.id))
+    }
+
+    pub(super) fn commit_and_end(&mut self, session_id: Uuid, sender: &ComponentSender<Self>) {
+        let Some(session) = self
+            .session
+            .as_ref()
+            .filter(|session| session_callback_matches(session_id, Some(session.id)))
+        else {
             return;
         };
-        if self.session_ending {
+        if self.ending_session_id == Some(session_id) {
             return;
         }
-        self.session_ending = true;
+        self.ending_session_id = Some(session_id);
         self.session_button.set_sensitive(false);
         self.status.set_label(&crate::tr!("Committing session…"));
         let shared = session.shared.clone();
@@ -168,12 +233,19 @@ impl SqlEditor {
             let result = commit_session(&shared)
                 .await
                 .map_err(|error| crate::ui::error_text::driver_message(&error));
-            sender.input(SqlEditorInput::SessionCommitFinished(result));
+            sender.input(SqlEditorInput::SessionCommitFinished { session_id, result });
         });
     }
 
-    pub(super) fn on_session_commit_finished(&mut self, result: Result<(), String>) {
-        self.session_ending = false;
+    pub(super) fn on_session_commit_finished(&mut self, session_id: Uuid, result: Result<(), String>) {
+        if !commit_callback_matches(
+            session_id,
+            self.session.as_ref().map(|session| session.id),
+            self.ending_session_id,
+        ) {
+            return;
+        }
+        self.ending_session_id = None;
         self.session_button.set_sensitive(true);
         match result {
             Ok(()) => {
@@ -188,6 +260,9 @@ impl SqlEditor {
     }
 
     fn confirm_session_end(&self, sender: &ComponentSender<Self>) {
+        let Some(session_id) = self.session.as_ref().map(|session| session.id) else {
+            return;
+        };
         let dialog = adw::AlertDialog::new(
             Some(&crate::tr!("End the session with an open transaction?")),
             Some(&crate::tr!(
@@ -203,8 +278,14 @@ impl SqlEditor {
         let sender = sender.clone();
         let button = self.session_button.clone();
         dialog.connect_response(None, move |_, response| match response {
-            "commit" => sender.input(SqlEditorInput::SessionEnd { commit: true }),
-            "rollback" => sender.input(SqlEditorInput::SessionEnd { commit: false }),
+            "commit" => sender.input(SqlEditorInput::SessionEnd {
+                session_id,
+                commit: true,
+            }),
+            "rollback" => sender.input(SqlEditorInput::SessionEnd {
+                session_id,
+                commit: false,
+            }),
             _ => button.set_active(true),
         });
         let parent = self.source_view.root().and_downcast::<gtk::Window>();
@@ -291,12 +372,54 @@ mod tests {
 
     #[tokio::test]
     async fn a_closed_session_target_refuses_instead_of_falling_back_to_the_pool() {
-        let target = StatementTarget::Session(Arc::new(tokio::sync::Mutex::new(None)));
+        let id = Uuid::new_v4();
+        let target = StatementTarget::Session {
+            id,
+            shared: Arc::new(tokio::sync::Mutex::new(None)),
+        };
         let control = OperationControl::with_timeout(std::time::Duration::from_secs(1));
 
         let error = target.query("SELECT 1", &[], &control).await.unwrap_err();
 
         assert!(matches!(error, DriverError::Unsupported(_)));
-        assert_eq!(target.transaction_open().await, Some(false));
+        assert_eq!(target.transaction_state().await, Some((id, false)));
+    }
+
+    #[test]
+    fn callbacks_from_an_older_editor_session_do_not_match_the_current_session() {
+        let old = Uuid::new_v4();
+        let current = Uuid::new_v4();
+        assert!(!session_callback_matches(old, Some(current)));
+        assert!(!session_callback_matches(old, None));
+        assert!(session_callback_matches(current, Some(current)));
+        let connection = Uuid::new_v4();
+        assert!(!open_callback_matches(old, Some(current), connection, Some(connection)));
+        assert!(!open_callback_matches(current, Some(current), connection, None));
+        assert!(open_callback_matches(
+            current,
+            Some(current),
+            connection,
+            Some(connection)
+        ));
+        assert!(!commit_callback_matches(old, Some(current), Some(old)));
+        assert!(!commit_callback_matches(current, Some(current), None));
+        assert!(commit_callback_matches(current, Some(current), Some(current)));
+    }
+
+    #[test]
+    fn a_late_transaction_state_does_not_change_a_replacement_session() {
+        let old_id = Uuid::new_v4();
+        let current_id = Uuid::new_v4();
+        let mut session = EditorSession {
+            id: current_id,
+            shared: Arc::new(tokio::sync::Mutex::new(None)),
+            connection_id: Uuid::new_v4(),
+            transaction_open: false,
+        };
+
+        assert!(!apply_transaction_state(&mut session, old_id, true));
+        assert!(!session.transaction_open);
+        assert!(apply_transaction_state(&mut session, current_id, true));
+        assert!(session.transaction_open);
     }
 }
