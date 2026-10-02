@@ -273,6 +273,14 @@ impl App {
             self.refresh_health_banner(current.clone());
             self.health_state = current;
         }
+        for tab in self.workspace_tabs.borrow().values() {
+            if let super::WorkspaceTab::Editor(slot) = tab {
+                let _ = slot
+                    .controller
+                    .sender()
+                    .send(crate::ui::editor::SqlEditorInput::ConnectionIdentityChanged);
+            }
+        }
     }
 
     pub(super) fn on_delete_connection(&self, id: Uuid, sender: ComponentSender<Self>) {

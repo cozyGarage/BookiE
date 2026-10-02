@@ -139,9 +139,11 @@ pub enum SqlEditorInput {
     SessionToggled(bool),
     SessionOpened {
         connection_id: Uuid,
+        connection_identity: crate::services::database_service::ConnectionIdentity,
         session_id: Uuid,
         result: Result<session_mode::OpenedSession, String>,
     },
+    ConnectionIdentityChanged,
     SessionState {
         session_id: Uuid,
         transaction_open: bool,
@@ -603,9 +605,11 @@ impl SimpleComponent for SqlEditor {
             SqlEditorInput::SessionToggled(enabled) => self.on_session_toggled(enabled, &sender),
             SqlEditorInput::SessionOpened {
                 connection_id,
+                connection_identity,
                 session_id,
                 result,
-            } => self.on_session_opened(connection_id, session_id, result, &sender),
+            } => self.on_session_opened(connection_id, connection_identity, session_id, result, &sender),
+            SqlEditorInput::ConnectionIdentityChanged => self.on_connection_identity_changed(&sender),
             SqlEditorInput::SessionState {
                 session_id,
                 transaction_open,

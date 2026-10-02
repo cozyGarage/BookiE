@@ -6,6 +6,8 @@ use relm4::{adw, gtk};
 use tablepro_core::{Connection, DriverError, OperationControl, QueryResult, Session, Value};
 use uuid::Uuid;
 
+use crate::services::database_service::ConnectionIdentity;
+
 use super::{SqlEditor, SqlEditorInput};
 
 pub(crate) type SharedSession = Arc<tokio::sync::Mutex<Option<Box<dyn Session>>>>;
@@ -78,6 +80,7 @@ pub(crate) struct EditorSession {
     pub(super) id: Uuid,
     pub(super) shared: SharedSession,
     connection_id: Uuid,
+    connection_identity: Option<ConnectionIdentity>,
     transaction_open: bool,
 }
 
@@ -126,10 +129,20 @@ pub(crate) fn session_label(transaction_open: bool) -> String {
 impl SqlEditor {
     pub(super) fn statement_target(&self, pooled: Arc<dyn Connection>) -> StatementTarget {
         match &self.session {
-            Some(session) if Some(session.connection_id) == self.connection_id => StatementTarget::Session {
-                id: session.id,
-                shared: session.shared.clone(),
-            },
+            Some(session)
+                if Some(session.connection_id) == self.connection_id
+                    && session.connection_identity.as_ref().is_some_and(|identity| {
+                        self.database.identity(session.connection_id).as_ref() == Some(identity)
+                    }) =>
+            {
+                StatementTarget::Session {
+                    id: session.id,
+                    shared: session.shared.clone(),
+                }
+            }
+            Some(session) if Some(session.connection_id) == self.connection_id => {
+                StatementTarget::Retired { id: session.id }
+            }
             _ if retired_connection_matches(self.retired_session_connection_id, self.connection_id) => {
                 StatementTarget::Retired {
                     id: self
@@ -162,9 +175,9 @@ impl SqlEditor {
     }
 
     fn open_session(&mut self, sender: &ComponentSender<Self>) {
-        let (Some(connection_id), Some(connection)) = (
+        let (Some(connection_id), Some((connection, connection_identity))) = (
             self.connection_id,
-            self.connection_id.and_then(|id| self.database.get(id)),
+            self.connection_id.and_then(|id| self.database.get_with_identity(id)),
         ) else {
             self.opening_session_id = None;
             self.session_button.set_active(false);
@@ -183,6 +196,7 @@ impl SqlEditor {
                 .map_err(|error| session_open_message(&error));
             sender.input(SqlEditorInput::SessionOpened {
                 connection_id,
+                connection_identity,
                 session_id,
                 result,
             });
@@ -192,12 +206,14 @@ impl SqlEditor {
     pub(super) fn on_session_opened(
         &mut self,
         connection_id: Uuid,
+        connection_identity: ConnectionIdentity,
         session_id: Uuid,
         result: Result<OpenedSession, String>,
         sender: &ComponentSender<Self>,
     ) {
         self.session_open_in_flight = false;
-        let is_current = open_callback_matches(session_id, self.opening_session_id, connection_id, self.connection_id);
+        let is_current = open_callback_matches(session_id, self.opening_session_id, connection_id, self.connection_id)
+            && self.database.identity(connection_id).as_ref() == Some(&connection_identity);
         if !is_current {
             if let Ok(OpenedSession(shared)) = result {
                 self.close_session_for_teardown(shared, sender);
@@ -214,6 +230,7 @@ impl SqlEditor {
                     id: session_id,
                     shared,
                     connection_id,
+                    connection_identity: Some(connection_identity),
                     transaction_open: false,
                 });
                 self.session_button.set_label(&session_label(false));
@@ -293,6 +310,23 @@ impl SqlEditor {
         for reply in self.session_teardown_waiters.drain(..) {
             let _ = reply.send(result.clone());
         }
+    }
+
+    pub(super) fn on_connection_identity_changed(&mut self, sender: &ComponentSender<Self>) {
+        let Some((session_id, connection_id, connection_identity)) = self
+            .session
+            .as_ref()
+            .map(|session| (session.id, session.connection_id, session.connection_identity.clone()))
+        else {
+            return;
+        };
+        if connection_identity
+            .as_ref()
+            .is_some_and(|identity| self.database.identity(connection_id).as_ref() == Some(identity))
+        {
+            return;
+        }
+        self.on_session_state(session_id, false, false, sender);
     }
 
     pub(super) fn on_session_state(
@@ -747,6 +781,7 @@ mod tests {
             id: current_id,
             shared: Arc::new(tokio::sync::Mutex::new(None)),
             connection_id: Uuid::new_v4(),
+            connection_identity: None,
             transaction_open: false,
         };
 
