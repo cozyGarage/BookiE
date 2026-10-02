@@ -154,7 +154,9 @@ mod tests {
         }
     }
 
-    struct IdleConn;
+    struct IdleConn {
+        attached: Arc<Mutex<Option<Arc<Notify>>>>,
+    }
 
     #[async_trait]
     impl Connection for IdleConn {
@@ -193,8 +195,39 @@ mod tests {
             Ok(())
         }
 
+        fn attach_fault_notify(&self, notify: Arc<Notify>) {
+            *self.attached.lock().expect("fault lock") = Some(notify);
+        }
+
         async fn close(self: Box<Self>) -> Result<(), DriverError> {
             Ok(())
+        }
+    }
+
+    struct ReconnectingDriver {
+        attempts: Arc<AtomicUsize>,
+        attached: Arc<Mutex<Option<Arc<Notify>>>>,
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for ReconnectingDriver {
+        fn id(&self) -> &'static str {
+            "reconnecting"
+        }
+
+        fn display_name(&self) -> &'static str {
+            "Reconnecting"
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            Ok(Box::new(IdleConn {
+                attached: self.attached.clone(),
+            }))
         }
     }
 
@@ -204,7 +237,9 @@ mod tests {
     async fn a_reported_fault_starts_a_reconnect_before_the_next_ping() {
         let attempts = Arc::new(AtomicUsize::new(0));
         let inner = Arc::new(Mutex::new(EntryInner {
-            connection: Arc::new(IdleConn) as Arc<dyn Connection>,
+            connection: Arc::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+            }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
         }));
@@ -230,6 +265,64 @@ mod tests {
         assert!(matches!(
             inner.lock().expect("entry lock").health,
             ConnectionHealth::Reconnecting { .. }
+        ));
+        cancel.cancel();
+        let _ = monitor.await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_reconnected_connection_reports_faults_before_its_next_ping() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let attached = Arc::new(Mutex::new(None));
+        let inner = Arc::new(Mutex::new(EntryInner {
+            connection: Arc::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+            }) as Arc<dyn Connection>,
+            tunnel: None,
+            health: ConnectionHealth::Healthy,
+        }));
+        let params = ReconnectParams {
+            driver: Arc::new(ReconnectingDriver {
+                attempts: attempts.clone(),
+                attached: attached.clone(),
+            }),
+            opts: ConnectOptions::default(),
+            ssh: None,
+            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        };
+        let cancel = CancellationToken::new();
+        let fault = Arc::new(Notify::new());
+        let monitor = tokio::spawn(run(inner.clone(), params, cancel.clone(), fault.clone()));
+        tokio::task::yield_now().await;
+        fault.notify_one();
+        tokio::task::yield_now().await;
+        tokio::time::advance(BACKOFF_INITIAL).await;
+        for _ in 0..100 {
+            if attempts.load(Ordering::SeqCst) >= 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
+        let replacement_fault = attached
+            .lock()
+            .expect("fault lock")
+            .clone()
+            .expect("replacement connection receives fault notification");
+        replacement_fault.notify_one();
+        tokio::task::yield_now().await;
+        tokio::time::advance(BACKOFF_INITIAL).await;
+        for _ in 0..100 {
+            if attempts.load(Ordering::SeqCst) >= 2 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+
+        assert!(matches!(
+            inner.lock().expect("entry lock").health,
+            ConnectionHealth::Healthy
         ));
         cancel.cancel();
         let _ = monitor.await;
