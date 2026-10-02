@@ -5,6 +5,8 @@ use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Value};
 
 #[path = "support/ubigint_array.rs"]
 mod bigint_array;
+#[path = "support/ubigint_struct.rs"]
+mod bigint_struct;
 #[path = "support/interval_csv_import.rs"]
 mod interval_csv_import;
 #[path = "support/submicro_parameter_expression.rs"]
