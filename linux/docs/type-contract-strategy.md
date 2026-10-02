@@ -132,7 +132,8 @@ Its focused contract compares exact native array text and records the current
 `Undecodable` result plus SQL-literal/bind refusal; see the
 [value ledger](value-contracts.md#duckdb-nested-ubigint-array-refusal-2026-10-02).
 This closes that shape's behavior contract, not nested-array support. Other
-nested unsigned collection shapes remain open.
+nested unsigned collection shapes remain open. The clean strict GTK+DuckDB
+value layer passed 186 tests on `6c2e61f`, including all 24 DuckDB contracts.
 
 ### Connection-loss contract update — September 30
 

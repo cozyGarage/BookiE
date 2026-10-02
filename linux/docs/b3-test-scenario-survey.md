@@ -225,10 +225,10 @@ supports them, or the known `enum_labels: unexpected NULL` metadata boundary
 otherwise. Its exact selector and remaining support limit are in the
 [type strategy](type-contract-strategy.md).
 
-The next bounded DuckDB case is `UBIGINT[]` above `i64::MAX`. Its embedded
-contract verifies the exact native array text and safe refusal by the result,
-SQL-literal and binding paths; other nested unsigned collection shapes remain
-open.
+The bounded DuckDB `UBIGINT[]` case above `i64::MAX` now verifies exact native
+array text and safe refusal by the result, SQL-literal and binding paths. The
+clean strict layer passed it on `6c2e61f`; other nested unsigned collection
+shapes remain open.
 
 Local anchors: `crates/drivers/postgres/tests/integration.rs`,
 `crates/core/src/sql_lex.rs`, `crates/core/src/export/csv.rs`,

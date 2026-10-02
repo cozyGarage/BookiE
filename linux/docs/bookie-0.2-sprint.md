@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`e704831` (source version 0.1.5).
+`6c2e61f` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -27,11 +27,12 @@ session reconnect follow-up stay open. Continue with one bounded
 engine/type/consumer case at a time using the
 [agent task template](validation-playbook.md#agent-task-template).
 The clean LT-TRUNG full gate passed on `8e7766c`; the clean strict GTK+DuckDB
-values layer passed 185 tests across 11 suites on current head `e704831`.
-Drivers, TLS, PostgreSQL release, keyring, security-policy, GTK, workflow,
-harness, packaging and change-contract layers also passed after installing the
-local prerequisites. Current hosted CI for `e704831` has Flatpak running,
-Security in progress, and Build Linux/test-quality pending. See the
+values layer passed 186 tests across 11 suites, including 24 DuckDB contracts,
+on current head `6c2e61f`. Drivers, TLS, PostgreSQL release, keyring,
+security-policy, GTK, workflow, harness, packaging and change-contract layers
+also passed after installing the local prerequisites. Current hosted CI for
+`6c2e61f` has Flatpak and Security in progress, with Build Linux and
+test-quality pending. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 

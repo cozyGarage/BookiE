@@ -3521,8 +3521,11 @@ current safe boundary without claiming nested-array support.
 rtk cargo test -p tablepro-driver-duckdb --test integration value_contract_nested_ubigint_array_refuses_lossy_consumers -- --exact --test-threads=1
 ```
 
-The focused embedded-DuckDB contract passed. Other nested unsigned shapes remain
-open; the strict GTK+DuckDB layer result is recorded below after the clean run.
+The clean strict GTK+DuckDB layer passed 186 selected tests across 11 suites,
+including 24 DuckDB contracts, with no missing suites on `6c2e61f`. See the
+[layer report](../target/quality/20261002T003009990931Z-layers/report.json)
+and [suite details](../target/quality/20261002T003010044333Z-values/report.json).
+Other nested unsigned shapes remain open.
 
 ## MySQL spatial grid edit refusal, 2026-09-30
 
