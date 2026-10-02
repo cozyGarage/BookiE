@@ -3748,6 +3748,15 @@ The strict report is
 and the quick-gate report is
 [`20261002T121254146544Z-quick/report.json`](../target/quality/20261002T121254146544Z-quick/report.json).
 
+The reversed nesting order, `Array(Map(UInt8, Nullable(UInt128)))`, is also
+covered with the same >`u64::MAX` value and SQL NULL. The native oracle and the
+shared refusal/preservation checks pass through the same contract. The focused
+Docker test and strict values layer passed; the quick gate passed when run with
+loopback socket permission for existing MongoDB tests. Reports:
+[`20261002T124905277939Z-values/report.json`](../target/quality/20261002T124905277939Z-values/report.json)
+and
+[`20261002T125842206487Z-quick/report.json`](../target/quality/20261002T125842206487Z-quick/report.json).
+
 ```sh
 rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
 ```

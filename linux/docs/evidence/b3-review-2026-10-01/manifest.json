@@ -173,6 +173,39 @@
         "report_dirty": true,
         "report": "target/quality/20261002T121254146544Z-quick/report.json"
       }
+    },
+    {
+      "source_revision": "67f5857620df012d24b761c9b9706a11db411fd6",
+      "source_clean": false,
+      "validation_note": "The focused test, strict values layer and quick gate used base revision b751a33 with this additional shape in the worktree; commit 67f5857 contains the tested change. The sandboxed quick attempt was blocked by loopback socket permissions; the same gate passed when rerun with socket permission.",
+      "contracts": [
+        {
+          "id": "clickhouse-array-of-numeric-key-nullable-uint128-map",
+          "test": "crates/drivers/clickhouse/tests/support/nested_values.rs::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "ClickHouse toTypeName and toJSONString for Array(Map(UInt8, Nullable(UInt128))) containing a value above u64::MAX and NULL",
+          "consumers": ["driver result", "JSON export", "CSV export/import", "SQL literal refusal", "parameter refusal", "MergeTree edit refusal with unchanged row"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 190,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report_revision": "b751a33d17af6b5cb56d3cb635ddc51ca50f440c",
+        "report_dirty": true,
+        "report": "target/quality/20261002T124905277939Z-values/report.json"
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "execution_context": "outside sandbox, to permit existing loopback listener tests",
+        "report_revision": "b751a33d17af6b5cb56d3cb635ddc51ca50f440c",
+        "report_dirty": true,
+        "report": "target/quality/20261002T125842206487Z-quick/report.json"
+      }
     }
   ],
   "commit_count_in_inventory": 197,
