@@ -323,17 +323,21 @@ commands.
 
 ### B4 next order
 
-Use the board's recorded decisions. Task IDs below belong to B4 lanes, not the
-sprint milestone numbers. Keep one owner for shared editor/policy files.
+Use the [October 2 dispatch plan and detailed agent packets](b4-task-board.md#october-2-review-and-dispatch-plan)
+as the B4 execution source. It preserves the recorded decisions and completed
+evidence, adds current source findings, file ownership, prerequisites, edge cases
+and per-task acceptance. Task IDs below belong to B4 lanes, not sprint milestone
+numbers. B3 remains active; reserve worktrees, shared build targets, fixtures
+and ledgers before dispatch. F1, F3 and G3 now have tested commits in isolated
+worktrees rebased onto B3 tip `1cf609c5d`; their details and validation remain
+pending integration on `linux` in the task board.
 
 | Order | Tasks | Outcome / dependencies |
 | --- | --- | --- |
-| 1 | E1 then E2; G3 | Refuse implicit/unterminated shared transactions; refuse cached sessions when key material cannot be verified, including after connect. Separate policy and agentd packets. |
-| 2 | F1; F3 then F5 then F2 | Capability-correct Stop; session identity guards; retired toggle; awaited rollback before close/disconnect. One editor owner, sequential commits. D3 is already available. |
-| 3 | F4 and F9 | Retire old editor sessions on reconnect and consume the built-in tunnel closed-state API in the monitor. Coordinate with the editor owner. |
-| 4 | F6; F8 | Confirm built-in host keys on connect/reconnect; isolate unknown-write blocking/recovery by connection. Include denied and allowed paths. Shared trust/audit changes need review before closure. |
-| 5 | C6; G5 | Real MySQL/SQL Server TLS through SSH, and unattended agentd OpenSSH refusal/success. Use existing TLS/SSH fixtures; mocks cannot qualify these tasks. |
-| 6 | I2, I3, I5; then F7 | Explicit Flatpak refusal and accurate docs/tier ownership; transport audit records; isolated Session GTK flow after lifecycle fixes. I4 manual steps were added in this review; runtime checks remain pending. |
+| 1 | E1 → E2; G3; F1 → F3 → F5 → F2; C6-MySQL → C6-SQLServer | Independent policy, daemon, editor and fixture owners. Refuse unsafe transactions/cache reuse; protect session callbacks/retirement and await cleanup; prove actual tunneled TLS per engine. Reserve shared resources. |
+| 2 | F4 + F9; F6; G5; I2 | Integrate tunnel-loss monitoring and old-session invalidation after F3/F5; then built-in host trust. G5 follows G3; Flatpak refusal follows shared transport changes. |
+| 3 | F8; I5; I3; F7 | Scope connection uncertainty without clearing journal-wide failures. Transport audit follows trust/daemon and audit contracts; documentation follows evidence; isolated GTK flow follows lifecycle fixes. |
+| 4 | Integrated gates and installed Arch acceptance | Freeze accepted B3+B4 SHA, retain completed regressions, execute native Wayland workflows and package upgrade/rollback. I4's runtime boxes remain pending until execution. |
 | After Arch | I1 | Required Debian rules recipe and validator askpass fix for the GNOME/Debian phase. |
 
 A, B, D and H regressions stay retained. Their per-task evidence is archived on
