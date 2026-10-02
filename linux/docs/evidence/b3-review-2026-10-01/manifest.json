@@ -141,6 +141,38 @@
           {"name": "Flatpak Linux (packaging only)", "run_id": "37002408794", "result": "passed"}
         ]
       }
+    },
+    {
+      "source_revision": "7650f2fff16287a5a63984c9cbcbd730d0e56ca4",
+      "source_clean": false,
+      "validation_note": "The focused Docker test, strict values layer and quick gate ran against base revision 4407651 with this one new case in the worktree; source commit 7650f2f contains the tested change.",
+      "contracts": [
+        {
+          "id": "clickhouse-numeric-key-nested-uint128-array-map",
+          "test": "crates/drivers/clickhouse/tests/support/nested_values.rs::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers",
+          "command": "cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1",
+          "result": "passed",
+          "oracle": "ClickHouse toTypeName and toJSONString for Map(UInt8, Array(Nullable(UInt128))) with wide integer, NULL and empty array",
+          "consumers": ["driver result", "JSON export", "CSV export/import", "SQL literal refusal", "parameter refusal", "MergeTree edit refusal with unchanged row"]
+        }
+      ],
+      "strict_values": {
+        "command": "python3 scripts/run-test-layer.py values",
+        "result": "passed",
+        "test_count": 190,
+        "suite_count": 11,
+        "missing_suites": 0,
+        "report_revision": "4407651edfcfa3259f56ad4295d188a4b87fa40f",
+        "report_dirty": true,
+        "report": "target/quality/20261002T120704261619Z-values/report.json"
+      },
+      "quick": {
+        "command": "./scripts/ci-local.sh quick",
+        "result": "passed",
+        "report_revision": "4407651edfcfa3259f56ad4295d188a4b87fa40f",
+        "report_dirty": true,
+        "report": "target/quality/20261002T121254146544Z-quick/report.json"
+      }
     }
   ],
   "commit_count_in_inventory": 197,

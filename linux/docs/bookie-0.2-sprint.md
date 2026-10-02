@@ -6,7 +6,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 ## Current continuation plan: 2026-10-02
 
 Working branch: **`linux`**. B3 code checkpoint:
-`5fb63af` (source version 0.1.5).
+`7650f2f` (source version 0.1.5).
 Target: **0.2.0**, implementation in progress; no release approved by this review.
 The [archived review](sprint-review-2026-09-28.md) inventories all 117 reachable
 commits in the September 26–28 window and records delivered work and open risks.
@@ -28,14 +28,16 @@ engine/type/consumer case at a time using the
 [agent task template](validation-playbook.md#agent-task-template).
 The clean LT-TRUNG full gate passed on `8e7766c`; the strict GTK+DuckDB
 values layer passed 190 tests across 11 suites, including 28 DuckDB contracts,
-on code commit `5fb63af`. The runner reused 746 fresh artifacts and rebuilt
-only the DuckDB test package. The local quick gate passed on the same code state.
+on code commit `7650f2f`. The runner reused 745 fresh artifacts and rebuilt
+only the ClickHouse and DuckDB packages. The local quick gate passed on the same
+code state.
 Drivers, TLS, PostgreSQL release, keyring, security-policy, GTK, workflow,
 harness, packaging and change-contract layers also passed after installing the
 local prerequisites. Hosted CI on `7afc416` and `efcbec7` passed all configured
-jobs. The code and evidence at `5fb63af` passed hosted CI on docs tip `6e45fbf`:
-Build run `37002408769`, Security run `37002408772`, and Flatpak run
-`37002408794` all completed successfully. See the
+jobs. The code and evidence at `5fb63af` passed hosted CI on docs tip `6e45fbf`;
+later docs tip `4407651` also passed all hosted workflows (Build `37004687278`,
+Security `37004687104`, Flatpak `37004687157`). Hosted CI for code commit
+`7650f2f` is pending. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
@@ -135,6 +137,13 @@ the shared consumer checks JSON/CSV and refuses type-less SQL, binding and grid
 edits. The strict GTK+DuckDB value layer passed 186 tests across 11 suites at
 code commit `0970896`; hosted CI is pending. See the
 [value evidence](value-contracts.md#clickhouse-numeric-key-nullable-map-2026-10-02).
+
+The ClickHouse nested map follow-up adds
+`Map(UInt8, Array(Nullable(UInt128)))` with a value above `u64::MAX`, NULL and
+an empty array. Native type/JSON oracles, JSON/CSV output and safe refusal by
+type-less write consumers all pass; the row remains unchanged after edit
+refusal. The strict 190-test values layer and local quick gate passed on the
+new case. Hosted validation is pending for `7650f2f`.
 
 The DuckDB nested unsigned follow-up adds a STRUCT containing `i64::MAX + 1`,
 `u64::MAX` and NULL. Native `typeof`/`VARCHAR` oracles and explicit result,

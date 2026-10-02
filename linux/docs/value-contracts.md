@@ -3726,7 +3726,27 @@ binding and keyed grid edit while confirming the MergeTree row is unchanged.
 The focused Docker test and strict GTK+DuckDB value layer passed; the layer ran
 186 tests across all 11 suites, including this contract. The report is
 [`20261002T004142618874Z-values/report.json`](../target/quality/20261002T004142618874Z-values/report.json).
-This is the thirteenth nested shape, and other nested combinations remain open.
+This was the thirteenth nested shape; other nested combinations remained open.
+
+### ClickHouse numeric-key map of nullable UInt128 arrays, 2026-10-02
+
+The shared Docker contract now includes
+`Map(UInt8, Array(Nullable(UInt128)))`, with a wide unsigned value and NULL in
+one array plus an empty array under another key. ClickHouse `toTypeName` and
+`toJSONString` provide native type and value oracles. Parsed JSON/CSV output
+preserves the exact nested value; SQL literal, parameter and MergeTree grid
+edit paths refuse it, and the stored row remains unchanged. The focused Docker
+test, strict GTK+DuckDB layer (190 tests, all 11 suites) and local quick gate
+passed. The strict run reused 745 artifacts and rebuilt ClickHouse and DuckDB.
+
+```sh
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
+```
+
+The strict report is
+[`20261002T120704261619Z-values/report.json`](../target/quality/20261002T120704261619Z-values/report.json),
+and the quick-gate report is
+[`20261002T121254146544Z-quick/report.json`](../target/quality/20261002T121254146544Z-quick/report.json).
 
 ```sh
 rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
