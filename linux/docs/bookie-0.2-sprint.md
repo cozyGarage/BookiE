@@ -40,8 +40,9 @@ Security `37004687104`, Flatpak `37004687157`). The code at `7650f2f` passed all
 hosted workflows on docs tip `b751a33`; all Build, Security and Flatpak jobs
 also passed for `67f5857` on docs tip `8b5edca`. The Lord Howe 30-minute DST
 fold contract passes the focused unit/server checks, strict 190-test values run
-and local quick gate on the tested `b4fd0e7` worktree; CI for this source commit
-is next. Validation reused all 747 Cargo artifacts. See the
+and local quick gate on the tested `b4fd0e7` worktree; Build `37039255022`,
+Security `37039255289` and Flatpak `37039255134` all passed. Validation reused
+all 747 Cargo artifacts. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
@@ -161,8 +162,9 @@ The next ClickHouse temporal slice covers Lord Howe Island's 30-minute
 fall-back fold alongside the existing New York one-hour fold. Its native query
 confirms the local wall time and one valid epoch; ambiguous result, SQL literal
 and parameter paths refuse to guess. Focused tests, the strict 190-test values
-layer and local quick gate passed on the tested `b4fd0e7` worktree; hosted CI is
-next. See the [value evidence](value-contracts.md#clickhouse-named-temporal-timezones-2026-09-27).
+layer and local quick gate passed on the tested `b4fd0e7` worktree; hosted Build,
+Security and Flatpak checks also passed. See the
+[value evidence](value-contracts.md#clickhouse-named-temporal-timezones-2026-09-27).
 
 The DuckDB nested unsigned follow-up adds a STRUCT containing `i64::MAX + 1`,
 `u64::MAX` and NULL. Native `typeof`/`VARCHAR` oracles and explicit result,

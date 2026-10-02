@@ -245,7 +245,12 @@
         "report_revision": "8b5edcafc80952ff8dcabbcaa6f15d5fc88ae0e7",
         "report_dirty": true,
         "report": "target/quality/20261002T170649834681Z-quick/report.json"
-      }
+      },
+      "hosted_ci": [
+        {"name": "Build Linux", "run_id": "37039255022", "result": "passed"},
+        {"name": "Linux Security", "run_id": "37039255289", "result": "passed"},
+        {"name": "Flatpak Linux (packaging only)", "run_id": "37039255134", "result": "passed"}
+      ]
     }
   ],
   "commit_count_in_inventory": 197,
