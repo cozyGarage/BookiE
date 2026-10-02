@@ -20,6 +20,8 @@ mod connect_refusal;
 mod datetimeoffset_csv;
 #[path = "support/disconnection.rs"]
 mod disconnection;
+#[path = "support/server_owned_columns.rs"]
+mod server_owned_columns;
 #[path = "support/temporal_boundaries.rs"]
 mod temporal_boundaries;
 

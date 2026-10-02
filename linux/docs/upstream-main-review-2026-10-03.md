@@ -1,7 +1,9 @@
 # macOS main fixes: Linux applicability review
 
 Reviewed on 2026-10-03. This is a source review and future-work handoff.
-No application code changed and no runtime tests ran during this review.
+The original review changed documentation only. The later
+[U1 implementation handoff](upstream-u1-sql-server-2026-10-03.md) records the
+bounded SQL Server metadata fix and its native regression evidence separately.
 
 ## Evidence and scope
 
@@ -31,7 +33,7 @@ the current branch and task ownership before editing.
 
 | ID | Priority / lane | Source conclusion | Next action |
 | --- | --- | --- | --- |
-| U1 | High / B3 metadata and writes | SQL Server marks only computed columns generated; rowversion and temporal/ledger columns are missing | Extend metadata and prove every generated write respects it |
+| U1 | High / B3 metadata and writes | Metadata fix and two INSERT consumers have native regression evidence | Finish GTK/other consumer and ledger acceptance in the [handoff](upstream-u1-sql-server-2026-10-03.md) |
 | U2 | High / B3 Copy as SQL | Literal INSERT keeps identity values without an engine-specific identity policy | Define safe default copying and explicit identity preservation |
 | U3 | Medium / editor correctness | Autocomplete drops schema identity and folds case in cache keys | Preserve resolved connection/schema/table identity |
 | U4 | Medium / B4 reconnect | Every reconnect error becomes a string and retries indefinitely | Separate retryable failures from permanent TLS/auth/config failures |

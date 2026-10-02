@@ -25,6 +25,11 @@ the B4 board; MongoDB collection-wide export coverage reuses the open B3 scope.
 These are source-review findings and reproduction tasks, with no new runtime
 acceptance or milestone closure.
 
+The [U1 SQL Server follow-up](upstream-u1-sql-server-2026-10-03.md) now fixes
+server-owned column metadata and verifies the two INSERT builders against a
+native temporal/rowversion fixture. U1 consumer/ledger acceptance and U2 identity
+copying remain open; this bounded fix does not close B3.
+
 October 2 audit checkpoint: R1–R5 and R7 have focused fixes, regressions and
 native/consumer evidence; R5 also has hosted test ownership. R7 protects XLSX
 floats from Excel's precision and range limits. The B3-P1 scalar-enum metadata

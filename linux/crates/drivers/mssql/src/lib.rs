@@ -304,7 +304,9 @@ impl Connection for MssqlConnection {
                        c.scale, \
                        c.is_nullable, \
                        c.is_identity, \
-                       c.is_computed, \
+                       CASE WHEN c.is_computed = 1 OR c.system_type_id = 189 \
+                            OR COLUMNPROPERTY(c.object_id, c.name, 'GeneratedAlwaysType') > 0 \
+                            THEN 1 ELSE 0 END AS is_generated, \
                        dc.definition AS default_def, \
                        CASE WHEN pk.column_id IS NOT NULL THEN 1 ELSE 0 END AS is_pk, \
                        CAST(ep.value AS nvarchar(max)) AS column_comment, \

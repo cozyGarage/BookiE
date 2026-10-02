@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-02T22:29:08.138856+00:00",
+  "code_baseline": "7b08dd4786db22ac38bc341f29d0f350412af82d",
+  "validation_parent": "5cdb2eeadaa747b3b8d7724a20205862d945d6a0",
+  "scope": "U1 SQL Server metadata fix in dirty tree on validation_parent; source hashes identify the tested code. Documentation changed during validation.",
+  "source_sha256": {
+    "linux/crates/drivers/mssql/src/lib.rs": "e1c14f7b60f161f847244f3aefee8c42d98d5649bb106a622da90303c0ea5173",
+    "linux/crates/drivers/mssql/tests/integration.rs": "7f660c2a54c9009e6e78fc949b96eb5150341c05f5767ecbb3b5eec9fb8040a8",
+    "linux/crates/drivers/mssql/tests/support/server_owned_columns.rs": "0fc772e3968b768f53fe833085e1ce217395a2d2c6b06c6dd8ccfdf28e1a4ef9"
+  },
+  "native_before": {
+    "status": "failed",
+    "reason": "Only calculated was marked generated; rowversion and both period columns were missing.",
+    "log": "native-before.txt",
+    "log_sha256": "a2a0d1baa587c0614a106493694aee89649733bb410255bd6b03251f6796da2f"
+  },
+  "native_after": {
+    "status": "passed",
+    "argv": [
+      "rtk",
+      "proxy",
+      "cargo",
+      "test",
+      "--manifest-path",
+      "linux/Cargo.toml",
+      "-p",
+      "tablepro-driver-mssql",
+      "--test",
+      "integration",
+      "--",
+      "--include-ignored",
+      "--test-threads=1"
+    ],
+    "passed": 34,
+    "failed": 0,
+    "ignored": 0,
+    "log": "native-after.txt",
+    "log_sha256": "20b219ff16165b36d5d2abe036b7139071b967cf02bfdba9b8ac6dd8bee1aceb"
+  },
+  "local_layers": {
+    "report": "linux/target/quality/20261002T222123464575Z-layers/report.json",
+    "report_sha256": "dc261008230406282ff218e478b35f6ec8bacac1a63179287463bdf05f1aadaa",
+    "status": "passed",
+    "layers": {
+      "full": {
+        "status": "passed",
+        "steps": [
+          {
+            "argv": [
+              "bash",
+              "scripts/ci-local.sh",
+              "full"
+            ],
+            "timeout_seconds": 1800,
+            "evidence": "rust-tests",
+            "status": "passed",
+            "log": "full-1.log",
+            "exit_code": 0,
+            "seconds": 168.808
+          }
+        ]
+      },
+      "change-contracts": {
+        "status": "passed",
+        "steps": [
+          {
+            "argv": [
+              "python3",
+              "scripts/run-change-contract-tests.py"
+            ],
+            "timeout_seconds": 1800,
+            "evidence": "exit",
+            "status": "passed",
+            "log": "change-contracts-1.log",
+            "exit_code": 0,
+            "seconds": 1.468
+          }
+        ]
+      }
+    },
+    "full_passing_executions": 2839,
+    "count_note": "Passing executions include subprocess and repeated test summaries; not unique coverage.",
+    "logs_sha256": {
+      "full-1.log": "0275ce33c14a6e9a3c45b2795d3ab1cdb4196ecf0d27a9cf2200c6d2fbb0a8d0",
+      "change-contracts-1.log": "6ea01e9a89fcd5b20f2f862cfb07c836e23090253276ed58afe0c7c6b8b8e271"
+    }
+  },
+  "environment_failure": "Initial raw-cargo suite run inside the sandbox could not access Docker; rerun outside the sandbox passed all 34 tests.",
+  "remaining": [
+    "Installed GTK consumer acceptance",
+    "Duplicate-row and CSV-import acceptance",
+    "Ledger-specific native fixtures",
+    "Older SQL Server runtime qualification",
+    "U2 identity copying",
+    "Hosted CI and installed package/Wayland qualification"
+  ]
+}

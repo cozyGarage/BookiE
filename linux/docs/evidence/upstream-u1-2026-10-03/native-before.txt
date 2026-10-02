@@ -1,0 +1,24 @@
+
+running 1 test
+test server_owned_columns::server_owned_columns_are_generated_and_omitted_from_insert_consumers ... FAILED
+
+failures:
+
+---- server_owned_columns::server_owned_columns_are_generated_and_omitted_from_insert_consumers stdout ----
+
+thread 'server_owned_columns::server_owned_columns_are_generated_and_omitted_from_insert_consumers' (22864) panicked at crates/drivers/mssql/tests/support/server_owned_columns.rs:18:5:
+assertion `left == right` failed
+  left: ["calculated"]
+ right: ["calculated", "version", "starts", "ends"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    server_owned_columns::server_owned_columns_are_generated_and_omitted_from_insert_consumers
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 33 filtered out; finished in 4.31s
+
+   Compiling tablepro-driver-mssql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mssql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.13s
+     Running tests/integration.rs (linux/target/debug/deps/integration-96d8f26021e5cb8e)
+error: test failed, to rerun pass `-p tablepro-driver-mssql --test integration`

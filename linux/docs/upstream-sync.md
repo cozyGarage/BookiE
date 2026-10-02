@@ -5,6 +5,10 @@ Rust/Linux foundations as well as behavior review. Apple source trees remain exc
 
 ## 2026-10-03: macOS main applicability review
 
+Follow-up: [U1 SQL Server handoff](upstream-u1-sql-server-2026-10-03.md)
+records the manual metadata fix for rowversion and temporal period columns,
+the failing-before/passing-after native regression, and remaining U1 consumers.
+
 Reviewed macOS main at `5c2df3b60cd40c25ba86c57e3d1c87499340cb3c` against
 BookiE `linux` at `7b08dd4786db22ac38bc341f29d0f350412af82d`.
 The [review and agent work packets](upstream-main-review-2026-10-03.md)
@@ -13,7 +17,8 @@ autocomplete keys, reconnect failure handling, client-certificate integration
 and MongoDB export coverage. Its inventory distinguishes subject screening
 from inspected diffs, and the review separates source gaps from cases still
 needing a reproduction. Existing policy and cancellation protections are retained.
-This entry records a documentation handoff; no behavior was ported or tested.
+The initial review was a documentation handoff. Implementation and tests belong
+to the linked U1 follow-up.
 
 ## 2026-09-25: system OpenSSH transport
 
