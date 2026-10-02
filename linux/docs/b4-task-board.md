@@ -103,6 +103,26 @@ advances before integration. The B3 reconnect tests added useful F9 context and
 did not conflict with the B4 editor or agentd files. These narrow results do
 not replace the final combined layers or installed Arch/Debian acceptance.
 
+#### Follow-up implementation packets (October 2)
+
+The current `linux` tip has advanced to `d7007a6a6`. E1 and F2 were implemented
+in isolated worktrees, rebased onto that tip, and pushed as separate review
+branches. They remain open until reviewed, merged and validated on the combined
+tree. Direct pushes to these feature branches do not trigger the Linux workflows;
+open PRs targeting `linux` or dispatch a workflow with the branch ref.
+
+| Task | Worktree / branch / commit | Evidence and remaining acceptance |
+| --- | --- | --- |
+| E1 | `/tmp/tablepro-b4-e1/linux`, `codex-b4-e1`, `fcc3f682c` | The dialect-aware shared policy gate refuses MySQL XA start and autocommit-off and SQL Server implicit transactions before approval/dispatch; tests ignore comments/literals and cover safe neighbors. Policy library: 165 passed before the final rebase; post-rebase Clippy with `-D warnings`, fmt and diff checks pass. The post-rebase test rerun was blocked by local disk quota, so rerun `quick security-policy` after integration. E2 is the next policy packet but depends on this gate's review/integration. |
+| F2 | `/tmp/tablepro-b4-f1`, `codex-b4-f2`, `335dd97bb` | Editor teardown now cancels/drains runs, joins in-flight opens and awaits one close before tab/window/connection destruction; rollback failures stay visible and audited as unknown. App library: 424 passed, 15 ignored on the implementation before final rebase; fmt and diff checks pass. The post-rebase app test rerun was blocked by local disk quota. Run `full widgets` and `postgres-release` after integration; installed close-route acceptance remains pending. |
+
+The `Build Linux` workflow covers `linux/**` pushes/PRs and runs `full` and
+`widgets`, so it will exercise the app changes on a PR to `linux`. The separate
+`Linux test quality` workflow covers policy mutation/coverage but intentionally
+does not measure the GTK app crate. `Linux Security` includes `security-policy`
+and triggers for Linux PRs. No workflow run has yet validated these two pushed
+branches.
+
 #### E1: refuse implicit transaction starters on shared connections
 
 - Inspect `crates/policy/src/{classify.rs,rules.rs,transaction_control.rs,guard.rs}`
