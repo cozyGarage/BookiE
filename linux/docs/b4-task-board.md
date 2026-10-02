@@ -103,6 +103,46 @@ advances before integration. The B3 reconnect tests added useful F9 context and
 did not conflict with the B4 editor or agentd files. These narrow results do
 not replace the final combined layers or installed Arch/Debian acceptance.
 
+#### Follow-up implementation packets (October 2)
+
+The current `linux` tip has advanced to `d7007a6a6`. E1 and F2 were implemented
+in isolated worktrees, rebased onto that tip, and pushed as separate review
+branches. A temporary integration tree passed the combined affected layers;
+the packets remain open until integrated into `linux` and hosted review checks
+finish. Direct pushes to these feature branches do not trigger the Linux
+workflows; PRs targeting `linux` or manual dispatch by ref do.
+
+| Task | Worktree / branch / commit | Evidence and remaining acceptance |
+| --- | --- | --- |
+| E1 | `/tmp/tablepro-b4-e1/linux`, `codex-b4-e1`, `3c165a0d7` | The dialect-aware shared policy gate refuses MySQL XA start and autocommit-off and SQL Server implicit transactions before approval/dispatch; tokens in comments/literals are ignored and safe neighboring statements remain allowed. Exact-tip report `target/quality/20261002T202739203539Z-layers/report.json`: `quick` and `security-policy` passed; policy lib: 165 passed. E2 is the next policy packet but depends on E1 review/integration. |
+| F2 | `/tmp/tablepro-b4-f1`, `codex-b4-f2`, `495c39931` | Editor teardown cancels/drains runs, joins opens, and awaits one close before tab/window/connection destruction; rollback failures stay visible and audited as unknown. Exact-tip report `target/quality/20261002T202523816125Z-layers/report.json`: `full`, `widgets`, `postgres-release` passed; app lib: 425 passed, 15 ignored. Real PostgreSQL selector `closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgres` passed (1/1), verifying fresh-connection row state and rollback audit. Route order ensures pending saves/discards precede a tab's rollback prompt. |
+
+Combined validation: temporary worktree `/tmp/tablepro-b4-integration`, merge
+commit `b9e75ac26` (base `d7007a6a6`), report
+`target/quality/20261002T203352934307Z-layers/report.json`. `quick`,
+`security-policy`, `full`, `widgets` and `postgres-release` all passed on the
+combined E1+F2 tree. The real PostgreSQL rollback/audit selector also passed on
+that tree (1/1).
+
+F2 route trace at the pushed branch:
+
+| Route | Guard and continuation | Evidence / remaining limit |
+| --- | --- | --- |
+| Single or bulk tab close | Pending save/discard resolves first; then transaction prompt. Cancel leaves the tab/session; confirm awaits that editor before removing it. Bulk actions use the same page-close hook per tab. | `workspace_tabs.rs`, `workspace_close.rs`; app unit and widget layers pass. No installed Wayland route run yet. |
+| Window close / quit | Existing dirty-save prompt and workspace flush finish first; transaction prompt follows. All editor replies must succeed before the close is retried. | `init_window.rs`, `session_teardown.rs`; window remains open on cleanup error/timeout. Installed acceptance pending. |
+| Disconnect | Existing pending-change prompt then transaction prompt; await every editor before tabs or DB connection are closed. | `connection.rs`, `session_teardown.rs`; unknown/error prevents disconnect completion. |
+| Connection switch | Existing running-query and dirty-change decisions precede transaction confirmation; await all editors before replacing the old connection. | `connection.rs`, `session_teardown.rs`; error resets transition and retains the current connection. |
+| Editor shutdown | Normal user teardown routes above intercept and await; component shutdown keeps detached close only as a final fallback for unexpected shutdown. | `editor/mod.rs`, `session_mode.rs`; close helper is idempotent and the underlying handle closes once. |
+
+Focused F2 regressions cover delayed close, close error and duplicate close, active-query/open gating, multiple editor replies and stale session callbacks. The report artifacts above are local; hosted workflow checks remain pending because direct pushes to the feature branches do not trigger workflows.
+
+The `Build Linux` workflow covers `linux/**` pushes/PRs and runs `full` and
+`widgets`, so it will exercise the app changes on a PR to `linux`. The separate
+`Linux test quality` workflow covers policy mutation/coverage but intentionally
+does not measure the GTK app crate. `Linux Security` includes `security-policy`
+and triggers for Linux PRs. No workflow run has yet validated these two pushed
+branches.
+
 #### E1: refuse implicit transaction starters on shared connections
 
 - Inspect `crates/policy/src/{classify.rs,rules.rs,transaction_control.rs,guard.rs}`

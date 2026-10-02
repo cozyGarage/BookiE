@@ -52,6 +52,40 @@ async fn read_only_denial_skips_blast_radius_query() {
 }
 
 #[tokio::test]
+async fn implicit_transaction_mode_is_denied_before_dispatch_and_audited() {
+    let executes = Arc::new(AtomicUsize::new(0));
+    let approvals = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let mut guard_context = context(
+        Principal::human_gui(),
+        Environment::Prod,
+        PolicyConfig::default(),
+        Arc::new(CountingApprovalSink {
+            calls: approvals.clone(),
+        }),
+        audit.clone(),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "mysql".into();
+    let guard = PolicyGuard::new(
+        connection(executes.clone(), Arc::new(AtomicUsize::new(0))),
+        guard_context,
+    );
+
+    guard
+        .execute("SET autocommit = 0")
+        .await
+        .expect_err("shared connection must refuse implicit transaction mode");
+
+    assert_eq!(executes.load(Ordering::SeqCst), 0);
+    assert_eq!(approvals.load(Ordering::SeqCst), 0);
+    let events = audit.events.lock().expect("audit events");
+    let event = events.last().expect("denial outcome");
+    assert_eq!(event.decision_rule, "transaction_control_needs_session");
+    assert_eq!(event.terminal_status, AuditTerminalStatus::Denied);
+}
+
+#[tokio::test]
 async fn disabled_audit_state_cannot_be_bypassed_by_approval() {
     let queries = Arc::new(AtomicUsize::new(0));
     let approvals = Arc::new(AtomicUsize::new(0));
