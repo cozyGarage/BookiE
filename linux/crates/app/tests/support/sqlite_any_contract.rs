@@ -17,7 +17,7 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO flexible VALUES (1, 1.5), (2, 'text'), (3, 42), (4, NULL)")
+        .execute("INSERT INTO flexible VALUES (1, 1.5), (2, 'text'), (3, 42), (4, NULL), (5, 'clear me')")
         .await
         .unwrap();
 
@@ -43,6 +43,24 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
         connection.execute_in_transaction(&[update]).await.unwrap();
     }
 
+    let current = connection
+        .query_params("SELECT value FROM flexible WHERE id = ?", &[Value::Int(5)])
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let clear = parse_input_for_grid_cell("", Some(&columns[value_index]), "sqlite", Some(&current)).unwrap();
+    let clear_update = tablepro_core::sql_dialect::build_keyed_update(
+        "sqlite",
+        None,
+        "flexible",
+        &columns,
+        &[(value_index, clear)],
+        &[Value::Int(5)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[clear_update]).await.unwrap();
+
     let saved = connection
         .query("SELECT id, typeof(value), value FROM flexible ORDER BY id")
         .await
@@ -54,6 +72,7 @@ async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class()
             vec![Value::Int(2), Value::Text("text".into()), Value::Text("007".into())],
             vec![Value::Int(3), Value::Text("integer".into()), Value::Int(43)],
             vec![Value::Int(4), Value::Text("null".into()), Value::Null],
+            vec![Value::Int(5), Value::Text("text".into()), Value::Text(String::new())],
         ]
     );
 }

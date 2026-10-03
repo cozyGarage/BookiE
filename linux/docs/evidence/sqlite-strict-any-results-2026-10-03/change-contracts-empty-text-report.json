@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "a210202292e16dcb008dd69a23a6c12bbab61418",
+  "working_tree": "M linux/crates/app/src/ui/browse_tab/value_parse.rs\n M linux/crates/app/tests/support/sqlite_any_contract.rs\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
+  "tracked_diff_sha256": "b547811e58afd3309bf8b6dfa77930eaad69772180d767e54f20568b64fcc9c8",
+  "started_utc": "2026-10-03T19:12:01.376137+00:00",
+  "status": "passed",
+  "layers": {
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 0.615
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T19:12:01.991990+00:00"
+}

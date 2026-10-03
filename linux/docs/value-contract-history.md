@@ -4401,6 +4401,15 @@ shared nullable-column rule and stores NULL; nonempty input stays TEXT, even
 when numeric-looking, because there is no existing runtime kind to preserve and
 the grid must not guess a conversion.
 
+A follow-up found that clearing existing nonempty TEXT through the grid was
+parsed as SQL NULL. The grid-cell parser now preserves an existing SQLite
+STRICT `ANY` TEXT cell as empty TEXT when its input is blank; blank NULL and
+draft cells still store SQL NULL. The native regression failed before the
+change with `typeof(value) = 'null'`, then passed with `typeof(value) = 'text'`
+and an empty returned string after the fix.
+The focused app regression passed, as did the DuckDB-enabled app-library suite
+(444 passed, 20 ignored), Clippy, and the mapped `change-contracts` layer.
+
 The SQLite-backed app regression directly exercises the grid-cell parser,
 keyed-update builder and driver write; it does not drive GTK event handling.
 `sqlite_strict_any_null_and_new_cells_use_text_unless_blank` checks that input

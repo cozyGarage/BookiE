@@ -1,0 +1,39 @@
+
+running 1 test
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class ... FAILED
+
+failures:
+
+---- ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class stdout ----
+
+thread 'ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class' (3259054) panicked at crates/app/src/ui/browse_tab/../../../tests/support/sqlite_any_contract.rs:68:5:
+assertion `left == right` failed
+  left: [[Int(1), Text("real"), Float(2.75)], [Int(2), Text("text"), Text("007")], [Int(3), Text("integer"), Int(43)], [Int(4), Text("null"), Null], [Int(5), Text("null"), Null]]
+ right: [[Int(1), Text("real"), Float(2.75)], [Int(2), Text("text"), Text("007")], [Int(3), Text("integer"), Int(43)], [Int(4), Text("null"), Null], [Int(5), Text("text"), Text("")]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 457 filtered out; finished in 0.00s
+
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+warning: unused import: `super::parse_input_for_grid_cell`
+ --> crates/app/src/ui/browse_tab/../../../tests/support/duckdb_enum_contract.rs:1:5
+  |
+1 | use super::parse_input_for_grid_cell;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `tablepro_core::Value`
+ --> crates/app/src/ui/browse_tab/../../../tests/support/duckdb_enum_contract.rs:2:5
+  |
+2 | use tablepro_core::Value;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: `tablepro-app` (lib test) generated 2 warnings (run `cargo fix --lib -p tablepro-app --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.87s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+error: test failed, to rerun pass `-p tablepro-app --lib`

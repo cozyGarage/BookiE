@@ -96,6 +96,13 @@ pub(super) fn parse_input_for_grid_cell(
     driver_id: &str,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
+    if text.is_empty()
+        && driver_id == "sqlite"
+        && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
+        && matches!(current_value, Some(Value::Text(_)))
+    {
+        return Ok(Value::Text(String::new()));
+    }
     if driver_id == "duckdb"
         && col.is_some_and(|column| column.data_type.trim().to_ascii_uppercase().starts_with("ENUM"))
         && let Some(label) = parse_sql_single_quoted_string(text.trim())

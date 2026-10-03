@@ -4,6 +4,7 @@
   "branch": "linux",
   "base_commit": "e0c2322041d248ecccafabe9e2c43281241fa7f3",
   "followup_base_commit": "c432ef418a37f258c27755c98bb6c96e2599ce4f",
+  "empty_text_followup_base_commit": "a21020229",
   "working_tree": "Local checks ran against the dirty source tree recorded below; this is development evidence, not hosted CI, installed GTK acceptance or release qualification.",
   "scope": [
     "Preserve an existing SQLite STRICT ANY cell's INTEGER, REAL or TEXT runtime storage class when edited through the app grid parser and keyed-update path.",
@@ -31,6 +32,14 @@
     "path": "SQLite driver decoding and the shared grid runtime-value editability gate.",
     "oracle": "Value::Bytes equality, gate returns not editable, SQLite typeof(value) = blob, exact bytes unchanged.",
     "result": "1 passed; the three focused STRICT ANY tests passed; full tablepro-app library suite 438 passed, 20 ignored."
+  },
+  "empty_text_followup": {
+    "selector": "sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class",
+    "fixture": "In-memory SQLite STRICT ANY table with an existing nonempty TEXT value cleared through the grid parser and keyed update.",
+    "path": "App grid-cell parser, keyed-update SQL builder, and SQLite driver write; the test directly invokes the parser and builder rather than GTK event handling.",
+    "oracle": "SQLite typeof(value) remains text and the returned value is empty TEXT. The same fixture keeps an empty NULL row as SQL NULL.",
+    "initial_failure": "Before the fix, clearing existing TEXT produced typeof(value) = null and Value::Null; before-empty-text-fix.log retains the failing native test output.",
+    "result": "Focused regression passed after fix; the optional DuckDB app library suite passed 444 tests with 20 ignored. Clippy and change-contracts passed."
   },
   "commands": [
     {
@@ -72,6 +81,22 @@
     {
       "argv": "python3 scripts/run-test-layer.py change-contracts",
       "result": "passed; report and output retained."
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class",
+      "result": "Before-fix test failed because blank existing TEXT became SQL NULL; after-fix 1 passed. Logs retained."
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib --features duckdb",
+      "result": "444 passed; 0 failed; 20 ignored; app-lib-empty-text.log retained."
+    },
+    {
+      "argv": "cargo clippy --locked -p tablepro-app --all-targets --features duckdb -- -D warnings",
+      "result": "passed; clippy-empty-text.log retained."
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py change-contracts",
+      "result": "passed; change-contracts-empty-text-report.json and log retained."
     }
   ],
   "layer_report": {
@@ -84,16 +109,21 @@
     "status": "passed",
     "layer": "change-contracts"
   },
+  "empty_text_layer_report": {
+    "path": "change-contracts-empty-text-report.json",
+    "status": "passed",
+    "layer": "change-contracts"
+  },
   "source_fingerprints_sha256": {
-    "crates/app/src/ui/browse_tab/value_parse.rs": "a5e273af6fa35710938b8b06660bd71aa6e9cb619c748d212693590c564a61ac",
+    "crates/app/src/ui/browse_tab/value_parse.rs": "84f3f76e86b479fd774d0ae2a329666788ab00f2da95bc14c1e99113fcfd2f5e",
     "crates/app/src/ui/browse_tab/row_ops.rs": "8867e8c473b78a3679b7a3325388c3fc591391f90cec086c5875ab53ec28c79b",
     "crates/app/tests/support/value_parse.rs": "8214d52ff4345a284cf9f4ccaa3e4b28a138a91053f8d4e2538aa7b8d8029212",
-    "crates/app/tests/support/sqlite_any_contract.rs": "db31a27cda3721fd7cd7ab99845848fab27c5eda582347377e6069cf9a424480",
-    "docs/type-contract-strategy.md": "e8c27b9135fb2828400533edddbd8ebc5d87d69cd38f94c8820e4ec2b6203cb8",
-    "docs/value-contracts.md": "d2d12b8c551d1e21c8c5606877a73be79012e35afe6fb6b2627afc65db26b546",
-    "docs/value-contract-history.md": "701470f93b0526c352fe451750b83d89218b3cd7966bb8ad41d34ede627ac8fc",
-    "docs/release-audit-2026-10-03.md": "358012113081583595f5fe5529bd0bea990ebdf511a4a56b4221a8fc1b0adf21",
-    "docs/b3-test-scenario-survey.md": "86abf00c4353b51cdb33fe8abb24acaeccbbe3a766e7e4701d271480b1f709c3"
+    "crates/app/tests/support/sqlite_any_contract.rs": "1953bcc886023bf16acfd6064531b0562833bc4ef3c83dc66282099f466ba6e0",
+    "docs/type-contract-strategy.md": "5a65aec83760835773ae1f38493276b87f82fd6c2ab644c83eea5b97d489789d",
+    "docs/value-contracts.md": "1261bcb5e389822359436320c456a472952f3230c5e0f787c77ec8df40942da8",
+    "docs/value-contract-history.md": "a2c7d5067970fb7562a666cb150b55486c35d64e08aec6204d321bc3a20a554b",
+    "docs/release-audit-2026-10-03.md": "636af08180c7c719749f8ada7de4d660b394000164a77de136aee72d7000a0e7",
+    "docs/b3-test-scenario-survey.md": "b6d9cccbca6f2bd3c3e7a8c8ee5ce627952f96c625511f91ddcb5d4395504348"
   },
   "retained_evidence_sha256": {
     "before-fix.log": "c88ecbf90d0eb1e2c035f9cf3b14c704e0668038bb8fad647b63114d9fea4372",
@@ -107,9 +137,15 @@
     "clippy-followup.log": "b7f0dfeb478f1461bb84b508e0f0a4fcb319378bbe46551be3761d0ec089b81d",
     "change-contracts-followup-report.json": "0646adaf1d8ec2f0a7a7430e44c3c2a03d40d7425bd4d34ad41d6cd3eb751dd9",
     "change-contracts-followup.log": "6b505239068f90a970b222eb3543b7a291c16f1395bb426e2b8b9ebc6003572f",
-    "sqlite-any-focused-followup.log": "4885a6763bc73b513c617589c941c38b8805a81c690c542094ea8fa62f39f383"
+    "sqlite-any-focused-followup.log": "4885a6763bc73b513c617589c941c38b8805a81c690c542094ea8fa62f39f383",
+    "before-empty-text-fix.log": "d6c276f717bc91c1aff5069ae2b01a643d8832da6ad1712e529663622a6f7605",
+    "focused-empty-text.log": "985b08fdc81c104f02c7ea2c71a30540e7d8f8eada334e852b00e97e69e6b39c",
+    "app-lib-empty-text.log": "94fe32ade3ab8624596941801c63b8cf14412f0e46624c7b2b4f403babb5d1d9",
+    "clippy-empty-text.log": "db686130097063a728f8e24eb58349fb5fa79db5e279150fc28a50b287f526cb",
+    "change-contracts-empty-text.log": "0c2bbf6bda31c8d370433bf78b5016f03397ca95bb4824eecc4327d2a5f42ba3",
+    "change-contracts-empty-text-report.json": "eadcb736a7f9f7ade2165b354158fbe843f2de96365067a8f1c3c5796d3ee7de"
   },
-  "evidence_normalization": "Captured terminal logs have trailing whitespace removed so the evidence packet passes git diff checks; test results and output content are unchanged.",
+  "evidence_normalization": "Earlier logs have trailing whitespace removed. Empty-text follow-up logs contain captured stdout/stderr.",
   "limitations": [
     "The parser/keyed-write tests directly exercise parsing, keyed SQL generation, SQLite writes and native type/value checks; the BLOB case directly checks the shared runtime-value gate. None drives GTK event handling or verifies an installed grid.",
     "No hosted GitHub Actions, package, Wayland, VM or release-candidate qualification is represented."
