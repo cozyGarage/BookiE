@@ -233,7 +233,7 @@ side-effect pattern. See the [MySQL evidence manifest](evidence/mysql-atomic-res
 Keep the existing IDs. Each row is one patch or one bounded evidence packet;
 larger acceptance groups should be executed as individual named scenarios.
 
-| Order / owner | Task | Closure evidence |
+| Risk rank / owner | Task | Closure evidence |
 | --- | --- | --- |
 | 1 / privacy | Remove sensitive panic payload output, including default-hook leakage | Sentinel absent from captured tracing/stderr/returned errors/audit; containment and terminal state retained |
 | 2 / G5 | Retire/invalidate the daemon handle after panic or disconnection even when ping succeeds | Fake-driver no-reuse/no-replay and real loss/panic fixture; stale handles refuse |
@@ -255,7 +255,10 @@ larger acceptance groups should be executed as individual named scenarios.
 | 18 / B7 | Frozen SHA: Arch native Wayland, I1 Debian helper, GNOME Wayland, upgrade/rollback, then soak | Exact artifact/checksum, per-scenario results; 30 retry-free GTK attempts across at least six runs |
 | 19 / MySQL batch engine semantics | **Narrow trigger contract now has native proof:** an InnoDB insert rolls back while its trigger's MyISAM side effect persists, matching the UI warning | [Native regression and evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); other storage engines and side-effect patterns remain open |
 
-Recommended next goal: **privacy and headless ownership** (rows 1–3), then
-continue the remaining B3 matrix and MySQL batch engine-semantics boundary.
-Review/preparation does not waive the sprint's B3 → B4 → installed qualification
-order. No goal was created and no release decision was made by this audit.
+The audit ranks privacy and headless ownership (rows 1–3) as high-risk gaps;
+that risk ranking does not change the approved sprint sequence. Follow
+**B3 → B4 → installed qualification**: close the remaining B3 matrix and enum
+cases first, then take the privacy/headless B4 tasks and other B4 acceptance.
+Risk review and preparation may overlap where they do not reserve the same
+files or fixtures. No goal was created and no release decision was made by this
+audit.
