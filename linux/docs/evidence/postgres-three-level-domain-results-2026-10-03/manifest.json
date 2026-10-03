@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "39b7721642c82714c13704ae1cdb0c2fa4759092",
+  "working_tree": "Native local PostgreSQL 16 evidence captured against the working tree based on base_commit; it is not hosted CI or installed acceptance.",
+  "scope": [
+    "Extend recursive PostgreSQL domain-over-enum metadata and consumer proof from two to three domain layers.",
+    "Retain exact leaf enum metadata, outer domain result type, native labels/NULL, schema-aware filters and writes, parameter inference, and invalid-label refusal with unchanged-row postconditions."
+  ],
+  "native_fixture": "PostgreSQL 16; custom enum with literal NULL, empty text, Unicode and ready labels; three nested domains; typed table column.",
+  "regression": {
+    "selector": "domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes",
+    "path": "Native driver catalog metadata, result decoding, parameter binding, schema-aware filters, keyed updates and draft inserts.",
+    "oracle": "Qualified base enum metadata; exact projected labels and SQL NULL; pg_typeof outer domain; SQLSTATE 22P02 for invalid labels; unchanged row after refusal.",
+    "result": "Focused contract passed; all 92 PostgreSQL integration tests passed."
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_three_level_domain_over_enum_infers_parameters_and_decodes -- --include-ignored --test-threads=1",
+      "result": "1 passed; focused.log retained."
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "92 passed; 0 failed; 0 ignored; postgres-integration.log retained."
+    },
+    {
+      "argv": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed; clippy.log retained."
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py change-contracts",
+      "result": "passed; report and change-contracts.log retained."
+    },
+    {
+      "argv": "cargo fmt --all -- --check; python3 scripts/check-function-size.py; bash scripts/check-file-size.sh; git diff --check",
+      "result": "passed."
+    }
+  ],
+  "layer_report": {
+    "path": "change-contracts-report.json",
+    "status": "passed",
+    "layer": "change-contracts"
+  },
+  "source_fingerprints_sha256": {
+    "crates/drivers/postgres/tests/support/domain_contract.rs": "fdc7bcd35a5e413f82296da1fc2d3e50a905485f67a5d0542760115737ab8056",
+    "docs/type-contract-strategy.md": "125e31cdda191e8ef72cbe137c257fbb0dd965dc854d88eb6e24198216d5674c",
+    "docs/value-contract-history.md": "b5ef114811dbb2538b0a86129783ed44ba0888c5db7b7b26d052d393cb9bb73f",
+    "docs/value-contracts.md": "d2d12b8c551d1e21c8c5606877a73be79012e35afe6fb6b2627afc65db26b546",
+    "docs/release-audit-2026-10-03.md": "c0e8c65a3cc937996d9e914e2f50c2b0270ac7cd2fa6751052b081acc4cfac94"
+  },
+  "retained_evidence_sha256": {
+    "focused.log": "5ffba581cd84722bc141f1233cb9c831ed6374c71a3befedc866cdaf3043d7db",
+    "postgres-integration.log": "e374b1103ee8d95d539dfd45b1a7453ff05a765f01dfca4def5ef12ad364a62d",
+    "clippy.log": "a1a928826de317a22685e0f751e210ef65c362aa03432454ff138141687bcc7e",
+    "change-contracts-report.json": "6eadeb52a0f42b3435290cf211f8321fbf5d79b06a3ed719006dcce4533bc616",
+    "change-contracts.log": "f1d15d0b677c00041242339f7a9fb54169330dfe7e45a4bb56cc70c928ea7dc7"
+  },
+  "evidence_normalization": "Captured terminal logs have trailing whitespace removed so the packet passes git diff checks; test output and outcomes are unchanged.",
+  "remaining": [
+    "Depths beyond three and other enum/domain configuration combinations are untested.",
+    "Raw domain-to-unknown comparison contexts still require explicit casts; automatic inference remains unsupported."
+  ],
+  "not_run": [
+    "GitHub Actions",
+    "installed GTK/package",
+    "Wayland/VM acceptance",
+    "release soak"
+  ]
+}

@@ -275,7 +275,7 @@ async fn value_contract_domain_over_enum_assignment_infers_parameter_type() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_nested_domain_over_enum_infers_parameters_and_decodes() {
+async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decodes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     connection
@@ -295,8 +295,15 @@ async fn value_contract_nested_domain_over_enum_infers_parameters_and_decodes() 
         .unwrap();
     connection
         .execute(
-            "CREATE DOMAIN value_contract_nested_domain.state_outer \
+            "CREATE DOMAIN value_contract_nested_domain.state_middle \
              AS value_contract_nested_domain.state_inner",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_nested_domain.state_outer \
+             AS value_contract_nested_domain.state_middle",
         )
         .await
         .unwrap();

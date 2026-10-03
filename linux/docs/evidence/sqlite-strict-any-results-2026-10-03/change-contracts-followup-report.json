@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "commit": "c432ef418a37f258c27755c98bb6c96e2599ce4f",
-  "working_tree": "M  linux/crates/app/src/ui/browse_tab/value_parse.rs\nMM linux/crates/app/tests/support/value_parse.rs\nM  linux/docs/b3-test-scenario-survey.md\nAM linux/docs/evidence/sqlite-strict-any-results-2026-10-03/app-lib-followup.log\nA  linux/docs/evidence/sqlite-strict-any-results-2026-10-03/change-contracts-followup-report.json\nAM linux/docs/evidence/sqlite-strict-any-results-2026-10-03/change-contracts-followup.log\nAM linux/docs/evidence/sqlite-strict-any-results-2026-10-03/clippy-followup.log\nM  linux/docs/evidence/sqlite-strict-any-results-2026-10-03/manifest.json\nAM linux/docs/evidence/sqlite-strict-any-results-2026-10-03/null-new-focused.log\nM  linux/docs/release-audit-2026-10-03.md\nM  linux/docs/type-contract-strategy.md\nMM linux/docs/value-contract-history.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
-  "tracked_diff_sha256": "39ed9437fff3dfdc50cd9fa02ff9886c781d52eee4d5dae7fe29235eebe20f8d",
-  "started_utc": "2026-10-03T18:34:16.704477+00:00",
+  "commit": "39b7721642c82714c13704ae1cdb0c2fa4759092",
+  "working_tree": "M linux/crates/app/src/ui/browse_tab/value_parse.rs\n M linux/crates/app/tests/support/value_parse.rs\n M linux/crates/drivers/postgres/tests/support/domain_contract.rs\n M linux/docs/evidence/sqlite-strict-any-results-2026-10-03/app-lib-followup.log\n M linux/docs/evidence/sqlite-strict-any-results-2026-10-03/change-contracts-followup.log\n M linux/docs/evidence/sqlite-strict-any-results-2026-10-03/clippy-followup.log\n M linux/docs/release-audit-2026-10-03.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/value-contract-history.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/crates/app/tests/support/sqlite_any_contract.rs\n?? linux/docs/evidence/postgres-three-level-domain-results-2026-10-03/",
+  "tracked_diff_sha256": "f4f40ee738fd1fd4d1333b0cf345a0eeb1f80f6e594f938920887bd55cc86e95",
+  "started_utc": "2026-10-03T18:44:40.275620+00:00",
   "status": "passed",
   "layers": {
     "change-contracts": {
@@ -24,5 +24,5 @@
       ]
     }
   },
-  "finished_utc": "2026-10-03T18:34:17.320438+00:00"
+  "finished_utc": "2026-10-03T18:44:40.891137+00:00"
 }

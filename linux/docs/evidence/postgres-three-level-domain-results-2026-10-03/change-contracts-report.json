@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "39b7721642c82714c13704ae1cdb0c2fa4759092",
+  "working_tree": "M linux/crates/drivers/postgres/tests/support/domain_contract.rs\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
+  "tracked_diff_sha256": "05aa3ed5c1f3cdb4dd7ad01c71a8501c708f09acfeb9002fdd66435be17059da",
+  "started_utc": "2026-10-03T18:41:41.152620+00:00",
+  "status": "passed",
+  "layers": {
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 0.215
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T18:41:41.367932+00:00"
+}

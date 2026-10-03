@@ -665,6 +665,10 @@ mod parser_contract;
 mod tests;
 
 #[cfg(test)]
+#[path = "../../../tests/support/sqlite_any_contract.rs"]
+mod sqlite_any_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
 

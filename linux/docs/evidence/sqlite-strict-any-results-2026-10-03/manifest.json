@@ -50,6 +50,10 @@
       "result": "1 passed; log retained in null-new-focused.log."
     },
     {
+      "argv": "cargo test --locked -p tablepro-app --lib sqlite_strict_any",
+      "result": "2 passed after moving both cases into a dedicated test module; log retained in sqlite-any-focused-followup.log."
+    },
+    {
       "argv": "cargo test --locked -p tablepro-app --lib",
       "result": "437 passed; 0 failed; 20 ignored; log retained in app-lib-followup.log."
     },
@@ -73,13 +77,14 @@
     "layer": "change-contracts"
   },
   "source_fingerprints_sha256": {
-    "crates/app/src/ui/browse_tab/value_parse.rs": "8808fd67874be4a206a401dec5065b70c6a00c8fdb12c66b73ebdac0b3ccf823",
+    "crates/app/src/ui/browse_tab/value_parse.rs": "a5e273af6fa35710938b8b06660bd71aa6e9cb619c748d212693590c564a61ac",
     "crates/app/src/ui/browse_tab/row_ops.rs": "8867e8c473b78a3679b7a3325388c3fc591391f90cec086c5875ab53ec28c79b",
-    "crates/app/tests/support/value_parse.rs": "5f7a14621d6b42257d63df76366b6b86bdb4f812889c332fe9120b022b3a648b",
-    "docs/type-contract-strategy.md": "13777951884a46d79c1734b7e2378d91eb083e60dac16749a68ccd07c1331c47",
-    "docs/value-contracts.md": "0d34d9907e600e8f92acb4623041e4f11caa86e6092fea6f5e08a02cac1a603e",
-    "docs/value-contract-history.md": "4af8fed848861aca46d274215144033753cd94cdc75968e28e71e10f6e3ec58f",
-    "docs/release-audit-2026-10-03.md": "668701285dafd0066bf528d4e7228d0e6a15296fb3ade30931fc974a7a01009e",
+    "crates/app/tests/support/value_parse.rs": "8214d52ff4345a284cf9f4ccaa3e4b28a138a91053f8d4e2538aa7b8d8029212",
+    "crates/app/tests/support/sqlite_any_contract.rs": "d122491ebcd832c4372562139a4219b0749856d14d0199d02c21fffd5b213d59",
+    "docs/type-contract-strategy.md": "125e31cdda191e8ef72cbe137c257fbb0dd965dc854d88eb6e24198216d5674c",
+    "docs/value-contracts.md": "d2d12b8c551d1e21c8c5606877a73be79012e35afe6fb6b2627afc65db26b546",
+    "docs/value-contract-history.md": "b5ef114811dbb2538b0a86129783ed44ba0888c5db7b7b26d052d393cb9bb73f",
+    "docs/release-audit-2026-10-03.md": "c0e8c65a3cc937996d9e914e2f50c2b0270ac7cd2fa6751052b081acc4cfac94",
     "docs/b3-test-scenario-survey.md": "81fd5c7e3ca04574a1e9394a3281bc0e30919aff4c02e360a0f19d9b9c8d902f"
   },
   "retained_evidence_sha256": {
@@ -90,10 +95,11 @@
     "change-contracts-report.json": "c02b57a56e29296d0e37da3d3b0efc8f62dc563fca05726fc0d2f3e2ebc17f44",
     "change-contracts.log": "b2d303a7f18081950ad356c4b77952eafc5c058d1d766b320652766d3864d5ab",
     "null-new-focused.log": "bd560dd9220baf9a5c5e202b2cda5757f22dacc916adedaffc1422751a3c9c82",
-    "app-lib-followup.log": "851e7ce4919a6e6fc4fae134240227f1f684369e316d1bcd895fdb75764d4d0d",
-    "clippy-followup.log": "8d0b5433965dc574d635aeb4998095fc3ad1a6750787dfd0799a2f27e8f186bc",
-    "change-contracts-followup-report.json": "cee19fbdca0715c21b6289d32db3b788d0485ddb0ab694660849b70542b46347",
-    "change-contracts-followup.log": "f426d10bc58333d9fa461ebe9f6442a68260e5ab024295d87d5d9d6aa1f9a421"
+    "app-lib-followup.log": "1d77b6c27fa84974f61f2dfe69a37d1bda1e6bfdc3c42b97436e8d89fc9b202e",
+    "clippy-followup.log": "2db60ebcd75c5b72f4840dde13f6db232e59d1bde96a7fc9d02e5f56007ddacc",
+    "change-contracts-followup-report.json": "2e81ceccb8ff95d3bd3d2da50caba0c3ea0af04acf6b675c72f7bf4f709a0751",
+    "change-contracts-followup.log": "bad59eb2b2d93f5a3b3ae332f2937897d531f211d75927ac10cd27cfa1681945",
+    "sqlite-any-focused-followup.log": "a44a3c3db4643d55c27fc1a384c23e799a2ea39caadbd5db89e4967ac3ccdd32"
   },
   "evidence_normalization": "Captured terminal logs have trailing whitespace removed so the evidence packet passes git diff checks; test results and output content are unchanged.",
   "limitations": [

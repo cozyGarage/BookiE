@@ -4376,6 +4376,18 @@ literal `NULL` label. Structured filters already produce those base-enum casts.
 Automatic inference for raw domain comparisons and other enum
 session/configuration combinations remain open.
 
+## PostgreSQL three-level domain-over-enum chain (2026-10-03)
+
+The nested-domain native fixture now inserts a third domain layer between the
+enum and the table column. The same PostgreSQL 16 contract still resolves the
+qualified enum leaf, preserves the outer domain type in projections and checks
+filters, keyed/draft writes, inferred parameters, invalid-label refusal and
+unchanged rows. The focused selector and all 92 PostgreSQL integration tests
+passed, as did Clippy and `change-contracts`. This extends proof to three
+domain levels; it does not prove arbitrary depth or other enum/session
+configurations. See the
+[three-level evidence packet](evidence/postgres-three-level-domain-results-2026-10-03/manifest.json).
+
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
 A SQLite STRICT table can declare `ANY` while storing different runtime kinds
