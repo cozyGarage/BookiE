@@ -4002,10 +4002,11 @@ native send bytes after import. The first full values run found that Chrono's
 valid leading `+` for year 10000 was rejected; after fixing validation and
 canonicalizing the year before PostgreSQL binding, the focused Docker test
 `date_contract::value_contract_bc_dates_survive_default_csv_import` passed.
-The latest strict GTK+DuckDB values layer passed 196 selected tests across all
-11 suites on the pre-merge dirty worktree based at `d7007a6`; it must be rerun
-after integration. Report:
-[`20261002T235951812293Z-values/report.json`](../target/quality/20261002T235951812293Z-values/report.json).
+The strict GTK+DuckDB values layer passed 196 selected tests across all 11
+suites, with no missing suites, on the merged working tree (`origin/linux` at
+`6346a431c` integrated on top of `cdcfcb0`). This report records a dirty
+worktree before the merge commit:
+[`20261003T002033438424Z-values/report.json`](../target/quality/20261003T002033438424Z-values/report.json).
 
 ## DuckDB extended calendar and TIMESTAMPTZ consumer support (October 3)
 

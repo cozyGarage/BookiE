@@ -48,11 +48,12 @@ this existing-eight-driver stabilization scope.
 This table summarizes source/evidence ownership, not a fresh runtime pass.
 Consult each exact case/SHA; do not promote a whole type or engine from one test.
 
-The latest pre-merge local GTK+DuckDB values layer passed 196 selected tests
-across all 11 suites after the October 3 extended-year CSV fix. Its report is
-[`20261002T235951812293Z-values/report.json`](../target/quality/20261002T235951812293Z-values/report.json)
-on dirty source based at `d7007a6`; rerun affected gates after integrating the
-incoming branch before treating this as merged-baseline evidence.
+The merged working tree passed local quick CI and the strict GTK+DuckDB values
+layer (196 selected tests across all 11 suites, with no missing suites). These
+reports capture the dirty merge worktree with `origin/linux` at `6346a431c`
+integrated on top of local commit `cdcfcb0`, before the merge commit:
+[quick CI](../target/quality/20261003T001826192859Z-quick/report.json) and
+[values layer](../target/quality/20261003T002033438424Z-values/report.json).
 
 ## B3 work packets
 
