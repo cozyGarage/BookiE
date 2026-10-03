@@ -4257,10 +4257,26 @@ Unicode, SQL NULL, marker-shaped labels, formula-shaped text in raw mode, and
 `pg_typeof`. Formula-shaped text is prefixed when spreadsheet-safe export is on;
 turning it off preserves the literal value for import. The ordinary blank
 format remains safe: enum import refuses it as ambiguous before any write.
-Clipboard CSV formatting and broader enum format/session coverage remain
-separate cases. This does not add an MCP import tool.
+This does not add an MCP import tool. The grid context-menu CSV serializer now
+chooses a collision-free NULL marker so SQL NULL, an empty enum label, literal
+`NULL`, and marker-shaped labels remain distinct in clipboard output. Formula
+sanitization remains enabled, so clipboard output is not a lossless restore
+format; see the [clipboard serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
+Other enum format/session coverage remains open.
 Commands and fingerprints are in the
 [PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### Grid clipboard CSV preserves enum NULL and empty text (October 4)
+
+The grid context-menu CSV serializer now uses a NULL marker selected to be
+absent from the copied rows and keeps formula sanitization enabled. Its pure
+app regression covers literal `NULL`, an empty enum label, SQL NULL, collisions
+with `\\N` and `\\NN`, and formula-shaped text, with and without headers. The
+focused test and all 441 non-ignored app library tests pass; 20 tests remain
+ignored. Strict app Clippy and formatting pass. This verifies serialization
+only; OS clipboard delivery, spreadsheet paste/import, and lossless treatment
+of formula-shaped labels remain unverified. See the
+[clipboard CSV evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
 
 ## Spreadsheet-safe PostgreSQL enum CSV is not reversible (October 3)
 

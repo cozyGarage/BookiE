@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "cfc942ca54efd49b8263bfc4085fc9e5ee93d988",
+  "case": "Grid context-menu CSV serialization for enum-shaped values",
+  "change": "The grid CSV serializer now disables ambiguous blank NULL output and chooses a null marker absent from the copied rows.",
+  "contract": [
+    "Literal text NULL, an empty enum label and SQL NULL have distinct CSV fields.",
+    "A marker collision with existing values \\N and \\NN advances to the next unused marker \\NNN.",
+    "Formula-shaped text remains spreadsheet-sanitized in clipboard output.",
+    "Header and headerless context-menu CSV paths use the same serializer contract."
+  ],
+  "oracle": "Exact serialized CSV bytes from the app grid serializer, using a PostgreSQL-qualified enum ColumnInfo and label/NULL values.",
+  "scope_limit": "Pure serializer proof only. It does not exercise a native PostgreSQL query, OS clipboard delivery, spreadsheet paste/import, or lossless restoration of formula-shaped values.",
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib clipboard_csv_keeps_null_empty_enum_and_marker_labels_distinct",
+      "result": "1 passed",
+      "log": "focused.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib",
+      "result": "441 passed, 20 ignored",
+      "log": "app-lib-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "7a076cb9f50a9dee92442b753a8d16532ab8119eced3f4fbf6e32084973ce358",
+    "app-lib-suite.txt": "68e3ff941b2493f21efc96fd43365c3f9c2adfa78f9e5ad5b5f5a56f41c040f2",
+    "clippy.txt": "9b90b58a741d271067bfb8593b9ef77357fa15e26ad589fa261011892fff2045",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Formula sanitization may alter formula-shaped enum labels, as documented for spreadsheet-safe output.",
+    "OS clipboard and spreadsheet paste/import acceptance remain unverified."
+  ]
+}

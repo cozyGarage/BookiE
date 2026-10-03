@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-03; each new case links to its source-fingerprinted
+and acceptance. Updated 2026-10-04; each new case links to its source-fingerprinted
 evidence packet, and this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
@@ -21,7 +21,7 @@ source/SHA attribution; this summary does not certify the current tree.
 | Redis | RESP3 tagged nested values/binary kinds, caps and persistent-stream refusal | Remaining protocol/native consumer coverage; display conversion does not prove subscription support |
 | MongoDB | Canonical Extended JSON, BSON width/subtypes and typed keyed edits; browse metadata and retained page rows come from one collection cursor; an off-page type change observed later in that cursor marks the column `mixed` and the visible rows read-only; a failpoint test asserts no second page `find`; explicit BSON null and missing sparse-document fields have distinct result markers | Full-scan cost, writes to documents already observed during the cursor, `run_find`'s separate schema/query reads, remaining consumer combinations and installed editing |
 | DuckDB (optional) | Wide integers, intervals, DuckDB enum result/literal/bound labels and app keyed edits (blank remains SQL NULL; `''` enters the empty label; doubled quotes decode), and extended DATE/TIMESTAMP/TIMESTAMPTZ text fallbacks; tested nested refusals | Remaining nested combinations, native sub-microsecond bindings and installed GTK editing; text transport is not native binding |
-| Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases | One missing format/type/configuration boundary, native kind after writes and refused-operation postconditions |
+| Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases; grid context-menu CSV uses a collision-free SQL NULL marker ([serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json)) | Remaining format/type/configuration boundaries, native kind after writes, clipboard/spreadsheet parity and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
 The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and

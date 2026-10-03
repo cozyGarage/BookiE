@@ -149,6 +149,10 @@ operators select the exact target rows after transaction-local `SET LOCAL search
 shadow-domain rows and their siblings remain unchanged. See the [domain-over-enum
 shadow evidence](evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json)
 and its [direct operator matrix](evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
+The grid context-menu CSV serializer selects a collision-free SQL NULL marker
+so empty enum labels, literal `NULL`, SQL NULL and marker-shaped labels remain
+distinct. Formula sanitization and spreadsheet/restore parity remain open; see
+[clipboard serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
 
 The three-level domain chain now checks inferred direct text and SQL NULL
 parameters for both NULL-safe distinctness operators, with leaf enum and outer

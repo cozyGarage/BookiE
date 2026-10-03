@@ -6,7 +6,7 @@ Implementation is authorized; no 0.2 release is approved.
 During consolidation, `573435766` merged F4/F9 and `8c0f17494` updated the B4 board;
 they are preserved in this checkout. The history files retain the earlier `0cf70382e` snapshot.
 
-## Current continuation plan: 2026-10-03
+## Current continuation plan: 2026-10-04
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -39,7 +39,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused fixes and native/consumer evidence recorded; MySQL zero-row metadata/bounded delivery and PostgreSQL custom-enum result/write cases have local regressions; still open pending the broader type/consumer matrix | [Type/consumer board](type-contract-strategy.md), [B3 findings](b3-review-2026-10-01.md), case evidence and mutation triage |
+| B3 type/value contracts | Focused fixes and native/consumer evidence recorded; PostgreSQL shadowed domain-over-enum query operators and collision-free enum clipboard CSV serialization now have regressions; still open pending the broader engine/type/consumer/configuration matrix | [Type/consumer board](type-contract-strategy.md), [B3 findings](b3-review-2026-10-01.md), case evidence and mutation triage |
 | B4 transport/sessions | Policy, daemon cache refusal, editor callback/retirement and awaited cleanup patches, built-in host consent and GUI uncertainty split merged through `6346a431c` | [Current B4 board](b4-task-board.md#b4-continuation-status-october-3): F4/F9, F6 and GUI F8 implementation are merged; MySQL DDL refusal, honest rollback reporting and the MyISAM-trigger rollback boundary have local regressions; headless generation/retirement parity, TLS/daemon/route/audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
