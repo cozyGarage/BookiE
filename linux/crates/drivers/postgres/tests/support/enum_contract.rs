@@ -1365,12 +1365,12 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
             &[Value::Text("paused".into())],
         )
         .await
-        .expect_err("ambiguous parameter type must not compare enum with text");
+        .expect_err("ambiguous parameter type must remain a query error");
     assert!(matches!(
         ambiguous_driver,
         tablepro_core::DriverError::Query {
             sqlstate: Some(code), ..
-        } if code == "42883"
+        } if code == "42P08"
     ));
 
     let explicitly_typed = connection

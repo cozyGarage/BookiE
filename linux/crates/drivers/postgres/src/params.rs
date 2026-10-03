@@ -19,14 +19,30 @@ pub(super) async fn describe_query_parameters(
     let described_sql = sqlx::AssertSqlSafe(described_sql.as_str()).into_sql_str();
     let statement = match connection.prepare(described_sql.clone()).await {
         Ok(statement) => statement,
-        Err(sqlx::Error::Database(error)) if matches!(error.code().as_deref(), Some("42P08" | "42P18")) => {
+        Err(error) => {
+            let ambiguous = error
+                .as_database_error()
+                .and_then(|error| error.code())
+                .is_some_and(|code| matches!(code.as_ref(), "42P08" | "42P18"));
+            if !ambiguous {
+                return Err(map_sqlx_error(error));
+            }
             let parameter_types = pg_parameter_type_infos(params);
-            connection
-                .prepare_with(described_sql, &parameter_types)
-                .await
-                .map_err(map_sqlx_error)?
+            match connection.prepare_with(described_sql, &parameter_types).await {
+                Ok(statement) => statement,
+                Err(fallback_error) => {
+                    let text_operator_mismatch = fallback_error
+                        .as_database_error()
+                        .and_then(|error| error.code())
+                        .is_some_and(|code| code.as_ref() == "42883");
+                    return Err(map_sqlx_error(if text_operator_mismatch {
+                        error
+                    } else {
+                        fallback_error
+                    }));
+                }
+            }
         }
-        Err(error) => return Err(map_sqlx_error(error)),
     };
     let parameters = statement
         .parameters()
