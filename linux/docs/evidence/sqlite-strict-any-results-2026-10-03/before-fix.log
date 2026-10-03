@@ -1,0 +1,36 @@
+
+running 1 test
+test ui::browse_tab::value_parse::tests::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class ... FAILED
+
+failures:
+
+---- ui::browse_tab::value_parse::tests::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class stdout ----
+
+thread 'ui::browse_tab::value_parse::tests::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class' (3216258) panicked at crates/app/src/ui/browse_tab/../../../tests/support/value_parse.rs:106:5:
+assertion `left == right` failed
+  left: [[Int(1), Text("text"), Text("2.75")], [Int(2), Text("text"), Text("007")], [Int(3), Text("text"), Text("43")], [Int(4), Text("null"), Null]]
+ right: [[Int(1), Text("real"), Float(2.75)], [Int(2), Text("text"), Text("007")], [Int(3), Text("integer"), Int(43)], [Int(4), Text("null"), Null]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ui::browse_tab::value_parse::tests::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-policy v0.1.0 (/home/trung/Projects/tablepro/linux/crates/policy)
+   Compiling tablepro-driver-clickhouse v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/clickhouse)
+   Compiling tablepro-driver-sqlite v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/sqlite)
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+   Compiling tablepro-driver-redis v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/redis)
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
+   Compiling tablepro-driver-mssql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mssql)
+   Compiling tablepro-storage v0.1.0 (/home/trung/Projects/tablepro/linux/crates/storage)
+   Compiling tablepro-transport v0.1.0 (/home/trung/Projects/tablepro/linux/crates/transport)
+   Compiling tablepro-mcp v0.1.0 (/home/trung/Projects/tablepro/linux/crates/mcp)
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.12s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+error: test failed, to rerun pass `-p tablepro-app --lib`

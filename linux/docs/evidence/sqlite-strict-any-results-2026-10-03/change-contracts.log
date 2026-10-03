@@ -1,0 +1,49 @@
+Change contract evidence: /home/trung/Projects/tablepro/linux/target/quality/20261003T182239343426Z-change-contracts/report.json
+Mapped source files:
+- tablepro-app: exact regressions
+  $ cargo test --locked -p tablepro-app --lib ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values -- --exact --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+
+running 1 test
+test ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_blanks_database_owned_cells_and_preserves_exact_values ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+  $ cargo test --locked -p tablepro-app --lib ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_carries_the_full_long_text_into_the_insert_not_the_display_text -- --exact --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+
+running 1 test
+test ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_carries_the_full_long_text_into_the_insert_not_the_display_text ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+  $ cargo test --locked -p tablepro-app --lib ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_a_source_with_wrong_cell_count -- --exact --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+
+running 1 test
+test ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_a_source_with_wrong_cell_count ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+  $ cargo test --locked -p tablepro-app --lib ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_an_undecodable_cell_instead_of_turning_it_into_null -- --exact --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+
+running 1 test
+test ui::browse_tab::row_ops::row_identity_tests::duplicating_a_row_refuses_an_undecodable_cell_instead_of_turning_it_into_null ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+  $ cargo test --locked -p tablepro-app --lib ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior -- --exact --test-threads=1
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-40541dde40605043)
+
+running 1 test
+test ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.00s
+
+change-contracts: passed; 5 focused test command(s) completed

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "e0c2322041d248ecccafabe9e2c43281241fa7f3",
+  "working_tree": "M linux/crates/app/src/ui/browse_tab/row_ops.rs\n M linux/crates/app/src/ui/browse_tab/value_parse.rs\n M linux/crates/app/tests/support/value_parse.rs\n M linux/docs/b3-test-scenario-survey.md\n M linux/docs/release-audit-2026-10-03.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/value-contract-history.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
+  "tracked_diff_sha256": "cf0e91080b6bc9bd109c7d5af83d0e61e774eaaac6201e7db87385951a7bb33d",
+  "started_utc": "2026-10-03T18:22:39.188843+00:00",
+  "status": "passed",
+  "layers": {
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 2.22
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T18:22:41.409182+00:00"
+}

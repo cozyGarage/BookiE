@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "e0c2322041d248ecccafabe9e2c43281241fa7f3",
+  "working_tree": "Local checks ran against the dirty source tree recorded below; this is development evidence, not hosted CI, installed GTK acceptance or release qualification.",
+  "scope": [
+    "Preserve an existing SQLite STRICT ANY cell's INTEGER, REAL or TEXT runtime storage class when edited through the app grid parser and keyed-update path.",
+    "Keep an untouched NULL cell NULL; policy for editing NULL or newly inserted ANY cells remains open."
+  ],
+  "regression": {
+    "selector": "sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class",
+    "fixture": "In-memory SQLite STRICT table with REAL, TEXT, INTEGER and NULL values.",
+    "path": "App grid-cell parser, keyed-update SQL builder, and SQLite driver write; the test directly invokes the parser and builder rather than GTK event handling.",
+    "oracle": "SQLite typeof(value), returned stored value, and unchanged NULL row.",
+    "initial_failure": "Before the parser change, edited REAL and INTEGER values became TEXT; the focused test failed.",
+    "final_result": "1 passed; full tablepro-app library suite 436 passed, 20 ignored."
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class",
+      "result": "1 passed after fix; before-fix failure retained."
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib",
+      "result": "436 passed; 0 failed; 20 ignored."
+    },
+    {
+      "argv": "cargo clippy --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed."
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py change-contracts",
+      "result": "passed; report and layer output retained."
+    },
+    {
+      "argv": "cargo fmt --all -- --check; python3 scripts/check-function-size.py; bash scripts/check-file-size.sh; git diff --check",
+      "result": "passed."
+    }
+  ],
+  "layer_report": {
+    "path": "change-contracts-report.json",
+    "status": "passed",
+    "layer": "change-contracts"
+  },
+  "source_fingerprints_sha256": {
+    "crates/app/src/ui/browse_tab/value_parse.rs": "79cc3fdaa618612f24e229d94eb37383847814d07710ec5705b0de9b46729c1b",
+    "crates/app/src/ui/browse_tab/row_ops.rs": "8867e8c473b78a3679b7a3325388c3fc591391f90cec086c5875ab53ec28c79b",
+    "crates/app/tests/support/value_parse.rs": "331f422ab0e66a97d3aa8ef12d0c2439689a7f15f689e698e23a65d39933c205",
+    "docs/type-contract-strategy.md": "8fc1f9dc485ac549df83698b74ae1e093f1d60cee877f99c7ddbb133574dfb5c",
+    "docs/value-contracts.md": "0d34d9907e600e8f92acb4623041e4f11caa86e6092fea6f5e08a02cac1a603e",
+    "docs/value-contract-history.md": "85ef48837a228ef7825c4abd1595529efd1427b9061a819804ea4d2cd1ebc5b5",
+    "docs/release-audit-2026-10-03.md": "86f767f8e304f855328098126a58092aef2ee1d63064150c9dbd6ab21de72084",
+    "docs/b3-test-scenario-survey.md": "47c30c1aba6e5e8bbc3373d41f9e61dedff340c9bcee8fdc8957164227ae9616"
+  },
+  "retained_evidence_sha256": {
+    "before-fix.log": "c88ecbf90d0eb1e2c035f9cf3b14c704e0668038bb8fad647b63114d9fea4372",
+    "focused.log": "13f08ee03926fbc1b2c857fcad528414870eed9f15d8bc37a9adeb562312b3f3",
+    "app-lib.log": "6b499b4f20a4d76a66e4e89eb12b3758d61bcfe2ced8109ee0e1d4ab615035d9",
+    "clippy.log": "8a2933ae25e59188be988ea6218274cb341f13d8bc4b533f57b12ececd4be8b3",
+    "change-contracts-report.json": "c02b57a56e29296d0e37da3d3b0efc8f62dc563fca05726fc0d2f3e2ebc17f44",
+    "change-contracts.log": "b2d303a7f18081950ad356c4b77952eafc5c058d1d766b320652766d3864d5ab"
+  },
+  "evidence_normalization": "Captured terminal logs have trailing whitespace removed so the evidence packet passes git diff checks; test results and output content are unchanged.",
+  "limitations": [
+    "The test directly exercises parsing, keyed SQL generation, SQLite writes and native type/value checks; it does not drive GTK event handling or verify an installed grid.",
+    "NULL/new-cell edit policy for SQLite ANY remains open.",
+    "No hosted GitHub Actions, package, Wayland, VM or release-candidate qualification is represented."
+  ]
+}

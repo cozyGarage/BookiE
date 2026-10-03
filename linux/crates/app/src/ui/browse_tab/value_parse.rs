@@ -90,6 +90,26 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     parse_input_for_column(text, col)
 }
 
+pub(super) fn parse_input_for_grid_cell(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    driver_id: &str,
+    current_value: Option<&Value>,
+) -> Result<Value, String> {
+    if !text.is_empty()
+        && driver_id == "sqlite"
+        && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
+    {
+        match current_value {
+            Some(Value::Int(_)) => return parse_int_value(text.trim()),
+            Some(Value::Float(_)) => return parse_float_value(text.trim()),
+            Some(Value::Text(_)) => return Ok(Value::Text(text.to_owned())),
+            _ => {}
+        }
+    }
+    parse_input_for_driver(text, col, driver_id)
+}
+
 fn parse_postgres_extended_temporal_input(
     text: &str,
     col: Option<&ColumnInfo>,

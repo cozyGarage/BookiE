@@ -258,8 +258,9 @@ impl BrowseTab {
         // Empty input on a nullable column becomes Value::Null
         // (canonical SQL convention for "user cleared the
         // cell"). Non-empty input is parsed against the
-        // column's data_type so every native type binds at
-        // its declared kind instead of falling back to text.
+        // column's data_type. SQLite STRICT ANY cells also use
+        // their current runtime value kind, since the declaration
+        // intentionally permits multiple storage classes.
         //
         // On parse failure the edit is rejected: a toast
         // explains why and `refresh_row` forces a re-bind so
@@ -283,7 +284,9 @@ impl BrowseTab {
             _ => normalize_single_line_input(&new_value),
         };
         let col = self.current_columns.get(col_index);
-        let new = match parse_input_for_driver(&normalized, col, &self.driver_id) {
+        let row_obj = self.row_object_at(row_position);
+        let current_value = row_obj.as_ref().map(|row| row.cell_value(col_index));
+        let new = match parse_input_for_grid_cell(&normalized, col, &self.driver_id, current_value.as_ref()) {
             Ok(v) => v,
             Err(message) => {
                 let _ = sender.output(BrowseTabOutput::ShowToast(message));
@@ -291,7 +294,6 @@ impl BrowseTab {
                 return;
             }
         };
-        let row_obj = self.row_object_at(row_position);
         if let Some(row_obj) = &row_obj
             && let Some(draft_id) = row_obj.draft_id()
         {

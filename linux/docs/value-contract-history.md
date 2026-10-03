@@ -4375,3 +4375,23 @@ explicit and verifies that casting both sides to the base enum returns the
 literal `NULL` label. Structured filters already produce those base-enum casts.
 Automatic inference for raw domain comparisons and other enum
 session/configuration combinations remain open.
+
+## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
+
+A SQLite STRICT table can declare `ANY` while storing different runtime kinds
+in one column. Before the fix, the app parsed every `ANY` grid edit as text: a
+REAL value edited from `1.5` to `2.75` became SQLite TEXT, and an INTEGER edit
+also became TEXT. The grid now uses the existing cell's `Value` kind when
+parsing an edit to an SQLite `ANY` column: INTEGER remains integer, REAL remains
+real, and TEXT remains text. A native `typeof(value)` query checks the persisted
+kind and value for each row. NULL rows are left untouched because they have no
+existing storage kind to preserve; null/new `ANY` cell input remains a separate
+policy case.
+
+The SQLite-backed app regression directly exercises the grid-cell parser,
+keyed-update builder and driver write; it does not drive GTK event handling.
+The app-library suite passed 436 tests with 20 ignored, including
+`sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class`.
+Clippy and the mapped `change-contracts` layer passed. The failing-first log,
+full app test log, local layer report, and source fingerprints are in the
+[STRICT ANY evidence packet](evidence/sqlite-strict-any-results-2026-10-03/manifest.json).
