@@ -389,6 +389,38 @@ async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type(
         ]
     );
 
+    for (operator, parameter, expected) in [
+        ("<", "paused", [Some(true), Some(false), None]),
+        ("<=", "paused", [Some(true), Some(true), None]),
+        (">", "ready", [Some(false), Some(true), None]),
+        (">=", "ready", [Some(true), Some(true), None]),
+    ] {
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, status::value_contract_domain_query.state {operator} $1, \
+                     pg_typeof($1)::text, pg_typeof(status)::text \
+                     FROM value_contract_domain_query.rows ORDER BY id"
+                ),
+                &[Value::Text(parameter.into())],
+            )
+            .await
+            .unwrap();
+        let expected = expected
+            .into_iter()
+            .enumerate()
+            .map(|(index, comparison)| {
+                vec![
+                    Value::Int(index as i64 + 1),
+                    comparison.map_or(Value::Null, Value::Bool),
+                    Value::Text("value_contract_domain_query.state".into()),
+                    Value::Text("value_contract_domain_query.state_domain".into()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(result.rows, expected, "operator {operator}");
+    }
+
     let between = connection
         .query_params(
             "SELECT id, status::value_contract_domain_query.state BETWEEN $1 AND $2, \
