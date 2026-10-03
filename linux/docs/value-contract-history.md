@@ -2901,6 +2901,16 @@ MariaDB truncates to `.789` with `TIME_ROUND_FRACTIONAL` absent and rounds to
 `.790` with it set. Both bound and generated-literal paths assert the returned
 time, cast text and native `MICROSECOND()` value. See the [native evidence](evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB exact-half DATETIME and TIMESTAMP boundaries (2026-10-04)
+
+The native cases insert `2024-01-02 03:04:05.789500` into `DATETIME(3)` and
+`TIMESTAMP(3)`. MySQL rounds to `.790` with `TIME_TRUNCATE_FRACTIONAL` absent
+and truncates to `.789` with it enabled; MariaDB truncates to `.789` by default
+and rounds to `.790` with `TIME_ROUND_FRACTIONAL` enabled. Both bound and
+generated-literal paths assert the stored native value, cast text and
+`MICROSECOND()` result. TIMESTAMP runs set the session timezone to UTC and
+check epoch microseconds. See the [native evidence](evidence/mysql-fractional-half-boundary-matrix-results-2026-10-04/manifest.json).
+
 ### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
 
 The paired Docker cases apply the same mode matrix to a `DATETIME(3)`
