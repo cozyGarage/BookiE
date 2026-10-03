@@ -166,6 +166,44 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
 }
 
 #[tokio::test]
+async fn computed_coalesce_over_strict_any_keeps_fallback_metadata_and_storage_classes() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL), (3, 'ready')")
+        .await
+        .unwrap();
+
+    let sql = "SELECT coalesce(value, 'fallback') AS result, \
+                      typeof(coalesce(value, 'fallback')) AS storage_class \
+               FROM flexible ORDER BY id";
+    let expected = vec![
+        vec![Value::Int(42), Value::Text("integer".into())],
+        vec![Value::Text("fallback".into()), Value::Text("text".into())],
+        vec![Value::Text("ready".into()), Value::Text("text".into())],
+    ];
+
+    let result = connection.query(sql).await.unwrap();
+    assert_eq!(result.columns[0].data_type, "NULL");
+    assert_eq!(result.rows, expected);
+
+    let bound = connection
+        .query_params(
+            "SELECT coalesce(value, 'fallback') AS result, \
+                    typeof(coalesce(value, 'fallback')) AS storage_class \
+             FROM flexible WHERE id > ? ORDER BY id",
+            &[Value::Int(0)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound.columns[0].data_type, "NULL");
+    assert_eq!(bound.rows, expected);
+}
+
+#[tokio::test]
 async fn direct_query_columns_resolve_unambiguous_attached_any_origins() {
     let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
     let mut transaction = connection.begin().await.unwrap();
