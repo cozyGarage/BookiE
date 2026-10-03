@@ -5,7 +5,10 @@ use std::time::Duration;
 use async_trait::async_trait;
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteRow};
-use sqlx::{Column, Pool, Row, Sqlite, SqliteConnection as SqlxSqliteConnection, TypeInfo, ValueRef};
+use sqlx::{
+    Column, Executor as SqlxExecutor, Pool, Row, SqlSafeStr, Sqlite, SqliteConnection as SqlxSqliteConnection,
+    Statement as SqlxStatement, TypeInfo, ValueRef,
+};
 
 use futures::stream::StreamExt;
 
@@ -459,18 +462,17 @@ impl tablepro_core::Transaction for SqliteTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
+        let statement = tx
+            .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+            .await
+            .map_err(map_sqlx_error)?;
+        let columns = result_columns(tx, statement.columns()).await;
+        drop(statement);
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut **tx)
             .await
             .map_err(map_sqlx_error)?;
-        if rows.is_empty() {
-            return Ok(QueryResult {
-                columns: Vec::new(),
-                rows: Vec::new(),
-                truncated: false,
-            });
-        }
-        Ok(rows_into_result(tx, &rows, false).await?)
+        Ok(rows_into_result(columns, &rows, false))
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
@@ -509,6 +511,12 @@ async fn stream_into_result(
     sql: &str,
     limit: usize,
 ) -> Result<QueryResult, DriverError> {
+    let statement = connection
+        .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+        .await
+        .map_err(map_sqlx_error)?;
+    let columns = result_columns(connection, statement.columns()).await;
+    drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
     let mut collected: Vec<SqliteRow> = Vec::new();
     let mut truncated = false;
@@ -521,23 +529,14 @@ async fn stream_into_result(
         collected.push(row);
     }
     drop(stream);
-    rows_into_result(connection, &collected, truncated).await
+    Ok(rows_into_result(columns, &collected, truncated))
 }
 
-async fn rows_into_result(
+async fn result_columns(
     connection: &mut SqlxSqliteConnection,
-    collected: &[SqliteRow],
-    truncated: bool,
-) -> Result<QueryResult, DriverError> {
-    let Some(first) = collected.first() else {
-        return Ok(QueryResult {
-            columns: Vec::new(),
-            rows: Vec::new(),
-            truncated,
-        });
-    };
-    let mut columns: Vec<ColumnInfo> = first
-        .columns()
+    source_columns: &[sqlx::sqlite::SqliteColumn],
+) -> Vec<ColumnInfo> {
+    let mut columns: Vec<ColumnInfo> = source_columns
         .iter()
         .map(|c| ColumnInfo {
             name: c.name().to_string(),
@@ -552,8 +551,7 @@ async fn rows_into_result(
             enum_type: None,
         })
         .collect();
-    let unknown_origins = first
-        .columns()
+    let unknown_origins = source_columns
         .iter()
         .enumerate()
         .filter_map(|(index, column)| {
@@ -581,15 +579,19 @@ async fn rows_into_result(
             }
         }
     }
+    columns
+}
+
+fn rows_into_result(columns: Vec<ColumnInfo>, collected: &[SqliteRow], truncated: bool) -> QueryResult {
     let rows: Vec<Vec<Value>> = collected
         .iter()
         .map(|r| (0..columns.len()).map(|i| extract_value(r, i)).collect())
         .collect();
-    Ok(QueryResult {
+    QueryResult {
         columns,
         rows,
         truncated,
-    })
+    }
 }
 
 async fn declared_table_columns(connection: &mut SqlxSqliteConnection, table: &str) -> HashMap<String, String> {
@@ -733,6 +735,12 @@ async fn params_into_result(
     if params.is_empty() {
         return stream_into_result(connection, sql, limit).await;
     }
+    let statement = connection
+        .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+        .await
+        .map_err(map_sqlx_error)?;
+    let columns = result_columns(connection, statement.columns()).await;
+    drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
     let mut collected: Vec<SqliteRow> = Vec::new();
@@ -746,7 +754,7 @@ async fn params_into_result(
         collected.push(row);
     }
     drop(stream);
-    rows_into_result(connection, &collected, truncated).await
+    Ok(rows_into_result(columns, &collected, truncated))
 }
 
 async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError>

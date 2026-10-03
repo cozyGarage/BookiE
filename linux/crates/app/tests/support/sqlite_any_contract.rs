@@ -228,6 +228,13 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
 
     let source_result = connection.query("SELECT value FROM source ORDER BY id").await.unwrap();
     assert_eq!(source_result.columns[0].data_type, "ANY");
+    let empty_result = connection.query("SELECT value FROM source WHERE 0").await.unwrap();
+    assert_eq!(empty_result.columns[0].data_type, "ANY");
+    assert!(empty_result.rows.is_empty());
+    assert_eq!(
+        render_csv(&empty_result.columns, &empty_result.rows, &CsvOptions::default()),
+        "value\n"
+    );
     let source_rows = source_result.rows;
     let null_marker = unique_csv_null_marker(&source_rows);
     let csv = render_csv(

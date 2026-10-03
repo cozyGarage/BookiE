@@ -79,11 +79,25 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
         .unwrap();
     assert_eq!(typed.columns[0].data_type, "ANY");
     assert_eq!(typed.rows, vec![vec![Value::Int(42)]]);
+    let empty = connection
+        .query("SELECT value AS result FROM flexible WHERE id = 99")
+        .await
+        .unwrap();
+    assert_eq!(empty.columns[0].name, "result");
+    assert_eq!(empty.columns[0].data_type, "ANY");
+    assert!(empty.rows.is_empty());
     let nullable = connection
         .query_params("SELECT value AS result FROM flexible WHERE id = ?", &[Value::Int(2)])
         .await
         .unwrap();
+    assert_eq!(nullable.columns[0].data_type, "ANY");
     assert_eq!(nullable.rows, vec![vec![Value::Null]]);
+    let empty_bound = connection
+        .query_params("SELECT value AS result FROM flexible WHERE id = ?", &[Value::Int(99)])
+        .await
+        .unwrap();
+    assert_eq!(empty_bound.columns[0].data_type, "ANY");
+    assert!(empty_bound.rows.is_empty());
 
     let expression = connection
         .query("SELECT value + 1 AS result FROM flexible WHERE id = 1")
@@ -99,6 +113,12 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
         .unwrap();
     assert_eq!(result.columns[0].data_type, "ANY");
     assert_eq!(result.rows, vec![vec![Value::Int(42)]]);
+    let empty = transaction
+        .query("SELECT value AS result FROM flexible WHERE id = 99")
+        .await
+        .unwrap();
+    assert_eq!(empty.columns[0].data_type, "ANY");
+    assert!(empty.rows.is_empty());
     transaction.rollback().await.unwrap();
 }
 
