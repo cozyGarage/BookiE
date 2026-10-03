@@ -106,6 +106,9 @@ pub(super) fn parse_input_for_grid_cell(
             Some(Value::Text(_)) => return Ok(Value::Text(text.to_owned())),
             _ => {}
         }
+        // A NULL or draft cell has no runtime kind to preserve. Keep its
+        // non-empty input as text instead of guessing that numeric-looking
+        // text means the user intended a different storage class.
     }
     parse_input_for_driver(text, col, driver_id)
 }
