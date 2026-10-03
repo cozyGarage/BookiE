@@ -1431,3 +1431,175 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         ]]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
+    let (_container, opts) = start_pg().await;
+    let setup = connect(opts.clone()).await;
+    setup.execute("CREATE SCHEMA enum_domain_shadow_a").await.unwrap();
+    setup.execute("CREATE SCHEMA enum_domain_shadow_b").await.unwrap();
+    setup
+        .execute("CREATE TYPE enum_domain_shadow_a.status_kind AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE TYPE enum_domain_shadow_b.status_kind AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE DOMAIN enum_domain_shadow_a.status_domain AS enum_domain_shadow_a.status_kind")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE DOMAIN enum_domain_shadow_b.status_domain AS enum_domain_shadow_b.status_kind")
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TABLE enum_domain_shadow_a.items \
+             (id INT PRIMARY KEY, status enum_domain_shadow_a.status_domain, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TABLE enum_domain_shadow_b.items \
+             (id INT PRIMARY KEY, status enum_domain_shadow_b.status_domain, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "INSERT INTO enum_domain_shadow_a.items VALUES \
+             (1, 'ready', 'shadow'), (2, NULL, 'shadow-null')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "INSERT INTO enum_domain_shadow_b.items VALUES \
+             (1, 'paused', 'target'), (2, NULL, 'target-null')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO enum_domain_shadow_a")
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = connect(opts).await;
+    assert_eq!(
+        connection.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("enum_domain_shadow_a".into())]]
+    );
+    let columns = connection
+        .fetch_columns(Some("enum_domain_shadow_b"), "items")
+        .await
+        .unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "enum_domain_shadow_b".into(),
+            name: "status_kind".into(),
+        })
+    );
+
+    let filters = FilterSet {
+        rules: vec![FilterRule {
+            column: "status".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("paused".into())),
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+        .unwrap()
+        .unwrap();
+    let filtered = connection
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM enum_domain_shadow_b.items WHERE {where_sql}"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("enum_domain_shadow_b.status_domain".into()),
+        ]]
+    );
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO enum_domain_shadow_a")
+        .await
+        .unwrap();
+    let text_parameter = transaction
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM enum_domain_shadow_b.items \
+             WHERE status::enum_domain_shadow_b.status_kind = $1",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        text_parameter.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("enum_domain_shadow_b.status_domain".into()),
+        ]]
+    );
+
+    let null_parameter = transaction
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM enum_domain_shadow_b.items \
+             WHERE status::enum_domain_shadow_b.status_kind IS NOT DISTINCT FROM $1 ORDER BY id",
+            &[Value::Null],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        null_parameter.rows,
+        vec![vec![
+            Value::Int(2),
+            Value::Null,
+            Value::Text("enum_domain_shadow_b.status_domain".into()),
+        ]]
+    );
+    transaction.rollback().await.unwrap();
+
+    let shadow = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text, sibling \
+                FROM enum_domain_shadow_a.items ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        shadow.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("ready".into()),
+                Value::Text("status_domain".into()),
+                Value::Text("shadow".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Text("status_domain".into()),
+                Value::Text("shadow-null".into()),
+            ],
+        ]
+    );
+}
