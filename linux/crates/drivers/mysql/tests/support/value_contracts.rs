@@ -559,6 +559,145 @@ async fn mariadb_timestamp_fractional_half_millisecond_boundary_respects_round_m
     .await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_time_fractional_precision_matrix_respects_truncate_mode() {
+    let (_container, options) = start_mysql().await;
+    assert_time_fractional_precision_matrix(&options, "TIME_TRUNCATE_FRACTIONAL", true, false).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_time_fractional_precision_matrix_respects_round_mode() {
+    let (_container, options) = start_mariadb().await;
+    assert_time_fractional_precision_matrix(&options, "TIME_ROUND_FRACTIONAL", false, true).await;
+}
+
+async fn assert_time_fractional_precision_matrix(
+    options: &ConnectOptions,
+    alternate_mode: &str,
+    baseline_rounds: bool,
+    alternate_rounds: bool,
+) {
+    let conn = connect(options.clone()).await;
+    let precisions = 0..=6;
+    let definitions = precisions
+        .map(|precision| format!("value_{precision} TIME({precision}) NOT NULL"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    conn.execute(&format!(
+        "CREATE TABLE fractional_precision_values (id INT PRIMARY KEY, {definitions})"
+    ))
+    .await
+    .unwrap();
+    let columns = conn.fetch_columns(None, "fractional_precision_values").await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled("SET SESSION time_zone = '+00:00'", &[], &control)
+        .await
+        .unwrap();
+
+    let input = Value::Time(micros_time(12, 34, 56, 789_956));
+    for (mode, bound_id, literal_id) in [("", 1, 2), (alternate_mode, 3, 4)] {
+        session
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .await
+            .unwrap();
+        for (id, literal) in [(bound_id, false), (literal_id, true)] {
+            let mut row = vec![Value::Int(id)];
+            row.extend((0..=6).map(|_| input.clone()));
+            if literal {
+                let statement = tablepro_core::sql_literal::build_insert_literal(
+                    "mysql",
+                    None,
+                    "fractional_precision_values",
+                    &columns,
+                    &row,
+                )
+                .unwrap();
+                session
+                    .query_params_controlled(&statement, &[], &control)
+                    .await
+                    .unwrap();
+            } else {
+                let placeholders = (0..row.len()).map(|_| "?").collect::<Vec<_>>().join(", ");
+                session
+                    .query_params_controlled(
+                        &format!("INSERT INTO fractional_precision_values VALUES ({placeholders})"),
+                        &row,
+                        &control,
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
+    let projections = (0..=6)
+        .flat_map(|precision| {
+            [
+                format!("value_{precision}"),
+                format!("CAST(value_{precision} AS CHAR)"),
+                format!("MICROSECOND(value_{precision})"),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let result = session
+        .query_params_controlled(
+            &format!("SELECT id, {projections} FROM fractional_precision_values ORDER BY id"),
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let expected_row = |id, rounds| {
+        let mut row = vec![Value::Int(id)];
+        for precision in 0..=6 {
+            let (value, rendered, microseconds) = expected_fractional_time(precision, rounds);
+            row.extend([value, Value::Text(rendered), Value::Int(microseconds)]);
+        }
+        row
+    };
+    assert_eq!(
+        result.rows,
+        vec![
+            expected_row(1, baseline_rounds),
+            expected_row(2, baseline_rounds),
+            expected_row(3, alternate_rounds),
+            expected_row(4, alternate_rounds),
+        ]
+    );
+    session.close().await.unwrap();
+}
+
+fn expected_fractional_time(precision: u32, rounds: bool) -> (Value, String, i64) {
+    let input_micros = i64::from((12 * 60 + 34) * 60 + 56) * 1_000_000 + 789_956;
+    let quantum = 10_i64.pow(6 - precision);
+    let stored_micros = if rounds {
+        (input_micros + quantum / 2) / quantum * quantum
+    } else {
+        input_micros / quantum * quantum
+    };
+    let seconds = (stored_micros / 1_000_000) as u32;
+    let microseconds = (stored_micros % 1_000_000) as u32;
+    let value = NaiveTime::from_num_seconds_from_midnight_opt(seconds, microseconds * 1_000).unwrap();
+    let rendered = if precision == 0 {
+        format!("{:02}:{:02}:{:02}", seconds / 3600, seconds / 60 % 60, seconds % 60)
+    } else {
+        format!(
+            "{:02}:{:02}:{:02}.{:0width$}",
+            seconds / 3600,
+            seconds / 60 % 60,
+            seconds % 60,
+            microseconds / quantum as u32,
+            width = precision as usize,
+        )
+    };
+    (Value::Time(value), rendered, i64::from(microseconds))
+}
+
 async fn assert_fractional_storage_mode_for_binds_and_literals(
     options: &ConnectOptions,
     column_type: &str,
