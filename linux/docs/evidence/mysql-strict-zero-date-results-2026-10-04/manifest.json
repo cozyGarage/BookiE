@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "fec477a888d0a48e34ec6eff16a151879635eb66",
+  "case": "MySQL strict zero-date session modes",
+  "test": "value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing",
+  "contract": [
+    "A dedicated MySQL session confirms STRICT_TRANS_TABLES, NO_ZERO_DATE and NO_ZERO_IN_DATE are active.",
+    "The server refuses zero and incomplete DATE values with SQLSTATE 22007.",
+    "Both refusals leave no rows; a valid DATE persists as the exact native date and text.",
+    "The existing permissive-mode zero/partial-date read contract remains covered in the same MySQL value-contract run."
+  ],
+  "validation": {
+    "focused_case": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed",
+      "suite_log": "value-contracts.txt"
+    },
+    "value_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts:: -- --include-ignored --test-threads=1",
+      "result": "8 passed, 0 failed",
+      "log": "value-contracts.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "value-contracts.txt": "ea0fbd439815eab9a80857a92d3159204fd337e5d0dc83677e3838bd684e2d17",
+    "clippy.txt": "d6897fcffccd2d4a226e2da34bc86ab47178f731758afb28eaa1996a2d3eb53d",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "This case proves MySQL 8 behavior; MariaDB strict zero-date parity is untested.",
+    "Other SQL modes, temporal types, consumer paths and installed grid editing remain open.",
+    "The broader B3 matrix remains open."
+  ]
+}

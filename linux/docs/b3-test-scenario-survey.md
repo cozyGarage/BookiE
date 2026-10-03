@@ -244,8 +244,12 @@ sessions, parser refusal in both modes, valid exact edits and neighbor identity.
 The focused command is
 `cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 -- --include-ignored --test-threads=1`.
 The dedicated-session column-comment DDL case now has a live integration test
-under default mode and `NO_BACKSLASH_ESCAPES`. Other DDL/session interactions
-and SQL modes outside the enumerated cases remain open in the driver matrix.
+under default mode and `NO_BACKSLASH_ESCAPES`. An October 4 native test also
+verifies that MySQL strict zero-date modes refuse zero and incomplete dates
+without writing, while valid DATE values stay exact
+([evidence](evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json)).
+Other DDL/session interactions, MariaDB strict-date parity and SQL modes outside
+the enumerated cases remain open in the driver matrix.
 
 The earlier MongoDB page-scoped heterogeneity contract has since been extended
 to a whole-collection cursor scan. Browse metadata and retained page rows now
