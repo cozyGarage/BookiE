@@ -2920,6 +2920,16 @@ MySQL's default rounds at each declared precision and
 the returned `Value::Time`, cast text and `MICROSECOND()` result for every
 precision. See the [native evidence](evidence/mysql-time-precision-matrix-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB DATETIME and TIMESTAMP fractional precision matrix (2026-10-04)
+
+The native cases insert `2024-01-02 03:04:05.789956` into both
+`DATETIME(0)` through `DATETIME(6)` and `TIMESTAMP(0)` through `TIMESTAMP(6)`.
+MySQL rounds by default and truncates with `TIME_TRUNCATE_FRACTIONAL`; MariaDB
+truncates by default and rounds with `TIME_ROUND_FRACTIONAL`. Bound and
+generated-literal paths assert native values, cast text and `MICROSECOND()`;
+TIMESTAMP checks also pin the UTC epoch microseconds. See the
+[native evidence](evidence/mysql-datetime-timestamp-precision-matrix-results-2026-10-04/manifest.json).
+
 ### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
 
 The paired Docker cases apply the same mode matrix to a `DATETIME(3)`

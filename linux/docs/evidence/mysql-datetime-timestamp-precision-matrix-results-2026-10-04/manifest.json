@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "a95f707deb470842f4a42d32ef6127da1421509c",
+  "case": "MySQL/MariaDB DATETIME and TIMESTAMP fractional precision rounding and truncation matrix",
+  "engines": {
+    "mysql": "testcontainers-modules 0.15.0 default image tag 8.1",
+    "mariadb": "mariadb:11"
+  },
+  "test": [
+    "value_contracts::mysql_datetime_and_timestamp_fractional_precision_matrix_respects_truncate_mode",
+    "value_contracts::mariadb_datetime_and_timestamp_fractional_precision_matrix_respects_round_mode"
+  ],
+  "contract": [
+    "Each case inserts 2024-01-02 03:04:05.789956 into DATETIME(0) through DATETIME(6) and TIMESTAMP(0) through TIMESTAMP(6), using both bound parameters and generated SQL literals.",
+    "MySQL default SQL mode rounds at each declared precision; TIME_TRUNCATE_FRACTIONAL truncates.",
+    "MariaDB default SQL mode truncates at each declared precision; TIME_ROUND_FRACTIONAL rounds.",
+    "Each stored value is checked as a native Value, CAST(value AS CHAR), and MICROSECOND(value); TIMESTAMP cases also assert UNIX_TIMESTAMP epoch microseconds with the session timezone set to UTC."
+  ],
+  "references": [
+    "https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html",
+    "https://mariadb.com/docs/server/server-management/variables-and-modes/sql_mode"
+  ],
+  "validation": {
+    "focused": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration datetime_and_timestamp_fractional_precision_matrix -- --include-ignored --test-threads=1",
+      "result": "2 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "mysql_mariadb_value_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts:: -- --include-ignored --test-threads=1",
+      "result": "25 passed, 0 failed",
+      "log": "value-contracts.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "inventory": "rtk proxy python3 linux/scripts/inventory-ignored-tests.py --check passed after regenerating linux/docs/ignored-tests.md",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "2ad97c9586f81dfe6da92005cdd2c42eafa49a27fe5060b589619015ca5fcfa1",
+    "value-contracts.txt": "27c3c7a06a6f08660ad6ce0493db93564304b39cb003211b03212ecf4dbab5bb",
+    "clippy.txt": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other SQL mode/session configurations and temporal consumer paths remain open.",
+    "Other engines, value types, and installed typed edits remain open.",
+    "This bounded contract does not close B3 or qualify the 0.2.0 release."
+  ]
+}
