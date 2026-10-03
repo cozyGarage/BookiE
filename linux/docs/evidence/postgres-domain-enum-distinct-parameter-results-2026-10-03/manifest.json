@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "726ea7ad61b606836009655a2d574ff35304aee8",
+  "engine": "PostgreSQL 16 via local Docker fixture",
+  "case": "NULL-safe query parameters for domain-over-enum values",
+  "change": "Exercise IS DISTINCT FROM and IS NOT DISTINCT FROM with both an enum label and SQL NULL against a domain-over-enum column cast to its base enum.",
+  "contract": [
+    "PostgreSQL infers the bound parameter as the qualified base enum type for both null-safe distinctness operators.",
+    "The source column retains its domain type.",
+    "Text and SQL NULL parameters produce the exact expected per-row truth values, including NULL-safe equality semantics."
+  ],
+  "independent_oracle": "Server-reported pg_typeof for the parameter and domain column plus exact PostgreSQL boolean results for ready, paused and SQL NULL rows.",
+  "validation": {
+    "domain_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --ignored --test-threads=1",
+      "result": "10 passed",
+      "log": "domain-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "domain-suite.txt": "b980957dfb4486ffd7af6655ff41bd4b435d96ef64d35e3f210d7186982bf26b",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Direct query contexts beyond the covered comparisons, lists, BETWEEN and NULL-safe distinctness operators remain open.",
+    "Session/search_path combinations, deeper nested-domain depths and other custom/native cases remain open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

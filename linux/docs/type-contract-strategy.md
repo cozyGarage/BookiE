@@ -36,11 +36,13 @@ filters, both NULL operators and both list operators, with exact rows/labels and
 native type assertions; see the
 [complete filter matrix](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
 For direct query parameters, base-enum-cast `=`, `<>`, `<`, `<=`, `>`, `>=`,
-`IN`, `NOT IN` and `BETWEEN` preserve inferred parameter types; raw domain
+`IN`, `NOT IN`, `BETWEEN`, `IS DISTINCT FROM` and `IS NOT DISTINCT FROM`
+preserve inferred parameter types; raw domain
 `= $1` remains explicitly refused with SQLSTATE 42883. See the
 [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
 and the [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
-and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json),
+plus [NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
 Other direct query-parameter contexts, session configurations, deeper
 nested-domain depths and other custom/native cases remain open.
 

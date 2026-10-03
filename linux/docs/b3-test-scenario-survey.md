@@ -125,6 +125,9 @@ The direct query parameter contract checks base-enum-cast `=`, `<>`, `<`,
 See the [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
 and [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
 and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+The same fixture now covers `IS DISTINCT FROM` and `IS NOT DISTINCT FROM` with
+text and SQL NULL parameters, checking server-inferred enum types and exact
+NULL-safe results; see [distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
 The same-named enum schema case applies structured equality, `IN` and `BETWEEN`
 filters under the shadowed `search_path` and confirms they remain bound to the
 target schema's native type; see the

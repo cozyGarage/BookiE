@@ -4602,6 +4602,18 @@ and diff checks. See the
 
 Other direct query contexts and session/search_path combinations remain open.
 
+## PostgreSQL domain-over-enum NULL-safe distinctness parameters (2026-10-03)
+
+The direct query contract now exercises `IS DISTINCT FROM` and
+`IS NOT DISTINCT FROM` with both a text label and SQL NULL against a
+domain-over-enum column cast to its base enum. PostgreSQL infers the parameter
+as the qualified enum type, while `pg_typeof(status)` remains the domain; exact
+per-row truth values prove NULL-safe semantics. All 10 domain contracts pass,
+along with Clippy and formatting. See the
+[NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
+
+Other direct query contexts and session/search_path combinations remain open.
+
 ## PostgreSQL schema-shadowed enum list and range filters (2026-10-03)
 
 The same-named enum fixture now checks structured `IN` and `BETWEEN` filters on
