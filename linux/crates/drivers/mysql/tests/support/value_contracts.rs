@@ -137,7 +137,18 @@ async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_expo
 #[ignore = "requires docker"]
 async fn strict_zero_date_modes_refuse_invalid_dates_without_writing() {
     let (_container, options) = start_mysql().await;
-    let conn = connect(options).await;
+    assert_strict_zero_date_modes_refuse_invalid_dates(&options, "MySQL").await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing() {
+    let (_container, options) = start_mariadb().await;
+    assert_strict_zero_date_modes_refuse_invalid_dates(&options, "MariaDB").await;
+}
+
+async fn assert_strict_zero_date_modes_refuse_invalid_dates(options: &ConnectOptions, engine: &str) {
+    let conn = connect(options.clone()).await;
     conn.execute("CREATE TABLE strict_dates (id INT PRIMARY KEY, value DATE NOT NULL)")
         .await
         .unwrap();
@@ -157,7 +168,9 @@ async fn strict_zero_date_modes_refuse_invalid_dates_without_writing() {
         .await
         .unwrap();
     assert!(
-        matches!(&mode.rows[0][0], Value::Text(mode) if mode.contains("STRICT_TRANS_TABLES") && mode.contains("NO_ZERO_DATE") && mode.contains("NO_ZERO_IN_DATE"))
+        matches!(&mode.rows[0][0], Value::Text(mode) if mode.contains("STRICT_TRANS_TABLES") && mode.contains("NO_ZERO_DATE") && mode.contains("NO_ZERO_IN_DATE")),
+        "{engine} session mode: {:?}",
+        mode.rows[0][0]
     );
 
     for (id, value) in [(1, "0000-00-00"), (2, "2024-00-15")] {
@@ -176,7 +189,7 @@ async fn strict_zero_date_modes_refuse_invalid_dates_without_writing() {
                     sqlstate: Some(code), ..
                 } if code == "22007"
             ),
-            "id {id}, date {value}: {error:?}"
+            "{engine}, id {id}, date {value}: {error:?}"
         );
     }
 
