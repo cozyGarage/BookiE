@@ -1667,8 +1667,12 @@ metadata and keyed-update builder select `enum_shadow_b.status_kind` even with
 the same type and table names present in `enum_shadow_a`. A role default points
 `search_path` at `enum_shadow_a`, confirmed on the fresh pool connection; independent
 `pg_typeof` and sibling queries verify the target native type and unchanged
-shadow row. This closes the same-named cross-schema keyed-edit case, while
-other enum/session combinations remain open.
+shadow row. Under the same `search_path`, a structured equality filter on
+`enum_shadow_b.items` also selects only the target enum value; the native type
+and row value remain `enum_shadow_b.status_kind`/`paused`. This closes the
+same-named cross-schema keyed-edit/filter combination, while other enum/session
+combinations remain open. See the
+[shadowed-filter evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum structured filters (October 3)
 

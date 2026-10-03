@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "e1ebd60620bf2e0f1ff4c5fb8e014a1a321d41c5",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Structured filter under a same-named enum search_path collision",
+  "outcome": "Exact typed support for a schema-aware equality filter while search_path resolves the same enum name in a different schema.",
+  "fixture": "enum_shadow_a and enum_shadow_b contain same-named status_kind types and items tables. The fresh connection defaults search_path to enum_shadow_a; the test edits and filters enum_shadow_b.items.",
+  "oracle": "current_schema confirms the shadow search_path; pg_typeof(status)::text confirms the target enum; native target and shadow rows prove the edit and filter do not cross schemas.",
+  "validation": {
+    "focused_shadow_filter": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract::value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "shadowed-filter.txt"
+    },
+    "enum_contract_suite": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "enum-suite.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "shadowed-filter.txt": "8e4cbe11425dcc5dcdb3e07f6ed9ed6ba18dab5b952b1198752ccb3721fdf81b",
+    "enum-suite.txt": "b7dd8fe13d3774d19075d59a900e30eb5c61def5da6bdf86006e55b28cf3c9ab"
+  },
+  "remaining": [
+    "Other enum operators and session configurations remain open.",
+    "This single shadow-schema filter does not close the PostgreSQL enum matrix or B3."
+  ]
+}

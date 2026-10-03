@@ -118,6 +118,10 @@ session contexts remain open; see the
 The direct query parameter contract also checks base-enum-cast `=`, `<>` and
 `BETWEEN`; raw domain equality remains explicitly refused. See the
 [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
+The same-named enum schema case now applies a structured equality filter under
+the shadowed `search_path` and confirms the filter remains bound to the target
+schema's native type; see the
+[focused evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 
