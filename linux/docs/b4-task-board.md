@@ -1,8 +1,8 @@
 # B4 task board: transport and sessions
 
 Base commit: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The local source
-also contains the uncommitted MySQL batch/result fixes indexed in the [evidence
-manifest](evidence/mysql-atomic-results-2026-10-03/manifest.json).
+includes the MySQL batch/result fixes integrated in `de5831eb1`, indexed in the
+[evidence manifest](evidence/mysql-atomic-results-2026-10-03/manifest.json).
 The [sprint](bookie-0.2-sprint.md) owns release order; [ADR 0008](decisions/0008-connection-and-session-ownership.md)
 owns the decisions. B4 remains open. Implementation, local execution, hosted
 execution and installed acceptance are separate states.
