@@ -14,5 +14,5 @@ test domain_contract::value_contract_domain_over_enum_sql_file_replay_preserves_
 test domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values ... ok
 test domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 85 filtered out; finished in 20.89s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 85 filtered out; finished in 21.00s
 

@@ -4458,8 +4458,9 @@ configurations remained open.
 
 A new PostgreSQL 16 integration case builds four nested domains over one enum.
 It verifies that fetched column metadata resolves to the schema-qualified enum
-leaf, a keyed update stores a new label at the four-layer outer domain, and a
-typed equality filter selects that row. Independent `pg_typeof` and value
+leaf, keyed and assignment-inferred updates store labels at the four-layer
+outer domain, and both a server-inferred enum comparison and typed equality
+filter select the intended rows. Independent `pg_typeof` and value
 queries confirm the outer domain type and that a sibling SQL NULL remains
 unchanged. All 11 PostgreSQL domain contracts passed, including the existing
 three-layer parameter cases. Domain chains deeper than four layers and other
