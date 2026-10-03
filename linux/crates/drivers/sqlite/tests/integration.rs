@@ -69,7 +69,7 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL)")
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL), (3, 'ready')")
         .await
         .unwrap();
 
@@ -106,6 +106,41 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
     assert_ne!(expression.columns[0].data_type, "ANY");
     assert_eq!(expression.rows, vec![vec![Value::Int(43)]]);
 
+    let mixed_expression = connection
+        .query(
+            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(mixed_expression.columns[0].data_type, "NULL");
+    assert_eq!(
+        mixed_expression.rows,
+        vec![
+            vec![Value::Int(42)],
+            vec![Value::Null],
+            vec![Value::Text("ready".into())]
+        ]
+    );
+
+    let empty_expression = connection
+        .query("SELECT value + 1 AS result FROM flexible WHERE id = 99")
+        .await
+        .unwrap();
+    assert_eq!(empty_expression.columns[0].data_type, "NULL");
+    assert!(empty_expression.rows.is_empty());
+
+    let bound_expression = connection
+        .query_params(
+            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result \
+             FROM flexible WHERE id > ? ORDER BY id",
+            &[Value::Int(0)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound_expression.columns[0].data_type, "NULL");
+    assert_eq!(bound_expression.rows, mixed_expression.rows);
+
     let mut transaction = connection.begin().await.unwrap();
     let result = transaction
         .query("SELECT value AS result FROM flexible WHERE id = 1")
@@ -119,6 +154,12 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
         .unwrap();
     assert_eq!(empty.columns[0].data_type, "ANY");
     assert!(empty.rows.is_empty());
+    let expression = transaction
+        .query("SELECT value + 1 AS result FROM flexible WHERE id = 99")
+        .await
+        .unwrap();
+    assert_eq!(expression.columns[0].data_type, "NULL");
+    assert!(expression.rows.is_empty());
     transaction.rollback().await.unwrap();
 }
 
