@@ -1,4 +1,6 @@
+#[cfg(feature = "duckdb")]
 use super::parse_input_for_grid_cell;
+#[cfg(feature = "duckdb")]
 use tablepro_core::Value;
 
 #[cfg(feature = "duckdb")]
