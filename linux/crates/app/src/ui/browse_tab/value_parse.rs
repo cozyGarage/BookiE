@@ -669,6 +669,10 @@ mod tests;
 mod sqlite_any_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/duckdb_enum_contract.rs"]
+mod duckdb_enum_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
 

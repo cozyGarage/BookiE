@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "4418127e4ecd0840a31fd4182275dfb62427611a",
+  "working_tree": "M linux/crates/app/src/ui/browse_tab/value_parse.rs\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/crates/app/tests/support/duckdb_enum_contract.rs",
+  "tracked_diff_sha256": "090f1620b8d46af9d34a7cdcc74c122d94dd6f80122dc50bbd57141266d2da34",
+  "started_utc": "2026-10-03T18:56:30.660875+00:00",
+  "status": "passed",
+  "layers": {
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 3.874
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T18:56:34.535241+00:00"
+}

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "4418127e4ecd0840a31fd4182275dfb62427611a",
+  "working_tree": "Local embedded DuckDB evidence captured with the optional app DuckDB feature enabled; source fingerprints identify this dirty tree. Not hosted CI or installed GTK acceptance.",
+  "native_fixture": "Pinned bundled DuckDB; ENUM('', 'NULL', '東京', 'ready') with a keyed table containing the empty label, literal NULL label, and SQL NULL.",
+  "scope": [
+    "Exercise a nonempty DuckDB ENUM label through the app parser, keyed-update builder and driver write.",
+    "Preserve the native ENUM type and distinguish empty text, the literal NULL label and SQL NULL as sibling values.",
+    "Refuse an invalid enum label without changing the keyed row."
+  ],
+  "regression": {
+    "selector": "value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_siblings",
+    "path": "App parser -> core keyed-update SQL builder -> DuckDB driver native write.",
+    "oracle": "DuckDB typeof(status), cast-to-VARCHAR labels, decoded SQL NULL, row identity and unchanged state after invalid-label failure.",
+    "initial_attempt": "The first test assertion incorrectly expected typeof(NULL-valued status) to be NULL. DuckDB reports the declared ENUM type for that typed NULL column; the decoded value remains Value::Null. The corrected contract asserts the native ENUM type for each row and keeps SQL NULL distinct by its decoded value.",
+    "result": "Focused test passed; app library with --features duckdb: 444 passed, 20 ignored."
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib --features duckdb value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_siblings",
+      "result": "1 passed; focused.log retained."
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-app --lib --features duckdb",
+      "result": "444 passed; 0 failed; 20 ignored; app-lib-feature-duckdb.log retained."
+    },
+    {
+      "argv": "cargo clippy --locked -p tablepro-app --all-targets --features duckdb -- -D warnings",
+      "result": "passed; clippy.log retained."
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py change-contracts",
+      "result": "passed; layer report and change-contracts.log retained."
+    },
+    {
+      "argv": "cargo fmt --all -- --check; python3 scripts/check-function-size.py; bash scripts/check-file-size.sh; git diff --check",
+      "result": "passed."
+    }
+  ],
+  "layer_report": {
+    "path": "change-contracts-report.json",
+    "status": "passed",
+    "layer": "change-contracts"
+  },
+  "source_fingerprints_sha256": {
+    "crates/app/src/ui/browse_tab/value_parse.rs": "7a7f36f1963e36c010732e9938a6f4527539d6f81c87448f80eb51d53fa2a3aa",
+    "crates/app/tests/support/duckdb_enum_contract.rs": "2b8b96cef26e332e9a969b3f3490ad8b56f80307d4e9d871988cc31ce8a613c0",
+    "docs/type-contract-strategy.md": "859ddab2193a9eb27a3a1188061f36de407bf3fa5a4f60a1018fc912def56328",
+    "docs/value-contract-history.md": "47aa460b1cf55b1d07bb23935e4afe9aa4ad7766b279a13ac8adc30d508a4347",
+    "docs/value-contracts.md": "1261bcb5e389822359436320c456a472952f3230c5e0f787c77ec8df40942da8",
+    "docs/release-audit-2026-10-03.md": "ad3b22ddb6747ba200f20abb20398fc90201699ab42a858cb6af8a700a2a94a0",
+    "docs/b3-test-scenario-survey.md": "ef021579ad794186a82de79f30546945874266f12d58e8e998f4ebfff05503e8"
+  },
+  "retained_evidence_sha256": {
+    "before-oracle-fix.log": "afdd45adbf50910f6006e523f20128b2a1567e43e1ab50e10392a98828421ccd",
+    "focused.log": "e23b793180b28bd97bcdb483475eecf9ad349b5b1284cb96d9b6499632c6d98c",
+    "app-lib-feature-duckdb.log": "3723f1ca8e900bef913092ddc2c1e59c7356d348514493b8e5c9bd47b53e0ae1",
+    "clippy.log": "f7e3c184739806549b86a00fb67b25467cc4024d65c808bf4602efed623407f1",
+    "change-contracts-report.json": "30d8eeaa40517161078292068378d6f7a04e22744d85fd1bab690836dd3aca27",
+    "change-contracts.log": "d5a6e1a374894a06d145efb564235172af5376568f02a3c34021d1cd12954cb6"
+  },
+  "evidence_normalization": "Captured terminal logs have trailing whitespace removed; test output and outcomes are unchanged.",
+  "remaining": [
+    "Empty enum-label input through the grid is ambiguous with the existing blank-to-NULL rule and remains open.",
+    "Installed GTK editing and broader DuckDB type/consumer/configuration parity remain open."
+  ],
+  "not_run": [
+    "GitHub Actions",
+    "installed GTK/package",
+    "Wayland/VM acceptance",
+    "release soak"
+  ]
+}

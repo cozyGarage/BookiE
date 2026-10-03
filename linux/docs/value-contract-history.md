@@ -4418,3 +4418,19 @@ NULL/new-cell policy and BLOB refusal contracts. Clippy and the mapped `change-c
 passed. The failing-first log, full app test logs, local layer reports, and
 source fingerprints are in the
 [STRICT ANY evidence packet](evidence/sqlite-strict-any-results-2026-10-03/manifest.json).
+
+## DuckDB enum keyed grid edit, 2026-10-03
+
+A local DuckDB-backed app contract now parses a nonempty enum label through the
+app parser and keyed-update builder, then verifies the saved value and native
+`ENUM(...)` type. The fixture also preserves an empty enum label and SQL NULL as
+distinct sibling values. An invalid label is rejected by DuckDB and the affected
+row remains unchanged. The initial run corrected the test oracle: DuckDB reports
+the declared ENUM type through `typeof(status)` even for a NULL value, while the
+decoded cell remains `Value::Null`.
+
+The focused app contract and all app-library tests with the optional DuckDB
+feature passed (444 passed, 20 ignored); Clippy and the mapped
+`change-contracts` layer passed. This covers nonempty keyed label edits. Empty
+enum-label grid input semantics and installed GTK behavior remain open. See the
+[DuckDB enum keyed-edit evidence](evidence/duckdb-enum-keyed-results-2026-10-03/manifest.json).
