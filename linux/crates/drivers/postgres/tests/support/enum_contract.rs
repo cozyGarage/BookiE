@@ -1479,7 +1479,7 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
     setup
         .execute(
             "INSERT INTO enum_domain_shadow_b.items VALUES \
-             (1, 'paused', 'target'), (2, NULL, 'target-null')",
+             (1, 'ready', 'target-ready'), (2, 'paused', 'target-paused'), (3, NULL, 'target-null')",
         )
         .await
         .unwrap();
@@ -1530,7 +1530,7 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
     assert_eq!(
         filtered.rows,
         vec![vec![
-            Value::Int(1),
+            Value::Int(2),
             Value::Text("paused".into()),
             Value::Text("enum_domain_shadow_b.status_domain".into()),
         ]]
@@ -1553,7 +1553,7 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
     assert_eq!(
         text_parameter.rows,
         vec![vec![
-            Value::Int(1),
+            Value::Int(2),
             Value::Text("paused".into()),
             Value::Text("enum_domain_shadow_b.status_domain".into()),
         ]]
@@ -1571,11 +1571,88 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
     assert_eq!(
         null_parameter.rows,
         vec![vec![
-            Value::Int(2),
+            Value::Int(3),
             Value::Null,
             Value::Text("enum_domain_shadow_b.status_domain".into()),
         ]]
     );
+
+    type OperatorCase = (&'static str, Vec<Value>, &'static [(i64, Option<&'static str>)]);
+    let operator_cases: [OperatorCase; 10] = [
+        (
+            "status::enum_domain_shadow_b.status_kind <> $1",
+            vec![Value::Text("ready".into())],
+            &[(2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind < $1",
+            vec![Value::Text("paused".into())],
+            &[(1, Some("ready"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind <= $1",
+            vec![Value::Text("ready".into())],
+            &[(1, Some("ready"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind > $1",
+            vec![Value::Text("ready".into())],
+            &[(2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind >= $1",
+            vec![Value::Text("paused".into())],
+            &[(2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind IN ($1, $2)",
+            vec![Value::Text("ready".into()), Value::Text("paused".into())],
+            &[(1, Some("ready")), (2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind NOT IN ($1)",
+            vec![Value::Text("ready".into())],
+            &[(2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind BETWEEN $1 AND $2",
+            vec![Value::Text("ready".into()), Value::Text("paused".into())],
+            &[(1, Some("ready")), (2, Some("paused"))],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind IS DISTINCT FROM $1",
+            vec![Value::Text("ready".into())],
+            &[(2, Some("paused")), (3, None)],
+        ),
+        (
+            "status::enum_domain_shadow_b.status_kind IS NOT DISTINCT FROM $1",
+            vec![Value::Null],
+            &[(3, None)],
+        ),
+    ];
+    for (predicate, params, expected) in operator_cases {
+        let result = transaction
+            .query_params(
+                &format!(
+                    "SELECT id, status::text, pg_typeof(status)::text \
+                     FROM enum_domain_shadow_b.items WHERE {predicate} ORDER BY id"
+                ),
+                &params,
+            )
+            .await
+            .unwrap();
+        let expected_rows = expected
+            .iter()
+            .map(|(id, status)| {
+                vec![
+                    Value::Int(*id),
+                    status.map(|value| Value::Text(value.into())).unwrap_or(Value::Null),
+                    Value::Text("enum_domain_shadow_b.status_domain".into()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(result.rows, expected_rows, "predicate {predicate:?}");
+    }
     transaction.rollback().await.unwrap();
 
     let shadow = connection
