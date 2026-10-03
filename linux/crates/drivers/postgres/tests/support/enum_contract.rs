@@ -1265,4 +1265,46 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
             Value::Text("enum_shadow_b.status_kind".into()),
         ]]
     );
+
+    for (operator, value) in [
+        (
+            tablepro_core::FilterOp::In,
+            tablepro_core::FilterValue::List(vec!["ready".into(), "paused".into()]),
+        ),
+        (
+            tablepro_core::FilterOp::Between,
+            tablepro_core::FilterValue::Pair("ready".into(), "paused".into()),
+        ),
+    ] {
+        let filters = tablepro_core::FilterSet {
+            rules: vec![tablepro_core::FilterRule {
+                column: "status".into(),
+                op: operator,
+                value: Some(value),
+            }],
+            ..Default::default()
+        };
+        let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+            .unwrap()
+            .unwrap();
+        let filtered = connection
+            .query_params(
+                &format!(
+                    "SELECT id, status::text, pg_typeof(status)::text \
+                     FROM enum_shadow_b.items WHERE {where_sql} ORDER BY id"
+                ),
+                &params,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            filtered.rows,
+            vec![vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("enum_shadow_b.status_kind".into()),
+            ]],
+            "operator {operator:?} under shadowed search_path"
+        );
+    }
 }
