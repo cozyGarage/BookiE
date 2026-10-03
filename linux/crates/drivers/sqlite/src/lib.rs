@@ -561,21 +561,53 @@ async fn result_columns(
         })
         .collect::<Vec<_>>();
     if !unknown_origins.is_empty() {
-        let mut table_types: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut table_types: HashMap<(String, String), HashMap<String, String>> = HashMap::new();
+        let mut attached_schemas = None;
+        let mut attached_schema_lookup_failed = false;
         for (index, origin) in unknown_origins {
-            // SQLx flattens attached-schema origins into "schema.table". That
-            // is indistinguishable from a main-schema table whose name contains
-            // a dot, so only resolve unqualified origins here.
-            if origin.table.contains('.') {
-                continue;
+            let origin_table = origin.table.as_ref();
+            // SQLx flattens attached origins to "schema.table", which can also
+            // be a main-schema table name. Use declared metadata only if unique.
+            let mut candidates = vec![("main".to_string(), origin_table.to_string())];
+            if origin_table.contains('.') {
+                if attached_schemas.is_none() && !attached_schema_lookup_failed {
+                    match attached_database_names(connection).await {
+                        Some(schemas) => attached_schemas = Some(schemas),
+                        None => attached_schema_lookup_failed = true,
+                    }
+                }
+                if attached_schema_lookup_failed {
+                    continue;
+                }
+                if let Some(schemas) = attached_schemas.as_ref() {
+                    for schema in schemas {
+                        if let Some(table) = origin_table.strip_prefix(&format!("{schema}.")) {
+                            candidates.push((schema.clone(), table.to_string()));
+                        }
+                    }
+                }
             }
-            let key = origin.table.to_string();
-            if !table_types.contains_key(&key) {
-                let declared = declared_table_columns(connection, &key).await;
-                table_types.insert(key.clone(), declared);
+
+            let mut declared_type = None;
+            let mut matches = 0;
+            for (schema, table) in candidates {
+                let key = (schema.clone(), table.clone());
+                if !table_types.contains_key(&key) {
+                    let declared = declared_table_columns(connection, &schema, &table).await;
+                    table_types.insert(key.clone(), declared);
+                }
+                if let Some(data_type) = table_types.get(&key).and_then(|types| types.get(origin.name.as_ref())) {
+                    matches += 1;
+                    declared_type = Some(data_type.clone());
+                    if matches > 1 {
+                        break;
+                    }
+                }
             }
-            if let Some(data_type) = table_types.get(&key).and_then(|types| types.get(origin.name.as_ref())) {
-                columns[index].data_type.clone_from(data_type);
+            if matches == 1
+                && let Some(data_type) = declared_type
+            {
+                columns[index].data_type = data_type;
             }
         }
     }
@@ -594,9 +626,21 @@ fn rows_into_result(columns: Vec<ColumnInfo>, collected: &[SqliteRow], truncated
     }
 }
 
-async fn declared_table_columns(connection: &mut SqlxSqliteConnection, table: &str) -> HashMap<String, String> {
-    sqlx::query("SELECT name, type FROM pragma_table_xinfo(?)")
+async fn attached_database_names(connection: &mut SqlxSqliteConnection) -> Option<Vec<String>> {
+    sqlx::query_scalar("SELECT name FROM pragma_database_list WHERE name <> 'main'")
+        .fetch_all(&mut *connection)
+        .await
+        .ok()
+}
+
+async fn declared_table_columns(
+    connection: &mut SqlxSqliteConnection,
+    schema: &str,
+    table: &str,
+) -> HashMap<String, String> {
+    sqlx::query("SELECT name, type FROM pragma_table_xinfo(?, ?)")
         .bind(table)
+        .bind(schema)
         .fetch_all(&mut *connection)
         .await
         .ok()

@@ -123,6 +123,42 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
 }
 
 #[tokio::test]
+async fn direct_query_columns_resolve_unambiguous_attached_any_origins() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("ATTACH DATABASE ':memory:' AS aux").await.unwrap();
+    transaction
+        .execute("CREATE TABLE aux.flexible (value ANY) STRICT")
+        .await
+        .unwrap();
+    transaction
+        .execute("INSERT INTO aux.flexible VALUES ('attached')")
+        .await
+        .unwrap();
+
+    let attached = transaction.query("SELECT value FROM aux.flexible").await.unwrap();
+    assert_eq!(attached.columns[0].data_type, "ANY");
+    assert_eq!(attached.rows, vec![vec![Value::Text("attached".into())]]);
+
+    transaction
+        .execute("CREATE TABLE \"aux.flexible\" (value ANY) STRICT")
+        .await
+        .unwrap();
+    transaction
+        .execute("INSERT INTO \"aux.flexible\" VALUES (42)")
+        .await
+        .unwrap();
+    let ambiguous_attached = transaction.query("SELECT value FROM aux.flexible").await.unwrap();
+    assert_eq!(ambiguous_attached.columns[0].data_type, "NULL");
+    assert_eq!(ambiguous_attached.rows, vec![vec![Value::Text("attached".into())]]);
+
+    let ambiguous_main = transaction.query("SELECT value FROM \"aux.flexible\"").await.unwrap();
+    assert_eq!(ambiguous_main.columns[0].data_type, "NULL");
+    assert_eq!(ambiguous_main.rows, vec![vec![Value::Int(42)]]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
 async fn declared_types_preserve_nulls_and_binary_affinity_mismatches() {
     let directory = TempDir::new().expect("temp dir");
     let connection = connect_file(&directory).await;
