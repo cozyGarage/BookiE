@@ -4543,20 +4543,36 @@ consumers, output formats and installed GTK editing remain open.
 
 The SQLite driver now prepares each query before execution and retains its
 result-column metadata even when it returns no rows. When SQLx reports an
-unrecognized declared type as `NULL`, the driver resolves direct unqualified
-table-column origins using `pragma_table_xinfo` on the same connection.
+unrecognized declared type as `NULL`, the driver resolves table-column origins
+using schema-qualified `pragma_table_xinfo` on the same connection when the
+source is unambiguous.
 Ordinary, bound-parameter and transaction queries preserve declared STRICT
 `ANY` metadata for both populated and empty results. Computed expressions do
 not inherit `ANY` from their inputs. The app's empty query export keeps its
 header, while the nonempty query-result CSV round trip continues to preserve
 INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL with native `typeof()` proof.
 
-The focused SQLite driver case, all 44 driver tests, five app STRICT ANY
+The focused SQLite driver case, all 45 driver tests, five app STRICT ANY
 contracts, Clippy, formatting and diff checks pass. See the
 [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
-Computed expressions without a reportable declared type and attached-schema
-origins remain unresolved; other formats, storage-class combinations and
+Computed expressions without a reportable declared type and ambiguous
+attached-schema origins remain unresolved; other formats, storage-class combinations and
 installed GTK editing remain open.
+
+## SQLite attached-schema query origins (2026-10-03)
+
+The driver now resolves a flattened attached origin against SQLite's database
+list and schema-qualified `pragma_table_xinfo`. It applies a declaration only
+when exactly one main/attached catalog source matches, so a main table literally
+named `aux.flexible` cannot be confused with `aux.flexible` in an attached
+database. A native fixture verifies declared STRICT `ANY` metadata for an
+unambiguous attached query and fallback metadata for both sources when names
+collide; row values remain exact. All 45 driver tests and five app STRICT ANY
+contracts pass, along with Clippy, formatting and diff checks. See the
+[attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json).
+
+Other affinity/storage-class combinations, formats and installed GTK editing
+remain open.
 
 ## PostgreSQL enum structured-filter operator matrix (2026-10-03)
 

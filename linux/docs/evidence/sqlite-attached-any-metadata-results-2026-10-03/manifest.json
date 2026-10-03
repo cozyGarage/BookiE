@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "4aa55c038cb18c4537d6c82a3de990467f9680a8",
+  "engine": "SQLite 3.53.4 via libsqlite3-sys pkg-config",
+  "case": "STRICT ANY metadata for attached-schema query origins",
+  "change": "Resolve SQLx's flattened attached table origin against SQLite's database list and schema-qualified table-valued PRAGMA metadata; retain fallback when multiple schemas match the flattened origin.",
+  "contract": [
+    "A direct query of aux.flexible recovers declared ANY when its flattened origin uniquely identifies the attached table.",
+    "When main contains a table literally named aux.flexible, attached and main origins are ambiguous and remain at the original unknown metadata instead of being assigned a guessed declaration.",
+    "Query rows still preserve their actual runtime values in both ambiguous cases."
+  ],
+  "independent_oracle": "SQLite STRICT declarations from the test setup plus exact query values from attached and main tables, including INTEGER versus TEXT runtime storage classes.",
+  "validation": {
+    "focused_attached_origin": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration direct_query_columns_resolve_unambiguous_attached_any_origins -- --test-threads=1",
+      "result": "1 passed, 24 filtered out",
+      "log": "focused.txt"
+    },
+    "sqlite_driver_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "45 passed across 3 suites; doc-tests 0",
+      "log": "sqlite-driver.txt"
+    },
+    "app_strict_any_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_any_contract -- --test-threads=1",
+      "result": "5 passed; two existing unused-import warnings in the DuckDB enum fixture",
+      "log": "app-focused.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "a5baa72ae96cea32ee3a006d5df8b75651dc843e19d557484170f94394740d4b",
+    "sqlite-driver.txt": "96fd77ebaf2d3ae34b7679a70942722e0775ea673189c389494045112d375469",
+    "app-focused.txt": "e3280a657c45107ac2f6ac5529f5e506b6c207da58f89ae7a04bfd8232bce08c",
+    "clippy.txt": "b37308a2c5073c705c6db2d536c0ca28c6ec0d4c81acc5610609d1dbcdd83c1e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Computed expressions without declared origins, other SQLite affinity/storage-class combinations and output formats remain open.",
+    "Installed GTK editing behavior remains open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}
