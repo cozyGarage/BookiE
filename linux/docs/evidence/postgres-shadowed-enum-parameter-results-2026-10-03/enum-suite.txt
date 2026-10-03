@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
      Running tests/integration.rs (linux/target/debug/deps/integration-140ee8fc03e79f3b)
 
 running 10 tests
@@ -13,5 +13,5 @@ test enum_contract::value_contract_custom_enum_sql_file_export_restores_labels_a
 test enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values ... ok
 test enum_contract::value_contract_scalar_enum_labels_preserve_exact_text ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 84 filtered out; finished in 25.35s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 84 filtered out; finished in 19.08s
 

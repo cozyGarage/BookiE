@@ -133,8 +133,8 @@ filters under the shadowed `search_path` and confirms they remain bound to the
 target schema's native type; see the
 [initial equality evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json)
 and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
-A direct bound equality query under the same collision also selects the target
-enum row and leaves the shadow row unchanged; see [query parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+A direct bound equality, `IN` and `BETWEEN` query under the same collision also
+select the target enum row and leave the shadow row unchanged; see [query parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 

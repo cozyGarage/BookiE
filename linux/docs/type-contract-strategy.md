@@ -29,8 +29,8 @@ The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and
 enum name in `enum_shadow_a`; native target type/value checks pass. See the
 [initial equality evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json)
 and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
-A direct equality query with a bound text value also resolves against the
-qualified target enum and leaves the shadow row untouched; see the
+A direct equality, `IN` and `BETWEEN` query with bound text values also resolve
+against the qualified target enum and leave the shadow row untouched; see the
 [query-parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
 
 The PostgreSQL 16 ordinary-enum and domain-over-enum structured filters now
