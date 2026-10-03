@@ -33,6 +33,10 @@ pub enum CellError {
     NotAnInterval,
     #[error("empty CSV field is ambiguous for a PostgreSQL enum; set an explicit NULL marker")]
     AmbiguousEnumNullOrEmpty,
+    #[error("empty CSV field is ambiguous for SQLite ANY; set an explicit NULL marker")]
+    AmbiguousSqliteAnyNullOrEmpty,
+    #[error("invalid tagged SQLite ANY CSV value")]
+    InvalidSqliteAnyCsvValue,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -290,6 +294,20 @@ pub(crate) fn row_to_values_for_driver(
 
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
+    if driver_id == "sqlite" && crate::sqlite_any_csv::is_any_type(&column.data_type) {
+        if text == options.null_marker {
+            return if options.null_marker.is_empty() {
+                Err(CellError::AmbiguousSqliteAnyNullOrEmpty)
+            } else {
+                Ok(Value::Null)
+            };
+        }
+        return match crate::sqlite_any_csv::decode(text) {
+            Ok(Some(value)) => Ok(value),
+            Ok(None) => Ok(Value::Text(text.to_owned())),
+            Err(crate::sqlite_any_csv::DecodeError::Malformed) => Err(CellError::InvalidSqliteAnyCsvValue),
+        };
+    }
     if driver_id == "postgres" && column.enum_type.is_some() && options.null_marker.is_empty() && text.is_empty() {
         return Err(CellError::AmbiguousEnumNullOrEmpty);
     }

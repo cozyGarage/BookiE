@@ -21,7 +21,8 @@ mod xml;
 
 pub use csv::{
     CsvDecimal, CsvDelimiter, CsvLineBreak, CsvOptions, CsvQuote, render_csv, render_tsv, unique_csv_null_marker,
-    write_csv_header, write_csv_header_with_options, write_csv_row, write_csv_row_with_options,
+    write_csv_header, write_csv_header_with_options, write_csv_row, write_csv_row_with_columns_and_options,
+    write_csv_row_with_options,
 };
 pub use error::ExportError;
 pub use file::{ResultExport, ResultFormat, SqlTarget, write_result_file};

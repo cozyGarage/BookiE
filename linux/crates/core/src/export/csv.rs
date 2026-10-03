@@ -105,7 +105,7 @@ pub fn render_csv(columns: &[ColumnInfo], rows: &[Vec<Value>], options: &CsvOpti
         output.push_str(options.line_break.as_str());
     }
     for row in rows {
-        output.push_str(&csv_row_line(row, options));
+        output.push_str(&csv_row_line_for_columns(row, columns, options));
         output.push_str(options.line_break.as_str());
     }
     output
@@ -132,8 +132,28 @@ pub(crate) fn csv_header_line(columns: &[ColumnInfo], options: &CsvOptions) -> S
 }
 
 pub(crate) fn csv_row_line(row: &[Value], options: &CsvOptions) -> String {
+    csv_row_line_with_any_columns(row, &[], options)
+}
+
+fn csv_row_line_for_columns(row: &[Value], columns: &[ColumnInfo], options: &CsvOptions) -> String {
+    let any_columns = columns
+        .iter()
+        .map(|column| crate::sqlite_any_csv::is_any_type(&column.data_type))
+        .collect::<Vec<_>>();
+    csv_row_line_with_any_columns(row, &any_columns, options)
+}
+
+fn csv_row_line_with_any_columns(row: &[Value], any_columns: &[bool], options: &CsvOptions) -> String {
     row.iter()
-        .map(|value| format_csv_cell(value, options))
+        .enumerate()
+        .map(|(index, value)| {
+            if any_columns.get(index) == Some(&true)
+                && let Some(encoded) = crate::sqlite_any_csv::encode(value)
+            {
+                return format_csv_cell(&Value::Text(encoded), options);
+            }
+            format_csv_cell(value, options)
+        })
         .collect::<Vec<_>>()
         .join(options.delimiter.as_str())
 }
@@ -196,6 +216,15 @@ pub fn write_csv_row(writer: &mut impl Write, row: &[Value]) -> io::Result<()> {
 
 pub fn write_csv_row_with_options(writer: &mut impl Write, row: &[Value], options: &CsvOptions) -> io::Result<()> {
     writeln!(writer, "{}", csv_row_line(row, options))
+}
+
+pub fn write_csv_row_with_columns_and_options(
+    writer: &mut impl Write,
+    columns: &[ColumnInfo],
+    row: &[Value],
+    options: &CsvOptions,
+) -> io::Result<()> {
+    writeln!(writer, "{}", csv_row_line_for_columns(row, columns, options))
 }
 
 fn is_plain_decimal(value: &str) -> bool {
@@ -276,6 +305,7 @@ fn escape_tsv_field(value: &str) -> String {
 pub(crate) struct CsvWriter {
     header: CsvOptions,
     rows: CsvOptions,
+    any_columns: Vec<bool>,
 }
 
 impl CsvWriter {
@@ -286,12 +316,17 @@ impl CsvWriter {
                 header_row: false,
                 ..options.clone()
             },
+            any_columns: Vec::new(),
         }
     }
 }
 
 impl ResultWriter for CsvWriter {
     fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
+        self.any_columns = columns
+            .iter()
+            .map(|column| crate::sqlite_any_csv::is_any_type(&column.data_type))
+            .collect();
         if !self.header.header_row {
             return Ok(());
         }
@@ -301,7 +336,7 @@ impl ResultWriter for CsvWriter {
     }
 
     fn write_row(&mut self, output: &mut dyn Write, _index: usize, row: &[Value]) -> Result<(), ExportError> {
-        output.write_all(csv_row_line(row, &self.rows).as_bytes())?;
+        output.write_all(csv_row_line_with_any_columns(row, &self.any_columns, &self.rows).as_bytes())?;
         output.write_all(self.rows.line_break.as_str().as_bytes())?;
         Ok(())
     }
@@ -361,6 +396,37 @@ mod tests {
         let rows = vec![vec![Value::Text("\\N".into())], vec![Value::Text("\\NN".into())]];
 
         assert_eq!(unique_csv_null_marker(&rows), "\\NNN");
+    }
+
+    #[test]
+    fn sqlite_any_csv_render_and_column_aware_row_writer_use_type_tags() {
+        let columns = [ColumnInfo {
+            data_type: "ANY".into(),
+            ..crate::export::test_support::column("value")
+        }];
+        let rows = vec![
+            vec![Value::Int(42)],
+            vec![Value::Float(1.5)],
+            vec![Value::Text("bookie:sqlite-any:v1:integer:9".into())],
+            vec![Value::Text(String::new())],
+            vec![Value::Null],
+            vec![Value::Bytes(vec![0, 255])],
+        ];
+        let options = CsvOptions {
+            null_to_empty: false,
+            null_marker: Some("\\N".into()),
+            ..CsvOptions::default()
+        };
+        let rendered = render_csv(&columns, &rows, &options);
+        let mut row_writer = Vec::new();
+        write_csv_header_with_options(&mut row_writer, &columns, &options).unwrap();
+        for row in &rows {
+            write_csv_row_with_columns_and_options(&mut row_writer, &columns, row, &options).unwrap();
+        }
+        assert_eq!(String::from_utf8(row_writer).unwrap(), rendered);
+        assert!(rendered.contains("bookie:sqlite-any:v1:integer:42"));
+        assert!(rendered.contains("bookie:sqlite-any:v1:blob:00ff"));
+        assert!(rendered.contains("bookie:sqlite-any:v1:text:bookie:sqlite-any:v1:integer:9"));
     }
 
     #[test]

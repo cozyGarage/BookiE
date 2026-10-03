@@ -16,7 +16,7 @@ pub const TOOL_NAMES: &[&str] = &[
 
 use serde_json::{Value as JsonValue, json};
 use tablepro_core::export::{
-    CsvOptions, unique_csv_null_marker, write_csv_header_with_options, write_csv_row_with_options,
+    CsvOptions, unique_csv_null_marker, write_csv_header_with_options, write_csv_row_with_columns_and_options,
 };
 
 use uuid::Uuid;
@@ -161,7 +161,8 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
                         .map_err(|error| error.to_string())?;
                     for row in &result.rows {
                         bridge.ensure_operation_active(&control)?;
-                        write_csv_row_with_options(&mut out, row, &options).map_err(|error| error.to_string())?;
+                        write_csv_row_with_columns_and_options(&mut out, &result.columns, row, &options)
+                            .map_err(|error| error.to_string())?;
                     }
                     bridge.ensure_operation_active(&control)?;
                     let content = String::from_utf8(out).map_err(|error| error.to_string())?;

@@ -302,6 +302,38 @@ mod tests {
     }
 
     #[test]
+    fn streamed_sqlite_any_csv_preserves_runtime_value_tags() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sqlite-any.csv");
+        let data = QueryResult {
+            columns: vec![ColumnInfo {
+                data_type: "ANY".into(),
+                ..column("value")
+            }],
+            rows: vec![
+                vec![Value::Int(42)],
+                vec![Value::Float(1.5)],
+                vec![Value::Text(String::new())],
+                vec![Value::Null],
+                vec![Value::Bytes(vec![0, 255])],
+            ],
+            truncated: false,
+        };
+        let options = CsvOptions {
+            null_to_empty: false,
+            null_marker: Some("\\N".into()),
+            ..CsvOptions::default()
+        };
+        write_result_file(&path, &data, &plain(ResultFormat::Csv, &options), || false, |_| {}).unwrap();
+        let csv = std::fs::read_to_string(path).unwrap();
+        assert!(csv.contains("bookie:sqlite-any:v1:integer:42"));
+        assert!(csv.contains("bookie:sqlite-any:v1:real:1.5"));
+        assert!(csv.contains("bookie:sqlite-any:v1:text:"));
+        assert!(csv.contains("\\N\n"));
+        assert!(csv.contains("bookie:sqlite-any:v1:blob:00ff"));
+    }
+
+    #[test]
     fn a_streamed_markdown_file_matches_the_clipboard_renderer() {
         let data = result();
         let expected = format!("{}\n", crate::export::render_markdown(&data.columns, &data.rows));

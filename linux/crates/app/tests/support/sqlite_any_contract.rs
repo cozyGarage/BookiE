@@ -197,3 +197,174 @@ async fn sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes() {
         ]]
     );
 }
+
+#[tokio::test]
+async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{
+        ConnectOptions, DatabaseDriver,
+        export::{CsvOptions, render_csv, unique_csv_null_marker},
+        import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
+    };
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE source (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE restored (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO source VALUES (1, 42), (2, 1.5), (3, '42'), (4, ''), (5, NULL), (6, X'00FF80'), (7, X''), (8, 'bookie:sqlite-any:v1:integer:9'), (9, '=SUM(1)')")
+        .await
+        .unwrap();
+
+    let source_columns = connection.fetch_columns(None, "source").await.unwrap();
+    let value_column = source_columns.iter().find(|column| column.name == "value").unwrap();
+    let source_rows = connection
+        .query("SELECT value FROM source ORDER BY id")
+        .await
+        .unwrap()
+        .rows;
+    let null_marker = unique_csv_null_marker(&source_rows);
+    let csv = render_csv(
+        std::slice::from_ref(value_column),
+        &source_rows,
+        &CsvOptions {
+            null_to_empty: false,
+            null_marker: Some(null_marker.clone()),
+            ..CsvOptions::default()
+        },
+    );
+
+    let sheet = read_csv(
+        csv.as_bytes(),
+        &CsvImportOptions {
+            has_header: true,
+            null_marker: null_marker.clone(),
+            ..CsvImportOptions::default()
+        },
+        None,
+    )
+    .unwrap();
+    let target_columns = connection.fetch_columns(None, "restored").await.unwrap();
+    let plan = build_insert_plan(
+        &ImportTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "restored",
+            columns: &target_columns,
+            mapping: &[None, Some(0)],
+        },
+        &sheet,
+        &CsvImportOptions {
+            has_header: true,
+            null_marker: null_marker.clone(),
+            ..CsvImportOptions::default()
+        },
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query("SELECT typeof(value), value FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("integer".into()), Value::Int(42)],
+            vec![Value::Text("real".into()), Value::Float(1.5)],
+            vec![Value::Text("text".into()), Value::Text("42".into())],
+            vec![Value::Text("text".into()), Value::Text(String::new())],
+            vec![Value::Text("null".into()), Value::Null],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![0x00, 0xff, 0x80])],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![])],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+            ],
+            vec![Value::Text("text".into()), Value::Text("=SUM(1)".into())],
+        ]
+    );
+    let source_real = match source_rows[1][0] {
+        Value::Float(value) => value.to_bits(),
+        ref other => panic!("expected source REAL value, got {other:?}"),
+    };
+    let restored_real = match restored.rows[1][1] {
+        Value::Float(value) => value.to_bits(),
+        ref other => panic!("expected restored REAL value, got {other:?}"),
+    };
+    assert_eq!(restored_real, source_real);
+}
+
+#[tokio::test]
+async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
+    use tablepro_core::{
+        ConnectOptions, DatabaseDriver,
+        import::{CsvImportOptions, ImportTarget, PlanError, build_insert_plan, read_csv},
+    };
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "flexible").await.unwrap();
+
+    let import = |bytes: &[u8], null_marker: String| {
+        let options = CsvImportOptions {
+            has_header: true,
+            null_marker,
+            ..CsvImportOptions::default()
+        };
+        let sheet = read_csv(bytes, &options, None).unwrap();
+        build_insert_plan(
+            &ImportTarget {
+                driver_id: "sqlite",
+                schema: None,
+                table: "flexible",
+                columns: &columns,
+                mapping: &[None, Some(0)],
+            },
+            &sheet,
+            &options,
+        )
+    };
+
+    let blank = import(b"value\n\"\"\n", String::new()).unwrap_err();
+    assert!(matches!(
+        blank,
+        PlanError::Rows { first, total: 1 }
+            if first[0].reason == tablepro_core::import::CellError::AmbiguousSqliteAnyNullOrEmpty
+    ));
+
+    let malformed = import(b"value\nbookie:sqlite-any:v1:blob:0xz1\n", "\\N".into()).unwrap_err();
+    assert!(matches!(
+        malformed,
+        PlanError::Rows { first, total: 1 }
+            if first[0].reason == tablepro_core::import::CellError::InvalidSqliteAnyCsvValue
+    ));
+
+    let untagged_text = import(b"value\n42\n", "\\N".into()).unwrap();
+    assert_eq!(untagged_text.rows, vec![vec![Value::Text("42".into())]]);
+    assert_eq!(
+        connection.query("SELECT COUNT(*) FROM flexible").await.unwrap().rows,
+        vec![vec![Value::Int(0)]]
+    );
+}

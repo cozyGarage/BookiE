@@ -27,6 +27,7 @@ pub mod sql_format;
 pub mod sql_lex;
 pub mod sql_literal;
 pub mod sql_syntax;
+mod sqlite_any_csv;
 pub mod text_file;
 mod tls;
 mod transaction;
