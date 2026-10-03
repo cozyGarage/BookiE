@@ -620,3 +620,168 @@ async fn value_contract_domain_over_enum_sql_file_replay_preserves_values_and_ty
         .unwrap();
     assert_eq!(table.rows, vec![vec![Value::Int(1)]]);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_file_formats_preserve_values_and_refuse_empty_xlsx() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_formats")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_formats.label AS ENUM \
+             ('NULL', '', '東京', '</label><img src=x onerror=\"alert(''x'')\">', \
+              E'a|b\\nc', '<tag>&amp;', '=1+1')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_formats.label_domain \
+             AS value_contract_domain_formats.label",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_formats.rows \
+             (id INT PRIMARY KEY, label value_contract_domain_formats.label_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_domain_formats.rows VALUES \
+             (1, 'NULL'), (2, ''), (3, '東京'), \
+             (4, '</label><img src=x onerror=\"alert(''x'')\">'), \
+             (5, E'a|b\\nc'), (6, '<tag>&amp;'), (7, '=1+1'), (8, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let all_rows = connection
+        .query(
+            "SELECT id, label, pg_typeof(label)::text AS native_type \
+             FROM value_contract_domain_formats.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let domain_type = Value::Text("value_contract_domain_formats.label_domain".into());
+    let hostile = "</label><img src=x onerror=\"alert('x')\">";
+    assert_eq!(
+        all_rows.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("NULL".into()), domain_type.clone()],
+            vec![Value::Int(2), Value::Text(String::new()), domain_type.clone()],
+            vec![Value::Int(3), Value::Text("東京".into()), domain_type.clone()],
+            vec![Value::Int(4), Value::Text(hostile.into()), domain_type.clone()],
+            vec![Value::Int(5), Value::Text("a|b\nc".into()), domain_type.clone()],
+            vec![Value::Int(6), Value::Text("<tag>&amp;".into()), domain_type.clone()],
+            vec![Value::Int(7), Value::Text("=1+1".into()), domain_type.clone()],
+            vec![Value::Int(8), Value::Null, domain_type],
+        ]
+    );
+
+    let directory = tempfile::tempdir().unwrap();
+    let csv = tablepro_core::export::CsvOptions::default();
+    for (name, format) in [
+        ("domain.xml", tablepro_core::export::ResultFormat::Xml),
+        ("domain.html", tablepro_core::export::ResultFormat::Html),
+        ("domain.md", tablepro_core::export::ResultFormat::Markdown),
+    ] {
+        let path = directory.path().join(name);
+        tablepro_core::export::write_result_file(
+            &path,
+            &all_rows,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &csv,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let output = std::fs::read_to_string(&path).unwrap();
+        match format {
+            tablepro_core::export::ResultFormat::Xml => {
+                assert!(output.contains("<label>NULL</label>"), "{output}");
+                assert!(output.contains("<label></label>"), "{output}");
+                assert!(output.contains("<label>東京</label>"), "{output}");
+                assert!(output.contains("onerror=&quot;alert(&apos;x&apos;)&quot;"), "{output}");
+                assert!(output.contains("<label null=\"true\"/>"), "{output}");
+            }
+            tablepro_core::export::ResultFormat::Html => {
+                assert!(output.contains("<td>NULL</td>"), "{output}");
+                assert!(output.contains("<td></td>"), "{output}");
+                assert!(output.contains("<td>東京</td>"), "{output}");
+                assert!(output.contains("&lt;/label&gt;&lt;img src=x"), "{output}");
+                assert!(!output.contains("<img src=x"), "{output}");
+                assert!(output.contains("<td class=\"null\"></td>"), "{output}");
+            }
+            tablepro_core::export::ResultFormat::Markdown => {
+                assert!(output.contains("| \"NULL\" |"), "{output}");
+                assert!(output.contains("| \"\" |"), "{output}");
+                assert!(output.contains("| \"東京\" |"), "{output}");
+                assert!(output.contains("a\\|b&#92;nc"), "{output}");
+                assert!(output.contains("&lt;tag&gt;&amp;amp;"), "{output}");
+                assert!(output.contains("| NULL |"), "{output}");
+            }
+            tablepro_core::export::ResultFormat::Csv
+            | tablepro_core::export::ResultFormat::Json
+            | tablepro_core::export::ResultFormat::Sql
+            | tablepro_core::export::ResultFormat::Xlsx => {}
+        }
+    }
+
+    let valid_rows = connection
+        .query(
+            "SELECT id, label, pg_typeof(label)::text AS native_type \
+             FROM value_contract_domain_formats.rows WHERE label::text <> '' ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let xlsx_path = directory.path().join("domain.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &valid_rows,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let workbook = std::fs::read(&xlsx_path).unwrap();
+    assert!(workbook.starts_with(b"PK"));
+    assert!(workbook.len() > 1_000, "{}", workbook.len());
+
+    let refusal_path = directory.path().join("keep.xlsx");
+    std::fs::write(&refusal_path, b"existing workbook").unwrap();
+    let error = tablepro_core::export::write_result_file(
+        &refusal_path,
+        &all_rows,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            tablepro_core::export::ExportError::WorkbookEmptyText { row: 2, column: 2 }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(std::fs::read(&refusal_path).unwrap(), b"existing workbook");
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 5);
+}

@@ -4295,8 +4295,11 @@ into a same-domain destination; exact native values/types survive and the
 statement-shaped label does not alter a neighboring table. Domain
 MCP coverage exercises `execute_query`, JSON and CSV `export_data`, then imports
 the exact emitted CSV with its marker and checks native domain values/types.
-Domain XML/HTML/Markdown/XLSX exports, parameter inference outside assignment
-writes and nested domain chains remain untested.
+XML/HTML/Markdown file outputs preserve NULL/empty distinctions, Unicode and
+escaped hostile labels. XLSX writes the non-empty domain labels as a workbook
+and refuses the empty label while preserving the existing destination.
+Additional PostgreSQL domain/session format combinations, parameter inference
+outside assignment writes and nested domain chains remain untested.
 Exact commands and results are in the
 [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 

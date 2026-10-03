@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_file_formats_preserve_values_and_refuse_empty_xlsx -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 90 filtered out (1 suite, 2.30s). XML/HTML/Markdown preserve exact text/NULL and escape hostile labels; XLSX writes non-empty labels and refuses empty text without replacing the existing workbook.
