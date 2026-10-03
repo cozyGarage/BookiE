@@ -4625,3 +4625,9 @@ all 10 enum contracts, Clippy, formatting and diff checks pass. See the
 [shadowed-filter matrix evidence](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
 
 The other session/search_path and operator combinations remain open.
+
+The same fixture also checks a direct bound equality query on
+`enum_shadow_b.items` while `search_path` resolves the colliding
+`enum_shadow_a.status_kind`. The target enum comparison succeeds, the returned
+column retains its qualified native type, and the shadow row remains unchanged.
+See the [direct parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
