@@ -698,9 +698,24 @@ async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
     let cases = [
         (FilterOp::Eq, FilterValue::Single("NULL".into()), vec![(1, "NULL")]),
         (
+            FilterOp::NotEq,
+            FilterValue::Single("NULL".into()),
+            vec![(2, "ready"), (3, "東京")],
+        ),
+        (
+            FilterOp::Lt,
+            FilterValue::Single("東京".into()),
+            vec![(1, "NULL"), (2, "ready")],
+        ),
+        (
             FilterOp::In,
             FilterValue::List(vec!["ready".into(), "東京".into()]),
             vec![(2, "ready"), (3, "東京")],
+        ),
+        (
+            FilterOp::Between,
+            FilterValue::Pair("NULL".into(), "ready".into()),
+            vec![(1, "NULL"), (2, "ready")],
         ),
     ];
     for (op, value, expected_ids) in cases {
