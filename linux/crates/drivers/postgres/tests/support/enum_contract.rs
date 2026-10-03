@@ -1343,6 +1343,33 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         );
     }
 
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO enum_shadow_a")
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("enum_shadow_a".into())]]
+    );
+    let session_inferred = transaction
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM enum_shadow_b.items WHERE status = $1 ORDER BY id",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        session_inferred.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("enum_shadow_b.status_kind".into()),
+        ]]
+    );
+    transaction.rollback().await.unwrap();
+
     let ambiguous_native = connection
         .execute(
             "PREPARE enum_shadow_ambiguous_parameter AS \
