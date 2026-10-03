@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "cfdd22632c0388c966df6693db3b413d32c32043",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Domain-over-enum direct query parameter operators",
+  "outcome": "Exact typed support for the explicitly base-enum-cast query contexts tested; the domain column retains its native domain type.",
+  "added_coverage": [
+    "Raw domain equality status = $1 remains explicitly refused with SQLSTATE 42883.",
+    "Casting the domain column to its base enum infers the native enum parameter type for =, <>, and BETWEEN.",
+    "Text parameters preserve expected truth values; BETWEEN checks the inferred type of both parameters.",
+    "SQL NULL equality stays SQL NULL while pg_typeof confirms base-enum parameter and domain-column types."
+  ],
+  "validation": {
+    "focused_query_operators": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_domain_over_enum_query_comparison_infers_parameter_type -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "query-operators.txt"
+    },
+    "domain_contract_suite": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "domain-suite.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "query-operators.txt": "8c5455d457b1ca1dab0be71034e72dff6cf5cdeb7db6b4a4c0acae321a8dd10e",
+    "domain-suite.txt": "9c1ee9e86926064e74c04481c6a49edcec8aaa26b8f1ce4727b78bcbe0e9ed74"
+  },
+  "remaining": [
+    "Other direct SQL operator contexts, uncast domain comparisons beyond the recorded equality refusal, and session/search_path configurations remain open.",
+    "This focused query contract does not close the PostgreSQL enum matrix or B3."
+  ]
+}

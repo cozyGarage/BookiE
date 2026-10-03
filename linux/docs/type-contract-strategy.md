@@ -27,6 +27,10 @@ source/SHA attribution; this summary does not certify the current tree.
 The PostgreSQL 16 domain-over-enum filter contract now verifies `=`, `<>`, `<`,
 `IN`, `BETWEEN` and `IS NULL` with native labels and `pg_typeof` assertions; see
 the [focused evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+For direct query parameters, base-enum-cast `=`, `<>` and `BETWEEN` preserve
+inferred parameter types; raw domain `= $1` remains explicitly refused with
+SQLSTATE 42883. See the
+[query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
 Other domain operators and session configurations remain open.
 
 SQLite STRICT `ANY` table CSV now tags INTEGER, REAL, TEXT and BLOB cells so a

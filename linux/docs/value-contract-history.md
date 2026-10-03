@@ -4324,6 +4324,16 @@ also cover `<>`, `<` and `BETWEEN`. Rows assert exact enum labels, keep literal
 contract tests pass; other domain operators and session configurations remain open. See the
 [operator evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
 
+### Domain-over-enum query parameter operator follow-up (October 3)
+
+The direct query comparison contract now checks the base-enum-cast `<>` and
+`BETWEEN` operators in addition to `=`. PostgreSQL infers the enum parameter
+type for both BETWEEN bounds; native `pg_typeof` and row truth-value assertions
+pass. Raw domain `= $1` continues to fail with SQLSTATE 42883, as recorded by
+the same contract. The full domain suite passes all 10 tests. Other direct
+operator and session configurations remain open. See the
+[query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
+
 ## MongoDB browse metadata and cursor consistency — 2026-10-03
 
 `fetch_rows` now builds collection-wide type metadata and retains requested

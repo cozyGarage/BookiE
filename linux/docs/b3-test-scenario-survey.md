@@ -115,6 +115,9 @@ regression now also verifies `<>`, `<` and `BETWEEN` alongside equality, `IN`
 and `IS NULL`, with native domain type checks. Other domain operator and
 session contexts remain open; see the
 [focused evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+The direct query parameter contract also checks base-enum-cast `=`, `<>` and
+`BETWEEN`; raw domain equality remains explicitly refused. See the
+[query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 
