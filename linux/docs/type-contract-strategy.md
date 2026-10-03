@@ -34,12 +34,13 @@ cover every shared `FilterOp`, including range comparisons, text-pattern
 filters, both NULL operators and both list operators, with exact rows/labels and
 native type assertions; see the
 [complete filter matrix](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
-For direct query parameters, base-enum-cast `=`, `<>`, `<`, `<=`, `>`, `>=` and
-`BETWEEN` preserve inferred parameter types; raw domain `= $1` remains explicitly
-refused with SQLSTATE 42883. See the
+For direct query parameters, base-enum-cast `=`, `<>`, `<`, `<=`, `>`, `>=`,
+`IN`, `NOT IN` and `BETWEEN` preserve inferred parameter types; raw domain
+`= $1` remains explicitly refused with SQLSTATE 42883. See the
 [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
-and [ordering-operator evidence](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
-Other direct query-parameter operator contexts, session configurations, deeper
+and the [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
+and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+Other direct query-parameter contexts, session configurations, deeper
 nested-domain depths and other custom/native cases remain open.
 
 SQLite STRICT `ANY` table and direct nonempty query-result CSV now tag INTEGER,

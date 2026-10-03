@@ -4569,4 +4569,16 @@ with Clippy, formatting and diff checks. See the
 [ordering-parameter evidence](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
 
 Direct query parameters for list operators and other session/search_path
-combinations remain untested.
+combinations remained untested at that checkpoint.
+
+## PostgreSQL domain-over-enum query list parameters (2026-10-03)
+
+The direct query comparison contract now checks `IN ($1, $2)` and
+`NOT IN ($1, $2)` on a domain-over-enum column cast to its base enum. Both
+parameters resolve to the qualified enum type, confirmed with `pg_typeof`, and
+the exact per-row truth values retain SQL NULL propagation. The focused
+PostgreSQL 16 case and all 10 domain contracts pass, as do Clippy, formatting
+and diff checks. See the
+[list-parameter evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+
+Other direct query contexts and session/search_path combinations remain open.
