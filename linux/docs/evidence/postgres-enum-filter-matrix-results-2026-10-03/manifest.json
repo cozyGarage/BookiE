@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "a41ef913086d3623e96c30ae953e2f2e6032b39c",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Structured filter operator matrix for custom enum and domain-over-enum columns",
+  "added_coverage": [
+    "Both ordinary enum and domain-over-enum filters now cover every shared FilterOp: equality and inequality; <, <=, >, >=; Contains, StartsWith, EndsWith, Like, NotLike and ILike; IsNull and IsNotNull; In, NotIn and Between.",
+    "Each comparison/pattern/list case asserts exact ordered row identities and labels; enum cases also check the native enum type, and domain cases check pg_typeof(domain_column)::text.",
+    "The fixtures include literal label NULL, SQL NULL, a Unicode enum label, and enum ordering. Pattern filters exercise the builder's enum-to-text path."
+  ],
+  "independent_oracle": "PostgreSQL 16 query results with exact row IDs/labels and native enum/domain type text.",
+  "validation": {
+    "ordinary_enum_focused": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_filters_preserve_labels_and_sql_null -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "ordinary-filter.txt"
+    },
+    "domain_enum_focused": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_filters_preserve_values_and_type -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "domain-filter.txt"
+    },
+    "enum_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "enum-suite.txt"
+    },
+    "domain_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "domain-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "ordinary-filter.txt": "25e6931b06bde24a135ba9f0c1679e44f900db2666d3472a2d694c51c834e992",
+    "domain-filter.txt": "2594f0bc42e8644d9376cb56556d38f6bfce5c696966dc4d8c0a9004853a610a",
+    "enum-suite.txt": "5210f90b2441705354c6a9426b9781fec67a985e48204ee37ca92bd38392e8c9",
+    "domain-suite.txt": "a11652df27bd33364ba738e9460a4a85fab20795bf3c224bf9acbb3c0e897b91",
+    "clippy.txt": "12dbc982bd4d5dded0c10b0ef720ab54e0ae8dee0ed49abcf9d7f49150082910"
+  },
+  "remaining": [
+    "Other direct query-parameter operator contexts, session/search_path combinations, deeper domain chains and other native types remain open.",
+    "This filter matrix does not close B3 or qualify the 0.2.0 release."
+  ]
+}

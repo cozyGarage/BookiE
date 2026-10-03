@@ -112,11 +112,12 @@ installed editing remain open; see the
 [table CSV case](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)
 and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03).
 
-October 3 B3-1 follow-up: the PostgreSQL domain-over-enum structured filter
-regression now also verifies `<>`, `<` and `BETWEEN` alongside equality, `IN`
-and `IS NULL`, with native domain type checks. Other domain operator and
-session contexts remain open; see the
-[focused evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
+cover all 17 shared structured-filter operators, including text-pattern
+operators, list complements and both NULL checks. Exact row labels and native
+enum/domain types are asserted. Direct query-parameter operator contexts and
+session configurations remain open; see the
+[complete filter matrix](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
 The direct query parameter contract also checks base-enum-cast `=`, `<>` and
 `BETWEEN`; raw domain equality remains explicitly refused. See the
 [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).

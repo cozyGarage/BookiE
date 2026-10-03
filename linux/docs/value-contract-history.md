@@ -4538,3 +4538,20 @@ Zero-row results still have no column metadata in the current row-based result
 conversion; computed expressions and attached-schema origins remain untyped
 when SQLx cannot supply a declared type. Other SQLite consumers, output formats
 and installed GTK editing remain open.
+
+## PostgreSQL enum structured-filter operator matrix (2026-10-03)
+
+The ordinary-enum and domain-over-enum filter contracts now cover every shared
+`FilterOp`: `=`, `<>`, `<`, `<=`, `>`, `>=`, Contains, StartsWith, EndsWith,
+Like, NotLike, ILike, IsNull, IsNotNull, In, NotIn and Between. Each fixture
+asserts exact row IDs and labels, with native enum type checks; the domain case
+checks `pg_typeof(domain_column)::text`. Cases include literal label `NULL`, SQL
+NULL, enum ordering and a Unicode label. Pattern filters exercise the enum to
+text comparison path. Both focused PostgreSQL 16 Docker cases and both complete
+10-test contract suites pass, as do PostgreSQL Clippy, formatting and diff
+checks. See the
+[operator matrix evidence](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
+
+This closes structured-filter operator coverage for these enum fixtures. Direct
+query-parameter operator contexts, session/search_path combinations, deeper
+domain chains and other enum/native value consumers remain open.
