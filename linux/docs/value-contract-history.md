@@ -4315,6 +4315,15 @@ bound text and SQL NULL parameters; `pg_typeof` and row outcomes are checked.
 Exact commands and results are in the
 [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
+### Domain-over-enum filter operator follow-up (October 3)
+
+The native filter contract was expanded from equality, `IN` and `IS NULL` to
+also cover `<>`, `<` and `BETWEEN`. Rows assert exact enum labels, keep literal
+`NULL` distinct from SQL NULL, and report the original domain through
+`pg_typeof`. The focused PostgreSQL 16 Docker contract and all 10 domain
+contract tests pass; other domain operators and session configurations remain open. See the
+[operator evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+
 ## MongoDB browse metadata and cursor consistency — 2026-10-03
 
 `fetch_rows` now builds collection-wide type metadata and retains requested

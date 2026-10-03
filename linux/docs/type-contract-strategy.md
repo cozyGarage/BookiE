@@ -24,6 +24,11 @@ source/SHA attribution; this summary does not certify the current tree.
 | Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases | One missing format/type/configuration boundary, native kind after writes and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
+The PostgreSQL 16 domain-over-enum filter contract now verifies `=`, `<>`, `<`,
+`IN`, `BETWEEN` and `IS NULL` with native labels and `pg_typeof` assertions; see
+the [focused evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+Other domain operators and session configurations remain open.
+
 SQLite STRICT `ANY` table CSV now tags INTEGER, REAL, TEXT and BLOB cells so a
 native import can retain their runtime storage classes; SQL NULL uses the
 export's explicit collision-free marker. Untagged text stays text, while a

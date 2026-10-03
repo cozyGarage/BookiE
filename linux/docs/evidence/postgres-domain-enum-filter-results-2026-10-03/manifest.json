@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "cace9fce9731125081f50a0261e19361a1d8aaba",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Structured filters on a domain-over-enum column",
+  "outcome": "Exact typed support for the named structured filter operations; domain type and values remain unchanged.",
+  "added_coverage": [
+    "The existing domain-over-enum filter regression now checks Eq, NotEq, Lt, In, Between and IsNull.",
+    "Literal label NULL remains distinct from SQL NULL, and a Unicode enum label is included.",
+    "Every selected row checks label text and pg_typeof(domain_column)::text against the native domain type."
+  ],
+  "validation": {
+    "focused_domain_filters": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_domain_over_enum_filters_preserve_values_and_type -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "domain-filter.txt"
+    },
+    "domain_contract_suite": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "domain-contract-suite.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "domain-filter.txt": "8c5455d457b1ca1dab0be71034e72dff6cf5cdeb7db6b4a4c0acae321a8dd10e",
+    "domain-contract-suite.txt": "4009d4cd5490f3d6f9989cdbe7be7bae05eda4cd70d31788d4794ee077c8c16a"
+  },
+  "remaining": [
+    "Other domain comparison/operator contexts and session/search_path configurations remain open.",
+    "This focused filter contract does not close the PostgreSQL enum matrix or B3."
+  ]
+}

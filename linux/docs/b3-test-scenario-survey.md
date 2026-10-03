@@ -110,6 +110,12 @@ reserved tags are refused. Arbitrary SQLite query exports whose result metadata
 does not identify declared `ANY`, other formats and installed editing remain
 open; see the [case record](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03).
 
+October 3 B3-1 follow-up: the PostgreSQL domain-over-enum structured filter
+regression now also verifies `<>`, `<` and `BETWEEN` alongside equality, `IN`
+and `IS NULL`, with native domain type checks. Other domain operator and
+session contexts remain open; see the
+[focused evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+
 ### B3-P1 current coverage verdict — September 30
 
 Temporal follow-up (2026-10-02): ClickHouse now checks both a one-hour New York
