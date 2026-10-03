@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixtures: 89 passed (1 suite, 201.68s). Includes domain-over-enum assignment parameter inference for text and SQL NULL.

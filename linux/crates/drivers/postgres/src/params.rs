@@ -32,14 +32,19 @@ pub(super) async fn describe_query_parameters(
         .parameters()
         .and_then(|types| types.left())
         .unwrap_or_default();
-    let enum_types = parameters
-        .iter()
-        .map(|type_info| matches!(type_info.kind(), PgTypeKind::Enum(_)).then(|| type_info.clone()))
-        .collect();
+    let enum_types = parameters.iter().map(enum_type_info).collect();
     Ok(PgParameterDescription {
         enum_types,
         columns: statement_columns(statement.columns()),
     })
+}
+
+fn enum_type_info(type_info: &PgTypeInfo) -> Option<PgTypeInfo> {
+    match type_info.kind() {
+        PgTypeKind::Enum(_) => Some(type_info.clone()),
+        PgTypeKind::Domain(base) => enum_type_info(base),
+        _ => None,
+    }
 }
 
 pub(super) fn needs_enum_type_inference(params: &[Value]) -> bool {

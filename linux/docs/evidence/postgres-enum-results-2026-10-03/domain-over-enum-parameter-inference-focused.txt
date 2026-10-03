@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_assignment_infers_parameter_type -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 88 filtered out (1 suite, 2.40s). Verifies uncast text and SQL NULL assignment parameters, exact stored domain type, and unchanged sibling row.

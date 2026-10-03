@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_assignment_infers_parameter_type -- --include-ignored --test-threads=1
+Failed before the parameter metadata fix. Native UPDATE assignment inferred value_contract_domain_infer.state_domain, but the driver bound the Value::Text parameter as text; PostgreSQL returned SQLSTATE 42804: column status is of type value_contract_domain_infer.state_domain but expression is of type text.

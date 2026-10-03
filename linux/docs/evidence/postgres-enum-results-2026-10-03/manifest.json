@@ -187,6 +187,15 @@
       "assertions": "PostgreSQL 16 renders a domain-over-enum result to raw CSV with an explicit \\N marker and imports literal NULL, empty text, Unicode and SQL NULL. Default blank ambiguity is refused before writes. Source and destination values match, and pg_typeof confirms the destination domain type.",
       "coverage_kind": "New native domain CSV export/import consumer contract; no production change was needed.",
       "test_module": "domain_contract"
+    },
+    {
+      "selector": "value_contract_domain_over_enum_assignment_infers_parameter_type",
+      "assertions": "PostgreSQL 16 infers uncast text and SQL NULL parameters from assignment to a domain-over-enum column. Native reads assert exact values, pg_typeof domain type and an unchanged sibling row.",
+      "before_fix": "Failed with SQLSTATE 42804: PostgreSQL inferred the domain target, but the driver bound the parameter as text.",
+      "after_fix": "Passed after parameter description followed domain metadata to its enum base for custom enum binding.",
+      "before_fix_log": "domain-over-enum-parameter-inference-before-fix.txt",
+      "coverage_kind": "New native implicit assignment-parameter regression and driver metadata fix.",
+      "test_module": "domain_contract"
     }
   ],
   "commands": {
@@ -279,7 +288,8 @@
     "domain_enum_filter_app_parser": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib unknown_type_falls_through_to_text",
     "domain_over_enum_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
     "domain_over_enum_csv_round_trip": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type -- --include-ignored --test-threads=1",
-    "domain_over_enum_csv_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1"
+    "domain_over_enum_csv_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "domain_over_enum_assignment_parameter_inference": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_assignment_infers_parameter_type -- --include-ignored --test-threads=1"
   },
   "validation": {
     "focused": {
@@ -1063,9 +1073,25 @@
       "output": "domain-over-enum-csv-focused.txt"
     },
     "domain_over_enum_csv_postgres_suite": {
-      "status": "passed",
+      "status": "superseded",
       "result": "88 passed; 1 suite; 191.80 seconds. PostgreSQL 16 Docker fixtures, including the final domain-over-enum CSV contract with exact value/type assertions.",
-      "output": "domain-over-enum-csv-postgres-suite.txt"
+      "output": "domain-over-enum-csv-postgres-suite.txt",
+      "superseded_by": "domain_over_enum_assignment_parameter_postgres_suite"
+    },
+    "domain_over_enum_assignment_parameter_inference_before_fix": {
+      "status": "failed_as_expected",
+      "result": "PostgreSQL returned SQLSTATE 42804 because the inferred domain target received a text-typed parameter.",
+      "output": "domain-over-enum-parameter-inference-before-fix.txt"
+    },
+    "domain_over_enum_assignment_parameter_inference": {
+      "status": "passed",
+      "result": "PostgreSQL 16 Docker fixture: 1 passed, 88 filtered out (1 suite, 2.40 seconds). Verifies uncast text and SQL NULL assignment parameters, exact domain type, and unchanged sibling row.",
+      "output": "domain-over-enum-parameter-inference-focused.txt"
+    },
+    "domain_over_enum_assignment_parameter_postgres_suite": {
+      "status": "passed",
+      "result": "89 passed; 1 suite; 201.68 seconds. PostgreSQL 16 Docker fixtures, including domain-over-enum CSV and inferred assignment parameters.",
+      "output": "domain-over-enum-assignment-parameter-postgres-suite.txt"
     }
   },
   "source_fingerprints_sha256": {
@@ -1080,13 +1106,13 @@
     "linux/crates/drivers/postgres/tests/integration.rs": "cf00eb8b2dd600f9d61cd68b33b2be607e411ba00cb613b2864e537d98e96881",
     "linux/crates/drivers/postgres/tests/support/array_contract.rs": "723188d7eff6cc146618c1ccfb46429d601280111ab74b8550882d49e6c9f85e",
     "linux/crates/drivers/postgres/tests/support/enum_contract.rs": "aaf229189adeee0a7f6530b098e3711d28103bd0544abcc41ed51d13562292df",
-    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "9176c963eaed4082f41ecb1a8fa2647dfcaa290c4c0a34edbcaa0e8cc6022568",
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "30d6a1c8bf08b45d19051dc39e423e8de4391ab02ad8080825c9bb1d4359591c",
     "linux/vendor/sqlx-postgres/src/types/array.rs": "f56af1aef5a9120f7db5aa70ec30fbd7743ba3fc39de8b4e498f51b5736e11e9",
     "linux/crates/core/src/filter.rs": "6f9b624c203c11ae260e0cc6445a26ca81516e6a7a13136ac9aa5ea055a22d38",
     "linux/crates/core/src/filter_tests.rs": "e2e9b7b25f2613e106d4e70d8e12a56fd77dfa075f3116111c6fe4f79d48d044",
     "linux/crates/core/src/import/cell.rs": "d6e81788cc04f9488d3cc089f7631152a3995e118293e83e5bc1ac739e4681e9",
     "linux/crates/core/src/import/plan.rs": "3c008947a740b67aaba931ffeb71a3de1002f3ea533307c398a0cb8361f22d66",
-    "linux/crates/drivers/postgres/src/params.rs": "587613219e9be45451fc0f287affc2d194dda664a3a181aa9f99b55237612a38",
+    "linux/crates/drivers/postgres/src/params.rs": "2fa3f6a5749e51582b2d41ccb58a8ba226efcf9301f8b20770067385fb556108",
     "linux/crates/drivers/postgres/src/tests.rs": "25c09cea7ae72f2dc84ad34d71d27abc56b05cd1cdbb085bff864281ec71e306",
     "linux/Cargo.lock": "f3da9e0c4496b3071a237f85187f5b3d2f550acbcab31fc6a160103b4ec38f47",
     "linux/crates/mcp/Cargo.toml": "2f294127edb9ddec009bdd5911cc1530747ddf4c0547a6f5c4dac35a82a9a13f",
@@ -1095,10 +1121,10 @@
     "linux/crates/mcp/tests/postgres_custom_enum.rs": "1954ad5621d201e6693e4eed8e67cc18c6506b9ddbe8b13b55918aa36e52ea24",
     "linux/crates/drivers/postgres/Cargo.toml": "68c472593388dc94e996244842478041e60f46d5f057c1e1fc8c65d32dd63a5b",
     "linux/docs/b3-test-scenario-survey.md": "173ba8cc6f853757e2ad9cb1972afe4bba3c14be7322c5ad42def423554f5772",
-    "linux/docs/type-contract-strategy.md": "ec1e8a0e6be129fa45e729878d34a5bfb007dc3802b990900217643425bf53e6",
-    "linux/docs/value-contract-history.md": "bd08434441734624b161001a48a068bdaee2c8965da7186796737b9cc67f869c",
+    "linux/docs/type-contract-strategy.md": "6331c2c1295db18002a99403836ffbfcd23e3290e491f85ad2fd7ca65989cb22",
+    "linux/docs/value-contract-history.md": "d1d0f8935f6b532f070894aad0543cc596ac438f630470f47509841647ccd6f0",
     "linux/docs/release-audit-2026-10-03.md": "80131d29c35524773fe555d7322e5e3afbb021e2f6cee553c88ee81a53c5c22c",
-    "linux/docs/ignored-tests.md": "c7b31aa5b15f547343a6a7ee55e699efcdab2b5b3c211a33dcf4a78d0ecd67a8",
+    "linux/docs/ignored-tests.md": "ee88f6c6864c46d521b1e46ba2ba49abd3bd1754cabedfc6076e68d30cf60178",
     "linux/crates/drivers/postgres/tests/support/enum_file_export_contract.rs": "2731dfaafb2971ff8758349c0ee197cde73bb59e6ff07b41f5dfacba28faba96",
     "linux/crates/core/src/export/markdown.rs": "dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d",
     "linux/CHANGELOG.md": "53502e69132557c8ab351abc54ed2da32b029398603acb95b005d2f75747c849",
@@ -1331,12 +1357,15 @@
     "domain-enum-filter-clippy.txt": "00706cca564272dbf0d90cf69e97d4e518d1cad706c0db6d6982ec851d928c52",
     "domain-over-enum-postgres-suite.txt": "39872b0745b5f4dabe8d69680d2c227605a3518628d9d6434da9b53a92d696fd",
     "domain-over-enum-csv-focused.txt": "e109fe58ab5f820328ac537c41ee0251197f4c6bcce6bf1e57e2ee8876bf29ea",
-    "domain-over-enum-csv-postgres-suite.txt": "ff07d97ab923fc867ef3d0af63448275d2d4514d15d28b6a379ef10c65d9c4e8"
+    "domain-over-enum-csv-postgres-suite.txt": "ff07d97ab923fc867ef3d0af63448275d2d4514d15d28b6a379ef10c65d9c4e8",
+    "domain-over-enum-parameter-inference-before-fix.txt": "2961ea9e75b633677499756d9fda554718732c022ba0867adce9e894194ab0c2",
+    "domain-over-enum-parameter-inference-focused.txt": "71b6d9c8d02776052c4bbcffd282318485096b5f2c877e3e8755b1323cf81682",
+    "domain-over-enum-assignment-parameter-postgres-suite.txt": "2de2a621d26cda222fc18dee3bbc5b77973353163fca5cdf6bb1526ff69e09e2"
   },
   "remaining": [
     "Additional PostgreSQL enum format/session combinations remain open. Core spreadsheet-safe CSV is now proven to be presentation-only and lossy on import; raw-text CSV has the native round-trip contract.",
     "Complete the broader PostgreSQL custom-enum type/session/configuration and consumer matrix with independent native oracles.",
     "These focused JSON/XML/HTML/Markdown/XLSX/MCP cases and PostgreSQL driver suite do not close B3\u2019s broader engine/type/consumer matrix or release gates.",
-    "Domain-over-enum support is proven for scalar/array results, structured filters, keyed updates, draft inserts, the app text parser, explicit-cast text/SQL NULL parameters and updates, and raw CSV export/import with explicit NULL markers; implicit parameter inference, JSON/file exports and nested domain chains remain untested."
+    "Domain-over-enum support is proven for scalar/array results, structured filters, keyed updates, draft inserts, the app text parser, explicit-cast parameters, assignment-inferred text/SQL NULL updates and raw CSV export/import with explicit NULL markers; parameter inference outside assignment writes, JSON/file exports and nested domain chains remain untested."
   ]
 }

@@ -154,6 +154,99 @@ async fn value_contract_domain_over_enum_parameters_preserve_native_type() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_assignment_infers_parameter_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_infer")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_domain_infer.state AS ENUM ('NULL', '東京', 'ready')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE DOMAIN value_contract_domain_infer.state_domain AS value_contract_domain_infer.state")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_infer.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_infer.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO value_contract_domain_infer.rows VALUES (1, 'NULL'), (2, '東京')")
+        .await
+        .unwrap();
+
+    let updated = connection
+        .execute_params(
+            "UPDATE value_contract_domain_infer.rows SET status = $1 WHERE id = 2",
+            &[Value::Text("ready".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.rows_affected, 1);
+    let stored = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_domain_infer.rows WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![vec![
+            Value::Int(2),
+            Value::Text("ready".into()),
+            Value::Text("value_contract_domain_infer.state_domain".into()),
+        ]]
+    );
+
+    let nulled = connection
+        .execute_params(
+            "UPDATE value_contract_domain_infer.rows SET status = $1 WHERE id = 2",
+            &[Value::Null],
+        )
+        .await
+        .unwrap();
+    assert_eq!(nulled.rows_affected, 1);
+    let stored_null = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_domain_infer.rows WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        stored_null.rows,
+        vec![vec![
+            Value::Int(2),
+            Value::Null,
+            Value::Text("value_contract_domain_infer.state_domain".into()),
+        ]]
+    );
+    let sibling = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_domain_infer.rows WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        sibling.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("NULL".into()),
+            Value::Text("value_contract_domain_infer.state_domain".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
