@@ -4351,3 +4351,27 @@ Selectors: `sqlite_real_storage_preserves_float_edge_bits` and
 23 tests; local `quick` and `change-contracts` layers also passed. Their retained
 report and source fingerprints are in
 [`sqlite REAL evidence`](evidence/sqlite-real-results-2026-10-03/manifest.json).
+
+## PostgreSQL nested domain-over-enum chain (2026-10-03)
+
+A PostgreSQL 16 fixture nests two domains over a custom enum and checks exact
+projection values plus the outer `pg_typeof`. Before the fix, `fetch_columns`
+returned no enum metadata for the domain column because the catalog lookup
+unwrapped only one domain layer. That omission prevented the existing
+schema-aware filter/keyed-update/draft-insert builders from using the base enum
+cast. The catalog now follows `pg_type.typbasetype` recursively until it finds
+the enum leaf. The regression verifies the resolved qualified enum metadata,
+literal label `NULL` filtering, keyed update, draft insert, inferred text and
+SQL NULL transaction writes, invalid-label SQLSTATE `22P02`, and unchanged
+native values/types for all rows.
+
+The focused new selector and all 92 PostgreSQL integration tests passed. Clippy
+passed for all PostgreSQL targets. The initial native assertion failure and
+current logs/source fingerprints are in the
+[nested-domain evidence manifest](evidence/postgres-nested-domain-results-2026-10-03/manifest.json).
+PostgreSQL 16 rejects an uncast raw comparison between this domain column and
+an unknown text parameter with SQLSTATE `42883`; the test keeps that boundary
+explicit and verifies that casting both sides to the base enum returns the
+literal `NULL` label. Structured filters already produce those base-enum casts.
+Automatic inference for raw domain comparisons and other enum
+session/configuration combinations remain open.

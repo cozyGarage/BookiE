@@ -224,14 +224,30 @@ impl Connection for PgConnection {
                 pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment,
                 CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
                     THEN co.collname::text END AS collation,
-                CASE WHEN enum_ty.typtype = 'e' THEN type_ns.nspname END AS enum_schema,
-                CASE WHEN enum_ty.typtype = 'e' THEN enum_ty.typname END AS enum_name
+                type_ns.nspname AS enum_schema,
+                enum_ty.typname AS enum_name
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
              JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
-             LEFT JOIN pg_catalog.pg_type enum_ty
-                 ON enum_ty.oid = CASE WHEN ty.typtype = 'd' THEN ty.typbasetype ELSE ty.oid END
+             LEFT JOIN LATERAL (
+                 WITH RECURSIVE type_chain(oid, typtype, typbasetype, typnamespace, typname) AS (
+                     SELECT candidate.oid, candidate.typtype, candidate.typbasetype,
+                            candidate.typnamespace, candidate.typname
+                     FROM pg_catalog.pg_type candidate
+                     WHERE candidate.oid = ty.oid
+                     UNION ALL
+                     SELECT base.oid, base.typtype, base.typbasetype,
+                            base.typnamespace, base.typname
+                     FROM pg_catalog.pg_type base
+                     JOIN type_chain ON base.oid = type_chain.typbasetype
+                     WHERE type_chain.typtype = 'd'
+                 )
+                 SELECT typnamespace, typname
+                 FROM type_chain
+                 WHERE typtype = 'e'
+                 LIMIT 1
+             ) enum_ty ON TRUE
              LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = enum_ty.typnamespace
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d

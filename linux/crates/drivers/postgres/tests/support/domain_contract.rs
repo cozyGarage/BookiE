@@ -275,6 +275,273 @@ async fn value_contract_domain_over_enum_assignment_infers_parameter_type() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_nested_domain_over_enum_infers_parameters_and_decodes() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_nested_domain")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_nested_domain.state AS ENUM ('NULL', '', '東京', 'ready')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_nested_domain.state_inner \
+             AS value_contract_nested_domain.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_nested_domain.state_outer \
+             AS value_contract_nested_domain.state_inner",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_nested_domain.rows \
+             (id INT PRIMARY KEY, status value_contract_nested_domain.state_outer)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_nested_domain.rows VALUES \
+             (1, 'NULL'), (2, '東京'), (3, '東京')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection
+        .fetch_columns(Some("value_contract_nested_domain"), "rows")
+        .await
+        .unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "value_contract_nested_domain".into(),
+            name: "state".into(),
+        })
+    );
+
+    let projected = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        projected.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("東京".into()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("東京".into()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+        ]
+    );
+
+    let uncast_comparison = connection
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows WHERE status = $1",
+            &[Value::Text("NULL".into())],
+        )
+        .await
+        .expect_err("PostgreSQL cannot resolve domain = unknown without an explicit cast");
+    assert!(matches!(
+        uncast_comparison,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "42883"
+    ));
+    let typed_comparison = connection
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows \
+             WHERE status::value_contract_nested_domain.state = \
+                   $1::value_contract_nested_domain.state",
+            &[Value::Text("NULL".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        typed_comparison.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("NULL".into()),
+            Value::Text("value_contract_nested_domain.state_outer".into()),
+        ]]
+    );
+
+    let updated = connection
+        .execute_params(
+            "UPDATE value_contract_nested_domain.rows SET status = $1 WHERE id = 2",
+            &[Value::Text("ready".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.rows_affected, 1);
+    let invalid = connection
+        .execute_params(
+            "UPDATE value_contract_nested_domain.rows SET status = $1 WHERE id = 2",
+            &[Value::Text("not a label".into())],
+        )
+        .await
+        .expect_err("invalid nested-domain enum labels must be refused by PostgreSQL");
+    assert!(matches!(
+        invalid,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "22P02"
+    ));
+    let after_invalid = connection
+        .query(
+            "SELECT status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        after_invalid.rows,
+        vec![vec![
+            Value::Text("ready".into()),
+            Value::Text("value_contract_nested_domain.state_outer".into()),
+        ]]
+    );
+
+    let literal_null_filter = FilterSet {
+        rules: vec![FilterRule {
+            column: "status".into(),
+            op: FilterOp::Eq,
+            value: Some(tablepro_core::FilterValue::Single("NULL".into())),
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &literal_null_filter)
+        .unwrap()
+        .unwrap();
+    let filtered = connection
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM value_contract_nested_domain.rows WHERE {where_sql}"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("NULL".into()),
+            Value::Text("value_contract_nested_domain.state_outer".into()),
+        ]]
+    );
+
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("value_contract_nested_domain"),
+        "rows",
+        &columns,
+        &[(1, Value::Text("東京".into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    connection.execute_params(&update_sql, &update_params).await.unwrap();
+    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+        "postgres",
+        Some("value_contract_nested_domain"),
+        "rows",
+        &columns,
+        &[Value::Int(4), Value::Text("NULL".into())],
+    )
+    .unwrap();
+    connection.execute_params(&insert_sql, &insert_params).await.unwrap();
+
+    let transaction = connection
+        .execute_in_transaction(&[
+            (
+                "UPDATE value_contract_nested_domain.rows SET status = $1 WHERE id = 1".into(),
+                vec![Value::Text(String::new())],
+            ),
+            (
+                "UPDATE value_contract_nested_domain.rows SET status = $1 WHERE id = 3".into(),
+                vec![Value::Null],
+            ),
+        ])
+        .await
+        .unwrap();
+    assert_eq!(transaction, vec![1, 1]);
+    let typed_null = connection
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows \
+             WHERE status::value_contract_nested_domain.state \
+                   IS NOT DISTINCT FROM $1::value_contract_nested_domain.state",
+            &[Value::Null],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        typed_null.rows,
+        vec![vec![
+            Value::Int(3),
+            Value::Null,
+            Value::Text("value_contract_nested_domain.state_outer".into()),
+        ]]
+    );
+    let stored = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_nested_domain.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text(String::new()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("東京".into()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+            vec![
+                Value::Int(4),
+                Value::Text("NULL".into()),
+                Value::Text("value_contract_nested_domain.state_outer".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

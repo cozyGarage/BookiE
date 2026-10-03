@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "a3b18a1c960636b6e43b5f3bec44b9870cc8e68c",
+  "working_tree": "Local source and native PostgreSQL 16 evidence; uncommitted when run. Source fingerprints identify the tested files. No hosted or installed acceptance is represented.",
+  "scope": [
+    "Resolve a custom enum leaf through a multi-level PostgreSQL domain chain in table-column metadata.",
+    "Exercise nested-domain scalar result decoding, filters, keyed updates, draft inserts, assignment-inferred text and SQL NULL transaction parameters.",
+    "Prove invalid enum labels are refused with SQLSTATE 22P02 and leave the row unchanged.",
+    "Pin the known PostgreSQL 42883 refusal for an uncast domain-to-unknown comparison and verify explicit base-enum casts separately."
+  ],
+  "native_fixture": "PostgreSQL 16; custom enum with literal NULL, empty text, Unicode and ready labels; two nested domains; typed table column.",
+  "regression": {
+    "selector": "domain_contract::value_contract_nested_domain_over_enum_infers_parameters_and_decodes",
+    "before_fix": "Failed: ColumnInfo.enum_type was None; expected schema-qualified enum base metadata. Raw failing test log retained.",
+    "after_fix": "Passed with native projection, recursively resolved enum metadata, schema-aware filter/keyed/draft writes, assignment and transaction inference, explicit-cast text/NULL comparisons, and SQLSTATE/no-write postconditions. An uncast domain = unknown comparison is asserted as SQLSTATE 42883."
+  },
+  "fix": "fetch_columns now recursively follows pg_type.typbasetype through domain layers to the enum leaf; this metadata feeds existing filter and schema-aware write builders.",
+  "commands": [
+    {
+      "argv": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_nested_domain_over_enum_infers_parameters_and_decodes -- --include-ignored --test-threads=1",
+      "result": "1 passed; raw output retained in post-fix-focused.log"
+    },
+    {
+      "argv": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "92 passed, 0 failed, 0 ignored; raw output retained in postgres-integration.log"
+    },
+    {
+      "argv": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed; raw output retained in clippy.log"
+    },
+    {
+      "argv": "cargo fmt --all -- --check; python3 scripts/check-function-size.py; bash scripts/check-file-size.sh; git diff --check",
+      "result": "passed"
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py change-contracts",
+      "result": "passed; report and command log retained"
+    }
+  ],
+  "source_fingerprints_sha256": {
+    "crates/drivers/postgres/src/lib.rs": "38610010092ea33d2338c1bd1f7bcea36cc08d7c1fa313d9e5e8b3e3500db5d7",
+    "crates/drivers/postgres/tests/support/domain_contract.rs": "470e3d44389552d1f0cd7637fe895609927534f7e58000b181dbc2f85b54a242",
+    "docs/type-contract-strategy.md": "ab9d27c18af6143e88bd02af4dfe37024175ee2bff6d56432b5a3a7aaa3f2ed5",
+    "docs/value-contract-history.md": "763a05afd51290e9662eeaf1acae88e2d7db1fa4c5492ae615fa27b2cb989501",
+    "docs/value-contracts.md": "cafc50d91c2bf562899483a800f6e17f1d4e703a6f357fe4bacf8187ced33431",
+    "docs/release-audit-2026-10-03.md": "744bceb633fa9bdfa85e88adf18850eefdc28b4888eb0864bd17d92e6b7d51bf"
+  },
+  "retained_evidence_sha256": {
+    "before-fix.log": "c548e5e17850d9bf0ae2d2c38325b91a37cac99481a98d70ad8c11590dce6209",
+    "post-fix-focused.log": "79a320dc1405fbf505c9765ee2eb70ead3e16f97d487c0b343543733a8110a98",
+    "postgres-integration.log": "51e3d642275388adbe044dd7bac12ac4d81fbf3f9db3cf3031075f7d6f7938bd",
+    "clippy.log": "a9f6e6aac1f6767d525aa2023b1b6629f552c2e9867d3284a709d97b9ce0704b",
+    "change-contracts-report.json": "b457833986994d988028c5b76200459a75a24ac0db660d53c7383920d9f7f144",
+    "change-contracts.log": "7a8dfed8eb62cf09cdea504a728a96e92192ba9a445a445853b4d7ef8e96d5c1"
+  },
+  "remaining": "Raw domain-to-unknown operator contexts such as status = $1 remain unsupported without explicit casts; additional enum session/configuration combinations, deeper domain chains and other custom/native consumer combinations still need separate proof.",
+  "not_run": [
+    "GitHub Actions",
+    "installed GTK/package",
+    "Wayland/VM acceptance",
+    "release soak"
+  ]
+}

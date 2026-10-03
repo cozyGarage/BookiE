@@ -1,0 +1,24 @@
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.46s
+     Running tests/integration.rs (target/debug/deps/integration-140ee8fc03e79f3b)
+
+running 1 test
+test domain_contract::value_contract_nested_domain_over_enum_infers_parameters_and_decodes ... FAILED
+
+failures:
+
+---- domain_contract::value_contract_nested_domain_over_enum_infers_parameters_and_decodes stdout ----
+
+thread 'domain_contract::value_contract_nested_domain_over_enum_infers_parameters_and_decodes' (3159408) panicked at crates/drivers/postgres/tests/support/domain_contract.rs:322:5:
+assertion `left == right` failed
+  left: None
+ right: Some(QualifiedTypeName { schema: "value_contract_nested_domain", name: "state" })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    domain_contract::value_contract_nested_domain_over_enum_infers_parameters_and_decodes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 91 filtered out; finished in 2.14s
+
+error: test failed, to rerun pass `-p tablepro-driver-postgres --test integration`

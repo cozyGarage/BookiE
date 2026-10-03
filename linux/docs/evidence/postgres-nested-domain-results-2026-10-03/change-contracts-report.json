@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "a3b18a1c960636b6e43b5f3bec44b9870cc8e68c",
+  "working_tree": "M linux/crates/drivers/postgres/src/lib.rs\n M linux/crates/drivers/postgres/tests/support/domain_contract.rs\n M linux/docs/release-audit-2026-10-03.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/value-contract-history.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/docs/evidence/postgres-nested-domain-results-2026-10-03/",
+  "tracked_diff_sha256": "9555341df3fbe73bc3f254f256e46ce92a2e582162c304a2560011607d32ab80",
+  "started_utc": "2026-10-03T18:10:17.267840+00:00",
+  "status": "passed",
+  "layers": {
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 1.367
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T18:10:18.634881+00:00"
+}
