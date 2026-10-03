@@ -2875,6 +2875,23 @@ strict-mode cases and all nine MySQL/MariaDB value-contract tests pass, along
 with strict Clippy and formatting. Other modes and consumer
 paths remain open. See the [native evidence](evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB fractional TIME mode semantics (2026-10-04)
+
+On MySQL 8.1 and MariaDB 11, a `TIME(3)` destination receiving
+`12:34:56.789900` with the fractional
+rounding/truncation modes absent stores as `.790` on MySQL and `.789` on
+MariaDB. Enabling `TIME_TRUNCATE_FRACTIONAL` on MySQL changes the stored value to `.789`;
+enabling `TIME_ROUND_FRACTIONAL` on MariaDB changes it to `.790`. Each case
+checks bound parameters and generated SQL literals independently, then checks
+the returned `Value::Time`, native text and `MICROSECOND()` against stored
+results. The test sets an empty session `sql_mode` for the baseline, so this
+records the engines' mode-absent temporal behavior rather than every vendor's
+unmodified server mode. See the [native evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+[MySQL SQL mode reference](https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html)
+and [MariaDB SQL mode reference](https://mariadb.com/docs/server/server-management/variables-and-modes/sql_mode).
+Other temporal types, precisions, consumers and installed typed edits remain
+open.
+
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
 The existing MySQL and MariaDB SQL export round trip also runs with

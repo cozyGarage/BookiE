@@ -121,6 +121,13 @@ and [COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
 colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 
+October 4 B3-2 follow-up: MySQL `TIME(3)` rounds fractional input when
+`TIME_TRUNCATE_FRACTIONAL` is absent and truncates when enabled; MariaDB
+truncates when `TIME_ROUND_FRACTIONAL` is absent and rounds when enabled.
+Bound and generated-literal inserts are checked against native stored values.
+Other temporal precisions/types and consumer paths remain open; see the
+[fractional TIME mode evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json).
+
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
 cover all 17 shared structured-filter operators, including text-pattern
 operators, list complements and both NULL checks. Exact row labels and native
