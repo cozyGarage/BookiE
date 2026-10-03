@@ -4290,8 +4290,11 @@ domain. The default blank representation is refused before any target rows are
 written; the imported values and native domain type are checked against native
 expected rows. Shared JSON rendering and the JSON result-file writer preserve
 the domain labels and SQL NULL as JSON strings/null, with `pg_typeof` confirming
-the source type. Domain XML/HTML/Markdown/XLSX/SQL/MCP exports, parameter
-inference outside assignment writes and nested domain chains remain untested.
+the source type. A SQL result-file contract replays quoted/adversarial values
+into a same-domain destination; exact native values/types survive and the
+statement-shaped label does not alter a neighboring table. Domain
+XML/HTML/Markdown/XLSX/MCP exports, parameter inference outside assignment
+writes and nested domain chains remain untested.
 Exact commands and results are in the
 [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 

@@ -534,3 +534,89 @@ async fn value_contract_domain_over_enum_csv_round_trip_preserves_values_and_typ
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    for sql in [
+        "CREATE SCHEMA value_contract_domain_sql",
+        "CREATE TYPE value_contract_domain_sql.state AS ENUM ('NULL', '', '東京', 'x''; DROP TABLE keep_me; --')",
+        "CREATE DOMAIN value_contract_domain_sql.state_domain AS value_contract_domain_sql.state",
+        "CREATE TABLE value_contract_domain_sql.source_rows (id INT PRIMARY KEY, label value_contract_domain_sql.state_domain)",
+        "CREATE TABLE value_contract_domain_sql.restore_rows (id INT PRIMARY KEY, label value_contract_domain_sql.state_domain)",
+        "INSERT INTO value_contract_domain_sql.source_rows VALUES \
+         (1, 'NULL'), (2, ''), (3, '東京'), (4, 'x''; DROP TABLE keep_me; --'), (5, NULL)",
+    ] {
+        connection.execute(sql).await.unwrap();
+    }
+    connection
+        .execute("CREATE TABLE value_contract_domain_sql.keep_me (id INT PRIMARY KEY)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO value_contract_domain_sql.keep_me VALUES (1)")
+        .await
+        .unwrap();
+
+    let result = connection
+        .query("SELECT id, label FROM value_contract_domain_sql.source_rows ORDER BY id")
+        .await
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("domain-enum.sql");
+    tablepro_core::export::write_result_file(
+        &path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: Some("value_contract_domain_sql"),
+                table: "restore_rows",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let sql = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(sql.lines().count(), result.rows.len());
+    assert!(
+        sql.lines()
+            .all(|line| line.starts_with("INSERT INTO \"value_contract_domain_sql\".\"restore_rows\""))
+    );
+    for statement in sql.lines() {
+        connection.execute(statement).await.unwrap();
+    }
+
+    let restored = connection
+        .query(
+            "SELECT id, label::text, pg_typeof(label)::text \
+             FROM value_contract_domain_sql.restore_rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let domain_type = Value::Text("value_contract_domain_sql.state_domain".into());
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("NULL".into()), domain_type.clone()],
+            vec![Value::Int(2), Value::Text(String::new()), domain_type.clone()],
+            vec![Value::Int(3), Value::Text("東京".into()), domain_type.clone()],
+            vec![
+                Value::Int(4),
+                Value::Text("x'; DROP TABLE keep_me; --".into()),
+                domain_type.clone(),
+            ],
+            vec![Value::Int(5), Value::Null, domain_type],
+        ]
+    );
+    let table = connection
+        .query("SELECT count(*)::bigint FROM value_contract_domain_sql.keep_me")
+        .await
+        .unwrap();
+    assert_eq!(table.rows, vec![vec![Value::Int(1)]]);
+}

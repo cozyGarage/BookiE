@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 89 filtered out (1 suite, 2.13s). SQL file replay preserves literal NULL, empty text, Unicode, a statement-shaped label and SQL NULL as exact domain values/types; adjacent table remains intact.
