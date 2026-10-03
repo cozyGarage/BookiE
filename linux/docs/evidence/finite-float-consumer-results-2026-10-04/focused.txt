@@ -1,0 +1,12 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+
+running 1 test
+test export::csv::tests::value_contract_csv_and_json_round_trip_seeded_finite_float_bits ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 511 filtered out; finished in 3.15s
+

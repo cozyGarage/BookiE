@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "4f62a2362f25be6339687f696e693abffe2ba05c",
+  "case": "Deterministic finite-f64 CSV and JSON consumer parity",
+  "change": "Expand the seeded raw-bit sample from 256 values to 65,536 finite IEEE-754 bit patterns, including subnormals; reject exponent-all-ones patterns so the corpus contains only finite values.",
+  "corpus": {
+    "explicit_edge_values": 6,
+    "deterministic_raw_finite_samples": 65536,
+    "sign_exponent_mantissa_boundary_values": 20470,
+    "total_values": 86012
+  },
+  "contract": [
+    "Every corpus value round-trips through default CSV export, typed DOUBLE PRECISION import and JSON export/parse with exact to_bits() equality.",
+    "All 86,012 expected entries are finite; the raw-bit sample is deterministic from a fixed xorshift seed.",
+    "The independent expected values are constructed from explicit IEEE-754 bit patterns and checked against imported/parsed bits."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_contract_csv_and_json_round_trip_seeded_finite_float_bits",
+      "result": "1 passed",
+      "log": "focused.txt"
+    },
+    "core_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+      "result": "512 passed",
+      "log": "core-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "1c6809e72f74fdff0638e6ffc88b28081a0604fa1cf30726fbf5c880e61db2d6",
+    "core-suite.txt": "4da5dc3a5b66fdf8fb1b8cd53399234fe12141eb3e99ebed05151fcddd0a6771",
+    "clippy.txt": "e9f284dd1f26735d3754865d031d25ea20f1377edf842a21781eef7b9d8a0c20",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "The corpus is deterministic broad coverage, not exhaustive enumeration of every finite f64 encoding.",
+    "Spreadsheet-application import and other consumer/session combinations remain open."
+  ]
+}

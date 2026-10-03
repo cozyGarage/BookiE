@@ -914,13 +914,15 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib value_con
 
 ### Seeded finite float consumer parity
 
-A deterministic xorshift corpus combines adjacent representable values, values
-near the normal/subnormal boundary, and finite values spread across signs,
-mantissas and exponents. All 262 values round-trip through default CSV export,
-typed `DOUBLE PRECISION` import, and JSON export/parse with exact IEEE-754 bit
-comparisons. The fixed seed makes failures repeatable without adding a test
-dependency. The unignored core unit test passed; it samples finite values and
-does not claim to exhaust all `f64` bit patterns.
+A deterministic xorshift corpus now combines six explicit edge values,
+65,536 raw finite IEEE-754 bit samples, and 20,470 sign/exponent/mantissa
+boundary values (86,012 entries total). Every value round-trips through default
+CSV export, typed `DOUBLE PRECISION` import, and JSON export/parse with exact
+`to_bits()` comparisons. Exponent-all-ones patterns are rejected, so generated
+samples remain finite; the fixed seed makes failures repeatable without another
+test dependency. The unignored core unit test passes. This broad corpus does
+not exhaust every finite `f64` encoding. See the
+[finite-float consumer evidence](evidence/finite-float-consumer-results-2026-10-04/manifest.json).
 
 ```sh
 rtk cargo test --locked -p tablepro-core --lib value_contract_csv_and_json_round_trip_seeded_finite_float_bits

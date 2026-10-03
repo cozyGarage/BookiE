@@ -1400,8 +1400,8 @@ Open findings from the audit:
 B3 remains open.
 
 The same exponent/mantissa-boundary values were added to the CSV typed
-export/import corpus: 262 seeded values plus 20,480 deterministic boundary
-values (20,742 total) preserve their `f64` bits through both CSV re-import and
+export/import corpus: 262 seeded values plus 20,470 deterministic boundary
+values (20,732 total) preserve their `f64` bits through both CSV re-import and
 JSON parse. The focused test passed. This closes the prior sampled-only claim
 for those exponent bands; unenumerated mantissas remain open.
 
@@ -1952,7 +1952,7 @@ rtk env TMPDIR=$PWD/target/mutation-tmp CARGO_TARGET_DIR=$PWD/target cargo mutan
 
 ### JSON finite float coverage and Bool distinction — September 30
 
-The JSON value contract now round-trips 20,480 deterministic finite `f64`
+The JSON value contract now round-trips 20,470 deterministic finite `f64`
 values: both signs across every finite exponent field, with zero, adjacent and
 edge mantissas. A separate contract keeps booleans distinct from textual
 `true`/`false` and SQL NULL. The focused `tablepro-core` JSON value-contract
