@@ -425,6 +425,50 @@ async fn mariadb_datetime_fractional_storage_respects_round_mode_for_binds_and_l
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_datetime_fractional_half_millisecond_boundary_respects_truncate_mode() {
+    let (_container, options) = start_mysql().await;
+    let date = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "DATETIME(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::DateTime(date.and_time(micros_time(3, 4, 5, 789_500))),
+        790_000,
+        789_000,
+        |microseconds| {
+            (
+                Value::DateTime(date.and_time(micros_time(3, 4, 5, microseconds))),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_datetime_fractional_half_millisecond_boundary_respects_round_mode() {
+    let (_container, options) = start_mariadb().await;
+    let date = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "DATETIME(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::DateTime(date.and_time(micros_time(3, 4, 5, 789_500))),
+        789_000,
+        790_000,
+        |microseconds| {
+            (
+                Value::DateTime(date.and_time(micros_time(3, 4, 5, microseconds))),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_timestamp_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
     let (_container, options) = start_mysql().await;
     let instant = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
@@ -456,6 +500,52 @@ async fn mariadb_timestamp_fractional_storage_respects_round_mode_for_binds_and_
         "TIMESTAMP(3)",
         "TIME_ROUND_FRACTIONAL",
         Value::TimestampTz(instant + chrono::Duration::microseconds(789_900)),
+        789_000,
+        790_000,
+        |microseconds| {
+            let value = instant + chrono::Duration::microseconds(i64::from(microseconds));
+            (
+                Value::TimestampTz(value),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_timestamp_fractional_half_millisecond_boundary_respects_truncate_mode() {
+    let (_container, options) = start_mysql().await;
+    let instant = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIMESTAMP(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::TimestampTz(instant + chrono::Duration::microseconds(789_500)),
+        790_000,
+        789_000,
+        |microseconds| {
+            let value = instant + chrono::Duration::microseconds(i64::from(microseconds));
+            (
+                Value::TimestampTz(value),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_timestamp_fractional_half_millisecond_boundary_respects_round_mode() {
+    let (_container, options) = start_mariadb().await;
+    let instant = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIMESTAMP(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::TimestampTz(instant + chrono::Duration::microseconds(789_500)),
         789_000,
         790_000,
         |microseconds| {
