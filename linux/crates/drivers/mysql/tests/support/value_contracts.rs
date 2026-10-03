@@ -283,32 +283,122 @@ async fn session_non_utc_time_zone_refuses_mysql_timestamp_instant() {
 #[ignore = "requires docker"]
 async fn mysql_time_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
     let (_container, options) = start_mysql().await;
-    assert_time_fractional_storage_mode_for_binds_and_literals(&options, "TIME_TRUNCATE_FRACTIONAL", 790_000, 789_000)
-        .await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIME(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::Time(micros_time(12, 34, 56, 789_900)),
+        790_000,
+        789_000,
+        |microseconds| {
+            (
+                Value::Time(micros_time(12, 34, 56, microseconds)),
+                format!("12:34:56.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn mariadb_time_fractional_storage_respects_round_mode_for_binds_and_literals() {
     let (_container, options) = start_mariadb().await;
-    assert_time_fractional_storage_mode_for_binds_and_literals(&options, "TIME_ROUND_FRACTIONAL", 789_000, 790_000)
-        .await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIME(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::Time(micros_time(12, 34, 56, 789_900)),
+        789_000,
+        790_000,
+        |microseconds| {
+            (
+                Value::Time(micros_time(12, 34, 56, microseconds)),
+                format!("12:34:56.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
 }
 
-async fn assert_time_fractional_storage_mode_for_binds_and_literals(
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_datetime_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
+    let (_container, options) = start_mysql().await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "DATETIME(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::DateTime(
+            NaiveDate::from_ymd_opt(2024, 1, 2)
+                .unwrap()
+                .and_time(micros_time(3, 4, 5, 789_900)),
+        ),
+        790_000,
+        789_000,
+        |microseconds| {
+            (
+                Value::DateTime(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap().and_time(micros_time(
+                    3,
+                    4,
+                    5,
+                    microseconds,
+                ))),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_datetime_fractional_storage_respects_round_mode_for_binds_and_literals() {
+    let (_container, options) = start_mariadb().await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "DATETIME(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::DateTime(
+            NaiveDate::from_ymd_opt(2024, 1, 2)
+                .unwrap()
+                .and_time(micros_time(3, 4, 5, 789_900)),
+        ),
+        789_000,
+        790_000,
+        |microseconds| {
+            (
+                Value::DateTime(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap().and_time(micros_time(
+                    3,
+                    4,
+                    5,
+                    microseconds,
+                ))),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+async fn assert_fractional_storage_mode_for_binds_and_literals(
     options: &ConnectOptions,
+    column_type: &str,
     alternate_mode: &str,
+    input: Value,
     baseline_microseconds: u32,
     alternate_microseconds: u32,
+    value_and_text_for_microseconds: impl Fn(u32) -> (Value, String),
 ) {
     let conn = connect(options.clone()).await;
-    conn.execute("CREATE TABLE fractional_times (id INT PRIMARY KEY, value TIME(3) NOT NULL)")
-        .await
-        .unwrap();
-    let columns = conn.fetch_columns(None, "fractional_times").await.unwrap();
+    conn.execute(&format!(
+        "CREATE TABLE fractional_values (id INT PRIMARY KEY, value {column_type} NOT NULL)"
+    ))
+    .await
+    .unwrap();
+    let columns = conn.fetch_columns(None, "fractional_values").await.unwrap();
     let mut session = conn.open_session().await.unwrap();
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
-    let input = Value::Time(micros_time(12, 34, 56, 789_900));
 
     for (mode, bound_id, literal_id) in [("", 1, 2), (alternate_mode, 3, 4)] {
         session
@@ -317,7 +407,7 @@ async fn assert_time_fractional_storage_mode_for_binds_and_literals(
             .unwrap();
         session
             .query_params_controlled(
-                "INSERT INTO fractional_times VALUES (?, ?)",
+                "INSERT INTO fractional_values VALUES (?, ?)",
                 &[Value::Int(bound_id), input.clone()],
                 &control,
             )
@@ -326,7 +416,7 @@ async fn assert_time_fractional_storage_mode_for_binds_and_literals(
         let literal = tablepro_core::sql_literal::build_insert_literal(
             "mysql",
             None,
-            "fractional_times",
+            "fractional_values",
             &columns,
             &[Value::Int(literal_id), input.clone()],
         )
@@ -337,17 +427,18 @@ async fn assert_time_fractional_storage_mode_for_binds_and_literals(
     let result = session
         .query_params_controlled(
             "SELECT id, value, CAST(value AS CHAR), MICROSECOND(value) \
-             FROM fractional_times ORDER BY id",
+             FROM fractional_values ORDER BY id",
             &[],
             &control,
         )
         .await
         .unwrap();
     let expected_row = |id, microseconds| {
+        let (value, text) = value_and_text_for_microseconds(microseconds);
         vec![
             Value::Int(id),
-            Value::Time(micros_time(12, 34, 56, microseconds)),
-            text(&format!("12:34:56.{:03}", microseconds / 1_000)),
+            value,
+            Value::Text(text),
             Value::Int(i64::from(microseconds)),
         ]
     };
