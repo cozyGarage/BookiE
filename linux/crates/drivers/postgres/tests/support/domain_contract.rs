@@ -390,6 +390,50 @@ async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type(
     );
 
     for (operator, parameter, expected) in [
+        (
+            "IS DISTINCT FROM",
+            Value::Text("ready".into()),
+            [Some(false), Some(true), Some(true)],
+        ),
+        (
+            "IS NOT DISTINCT FROM",
+            Value::Text("ready".into()),
+            [Some(true), Some(false), Some(false)],
+        ),
+        ("IS DISTINCT FROM", Value::Null, [Some(true), Some(true), Some(false)]),
+        (
+            "IS NOT DISTINCT FROM",
+            Value::Null,
+            [Some(false), Some(false), Some(true)],
+        ),
+    ] {
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, status::value_contract_domain_query.state {operator} $1, \
+                     pg_typeof($1)::text, pg_typeof(status)::text \
+                     FROM value_contract_domain_query.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected = expected
+            .into_iter()
+            .enumerate()
+            .map(|(index, comparison)| {
+                vec![
+                    Value::Int(index as i64 + 1),
+                    Value::Bool(comparison.unwrap()),
+                    Value::Text("value_contract_domain_query.state".into()),
+                    Value::Text("value_contract_domain_query.state_domain".into()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(result.rows, expected, "operator {operator}, parameter {parameter:?}");
+    }
+
+    for (operator, parameter, expected) in [
         ("<", "paused", [Some(true), Some(false), None]),
         ("<=", "paused", [Some(true), Some(true), None]),
         (">", "ready", [Some(false), Some(true), None]),
