@@ -29,6 +29,12 @@
       "result": "5 passed",
       "log": "app-focused.txt"
     },
+    "app_full_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib -- --test-threads=1",
+      "result": "440 passed, 20 ignored",
+      "source_commit": "c9ada156d09833de1d39e6465e124122f3b507e4",
+      "log": "app-full.txt"
+    },
     "clippy": {
       "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
       "result": "No issues found",
@@ -40,6 +46,7 @@
     "focused-driver.txt": "9c9ed6f4e7dddf1fc02f19564ab9be8b2b63a632dcea61aae626f6ae8ec09992",
     "sqlite-driver.txt": "b0130bbc6eaa2122912fab9f43e8a58c3fd144f7d3e89a4b105c58d02321cf86",
     "app-focused.txt": "5cb661c3967f35e7947641f17ba9396b6e2a057247b393ef54640f8bf5e1b6ee",
+    "app-full.txt": "7978c4b305723e17b9deb6c328f16214f4db0f33d6c7c05ab254e35679a98400",
     "clippy.txt": "a67e4a1526744a9936c0c7f8440bff92f7f2fb824294e9e2deac83b2f0de9d08"
   },
   "remaining": [
