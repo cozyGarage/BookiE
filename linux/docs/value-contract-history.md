@@ -2892,6 +2892,18 @@ and [MariaDB SQL mode reference](https://mariadb.com/docs/server/server-manageme
 Other temporal types, precisions, consumers and installed typed edits remain
 open.
 
+### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
+
+The paired Docker cases apply the same mode matrix to a `DATETIME(3)`
+destination and input `2024-01-02 03:04:05.789900`. With the fractional modes
+absent, MySQL 8.1 stores `.790` and MariaDB 11 stores `.789`;
+`TIME_TRUNCATE_FRACTIONAL` truncates on MySQL, while
+`TIME_ROUND_FRACTIONAL` rounds on MariaDB. Bound parameters and generated SQL
+literals are checked separately against returned `Value::DateTime`, cast text,
+and `MICROSECOND()`. As in the TIME cases, the tests clear session `sql_mode`
+for the baseline. Other temporal types, precisions and consumer paths remain
+open; see the [native evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json).
+
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
 The existing MySQL and MariaDB SQL export round trip also runs with
