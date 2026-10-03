@@ -1,0 +1,10 @@
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/integration.rs (linux/target/debug/deps/integration-245109a29f7e15d5)
+
+running 2 tests
+test value_contracts::mariadb_timestamp_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_timestamp_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 15.48s
+

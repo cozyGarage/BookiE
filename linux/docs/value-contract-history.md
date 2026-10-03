@@ -2904,6 +2904,18 @@ and `MICROSECOND()`. As in the TIME cases, the tests clear session `sql_mode`
 for the baseline. Other temporal types, precisions and consumer paths remain
 open; see the [native evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB fractional TIMESTAMP mode semantics (2026-10-04)
+
+The paired Docker cases insert `2024-01-02 03:04:05.789900` into
+`TIMESTAMP(3)` with the dedicated session timezone set to UTC. With the
+fractional modes absent, MySQL 8.1 stores `.790` and MariaDB 11 stores `.789`;
+`TIME_TRUNCATE_FRACTIONAL` truncates on MySQL, while
+`TIME_ROUND_FRACTIONAL` rounds on MariaDB. Bound parameters and generated SQL
+literals are checked against returned `Value::TimestampTz`, UTC cast text,
+`MICROSECOND()`, and `UNIX_TIMESTAMP()` epoch microseconds. The session
+`sql_mode` is cleared for the baseline. Other temporal precisions and consumer
+paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
+
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
 The existing MySQL and MariaDB SQL export round trip also runs with

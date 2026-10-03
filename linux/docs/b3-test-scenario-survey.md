@@ -121,13 +121,14 @@ and [COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
 colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 
-October 4 B3-2 follow-up: MySQL `TIME(3)` and `DATETIME(3)` round fractional
-input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate when enabled;
-MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and rounds when
-enabled. Bound and generated-literal writes are checked against native stored
-values. Other temporal types/precisions and consumer paths remain open; see the
-[TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json)
-and [DATETIME evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json).
+October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
+round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
+when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and
+rounds when enabled. Bound and generated-literal writes are checked against
+native stored values; the TIMESTAMP cases also pin UTC session/epoch semantics.
+Other temporal precisions and consumer paths remain open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+[DATETIME evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json)
+and [TIMESTAMP evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
 cover all 17 shared structured-filter operators, including text-pattern
