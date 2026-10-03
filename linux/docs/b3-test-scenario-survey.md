@@ -144,9 +144,11 @@ ambiguous parameter type `42P08`, which the driver preserves across its text
 fallback; the explicit target-enum cast is covered too.
 Domain-over-enum metadata and structured equality also resolve to the target
 schema when both the domain and its leaf enum have same-named shadow definitions.
-Text equality and NULL-safe distinctness query parameters continue to select
-the target rows after transaction-local `SET LOCAL search_path`; shadow-domain
-rows and their siblings remain unchanged. See [domain-over-enum shadow evidence](evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json).
+The tested direct comparison, ordering, list, range and NULL-safe query
+operators select the exact target rows after transaction-local `SET LOCAL search_path`;
+shadow-domain rows and their siblings remain unchanged. See the [domain-over-enum
+shadow evidence](evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json)
+and its [direct operator matrix](evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
 
 The three-level domain chain now checks inferred direct text and SQL NULL
 parameters for both NULL-safe distinctness operators, with leaf enum and outer

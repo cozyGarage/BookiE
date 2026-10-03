@@ -4681,3 +4681,16 @@ See the [shadowed domain-over-enum evidence](evidence/postgres-shadowed-domain-e
 
 This proves the tested schema collision and operators. Other direct query
 operators and session/search_path configurations remain open.
+
+## PostgreSQL shadowed domain-over-enum direct operator matrix (2026-10-03)
+
+The same two-schema fixture now checks direct bound `<>`, `<`, `<=`, `>`, `>=`,
+`IN`, `NOT IN`, `BETWEEN`, `IS DISTINCT FROM` and `IS NOT DISTINCT FROM`
+comparisons against the target domain's qualified leaf enum while the connection
+and transaction-local `search_path` resolve the shadow schema. Each query checks
+ordered target row IDs, labels, SQL NULL behavior and the target domain reported
+by `pg_typeof(status)`; the shadow table and sibling values remain unchanged.
+The focused PostgreSQL 16 case and all 11 enum contracts pass, as do Clippy and
+formatting. See the [operator-matrix evidence](evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
+
+Other schema/session configurations remain open; this case does not close B3.
