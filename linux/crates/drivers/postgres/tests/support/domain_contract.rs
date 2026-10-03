@@ -900,7 +900,10 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO value_contract_four_domains.rows VALUES (1, 'ready'), (2, NULL)")
+        .execute(
+            "INSERT INTO value_contract_four_domains.rows VALUES \
+             (1, 'ready'), (2, NULL), (3, 'ready')",
+        )
         .await
         .unwrap();
 
@@ -927,6 +930,33 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
     .unwrap();
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
+    let inferred_query = connection
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_four_domains.rows \
+             WHERE status::value_contract_four_domains.state = $1 ORDER BY id",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        inferred_query.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("value_contract_four_domains.state_domain_4".into()),
+        ]]
+    );
+
+    let inferred_update = connection
+        .execute_params(
+            "UPDATE value_contract_four_domains.rows SET status = $1 WHERE id = 3",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(inferred_update.rows_affected, 1);
+
     let filters = FilterSet {
         rules: vec![FilterRule {
             column: "status".into(),
@@ -950,11 +980,18 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         .unwrap();
     assert_eq!(
         filtered.rows,
-        vec![vec![
-            Value::Int(1),
-            Value::Text("paused".into()),
-            Value::Text("value_contract_four_domains.state_domain_4".into()),
-        ]]
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_four_domains.state_domain_4".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_four_domains.state_domain_4".into()),
+            ],
+        ]
     );
 
     let stored = connection
@@ -975,6 +1012,11 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
             vec![
                 Value::Int(2),
                 Value::Null,
+                Value::Text("value_contract_four_domains.state_domain_4".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("paused".into()),
                 Value::Text("value_contract_four_domains.state_domain_4".into()),
             ],
         ]
