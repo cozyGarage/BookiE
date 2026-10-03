@@ -108,7 +108,8 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
 
     let mixed_expression = connection
         .query(
-            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result \
+            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result, \
+                    typeof(CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END) AS storage_class \
              FROM flexible ORDER BY id",
         )
         .await
@@ -117,9 +118,9 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
     assert_eq!(
         mixed_expression.rows,
         vec![
-            vec![Value::Int(42)],
-            vec![Value::Null],
-            vec![Value::Text("ready".into())]
+            vec![Value::Int(42), Value::Text("integer".into())],
+            vec![Value::Null, Value::Text("null".into())],
+            vec![Value::Text("ready".into()), Value::Text("text".into())]
         ]
     );
 
@@ -132,7 +133,8 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
 
     let bound_expression = connection
         .query_params(
-            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result \
+            "SELECT CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END AS result, \
+                    typeof(CASE WHEN id = 1 THEN value WHEN id = 2 THEN NULL ELSE 'ready' END) AS storage_class \
              FROM flexible WHERE id > ? ORDER BY id",
             &[Value::Int(0)],
         )
