@@ -773,6 +773,47 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
         .await
         .unwrap();
     assert_eq!(transaction, vec![1, 1]);
+
+    for (operator, parameter, expected) in [
+        (
+            "IS DISTINCT FROM",
+            Value::Text("東京".into()),
+            [true, false, true, true],
+        ),
+        (
+            "IS NOT DISTINCT FROM",
+            Value::Text("東京".into()),
+            [false, true, false, false],
+        ),
+        ("IS DISTINCT FROM", Value::Null, [true, true, false, true]),
+        ("IS NOT DISTINCT FROM", Value::Null, [false, false, true, false]),
+    ] {
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, status::value_contract_nested_domain.state {operator} $1, \
+                     pg_typeof($1)::text, pg_typeof(status)::text \
+                     FROM value_contract_nested_domain.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected = expected
+            .into_iter()
+            .enumerate()
+            .map(|(index, comparison)| {
+                vec![
+                    Value::Int(index as i64 + 1),
+                    Value::Bool(comparison),
+                    Value::Text("value_contract_nested_domain.state".into()),
+                    Value::Text("value_contract_nested_domain.state_outer".into()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(result.rows, expected, "operator {operator}, parameter {parameter:?}");
+    }
+
     let typed_null = connection
         .query_params(
             "SELECT id, status::text, pg_typeof(status)::text \
