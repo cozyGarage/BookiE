@@ -868,6 +868,121 @@ async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decod
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_four_domains")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_four_domains.state AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+
+    let mut base_type = "state".to_owned();
+    for level in 1..=4 {
+        let domain = format!("state_domain_{level}");
+        connection
+            .execute(&format!(
+                "CREATE DOMAIN value_contract_four_domains.{domain} \
+                 AS value_contract_four_domains.{base_type}"
+            ))
+            .await
+            .unwrap();
+        base_type = domain;
+    }
+    connection
+        .execute(&format!(
+            "CREATE TABLE value_contract_four_domains.rows \
+             (id INT PRIMARY KEY, status value_contract_four_domains.{base_type})"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO value_contract_four_domains.rows VALUES (1, 'ready'), (2, NULL)")
+        .await
+        .unwrap();
+
+    let columns = connection
+        .fetch_columns(Some("value_contract_four_domains"), "rows")
+        .await
+        .unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "value_contract_four_domains".into(),
+            name: "state".into(),
+        })
+    );
+
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("value_contract_four_domains"),
+        "rows",
+        &columns,
+        &[(1, Value::Text("paused".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_params(&update_sql, &update_params).await.unwrap();
+
+    let filters = FilterSet {
+        rules: vec![FilterRule {
+            column: "status".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single("paused".into())),
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+        .unwrap()
+        .unwrap();
+    let filtered = connection
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM value_contract_four_domains.rows WHERE {where_sql} ORDER BY id"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("value_contract_four_domains.state_domain_4".into()),
+        ]]
+    );
+
+    let stored = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_four_domains.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_four_domains.state_domain_4".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Text("value_contract_four_domains.state_domain_4".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
