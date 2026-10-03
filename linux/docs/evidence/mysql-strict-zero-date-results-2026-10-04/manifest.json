@@ -2,24 +2,32 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "fec477a888d0a48e34ec6eff16a151879635eb66",
-  "case": "MySQL strict zero-date session modes",
-  "test": "value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing",
+  "source_commit": "adef2b8f9d6b7c8688d1e35f04eb2b29e15e2276",
+  "case": "Strict zero-date SQL mode behavior on MySQL 8 and MariaDB 11",
+  "test": [
+    "value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing",
+    "value_contracts::mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing"
+  ],
   "contract": [
-    "A dedicated MySQL session confirms STRICT_TRANS_TABLES, NO_ZERO_DATE and NO_ZERO_IN_DATE are active.",
-    "The server refuses zero and incomplete DATE values with SQLSTATE 22007.",
+    "Dedicated sessions on MySQL 8 and MariaDB 11 confirm STRICT_TRANS_TABLES, NO_ZERO_DATE and NO_ZERO_IN_DATE are active.",
+    "Both servers refuse zero and incomplete DATE values with SQLSTATE 22007.",
     "Both refusals leave no rows; a valid DATE persists as the exact native date and text.",
-    "The existing permissive-mode zero/partial-date read contract remains covered in the same MySQL value-contract run."
+    "The existing permissive-mode zero/partial-date read contract remains covered in the MySQL/MariaDB value-contract run."
   ],
   "validation": {
-    "focused_case": {
+    "mysql_focused": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing -- --include-ignored --exact --test-threads=1",
       "result": "1 passed",
-      "suite_log": "value-contracts.txt"
+      "verified_in": "value-contracts.txt"
     },
-    "value_contract_group": {
+    "mariadb_focused": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts::mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed",
+      "verified_in": "value-contracts.txt"
+    },
+    "mysql_mariadb_value_contract_group": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration value_contracts:: -- --include-ignored --test-threads=1",
-      "result": "8 passed, 0 failed",
+      "result": "9 passed, 0 failed",
       "log": "value-contracts.txt"
     },
     "clippy": {
@@ -35,12 +43,11 @@
     "diff_check": "git diff --check passed"
   },
   "log_sha256": {
-    "value-contracts.txt": "ea0fbd439815eab9a80857a92d3159204fd337e5d0dc83677e3838bd684e2d17",
-    "clippy.txt": "d6897fcffccd2d4a226e2da34bc86ab47178f731758afb28eaa1996a2d3eb53d",
+    "value-contracts.txt": "9734b4b6c98b65352b8d10dad0ae0978e8af0fb90754a7dffab5f012f6822cef",
+    "clippy.txt": "93444c0a2b3f66d516ad6dabb9cb686ed1d88e7624386cffe55bbf4e4d4ac5c7",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
-    "This case proves MySQL 8 behavior; MariaDB strict zero-date parity is untested.",
     "Other SQL modes, temporal types, consumer paths and installed grid editing remain open.",
     "The broader B3 matrix remains open."
   ]

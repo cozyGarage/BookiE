@@ -1,7 +1,8 @@
     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
      Running tests/integration.rs (linux/target/debug/deps/integration-245109a29f7e15d5)
 
-running 8 tests
+running 9 tests
+test value_contracts::mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
 test value_contracts::native_time_zero_date_and_year_values_survive_reads_parameters_and_exports ... ok
 test value_contracts::session_non_utc_time_zone_refuses_mysql_timestamp_instant ... ok
 test value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
@@ -11,5 +12,5 @@ test value_contracts::value_contract_mysql_pad_char_mode_keeps_fixed_width_text_
 test value_contracts::value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
 test value_contracts::value_contract_text_exports_survive_with_and_without_backslash_escapes ... ok
 
-test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 101.93s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 34 filtered out; finished in 109.87s
 

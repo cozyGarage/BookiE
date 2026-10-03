@@ -2865,15 +2865,15 @@ acceptance and broader consumer parity remain open.
 
 ### MySQL strict zero-date SQL modes (2026-10-04)
 
-A dedicated session enables `STRICT_TRANS_TABLES`, `NO_ZERO_DATE` and
-`NO_ZERO_IN_DATE`, then verifies that both `0000-00-00` and `2024-00-15` are
-refused with SQLSTATE `22007`. The failed inserts leave the destination empty;
-a valid date persists with exact native and text values. The existing
-permissive-mode zero/partial-date read, bound-write and SQL-literal round-trip
-contract continues to pass. The strict-mode case and all eight MySQL temporal,
-SQL-mode and scalar value contracts pass, along with strict Clippy and
-formatting. MariaDB strict zero-date parity, other modes and consumer paths
-remain open. See the [native evidence](evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json).
+Dedicated sessions on MySQL 8 and MariaDB 11 enable
+`STRICT_TRANS_TABLES`, `NO_ZERO_DATE` and `NO_ZERO_IN_DATE`, then verify that
+both `0000-00-00` and `2024-00-15` are refused with SQLSTATE `22007`. The
+failed inserts leave the destination empty; a valid date persists with exact
+native and text values. The existing permissive-mode zero/partial-date
+read, bound-write and SQL-literal round-trip contract continues to pass. Both
+strict-mode cases and all nine MySQL/MariaDB value-contract tests pass, along
+with strict Clippy and formatting. Other modes and consumer
+paths remain open. See the [native evidence](evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
