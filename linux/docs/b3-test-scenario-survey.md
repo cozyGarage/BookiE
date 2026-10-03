@@ -106,11 +106,13 @@ lossless re-import. Further enum consumer and session combinations remain open.
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.
-Ambiguous blanks and malformed reserved tags are refused. Zero-row query
-metadata, computed expressions, attached-schema origins, other formats and
-installed editing remain open; see the
+Ambiguous blanks and malformed reserved tags are refused. Empty query results
+retain their declared `ANY` metadata and CSV header. Computed expressions,
+attached-schema origins, other formats and installed editing remain open; see
+the
 [table CSV case](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)
-and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03).
+and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03),
+with [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
 
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
 cover all 17 shared structured-filter operators, including text-pattern

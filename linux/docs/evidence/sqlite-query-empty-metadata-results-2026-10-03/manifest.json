@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "db4ad22785d302cf7ebd5384a046fd1e218b827e",
+  "engine": "SQLite 3.53.4 via libsqlite3-sys pkg-config",
+  "case": "Declared result metadata for empty SQLite queries",
+  "change": "Prepare the query before execution and use its result-column metadata, including source origin, even when no row is returned. Resolve unknown declared types using pragma_table_xinfo on the same connection.",
+  "contract": [
+    "Direct STRICT ANY columns report declared ANY for ordinary, parameterized and transaction queries that return rows and zero rows.",
+    "An empty app query result retains its CSV header and ANY metadata; the CSV is exactly the header line.",
+    "Computed expressions do not inherit ANY from their input column.",
+    "Catalog lookup failure leaves the query usable with the original metadata."
+  ],
+  "independent_oracle": "Native SQLite query results plus a separate STRICT ANY CSV round trip checked by typeof(value) and exact returned Value.",
+  "validation": {
+    "focused_driver_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration direct_query_columns_recover_declared_strict_any_metadata -- --test-threads=1",
+      "result": "1 passed, 23 filtered out",
+      "log": "focused-driver.txt"
+    },
+    "sqlite_driver_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "44 passed across 4 suites",
+      "log": "sqlite-driver.txt"
+    },
+    "app_strict_any_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_any_contract -- --test-threads=1",
+      "result": "5 passed",
+      "log": "app-focused.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "focused-driver.txt": "9c9ed6f4e7dddf1fc02f19564ab9be8b2b63a632dcea61aae626f6ae8ec09992",
+    "sqlite-driver.txt": "b0130bbc6eaa2122912fab9f43e8a58c3fd144f7d3e89a4b105c58d02321cf86",
+    "app-focused.txt": "5cb661c3967f35e7947641f17ba9396b6e2a057247b393ef54640f8bf5e1b6ee",
+    "clippy.txt": "a67e4a1526744a9936c0c7f8440bff92f7f2fb824294e9e2deac83b2f0de9d08"
+  },
+  "remaining": [
+    "Computed expressions without a reportable declared type and attached-schema origins remain untyped where source metadata cannot be resolved safely.",
+    "Other SQLite output formats, storage-class/affinity combinations and installed GTK behavior remain open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

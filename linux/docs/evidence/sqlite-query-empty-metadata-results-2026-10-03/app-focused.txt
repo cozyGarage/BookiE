@@ -1,0 +1,28 @@
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+warning: unused import: `super::parse_input_for_grid_cell`
+ --> crates/app/src/ui/browse_tab/../../../tests/support/duckdb_enum_contract.rs:1:5
+  |
+1 | use super::parse_input_for_grid_cell;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `tablepro_core::Value`
+ --> crates/app/src/ui/browse_tab/../../../tests/support/duckdb_enum_contract.rs:2:5
+  |
+2 | use tablepro_core::Value;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: `tablepro-app` (lib test) generated 2 warnings (run `cargo fix --lib -p tablepro-app --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.87s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-40541dde40605043)
+
+running 5 tests
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_null_and_new_cells_use_text_unless_blank ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 455 filtered out; finished in 0.01s
+

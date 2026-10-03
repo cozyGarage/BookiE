@@ -4534,10 +4534,29 @@ focused STRICT ANY contracts, all 44 SQLite driver tests and SQLite driver
 Clippy pass. See the
 [query-result evidence](evidence/sqlite-strict-any-query-csv-results-2026-10-03/manifest.json).
 
-Zero-row results still have no column metadata in the current row-based result
-conversion; computed expressions and attached-schema origins remain untyped
-when SQLx cannot supply a declared type. Other SQLite consumers, output formats
-and installed GTK editing remain open.
+At that checkpoint, zero-row results had no column metadata in the row-based
+conversion; see the follow-up below. Computed expressions and attached-schema
+origins remain untyped when SQLx cannot supply a declared type. Other SQLite
+consumers, output formats and installed GTK editing remain open.
+
+## SQLite empty query result metadata (2026-10-03)
+
+The SQLite driver now prepares each query before execution and retains its
+result-column metadata even when it returns no rows. When SQLx reports an
+unrecognized declared type as `NULL`, the driver resolves direct unqualified
+table-column origins using `pragma_table_xinfo` on the same connection.
+Ordinary, bound-parameter and transaction queries preserve declared STRICT
+`ANY` metadata for both populated and empty results. Computed expressions do
+not inherit `ANY` from their inputs. The app's empty query export keeps its
+header, while the nonempty query-result CSV round trip continues to preserve
+INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL with native `typeof()` proof.
+
+The focused SQLite driver case, all 44 driver tests, five app STRICT ANY
+contracts, Clippy, formatting and diff checks pass. See the
+[empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
+Computed expressions without a reportable declared type and attached-schema
+origins remain unresolved; other formats, storage-class combinations and
+installed GTK editing remain open.
 
 ## PostgreSQL enum structured-filter operator matrix (2026-10-03)
 
