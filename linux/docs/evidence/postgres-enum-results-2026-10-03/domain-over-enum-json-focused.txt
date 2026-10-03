@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_projection_preserves_labels_and_null -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 88 filtered out (1 suite, 2.27s). Shared JSON rendering and JSON file output preserve literal NULL, Unicode and SQL NULL; pg_typeof confirms the source domain type.

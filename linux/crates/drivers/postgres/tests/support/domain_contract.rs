@@ -40,6 +40,34 @@ async fn value_contract_domain_over_enum_projection_preserves_labels_and_null() 
             vec![Value::Null, Value::Text("value_contract_domain_enum_label".into())],
         ]
     );
+
+    let expected_json = serde_json::json!([
+        {"label": "NULL", "native_type": "value_contract_domain_enum_label"},
+        {"label": "東京", "native_type": "value_contract_domain_enum_label"},
+        {"label": null, "native_type": "value_contract_domain_enum_label"}
+    ]);
+    let rendered = tablepro_core::export::render_json(&result.columns, &result.rows);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&rendered).unwrap(),
+        expected_json
+    );
+
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("domain-enum.json");
+    tablepro_core::export::write_result_file(
+        &path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let file_json: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert_eq!(file_json, expected_json);
 }
 
 #[tokio::test]
