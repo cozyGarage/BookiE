@@ -4666,3 +4666,18 @@ The same fixture records that `pg_typeof($1)` alongside the enum comparison is
 ambiguous to native `PREPARE` (`42P08`). The driver now preserves that error
 when its text-typed fallback conflicts with the enum operator; an explicit
 qualified parameter cast lets the diagnostic query report the target enum type.
+
+## PostgreSQL schema-shadowed domain-over-enum parameters (2026-10-03)
+
+The new PostgreSQL 16 fixture creates same-named enum and domain types in two
+schemas, then points the role's `search_path` at the shadow schema while reading
+the target table. Catalog metadata identifies the target domain's qualified
+leaf enum, and a structured equality filter selects only the target row. Inside
+a transaction with `SET LOCAL search_path` still resolving the shadow schema,
+direct text equality and `IS NOT DISTINCT FROM` with SQL NULL select the expected
+target rows. The shadow rows, domain type and sibling values remain unchanged.
+The focused case and all 11 enum contracts pass; Clippy and formatting pass.
+See the [shadowed domain-over-enum evidence](evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json).
+
+This proves the tested schema collision and operators. Other direct query
+operators and session/search_path configurations remain open.

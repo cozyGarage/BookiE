@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "d53647e13a7758277866dcaf7527e833637d2d99",
+  "engine": "PostgreSQL 16 via local Docker fixture",
+  "case": "Domain-over-enum metadata and parameters under a shadowed search_path",
+  "change": "Add a same-named domain and leaf enum in two schemas; resolve the target schema metadata and test structured equality plus direct text and SQL NULL comparisons under a shadowed search_path.",
+  "contract": [
+    "Catalog metadata for the target domain-over-enum column identifies the target schema's qualified leaf enum even while search_path resolves same-named types in a shadow schema.",
+    "A structured equality filter selects the matching target-schema row and preserves the target domain column type.",
+    "A direct text equality comparison and IS NOT DISTINCT FROM with SQL NULL succeed against the target table after transaction-local SET LOCAL search_path selects the shadow schema.",
+    "The shadow table retains its original domain values and sibling data."
+  ],
+  "independent_oracle": "PostgreSQL current_schema(), driver catalog metadata, pg_typeof(status)::text, and exact target/shadow row values after native parameter comparisons.",
+  "validation": {
+    "focused_case": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_enum_parameters_resolve_shadowed_schema_type -- --ignored --test-threads=1",
+      "result": "1 passed",
+      "log": "focused.txt"
+    },
+    "enum_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --ignored --test-threads=1",
+      "result": "11 passed",
+      "log": "enum-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "e488c55f7ba7617af6e714a706d33f4987980ff93217b656d12089451d3de663",
+    "enum-suite.txt": "0917fc20f8cfcf1eb1383a1a213c2ae22c67d09f163d8e53613d0e9fd355ed88",
+    "clippy.txt": "25fd142d2df397be085ff067f9cc4884da4af55f730084f88186b55601afbd54",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "This case covers one same-named domain/enum collision and two direct query operators; other operators and session/search_path combinations remain open.",
+    "This evidence does not close B3 or qualify the 0.2.0 release."
+  ]
+}
