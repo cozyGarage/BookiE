@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-mcp --test postgres_custom_enum -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixtures: 2 passed (1 suite, 3.97s), including ordinary-enum and domain-over-enum MCP contracts.

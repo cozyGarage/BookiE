@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-mcp --test postgres_custom_enum postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_import -- --include-ignored --exact --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 1 filtered out (1 suite, 2.31s). Covers MCP execute_query, JSON/CSV export_data, marker-aware CSV import and native domain value/type assertions.
