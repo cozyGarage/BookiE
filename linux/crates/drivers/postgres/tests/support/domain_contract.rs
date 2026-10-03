@@ -948,6 +948,41 @@ async fn value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed
         ]]
     );
 
+    let ambiguous_parameter = connection
+        .execute(
+            "PREPARE four_domain_ambiguous_parameter AS \
+             SELECT pg_typeof($1)::text FROM value_contract_four_domains.rows \
+             WHERE status::value_contract_four_domains.state = $1",
+        )
+        .await
+        .expect_err("pg_typeof leaves this enum comparison parameter ambiguous");
+    assert!(matches!(
+        ambiguous_parameter,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "42P08"
+    ));
+
+    let explicitly_typed = connection
+        .query_params(
+            "SELECT id, pg_typeof($1::value_contract_four_domains.state)::text, \
+             pg_typeof(status)::text \
+             FROM value_contract_four_domains.rows \
+             WHERE status::value_contract_four_domains.state = \
+                   $1::value_contract_four_domains.state ORDER BY id",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        explicitly_typed.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("value_contract_four_domains.state".into()),
+            Value::Text("value_contract_four_domains.state_domain_4".into()),
+        ]]
+    );
+
     let inferred_update = connection
         .execute_params(
             "UPDATE value_contract_four_domains.rows SET status = $1 WHERE id = 3",
