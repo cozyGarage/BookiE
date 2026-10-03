@@ -381,6 +381,52 @@ async fn mariadb_datetime_fractional_storage_respects_round_mode_for_binds_and_l
     .await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_timestamp_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
+    let (_container, options) = start_mysql().await;
+    let instant = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIMESTAMP(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::TimestampTz(instant + chrono::Duration::microseconds(789_900)),
+        790_000,
+        789_000,
+        |microseconds| {
+            let value = instant + chrono::Duration::microseconds(i64::from(microseconds));
+            (
+                Value::TimestampTz(value),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_timestamp_fractional_storage_respects_round_mode_for_binds_and_literals() {
+    let (_container, options) = start_mariadb().await;
+    let instant = Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).unwrap();
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIMESTAMP(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::TimestampTz(instant + chrono::Duration::microseconds(789_900)),
+        789_000,
+        790_000,
+        |microseconds| {
+            let value = instant + chrono::Duration::microseconds(i64::from(microseconds));
+            (
+                Value::TimestampTz(value),
+                format!("2024-01-02 03:04:05.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
 async fn assert_fractional_storage_mode_for_binds_and_literals(
     options: &ConnectOptions,
     column_type: &str,
@@ -399,6 +445,14 @@ async fn assert_fractional_storage_mode_for_binds_and_literals(
     let columns = conn.fetch_columns(None, "fractional_values").await.unwrap();
     let mut session = conn.open_session().await.unwrap();
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let timestamp_epoch_seconds = match &input {
+        Value::TimestampTz(timestamp) => Some(timestamp.timestamp()),
+        _ => None,
+    };
+    session
+        .query_params_controlled("SET SESSION time_zone = '+00:00'", &[], &control)
+        .await
+        .unwrap();
 
     for (mode, bound_id, literal_id) in [("", 1, 2), (alternate_mode, 3, 4)] {
         session
@@ -424,10 +478,17 @@ async fn assert_fractional_storage_mode_for_binds_and_literals(
         session.query_params_controlled(&literal, &[], &control).await.unwrap();
     }
 
+    let epoch_projection = if timestamp_epoch_seconds.is_some() {
+        ", CAST(UNIX_TIMESTAMP(value) * 1000000 AS SIGNED)"
+    } else {
+        ""
+    };
     let result = session
         .query_params_controlled(
-            "SELECT id, value, CAST(value AS CHAR), MICROSECOND(value) \
-             FROM fractional_values ORDER BY id",
+            &format!(
+                "SELECT id, value, CAST(value AS CHAR), MICROSECOND(value){epoch_projection} \
+                 FROM fractional_values ORDER BY id"
+            ),
             &[],
             &control,
         )
@@ -435,12 +496,16 @@ async fn assert_fractional_storage_mode_for_binds_and_literals(
         .unwrap();
     let expected_row = |id, microseconds| {
         let (value, text) = value_and_text_for_microseconds(microseconds);
-        vec![
+        let mut row = vec![
             Value::Int(id),
             value,
             Value::Text(text),
             Value::Int(i64::from(microseconds)),
-        ]
+        ];
+        if let Some(epoch_seconds) = timestamp_epoch_seconds {
+            row.push(Value::Int(epoch_seconds * 1_000_000 + i64::from(microseconds)));
+        }
+        row
     };
     assert_eq!(
         result.rows,
