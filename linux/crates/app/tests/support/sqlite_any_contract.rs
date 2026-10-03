@@ -130,3 +130,51 @@ async fn sqlite_strict_any_null_and_new_cells_use_text_unless_blank() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, X'00FF80')")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "flexible").await.unwrap();
+    let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+    let current = connection
+        .query("SELECT value FROM flexible WHERE id = 1")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    assert_eq!(current, Value::Bytes(vec![0x00, 0xff, 0x80]));
+    assert!(!crate::ui::grid::cell_allows_inline_edit(
+        &columns[value_index],
+        &current
+    ));
+
+    let saved = connection
+        .query("SELECT id, typeof(value), value FROM flexible")
+        .await
+        .unwrap();
+    assert_eq!(
+        saved.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("blob".into()),
+            Value::Bytes(vec![0x00, 0xff, 0x80]),
+        ]]
+    );
+}

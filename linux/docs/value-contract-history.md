@@ -4406,10 +4406,15 @@ keyed-update builder and driver write; it does not drive GTK event handling.
 `sqlite_strict_any_null_and_new_cells_use_text_unless_blank` checks that input
 policy through a keyed edit and draft insert, with native storage-class/value
 assertions.
+`sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes` adds the
+other supported SQLite storage class: the driver returns exact BLOB bytes and
+the shared runtime-value gate refuses inline editing. The independent native
+oracle checks `typeof(value) = 'blob'` and the original bytes. The regression
+checks the gate directly; installed GTK behavior remains unverified.
 The app-library suite passed 436 tests with 20 ignored, including
 `sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class`.
-The follow-up app-library suite passed 437 tests with 20 ignored, including the
-NULL/new-cell policy contract. Clippy and the mapped `change-contracts` layer
+The follow-up app-library suite passed 438 tests with 20 ignored, including the
+NULL/new-cell policy and BLOB refusal contracts. Clippy and the mapped `change-contracts` layer
 passed. The failing-first log, full app test logs, local layer reports, and
 source fingerprints are in the
 [STRICT ANY evidence packet](evidence/sqlite-strict-any-results-2026-10-03/manifest.json).

@@ -44,10 +44,10 @@
   },
   "source_fingerprints_sha256": {
     "crates/drivers/postgres/tests/support/domain_contract.rs": "fdc7bcd35a5e413f82296da1fc2d3e50a905485f67a5d0542760115737ab8056",
-    "docs/type-contract-strategy.md": "125e31cdda191e8ef72cbe137c257fbb0dd965dc854d88eb6e24198216d5674c",
-    "docs/value-contract-history.md": "b5ef114811dbb2538b0a86129783ed44ba0888c5db7b7b26d052d393cb9bb73f",
+    "docs/type-contract-strategy.md": "e8c27b9135fb2828400533edddbd8ebc5d87d69cd38f94c8820e4ec2b6203cb8",
+    "docs/value-contract-history.md": "701470f93b0526c352fe451750b83d89218b3cd7966bb8ad41d34ede627ac8fc",
     "docs/value-contracts.md": "d2d12b8c551d1e21c8c5606877a73be79012e35afe6fb6b2627afc65db26b546",
-    "docs/release-audit-2026-10-03.md": "c0e8c65a3cc937996d9e914e2f50c2b0270ac7cd2fa6751052b081acc4cfac94"
+    "docs/release-audit-2026-10-03.md": "358012113081583595f5fe5529bd0bea990ebdf511a4a56b4221a8fc1b0adf21"
   },
   "retained_evidence_sha256": {
     "focused.log": "5ffba581cd84722bc141f1233cb9c831ed6374c71a3befedc866cdaf3043d7db",

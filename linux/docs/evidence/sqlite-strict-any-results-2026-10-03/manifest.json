@@ -7,7 +7,8 @@
   "working_tree": "Local checks ran against the dirty source tree recorded below; this is development evidence, not hosted CI, installed GTK acceptance or release qualification.",
   "scope": [
     "Preserve an existing SQLite STRICT ANY cell's INTEGER, REAL or TEXT runtime storage class when edited through the app grid parser and keyed-update path.",
-    "For a NULL or newly inserted cell, empty input follows the shared nullable-column rule and stores NULL; nonempty input remains TEXT rather than guessing a storage class."
+    "For a NULL or newly inserted cell, empty input follows the shared nullable-column rule and stores NULL; nonempty input remains TEXT rather than guessing a storage class.",
+    "A BLOB runtime value in SQLite STRICT ANY is refused by the shared inline-editability gate and retains its exact bytes."
   ],
   "regression": {
     "selector": "sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class",
@@ -23,6 +24,13 @@
     "path": "The app grid-cell parser, keyed-update builder, SQLite draft INSERT builder and driver write; no GTK event handling.",
     "oracle": "SQLite typeof(value), exact returned text (including leading zeroes), SQL NULL, and generated row identity.",
     "result": "1 passed; full tablepro-app library suite 437 passed, 20 ignored."
+  },
+  "blob_refusal_regression": {
+    "selector": "sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes",
+    "fixture": "In-memory SQLite STRICT ANY column containing bytes 00 FF 80.",
+    "path": "SQLite driver decoding and the shared grid runtime-value editability gate.",
+    "oracle": "Value::Bytes equality, gate returns not editable, SQLite typeof(value) = blob, exact bytes unchanged.",
+    "result": "1 passed; the three focused STRICT ANY tests passed; full tablepro-app library suite 438 passed, 20 ignored."
   },
   "commands": [
     {
@@ -51,11 +59,11 @@
     },
     {
       "argv": "cargo test --locked -p tablepro-app --lib sqlite_strict_any",
-      "result": "2 passed after moving both cases into a dedicated test module; log retained in sqlite-any-focused-followup.log."
+      "result": "3 passed after moving the cases into a dedicated test module; log retained in sqlite-any-focused-followup.log."
     },
     {
       "argv": "cargo test --locked -p tablepro-app --lib",
-      "result": "437 passed; 0 failed; 20 ignored; log retained in app-lib-followup.log."
+      "result": "438 passed; 0 failed; 20 ignored; log retained in app-lib-followup.log."
     },
     {
       "argv": "cargo clippy --locked -p tablepro-app --all-targets -- -D warnings",
@@ -80,12 +88,12 @@
     "crates/app/src/ui/browse_tab/value_parse.rs": "a5e273af6fa35710938b8b06660bd71aa6e9cb619c748d212693590c564a61ac",
     "crates/app/src/ui/browse_tab/row_ops.rs": "8867e8c473b78a3679b7a3325388c3fc591391f90cec086c5875ab53ec28c79b",
     "crates/app/tests/support/value_parse.rs": "8214d52ff4345a284cf9f4ccaa3e4b28a138a91053f8d4e2538aa7b8d8029212",
-    "crates/app/tests/support/sqlite_any_contract.rs": "d122491ebcd832c4372562139a4219b0749856d14d0199d02c21fffd5b213d59",
-    "docs/type-contract-strategy.md": "125e31cdda191e8ef72cbe137c257fbb0dd965dc854d88eb6e24198216d5674c",
+    "crates/app/tests/support/sqlite_any_contract.rs": "db31a27cda3721fd7cd7ab99845848fab27c5eda582347377e6069cf9a424480",
+    "docs/type-contract-strategy.md": "e8c27b9135fb2828400533edddbd8ebc5d87d69cd38f94c8820e4ec2b6203cb8",
     "docs/value-contracts.md": "d2d12b8c551d1e21c8c5606877a73be79012e35afe6fb6b2627afc65db26b546",
-    "docs/value-contract-history.md": "b5ef114811dbb2538b0a86129783ed44ba0888c5db7b7b26d052d393cb9bb73f",
-    "docs/release-audit-2026-10-03.md": "c0e8c65a3cc937996d9e914e2f50c2b0270ac7cd2fa6751052b081acc4cfac94",
-    "docs/b3-test-scenario-survey.md": "81fd5c7e3ca04574a1e9394a3281bc0e30919aff4c02e360a0f19d9b9c8d902f"
+    "docs/value-contract-history.md": "701470f93b0526c352fe451750b83d89218b3cd7966bb8ad41d34ede627ac8fc",
+    "docs/release-audit-2026-10-03.md": "358012113081583595f5fe5529bd0bea990ebdf511a4a56b4221a8fc1b0adf21",
+    "docs/b3-test-scenario-survey.md": "86abf00c4353b51cdb33fe8abb24acaeccbbe3a766e7e4701d271480b1f709c3"
   },
   "retained_evidence_sha256": {
     "before-fix.log": "c88ecbf90d0eb1e2c035f9cf3b14c704e0668038bb8fad647b63114d9fea4372",
@@ -95,15 +103,15 @@
     "change-contracts-report.json": "c02b57a56e29296d0e37da3d3b0efc8f62dc563fca05726fc0d2f3e2ebc17f44",
     "change-contracts.log": "b2d303a7f18081950ad356c4b77952eafc5c058d1d766b320652766d3864d5ab",
     "null-new-focused.log": "bd560dd9220baf9a5c5e202b2cda5757f22dacc916adedaffc1422751a3c9c82",
-    "app-lib-followup.log": "1d77b6c27fa84974f61f2dfe69a37d1bda1e6bfdc3c42b97436e8d89fc9b202e",
-    "clippy-followup.log": "2db60ebcd75c5b72f4840dde13f6db232e59d1bde96a7fc9d02e5f56007ddacc",
-    "change-contracts-followup-report.json": "2e81ceccb8ff95d3bd3d2da50caba0c3ea0af04acf6b675c72f7bf4f709a0751",
-    "change-contracts-followup.log": "bad59eb2b2d93f5a3b3ae332f2937897d531f211d75927ac10cd27cfa1681945",
-    "sqlite-any-focused-followup.log": "a44a3c3db4643d55c27fc1a384c23e799a2ea39caadbd5db89e4967ac3ccdd32"
+    "app-lib-followup.log": "f6f6763025b6350a5ca55067145acf57fcd2a91e73930652166f4f826a92e9fc",
+    "clippy-followup.log": "b7f0dfeb478f1461bb84b508e0f0a4fcb319378bbe46551be3761d0ec089b81d",
+    "change-contracts-followup-report.json": "0646adaf1d8ec2f0a7a7430e44c3c2a03d40d7425bd4d34ad41d6cd3eb751dd9",
+    "change-contracts-followup.log": "6b505239068f90a970b222eb3543b7a291c16f1395bb426e2b8b9ebc6003572f",
+    "sqlite-any-focused-followup.log": "4885a6763bc73b513c617589c941c38b8805a81c690c542094ea8fa62f39f383"
   },
   "evidence_normalization": "Captured terminal logs have trailing whitespace removed so the evidence packet passes git diff checks; test results and output content are unchanged.",
   "limitations": [
-    "The test directly exercises parsing, keyed SQL generation, SQLite writes and native type/value checks; it does not drive GTK event handling or verify an installed grid.",
+    "The parser/keyed-write tests directly exercise parsing, keyed SQL generation, SQLite writes and native type/value checks; the BLOB case directly checks the shared runtime-value gate. None drives GTK event handling or verifies an installed grid.",
     "No hosted GitHub Actions, package, Wayland, VM or release-candidate qualification is represented."
   ]
 }
