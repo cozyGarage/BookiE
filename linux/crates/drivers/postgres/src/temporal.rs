@@ -3,6 +3,10 @@ use tablepro_core::Value;
 
 const MICROS_PER_DAY: i64 = 86_400_000_000;
 const OFFSET_LIMIT: i32 = 57_600;
+const PG_DATE_MIN_DAYS: i32 = -2_451_507;
+const PG_DATE_MAX_DAYS: i32 = 2_145_031_948;
+const PG_TIMESTAMP_MIN_MICROS: i64 = -211_810_204_800_000_000;
+const PG_TIMESTAMP_MAX_MICROS: i64 = 9_223_371_331_199_999_999;
 
 pub(crate) fn array_text(value: Value) -> Option<String> {
     match value {
@@ -61,9 +65,15 @@ pub(crate) fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
             i32::MAX => return Some(Value::Text("infinity".into())),
             _ => {}
         }
-        return epoch
-            .checked_add_signed(chrono::TimeDelta::try_days(i64::from(days))?)
-            .map(Value::Date);
+        if !(PG_DATE_MIN_DAYS..=PG_DATE_MAX_DAYS).contains(&days) {
+            return None;
+        }
+        return Some(
+            epoch
+                .checked_add_signed(chrono::TimeDelta::try_days(i64::from(days))?)
+                .map(Value::Date)
+                .unwrap_or_else(|| Value::Text(calendar_date(i64::from(days)))),
+        );
     }
     let micros = i64::from_be_bytes(bytes.try_into().ok()?);
     match micros {
@@ -71,14 +81,64 @@ pub(crate) fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
         i64::MAX => return Some(Value::Text("infinity".into())),
         _ => {}
     }
-    let time = epoch
-        .and_hms_opt(0, 0, 0)?
-        .checked_add_signed(chrono::TimeDelta::microseconds(micros))?;
-    Some(if type_name == "TIMESTAMPTZ" {
-        Value::TimestampTz(time.and_utc())
+    if !(PG_TIMESTAMP_MIN_MICROS..=PG_TIMESTAMP_MAX_MICROS).contains(&micros) {
+        return None;
+    }
+    Some(
+        epoch
+            .and_hms_opt(0, 0, 0)?
+            .checked_add_signed(chrono::TimeDelta::microseconds(micros))
+            .map(|time| {
+                if type_name == "TIMESTAMPTZ" {
+                    Value::TimestampTz(time.and_utc())
+                } else {
+                    Value::DateTime(time)
+                }
+            })
+            .unwrap_or_else(|| {
+                let timestamp = calendar_timestamp(micros);
+                Value::Text(if type_name == "TIMESTAMPTZ" {
+                    format!("{timestamp}+00")
+                } else {
+                    timestamp
+                })
+            }),
+    )
+}
+
+fn calendar_date(days_since_postgres_epoch: i64) -> String {
+    // PostgreSQL and Unix epochs differ by exactly 10,957 civil days.
+    let days = days_since_postgres_epoch + 10_957 + 719_468;
+    let era = days.div_euclid(146_097);
+    let day_of_era = days - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_part = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_part + 2) / 5 + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    year += if month <= 2 { 1 } else { 0 };
+    if year <= 0 {
+        format!("{:04}-{:02}-{day:02} BC", 1 - year, month)
     } else {
-        Value::DateTime(time)
-    })
+        format!("{year:04}-{month:02}-{day:02}")
+    }
+}
+
+fn calendar_timestamp(micros_since_postgres_epoch: i64) -> String {
+    let days = micros_since_postgres_epoch.div_euclid(MICROS_PER_DAY);
+    let micros = micros_since_postgres_epoch.rem_euclid(MICROS_PER_DAY);
+    let date = calendar_date(days);
+    let hour = micros / 3_600_000_000;
+    let minute = micros % 3_600_000_000 / 60_000_000;
+    let second = micros % 60_000_000 / 1_000_000;
+    let fraction = format!("{:06}", micros % 1_000_000);
+    let fraction = fraction.trim_end_matches('0');
+    if fraction.is_empty() {
+        format!("{date} {hour:02}:{minute:02}:{second:02}")
+    } else {
+        format!("{date} {hour:02}:{minute:02}:{second:02}.{fraction}")
+    }
 }
 
 #[cfg(test)]

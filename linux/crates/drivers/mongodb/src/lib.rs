@@ -25,8 +25,6 @@ use tablepro_core::{
     QueryResult, TableInfo, Value,
 };
 
-const SAMPLE_DOCS: i64 = 50;
-
 pub struct MongodbDriver;
 
 /// Validate text using BSON Decimal128's range and return its exact canonical text.
@@ -173,7 +171,8 @@ impl Connection for MongodbConnection {
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
         let coll = self.db().collection::<Document>(table);
-        let mut cursor = coll.find(doc! {}).limit(SAMPLE_DOCS).await.map_err(map_mongo_error)?;
+        // ponytail: exact schema costs one collection scan per page; cache metadata if browse latency warrants it.
+        let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
         let mut union: BTreeMap<String, String> = BTreeMap::new();
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
             for (key, value) in doc {

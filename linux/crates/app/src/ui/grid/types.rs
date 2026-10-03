@@ -62,7 +62,7 @@ pub(super) fn is_float_type(data_type: &str) -> bool {
 
 pub(super) fn is_json_type(data_type: &str) -> bool {
     let dt = data_type.to_ascii_lowercase();
-    dt.contains("json")
+    dt.contains("json") || dt.starts_with("bindata-subtype-")
 }
 
 pub(super) fn is_bytes_type(s: &str) -> bool {
@@ -115,5 +115,6 @@ mod tests {
     fn mysql_bit_widths_choose_an_editor_matching_the_value_contract() {
         assert_eq!(classify_editor_kind("bit(8)"), CellEditorKind::Int);
         assert_eq!(classify_editor_kind("bit(64)"), CellEditorKind::Int);
+        assert_eq!(classify_editor_kind("binData-subtype-04"), CellEditorKind::Json);
     }
 }

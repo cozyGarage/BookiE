@@ -9,6 +9,8 @@ mod bigint_array;
 mod bigint_map;
 #[path = "support/ubigint_struct.rs"]
 mod bigint_struct;
+#[path = "support/extended_timestamptz.rs"]
+mod extended_timestamptz;
 #[path = "support/uhugeint_fixed_array.rs"]
 mod fixed_uhugeint_array;
 #[path = "support/interval_csv_import.rs"]
@@ -165,6 +167,7 @@ async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
         ("DATE", "1969-12-31"),
         ("DATE", "2000-02-29"),
         ("DATE", "10000-01-01"),
+        ("DATE", "1000000-01-01"),
         ("DATE", "0001-01-01 (BC)"),
         ("DATE", "0002-12-31 (BC)"),
         ("TIME", "24:00:00"),
@@ -173,6 +176,8 @@ async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
         ("TIMESTAMP_S", "1969-12-31 23:59:59"),
         ("TIMESTAMP_MS", "1969-12-31 23:59:59.999"),
         ("TIMESTAMP", "1969-12-31 23:59:59.999999"),
+        ("TIMESTAMP", "100000-01-02 03:04:05.123456"),
+        ("TIMESTAMP", "0001-01-01 (BC) 00:00:00"),
         ("TIMESTAMP_NS", "1969-12-31 23:59:59.999999999"),
         ("TIMESTAMP_NS", "2026-09-27 12:34:56.123456789"),
         ("TIMESTAMPTZ", "2026-09-27 12:34:56.123456+05:30"),
@@ -327,9 +332,6 @@ async fn value_contract_enum_labels_and_unsupported_collections_are_explicit() {
         "{'a': 1}",
         "MAP(['a'], [1])",
         "union_value(a := 1)",
-        "DATE '1000000-01-01'",
-        "TIMESTAMP '10000-01-01 00:00:00'",
-        "TIMESTAMP '0001-01-01 (BC) 00:00:00'",
     ] {
         let result = connection.query(&format!("SELECT {expression}")).await.unwrap();
         let value = &result.rows[0][0];

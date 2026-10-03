@@ -34,7 +34,6 @@ wait_for_port() {
   local host="$1" port="$2" label="$3"
   for _ in $(seq 1 120); do
     if (exec 3<>"/dev/tcp/$host/$port") 2>/dev/null; then
-      exec 3>&- 2>/dev/null || true
       return 0
     fi
     sleep 1
@@ -66,6 +65,7 @@ chmod 0700 "$secret_root/runtime"
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 CARGO_HOME="$cargo_home" \
+RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   HOME="$secret_root/home" \
   XDG_CONFIG_HOME="$STATE/config" \
   XDG_DATA_HOME="$secret_root/data" \

@@ -3,7 +3,7 @@
 Approved: 2026-09-16. Status: implementation started, no release approved.
 Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. This document supersedes the 0.1.1 plan for sequencing.
 
-## Current continuation plan: 2026-10-02
+## Current continuation plan: 2026-10-03
 
 Working branch: **`linux`**. B3 code checkpoint:
 `b4fd0e7` (source version 0.1.5).
@@ -45,6 +45,24 @@ Security `37039255289` and Flatpak `37039255134` all passed. Validation reused
 all 747 Cargo artifacts. See the
 [validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
+
+October 3 continuation: DuckDB finite DATE32 values across chrono's calendar
+and TIMESTAMP values outside chrono now return exact calendar text and survive
+SQL-literal, typed-parameter and app keyed-edit round trips. Local unit, driver
+integration and DuckDB-enabled app contracts pass. The exact text fallback
+avoids forcing values outside Rust's calendar into chrono types. Extended
+TIMESTAMPTZ results retain `+00`; year-280000 offset values also pass SQL-literal,
+typed-parameter, CSV and keyed-edit round trips. PostgreSQL year-1,000,000 DATE
+and upper finite TIMESTAMP/TIMESTAMPTZ pass result, literal, parameter, CSV and
+app keyed-edit contracts with native wire-byte checks. The maximum finite DATE
+value `5874897-12-31` has result/literal/bind wire checks. B3 remains open for
+the other named DuckDB, PostgreSQL, MySQL, SQL Server, ClickHouse, MongoDB and
+Redis targets below.
+
+The strict local GTK+DuckDB values layer passed 196 selected tests across all
+11 suites on the dirty worktree at `d7007a6` after the PostgreSQL extended-year
+CSV import regression was fixed. Report:
+[`20261002T235951812293Z-values/report.json`](../target/quality/20261002T235951812293Z-values/report.json).
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
@@ -95,6 +113,10 @@ engine/type/consumer before handing it off. Preserve known text fallbacks and
 explicit refusals; do not equate refusal with completed exact support. The
 [type matrix](type-contract-strategy.md) and [value evidence](value-contracts.md)
 carry detailed native-type targets. Do not rebuild completed scalar/BSON/export work.
+For 0.2.0 safety, a tested refusal closes a named gap only after that gap is
+explicitly accepted out of scope and its exposed consumers are covered. Keep
+support status and scope acceptance separate; every in-scope case still needs
+exact support.
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
 | --- | --- | --- |
@@ -107,10 +129,11 @@ carry detailed native-type targets. Do not rebuild completed scalar/BSON/export 
 
 P2–P5 must also retain the remaining driver targets in the matrix: DuckDB
 interval/collections and high-precision bindings, SQL Server temporal/money/variant,
-ClickHouse bounds/wide/nested values, MySQL session modes, Redis nested/binary
-semantics and MongoDB mixed-type editing. Audit first; do not silently remove
-those targets to mark B3 done. Close B3 only when each in-scope contract has
-explicit evidence and outstanding correctness findings are resolved.
+ClickHouse bounds/wide/nested values, MySQL additional SQL modes and DDL/session
+interactions, Redis nested/binary semantics and MongoDB mixed-type editing. Audit
+first; do not silently remove those targets to mark B3 done. Close B3 only when
+each in-scope contract has exact-support evidence, each accepted out-of-scope
+gap has a tested safe refusal, and outstanding correctness findings are resolved.
 
 ### B3 continuation — SQL Server datetimeoffset CSV, 2026-10-01
 
@@ -424,13 +447,17 @@ Worktree: /home/trung/Projects/tablepro; working branch: linux.
 Read CLAUDE.md, PLAN.md, docs/bookie-0.2-sprint.md and docs/validation-playbook.md
 (paths under linux/ for docs). Follow the RTK instruction for shell commands.
 Confirm current full HEAD and git status; reviewed baseline was
-fe22716459c242b350bf34e7070dde19bba184ba. Record any newer commits or local edits.
+`d7007a6a6`. Record any newer commits or local edits before reconciling.
 Task: B3-P1 only. Reconcile remaining type/consumer coverage against current code
 and the archived September 26–28 review. Update the three B3 evidence documents.
 Allowed edits: linux/docs/type-contract-strategy.md,
 linux/docs/b3-test-scenario-survey.md, linux/docs/value-contracts.md.
-Return a concrete smallest next case, exact test command, existing evidence SHA,
-and open gaps. Do not claim new runtime passes from inspecting test source.
+For every remaining row, keep capability outcome (typed, text fallback, refusal,
+untested) separate from scope decision (in scope, accepted out of scope, undecided).
+A refusal satisfies 0.2.0 safety only for a named accepted out-of-scope row and
+only when its exposed consumers have regression coverage. Return accepted rows,
+open decisions, the smallest next in-scope case, exact test command, evidence
+SHA, and remaining gaps. Do not claim runtime passes from inspecting test source.
 No GNOME/Debian VM setup, production-code edits, release, push or publication.
 ```
 

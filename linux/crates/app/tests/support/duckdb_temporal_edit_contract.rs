@@ -2,6 +2,151 @@ use super::{col, parse_input_for_driver};
 use chrono::Timelike;
 use tablepro_core::Value;
 
+#[test]
+fn value_contract_duckdb_extended_calendar_values_parse_as_exact_text() {
+    let date = col("DATE", false);
+    assert_eq!(
+        parse_input_for_driver("1000000-02-29", Some(&date), "duckdb").unwrap(),
+        Value::Text("1000000-02-29".into())
+    );
+    assert!(parse_input_for_driver("1000001-02-29", Some(&date), "duckdb").is_err());
+    assert_eq!(
+        parse_input_for_driver("0001-01-01 (BC)", Some(&date), "duckdb").unwrap(),
+        Value::Text("0001-01-01 (BC)".into())
+    );
+
+    let timestamp = col("TIMESTAMP", false);
+    assert_eq!(
+        parse_input_for_driver("280000-02-29 12:34:56.123456", Some(&timestamp), "duckdb").unwrap(),
+        Value::Text("280000-02-29 12:34:56.123456".into())
+    );
+    assert!(parse_input_for_driver("280001-02-29 12:34:56", Some(&timestamp), "duckdb").is_err());
+}
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
+async fn value_contract_duckdb_extended_calendar_grid_edits_preserve_native_values() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE extended_dates (id INTEGER PRIMARY KEY, day DATE, moment TIMESTAMP)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO extended_dates VALUES (1, DATE '1000000-02-29', TIMESTAMP '280000-02-29 12:34:56.123456')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "extended_dates").await.unwrap();
+    let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+    let day_index = columns.iter().position(|column| column.name == "day").unwrap();
+    let moment_index = columns.iter().position(|column| column.name == "moment").unwrap();
+    let before = connection.query("SELECT * FROM extended_dates").await.unwrap();
+    assert_eq!(before.rows[0][day_index], Value::Text("1000000-02-29".into()));
+    assert_eq!(
+        before.rows[0][moment_index],
+        Value::Text("280000-02-29 12:34:56.123456".into())
+    );
+    let edits = [
+        (
+            day_index,
+            parse_input_for_driver("1000001-03-01", Some(&columns[day_index]), "duckdb").unwrap(),
+        ),
+        (
+            moment_index,
+            parse_input_for_driver("280001-03-01 01:02:03.654321", Some(&columns[moment_index]), "duckdb").unwrap(),
+        ),
+    ];
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "duckdb",
+        None,
+        "extended_dates",
+        &columns,
+        &edits,
+        &[before.rows[0][id_index].clone()],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    assert_eq!(
+        connection
+            .query("SELECT CAST(day AS VARCHAR), CAST(moment AS VARCHAR) FROM extended_dates")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![
+            Value::Text("1000001-03-01".into()),
+            Value::Text("280001-03-01 01:02:03.654321".into())
+        ]]
+    );
+}
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
+async fn value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection.execute("SET TimeZone = 'UTC'").await.unwrap();
+    connection
+        .execute("CREATE TABLE extended_zoned (id INTEGER PRIMARY KEY, moment TIMESTAMPTZ)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO extended_zoned VALUES \
+             (1, TIMESTAMPTZ '280000-02-29 12:34:56.123456+00:00')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "extended_zoned").await.unwrap();
+    let moment_index = columns.iter().position(|column| column.name == "moment").unwrap();
+    let before = connection.query("SELECT * FROM extended_zoned").await.unwrap();
+    assert_eq!(
+        before.rows[0][moment_index],
+        Value::Text("280000-02-29 12:34:56.123456+00".into())
+    );
+    let edited = parse_input_for_driver(
+        "280001-03-01T01:02:03.654321+05:30",
+        Some(&columns[moment_index]),
+        "duckdb",
+    )
+    .unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "duckdb",
+        None,
+        "extended_zoned",
+        &columns,
+        &[(moment_index, edited)],
+        &[before.rows[0][0].clone()],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    assert_eq!(
+        connection
+            .query("SELECT epoch_us(moment) = epoch_us(TIMESTAMPTZ '280001-03-01 01:02:03.654321+05:30') FROM extended_zoned")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Bool(true)]]
+    );
+}
+
 #[cfg(feature = "duckdb")]
 #[tokio::test]
 async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
@@ -196,6 +341,20 @@ fn value_contract_duckdb_timestamptz_parser_refuses_submicro_edits() {
         parse_input_for_driver(submicro, Some(&column), "duckdb").unwrap_err(),
         "DuckDB TIMESTAMPTZ supports microsecond precision only"
     );
+    assert_eq!(
+        parse_input_for_driver("280000-02-29T12:34:56.123456+05:30", Some(&column), "duckdb").unwrap(),
+        Value::Text("280000-02-29T12:34:56.123456+05:30".into())
+    );
+    assert_eq!(
+        parse_input_for_driver("0001-01-01 (BC) 12:34:56.123456+00:00", Some(&column), "duckdb").unwrap(),
+        Value::Text("0001-01-01 (BC) 12:34:56.123456+00:00".into())
+    );
+    assert_eq!(
+        parse_input_for_driver("280000-02-29T12:34:56.123456789+00:00", Some(&column), "duckdb").unwrap_err(),
+        "DuckDB TIMESTAMPTZ supports microsecond precision only"
+    );
+    assert!(parse_input_for_driver("280001-02-29T12:34:56+00:00", Some(&column), "duckdb").is_err());
+    assert!(parse_input_for_driver("280000-02-29T12:34:56+24:00", Some(&column), "duckdb").is_err());
     assert_eq!(
         parse_input_for_driver(submicro, Some(&col("TEXT", false)), "duckdb").unwrap(),
         Value::Text(submicro.into()),

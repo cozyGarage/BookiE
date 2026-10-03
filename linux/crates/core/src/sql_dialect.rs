@@ -311,6 +311,7 @@ pub fn build_keyed_update(
             let placeholder = placeholder_for(driver_id, params.len());
             let value_sql = if driver_id == "postgres" && matches!(new_value, Value::Text(_)) {
                 postgres_array_cast_type(&columns[*col_idx].data_type)
+                    .or_else(|| postgres_temporal_cast_type(&columns[*col_idx].data_type))
                     .or_else(|| postgres_numeric_cast_type(&columns[*col_idx].data_type))
                     .map(|array_type| format!("{placeholder}::text::{array_type}"))
                     .unwrap_or(placeholder)

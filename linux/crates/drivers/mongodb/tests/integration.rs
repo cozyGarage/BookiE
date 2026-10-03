@@ -697,7 +697,7 @@ async fn negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn browse_page_types_include_documents_after_the_metadata_sample() {
+async fn collection_scan_finds_mixed_values_beyond_sample_and_page() {
     use mongodb::bson::{Decimal128, doc};
 
     let (_container, host, port) = start_mongo().await;
@@ -709,29 +709,26 @@ async fn browse_page_types_include_documents_after_the_metadata_sample() {
         .collection::<mongodb::bson::Document>("late_mixed_values");
     let decimal_text = "12345678901234567890.1234567890123";
     let decimal = decimal_text.parse::<Decimal128>().unwrap();
-    let mut docs = (0..50)
+    let mut docs = (0..51)
         .map(|index| doc! { "_id": index, "value": decimal_text })
         .collect::<Vec<_>>();
-    docs.push(doc! { "_id": 50, "value": decimal });
+    docs.push(doc! { "_id": 51, "value": decimal });
     collection
         .insert_many(docs)
         .await
         .expect("seed metadata sample and page");
 
     let connection = MongodbDriver.connect(opts(&host, port, "appdb")).await.unwrap();
-    let page = connection.fetch_rows(None, "late_mixed_values", 50, 1).await.unwrap();
+    let page = connection.fetch_rows(None, "late_mixed_values", 0, 1).await.unwrap();
     let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(page.rows.len(), 1);
-    assert_eq!(page.rows[0][id_index], Value::Int(50));
+    assert_eq!(page.rows[0][id_index], Value::Int(0));
     assert_eq!(page.columns[value_index].data_type, "mixed");
-    assert_eq!(
-        page.rows[0][value_index],
-        Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))
-    );
+    assert_eq!(page.rows[0][value_index], Value::Json(serde_json::json!(decimal_text)));
 
     let query_page = connection
-        .query("db.late_mixed_values.find({}).skip(50).limit(1)")
+        .query("db.late_mixed_values.find({}).limit(1)")
         .await
         .unwrap();
     let query_value_index = query_page
@@ -742,14 +739,46 @@ async fn browse_page_types_include_documents_after_the_metadata_sample() {
     assert_eq!(query_page.columns[query_value_index].data_type, "mixed");
     assert_eq!(
         query_page.rows[0][query_value_index],
+        Value::Json(serde_json::json!(decimal_text))
+    );
+
+    let late_page = connection.fetch_rows(None, "late_mixed_values", 51, 1).await.unwrap();
+    let late_id_index = late_page
+        .columns
+        .iter()
+        .position(|column| column.name == "_id")
+        .unwrap();
+    let late_value_index = late_page
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    assert_eq!(late_page.rows[0][late_id_index], Value::Int(51));
+    assert_eq!(late_page.columns[late_value_index].data_type, "mixed");
+    assert_eq!(
+        late_page.rows[0][late_value_index],
+        Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))
+    );
+
+    let late_query = connection
+        .query("db.late_mixed_values.find({}).skip(51).limit(1)")
+        .await
+        .unwrap();
+    let late_query_value_index = late_query
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    assert_eq!(
+        late_query.rows[0][late_query_value_index],
         Value::Json(serde_json::json!({"$numberDecimal": decimal_text}))
     );
 
     let persisted = collection
-        .find_one(doc! { "_id": 50 })
+        .find_one(doc! { "_id": 51 })
         .await
         .expect("read late native value")
-        .expect("late page document exists");
+        .expect("late collection document exists");
     assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
 }
 

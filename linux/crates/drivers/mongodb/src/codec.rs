@@ -152,7 +152,7 @@ pub(super) fn bson_type_name(b: &Bson) -> String {
         Bson::String(_) => "string",
         Bson::ObjectId(_) => "ObjectId",
         Bson::DateTime(_) => "date",
-        Bson::Binary(_) => "binData",
+        Bson::Binary(binary) => return format!("binData-subtype-{:02x}", u8::from(binary.subtype)),
         Bson::Document(_) => "object",
         Bson::Array(_) => "array",
         Bson::Decimal128(_) => "decimal",

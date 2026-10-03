@@ -165,7 +165,7 @@ async fn guarded_tool_path_journals_policy_decision() {
 
     let dir = tempfile::TempDir::new().unwrap();
     let journal_path = dir.path().join("audit.jsonl");
-    let journal = Arc::new(AuditJournal::open(journal_path.clone()));
+    let journal = Arc::new(AuditJournal::open_validated(journal_path.clone()).unwrap());
     let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
     let conn_id = Uuid::new_v4();
     let (_meta, plain) = store

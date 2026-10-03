@@ -51,6 +51,7 @@ struct JournalRecordRaw<'a> {
 pub struct AuditJournalRecovery {
     legacy_journal: Option<LegacyJournalRotation>,
     recovered_operation_ids: Vec<Uuid>,
+    unresolved_operation_ids: Vec<Uuid>,
 }
 
 impl AuditJournalRecovery {
@@ -62,8 +63,12 @@ impl AuditJournalRecovery {
         &self.recovered_operation_ids
     }
 
-    pub fn recovered_unresolved_operations(&self) -> bool {
-        !self.recovered_operation_ids.is_empty()
+    pub fn unresolved_operation_ids(&self) -> &[Uuid] {
+        &self.unresolved_operation_ids
+    }
+
+    pub fn has_unresolved_writes(&self) -> bool {
+        !self.unresolved_operation_ids.is_empty()
     }
 }
 
@@ -98,6 +103,9 @@ pub struct AuditJournal {
     path: PathBuf,
     writer: Arc<Mutex<()>>,
     recovery: AuditJournalRecovery,
+    // GUI and agentd share the journal. This lease prevents another live
+    // process from treating an in-flight intent as a crash during startup.
+    _active_lock_file: File,
 }
 
 impl AuditJournal {
@@ -105,22 +113,14 @@ impl AuditJournal {
         Self::open_validated(journal_path()?)
     }
 
-    pub fn open(path: PathBuf) -> Self {
-        let path = absolute_path(path);
-        Self {
-            writer: writer_for(&path),
-            path,
-            recovery: AuditJournalRecovery::default(),
-        }
-    }
-
     pub fn open_validated(path: PathBuf) -> Result<Self, StorageError> {
         let path = absolute_path(path);
-        let recovery = initialize(&path)?;
+        let (recovery, active_lock_file) = initialize(&path)?;
         Ok(Self {
             writer: writer_for(&path),
             path,
             recovery,
+            _active_lock_file: active_lock_file,
         })
     }
 
@@ -211,23 +211,48 @@ fn absolute_path(path: PathBuf) -> PathBuf {
     std::env::current_dir().map_or(path.clone(), |current| current.join(path))
 }
 
-fn initialize(path: &Path) -> Result<AuditJournalRecovery, StorageError> {
+fn initialize(path: &Path) -> Result<(AuditJournalRecovery, File), StorageError> {
     create_parent(path)?;
     let lock_file = open_initialization_lock(path)?;
-    let _initialization_lock = FileLock::exclusive(&lock_file.file)?;
+    let active_lock = open_active_lock(path)?;
+    let initialization_lock = FileLock::exclusive(&lock_file.file)?;
+
+    if !try_exclusive_lock(&active_lock.file)? {
+        // A live owner exists. Validate its journal state without repairing it.
+        drop(initialization_lock);
+        acquire_shared_lock(&active_lock.file)?;
+        let _initialization_lock = FileLock::exclusive(&lock_file.file)?;
+        let mut opened = open_file(path)?;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        let _journal_lock = FileLock::exclusive(&opened.file)?;
+        let verified = verify_locked(&mut opened.file, false)?;
+        return Ok((
+            AuditJournalRecovery {
+                legacy_journal: None,
+                recovered_operation_ids: Vec::new(),
+                unresolved_operation_ids: verified.unresolved_operation_ids,
+            },
+            active_lock.file,
+        ));
+    }
 
     let legacy_journal = rotate_legacy_journal(path)?;
     let mut opened = open_file(path)?;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
     let verified = verify_locked(&mut opened.file, true)?;
-    let recovered_operation_ids = recover_pending_intents(&mut opened.file, verified)?;
+    let unresolved_operation_ids = recover_pending_intents(&mut opened.file, verified)?;
     opened.file.flush()?;
     sync_created_file_and_parent(&opened, path)?;
+    acquire_shared_lock(&active_lock.file)?;
 
-    Ok(AuditJournalRecovery {
-        legacy_journal,
-        recovered_operation_ids,
-    })
+    Ok((
+        AuditJournalRecovery {
+            legacy_journal,
+            recovered_operation_ids: unresolved_operation_ids.clone(),
+            unresolved_operation_ids,
+        },
+        active_lock.file,
+    ))
 }
 
 fn create_parent(path: &Path) -> Result<(), StorageError> {
@@ -251,6 +276,34 @@ fn open_initialization_lock(path: &Path) -> Result<OpenedFile, StorageError> {
     let opened = open_file_with_options(&lock_path, false)?;
     sync_created_file_and_parent(&opened, &lock_path)?;
     Ok(opened)
+}
+
+fn open_active_lock(path: &Path) -> Result<OpenedFile, StorageError> {
+    let lock_path = sibling_path(path, "active")?;
+    let opened = open_file_with_options(&lock_path, false)?;
+    std::fs::set_permissions(&lock_path, std::fs::Permissions::from_mode(0o600))?;
+    sync_created_file_and_parent(&opened, &lock_path)?;
+    Ok(opened)
+}
+
+fn try_exclusive_lock(file: &File) -> Result<bool, StorageError> {
+    let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if result == 0 {
+        return Ok(true);
+    }
+    let error = std::io::Error::last_os_error();
+    if error.kind() == std::io::ErrorKind::WouldBlock {
+        return Ok(false);
+    }
+    Err(error.into())
+}
+
+fn acquire_shared_lock(file: &File) -> Result<(), StorageError> {
+    let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH) };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(())
 }
 
 fn open_file_with_options(path: &Path, append: bool) -> Result<OpenedFile, StorageError> {
@@ -729,7 +782,7 @@ mod tests {
         tokio::fs::write(&path, format!("{line}\n")).await.unwrap();
         let journal =
             AuditJournal::open_validated(path).expect("a non-canonical but faithfully hashed record must verify");
-        assert!(!journal.recovery().recovered_unresolved_operations());
+        assert!(!journal.recovery().has_unresolved_writes());
     }
 
     #[tokio::test]

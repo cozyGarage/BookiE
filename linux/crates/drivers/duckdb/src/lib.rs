@@ -387,6 +387,9 @@ fn run_query(
                 .enumerate()
                 .map(|(i, zoned)| match duck_value_ref_to_value(row.get_ref_unwrap(i)) {
                     Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                    Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
+                        Value::Text(format!("{timestamp}+00"))
+                    }
                     value => value,
                 })
                 .collect(),

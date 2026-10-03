@@ -1,23 +1,59 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::{Connection, DriverError, OperationControl, Value};
+use tablepro_core::{Connection, OperationControl, Value};
 use tokio_util::sync::CancellationToken;
 
-fn assert_undecodable_temporal_exports(result: &tablepro_core::QueryResult, type_name: &str) {
-    let value = result.rows[0][0].clone();
-    let rows = vec![vec![value]];
-    let columns = &result.columns[..1];
-    let json = tablepro_core::export::render_json(columns, &rows);
+async fn assert_extended_temporal_csv_round_trip(connection: &dyn Connection, kind: &str, text: &str, send: &str) {
+    let table = format!("extended_{kind}_csv");
+    connection
+        .execute(&format!("CREATE TABLE {table} (value {kind})"))
+        .await
+        .unwrap();
+    let source = connection
+        .query(&format!("SELECT '{text}'::{kind} AS value"))
+        .await
+        .unwrap();
+    assert_eq!(source.rows[0][0], Value::Text(text.into()));
+    let json = tablepro_core::export::render_json(&source.columns, &source.rows);
     let parsed_json: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(
-        parsed_json,
-        serde_json::json!([{"value": format!("<undecodable {type_name}>")}])
+    assert_eq!(parsed_json, serde_json::json!([{"value": text}]));
+    let csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
     );
-
-    let options = tablepro_core::export::CsvOptions::default();
-    let csv = tablepro_core::export::render_csv(columns, &rows, &options);
-    let parsed_csv = tablepro_core::import::read_csv(csv.as_bytes(), &Default::default(), None).unwrap();
-    assert_eq!(parsed_csv.rows[0][0], format!("<undecodable {type_name}>"));
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let columns = connection.fetch_columns(None, &table).await.unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: &table,
+            columns: &columns,
+            mapping: &[Some(0)],
+        },
+        &sheet,
+        &options,
+    )
+    .unwrap();
+    assert_eq!(plan.rows, vec![vec![Value::Text(text.into())]]);
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+    let expected = connection
+        .query(&format!(
+            "SELECT '{text}'::{kind}::text, encode({send}('{text}'::{kind}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let actual = connection
+        .query(&format!(
+            "SELECT value::text, encode({send}(value), 'hex') FROM {table}"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(actual.rows, expected.rows, "{kind} CSV import changed the value");
 }
 
 pub async fn assert_date_contract(connection: &dyn Connection) {
@@ -36,6 +72,7 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
             ("date", "9999-12-31"),
             ("date", "10000-01-01"),
             ("date", "262000-02-29"),
+            ("timestamp", "4713-01-01 00:00:00 BC"),
             ("timestamp", "0001-01-01 12:34:56.123456 BC"),
             ("timestamp", "0002-12-31 23:59:59.999999 BC"),
             ("timestamp", "10000-01-01 00:00:00.000001"),
@@ -77,38 +114,83 @@ pub async fn assert_date_contract(connection: &dyn Connection) {
     let sql = "SELECT '1000000-01-01'::date AS value, '1000000-01-01'::date::text AS server_text, encode(date_send('1000000-01-01'::date), 'hex') AS server_wire";
     let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
     assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
-    assert_eq!(result.rows[0][0], Value::Undecodable("DATE".into()));
+    assert_eq!(result.rows[0][0], Value::Text("1000000-01-01".into()));
     assert_eq!(result.rows[0][1], Value::Text("1000000-01-01".into()));
     assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
-    assert_undecodable_temporal_exports(&result, "DATE");
-    assert_eq!(
-        tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
-        Err(tablepro_core::sql_literal::LiteralError::Undecodable)
-    );
-    assert!(matches!(
-        connection
-            .query_params("SELECT $1::date", std::slice::from_ref(&result.rows[0][0]))
-            .await,
-        Err(DriverError::Unsupported(_))
-    ));
+    crate::wire_round_trip::assert_wire_round_trip(
+        session.as_mut(),
+        &control,
+        "DATE",
+        &result.columns[0],
+        &result.rows[0][0],
+        &result.rows[0][2],
+    )
+    .await;
+    assert_extended_temporal_csv_round_trip(connection, "date", "1000000-01-01", "date_send").await;
+
+    let sql = "SELECT DATE '5874897-12-31' AS value, DATE '5874897-12-31'::text AS server_text, encode(date_send(DATE '5874897-12-31'), 'hex') AS server_wire";
+    let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
+    assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
+    assert_eq!(result.rows[0][0], Value::Text("5874897-12-31".into()));
+    assert_eq!(result.rows[0][1], Value::Text("5874897-12-31".into()));
+    crate::wire_round_trip::assert_wire_round_trip(
+        session.as_mut(),
+        &control,
+        "DATE",
+        &result.columns[0],
+        &result.rows[0][0],
+        &result.rows[0][2],
+    )
+    .await;
 
     let sql = "SELECT TIMESTAMP '294276-12-31 23:59:59.999999' AS value, TIMESTAMP '294276-12-31 23:59:59.999999'::text AS server_text, encode(timestamp_send(TIMESTAMP '294276-12-31 23:59:59.999999'), 'hex') AS server_wire";
     let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
     assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
-    assert_eq!(result.rows[0][0], Value::Undecodable("TIMESTAMP".into()));
+    assert_eq!(result.rows[0][0], Value::Text("294276-12-31 23:59:59.999999".into()));
     assert_eq!(result.rows[0][1], Value::Text("294276-12-31 23:59:59.999999".into()));
     assert!(matches!(&result.rows[0][2], Value::Text(wire) if !wire.is_empty()));
-    assert_undecodable_temporal_exports(&result, "TIMESTAMP");
-    assert_eq!(
-        tablepro_core::sql_literal::render_sql_literal("postgres", &result.rows[0][0]),
-        Err(tablepro_core::sql_literal::LiteralError::Undecodable)
-    );
-    assert!(matches!(
-        connection
-            .query_params("SELECT $1::timestamp", std::slice::from_ref(&result.rows[0][0]))
-            .await,
-        Err(DriverError::Unsupported(_))
-    ));
+    crate::wire_round_trip::assert_wire_round_trip(
+        session.as_mut(),
+        &control,
+        "TIMESTAMP",
+        &result.columns[0],
+        &result.rows[0][0],
+        &result.rows[0][2],
+    )
+    .await;
+    assert_extended_temporal_csv_round_trip(
+        connection,
+        "timestamp",
+        "294276-12-31 23:59:59.999999",
+        "timestamp_send",
+    )
+    .await;
+
+    session
+        .query_params_controlled("SET TIME ZONE 'UTC'", &[], &control)
+        .await
+        .unwrap();
+    let sql = "SELECT TIMESTAMPTZ '294276-12-31 23:59:59.999999+00' AS value, TIMESTAMPTZ '294276-12-31 23:59:59.999999+00'::text AS server_text, encode(timestamptz_send(TIMESTAMPTZ '294276-12-31 23:59:59.999999+00'), 'hex') AS server_wire";
+    let result = session.query_params_controlled(sql, &[], &control).await.unwrap();
+    assert_eq!(result.rows, connection.query(sql).await.unwrap().rows);
+    assert_eq!(result.rows[0][0], Value::Text("294276-12-31 23:59:59.999999+00".into()));
+    assert_eq!(result.rows[0][0], result.rows[0][1]);
+    crate::wire_round_trip::assert_wire_round_trip(
+        session.as_mut(),
+        &control,
+        "TIMESTAMPTZ",
+        &result.columns[0],
+        &result.rows[0][0],
+        &result.rows[0][2],
+    )
+    .await;
+    assert_extended_temporal_csv_round_trip(
+        connection,
+        "timestamptz",
+        "294276-12-31 23:59:59.999999+00",
+        "timestamptz_send",
+    )
+    .await;
 }
 
 #[tokio::test]

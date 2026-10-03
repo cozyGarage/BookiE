@@ -434,7 +434,7 @@ async fn a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson
         .iter()
         .position(|column| column.name == "uuid_binary")
         .unwrap();
-    assert_eq!(before.columns[uuid_binary_index].data_type, "binData");
+    assert_eq!(before.columns[uuid_binary_index].data_type, "binData-subtype-04");
 
     let edited = serde_json::json!({
         "amount": {"$numberDecimal": "1234567890123456789.123456789012345"},
@@ -784,7 +784,7 @@ async fn value_contract_generic_binary_grid_edit_preserves_native_bson() {
         .iter()
         .position(|column| column.name == "payload")
         .unwrap();
-    assert_eq!(before.columns[payload_index].data_type, "binData");
+    assert_eq!(before.columns[payload_index].data_type, "binData-subtype-00");
     assert_eq!(before.rows[0][payload_index], Value::Bytes(vec![0, 255, 65]));
 
     let edited = vec![255, 0, 66, 128];
@@ -876,7 +876,7 @@ async fn value_contract_binary_subtypes_survive_native_grid_edits() {
         .iter()
         .map(|(field, subtype, code)| {
             let index = before.columns.iter().position(|column| column.name == *field).unwrap();
-            assert_eq!(before.columns[index].data_type, "binData");
+            assert_eq!(before.columns[index].data_type, format!("binData-subtype-{code}"));
             let value = if *subtype == BinarySubtype::Generic {
                 Value::Bytes(edited_bytes.clone())
             } else {

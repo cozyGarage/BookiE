@@ -1,5 +1,5 @@
 use super::native_connection;
-use tablepro_core::{Connection, Value};
+use tablepro_core::Value;
 
 #[tokio::test]
 async fn value_contract_submicro_text_parameters_keep_precision_after_explicit_casts() {

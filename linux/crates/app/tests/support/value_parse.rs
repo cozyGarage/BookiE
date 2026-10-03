@@ -2,10 +2,13 @@ use super::{
     TypeKind, classify_type, normalize_single_line_input, parse_decimal_value, parse_input_for_column,
     parse_input_for_driver,
 };
-use tablepro_core::{ColumnInfo, Value};
+use tablepro_core::{ColumnInfo, Value, import::column_kind};
 
 #[path = "postgres_numeric_csv.rs"]
 mod postgres_numeric_csv;
+
+#[path = "postgres_temporal.rs"]
+mod postgres_temporal;
 
 #[tokio::test]
 async fn sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior() {
@@ -351,14 +354,10 @@ async fn value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding()
         .await
         .unwrap();
 
-    let submicro = Value::TimestampTz(
-        chrono::DateTime::parse_from_rfc3339("2026-09-29T12:34:56.123456789+00:00")
-            .unwrap()
-            .to_utc(),
-    );
-    let Value::TimestampTz(submicro_instant) = &submicro else {
-        unreachable!()
-    };
+    let submicro_instant = chrono::DateTime::parse_from_rfc3339("2026-09-29T12:34:56.123456789+00:00")
+        .unwrap()
+        .to_utc();
+    let submicro = Value::TimestampTz(submicro_instant);
     let implicit_cast = connection
         .query_params(
             "SELECT typeof(CAST(? AS TIMESTAMPTZ)), epoch_us(CAST(? AS TIMESTAMPTZ))",
@@ -774,6 +773,26 @@ fn value_contract_mongodb_date_parser_preserves_milliseconds_and_refuses_roundin
 }
 
 #[test]
+fn mongodb_binary_subtype_edits_parse_as_extended_json() {
+    let data_type = "binData-subtype-04";
+    let column = col(data_type, false);
+    let input = r#"{"$binary":{"base64":"AP9B","subType":"04"}}"#;
+    let expected = serde_json::json!({"$binary": {"base64": "AP9B", "subType": "04"}});
+    assert_eq!(classify_type(&data_type.to_ascii_lowercase()), TypeKind::Json);
+    assert_eq!(column_kind(data_type), tablepro_core::import::ColumnKind::Json);
+    let generic_kind = column_kind("binData-subtype-00");
+    assert_eq!(generic_kind, tablepro_core::import::ColumnKind::Bytes);
+    assert_eq!(
+        tablepro_core::import::parse_cell("\\x00ff", generic_kind),
+        Ok(Value::Bytes(vec![0, 255]))
+    );
+    assert_eq!(
+        parse_input_for_driver(input, Some(&column), "mongodb").unwrap(),
+        Value::Json(expected)
+    );
+}
+
+#[test]
 fn value_contract_mongodb_decimal128_parser_preserves_wide_precision() {
     let column = col("decimal", false);
     let wide_integer = "1234567890123456789012345678901234";
@@ -989,6 +1008,28 @@ fn rejects_invalid_type_specific_input() {
     assert!(parse_input_for_column("2024/01/15", Some(&col("date", false))).is_err());
     assert!(parse_input_for_column("1000000-01-01", Some(&col("date", false))).is_err());
     assert!(parse_input_for_column("294276-12-31 23:59:59.999999", Some(&col("timestamp", false))).is_err());
+    assert_eq!(
+        parse_input_for_driver("1000000-02-29", Some(&col("date", false)), "postgres").unwrap(),
+        Value::Text("1000000-02-29".into())
+    );
+    assert_eq!(
+        parse_input_for_driver(
+            "294276-12-31 23:59:59.999999",
+            Some(&col("timestamp", false)),
+            "postgres"
+        )
+        .unwrap(),
+        Value::Text("294276-12-31 23:59:59.999999".into())
+    );
+    assert!(parse_input_for_driver("1000001-02-29", Some(&col("date", false)), "postgres").is_err());
+    assert!(
+        parse_input_for_driver(
+            "294276-12-31 23:59:59.999999001",
+            Some(&col("timestamp", false)),
+            "postgres"
+        )
+        .is_err()
+    );
     assert!(parse_input_for_column("13:00:99", Some(&col("time", false))).is_err());
     assert!(parse_input_for_column("not-a-date", Some(&col("timestamp", false))).is_err());
     assert!(parse_input_for_column("maybe", Some(&col("boolean", false))).is_err());

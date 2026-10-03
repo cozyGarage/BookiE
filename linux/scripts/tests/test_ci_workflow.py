@@ -31,6 +31,7 @@ class CiWorkflowTests(unittest.TestCase):
             {entry[2].split("::")[-1] for entry in registry["app-server"]},
             {
                 "postgres_numeric_parser_outputs_round_trip_through_server",
+                "postgres_extended_temporal_grid_edits_preserve_native_values",
                 "value_contract_mongodb_int32_grid_edit_preserves_integer_width",
                 "value_contract_mongodb_date_grid_edit_preserves_millisecond_instant",
                 "value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision",
@@ -38,7 +39,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64",
                 "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
                 "value_contract_mysql_bit_parser_edits_preserve_native_values",
-                "value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit",
+                "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

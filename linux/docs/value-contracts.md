@@ -639,15 +639,15 @@ The focused SQL Server Docker contract passed.
 
 ## MongoDB page metadata and grid editability, 2026-09-30
 
-MongoDB's `fetch_rows` returns page columns formed from the first-50 sample
-and the current page; conflicting observed BSON kinds are labeled `mixed`.
+MongoDB's `fetch_columns` scans the collection so conflicting BSON kinds are
+labeled `mixed` even when the conflicting document is outside the current page.
 The browse UI previously retained only the earlier `ColumnsLoaded` columns,
 leaving grid factories and schema-dependent filters with stale metadata. It now
 uses page columns for the active result, keeps the initial metadata for drivers
 whose page results omit columns, and rebuilds factories when any `ColumnInfo`
 changes, even when the column count is unchanged. This ensures mixed columns
-remain read-only and late fields use their observed metadata. Schema discovery
-for documents outside the sample and returned page is still not exhaustive.
+remain read-only and late fields use their observed metadata. The exact census
+costs one full collection scan per browse page.
 
 The regression tests cover the Mongo page-schema handoff, preservation of
 non-Mongo behavior and same-width type-change invalidation. A follow-up now
@@ -688,8 +688,7 @@ JavaScript-with-scope, Symbol, DbPointer, Undefined, MinKey and MaxKey all have
 native keyed-edit assertions; binary subtypes and BSONColumn have dedicated
 native checks, and scalar/container variants have driver value contracts. The
 whole MongoDB integration suite passed all 26 tests, including ignored Docker
-fixtures. The remaining MongoDB schema gap is collection-wide discovery beyond
-the first-50 sample and current result page.
+fixtures. Collection-wide discovery is now covered by the regression below.
 
 ```sh
 rtk cargo test --locked -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1
@@ -1164,7 +1163,7 @@ The new suite supplements those tests.
 This is a growing contract, not proof of every database type. PostgreSQL's other
 unconstrained numeric edit boundaries and special numerics, JSON and other unsupported array element
 types, array grid write-back beyond the verified built-in `integer[]` case,
-finite calendars beyond the shared range, and interval consumer parity still need
+remaining driver-specific calendar boundaries, and interval consumer parity still need
 focused cases. ClickHouse Int128/UInt128
 now have local parser and real-server exact-text result, binding and SQL export/import contracts at signed and unsigned boundaries, plus Int128 and UInt128 grid-edit contracts.
 Installed GTK/package SQLite grid acceptance, spreadsheet floating-point edges and
@@ -1888,6 +1887,8 @@ separately, and compares every element as `numeric::text`. The app
 parser-to-builder unit, PostgreSQL scalar numeric decoder unit, escaped-text
 array unit, and Docker-backed numeric[] grid assertion passed against PostgreSQL.
 
+### PostgreSQL JSON array refusal
+
 The `jsonb[]` refusal contract checks a native JSONB array containing an object
 and JSON null. PostgreSQL independently reports the `jsonb[]` type, its exact
 `array_to_json(... )::text`, and semantic JSONB equality. BookiE returns an
@@ -2176,11 +2177,11 @@ explicit SQL-literal/parameter refusal. They still lack exact application value
 support. Infinities, mixed intervals, temporal arrays and non-SQL consumer/editing
 acceptance remain open.
 
-The extended-calendar contract now parses the DATE and TIMESTAMP exports back
-through the CSV reader and checks their visible `<undecodable DATE>` and
-`<undecodable TIMESTAMP>` markers; JSON output is checked as structured JSON.
-This prevents either consumer from silently presenting these native values as
-empty cells or SQL NULL. The focused PostgreSQL Docker test passed.
+At this checkpoint, the extended-calendar contract parsed DATE and TIMESTAMP
+exports back through the CSV reader and checked visible `<undecodable DATE>` and
+`<undecodable TIMESTAMP>` markers; JSON output was checked as structured JSON.
+The October 3 continuation below supersedes that refusal status for the named
+DATE, TIMESTAMP and TIMESTAMPTZ ranges with exact-value consumer support.
 
 The PostgreSQL temporal infinity test then exposed a default CSV formula marker
 that typed import rejected for `-infinity`. Import now removes the marker only
@@ -2447,6 +2448,34 @@ The native decoder previously exposed `date32:-1`, timestamp unit counters, inte
 
 Dates and times now use shared typed values where representable. Timestamp seconds, milliseconds, microseconds and nanoseconds are split with Euclidean division so negative fractional epochs retain their exact fraction. Arrow timezone metadata selects the UTC instant variant. Enum dictionary labels preserve empty text, literal NULL text, Unicode and SQL NULL. Date infinities, BC dates and years above 9999 use DuckDB-compatible text; 24:00:00 remains distinct from midnight.
 
+### DuckDB extended calendar results and keyed edits, 2026-10-03
+
+Finite DATE values across the valid DATE32 range and TIMESTAMP values outside
+chrono's calendar now decode as exact DuckDB calendar text instead of
+`Undecodable`. The app parser keeps extended dates, BC dates and timestamps as
+text; a real embedded-engine keyed-edit contract checks the saved native DATE
+and TIMESTAMP strings. The DATE32 lower/upper values are also compared with
+DuckDB's `CAST(... AS VARCHAR)` oracle. SQL-literal and bound-parameter
+round-trips cover one-million-year DATE, year-100000 TIMESTAMP and BC
+TIMESTAMP. Exported extended DATE/TIMESTAMP text now also re-imports through
+the DuckDB CSV plan and bound INSERT path with the exact native values intact.
+
+Extended TIMESTAMPTZ results outside Chrono now retain `+00` on their exact UTC
+text fallback. A year-280000 value originating at `+05:30` matches DuckDB's
+native VARCHAR and epoch oracles through results, SQL literal and bound casts,
+CSV export/import, and a keyed app edit. The app and CSV parsers validate
+extended zoned dates, offsets, and microsecond precision through one shared
+core parser.
+
+```sh
+rtk cargo test -p tablepro-driver-duckdb --lib temporal::tests
+rtk cargo test -p tablepro-driver-duckdb --test integration value_contract_native_temporals_round_trip_parameters_and_sql -- --exact --test-threads=1
+rtk cargo test -p tablepro-driver-duckdb --test integration interval_csv_import::value_contract_extended_calendar_csv_round_trips_exactly -- --exact --test-threads=1
+rtk cargo test -p tablepro-driver-duckdb --test integration extended_timestamptz::value_contract_extended_timestamptz_matches_duckdb_text_and_epoch -- --exact --test-threads=1
+rtk cargo test -p tablepro-app --features duckdb --lib value_contract_duckdb_extended_calendar -- --test-threads=1
+rtk cargo test -p tablepro-app --features duckdb --lib value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants -- --test-threads=1
+```
+
 The enum contract also round-trips the empty, `NULL`, and Unicode labels through
 SQL literals and typed parameters. Each server result retains an ENUM native
 type and exact VARCHAR label; the literal label `NULL` remains distinct from
@@ -2454,7 +2483,7 @@ SQL NULL.
 
 The integration corpus checks server-rendered source values against both parameter rebinding and generated SQL literals, plus independent JSON expectations for nanosecond timestamps and microsecond times. It includes nulls for every temporal family. Decoder unit tests cover all four units, negative remainders, end-of-day boundaries and arithmetic overflow.
 
-Mixed month/day/microsecond intervals now preserve DuckDB's native month, day and nanosecond carrier fields as exact text with an explicit microsecond unit. A live embedded-engine contract checks `typeof`, DuckDB's `VARCHAR` representation and independent `date_part` component oracles, then re-imports through both a generated SQL literal and an explicitly cast bound parameter. DuckDB column metadata now exposes simple and composite primary keys from `duckdb_constraints()`, with an independent catalog oracle. A separate app-parser contract sends edited text through the keyed-update builder and verifies the saved native INTERVAL type and signed month/day/microsecond components. Intervals with sub-microsecond carrier precision remain explicitly undecodable. A MAP containing a UHUGEINT above `u64::MAX` and explicit NULL has exact native `typeof` and `VARCHAR` oracles; LIST, fixed ARRAY, STRUCT and UNION have exact native type and JSON rendering oracles. The driver, SQL-literal and parameter consumers explicitly refuse all these collection kinds. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; it is explicitly undecodable, and SQL literal and parameter consumers refuse it. Other interval boundaries, installed GTK acceptance and additional nested collection combinations remain open. Dates outside the shared calendar range and finite timestamps outside years 1–9999 are also explicitly undecodable. This is not full native-type, arbitrary-precision editing, MCP or release acceptance.
+Mixed month/day/microsecond intervals now preserve DuckDB's native month, day and nanosecond carrier fields as exact text with an explicit microsecond unit. A live embedded-engine contract checks `typeof`, DuckDB's `VARCHAR` representation and independent `date_part` component oracles, then re-imports through both a generated SQL literal and an explicitly cast bound parameter. DuckDB column metadata now exposes simple and composite primary keys from `duckdb_constraints()`, with an independent catalog oracle. A separate app-parser contract sends edited text through the keyed-update builder and verifies the saved native INTERVAL type and signed month/day/microsecond components. Intervals with sub-microsecond carrier precision remain explicitly undecodable. A MAP containing a UHUGEINT above `u64::MAX` and explicit NULL has exact native `typeof` and `VARCHAR` oracles; LIST, fixed ARRAY, STRUCT and UNION have exact native type and JSON rendering oracles. The driver, SQL-literal and parameter consumers explicitly refuse all these collection kinds. The `UHUGEINT[]` case has a native `typeof` and exact `VARCHAR` oracle for `18446744073709551616`; it is explicitly undecodable, and SQL literal and parameter consumers refuse it. Other interval boundaries, installed GTK acceptance and additional nested collection combinations remain open. Extended TIMESTAMPTZ is covered by the 2026-10-03 result, CSV, parameter and keyed-edit contract above. This is not full native-type, arbitrary-precision editing, MCP or release acceptance.
 
 The interval boundary contract now covers `i32::MIN`/`i32::MAX` months and days,
 plus the largest positive and negative whole-microsecond values that fit the
@@ -2598,9 +2627,19 @@ The native interval regression first failed when `i64::MIN` microseconds became 
 
 A second reproducer returned Undecodable for DATE infinity and date arrays. The driver now recognizes PostgreSQL infinity sentinels and decodes date, time, timetz, timestamp, timestamptz and interval array elements. Existing array dimension/lower-bound and size guards remain. Native array_send equality checks cover eras, year 10000, microseconds, end-of-day time, second-resolution offsets, DST-distinct instants, infinities, NULL elements and multidimensional bounds. SQL INSERT and bound parameter re-imports are included; a session in Asia/Kathmandu verifies that timestamp array imports preserve UTC instants.
 
-New unit contracts check temporal element lengths, out-of-range payloads, empty/null arrays, infinity signs, era formatting and interval extremes. A real PostgreSQL DATE at year 1,000,000 remains within the server's finite range but exceeds chrono's shared calendar: the driver returns `Undecodable("DATE")`, while an independent `date::text` column remains exactly `1000000-01-01`. The app date parser rejects that input, and SQL literal rendering and parameter binding refuse the undecodable marker. A TIMESTAMP at PostgreSQL's upper finite bound, `294276-12-31 23:59:59.999999`, is also accepted by the server but returned as `Undecodable("TIMESTAMP")`; its independent `timestamp::text` value is exact, and the app parser, SQL literal renderer and parameter binder refuse it. Full finite temporal support beyond chrono's range, unsupported element types and broader consumer parity remain open. These changes do not prove complete native-type support for PostgreSQL or the other drivers.
+New unit contracts check temporal element lengths, out-of-range payloads, empty/null arrays, infinity signs, era formatting and interval extremes. PostgreSQL DATE values outside chrono's calendar now decode to validated exact text; year 1,000,000 DATE round-trips through results, native `date_send` bytes, SQL literals, typed text parameters, keyed grid edits and CSV import; its app edit also checks an untouched sibling row. The maximum finite DATE `5874897-12-31` has result/literal/bind wire-byte checks. The DATE and upper TIMESTAMP/TIMESTAMPTZ CSV fixtures assert exact JSON text values. The upper finite TIMESTAMP `294276-12-31 23:59:59.999999` and TIMESTAMPTZ at the same UTC instant have the same result, literal, parameter, keyed-edit and CSV coverage against their native send bytes. The keyed-update builder now applies the allowlisted PostgreSQL temporal cast to text-backed temporal edits, matching its INSERT path. Other unsupported element types and broader consumer parity remain open. These changes do not prove complete native-type support for PostgreSQL or the other drivers.
 
-Run `cargo test --locked -p tablepro-driver-postgres --lib value_contract`, then `cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --include-ignored --exact --test-threads=1` with Docker available. The combined strict value runner discovers all seven PostgreSQL server contracts. Updated fixture declarations are recorded in [ignored tests](ignored-tests.md).
+The October 3 CSV regression now also round-trips BC, AD, year 9999 and year
+10000 values for DATE, TIMESTAMP and TIMESTAMPTZ through the default sanitized
+CSV import path. It compares persisted native send bytes and confirms NULL stays
+NULL. Chrono's leading `+` on extended positive years is validated, then removed
+before PostgreSQL binding. The focused Docker test
+`date_contract::value_contract_bc_dates_survive_default_csv_import` passed.
+The strict GTK+DuckDB values layer passed 196 selected tests across all 11
+suites on the dirty worktree at `d7007a6`; report:
+[`20261002T235951812293Z-values/report.json`](../target/quality/20261002T235951812293Z-values/report.json).
+
+Run `cargo test -p tablepro-driver-postgres --lib temporal::tests`, then `TMPDIR=/var/tmp cargo test -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --include-ignored --test-threads=1` with Docker available. The app grid contract is `TMPDIR=/var/tmp cargo test -p tablepro-app --lib postgres_extended_temporal_grid_edits_preserve_native_values -- --include-ignored --test-threads=1`. Updated fixture declarations are recorded in [ignored tests](ignored-tests.md).
 
 Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](type-contract-strategy.md).
 
@@ -2845,9 +2884,9 @@ field, checks the reloaded `$oid`, then uses an independent MongoDB client to
 confirm native ObjectId values. The date contract routes the RFC3339 value shown
 in a `date` cell through the driver-aware parser, rejects sub-millisecond input
 without changing the row, and verifies a valid offset-origin edit against the
-stored BSON millisecond epoch. Other top-level kinds without a named
-server-backed edit and collection-wide heterogeneity outside the metadata sample
-and returned page remain open.
+stored BSON millisecond epoch. Collection metadata now distinguishes every BSON
+binary subtype; the app parser and keyed update preserve UUID subtype and bytes.
+Other top-level kinds without a named server-backed edit remain open.
 
 The focused ObjectId grid contract is:
 
@@ -2934,13 +2973,12 @@ becomes a JSON string and Decimal128 retains its `$numberDecimal` marker. The
 unignored codec unit test checks this distinction through JSON and CSV; the
 Docker-backed regression also verifies JSON, CSV and XLSX exports from a real
 query and confirms the native BSON values remain distinct in storage.
-Browse and `find` metadata starts from a 50-document sample, then incorporates
-the bounded documents actually returned on the page. A Docker regression puts
-Decimal128 at offset 50 after 50 String values and verifies the returned page's
-column is `mixed`; the returned Decimal128 cell carries canonical Extended JSON
-while the shared grid gate keeps the column read-only. Heterogeneity outside
-both the sample and returned page remains undetected. A separate Docker test
-checks that identical BSON String/Decimal128 text remains type-distinct through
+Browse and `find` metadata scans the collection and marks fields `mixed` when
+documents contain conflicting BSON kinds. A Docker regression places a
+Decimal128 after 51 String values, reads the first row, and verifies the column
+is already `mixed`; that String cell carries canonical Extended JSON while the
+shared grid gate keeps the column read-only. A separate Docker test checks that
+identical BSON String/Decimal128 text remains type-distinct through
 the JSON renderer, CSV writer and XLSX workbook:
 
 ```sh
@@ -3085,11 +3123,11 @@ Both pass. The real-server contract is
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata -- --include-ignored --exact --test-threads=1
 ```
 
-Late page sampling is covered by
-`browse_page_types_include_documents_after_the_metadata_sample`:
+Collection-wide schema discovery is covered by
+`collection_scan_finds_mixed_values_beyond_sample_and_page`:
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration browse_page_types_include_documents_after_the_metadata_sample -- --include-ignored --exact --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration collection_scan_finds_mixed_values_beyond_sample_and_page -- --include-ignored --exact --test-threads=1
 ```
 
 ### MongoDB BSON Undefined grid edit
@@ -3780,16 +3818,15 @@ rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::v
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --test-threads=1
 ```
 
-## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
+## MongoDB collection-wide heterogeneity blocks grid editing, 2026-10-02
 
-The first 50 documents declare a field as string; the next fetched page contains
-a Decimal128 value for that field. A Docker-backed app contract obtains the
-initial metadata and later page from MongoDB, merges the page schema through
-`columns_for_browse_page`, and verifies the conflicting value marks the column
-`mixed`, invalidates the cached grid layout, and fails the actual inline-edit
-gate. A native MongoDB client confirms the Decimal128 value and row identity are
-unchanged. This proves safety for each fetched page; it does not claim a global
-type census for documents outside the current page.
+The first 51 documents declare a field as string; a Decimal128 value occurs at
+document 52. A Docker-backed driver contract reads the first row and checks
+the collection-wide census marks its column `mixed` while preserving the String
+as a String. It then reads the later page through browse and query paths and
+checks the Decimal128 retains its canonical `$numberDecimal` marker. A native
+client confirms the Decimal128 remains stored. This covers conflicting types
+beyond both the old sample and the returned page.
 
 The test passed in `20260930T215342621227Z-values/report.json`: 26 app tests and
 163 tests across all 11 configured suites, including GTK and DuckDB. The quick
@@ -3804,7 +3841,7 @@ the retained in-place run reused the workspace target:
 [`outcomes.json`](../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json).
 
 ```sh
-rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit -- --include-ignored --test-threads=1
+rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit -- --include-ignored --test-threads=1
 ```
 
 ## PostgreSQL built-in array CSV INSERT matrix, 2026-10-01

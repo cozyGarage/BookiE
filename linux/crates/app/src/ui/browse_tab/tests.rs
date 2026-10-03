@@ -86,7 +86,7 @@ fn mongodb_page_schema_updates_late_fields_and_mixed_types_before_grid_editing()
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit() {
+async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
     use tablepro_core::OperationControl;
 
     let (_container, connection, collection, decimal) = mongodb_late_mixed_page_fixture().await;
@@ -96,10 +96,10 @@ async fn value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit(
         .await
         .unwrap();
     let loaded_value_index = loaded_columns.iter().position(|column| column.name == "value").unwrap();
-    assert_eq!(loaded_columns[loaded_value_index].data_type, "string");
+    assert_eq!(loaded_columns[loaded_value_index].data_type, "mixed");
 
     let page = connection
-        .fetch_rows_controlled(None, "page_mixed_edit_contract", 50, 1, &control)
+        .fetch_rows_controlled(None, "page_mixed_edit_contract", 0, 1, &control)
         .await
         .unwrap();
     let effective_columns = columns_for_browse_page("mongodb", &loaded_columns, Some(&page));
@@ -112,12 +112,34 @@ async fn value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit(
         .position(|column| column.name == "_id")
         .unwrap();
     assert_eq!(page.rows.len(), 1);
-    assert_eq!(page.rows[0][id_index], Value::Int(50));
+    assert_eq!(page.rows[0][id_index], Value::Int(0));
     assert_eq!(effective_columns[value_index].data_type, "mixed");
-    assert!(!column_layout_matches(&loaded_columns, &effective_columns));
+    assert!(column_layout_matches(&loaded_columns, &effective_columns));
     assert!(
         !crate::ui::grid::cell_allows_inline_edit(&effective_columns[value_index], &page.rows[0][value_index]),
-        "the page's conflicting BSON type must become read-only before the grid can edit it"
+        "a conflict beyond the returned page must make its first-page cell read-only"
+    );
+
+    let later_page = connection
+        .fetch_rows_controlled(None, "page_mixed_edit_contract", 50, 1, &control)
+        .await
+        .unwrap();
+    let later_columns = columns_for_browse_page("mongodb", &loaded_columns, Some(&later_page));
+    let later_value_index = later_columns.iter().position(|column| column.name == "value").unwrap();
+    let later_id_index = later_columns.iter().position(|column| column.name == "_id").unwrap();
+    assert_eq!(later_page.rows[0][later_id_index], Value::Int(50));
+    assert_eq!(
+        later_page.rows[0][later_value_index],
+        Value::Json(serde_json::json!({"$numberDecimal": decimal.to_string()}))
+    );
+    assert_eq!(later_columns[later_value_index].data_type, "mixed");
+    assert!(column_layout_matches(&loaded_columns, &later_columns));
+    assert!(
+        !crate::ui::grid::cell_allows_inline_edit(
+            &later_columns[later_value_index],
+            &later_page.rows[0][later_value_index]
+        ),
+        "the later Decimal128 page must remain read-only under the collection-wide schema"
     );
 
     let persisted = collection

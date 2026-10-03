@@ -299,6 +299,7 @@ mod tests {
         }
         assert_eq!(temporal_element(9999, &[]), None);
         assert_eq!(temporal_element(1083, &(-1_i64).to_be_bytes()), None);
+        assert_eq!(temporal_element(1082, &(i32::MIN + 1).to_be_bytes()), None);
         assert_eq!(temporal_element(1082, &(i32::MAX - 1).to_be_bytes()), None);
         assert_eq!(temporal_element(1114, &(i64::MAX - 1).to_be_bytes()), None);
         assert_eq!(temporal_element(1184, &(i64::MIN + 1).to_be_bytes()), None);

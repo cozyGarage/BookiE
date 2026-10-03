@@ -56,6 +56,7 @@ async fn validated_open_truncates_only_trailing_partial_record() {
     let journal = AuditJournal::open_validated(path.clone()).unwrap();
     journal.append(sample_event(Principal::human_gui())).await.unwrap();
     let valid_len = std::fs::metadata(&path).unwrap().len();
+    drop(journal);
     use std::io::Write;
     let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
     file.write_all(br#"{"seq":2,"prev_hash":"partial""#).unwrap();
@@ -166,7 +167,7 @@ async fn unmatched_read_is_recovered_once_without_poisoning_writes() {
     drop(journal);
 
     let recovered = AuditJournal::open_validated(path.clone()).unwrap();
-    assert!(!recovered.recovery().recovered_unresolved_operations());
+    assert!(!recovered.recovery().has_unresolved_writes());
     assert!(recovered.recovery().recovered_operation_ids().is_empty());
     assert_eq!(recovered.verify_chain().await.unwrap(), 2);
     let read_outcomes = recovered
@@ -184,13 +185,45 @@ async fn unmatched_read_is_recovered_once_without_poisoning_writes() {
     drop(recovered);
 
     let reopened = AuditJournal::open_validated(path).unwrap();
-    assert!(!reopened.recovery().recovered_unresolved_operations());
+    assert!(!reopened.recovery().has_unresolved_writes());
     assert_eq!(reopened.verify_chain().await.unwrap(), 2);
     reopened
         .append_durable(intent_event(Uuid::from_u128(11), AuditOperationClass::Mutation))
         .await
         .unwrap();
     assert_eq!(reopened.verify_chain().await.unwrap(), 3);
+}
+
+#[tokio::test]
+async fn validated_open_does_not_recover_a_live_write_intent() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let first = AuditJournal::open_validated(path.clone()).unwrap();
+    let operation_id = Uuid::from_u128(12);
+    first
+        .append_durable(intent_event(operation_id, AuditOperationClass::Mutation))
+        .await
+        .unwrap();
+
+    let second = AuditJournal::open_validated(path).unwrap();
+    assert!(second.recovery().recovered_operation_ids().is_empty());
+    assert!(second.recovery().unresolved_operation_ids().is_empty());
+    assert!(!second.recovery().has_unresolved_writes());
+
+    let mut outcome = sample_event(Principal::human_gui());
+    outcome.operation_id = operation_id;
+    outcome.operation_class = AuditOperationClass::Mutation;
+    first.append_durable(outcome).await.unwrap();
+
+    let outcomes = second
+        .recent(10)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|event| event.operation_id == operation_id && event.phase == AuditRecordPhase::Outcome)
+        .collect::<Vec<_>>();
+    assert_eq!(outcomes.len(), 1);
+    assert_eq!(outcomes[0].terminal_status, AuditTerminalStatus::Succeeded);
 }
 
 #[tokio::test]
@@ -254,6 +287,7 @@ async fn validated_open_preserves_complete_record_without_newline() {
     let path = dir.path().join("audit.jsonl");
     let journal = AuditJournal::open_validated(path.clone()).unwrap();
     journal.append(sample_event(Principal::human_gui())).await.unwrap();
+    drop(journal);
     let mut bytes = std::fs::read(&path).unwrap();
     assert_eq!(bytes.pop(), Some(b'\n'));
     std::fs::write(&path, bytes).unwrap();

@@ -119,14 +119,14 @@ impl AuditRuntime {
     fn from_journal(result: Result<AuditJournal, tablepro_storage::StorageError>) -> Self {
         match result {
             Ok(journal) => {
-                let recovered = journal.recovery().recovered_unresolved_operations();
-                if recovered {
+                let has_unresolved_writes = journal.recovery().has_unresolved_writes();
+                if has_unresolved_writes {
                     tracing::error!(
-                        operations = journal.recovery().recovered_operation_ids().len(),
-                        "unresolved audit intents recovered; governed writes remain disabled"
+                        operations = journal.recovery().unresolved_operation_ids().len(),
+                        "unresolved audit operations detected; governed writes remain disabled"
                     );
                 }
-                let state = if recovered {
+                let state = if has_unresolved_writes {
                     AuditState::with_governed_writes_disabled()
                 } else {
                     AuditState::new()

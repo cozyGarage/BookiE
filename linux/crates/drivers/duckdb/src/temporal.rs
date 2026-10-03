@@ -6,6 +6,7 @@ pub(crate) fn date(days: i32) -> Value {
     match days {
         i32::MAX => Value::Text("infinity".into()),
         value if value == -i32::MAX => Value::Text("-infinity".into()),
+        i32::MIN => Value::Undecodable("DATE outside supported calendar range".into()),
         _ => days
             .checked_add(719_163)
             .and_then(NaiveDate::from_num_days_from_ce_opt)
@@ -16,8 +17,23 @@ pub(crate) fn date(days: i32) -> Value {
                     Value::Text(calendar_text(date))
                 }
             })
-            .unwrap_or_else(|| Value::Undecodable("DATE outside supported calendar range".into())),
+            .unwrap_or_else(|| Value::Text(calendar_text_from_days(i64::from(days)))),
     }
+}
+
+fn calendar_text_from_days(days_since_epoch: i64) -> String {
+    let days = days_since_epoch + 719_468;
+    let era = days.div_euclid(146_097);
+    let day_of_era = days - era * 146_097;
+    let year_of_era = (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let mut year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_part = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_part + 2) / 5 + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    year += if month <= 2 { 1 } else { 0 };
+    let (year, era) = if year <= 0 { (1 - year, " (BC)") } else { (year, "") };
+    format!("{year:04}-{month:02}-{day:02}{era}")
 }
 
 fn calendar_text(date: NaiveDate) -> String {
@@ -50,15 +66,27 @@ pub(crate) fn timestamp(unit: TimeUnit, value: i64) -> Value {
         _ => {
             let (seconds, nanos) = seconds_and_nanos(unit, value);
             DateTime::from_timestamp(seconds, nanos)
-                .map(|date| {
-                    if (1..=9999).contains(&date.year()) {
-                        Value::DateTime(date.naive_utc())
-                    } else {
-                        Value::Undecodable("TIMESTAMP outside supported export calendar range".into())
-                    }
-                })
-                .unwrap_or_else(|| Value::Undecodable("TIMESTAMP outside supported calendar range".into()))
+                .filter(|date| (1..=9999).contains(&date.year()))
+                .map_or_else(
+                    || Value::Text(timestamp_text(seconds, nanos)),
+                    |date| Value::DateTime(date.naive_utc()),
+                )
         }
+    }
+}
+
+fn timestamp_text(seconds: i64, nanos: u32) -> String {
+    let days = seconds.div_euclid(86_400);
+    let second_of_day = seconds.rem_euclid(86_400);
+    let date = calendar_text_from_days(days);
+    let hour = second_of_day / 3_600;
+    let minute = second_of_day % 3_600 / 60;
+    let second = second_of_day % 60;
+    let fraction = format!("{nanos:09}").trim_end_matches('0').to_owned();
+    if fraction.is_empty() {
+        format!("{date} {hour:02}:{minute:02}:{second:02}")
+    } else {
+        format!("{date} {hour:02}:{minute:02}:{second:02}.{fraction}")
     }
 }
 
@@ -130,13 +158,25 @@ mod tests {
     }
 
     #[test]
-    fn value_contract_calendar_limits_refuse_overflow() {
+    fn value_contract_invalid_date_sentinel_refuses() {
         assert!(matches!(date(0), Value::Date(day) if day.to_string() == "1970-01-01"));
-        for days in [i32::MIN, i32::MIN + 2, i32::MAX - 1] {
-            assert!(matches!(date(days), Value::Undecodable(_)));
-        }
-        for value in [i64::MIN, i64::MAX - 1] {
-            assert!(matches!(timestamp(TimeUnit::Second, value), Value::Undecodable(_)));
+        assert!(matches!(date(i32::MIN), Value::Undecodable(_)));
+    }
+
+    #[test]
+    fn value_contract_extended_dates_match_duckdb_text_at_both_bounds() {
+        use duckdb::types::Value as DuckdbValue;
+
+        let connection = duckdb::Connection::open_in_memory().unwrap();
+        for days in [i32::MIN + 2, i32::MAX - 1] {
+            let native: String = connection
+                .query_row(
+                    "SELECT CAST(CAST(? AS DATE) AS VARCHAR)",
+                    [&DuckdbValue::Date32(days)],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(date(days), Value::Text(native), "DATE32 days={days}");
         }
     }
 }

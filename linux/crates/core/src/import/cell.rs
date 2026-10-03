@@ -1,9 +1,10 @@
-use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime, NaiveTime, Timelike, Utc};
 use rust_decimal::Decimal;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::import::csv_import::CsvImportOptions;
+use crate::import::extended_temporal::{duckdb_extended_date, duckdb_extended_timestamptz_nanos};
 use crate::query::{ColumnInfo, Value};
 
 /// What a field could not be turned into. Names the failure only: the cell
@@ -82,6 +83,13 @@ impl ColumnKind {
 /// what the file said.
 pub fn column_kind(data_type: &str) -> ColumnKind {
     let lowered = data_type.trim().to_ascii_lowercase();
+    if lowered.starts_with("bindata-subtype-") {
+        return if lowered.ends_with("-00") {
+            ColumnKind::Bytes
+        } else {
+            ColumnKind::Json
+        };
+    }
     // Array values are transported as their driver's textual array form.
     // Parsing the element type here would incorrectly treat the whole cell
     // (for example, "{1,2}") as a scalar number.
@@ -300,6 +308,11 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
 }
 
 fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver_id: &str) -> Result<Value, CellError> {
+    if driver_id == "duckdb"
+        && let Some(value) = duckdb_extended_calendar_text(text, &column.data_type)
+    {
+        return Ok(Value::Text(value.to_owned()));
+    }
     if driver_id == "postgres"
         && let Some(value) = postgres_extended_temporal(text, &column.data_type)
     {
@@ -334,6 +347,9 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
         return Ok(Value::Text(value.to_owned()));
     }
     match parse_cell(text, kind) {
+        Ok(Value::TimestampTz(value)) if driver_id == "duckdb" && value.timestamp_subsec_nanos() % 1_000 != 0 => {
+            Err(CellError::NotATimestamp)
+        }
         Ok(value) if driver_id == "postgres" && postgres_temporal_needs_text(&value) => {
             match crate::sql_literal::postgres_temporal_text(&value) {
                 Some(text) => Ok(Value::Text(text)),
@@ -350,6 +366,45 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
         }
         Err(error) => Err(error),
     }
+}
+
+fn duckdb_extended_calendar_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
+    let data_type = data_type.trim();
+    let date_text = if data_type.eq_ignore_ascii_case("date") {
+        text
+    } else if ["timestamptz", "timestamp with time zone"]
+        .iter()
+        .any(|kind| data_type.eq_ignore_ascii_case(kind))
+    {
+        if duckdb_extended_timestamptz_nanos(text)? % 1_000 != 0 {
+            return None;
+        }
+        return Some(text);
+    } else if ["timestamp", "timestamp without time zone"]
+        .iter()
+        .any(|kind| data_type.eq_ignore_ascii_case(kind))
+    {
+        let (date, time) = if let Some((date, time)) = text.split_once(" (BC) ") {
+            (format!("{date} (BC)"), time)
+        } else {
+            let (date, time) = text.split_once(' ')?;
+            (date.to_owned(), time)
+        };
+        let valid_date = duckdb_extended_date(&date);
+        if !valid_date {
+            return None;
+        }
+        let time = NaiveTime::parse_from_str(time, "%H:%M:%S%.f")
+            .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
+            .ok()?;
+        if time.nanosecond() % 1_000 != 0 {
+            return None;
+        }
+        return Some(text);
+    } else {
+        return None;
+    };
+    duckdb_extended_date(date_text).then_some(text)
 }
 
 fn postgres_temporal_needs_text(value: &Value) -> bool {
@@ -384,18 +439,27 @@ fn postgres_text_temporal<'a>(text: &'a str, data_type: &str) -> Option<&'a str>
 
 fn postgres_extended_temporal(text: &str, data_type: &str) -> Option<String> {
     let kind = data_type.trim().to_ascii_lowercase();
-    if !matches!(
-        kind.as_str(),
-        "date" | "timestamp" | "timestamp without time zone" | "timestamptz" | "timestamp with time zone"
-    ) {
-        return None;
-    }
     let value = text.strip_prefix('\'').unwrap_or(text);
-    let year = value.split_once('-')?.0.strip_prefix('+')?;
-    if year.len() <= 4 || !year.bytes().all(|byte| byte.is_ascii_digit()) {
+    if kind == "date" {
+        let value = value.strip_prefix('+').unwrap_or(value);
+        return duckdb_extended_date(value).then(|| value.to_owned());
+    }
+    if matches!(kind.as_str(), "timestamptz" | "timestamp with time zone") {
+        return duckdb_extended_timestamptz_nanos(value)
+            .filter(|nanos| nanos % 1_000 == 0)
+            .map(|_| value.strip_prefix('+').unwrap_or(value).replace('T', " "));
+    }
+    if !matches!(kind.as_str(), "timestamp" | "timestamp without time zone") {
         return None;
     }
-    Some(value.strip_prefix('+').unwrap_or(value).replace('T', " "))
+    let (date, time) = value.split_once(' ').or_else(|| value.split_once('T'))?;
+    if !duckdb_extended_date(date) {
+        return None;
+    }
+    let time = NaiveTime::parse_from_str(time, "%H:%M:%S%.f")
+        .or_else(|_| NaiveTime::parse_from_str(time, "%H:%M"))
+        .ok()?;
+    (time.nanosecond() % 1_000 == 0).then(|| value.strip_prefix('+').unwrap_or(value).replace('T', " "))
 }
 
 fn duckdb_formula_safe_interval<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
@@ -925,6 +989,53 @@ mod tests {
         .expect("year zero is PostgreSQL 1 BC");
 
         assert_eq!(values, vec![Value::Text("0001-01-02 BC".into())]);
+    }
+
+    #[test]
+    fn value_contract_duckdb_csv_preserves_extended_calendar_values_exactly() {
+        let options = CsvImportOptions::default();
+        for (data_type, text) in [
+            ("DATE", "1000000-02-29"),
+            ("DATE", "+10000-01-01"),
+            ("DATE", "0001-01-01 (BC)"),
+            ("TIMESTAMP", "280000-02-29 12:34:56.123456"),
+            ("TIMESTAMP", "+10000-01-01 12:34:56.123456"),
+            ("TIMESTAMP", "0001-01-01 (BC) 12:34:56"),
+            ("TIMESTAMP WITH TIME ZONE", "280000-02-29 12:34:56.123456+05:30"),
+            ("TIMESTAMPTZ", "+10000-01-01 12:34:56.123456+00:00"),
+            ("TIMESTAMPTZ", "0001-01-01 (BC) 12:34:56+00"),
+        ] {
+            let values = row_to_values_for_driver(
+                &[text.into()],
+                &[Some(0)],
+                &[column("value", data_type)],
+                &options,
+                2,
+                "duckdb",
+            )
+            .expect("valid extended DuckDB calendar value should remain bindable text");
+            assert_eq!(values, vec![Value::Text(text.into())]);
+        }
+        for (data_type, text) in [
+            ("DATE", "1000001-02-29"),
+            ("TIMESTAMP", "280001-02-29 12:34:56"),
+            ("TIMESTAMP", "280000-02-29 12:34:56.123456789"),
+            ("TIMESTAMPTZ", "280000-02-29 12:34:56.123456789+00:00"),
+            ("TIMESTAMPTZ", "280000-02-29 12:34:56+24:00"),
+        ] {
+            assert!(
+                row_to_values_for_driver(
+                    &[text.into()],
+                    &[Some(0)],
+                    &[column("value", data_type)],
+                    &options,
+                    2,
+                    "duckdb",
+                )
+                .is_err(),
+                "invalid {data_type} input was accepted: {text}"
+            );
+        }
     }
 
     #[test]

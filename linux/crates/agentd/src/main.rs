@@ -267,10 +267,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let journal =
         AuditJournal::open_default().map_err(|error| format!("required audit journal unavailable: {error}"))?;
-    if journal.recovery().recovered_unresolved_operations() {
+    if journal.recovery().has_unresolved_writes() {
         return Err(format!(
             "refusing to start with {} unresolved audit operation(s)",
-            journal.recovery().recovered_operation_ids().len()
+            journal.recovery().unresolved_operation_ids().len()
         )
         .into());
     }

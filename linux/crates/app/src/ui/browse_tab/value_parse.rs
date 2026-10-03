@@ -69,6 +69,12 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
             Err(error) => Err(error),
         };
     }
+    if let Some(result) = parse_postgres_extended_temporal_input(trimmed, col, driver_id) {
+        return result;
+    }
+    if let Some(result) = parse_duckdb_date_input(trimmed, col, driver_id) {
+        return result;
+    }
     if let Some(result) = parse_mongodb_decimal_input(trimmed, col, driver_id) {
         return result;
     }
@@ -82,6 +88,49 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_postgres_extended_temporal_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    driver_id: &str,
+) -> Option<Result<Value, String>> {
+    let column = col?;
+    if driver_id != "postgres" {
+        return None;
+    }
+    let kind = column.data_type.trim().to_ascii_lowercase();
+    if kind == "date" {
+        if parse_date_value(text).is_ok() {
+            return None;
+        }
+        return Some(if extended_duckdb_date(text).is_some() {
+            Ok(Value::Text(text.to_owned()))
+        } else {
+            Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+        });
+    }
+    if matches!(kind.as_str(), "timestamp" | "timestamp without time zone") {
+        if parse_datetime_value(text).is_ok() {
+            return None;
+        }
+        return Some(match extended_duckdb_timestamp_nanos(text) {
+            Some(nanos) if nanos % 1_000 == 0 => Ok(Value::Text(text.replace('T', " "))),
+            _ => Err(crate::tr!("Invalid datetime. Use YYYY-MM-DD HH:MM:SS.")),
+        });
+    }
+    if matches!(kind.as_str(), "timestamptz" | "timestamp with time zone") {
+        if parse_timestamptz_value(text).is_ok() {
+            return None;
+        }
+        return Some(
+            tablepro_core::import::duckdb_extended_timestamptz_nanos(text)
+                .filter(|nanos| nanos % 1_000 == 0)
+                .map(|_| Value::Text(text.replace('T', " ")))
+                .ok_or_else(|| crate::tr!("Invalid timestamp with time zone.")),
+        );
+    }
+    None
 }
 
 fn parse_mysql_spatial_input(col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
@@ -210,14 +259,19 @@ fn parse_duckdb_timestamptz_input(
         return None;
     }
     Some((|| {
-        let value = parse_timestamptz_value(text)?;
-        let Value::TimestampTz(timestamp) = value else {
+        if let Ok(Value::TimestampTz(timestamp)) = parse_timestamptz_value(text) {
+            if timestamp.timestamp_subsec_nanos() % 1_000 != 0 {
+                return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
+            }
+            return Ok(Value::TimestampTz(timestamp));
+        }
+        let Some(nanos) = tablepro_core::import::duckdb_extended_timestamptz_nanos(text) else {
             return Err(crate::tr!("Invalid timestamp with time zone."));
         };
-        if timestamp.timestamp_subsec_nanos() % 1_000 != 0 {
+        if nanos % 1_000 != 0 {
             return Err(crate::tr!("DuckDB TIMESTAMPTZ supports microsecond precision only"));
         }
-        Ok(Value::TimestampTz(timestamp))
+        Ok(Value::Text(text.to_owned()))
     })())
 }
 
@@ -243,20 +297,72 @@ fn parse_duckdb_temporal_input(text: &str, col: Option<&ColumnInfo>, driver_id: 
                 }
                 _ => return Err(crate::tr!("Invalid time.")),
             }
+        } else if let Ok(Value::DateTime(value)) = parse_datetime_value(text) {
+            let nanos = value.nanosecond();
+            (Value::DateTime(value), nanos)
+        } else if let Some(nanos) = extended_duckdb_timestamp_nanos(text) {
+            (Value::Text(text.to_owned()), nanos)
         } else {
-            match parse_datetime_value(text)? {
-                Value::DateTime(value) => {
-                    let nanos = value.nanosecond();
-                    (Value::DateTime(value), nanos)
-                }
-                _ => return Err(crate::tr!("Invalid date and time.")),
-            }
+            return Err(crate::tr!("Invalid date and time."));
         };
         if nanos % quantum_ns != 0 {
             return Err(format!("DuckDB {kind} precision cannot represent this value exactly"));
         }
         Ok(value)
     })())
+}
+
+fn parse_duckdb_date_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    if driver_id != "duckdb" || !col?.data_type.trim().eq_ignore_ascii_case("date") {
+        return None;
+    }
+    if parse_date_value(text).is_ok() {
+        return None;
+    }
+    Some(if extended_duckdb_date(text).is_some() {
+        Ok(Value::Text(text.to_owned()))
+    } else {
+        Err(crate::tr!("Invalid date. Use YYYY-MM-DD."))
+    })
+}
+
+fn extended_duckdb_timestamp_nanos(text: &str) -> Option<u32> {
+    let (date, time) = if let Some((date, time)) = text.split_once(" (BC) ") {
+        (format!("{date} (BC)"), time)
+    } else {
+        let (date, time) = text.split_once(' ')?;
+        (date.to_owned(), time)
+    };
+    extended_duckdb_date(&date)?;
+    let Value::Time(time) = parse_time_value(time).ok()? else {
+        return None;
+    };
+    Some(time.nanosecond())
+}
+
+fn extended_duckdb_date(text: &str) -> Option<(i64, u32, u32, bool)> {
+    let (date, bc) = text.strip_suffix(" (BC)").map_or((text, false), |date| (date, true));
+    let mut parts = date.split('-');
+    let year_text = parts.next()?;
+    if year_text.len() < 4 || !year_text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let year = year_text.parse::<i64>().ok()?;
+    let month = parts.next()?.parse::<u32>().ok()?;
+    let day = parts.next()?.parse::<u32>().ok()?;
+    if parts.next().is_some() || year == 0 || month == 0 || month > 12 {
+        return None;
+    }
+    let astronomical_year = if bc { 1 - year } else { year };
+    let leap = astronomical_year.rem_euclid(4) == 0
+        && (astronomical_year.rem_euclid(100) != 0 || astronomical_year.rem_euclid(400) == 0);
+    let days_in_month = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    (day > 0 && day <= days_in_month && (bc || year > 9999)).then_some((year, month, day, bc))
 }
 
 fn is_postgres_numeric_literal(text: &str) -> bool {
@@ -379,6 +485,7 @@ fn classify_bool_or_bit(dt: &str) -> Option<TypeKind> {
 
 fn is_json_like(dt: &str) -> bool {
     dt.contains("json")
+        || dt.starts_with("bindata-subtype-")
         || matches!(
             dt,
             "object"

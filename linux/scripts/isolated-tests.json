@@ -8,6 +8,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::tests::postgres_temporal::postgres_extended_temporal_grid_edits_preserve_native_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
@@ -43,7 +48,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::tests::value_contract_mongodb_late_mixed_page_refreshes_grid_and_refuses_edit"
+      "ui::browse_tab::tests::value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit"
     ]
   ],
   "gtk": [

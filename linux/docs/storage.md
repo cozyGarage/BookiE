@@ -60,7 +60,21 @@ The GUI loads `$XDG_CONFIG_HOME/tablepro/policy.toml` at startup. A missing file
 
 Each record contains a sequence number, previous hash, current hash, and audit event. Mutation intents and transaction commit records use the durable append path. File locks serialize initialization and appends across processes.
 
-The GTK application disables governed writes and MCP startup when the required audit journal cannot be opened. `tablepro-agentd` also refuses startup when the journal is unavailable or unresolved operations are recovered.
+The GUI and `tablepro-agentd` may hold the journal at the same time. Each live
+owner holds a shared process lock; startup recovery requires the exclusive lock,
+so a second process does not record another process's in-flight mutation as
+`Unknown`. It validates the chain without recovery. New write intents are still
+refused while an earlier write remains pending. After all owners exit, the next
+opener recovers any intents left pending by a crash.
+
+Every append currently verifies the full journal, and `recent(limit)` reads the
+full file before trimming its result. Append cost therefore grows with journal
+size; the 1,000-append concurrency test takes about 25 seconds locally. There is
+no retention or compaction policy. Keep the full-chain integrity check until a
+checkpoint/rotation design can preserve crash recovery and tamper detection;
+do not prune audit history as a performance shortcut.
+
+The GTK application disables governed writes and MCP startup when the required audit journal cannot be opened or reports unresolved writes. `tablepro-agentd` also refuses startup when the journal is unavailable or reports unresolved writes.
 
 ## Secrets
 
