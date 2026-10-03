@@ -279,6 +279,90 @@ async fn session_non_utc_time_zone_refuses_mysql_timestamp_instant() {
     tx.rollback().await.unwrap();
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_time_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
+    let (_container, options) = start_mysql().await;
+    assert_time_fractional_storage_mode_for_binds_and_literals(&options, "TIME_TRUNCATE_FRACTIONAL", 790_000, 789_000)
+        .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_time_fractional_storage_respects_round_mode_for_binds_and_literals() {
+    let (_container, options) = start_mariadb().await;
+    assert_time_fractional_storage_mode_for_binds_and_literals(&options, "TIME_ROUND_FRACTIONAL", 789_000, 790_000)
+        .await;
+}
+
+async fn assert_time_fractional_storage_mode_for_binds_and_literals(
+    options: &ConnectOptions,
+    alternate_mode: &str,
+    baseline_microseconds: u32,
+    alternate_microseconds: u32,
+) {
+    let conn = connect(options.clone()).await;
+    conn.execute("CREATE TABLE fractional_times (id INT PRIMARY KEY, value TIME(3) NOT NULL)")
+        .await
+        .unwrap();
+    let columns = conn.fetch_columns(None, "fractional_times").await.unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let input = Value::Time(micros_time(12, 34, 56, 789_900));
+
+    for (mode, bound_id, literal_id) in [("", 1, 2), (alternate_mode, 3, 4)] {
+        session
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .await
+            .unwrap();
+        session
+            .query_params_controlled(
+                "INSERT INTO fractional_times VALUES (?, ?)",
+                &[Value::Int(bound_id), input.clone()],
+                &control,
+            )
+            .await
+            .unwrap();
+        let literal = tablepro_core::sql_literal::build_insert_literal(
+            "mysql",
+            None,
+            "fractional_times",
+            &columns,
+            &[Value::Int(literal_id), input.clone()],
+        )
+        .unwrap();
+        session.query_params_controlled(&literal, &[], &control).await.unwrap();
+    }
+
+    let result = session
+        .query_params_controlled(
+            "SELECT id, value, CAST(value AS CHAR), MICROSECOND(value) \
+             FROM fractional_times ORDER BY id",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let expected_row = |id, microseconds| {
+        vec![
+            Value::Int(id),
+            Value::Time(micros_time(12, 34, 56, microseconds)),
+            text(&format!("12:34:56.{:03}", microseconds / 1_000)),
+            Value::Int(i64::from(microseconds)),
+        ]
+    };
+    assert_eq!(
+        result.rows,
+        vec![
+            expected_row(1, baseline_microseconds),
+            expected_row(2, baseline_microseconds),
+            expected_row(3, alternate_microseconds),
+            expected_row(4, alternate_microseconds),
+        ]
+    );
+    session.close().await.unwrap();
+}
+
 const BACKSLASH_SENSITIVE_TEXTS: [&str; 7] = [
     "a\\b",
     "\\",
