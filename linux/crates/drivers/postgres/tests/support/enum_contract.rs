@@ -202,9 +202,51 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
             vec![(1, "NULL"), (2, "ready")],
         ),
         (
+            FilterOp::LtEq,
+            FilterValue::Single("paused".into()),
+            vec![(1, "NULL"), (2, "ready"), (3, "paused")],
+        ),
+        (
+            FilterOp::Gt,
+            FilterValue::Single("ready".into()),
+            vec![(3, "paused"), (4, "東京")],
+        ),
+        (
+            FilterOp::GtEq,
+            FilterValue::Single("ready".into()),
+            vec![(2, "ready"), (3, "paused"), (4, "東京")],
+        ),
+        (
+            FilterOp::Contains,
+            FilterValue::Single("aus".into()),
+            vec![(3, "paused")],
+        ),
+        (
+            FilterOp::StartsWith,
+            FilterValue::Single("rea".into()),
+            vec![(2, "ready")],
+        ),
+        (FilterOp::EndsWith, FilterValue::Single("dy".into()), vec![(2, "ready")]),
+        (FilterOp::Like, FilterValue::Single("pau%".into()), vec![(3, "paused")]),
+        (
+            FilterOp::NotLike,
+            FilterValue::Single("p%".into()),
+            vec![(1, "NULL"), (2, "ready"), (4, "東京")],
+        ),
+        (
+            FilterOp::Ilike,
+            FilterValue::Single("%READY%".into()),
+            vec![(2, "ready")],
+        ),
+        (
             FilterOp::In,
             FilterValue::List(vec!["NULL".into(), "東京".into()]),
             vec![(1, "NULL"), (4, "東京")],
+        ),
+        (
+            FilterOp::NotIn,
+            FilterValue::List(vec!["NULL".into(), "東京".into()]),
+            vec![(2, "ready"), (3, "paused")],
         ),
         (
             FilterOp::Between,
@@ -270,6 +312,53 @@ async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
             Value::Null,
             Value::Text("value_contract_enum_filter.status".into()),
         ]]
+    );
+
+    let not_null_filter = FilterSet {
+        rules: vec![FilterRule {
+            column: "status".into(),
+            op: FilterOp::IsNotNull,
+            value: None,
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &not_null_filter)
+        .unwrap()
+        .unwrap();
+    let result = connection
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM value_contract_enum_filter.rows WHERE {where_sql} ORDER BY id"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Text("value_contract_enum_filter.status".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("ready".into()),
+                Value::Text("value_contract_enum_filter.status".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_enum_filter.status".into())
+            ],
+            vec![
+                Value::Int(4),
+                Value::Text("東京".into()),
+                Value::Text("value_contract_enum_filter.status".into())
+            ],
+        ]
     );
 }
 

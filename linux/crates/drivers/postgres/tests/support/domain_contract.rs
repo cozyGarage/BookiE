@@ -777,9 +777,47 @@ async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
             vec![(1, "NULL"), (2, "ready")],
         ),
         (
+            FilterOp::LtEq,
+            FilterValue::Single("ready".into()),
+            vec![(1, "NULL"), (2, "ready")],
+        ),
+        (FilterOp::Gt, FilterValue::Single("ready".into()), vec![(3, "東京")]),
+        (
+            FilterOp::GtEq,
+            FilterValue::Single("ready".into()),
+            vec![(2, "ready"), (3, "東京")],
+        ),
+        (
+            FilterOp::Contains,
+            FilterValue::Single("ead".into()),
+            vec![(2, "ready")],
+        ),
+        (
+            FilterOp::StartsWith,
+            FilterValue::Single("re".into()),
+            vec![(2, "ready")],
+        ),
+        (FilterOp::EndsWith, FilterValue::Single("dy".into()), vec![(2, "ready")]),
+        (FilterOp::Like, FilterValue::Single("re%".into()), vec![(2, "ready")]),
+        (
+            FilterOp::NotLike,
+            FilterValue::Single("東%".into()),
+            vec![(1, "NULL"), (2, "ready")],
+        ),
+        (
+            FilterOp::Ilike,
+            FilterValue::Single("%READY%".into()),
+            vec![(2, "ready")],
+        ),
+        (
             FilterOp::In,
             FilterValue::List(vec!["ready".into(), "東京".into()]),
             vec![(2, "ready"), (3, "東京")],
+        ),
+        (
+            FilterOp::NotIn,
+            FilterValue::List(vec!["NULL".into(), "東京".into()]),
+            vec![(2, "ready")],
         ),
         (
             FilterOp::Between,
@@ -850,6 +888,48 @@ async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
             Value::Null,
             Value::Text("value_contract_domain_filter.status_domain".into())
         ]]
+    );
+
+    let not_null_filter = FilterSet {
+        rules: vec![FilterRule {
+            column: "label".into(),
+            op: FilterOp::IsNotNull,
+            value: None,
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &not_null_filter)
+        .unwrap()
+        .unwrap();
+    let result = connection
+        .query_params(
+            &format!(
+                "SELECT id, label::text, pg_typeof(label)::text \
+                 FROM value_contract_domain_filter.rows WHERE {where_sql} ORDER BY id"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Text("value_contract_domain_filter.status_domain".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("ready".into()),
+                Value::Text("value_contract_domain_filter.status_domain".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("東京".into()),
+                Value::Text("value_contract_domain_filter.status_domain".into())
+            ],
+        ]
     );
 
     let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
