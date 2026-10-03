@@ -2,17 +2,18 @@
   "schema_version": 1,
   "date": "2026-10-03",
   "branch": "linux",
-  "source_commit": "549fd79f6100c32408524f413f53a4fb3da57374",
+  "source_commit": "cf9e650e8d4d55122f07b89d9b7e2acb5ecec69b",
   "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
   "case": "Qualified direct enum query parameters under a same-named search_path collision",
   "change": "Extend the shadowed enum fixture with direct equality, IN and BETWEEN query parameters against enum_shadow_b.items while search_path resolves enum_shadow_a.status_kind.",
   "contract": [
     "Explicitly qualified target enum equality, IN and BETWEEN comparisons accept text parameters and return the target row under a colliding search_path.",
     "The returned column retains enum_shadow_b.status_kind as its native type, and the shadow schema row remains unchanged.",
+    "Inside a transaction, SET LOCAL search_path to enum_shadow_a keeps direct status = $1 inference bound to enum_shadow_b.status_kind when querying the target table.",
     "A parameter used by both pg_typeof($1) and an enum comparison is ambiguous to native PostgreSQL PREPARE (42P08); the driver preserves that ambiguity when a text-typed fallback conflicts with the enum operator.",
     "Explicitly casting the parameter to enum_shadow_b.status_kind resolves the diagnostic query and pg_typeof($1::enum_shadow_b.status_kind) reports that enum."
   ],
-  "independent_oracle": "PostgreSQL current_schema(), native PREPARE and driver query SQLSTATE 42P08, successful explicitly typed enum comparison, pg_typeof results and exact rows from both schemas.",
+  "independent_oracle": "PostgreSQL current_schema() before and after SET LOCAL, native PREPARE and driver query SQLSTATE 42P08, successful enum comparisons, pg_typeof results and exact rows from both schemas.",
   "validation": {
     "focused_shadowed_enum_contract": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema -- --ignored --test-threads=1",
@@ -33,9 +34,9 @@
     "diff_check": "git diff --check passed"
   },
   "log_sha256": {
-    "focused.txt": "537ea05faacd4a6e345850886f79d7a72c41f47aa4bb897541fd64f05b11e84c",
-    "enum-suite.txt": "a915dffd66dd00ec7622cc536065d9272aa0afacca30fafdddd8a890ed2b230c",
-    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "focused.txt": "fef828e6376818d0b08b22ab187790dd0b220973e0d7bb987a7800d374b9c009",
+    "enum-suite.txt": "55a89c3e7e69cf994fe87a2ef8917de2c00797a3f0e349611ff85b0186e97ae6",
+    "clippy.txt": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [

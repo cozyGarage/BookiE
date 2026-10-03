@@ -137,6 +137,8 @@ target schema's native type; see the
 and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
 A direct bound equality, `IN` and `BETWEEN` query under the same collision also
 select the target enum row and leave the shadow row unchanged; see [query parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+The fixture also changes `search_path` with transaction-local `SET LOCAL` and
+checks direct `status = $1` inference against the qualified target table.
 For diagnostics using polymorphic `pg_typeof($1)`, native preparation reports
 ambiguous parameter type `42P08`, which the driver preserves across its text
 fallback; the explicit target-enum cast is covered too.

@@ -4659,6 +4659,9 @@ on `enum_shadow_b.items` while `search_path` resolves the colliding
 `enum_shadow_a.status_kind`. The target enum comparisons succeed, the returned
 column retains its qualified native type, and the shadow row remains unchanged.
 See the [direct parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+Within a transaction, `SET LOCAL search_path TO enum_shadow_a` also leaves
+`status = $1` against `enum_shadow_b.items` correctly inferred from the target
+column, without explicitly casting the column.
 The same fixture records that `pg_typeof($1)` alongside the enum comparison is
 ambiguous to native `PREPARE` (`42P08`). The driver now preserves that error
 when its text-typed fallback conflicts with the enum operator; an explicit

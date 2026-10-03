@@ -32,6 +32,8 @@ and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results
 A direct equality, `IN` and `BETWEEN` query with bound text values also resolve
 against the qualified target enum and leave the shadow row untouched; see the
 [query-parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+The same contract changes `search_path` with `SET LOCAL` and verifies that an
+uncast `status = $1` query still infers the target table's enum type.
 When `pg_typeof($1)` leaves an enum comparison parameter ambiguous, native
 PostgreSQL preparation returns `42P08`; an explicit qualified enum cast makes
 the parameter type unambiguous. The driver preserves native `42P08` if its
