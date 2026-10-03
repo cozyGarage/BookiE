@@ -356,6 +356,75 @@ async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type(
         ]
     );
 
+    let not_equal = connection
+        .query_params(
+            "SELECT id, status::value_contract_domain_query.state <> $1, \
+             pg_typeof($1)::text, pg_typeof(status)::text \
+             FROM value_contract_domain_query.rows ORDER BY id",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        not_equal.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Bool(true),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Bool(false),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+        ]
+    );
+
+    let between = connection
+        .query_params(
+            "SELECT id, status::value_contract_domain_query.state BETWEEN $1 AND $2, \
+             pg_typeof($1)::text, pg_typeof($2)::text, pg_typeof(status)::text \
+             FROM value_contract_domain_query.rows ORDER BY id",
+            &[Value::Text("ready".into()), Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        between.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Bool(true),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Bool(true),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+        ]
+    );
+
     let null_result = connection
         .query_params(
             "SELECT status::value_contract_domain_query.state = $1, \
