@@ -1058,37 +1058,48 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
 #[ignore = "requires docker"]
 async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema() {
     let (_container, opts) = start_pg().await;
-    let connection = connect(opts).await;
-    connection.execute("CREATE SCHEMA enum_shadow_a").await.unwrap();
-    connection.execute("CREATE SCHEMA enum_shadow_b").await.unwrap();
-    connection
+    let setup = connect(opts.clone()).await;
+    setup.execute("CREATE SCHEMA enum_shadow_a").await.unwrap();
+    setup.execute("CREATE SCHEMA enum_shadow_b").await.unwrap();
+    setup
         .execute("CREATE TYPE enum_shadow_a.status_kind AS ENUM ('ready', 'paused')")
         .await
         .unwrap();
-    connection
+    setup
         .execute("CREATE TYPE enum_shadow_b.status_kind AS ENUM ('ready', 'paused')")
         .await
         .unwrap();
-    connection
+    setup
         .execute(
             "CREATE TABLE enum_shadow_a.items (id INT PRIMARY KEY, status enum_shadow_a.status_kind, sibling TEXT NOT NULL)",
         )
         .await
         .unwrap();
-    connection
+    setup
         .execute(
             "CREATE TABLE enum_shadow_b.items (id INT PRIMARY KEY, status enum_shadow_b.status_kind, sibling TEXT NOT NULL)",
         )
         .await
         .unwrap();
-    connection
+    setup
         .execute("INSERT INTO enum_shadow_a.items VALUES (1, 'ready', 'shadow')")
         .await
         .unwrap();
-    connection
+    setup
         .execute("INSERT INTO enum_shadow_b.items VALUES (1, 'ready', 'target')")
         .await
         .unwrap();
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO enum_shadow_a")
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = connect(opts).await;
+    assert_eq!(
+        connection.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("enum_shadow_a".into())]]
+    );
 
     let columns = connection.fetch_columns(Some("enum_shadow_b"), "items").await.unwrap();
     assert_eq!(
@@ -1131,7 +1142,7 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         vec![vec![
             Value::Int(1),
             Value::Text("ready".into()),
-            Value::Text("enum_shadow_a.status_kind".into()),
+            Value::Text("status_kind".into()),
             Value::Text("shadow".into()),
         ]]
     );

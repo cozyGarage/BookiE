@@ -1664,7 +1664,8 @@ in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manife
 A PostgreSQL 16 native regression creates `status_kind` and `items` in two
 schemas, then edits only the `enum_shadow_b.items` row. The app's fetched enum
 metadata and keyed-update builder select `enum_shadow_b.status_kind` even with
-the same type and table names present in `enum_shadow_a`; independent
+the same type and table names present in `enum_shadow_a`. A role default points
+`search_path` at `enum_shadow_a`, confirmed on the fresh pool connection; independent
 `pg_typeof` and sibling queries verify the target native type and unchanged
 shadow row. This closes the same-named cross-schema keyed-edit case, while
 other enum/session combinations remain open.
