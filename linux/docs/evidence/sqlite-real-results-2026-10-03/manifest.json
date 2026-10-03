@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "8c76f7d319ae6807b248d98776371780ea6145c1",
+  "working_tree": "Checks ran against the dirty source tree recorded in layers-report.json; source files listed below were unchanged after the checks. This is local development evidence, not hosted CI or installed acceptance.",
+  "scope": [
+    "SQLite REAL bound values: preserve exact bits and native REAL storage for the smallest subnormal, f64::MAX and both infinities.",
+    "SQLite REAL binding: explicitly refuse NaN and negative zero before write dispatch; assert no rows are written.",
+    "SQLite generated INSERT literal: explicitly refuse negative zero as unrepresentable."
+  ],
+  "outcomes": {
+    "bound subnormal_max_and_infinities": "exact typed support; typeof(value) is real and to_bits matches",
+    "bound NaN_and_negative_zero": "explicit refusal; no rows written",
+    "generated negative_zero literal": "explicit refusal; UnrepresentableValue for value column"
+  },
+  "regressions": [
+    {
+      "selector": "sqlite_real_storage_preserves_float_edge_bits",
+      "oracle": "SQLite typeof(value) plus exact f64::to_bits()"
+    },
+    {
+      "selector": "sqlite_real_binding_refuses_negative_zero_and_nan",
+      "oracle": "DriverError::Unsupported, generated INSERT refusal and empty-table postcondition"
+    }
+  ],
+  "commands": [
+    {
+      "argv": "cargo test --locked -p tablepro-driver-sqlite --test integration",
+      "result": "23 passed; raw output retained in sqlite-integration.log"
+    },
+    {
+      "argv": "python3 scripts/run-test-layer.py quick change-contracts",
+      "result": "passed; exact report and per-layer logs retained"
+    }
+  ],
+  "layer_report": {
+    "path": "layers-report.json",
+    "status": "passed",
+    "tracked_diff_sha256": "0c40236964b08a83301b1390c328cd7728eff0fdcfb3ae2007627cb3dfcecacf",
+    "layers": {
+      "quick": "passed",
+      "change-contracts": "passed"
+    }
+  },
+  "source_fingerprints_sha256": {
+    "crates/core/src/sql_literal.rs": "20025adc2cc757be2205308b4b17a17f3fcc9ec10785f5da655b4c163722cae6",
+    "crates/drivers/sqlite/src/lib.rs": "baee1088090c6607f2a6098950a2253200fa350f88366f2f49da62955a8ad74f",
+    "crates/drivers/sqlite/tests/integration.rs": "df1d1ca2f34005c4cbf3b824471bb131f49b99351a1fbc574f57ffadf305c08c",
+    "docs/type-contract-strategy.md": "83195ffd8622cd7af6193a2a02970b0cc1436c868b656907cdfb9490c25ae4aa",
+    "docs/value-contract-history.md": "b6405ee9ebd90163fad88414259d7279afa37412b293ce0099f8af2d1405466a",
+    "docs/value-contracts.md": "0bec971d98466b6194e253287eebdedd859ffe9852f3b68d67a4451aeaaa7b15"
+  },
+  "retained_evidence_sha256": {
+    "before-fix.txt": "0e30d4d55333041949b783526e26a57190186eb4bbd77916510f70f54b47860f",
+    "sqlite-integration.log": "93bb2513c14b267bc3e952abd8b123e5e3611a3c982aa6b95d07614bdd6c44b0",
+    "layers-report.json": "9f5f5f62dae8e5179814050ef96663e712b1609a8b1b495fe872b25b9db11abe",
+    "layers-quick-1.log": "1b5228a07ad306cc6c3cf6c31f10c8eb243d30527b628b51b2f8a1f13dff9773",
+    "layers-change-contracts-1.log": "8b466968fa15fd2c50c93f3376842aee32bb6e549b743ce6ebbab425bbecfcf0"
+  },
+  "limitations": [
+    "The initial failing-first observations are transcribed in before-fix.txt; raw pre-fix process output was not retained.",
+    "No hosted workflow, installed GTK, package, Wayland, VM or release-candidate qualification is represented."
+  ]
+}

@@ -1,0 +1,11 @@
+Failing-first observations from the implementation run on the pre-fix source:
+
+- A REAL-bound negative zero was returned with bits 0 instead of the expected
+  sign-bit-only pattern 0x8000000000000000.
+- A NaN parameter insert returned success with rows_affected = 1; SQLite's
+  subsequent REAL read exposed the lossy conversion as NULL.
+
+The initial failing process output was not retained as a raw log. These
+observations are recorded from that run; the current tests assert exact bits,
+SQLite typeof(value), explicit refusal and the no-write postcondition. Current
+raw suite and layer logs are retained alongside this note.

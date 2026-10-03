@@ -668,3 +668,75 @@ async fn an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digi
         assert_eq!(row[2], Value::Int(i64::from(storage_class == "text")), "{input}");
     }
 }
+
+#[tokio::test]
+async fn sqlite_real_storage_preserves_float_edge_bits() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    connection
+        .execute("CREATE TABLE float_edges (id INTEGER PRIMARY KEY, value REAL)")
+        .await
+        .unwrap();
+    let values = [f64::from_bits(1), f64::MAX, f64::INFINITY, f64::NEG_INFINITY];
+    for (index, value) in values.into_iter().enumerate() {
+        connection
+            .execute_params(
+                "INSERT INTO float_edges VALUES (?1, ?2)",
+                &[Value::Int(index as i64 + 1), Value::Float(value)],
+            )
+            .await
+            .unwrap();
+    }
+
+    let stored = connection
+        .query("SELECT typeof(value), value FROM float_edges ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(stored.rows.len(), values.len());
+    for (row, expected) in stored.rows.iter().zip(values) {
+        assert_eq!(row[0], Value::Text("real".into()));
+        let Value::Float(actual) = row[1] else {
+            panic!("SQLite REAL storage must decode as a float: {:?}", row[1]);
+        };
+        assert_eq!(actual.to_bits(), expected.to_bits());
+    }
+}
+
+#[tokio::test]
+async fn sqlite_real_binding_refuses_negative_zero_and_nan() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    connection
+        .execute("CREATE TABLE float_edges (id INTEGER PRIMARY KEY, value REAL)")
+        .await
+        .unwrap();
+
+    for (id, value, boundary) in [(2, f64::NAN, "NaN"), (1, -0.0, "negative zero")] {
+        let error = connection
+            .execute_params(
+                "INSERT INTO float_edges VALUES (?1, ?2)",
+                &[Value::Int(id), Value::Float(value)],
+            )
+            .await
+            .expect_err(boundary);
+        assert!(
+            matches!(error, tablepro_core::DriverError::Unsupported(_)),
+            "{boundary}: {error:?}"
+        );
+    }
+
+    let columns = connection.fetch_columns(None, "float_edges").await.unwrap();
+    let literal_error = tablepro_core::sql_literal::build_insert_literal(
+        "sqlite",
+        None,
+        "float_edges",
+        &columns,
+        &[Value::Int(3), Value::Float(-0.0)],
+    )
+    .expect_err("SQLite SQL export must not erase negative zero");
+    assert!(matches!(
+        literal_error,
+        tablepro_core::sql_dialect::BuildSqlError::UnrepresentableValue { column } if column == "value"
+    ));
+
+    let after_refusal = connection.query("SELECT count(*) FROM float_edges").await.unwrap();
+    assert_eq!(after_refusal.rows, vec![vec![Value::Int(0)]]);
+}

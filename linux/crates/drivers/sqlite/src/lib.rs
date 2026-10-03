@@ -660,6 +660,11 @@ fn bind_sqlite_params<'q>(
             Value::Null => q.bind(Option::<&str>::None),
             Value::Bool(b) => q.bind(*b),
             Value::Int(i) => q.bind(*i),
+            Value::Float(f) if f.is_nan() || (*f == 0.0 && f.is_sign_negative()) => {
+                return Err(DriverError::Unsupported(
+                    "SQLite cannot preserve NaN or negative zero as a REAL value".into(),
+                ));
+            }
             Value::Float(f) => q.bind(*f),
             Value::Text(s) => q.bind(s.clone()),
             Value::Bytes(b) => q.bind(b.clone()),

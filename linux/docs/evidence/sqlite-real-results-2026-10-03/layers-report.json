@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "commit": "8c76f7d319ae6807b248d98776371780ea6145c1",
+  "working_tree": "M linux/crates/core/src/sql_literal.rs\n M linux/crates/drivers/sqlite/src/lib.rs\n M linux/crates/drivers/sqlite/tests/integration.rs\n M linux/docs/type-contract-strategy.md\n M linux/docs/value-contract-history.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
+  "tracked_diff_sha256": "0c40236964b08a83301b1390c328cd7728eff0fdcfb3ae2007627cb3dfcecacf",
+  "started_utc": "2026-10-03T17:43:56.517880+00:00",
+  "status": "passed",
+  "layers": {
+    "quick": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "quick"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "quick-1.log",
+          "exit_code": 0,
+          "seconds": 92.223
+        }
+      ]
+    },
+    "change-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-change-contract-tests.py"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "change-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 1.717
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T17:45:30.458989+00:00"
+}

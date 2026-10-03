@@ -92,6 +92,9 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Bool(value) => value.to_string(),
         Value::Int(value) => value.to_string(),
         Value::Float(value) if !value.is_finite() => return Err(LiteralError::NonFinite),
+        Value::Float(value) if driver_id == "sqlite" && *value == 0.0 && value.is_sign_negative() => {
+            return Err(LiteralError::Unsupported);
+        }
         Value::Float(value) => format!("{value:e}"),
         Value::Decimal(value) if driver_id == "clickhouse" => format!("toDecimal128('{value}', {})", value.scale()),
         Value::Decimal(value) => value.to_string(),

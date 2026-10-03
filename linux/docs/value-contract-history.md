@@ -4332,3 +4332,22 @@ not refresh data or establish a collection snapshot. A diagnostic Docker test
 measures full-census time for 1,000 and 10,000 documents with a 50-row page;
 results are machine-specific and have no pass/fail threshold. These boundaries
 are covered by [the MongoDB census evidence manifest](evidence/mongodb-census-results-2026-10-03/manifest.json).
+
+## SQLite REAL float edge checkpoint (2026-10-03)
+
+SQLite's `REAL` binding must preserve floating-point bits it can store and refuse
+inputs whose meaning SQLite changes. An independent `typeof(value)` query
+confirms `f64::from_bits(1)`, `f64::MAX`, positive infinity and negative
+infinity are stored as `real`; the returned floats retain their exact `to_bits()`.
+NaN previously succeeded as an insert and became SQLite NULL, while negative
+zero came back with the positive-zero bit pattern. Both parameter writes now
+return `DriverError::Unsupported` before dispatch. The generated INSERT literal
+path also refuses negative zero as `UnrepresentableValue`; a postcondition
+asserts both refused writes leave the table empty.
+
+Selectors: `sqlite_real_storage_preserves_float_edge_bits` and
+`sqlite_real_binding_refuses_negative_zero_and_nan` in
+`crates/drivers/sqlite/tests/integration.rs`. The native integration suite passed
+23 tests; local `quick` and `change-contracts` layers also passed. Their retained
+report and source fingerprints are in
+[`sqlite REAL evidence`](evidence/sqlite-real-results-2026-10-03/manifest.json).
