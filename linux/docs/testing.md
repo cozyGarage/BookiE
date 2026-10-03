@@ -22,7 +22,7 @@ release, installed GTK, optional DuckDB and supply-chain checks. It does not
 certify package installation, Wayland, upgrade/rollback or retry-free candidate soak.
 See [0.1.4 review actions and evidence](release-0.1.4.md).
 
-Run test commands from the `linux/` workspace root. Current results and limits are in [the bug and consistency audit](bug-consistency-2026-09.md); [the earlier September audit](stabilization-2026-09.md) records historical evidence.
+Run test commands from the `linux/` workspace root. Current scope and acceptance are in [the active sprint](bookie-0.2-sprint.md); the [bug and consistency audit](bug-consistency-2026-09.md) records its dated source tree; [the earlier September audit](stabilization-2026-09.md) records historical evidence.
 
 ## Current local checks
 
@@ -365,8 +365,8 @@ timed-out measurement. The measurement timeout leaves time before the job limit
 for evidence upload. Active quality runs are retained across new pushes. Both
 Build Linux and test-quality jobs share an immutable resolved commit.
 
-For native numeric, temporal and collection coverage, follow the
-[type-contract strategy](type-contract-strategy.md). It separates exact typed
+For native numeric, temporal and collection coverage, follow
+[ADR 0007](decisions/0007-type-and-value-preservation.md) and the [B3 board](type-contract-strategy.md). The standard separates exact typed
 support, exact text fallback, explicit refusal and untested paths, with a
 per-driver list of remaining targets. The latest PostgreSQL interval/array
 mutation command and evidence are in [value contracts](value-contracts.md).

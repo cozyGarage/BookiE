@@ -3,6 +3,10 @@
 - **Status**: Accepted
 - **Date**: 2026-09-18
 
+## October 3 implementation/privacy note
+
+The unwind containment decision remains accepted. The source currently logs the caught payload, and the default panic hook may also expose it. “Logs only” below describes the original routing; it does not make arbitrary payload text safe or override the no-secret/SQL logging rule. [The consistency review](../architecture-consistency-review-2026-10-03.md#remaining-source-risks) defines the redaction and headless retirement follow-ups. Keep unwind enabled while addressing them.
+
 ## Context
 
 Drivers decode whatever the server sends. A hostile, compromised, or merely buggy server can drive a decoder into a state its author did not anticipate, and some of our dependencies answer that with a panic rather than an error. The SQL Server driver is the concrete case: `tiberius` panics inside its codec on input it cannot parse, and we consume it as a pinned git dependency, so we cannot fix it in our own code.

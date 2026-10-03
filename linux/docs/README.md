@@ -1,0 +1,54 @@
+# Documentation entry point
+
+Read this page before loading long plans or evidence ledgers. The active sprint
+sets work order; accepted ADRs set technical rules. A dated result proves only
+its recorded source, environment and consumer.
+
+## Minimum agent context
+
+1. Repository `CLAUDE.md` and applicable `AGENTS.md` instructions.
+2. [Active sprint](bookie-0.2-sprint.md): choose one milestone/task.
+3. The relevant [ADR](decisions/README.md); for every type/value change read
+   [ADR 0007](decisions/0007-type-and-value-preservation.md).
+4. The owning task/case and affected checks in the [validation playbook](validation-playbook.md).
+
+Do not load every archive as mandatory context. Look up the specific heading,
+test selector and SHA needed for the task. Recheck current source before relying
+on historical statements such as “next”, “current” or “pending”.
+
+## Where each fact belongs
+
+| Fact | Owner | Update rule |
+| --- | --- | --- |
+| Type/value semantics and proof standard | [ADR 0007](decisions/0007-type-and-value-preservation.md) | Change a decision explicitly; link it from plans |
+| Connection/session/trust semantics | [ADR 0008](decisions/0008-connection-and-session-ownership.md) | B4 task IDs track implementation, not competing rules |
+| Durable identity and migration semantics | [ADR 0009](decisions/0009-persistence-and-identity-compatibility.md) | Operational procedures stay in storage/state guides |
+| Milestones, order and acceptance | [Active sprint](bookie-0.2-sprint.md) | Keep current instructions compact; archive dated progress |
+| B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
+| B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
+| Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
+| Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
+| Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
+| Capability backlog / short status | [PLAN](../../PLAN.md) / [ROADMAP](../ROADMAP.md) | Summarize and link; do not duplicate ADRs or progress logs |
+
+## History and review lookup
+
+- [Sprint history](bookie-0.2-history.md): original approved scope, dated
+  continuation packets, implementation counts, migration and commit records.
+- [Type-contract history](type-contract-history.md): detailed driver matrices
+  and dated consumer reconciliation.
+- [Value-contract history](value-contract-history.md): case selectors, native
+  oracles, before/after results and report links.
+- [Architecture/evidence review](architecture-consistency-review-2026-10-03.md):
+  source risks and unavailable raw proof; its manifest is a dated snapshot.
+- [Upstream main](upstream-main-review-2026-10-03.md) and
+  [older releases](upstream-older-releases-review-2026-10-03.md): candidate fixes,
+  mapped to the existing B3/B4 owners.
+
+## Keep context bounded
+
+Record a rule once in an ADR, a task once on its board, and a runtime result once
+in its case evidence. Link those from the sprint. Archive completed narratives;
+preserve their anchors and attribution when moving them. A history file may be
+long because it is consulted selectively; it must not become required startup
+reading. Do not copy old test counts into a current acceptance claim.

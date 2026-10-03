@@ -133,7 +133,7 @@ open. Returned-page metadata now reaches the
 browse grid, so late fields and mixed types update editability and rebuild
 factories even when the number of columns is unchanged; whole-collection
 schema discovery remains outside this page-scoped contract. See the updated
-[value contracts](value-contracts.md#mongodb-nested-bson-and-native-boundary-checkpoint).
+[value contracts](value-contract-history.md#mongodb-nested-bson-and-native-boundary-checkpoint).
 
 The same follow-up found that BSON `date` values display RFC3339 text but the
 generic app parser treated their metadata as date-only and rejected the value.
@@ -143,7 +143,7 @@ parser preserves UTC milliseconds and refuses sub-millisecond edits. A MongoDB
 round-trip and unchanged data after refusal. The clean strict report passed 133
 selected contracts across 11 suites at
 `35d457fa488768a5204a26d785c90114073d4acd`; details and mutation evidence are
-in [value contracts](value-contracts.md#mongodb-bson-datetime-grid-edit-precision).
+in [value contracts](value-contract-history.md#mongodb-bson-datetime-grid-edit-precision).
 
 The September 30 pass checked two previously raised gaps against the current
 tests. MySQL spatial values now have parser refusals for all eight spatial base
@@ -213,13 +213,13 @@ latest additions `Tuple(String, Map(String, Nullable(Decimal(38, 9))))` and
 against the native `toTypeName` and `toJSONString` oracles, JSON/CSV parsing,
 SQL and bind refusal, and unchanged MergeTree rows after edit refusal; its
 focused Docker test passed. The runnable command and exact assertions are in
-the [value ledger](value-contracts.md#clickhouse-tuple-containing-a-nullable-decimal-map-2026-10-01).
+the [value ledger](value-contract-history.md#clickhouse-tuple-containing-a-nullable-decimal-map-2026-10-01).
 
 The MySQL wide-decimal CSV path now validates catalog precision/scale and known
 `UNSIGNED`/`ZEROFILL` modifiers, rejects unknown or repeated suffixes, and has a
 live `DECIMAL(65,0) UNSIGNED` import contract. The 36-mutant scope, 168-test
 strict values layer and quick gate passed on the updated source; evidence is
-linked in the [wide DECIMAL checkpoint](value-contracts.md#mysql-wide-decimal-csv-import-2026-10-01).
+linked in the [wide DECIMAL checkpoint](value-contract-history.md#mysql-wide-decimal-csv-import-2026-10-01).
 
 Disconnect and cancellation expectations are now consolidated in
 [`disconnection-contracts.md`](disconnection-contracts.md), including the
@@ -243,7 +243,7 @@ The next DuckDB nested unsigned case extends this refusal contract to a STRUCT
 with `UBIGINT` values above the signed boundary and `u64::MAX`, plus a NULL
 field. The clean strict layer passed 187 tests across all 11 suites on
 `19c5b6a`; other nested unsigned shapes remain open. See the
-[value evidence](value-contracts.md#duckdb-nested-ubigint-struct-refusal-2026-10-02).
+[value evidence](value-contract-history.md#duckdb-nested-ubigint-struct-refusal-2026-10-02).
 
 The ClickHouse nested consumer contract now includes a numeric-key
 `Map(UInt8, Nullable(UInt128))`, checking exact server oracles, JSON/CSV
@@ -322,12 +322,12 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   and a keyed re-edit, with PostgreSQL wire-byte and sibling-row oracles. CSV
   import now keeps array-shaped cells as exact text. Broader array types and
   automatic parameter typing remain open. See the
-  [array checkpoint](value-contracts.md#postgresql-array-checkpoint).
+  [array checkpoint](value-contract-history.md#postgresql-array-checkpoint).
 - PostgreSQL IPv6 `inet[]` now has a bounded safe-refusal contract: independent
   server type/text/JSON and per-element host/prefix/family oracles pass, while
   result, SQL-literal and parameter consumers refuse the unsupported array.
 - B3-2 implementation follow-up: end-of-day time and timetz offsets have a
-  [server round-trip contract](value-contracts.md#postgresql-time-checkpoint);
+  [server round-trip contract](value-contract-history.md#postgresql-time-checkpoint);
   temporal eras, infinities, mixed intervals and temporal arrays are also covered.
 - Keep mutation testing alongside each decoder change and ensure its selected
   test filter includes malformed-input units as well as server regressions.
@@ -336,7 +336,7 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   refuse it instead of narrowing the unsigned value. Other nested collection
   types and interval carrier limits remain open.
 - B3-2 SQL export follow-up: BC dates and years above 9999 have a
-  [server wire round-trip contract](value-contracts.md#postgresql-era-and-mutation-checkpoint),
+  [server wire round-trip contract](value-contract-history.md#postgresql-era-and-mutation-checkpoint),
   including repeated-hour instants. Values outside chrono's range, infinities,
   mixed intervals and temporal arrays still need their own acceptance.
 - ClickHouse Int128/UInt128 now have Docker-backed exact-text contracts for

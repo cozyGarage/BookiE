@@ -1,6 +1,6 @@
 # BookiE
 
-Current bug-fix scope and validation: [bug and consistency audit](docs/bug-consistency-2026-09.md). It supersedes older candidate-status statements below; package release approval remains separate.
+Current delivery scope and evidence: [active sprint](docs/bookie-0.2-sprint.md). The [October 3 consistency review](docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
 BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. It is a fork of [TablePro](https://github.com/TableProApp/TablePro). The Rust workspace is rooted in this `linux/` directory.
 
@@ -10,7 +10,7 @@ The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHou
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
 
-The Linux client remains under development. The [bug and consistency audit](docs/bug-consistency-2026-09.md) records the current corrections and verification. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4). Wayland soak remains an operator check after install.
+The Linux client remains under development. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance; the September audits retain their dated verification. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4). Wayland soak remains an operator check after install.
 
 ## Linux versions
 
@@ -132,6 +132,8 @@ TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/b
 The helper archives that commit, verifies a real checksum, and does not publish to AUR. Set `TABLEPRO_RC_TAG=linux-v…` instead of `TABLEPRO_RC_COMMIT` only to verify an already published tag.
 
 ## Documentation
+
+Start with [the documentation entry point](docs/README.md), then the active sprint and relevant ADR. Use the value evidence index to read a case instead of loading the full historical ledger.
 
 | Topic | File |
 |---|---|

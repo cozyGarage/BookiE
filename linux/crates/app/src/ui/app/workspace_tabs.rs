@@ -571,10 +571,6 @@ impl App {
         let Some(tab_view) = self.workspace_tab_view.clone() else {
             return;
         };
-        if self.confirm_close_with_open_transaction(id, &tab_view, sender.clone()) {
-            return;
-        }
-
         // If this is a Browse tab with pending changeset, intercept the
         // close with an AdwAlertDialog (Discard / Cancel). The user can
         // also cancel close, save manually, then close — no Save-and-
@@ -698,12 +694,35 @@ impl App {
             return;
         }
 
-        self.finish_close_workspace_tab(id, &tab_view);
+        if self.confirm_close_with_open_transaction(id, &tab_view, sender.clone()) {
+            return;
+        }
+        self.finish_close_workspace_tab(id, &tab_view, sender);
     }
 
     /// Tear down a tab without prompting. Internal helper called once
     /// the close-with-pending dialog (if any) has resolved.
-    pub(super) fn finish_close_workspace_tab(&mut self, id: Uuid, tab_view: &adw::TabView) {
+    pub(super) fn finish_close_workspace_tab(
+        &mut self,
+        id: Uuid,
+        tab_view: &adw::TabView,
+        sender: ComponentSender<Self>,
+    ) {
+        if matches!(self.workspace_tabs.borrow().get(&id), Some(WorkspaceTab::Editor(_))) {
+            if let Some(page) = self.workspace_tabs.borrow().get(&id).map(|tab| match tab {
+                WorkspaceTab::Editor(slot) => slot.page.clone(),
+                WorkspaceTab::Structure(slot) => slot.page.clone(),
+                WorkspaceTab::Table(slot) => slot.page.clone(),
+            }) {
+                tab_view.close_page_finish(&page, false);
+            }
+            self.close_tab_after_session_cleanup(id, sender);
+            return;
+        }
+        self.finish_close_workspace_tab_now(id, tab_view);
+    }
+
+    pub(super) fn finish_close_workspace_tab_now(&mut self, id: Uuid, tab_view: &adw::TabView) {
         let removed = self.workspace_tabs.borrow_mut().remove(&id);
         let Some(removed) = removed else {
             return;

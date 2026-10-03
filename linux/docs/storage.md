@@ -87,7 +87,7 @@ The implemented kinds are:
 - SSH private-key passphrase
 - MCP token secret
 
-Loaded values are returned as `secrecy::SecretString`. If Secret Service cannot be opened during a load, the storage layer logs a warning and returns no secret. It does not copy the value into a JSON file.
+Loaded values are returned as `secrecy::SecretString`. An absent item returns `Ok(None)`. Secret Service failures return a typed `StorageError`, distinguishing unavailable, locked and cancelled access; saved transport assembly propagates that failure instead of treating it as a missing password. It does not copy the value into a JSON file.
 
 ## Change rules
 

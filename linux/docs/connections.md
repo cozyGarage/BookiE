@@ -1,9 +1,9 @@
 # Connection handling
 
-Historical connection audit: 2026-09-07. The current source and verification record is the [bug and consistency audit](bug-consistency-2026-09.md).
+Historical connection audit: 2026-09-07. The original audit and its coverage table below are dated snapshots. Later additions retain their own dates. Current B4 acceptance is in [the task board](b4-task-board.md), with evidence availability in [the consistency review](architecture-consistency-review-2026-10-03.md).
 
 TablePro is a connection engine before it is a grid. This document records what
-the connection layer actually does today, what is proven, what is known to be
+the connection layer did at that checkpoint, what is proven, what is known to be
 wrong, and what has never been exercised. Every claim below was read out of the
 source at the audit date. Status terms match [ROADMAP.md](../ROADMAP.md):
 **implemented** means the code and unit tests exist, **integrated** means every
@@ -60,7 +60,7 @@ Two ideas carry most of the security weight:
 "Pool acquire only" means the driver bounds how long it waits for a pooled
 connection but does not bound the initial TCP or TLS handshake.
 
-The [bug and consistency audit](bug-consistency-2026-09.md) records the current source baseline; the [September audit](stabilization-2026-09.md) distinguishes historical base-commit hosted evidence from newer local changes. The driver TLS fixture also covers MySQL, ClickHouse, Redis and MongoDB; it is not a full SSH/reconnect fixture.
+The [bug and consistency audit](bug-consistency-2026-09.md) records its September source baseline; the [September audit](stabilization-2026-09.md) distinguishes historical base-commit hosted evidence from newer local changes. The driver TLS fixture also covers MySQL, ClickHouse, Redis and MongoDB; it is not a full SSH/reconnect fixture.
 
 ## What is release-verified
 
@@ -244,7 +244,7 @@ Not confirmed. Listed so they are not rediscovered as surprises.
 
 Ordered by how much risk the gap carries.
 
-| Area | Current coverage |
+| Area | Historical coverage at the original audit |
 |---|---|
 | TLS on SQL Server | none — the container tests connect in plaintext |
 | Redis, MongoDB, DuckDB | no integration test file at all |

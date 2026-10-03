@@ -4,6 +4,31 @@ Surveyed on 2026-09-27 at `5fac54059` (source version 0.1.5). This board splits
 the open B4 work in [the 0.2 sprint](bookie-0.2-sprint.md) into small tasks that
 separate agents can take in parallel.
 
+## B4 continuation status (October 3)
+
+Latest integrated base: `d1434438e` on `linux`. These B4 reports originated in
+isolated worktrees while B3 work was concurrent. Recheck current checkout
+status; that observation does not assert a dirty tree in later sessions. Keep B4 open until the remaining tasks and installed Arch/Debian
+acceptance are complete.
+
+| Task | Current state | Evidence / next step |
+| --- | --- | --- |
+| E1, E2, G3, F1, F2, F3 | Merged to `linux` in PRs #16–#18 | Hosted required checks passed; see the linked PRs for packet details. |
+| F5 | Merged to `linux` by [PR #19](https://github.com/cozyGarage/BookiE/pull/19) as `4b7814f5e` | Local focused tests and `full` passed; hosted Build Linux, Linux Security, and both Flatpak jobs passed. Scheduled current-stable Clippy was skipped by workflow schedule. |
+| F4 + F9 | Merged in [PR #20](https://github.com/cozyGarage/BookiE/pull/20) as `573435766`; implementation commit `ecadbe204` | Local `full`, `ssh`, and `postgres-release` passed in `/tmp/tablepro-b4-f5/linux/linux/target/quality/20261002T225224078495Z-layers/report.json`, including `ssh_reconnect_replaces_the_tunnel_and_the_session`. Build Linux and Flatpak checks were still running at this update; Linux Security had passed. |
+| F6 | Merged in PR #22 as `d1434438e`; 86 SSH unit tests, 2 prompt UI tests, affected-crate Clippy and ignored-test inventory passed | Hosted check results were not verified in this session. Docker-backed trust and multi-hop tests are registered in the SSH CI layer. |
+| F8 | Implemented on `codex-b4-f8` at `5b69480d`; connection-generation uncertainty is isolated while journal failures remain shared | `full`, `security-policy`, and `postgres-release` passed in `/tmp/tablepro-b4-f8/linux/target/quality/20261002T234851138407Z-layers/report.json`; affected-crate Clippy and focused connection/isolation tests passed. Push completed locally; hosted checks and merge pending. |
+| Remaining | C6 MySQL/SQL Server, G5, I2, I5, F7, I3, native Arch acceptance, I1/Debian | Follow the dependencies and evidence requirements in the packets below. B3 completion remains the sprint prerequisite. |
+
+## October 3 integration checkpoint
+
+Historical checkpoint at `4b7814f5e`; the continuation status above supersedes
+its F4/F9 open-state wording after PR #20 merged. Retain its recorded evidence scope.
+
+Reviewed `linux` at `4b7814f5e1f586c3761c1454e66d3394ad2c9609`. The isolated-worktree progress below is historical; do not reapply those patches as unmerged work. Main-branch history now includes F1/F3 (`7054a7867`, #13), daemon cache refusal (`d80bade4c` / `768188734`, #14/#17), shared transaction policy (`ad807c61b`, #18), awaited editor cleanup (`7b08dd478`, #16), and editor retirement (`4b7814f5e`, #19). The current retirement path refuses further session dispatch and requires reopening Session. This checkpoint traces source integration; it does not rerun the older branch reports or certify hosted/installed acceptance. F4/F9, F8 and wider B4 acceptance stay open.
+
+The [consistency review](architecture-consistency-review-2026-10-03.md) records remaining panic/headless-retirement risks. The [older-release review](upstream-older-releases-review-2026-10-03.md) adds transition and result-contract reproducers under existing owners, avoiding a second lifecycle engine.
+
 ## October 2 review and dispatch plan
 
 Reviewed source checkpoint: `e6e5c34d0ba918aef8cb937b3cbc2741b3f27d64` on
@@ -102,6 +127,46 @@ F1/F3 use the app test target in `/tmp/tablepro-b4-f1-target`; G3 uses
 advances before integration. The B3 reconnect tests added useful F9 context and
 did not conflict with the B4 editor or agentd files. These narrow results do
 not replace the final combined layers or installed Arch/Debian acceptance.
+
+#### Follow-up implementation packets (October 2)
+
+The current `linux` tip has advanced to `d7007a6a6`. E1 and F2 were implemented
+in isolated worktrees, rebased onto that tip, and pushed as separate review
+branches. A temporary integration tree passed the combined affected layers;
+the packets remain open until integrated into `linux` and hosted review checks
+finish. Direct pushes to these feature branches do not trigger the Linux
+workflows; PRs targeting `linux` or manual dispatch by ref do.
+
+| Task | Worktree / branch / commit | Evidence and remaining acceptance |
+| --- | --- | --- |
+| E1 | `/tmp/tablepro-b4-e1/linux`, `codex-b4-e1`, `3c165a0d7` | The dialect-aware shared policy gate refuses MySQL XA start and autocommit-off and SQL Server implicit transactions before approval/dispatch; tokens in comments/literals are ignored and safe neighboring statements remain allowed. Exact-tip report `target/quality/20261002T202739203539Z-layers/report.json`: `quick` and `security-policy` passed; policy lib: 165 passed. E2 is the next policy packet but depends on E1 review/integration. |
+| F2 | `/tmp/tablepro-b4-f1`, `codex-b4-f2`, `495c39931` | Editor teardown cancels/drains runs, joins opens, and awaits one close before tab/window/connection destruction; rollback failures stay visible and audited as unknown. Exact-tip report `target/quality/20261002T202523816125Z-layers/report.json`: `full`, `widgets`, `postgres-release` passed; app lib: 425 passed, 15 ignored. Real PostgreSQL selector `closing_a_session_with_an_open_transaction_rolls_it_back_on_real_postgres` passed (1/1), verifying fresh-connection row state and rollback audit. Route order ensures pending saves/discards precede a tab's rollback prompt. |
+
+Combined validation: temporary worktree `/tmp/tablepro-b4-integration`, merge
+commit `b9e75ac26` (base `d7007a6a6`), report
+`target/quality/20261002T203352934307Z-layers/report.json`. `quick`,
+`security-policy`, `full`, `widgets` and `postgres-release` all passed on the
+combined E1+F2 tree. The real PostgreSQL rollback/audit selector also passed on
+that tree (1/1).
+
+F2 route trace at the pushed branch:
+
+| Route | Guard and continuation | Evidence / remaining limit |
+| --- | --- | --- |
+| Single or bulk tab close | Pending save/discard resolves first; then transaction prompt. Cancel leaves the tab/session; confirm awaits that editor before removing it. Bulk actions use the same page-close hook per tab. | `workspace_tabs.rs`, `workspace_close.rs`; app unit and widget layers pass. No installed Wayland route run yet. |
+| Window close / quit | Existing dirty-save prompt and workspace flush finish first; transaction prompt follows. All editor replies must succeed before the close is retried. | `init_window.rs`, `session_teardown.rs`; window remains open on cleanup error/timeout. Installed acceptance pending. |
+| Disconnect | Existing pending-change prompt then transaction prompt; await every editor before tabs or DB connection are closed. | `connection.rs`, `session_teardown.rs`; unknown/error prevents disconnect completion. |
+| Connection switch | Existing running-query and dirty-change decisions precede transaction confirmation; await all editors before replacing the old connection. | `connection.rs`, `session_teardown.rs`; error resets transition and retains the current connection. |
+| Editor shutdown | Normal user teardown routes above intercept and await; component shutdown keeps detached close only as a final fallback for unexpected shutdown. | `editor/mod.rs`, `session_mode.rs`; close helper is idempotent and the underlying handle closes once. |
+
+Focused F2 regressions cover delayed close, close error and duplicate close, active-query/open gating, multiple editor replies and stale session callbacks. The report artifacts above are local; hosted workflow checks remain pending because direct pushes to the feature branches do not trigger workflows.
+
+The `Build Linux` workflow covers `linux/**` pushes/PRs and runs `full` and
+`widgets`, so it will exercise the app changes on a PR to `linux`. The separate
+`Linux test quality` workflow covers policy mutation/coverage but intentionally
+does not measure the GTK app crate. `Linux Security` includes `security-policy`
+and triggers for Linux PRs. No workflow run has yet validated these two pushed
+branches.
 
 #### E1: refuse implicit transaction starters on shared connections
 
@@ -454,17 +519,20 @@ A task that names a decision follows the recorded decision.
 
 ## Decisions
 
-Decided on 2026-09-27.
+The seven September 27 decisions are now recorded in
+[ADR 0008](decisions/0008-connection-and-session-ownership.md). The stable numbers
+below preserve task references; the ADR owns the rules and this board owns
+implementation/acceptance. Accepted architecture is not a runtime pass.
 
-| # | Question | Decision |
-|---|---|---|
-| 1 | The GUI built-in SSH client trusts an unknown host key without asking (`UnknownHostKey::Learn` in `app/src/services/database_service.rs:179` and `connection_monitor.rs:210`). agentd refuses. | The GUI asks before trusting a new host key, as the OpenSSH path does. |
-| 2 | With "Use system OpenSSH" inside Flatpak, the sprint doc says the app falls back to the built-in client, `connections.md` says it fails, and the code does neither. | Refuse with a clear message. Both docs describe that behavior. |
-| 3 | One unknown write outcome turns off governed writes for every connection until restart. | Turn off governed writes only for the affected connection, restore them when that connection restarts, and document the rule. |
-| 4 | `SET autocommit=0`, `SET IMPLICIT_TRANSACTIONS ON` and `XA START` are not treated as transaction control. | Refuse them on shared connections. Session handling is unchanged for now. |
-| 5 | A batch such as `BEGIN; UPDATE ...` without COMMIT is allowed on a shared connection. | Refuse unterminated batches on shared connections for now. |
-| 6 | Tunnel setup and host-key refusal write no audit record. | Write audit records for both. |
-| 7 | agentd reuses a cached connection when it cannot verify the SSH key material (`agentd/src/lib.rs:312`). | Refuse it as a weaker fallback. |
+| Legacy decision | ADR section | Owning implementation |
+| --- | --- | --- |
+| 1: built-in host-key consent | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | F6 |
+| 2: unavailable Flatpak OpenSSH route | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I2 |
+| 3: connection uncertainty scope | [Uncertainty scope](decisions/0008-connection-and-session-ownership.md#uncertainty-scope) | F8; journal-wide failures remain fail-closed |
+| 4: implicit shared transaction starters | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E1 |
+| 5: unterminated shared transaction batches | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E2 |
+| 6: transport/trust audit records | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I5 |
+| 7: verified daemon cache reuse | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | G3/G5 |
 
 ## Lane A: built-in SSH — implementation delivered; A5 monitor follow-up open
 

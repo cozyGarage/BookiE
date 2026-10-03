@@ -9,8 +9,11 @@ use tablepro_transport::Tunnel;
 
 use super::connection_service;
 use super::database_service::{ConnectionHealth, EntryInner, ReconnectParams};
+#[cfg(test)]
+use tablepro_policy::AuditState;
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
+const TUNNEL_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const BACKOFF_INITIAL: Duration = Duration::from_secs(5);
 const BACKOFF_MAX: Duration = Duration::from_secs(60);
 
@@ -21,16 +24,17 @@ pub(super) async fn run(
     fault: Arc<Notify>,
 ) {
     loop {
-        // A reported fault skips the ping: the driver stopped
-        // mid-protocol, so a successful ping would not prove the
-        // connection is usable.
-        let faulted = tokio::select! {
+        let wake = tokio::select! {
             _ = cancel.cancelled() => return,
-            _ = tokio::time::sleep(PING_INTERVAL) => false,
-            _ = fault.notified() => true,
+            _ = tokio::time::sleep(PING_INTERVAL) => Wake::Ping,
+            _ = fault.notified() => Wake::Fault,
+            _ = wait_for_closed_tunnel(&inner) => Wake::TunnelClosed,
         };
 
-        if faulted {
+        if matches!(wake, Wake::Fault | Wake::TunnelClosed) {
+            if matches!(wake, Wake::TunnelClosed) {
+                tracing::warn!("SSH tunnel closed; starting reconnect");
+            }
             if reconnect_loop(&inner, &params, &cancel, &fault).await.is_err() {
                 return;
             }
@@ -42,11 +46,60 @@ pub(super) async fn run(
             None => return,
         };
 
-        if let Err(e) = conn.ping().await {
-            tracing::warn!(error = %e, "connection ping failed; starting reconnect");
-            if reconnect_loop(&inner, &params, &cancel, &fault).await.is_err() {
-                return;
+        let ping_result = tokio::select! {
+            _ = cancel.cancelled() => return,
+            _ = fault.notified() => Err(PingFailure::Reported),
+            _ = wait_for_closed_tunnel(&inner) => Err(PingFailure::TunnelClosed),
+            result = conn.ping() => result.map_err(PingFailure::Driver),
+        };
+        let reconnect = ping_result.is_err();
+        match ping_result {
+            Ok(()) => {}
+            Err(PingFailure::Driver(error)) => {
+                tracing::warn!(error = %error, "connection ping failed; starting reconnect");
             }
+            Err(PingFailure::Reported) => {
+                tracing::warn!("connection reported a transport fault; starting reconnect");
+            }
+            Err(PingFailure::TunnelClosed) => {
+                tracing::warn!("SSH tunnel closed during ping; starting reconnect");
+            }
+        }
+        if reconnect && reconnect_loop(&inner, &params, &cancel, &fault).await.is_err() {
+            return;
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Wake {
+    Ping,
+    Fault,
+    TunnelClosed,
+}
+
+enum PingFailure {
+    Driver(tablepro_core::DriverError),
+    Reported,
+    TunnelClosed,
+}
+
+async fn wait_for_closed_tunnel(inner: &Arc<Mutex<EntryInner>>) {
+    wait_until_closed(|| {
+        inner
+            .lock()
+            .ok()
+            .and_then(|entry| entry.tunnel.as_ref().map(Tunnel::is_closed))
+    })
+    .await;
+}
+
+async fn wait_until_closed(mut tunnel_is_closed: impl FnMut() -> Option<bool>) {
+    loop {
+        match tunnel_is_closed() {
+            Some(true) => return,
+            Some(false) => tokio::time::sleep(TUNNEL_POLL_INTERVAL).await,
+            None => std::future::pending().await,
         }
     }
 }
@@ -112,6 +165,7 @@ fn swap_connection(
     if let Ok(mut g) = inner.lock() {
         g.connection = arc;
         g.tunnel = tunnel;
+        g.audit_state = Arc::new(g.audit_state.new_connection_generation());
     }
 }
 
@@ -123,12 +177,58 @@ fn set_health(inner: &Arc<Mutex<EntryInner>>, health: ConnectionHealth) {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     use async_trait::async_trait;
     use tablepro_core::{ConnectOptions, DatabaseDriver, DriverError, ExecResult, QueryResult, TableInfo};
 
     use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn a_closed_tunnel_is_detected_within_one_poll_interval() {
+        let closed = Arc::new(AtomicBool::new(false));
+        let observed = closed.clone();
+        let watcher = tokio::spawn(async move {
+            wait_until_closed(|| Some(observed.load(Ordering::SeqCst))).await;
+        });
+        tokio::task::yield_now().await;
+        closed.store(true, Ordering::SeqCst);
+        tokio::time::advance(TUNNEL_POLL_INTERVAL).await;
+        tokio::time::timeout(TUNNEL_POLL_INTERVAL, watcher)
+            .await
+            .expect("closed tunnel poll is bounded")
+            .expect("watcher task completes");
+    }
+
+    #[test]
+    fn reconnect_advances_audit_generation_without_clearing_global_lockdown() {
+        let journal = Arc::new(AuditState::with_governed_writes_disabled());
+        let old_state = Arc::new(journal.new_connection_generation());
+        let inner = Arc::new(Mutex::new(EntryInner {
+            connection: Arc::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
+            }) as Arc<dyn Connection>,
+            tunnel: None,
+            health: ConnectionHealth::Healthy,
+            audit_state: old_state.clone(),
+        }));
+
+        swap_connection(
+            &inner,
+            Box::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
+            }),
+            None,
+            &Arc::new(Notify::new()),
+        );
+
+        let new_state = inner.lock().unwrap().audit_state.clone();
+        assert!(!Arc::ptr_eq(&old_state, &new_state));
+        assert!(old_state.governed_writes_disabled());
+        assert!(new_state.governed_writes_disabled());
+    }
 
     struct CountingDriver {
         attempts: Arc<AtomicUsize>,
@@ -247,6 +347,7 @@ mod tests {
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(AuditState::new()),
         }));
         let params = ReconnectParams {
             driver: Arc::new(CountingDriver {
@@ -287,6 +388,7 @@ mod tests {
             }) as Arc<dyn Connection>,
             tunnel: None,
             health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(AuditState::new()),
         }));
         let params = ReconnectParams {
             driver: Arc::new(ReconnectingDriver {

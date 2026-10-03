@@ -1,12 +1,12 @@
 # BookiE roadmap
 
 Active delivery plan: [BookiE 0.1.x → 0.2 sprint](docs/bookie-0.2-sprint.md),
-approved September 16, continuation updated September 28 at `85fecbe0b` (source 0.1.5). It supersedes older sequencing below.
+approved September 16, with the October 2 continuation and October 3 source/document review at `4b7814f5e` (source 0.1.5). It supersedes older sequencing below.
 See the [30-commit baseline review](docs/baseline-review-2026-09-17.md) before further convergence work.
 
 Current scope and verification are recorded in the [approved sprint ledger](docs/bookie-0.2-sprint.md). Prior audits retain evidence for their own source trees.
 
-The repository-level [`PLAN.md`](../PLAN.md) is the source of truth for sequencing, detailed acceptance criteria, and the Linux capability backlog. This file is the concise status view.
+The [active sprint](docs/bookie-0.2-sprint.md) owns sequencing and acceptance. [`PLAN.md`](../PLAN.md) is the capability backlog and entry point; accepted ADRs constrain both. This file is the concise status view. See the [cross-session consistency review](docs/architecture-consistency-review-2026-10-03.md) and [older app-release review](docs/upstream-older-releases-review-2026-10-03.md) before adopting external changes.
 
 ## Current state
 
@@ -46,6 +46,8 @@ Status terms:
 | i18n and accessibility | Infrastructure | English strings/checklist exist; end-user verification is incomplete |
 
 ## Active phases
+
+The numbered phases below retain earlier completion records. Toolchain versions and evidence counts there describe those checkpoints; current requirements and acceptance come from the active sprint and ADRs.
 
 ### 0: Development baseline
 
@@ -167,7 +169,7 @@ Phase 10 is in progress. Slice 10.2 added connection organisation: groups, tags,
 
 ## Next implementation target
 
-Follow the [September 28 continuation plan](docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28):
+Follow the [current continuation plan](docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-03):
 finish **B3 value/consumer contracts**, then **B4 transport, policy and session
 integration**, then verify the UI on **Arch/Omarchy/Hyprland native Wayland**.
 The [117-commit archive](docs/sprint-review-2026-09-28.md) records recent delivery;

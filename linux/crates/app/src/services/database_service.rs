@@ -43,6 +43,7 @@ pub(super) struct EntryInner {
     pub(super) connection: Arc<dyn Connection>,
     pub(super) tunnel: Option<Tunnel>,
     pub(super) health: ConnectionHealth,
+    pub(super) audit_state: Arc<AuditState>,
 }
 
 #[derive(Debug, Clone)]
@@ -202,7 +203,7 @@ impl DatabaseService {
             policy_available,
             audit_state: audit.state,
             approval: Mutex::new(Arc::new(DenyApprovalSink)),
-            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn)),
+            ssh_environment: Mutex::new(SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Refuse)),
             #[cfg(test)]
             _audit_temp_dir: audit_temp_dir,
         }
@@ -219,8 +220,22 @@ impl DatabaseService {
     /// Whether a prior governed operation has an unresolved outcome.  The UI
     /// uses this to stop a connection transition after cancelling running
     /// work: switching databases must not hide a newly ambiguous write.
-    pub fn governed_writes_disabled(&self) -> bool {
-        self.audit_state.governed_writes_disabled()
+    pub fn governed_writes_disabled(&self, id: Uuid) -> bool {
+        if self.audit_state.governed_writes_disabled() {
+            return true;
+        }
+        self.connections
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&id)
+            .and_then(|entry| {
+                entry
+                    .inner
+                    .lock()
+                    .ok()
+                    .map(|inner| inner.audit_state.governed_writes_disabled())
+            })
+            .unwrap_or(false)
     }
 
     pub fn ssh_environment(&self) -> SshEnvironment {
@@ -229,6 +244,13 @@ impl DatabaseService {
 
     pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
         self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
+    }
+
+    pub fn enable_builtin_ssh_prompter(&self, prompter: Arc<dyn tablepro_ssh::openssh::Prompter>) {
+        self.ssh_environment
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .set_builtin_prompter(prompter);
     }
 
     pub fn set_approval_sink(&self, sink: Arc<dyn tablepro_policy::ApprovalSink>) {
@@ -287,6 +309,7 @@ impl DatabaseService {
             connection: arc,
             tunnel,
             health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(self.audit_state.new_connection_generation()),
         }));
         let cancel = CancellationToken::new();
         let monitor = tokio::spawn(connection_monitor::run(
@@ -359,7 +382,7 @@ impl DatabaseService {
             policy,
             approval,
             audit: self.audit.clone(),
-            audit_state: self.audit_state.clone(),
+            audit_state: inner.audit_state.clone(),
         };
         let fault = Arc::new(EntryFaultSink {
             connection_id: entry.metadata.id,
@@ -484,6 +507,21 @@ mod tests {
         assert_eq!(service.all_connections().len(), 2);
         assert!(service.handle(first, Principal::human_gui()).is_some());
         assert!(service.handle(second, Principal::human_gui()).is_some());
+    }
+
+    #[tokio::test]
+    async fn a_disabled_connection_does_not_block_writes_on_its_sibling() {
+        let service = DatabaseService::new_isolated();
+        let first = open_memory_connection(&service, "first").await;
+        let second = open_memory_connection(&service, "second").await;
+        let first_inner = service.connections.lock().unwrap().get(&first).unwrap().inner.clone();
+        first_inner.lock().unwrap().audit_state = Arc::new(AuditState::with_governed_writes_disabled());
+
+        assert!(service.governed_writes_disabled(first));
+        assert!(!service.governed_writes_disabled(second));
+
+        service.close(first);
+        service.close(second);
     }
 
     /// H3: two windows opening the same saved connection must not let the

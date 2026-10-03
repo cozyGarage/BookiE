@@ -2,7 +2,7 @@ use tablepro_core::{ColumnInfo, ForeignKeyInfo, QueryResult, Value};
 use tablepro_storage::{ConnectionOrganization, ConnectionOrganizationIndex, SavedConnection};
 use uuid::Uuid;
 
-use super::OpenMode;
+use super::{OpenMode, SessionTeardownAction};
 
 #[derive(Debug)]
 pub enum AppMsg {
@@ -83,6 +83,13 @@ pub enum AppMsg {
     ReplaceActiveTabQuery(String),
     Disconnect,
     ForceDisconnect,
+    PrepareWindowClose,
+    ConfirmSessionTeardown(SessionTeardownAction),
+    CancelSessionTeardown(SessionTeardownAction),
+    SessionTeardownCompleted {
+        action: SessionTeardownAction,
+        result: Result<(), String>,
+    },
     PollHealth,
     RefreshPage,
     ShowShortcuts,

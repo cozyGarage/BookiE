@@ -2,6 +2,8 @@
 
 Historical matrix below. For later main-branch decisions and implemented fixes,
 see the [September 14 Linux sprint](sprint-2026-09-14.md).
+For the October 2 macOS main tip, see the
+[October 3 applicability review](upstream-main-review-2026-10-03.md).
 
 Reviewed: 2026-09-07. Linux baseline: `7d8288132` plus the stabilization changes described in the [historical sprint audit](stabilization-2026-09.md).
 
@@ -36,7 +38,7 @@ Reimplement relevant behavior in Rust/GTK. Never merge Apple source trees. All d
 | EXPLAIN and insights | Partial: [EXPLAIN dialog](../crates/app/src/ui/explain_dialog.rs); no insights aggregation | First make a pinnable plan tree; later local history aggregation. Defer diagram and charts |
 | Timing breakdown | Missing: [statement outcomes](../crates/app/src/ui/editor/outcomes.rs) record elapsed time only | Add optional metrics with documented driver semantics. Never label elapsed time as server time or unavailable as zero |
 | Query history | Implemented: [SQLite FTS store](../crates/storage/src/query_history.rs) | Add retention, failure, and privacy tests; keep MCP history isolated |
-| Export/import | Partial: [core CSV](../crates/core/src/export.rs), current-page GUI CSV/JSON | Build streaming, progress, cancellation and snapshot contract first; no full SQL dump is currently available |
+| Export/import | Partial: [core CSV](../crates/core/src/export/mod.rs), current-page GUI CSV/JSON | Build streaming, progress, cancellation and snapshot contract first; no full SQL dump is currently available |
 | Advanced export options/formats | Missing integrated workflows | After foundation: object selection, per-table selection, conflict modes, file parts, NDJSON, bookmarks, import error report, then other formats/XLSX. Fixtures must prove quoting, ordering and partial outcomes |
 | Cross-connection transfer | Missing | After object administration/export foundation; separate source/destination guards, bounded batches, destination approval, auditable partial completion |
 | Engine-native backup/restore | Missing | Per-engine subprocess adapter with checked availability, safe argv, cancellation, output draining and destructive restore confirmation |

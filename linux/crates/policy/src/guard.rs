@@ -110,7 +110,7 @@ impl PolicyGuard {
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let facts = classify(sql, &self.ctx.driver_id);
-        if let Some(decision) = shared_connection_decision(&facts) {
+        if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
             return self.resolve_authorization(sql, facts, decision, None).await;
         }
         self.authorize_classified(sql, facts, control).await
@@ -526,7 +526,7 @@ impl PolicyGuard {
         let Err(error) = result else {
             return Ok(());
         };
-        self.ctx.audit_state.disable_governed_writes();
+        self.ctx.audit_state.disable_globally();
         Err(DriverError::Internal(format!(
             "audit outcome could not be persisted; the operation may have succeeded and further governed writes are disabled: {error}"
         )))

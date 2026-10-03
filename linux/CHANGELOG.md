@@ -8,6 +8,7 @@
 
 ### Fixed
 
+- SQL Server rowversion and temporal period columns are read-only and omitted from generated INSERT statements, so copying or inserting rows does not try to overwrite server-owned values.
 - CSV imports accept the `\x` hexadecimal blob format written by exports, preserving empty blobs and NULL separately.
 - Formula-safe decimal CSV imports reject excess precision instead of rounding it.
 - CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.

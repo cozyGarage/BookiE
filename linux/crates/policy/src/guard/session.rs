@@ -78,15 +78,27 @@ impl Session for PolicySession {
     }
 
     async fn close(mut self: Box<Self>) -> Result<(), DriverError> {
-        if let Some(batch) = self.batch {
+        let cleanup = if let Some(batch) = self.batch {
             if self.is_usable() && !batch.uncertain {
                 let control = OperationControl::with_timeout(CLOSE_ROLLBACK_TIMEOUT);
-                let _ = self.finish("ROLLBACK", &control, Finish::Rollback, false).await;
-            } else if batch.wrote {
+                let rollback = self.finish("ROLLBACK", &control, Finish::Rollback, false).await;
+                if rollback.is_err()
+                    && let Some(open_batch) = self.batch
+                {
+                    record_abandoned_transaction(&self.guard, open_batch.id).await;
+                }
+                rollback.map(|_| ())
+            } else {
                 record_abandoned_transaction(&self.guard, batch.id).await;
+                Err(DriverError::OperationOutcomeUnknown {
+                    source: Box::new(DriverError::Disconnected),
+                })
             }
-        }
-        self.inner.close().await
+        } else {
+            Ok(())
+        };
+        let close = self.inner.close().await;
+        cleanup.and(close)
     }
 }
 

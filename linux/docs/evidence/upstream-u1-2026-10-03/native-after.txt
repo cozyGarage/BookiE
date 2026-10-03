@@ -1,0 +1,41 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/integration.rs (linux/target/debug/deps/integration-96d8f26021e5cb8e)
+
+running 34 tests
+test a_column_comment_round_trips_from_its_extended_property ... ok
+test a_completed_controlled_statement_leaves_the_connection_usable ... ok
+test a_lost_sql_server_is_reported_as_disconnected ... ok
+test a_result_cut_at_the_row_limit_still_finishes_the_batch ... ok
+test a_session_keeps_temp_tables_and_its_transaction_between_statements ... ok
+test alter_column_default_round_trips ... ok
+test alter_column_keeps_its_collation ... ok
+test an_error_raised_after_the_first_result_set_is_reported ... ok
+test an_interrupted_session_statement_retires_the_session_but_not_the_shared_connection ... ok
+test an_interrupted_statement_retires_the_connection_instead_of_stranding_it ... ok
+test an_unavailable_sql_server_is_classified_as_connection_refused ... ok
+test bad_sql_returns_query_error ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test connect_list_tables_pk_and_identity ... ok
+test ddl_batch_commits_and_rolls_back_as_a_unit ... ok
+test disconnection::a_disconnected_session_is_retired_after_server_loss ... ok
+test empty_result_set_still_reports_columns ... ok
+test foreign_key_actions_round_trip ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test index_columns_exclude_included_columns ... ok
+test inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_round_trip ... ok
+test pagination_and_truncated_flag ... ok
+test server_loss_during_multi_result_stream_rejects_the_whole_query ... ok
+test server_owned_columns::server_owned_columns_are_generated_and_omitted_from_insert_consumers ... ok
+test sql_exports_preserve_unicode_and_boolean_values ... ok
+test sql_variant_result_is_refused_without_panicking_or_reusing_the_connection ... ok
+test temporal_boundaries::value_contract_supported_temporal_calendar_edges_match_native_text_and_bind_exactly ... ok
+test the_driver_does_not_claim_server_side_cancellation ... ok
+test value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports ... ok
+test value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent ... ok
+test value_contract_money_values_are_refused_but_server_nulls_remain_null ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contract_smalldatetime_rounding_matches_server_text ... ok
+test value_roundtrip_representative_types ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 175.60s
+

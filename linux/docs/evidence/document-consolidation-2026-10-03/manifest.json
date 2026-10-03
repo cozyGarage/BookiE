@@ -1,0 +1,183 @@
+{
+  "source_revision": "0cf70382eed72c144ea94208dfef5f5706e0a7dd",
+  "date": "2026-10-03",
+  "scope": "documentation consolidation and extraction of existing technical decisions; no production changes or runtime tests",
+  "moved_documents": [
+    {
+      "original_path": "linux/docs/bookie-0.2-sprint.md",
+      "original_sha256": "78143ef051a5fb36dc69d0fe7aa0c2bccaeb865d90062121bfbe50e53f141962",
+      "original_lines": 2296,
+      "active_lines": 137,
+      "history_path": "linux/docs/bookie-0.2-history.md",
+      "retention": "original body retained with relative documentation anchor destinations updated",
+      "history_body_retained_with_link_updates": true,
+      "history_sha256": "5aeb8178fb6e4ef2bdb6491162a4bacd053586044c966bbe889ec4181461b9c4",
+      "active_sha256": "8508f2dd9b7bb1ed8c0327d0c93762c823b1636777d03af09792d741e9a8428e"
+    },
+    {
+      "original_path": "linux/docs/type-contract-strategy.md",
+      "original_sha256": "3bbd0dd85916500837e646e99acc105b69eefb4fc83d76aa7502140550cfafe6",
+      "original_lines": 360,
+      "active_lines": 59,
+      "history_path": "linux/docs/type-contract-history.md",
+      "retention": "original body retained with relative documentation anchor destinations updated",
+      "history_body_retained_with_link_updates": true,
+      "history_sha256": "8086242aa77d19ef0ca80c7dfaafcf0919a034a7d46ab220f36da7ed7ccc22a7",
+      "active_sha256": "6c35e322d2c67623ce5da50afbd41e9ec94d87d436dcb65f827108a2be12161d"
+    },
+    {
+      "original_path": "linux/docs/value-contracts.md",
+      "original_sha256": "4021217c0d9c3b4f7157c3c53f6e46ae13e15c99a728ffdf3e11918937139465",
+      "original_lines": 3968,
+      "active_lines": 60,
+      "history_path": "linux/docs/value-contract-history.md",
+      "retention": "original body retained with relative documentation anchor destinations updated",
+      "history_body_retained_with_link_updates": true,
+      "history_sha256": "01dbc42de7b0fcf28c5b7961083f37cf5f0d94b9693b7e7c57037e10fee1e630",
+      "active_sha256": "5e666491b40152a9dd549291d117f806fd95781ed63cd012043f6951842abe19"
+    }
+  ],
+  "active_lines_before": 6624,
+  "active_lines_after": 256,
+  "adr_extractions": [
+    {
+      "id": "0007",
+      "origin": "sprint B3 and type-contract strategy",
+      "topic": "shared native type/value standard"
+    },
+    {
+      "id": "0008",
+      "origin": "sprint B4 and September 27 board decisions 1-7",
+      "topic": "connection/session/trust ownership; implementation gates remain open"
+    },
+    {
+      "id": "0009",
+      "origin": "sprint A4/B2 and migration/compatibility rules",
+      "topic": "durable identity and recoverable persistence"
+    }
+  ],
+  "validation": {
+    "history_retention": "three original bodies preserved with documentation link updates only",
+    "runtime_tests": "not run; documentation-only change",
+    "historical_manifests": "unchanged dated snapshots",
+    "markdown_files_checked": 83,
+    "broken_local_anchors": 0,
+    "unexpected_missing_local_files": 0,
+    "preserved_unavailable_cache_or_vendor_references": [
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 1613,
+        "target": "../target/quality/20261002T001913901283Z-layers/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 1614,
+        "target": "../target/quality/20261002T001913960449Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3557,
+        "target": "../target/quality/20261002T003009990931Z-layers/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3558,
+        "target": "../target/quality/20261002T003010044333Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3576,
+        "target": "../target/quality/20261002T005849903174Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3593,
+        "target": "../target/quality/20261002T072337041331Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3595,
+        "target": "../target/quality/20261002T072915341877Z-quick/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3611,
+        "target": "../target/quality/20261002T074300432752Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3613,
+        "target": "../target/quality/20261002T074833600560Z-quick/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3630,
+        "target": "../target/quality/20261002T080301493778Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3632,
+        "target": "../target/quality/20261002T111624439672Z-quick/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3759,
+        "target": "../target/quality/20261002T004142618874Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3778,
+        "target": "../target/quality/20261002T120704261619Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3780,
+        "target": "../target/quality/20261002T121254146544Z-quick/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3787,
+        "target": "../target/quality/20261002T124905277939Z-values/report.json"
+      },
+      {
+        "path": "linux/docs/value-contract-history.md",
+        "line": 3789,
+        "target": "../target/quality/20261002T125842206487Z-quick/report.json"
+      },
+      {
+        "path": "linux/docs/validation-playbook.md",
+        "line": 39,
+        "target": "../target/quality/20261001T235848303064Z-layers/report.json"
+      },
+      {
+        "path": "linux/docs/validation-playbook.md",
+        "line": 44,
+        "target": "../target/quality/20261001T231537044614Z-layers/report.json"
+      },
+      {
+        "path": "linux/docs/validation-playbook.md",
+        "line": 46,
+        "target": "../target/quality/20261001T232237703877Z-layers/report.json"
+      },
+      {
+        "path": "linux/docs/validation-playbook.md",
+        "line": 51,
+        "target": "../target/quality/20261001T232237703877Z-layers/report.json"
+      },
+      {
+        "path": "linux/vendor/redis/README.md",
+        "line": 307,
+        "target": "DEVELOPMENT.md"
+      }
+    ]
+  },
+  "integration": {
+    "rebased_onto": "8c0f174942a3afbc3cb7390d9733db9cc2eb20e2",
+    "preserved_remote_commits": [
+      "573435766",
+      "8c0f17494"
+    ],
+    "documentation_updates": "current B4 ownership/status reconciled with merged F4/F9; original archived bodies retain the 0cf70382e snapshot",
+    "runtime_tests": "not rerun for the documentation delta"
+  }
+}

@@ -1,8 +1,8 @@
 # TablePro
 
-Current bug-fix scope and validation: [bug and consistency audit](linux/docs/bug-consistency-2026-09.md). It supersedes older candidate-status statements below; package release approval remains separate.
+Current delivery scope and evidence: [active sprint](linux/docs/bookie-0.2-sprint.md). The [October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
-TablePro is a native Linux database client built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. Current development is on the `linux` branch. The Cargo workspace is under `linux/` and requires Rust 1.93.
+TablePro is a native Linux database client built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. Current development is on the `linux` branch. The Cargo workspace is under `linux/` and requires Rust 1.98.
 
 Every shipped feature is free to use. TablePro has no account, license, subscription, paid-tier, or remote entitlement gate.
 
@@ -27,7 +27,7 @@ Database support is provided by static Rust crates compiled into the app:
 
 See [`linux/docs/driver-maturity.md`](linux/docs/driver-maturity.md) for current limits.
 
-See the [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) for current test results and the [macOS 0.72 gap review](linux/docs/upstream-adoption.md) for follow-up features.
+See the [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) for its dated test results and the [macOS 0.72 gap review](linux/docs/upstream-adoption.md) for follow-up features.
 
 ## Architecture
 
@@ -46,7 +46,7 @@ Read [`linux/ARCHITECTURE.md`](linux/ARCHITECTURE.md) for crate boundaries and d
 
 ## Build
 
-Install Rust 1.93 and the GTK development packages listed in [`linux/README.md`](linux/README.md), then run from the repository root:
+Install Rust 1.98 and the GTK development packages listed in [`linux/README.md`](linux/README.md), then run from the repository root:
 
 ```bash
 cargo run --manifest-path linux/Cargo.toml -p tablepro-app

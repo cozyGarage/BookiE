@@ -14,6 +14,7 @@ mod ran_statements;
 mod render;
 mod row_ops;
 mod schema_index;
+mod session_teardown;
 mod shortcuts;
 mod status_pages;
 mod structure;
@@ -48,6 +49,14 @@ pub use msg::AppMsg;
 use render::qualified_label;
 use types::{CLOSED_TABS_CAPACITY, ConnectionTransition, ExportFormat, StatusKind, SwitchDecision};
 pub use types::{ClosedTabDescriptor, EditorTabSlot, OpenMode, StructureTabSlot, TableTabSlot, WorkspaceTab};
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum SessionTeardownAction {
+    CloseTab(Uuid),
+    Disconnect,
+    ConnectionSwitch,
+    WindowClose,
+}
 
 #[derive(Clone)]
 pub struct AppInit {
@@ -200,6 +209,8 @@ pub struct App {
     /// blocks while this is > 0 so an async transaction never commits
     /// after the tab / window has been torn down.
     in_flight_saves: std::rc::Rc<std::cell::Cell<usize>>,
+    session_teardown_ready: std::rc::Rc<std::cell::Cell<bool>>,
+    session_teardown_pending: std::rc::Rc<std::cell::Cell<bool>>,
     /// Structure tabs currently mid-DDL-transaction. A second Ctrl+S
     /// while a Save is still in flight would dispatch a parallel
     /// transaction and potentially commit twice; this set lets the
@@ -511,6 +522,8 @@ impl SimpleComponent for App {
             close_after_save: window_handles.close_after_save,
             close_window_after_save: window_handles.close_window_after_save,
             in_flight_saves: window_handles.in_flight_saves,
+            session_teardown_ready: window_handles.session_teardown_ready,
+            session_teardown_pending: window_handles.session_teardown_pending,
             structure_saves_in_flight: std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashSet::new())),
             persist_pending: std::rc::Rc::new(std::cell::Cell::new(false)),
             persist_timeout: std::rc::Rc::new(std::cell::RefCell::new(None)),
@@ -574,7 +587,22 @@ impl SimpleComponent for App {
             AppMsg::ConnectionPrepareFailed(message) => self.on_connection_prepare_failed(message),
             AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
-            AppMsg::ForceDisconnect => self.do_disconnect(sender),
+            AppMsg::ForceDisconnect => self.request_disconnect(sender),
+            AppMsg::PrepareWindowClose => self.prepare_window_close(sender),
+            AppMsg::ConfirmSessionTeardown(action) => self.prepare_editor_sessions(action, sender),
+            AppMsg::CancelSessionTeardown(action) => match action {
+                SessionTeardownAction::WindowClose => self.session_teardown_pending.set(false),
+                SessionTeardownAction::ConnectionSwitch => {
+                    self.connection_transition = ConnectionTransition::Idle;
+                    self.prepared_connection = None;
+                    self.switch_saves_pending.clear();
+                    self.switch_cancel_audit_was_disabled = None;
+                }
+                SessionTeardownAction::CloseTab(_) | SessionTeardownAction::Disconnect => {}
+            },
+            AppMsg::SessionTeardownCompleted { action, result } => {
+                self.on_session_teardown_completed(action, result, sender);
+            }
             AppMsg::DialogClosed => self.on_connect_dialog_closed(),
             AppMsg::SelectTable {
                 schema,
@@ -673,7 +701,7 @@ impl SimpleComponent for App {
             AppMsg::WorkspaceTabClosed(id) => self.close_workspace_tab_by_id(id, sender),
             AppMsg::FinishCloseWorkspaceTab(id) => {
                 if let Some(tab_view) = self.workspace_tab_view.clone() {
-                    self.finish_close_workspace_tab(id, &tab_view);
+                    self.finish_close_workspace_tab(id, &tab_view, sender);
                 }
             }
             AppMsg::CloseOtherWorkspaceTabs(id) => self.close_other_workspace_tabs(id, sender),

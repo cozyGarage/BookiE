@@ -4,9 +4,11 @@ Active delivery sequencing and acceptance are now in the approved
 [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md).
 The capability backlog and historical evidence below remain reference material.
 
-Last updated: 2026-09-28
+Last updated: 2026-10-03
 
-This plan is the source of truth for the Linux application. It separates:
+Start with the compact [documentation entry point](linux/docs/README.md). Type/value semantics are defined once in [ADR 0007](linux/docs/decisions/0007-type-and-value-preservation.md); plans and historical evidence apply that standard.
+
+This plan is the capability backlog and entry point for the Linux application. Accepted architecture decisions constrain changes; the active sprint owns sequencing and acceptance. The [October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) defines the document authority order. This plan separates:
 
 1. Implemented code from release-verified behavior
 2. Safety and reliability from feature breadth
@@ -17,7 +19,12 @@ The application is a Linux-only native Rust and GTK product. Database drivers ar
 
 ## Current continuation
 
-Work on **`linux`**. The [September 28 continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-09-28)
+The [October 3 macOS main review](linux/docs/upstream-main-review-2026-10-03.md)
+maps new upstream fixes to the Linux source and defines U1–U6 work packets with
+regression acceptance. Use it alongside the current sprint and B4 task board;
+U1 is implemented in `6822efa42` with [native evidence](linux/docs/upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [older app-release review](linux/docs/upstream-older-releases-review-2026-10-03.md) extends the screen to all 128 published app releases, including pre-0.62 history and 0.73/0.74.
+
+Work on **`linux`**. The [current continuation plan](linux/docs/bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
 orders **B3 → B4 → Arch/Omarchy/Hyprland native Wayland UI** and includes bounded
 Luna handoffs. GNOME desktop on Debian is the required next phase after the Arch
 pass, within the same continuation plan.
@@ -26,7 +33,7 @@ The [117-commit archive](linux/docs/sprint-review-2026-09-28.md) records Septemb
 
 ## Current baseline
 
-- Current reviewed baseline: `85fecbe0b1d86d2deac3c040c63f24712333854a` on `linux`, source version 0.1.5. The [September 28 review](linux/docs/sprint-review-2026-09-28.md) archives the two recent work days and today's follow-ups. The September 26 reconciliation and September 17 baseline remain historical evidence; no 0.2 release is approved.
+- Current architecture-review baseline: `4b7814f5e1f586c3761c1454e66d3394ad2c9609` on `linux`, source version 0.1.5. It includes U1 and the merged editor retirement fix. The [September 28 review](linux/docs/sprint-review-2026-09-28.md) archives its own `85fecbe0b` source tree. The September 26 reconciliation and September 17 baseline remain historical evidence; no 0.2 release is approved.
 
 - Completed safety sprint: `30b7e530f`, pushed to `fork/linux`. See the [September 14 implementation and evidence ledger](linux/docs/sprint-2026-09-14.md) for passed local gates and remaining release checks.
 - Active work follows the approved [BookiE 0.1.x → 0.2 sprint](linux/docs/bookie-0.2-sprint.md): correctness, editor/grid workflows, BookiE identity, upstream foundations and read-only PostgreSQL catalog browsing.
@@ -85,6 +92,10 @@ in the approved sprint; do not globally replace persistence or credential identi
 A checkbox may be checked only when its stated criterion is verified. A stub or partial path is not complete.
 
 ---
+
+# Historical phase ledger
+
+The phase records below retain their dated implementation and acceptance claims. Rust 1.93, older distro baselines and earlier source totals in these records are historical; current requirements are in [toolchains](linux/docs/toolchains.md), ADR 0002 and the active sprint. They do not override later B3/B4 or package gates.
 
 # Phase 0: Restore a trustworthy development baseline
 

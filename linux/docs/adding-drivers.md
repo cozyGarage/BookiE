@@ -1,241 +1,104 @@
 # Adding a database driver
 
-This is the canonical contributor task. Every database engine TablePro Linux supports has a driver crate under `crates/drivers/`. There is no plugin system: a driver is a Rust crate, statically linked, registered in one place at startup. See [decisions/0001-no-plugin-system.md](decisions/0001-no-plugin-system.md) for why.
+Reviewed against Linux `4b7814f5e` on 2026-10-03. Drivers are static Rust crates
+under `linux/crates/drivers/`; see [ADR 0001](decisions/0001-no-plugin-system.md).
+The [active sprint](bookie-0.2-sprint.md) owns engine scope and sequencing.
+Use [ADR 0007](decisions/0007-type-and-value-preservation.md) as the common
+type/value and native proof standard. The [documentation entry point](README.md)
+identifies the owning boards and selective evidence lookup.
 
-End to end, adding a driver is six steps:
+## Contracts and crate boundaries
 
-1. Pick the underlying Rust library
-2. Create a new crate
-3. Implement `core::DatabaseDriver` and `core::Connection` (set `maturity()` when incomplete; see [driver-maturity.md](driver-maturity.md))
-4. Add the crate to the workspace
-5. Register the driver in `app::main` and `agentd` (Cargo-feature-gate when connect needs native libs or a huge build)
-6. Add tests
+Read the actual traits before implementing a driver:
 
-Each step is small. The whole task takes between half a day for a PG-shaped engine and a week for an engine that needs native FFI.
+- [DatabaseDriver](../crates/core/src/driver.rs): identity, defaults, maturity,
+  metadata and transport capabilities, row-count and DDL guarantees.
+- [Connection](../crates/core/src/connection.rs): schema-aware reads, bound
+  parameters, transactions, controlled calls and session creation.
+- [Session](../crates/core/src/session.rs): dedicated connection lifetime,
+  transactions, usability and awaited close.
+- [Values](../crates/core/src/query.rs), [errors](../crates/core/src/error.rs)
+  and [operation control](../crates/core/src/operation.rs).
 
-## 1. Pick the Rust library
+Use an existing driver's implementation and manifest as the starting point.
+The actual trait definitions own the contract; an incomplete example can omit
+safety hooks. Unsupported defaults do not establish capability support.
 
-| Engine | Recommended crate | Notes |
-|---|---|---|
-| PostgreSQL | `sqlx` with `runtime-tokio` + `tls-rustls` + `postgres` | Fully async, prepared statements, streaming. |
-| MySQL / MariaDB | `sqlx` with `mysql` feature | Same shape as PostgreSQL. |
-| SQLite | `sqlx` with `sqlite` feature | File-based, no network. |
-| MSSQL | `tiberius` | Pure Rust TDS. Watch governance. `praxiomlabs/rust-mssql-driver` is a credible alternative. |
-| ClickHouse | official `clickhouse` crate | HTTP interface (8123). Dynamic results streamed via `FORMAT JSONCompactEachRowWithNamesAndTypes`. |
-| Redis | `fred` | Modern tokio rewrite of redis-rs. |
-| MongoDB | official `mongodb` | Mature, OpenTelemetry support. |
-| DuckDB | `duckdb` (official) | Bundled native lib, edition 2024. |
-| Cassandra / Scylla | `scylla` | Cassandra-compatible, shard-aware. |
-| DynamoDB | `aws-sdk-dynamodb` | Type-safe AWS SDK. |
-| BigQuery | `google-cloud-bigquery` (third-party) | No first-party Google SDK. |
+Production drivers depend on `tablepro-core`, not GTK, Relm4, policy, MCP,
+storage, transport or sibling drivers. Shared saved-credential assembly and
+tunnel ownership belong in `tablepro-transport`; SSH backends belong in
+`tablepro-ssh`. Policy wraps the raw handle in the composition root.
 
-If the engine is not listed, open an issue first and discuss the crate choice before writing code.
+## Existing libraries
 
-## 2. Create the crate
+These are the dependencies used by the current drivers:
 
-Convention: `crates/drivers/<engine>/`.
+| Engines | Library |
+| --- | --- |
+| PostgreSQL, MySQL/MariaDB, SQLite | `sqlx` with engine-specific features |
+| SQL Server | `tiberius` at the workspace's pinned source |
+| ClickHouse | `clickhouse` plus the current dynamic-result implementation |
+| Redis | `redis`, including the workspace's vendored patch |
+| MongoDB | `mongodb`, including the workspace's vendored patch |
+| DuckDB | `duckdb`, behind the optional `duckdb` feature |
+
+Review engine/library proposals against [driver priority](driver-priority.md),
+dependency policy and license requirements. Upstream macOS plugins are behavior
+references; they do not introduce a Linux runtime plugin ABI.
+
+## Implementation checklist
+
+1. Create `crates/drivers/<engine>/`. Package name is
+   `tablepro-driver-<engine>`; existing library names use `drivers_<engine>`.
+   Reuse workspace versions/lints and review dependencies with `deny.toml`.
+2. Implement the current traits. Preserve SQL NULL versus unsupported/non-NULL
+   values; unsupported values must remain `Value::Undecodable` or be refused,
+   rather than becoming NULL. Map errors to typed `DriverError` variants.
+3. Bind values and quote identifiers for the actual dialect. Carry schema and
+   table identity separately. Declare generated/identity metadata accurately;
+   include composite keys and real affected-row behavior.
+4. Declare maturity and capabilities honestly. Controlled calls need a bounded
+   operation, confirmed server cancellation or an honest unknown outcome with
+   retirement. Do not claim Stop support from a dropped client future.
+5. If supporting sessions, prove settings/temp tables/transactions stay on one
+   physical connection, lost sessions never fall back to a pool, and close is
+   awaited. New methods must be forwarded through policy and owning wrappers.
+6. Keep dial endpoints separate from TLS/Kerberos service identity. Test wrong
+   CA/hostname, no plaintext fallback and tunneled verification per engine.
+   Initialize the shared crypto provider in test composition roots that link
+   multiple TLS drivers. Do not load saved secrets inside a driver.
+7. Add the workspace member and dependencies in both composition roots.
+   Register in [app::build_registry](../crates/app/src/lib.rs) and
+   [agentd::build_registry](../crates/agentd/src/main.rs). Apply matching feature
+   gates where native build cost requires them.
+8. Update maturity/connection documentation and the user-facing changelog.
+   Register tests and runner ownership before claiming integration.
+
+## Tests and evidence
+
+Use current testcontainers `AsyncRunner` examples in existing drivers.
+Integration crates need the test-only Clippy allowances specified in
+`CLAUDE.md`; fixture tests are ignored in the fast tier and executed by their
+dedicated layer.
+
+From `linux/`, a focused engine fixture command is:
 
 ```bash
-cd crates/drivers
-cargo new --lib clickhouse
-cd clickhouse
+cargo test -p tablepro-driver-<engine> --test integration -- --include-ignored --test-threads=1
 ```
 
-The crate is named `tablepro-driver-<engine>` in `Cargo.toml`. The library crate name is `drivers_<engine>` (Rust-conventional underscore).
+Cover native stored type/value, invalid neighbors, bound parameters, consumer
+round trips, late stream failures, server loss and subsequent handle usability.
+Mocks cover dispatch/denial; real engine assertions establish server behavior.
+Record initial failing behavior before applying a bug fix.
 
-Skeleton `Cargo.toml`:
+Review `scripts/ci-local.sh`, `scripts/test-layers.json`, the TLS runner,
+change-test mapping, ignored-test inventory and hosted workflow package lists
+for a new crate. Register isolated GTK/keyring tests where needed. Run affected
+layers selected through [the validation playbook](validation-playbook.md);
+regenerate the ignored-test inventory. Optional-feature build evidence is
+separate from default-workspace success.
 
-```toml
-[package]
-name = "tablepro-driver-clickhouse"
-version = "0.1.0"
-edition = "2024"
-publish = false
-
-[lib]
-name = "drivers_clickhouse"
-path = "src/lib.rs"
-
-[dependencies]
-tablepro-core = { path = "../../core" }
-async-trait = "0.1"
-clickhouse = { version = "0.15", default-features = false, features = ["rustls-tls"] }
-tokio = { version = "1", features = ["rt", "macros", "net", "time"] }
-thiserror = "2"
-```
-
-Do not add unrelated dependencies. Do not depend on `gtk4`, `libadwaita`, or any other workspace crate except `tablepro-core`.
-
-## 3. Implement the traits
-
-Two traits, both defined in `tablepro-core`:
-
-```rust
-#[async_trait::async_trait]
-pub trait DatabaseDriver: Send + Sync {
-    fn id(&self) -> &'static str;
-    fn display_name(&self) -> &'static str;
-    fn default_port(&self) -> u16;
-    fn is_file_based(&self) -> bool { false }
-    fn supports_integrated_auth(&self) -> bool { false }
-    async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError>;
-}
-
-#[async_trait::async_trait]
-pub trait Connection: Send + Sync {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError>;
-    async fn fetch_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError>;
-    async fn fetch_rows(&self, table: &str, offset: u64, limit: u64) -> Result<QueryResult, DriverError>;
-    async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError>;
-    async fn ping(&self) -> Result<(), DriverError>;
-    async fn close(self: Box<Self>) -> Result<(), DriverError>;
-}
-```
-
-A driver crate exports two types:
-
-- A zero-sized `*Driver` struct that implements `DatabaseDriver`.
-- A connection struct (typically wrapping a connection pool from the underlying crate) that implements `Connection`.
-
-Skeleton `src/lib.rs`:
-
-```rust
-use async_trait::async_trait;
-use tablepro_core::{
-    Connection, ConnectOptions, DatabaseDriver, DriverError,
-    ColumnInfo, ExecResult, QueryResult, TableInfo,
-};
-
-pub struct ClickhouseDriver;
-
-#[async_trait]
-impl DatabaseDriver for ClickhouseDriver {
-    fn id(&self) -> &'static str { "clickhouse" }
-    fn display_name(&self) -> &'static str { "ClickHouse" }
-    fn default_port(&self) -> u16 { 8123 }
-
-    async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
-        let client = build_client(opts).await?;
-        Ok(Box::new(ClickhouseConnection { client }))
-    }
-}
-
-struct ClickhouseConnection {
-    client: clickhouse::Client,
-}
-
-#[async_trait]
-impl Connection for ClickhouseConnection {
-    async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> { /* ... */ }
-    async fn fetch_columns(&self, table: &str) -> Result<Vec<ColumnInfo>, DriverError> { /* ... */ }
-    async fn fetch_rows(&self, table: &str, offset: u64, limit: u64) -> Result<QueryResult, DriverError> { /* ... */ }
-    async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> { /* ... */ }
-    async fn ping(&self) -> Result<(), DriverError> { /* ... */ }
-    async fn close(self: Box<Self>) -> Result<(), DriverError> { /* ... */ }
-}
-```
-
-Notes:
-
-- The `id()` is the stable string used in saved connection files. Once shipped, never change it. Pick something obvious and short (`postgres`, `mysql`, `clickhouse`).
-- `default_port()` is what the connection dialog pre-fills.
-- `is_file_based()` hides network, TLS, authentication, and SSH fields for file-backed drivers.
-- `supports_integrated_auth()` must return `true` only when `connect()` maps Kerberos mode to the driver's ambient ticket-cache authentication path. Unsupported modes are rejected before the driver connects.
-- When an SSH tunnel changes the dial address, use `ConnectOptions::service_address()` for protocol identity such as a TLS server name or Kerberos SPN.
-- `DriverError` is a `thiserror` enum in `tablepro-core`. Map underlying crate errors into the variants. Add a new variant only after PR discussion.
-
-`DatabaseDriver` also has defaulted hooks for engines that break an assumption the app otherwise makes. Override one only when the default is wrong for your engine:
-
-- `ddl_is_transactional()`: the structure editor batches DDL into one transaction when true. False for engines that commit implicitly on every DDL statement.
-- `reports_rows_affected()`: the inline-edit Save path reads a zero `rows_affected` on an UPDATE or DELETE as another session having changed the row. Return false if the engine cannot produce a count, or every successful save warns about a lost update.
-
-If your engine needs a different SQL spelling for a statement the app builds centrally, add the dialect branch in `core::sql_dialect` (`quote_ident`, `placeholder_for`, `build_update`, `build_order_and_pagination`) rather than rewriting the SQL inside the driver. ClickHouse takes `build_update`'s `ALTER TABLE … UPDATE` branch for this reason.
-
-## 4. Add the crate to the workspace
-
-Edit `linux/Cargo.toml`:
-
-```toml
-[workspace]
-members = [
-    "crates/app",
-    "crates/core",
-    "crates/storage",
-    "crates/drivers/postgres",
-    "crates/drivers/mysql",
-    "crates/drivers/sqlite",
-    "crates/drivers/clickhouse",   # add this
-]
-```
-
-Run `cargo check --workspace` from `linux/`. The new crate must compile in isolation against `core`.
-
-## 5. Register the driver
-
-Edit `crates/app/src/main.rs`:
-
-```rust
-use tablepro_driver_clickhouse::ClickhouseDriver;
-
-fn build_registry() -> DriverRegistry {
-    let mut r = DriverRegistry::new();
-    r.register(Arc::new(drivers_postgres::PgDriver));
-    r.register(Arc::new(drivers_mysql::MysqlDriver));
-    r.register(Arc::new(drivers_sqlite::SqliteDriver));
-    r.register(Arc::new(ClickhouseDriver));   // add this
-    r
-}
-```
-
-Update `crates/app/Cargo.toml` to depend on the new driver crate. **This step is the one most often forgotten.** The driver crate compiles fine without it; the app simply does not know the driver exists.
-
-## 6. Tests
-
-Two test layers, both required for merge:
-
-**Unit tests** belong in the `src/lib.rs` `#[cfg(test)]` module. Exercise pure logic: SQL builders, type mappers, error mapping. Do not require a running database.
-
-**Integration tests** belong in `tests/integration.rs`. Use [testcontainers-rs](https://crates.io/crates/testcontainers) to spin up a real instance:
-
-```rust
-use testcontainers::clients::Cli;
-use testcontainers::images::generic::GenericImage;
-
-#[tokio::test]
-async fn list_tables_returns_seeded_tables() {
-    let docker = Cli::default();
-    let image = GenericImage::new("clickhouse/clickhouse-server", "latest")
-        .with_exposed_port(8123);
-    let node = docker.run(image);
-    let port = node.get_host_port_ipv4(8123);
-
-    let driver = ClickhouseDriver;
-    let conn = driver.connect(ConnectOptions {
-        host: "127.0.0.1".into(),
-        port,
-        username: "default".into(),
-        password: "".into(),
-        database: "default".into(),
-        ..Default::default()
-    }).await.unwrap();
-
-    conn.execute("CREATE TABLE foo (id Int32) ENGINE=Memory").await.unwrap();
-    let tables = conn.list_tables().await.unwrap();
-    assert!(tables.iter().any(|t| t.name == "foo"));
-}
-```
-
-Integration tests run in CI on the Linux runner, gated behind `--ignored` so contributors without Docker can still run `cargo test`.
-
-## Checklist for the PR
-
-- [ ] New crate at `crates/drivers/<engine>/` compiles in isolation
-- [ ] `DatabaseDriver` and `Connection` fully implemented (no `todo!()` in any method)
-- [ ] Crate added to workspace `members`
-- [ ] Driver registered in `app::build_registry`
-- [ ] App `Cargo.toml` depends on the new driver crate
-- [ ] At least one unit test for type / error mapping
-- [ ] At least one integration test using testcontainers
-- [ ] PR description includes the engine version tested against
-- [ ] No new dependencies in `core` or `storage` crates
-- [ ] `cargo clippy --all -- -D warnings` clean
+Return an exact SHA, commands, report paths, retained sanitized evidence and
+unrun gates. Driver maturity, a fixture pass, package qualification and release
+approval are separate claims.

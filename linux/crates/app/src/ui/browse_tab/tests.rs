@@ -17,6 +17,10 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
     }
 }
 
+fn assert_cell_read_only(column: &ColumnInfo, value: &Value) {
+    assert!(!crate::ui::grid::cell_allows_inline_edit(column, value));
+}
+
 #[test]
 fn only_the_latest_browse_page_request_is_accepted() {
     let tracker = PageRequestTracker::default();
@@ -115,10 +119,7 @@ async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
     assert_eq!(page.rows[0][id_index], Value::Int(0));
     assert_eq!(effective_columns[value_index].data_type, "mixed");
     assert!(column_layout_matches(&loaded_columns, &effective_columns));
-    assert!(
-        !crate::ui::grid::cell_allows_inline_edit(&effective_columns[value_index], &page.rows[0][value_index]),
-        "a conflict beyond the returned page must make its first-page cell read-only"
-    );
+    assert_cell_read_only(&effective_columns[value_index], &page.rows[0][value_index]);
 
     let later_page = connection
         .fetch_rows_controlled(None, "page_mixed_edit_contract", 50, 1, &control)
@@ -134,12 +135,9 @@ async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
     );
     assert_eq!(later_columns[later_value_index].data_type, "mixed");
     assert!(column_layout_matches(&loaded_columns, &later_columns));
-    assert!(
-        !crate::ui::grid::cell_allows_inline_edit(
-            &later_columns[later_value_index],
-            &later_page.rows[0][later_value_index]
-        ),
-        "the later Decimal128 page must remain read-only under the collection-wide schema"
+    assert_cell_read_only(
+        &later_columns[later_value_index],
+        &later_page.rows[0][later_value_index],
     );
 
     let persisted = collection
