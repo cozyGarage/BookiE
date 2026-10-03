@@ -48,7 +48,7 @@ impl tablepro_core::Session for SqliteSession {
         let result = {
             let handle = InterruptHandle::of(&mut connection).await?;
             run_server_cancellable(
-                params_into_result(&mut *connection, sql, params, MAX_QUERY_ROWS),
+                params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS),
                 request_interrupt(&handle),
                 confirms_cancellation,
                 control,

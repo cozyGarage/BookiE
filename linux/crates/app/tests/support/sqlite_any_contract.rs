@@ -226,16 +226,12 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
         .await
         .unwrap();
 
-    let source_columns = connection.fetch_columns(None, "source").await.unwrap();
-    let value_column = source_columns.iter().find(|column| column.name == "value").unwrap();
-    let source_rows = connection
-        .query("SELECT value FROM source ORDER BY id")
-        .await
-        .unwrap()
-        .rows;
+    let source_result = connection.query("SELECT value FROM source ORDER BY id").await.unwrap();
+    assert_eq!(source_result.columns[0].data_type, "ANY");
+    let source_rows = source_result.rows;
     let null_marker = unique_csv_null_marker(&source_rows);
     let csv = render_csv(
-        std::slice::from_ref(value_column),
+        &source_result.columns,
         &source_rows,
         &CsvOptions {
             null_to_empty: false,

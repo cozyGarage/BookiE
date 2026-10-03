@@ -62,6 +62,47 @@ async fn nullable_blob_columns_distinguish_null_empty_and_binary_values() {
 }
 
 #[tokio::test]
+async fn direct_query_columns_recover_declared_strict_any_metadata() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL)")
+        .await
+        .unwrap();
+
+    let typed = connection
+        .query("SELECT value AS result FROM flexible WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(typed.columns[0].data_type, "ANY");
+    assert_eq!(typed.rows, vec![vec![Value::Int(42)]]);
+    let nullable = connection
+        .query_params("SELECT value AS result FROM flexible WHERE id = ?", &[Value::Int(2)])
+        .await
+        .unwrap();
+    assert_eq!(nullable.rows, vec![vec![Value::Null]]);
+
+    let expression = connection
+        .query("SELECT value + 1 AS result FROM flexible WHERE id = 1")
+        .await
+        .unwrap();
+    assert_ne!(expression.columns[0].data_type, "ANY");
+    assert_eq!(expression.rows, vec![vec![Value::Int(43)]]);
+
+    let mut transaction = connection.begin().await.unwrap();
+    let result = transaction
+        .query("SELECT value AS result FROM flexible WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "ANY");
+    assert_eq!(result.rows, vec![vec![Value::Int(42)]]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
 async fn declared_types_preserve_nulls_and_binary_affinity_mismatches() {
     let directory = TempDir::new().expect("temp dir");
     let connection = connect_file(&directory).await;
