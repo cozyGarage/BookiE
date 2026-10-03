@@ -127,6 +127,7 @@ fn redis_columns() -> Vec<ColumnInfo> {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "Type".into(),
@@ -138,6 +139,7 @@ fn redis_columns() -> Vec<ColumnInfo> {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "TTL".into(),
@@ -149,6 +151,7 @@ fn redis_columns() -> Vec<ColumnInfo> {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "Value".into(),
@@ -160,6 +163,7 @@ fn redis_columns() -> Vec<ColumnInfo> {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ]
 }
@@ -411,6 +415,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             }],
             rows: vec![vec![Value::Int(i)]],
             truncated: false,
@@ -426,6 +431,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             }],
             rows: vec![vec![Value::Float(f)]],
             truncated: false,
@@ -441,6 +447,7 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             }],
             rows: vec![vec![Value::Bool(b)]],
             truncated: false,
@@ -518,6 +525,7 @@ fn text_col(name: &str) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

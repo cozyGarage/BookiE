@@ -14,66 +14,11 @@ The `app` crate uses [Relm4](https://relm4.org) on top of gtk4-rs. The choice is
 
 If you find yourself adding a global singleton for application state, you are not using the framework. Stop and re-read the model.
 
-## Component skeleton
+## Component structure
 
-```rust
-use relm4::{Component, ComponentParts, ComponentSender};
-
-pub struct ConnectionListModel {
-    connections: Vec<SavedConnection>,
-    selected: Option<ConnectionId>,
-}
-
-#[derive(Debug)]
-pub enum ConnectionListInput {
-    Select(ConnectionId),
-    Connect(ConnectionId),
-    Delete(ConnectionId),
-    Reload,
-}
-
-#[derive(Debug)]
-pub enum ConnectionListOutput {
-    OpenConnection(SavedConnection),
-}
-
-#[derive(Debug)]
-pub enum ConnectionListCmd {
-    Reloaded(Vec<SavedConnection>),
-}
-
-impl Component for ConnectionListModel {
-    type Init = ();
-    type Input = ConnectionListInput;
-    type Output = ConnectionListOutput;
-    type CommandOutput = ConnectionListCmd;
-    type Root = gtk::Box;
-    type Widgets = ConnectionListWidgets;
-
-    fn init(_: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
-        // Build widgets, attach handlers, return ComponentParts
-    }
-
-    fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, _: &Self::Root) {
-        match msg {
-            ConnectionListInput::Select(id) => self.selected = Some(id),
-            ConnectionListInput::Reload => sender.command(|out, shutdown| {
-                shutdown.register(async move {
-                    let conns = storage::load_connections().await.unwrap_or_default();
-                    out.send(ConnectionListCmd::Reloaded(conns)).ok();
-                }).drop_on_shutdown()
-            }),
-            // ...
-        }
-    }
-
-    fn update_cmd(&mut self, msg: Self::CommandOutput, _: ComponentSender<Self>, _: &Self::Root) {
-        match msg {
-            ConnectionListCmd::Reloaded(conns) => self.connections = conns,
-        }
-    }
-}
-```
+Use [the existing editor component](../crates/app/src/ui/editor/mod.rs) for the
+message/command shape. Commands return `Result` outcomes to the update loop;
+a failed storage read must remain visible rather than becoming an empty model.
 
 Naming:
 
@@ -166,4 +111,5 @@ Relm4 ships test helpers but they require a running GTK main loop, which is awkw
 
 Browse SQL planning is pure and shared between counts and pages. A validation error clears the count through the existing request-generation failure path and surfaces the error; it cannot fall back to an unfiltered total. Delayed sidebar metadata is accepted only for the same connection allocation, so reconnecting the same saved UUID does not make an old response current. See the tests in `services/browse_query.rs` and `services/database_service.rs`.
 
-Editor schema completion uses the same session token: allocating a fresh policy wrapper no longer invalidates its cache. Reconnect invalidates pending requests before they are applied.
+Completion identity and reconnect behavior are described in
+[architecture](../ARCHITECTURE.md) and constrained by ADR 0008.

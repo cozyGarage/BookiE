@@ -1,0 +1,11 @@
+---- postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool stdout ----
+
+thread 'postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool' (2570703) panicked at crates/mcp/tests/postgres_custom_enum.rs:174:5:
+assertion `left == right` failed
+  left: String("")
+ right: "\\NNN"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.14s
+[full output: ~/.local/share/rtk/tee/1791032781_cargo_test.log]

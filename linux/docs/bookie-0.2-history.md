@@ -17,7 +17,7 @@ Delivery branch: `linux`, tracked here as `fork/linux` in `cozyGarage/BookiE`. T
 
 ## October 3 review handoff
 
-Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The [older app-release review](upstream-older-releases-review-2026-10-03.md) screens all 128 app releases and adds O1–O3 reproduction candidates under existing B3/B4 ownership. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [B4 integration checkpoint](b4-task-board.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
+Source/document checkpoint: `4b7814f5e` on `linux`. The [architecture and evidence consistency review](architecture-consistency-review-2026-10-03.md) inventories all tracked Markdown/evidence and reconciles document authority. The [older app-release review](upstream-older-releases-review-2026-10-03.md) screens all 128 app releases and adds O1–O3 reproduction candidates under existing B3/B4 ownership. U1 is implemented in `6822efa42` with [native evidence](upstream-u1-sql-server-2026-10-03.md); U2–U6 remain open. The [B4 integration checkpoint](b4-history.md#october-3-integration-checkpoint) records already merged policy/editor/daemon work; source integration does not close runtime or installed acceptance. Continue B3 → B4 → Arch/Wayland → Debian/GNOME.
 
 ## Current continuation plan: 2026-10-02
 
@@ -352,7 +352,7 @@ commands.
 
 ### B4 next order
 
-Use the [October 2 dispatch plan and detailed agent packets](b4-task-board.md#october-2-review-and-dispatch-plan)
+Use the [October 2 dispatch plan and detailed agent packets](b4-history.md#october-2-review-and-dispatch-plan)
 as the B4 execution source. It preserves the recorded decisions and completed
 evidence, adds current source findings, file ownership, prerequisites, edge cases
 and per-task acceptance. Task IDs below belong to B4 lanes, not sprint milestone

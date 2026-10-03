@@ -13,12 +13,17 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let PgTypeKind::Array(element) = info.kind() else {
         return None;
     };
-    let render = match info.oid()?.0 {
-        INT2VECTOR_OID | OIDVECTOR_OID => decode_vector,
-        _ => decode_binary,
-    };
+    let element_oid = element.oid()?.0;
+    let enum_element = matches!(element.kind(), PgTypeKind::Enum(_));
     match raw.format() {
-        PgValueFormat::Binary => render(raw.as_bytes().ok()?, element.oid()?.0).map(Value::Text),
+        PgValueFormat::Binary => {
+            let bytes = raw.as_bytes().ok()?;
+            let text = match info.oid()?.0 {
+                INT2VECTOR_OID | OIDVECTOR_OID => decode_vector(bytes, element_oid),
+                _ => decode_binary(bytes, element_oid, enum_element),
+            }?;
+            Some(Value::Text(text))
+        }
         PgValueFormat::Text => raw.as_str().ok().map(|text| Value::Text(text.into())),
     }
 }
@@ -38,7 +43,7 @@ fn decode_vector(bytes: &[u8], expected_oid: u32) -> Option<String> {
     let mut elements = Vec::with_capacity(length);
     for _ in 0..length {
         let length = reader.integer()?;
-        elements.push(element_text(oid, read_bounded_element(&mut reader, length)?)?);
+        elements.push(element_text(oid, false, read_bounded_element(&mut reader, length)?)?);
     }
     reader.remaining.is_empty().then(|| elements.join(" "))
 }
@@ -82,12 +87,13 @@ fn read_dimensions(reader: &mut Reader<'_>, count: usize) -> Option<(Vec<Dimensi
     (total <= reader.remaining.len() / 4).then_some((dimensions, total))
 }
 
-fn decode_binary(bytes: &[u8], expected_oid: u32) -> Option<String> {
+fn decode_binary(bytes: &[u8], expected_oid: u32, enum_element: bool) -> Option<String> {
     let mut reader = Reader { remaining: bytes };
     let count = reader.integer()?;
     let flags = reader.integer()?;
     let oid = reader.integer()? as u32;
-    if !(0..=6).contains(&count) || !matches!(flags, 0 | 1) || oid != expected_oid || !supported(oid) {
+    if !(0..=6).contains(&count) || !matches!(flags, 0 | 1) || oid != expected_oid || (!enum_element && !supported(oid))
+    {
         return None;
     }
     let (dimensions, total) = read_dimensions(&mut reader, count as usize)?;
@@ -101,7 +107,7 @@ fn decode_binary(bytes: &[u8], expected_oid: u32) -> Option<String> {
     if total == 0 {
         output.push_str("{}");
     } else {
-        append_dimension(&mut reader, &dimensions, oid, flags == 1, &mut output)?;
+        append_dimension(&mut reader, &dimensions, oid, enum_element, flags == 1, &mut output)?;
     }
     reader.remaining.is_empty().then_some(output)
 }
@@ -110,6 +116,7 @@ fn append_dimension(
     reader: &mut Reader<'_>,
     dimensions: &[Dimension],
     oid: u32,
+    enum_element: bool,
     allows_null: bool,
     output: &mut String,
 ) -> Option<()> {
@@ -125,10 +132,10 @@ fn append_dimension(
                 output.push_str("NULL");
             } else {
                 let bytes = read_bounded_element(reader, length)?;
-                append_quoted(output, &element_text(oid, bytes)?)?;
+                append_quoted(output, &element_text(oid, enum_element, bytes)?)?;
             }
         } else {
-            append_dimension(reader, rest, oid, allows_null, output)?;
+            append_dimension(reader, rest, oid, enum_element, allows_null, output)?;
         }
         if output.len() >= MAX_ARRAY_TEXT_BYTES {
             return None;
@@ -192,7 +199,10 @@ fn supported(oid: u32) -> bool {
     )
 }
 
-fn element_text(oid: u32, bytes: &[u8]) -> Option<String> {
+fn element_text(oid: u32, enum_element: bool, bytes: &[u8]) -> Option<String> {
+    if enum_element {
+        return Some(std::str::from_utf8(bytes).ok()?.into());
+    }
     Some(match oid {
         16 => match bytes {
             [0] => "f".into(),
@@ -291,9 +301,9 @@ mod tests {
                     "{oid}: {size}"
                 );
             }
-            assert_eq!(decode_binary(&wire(oid, &[], &[]), oid).as_deref(), Some("{}"));
+            assert_eq!(decode_binary(&wire(oid, &[], &[]), oid, false).as_deref(), Some("{}"));
             assert_eq!(
-                decode_binary(&wire(oid, &[(1, 1)], &[None]), oid).as_deref(),
+                decode_binary(&wire(oid, &[(1, 1)], &[None]), oid, false).as_deref(),
                 Some("{NULL}")
             );
         }
@@ -333,14 +343,14 @@ mod tests {
 
     #[test]
     fn value_contract_array_null_empty_and_escaped_text_stay_distinct() {
-        assert_eq!(decode_binary(&wire(25, &[], &[]), 25).as_deref(), Some("{}"));
+        assert_eq!(decode_binary(&wire(25, &[], &[]), 25, false).as_deref(), Some("{}"));
         let bytes = wire(
             25,
             &[(5, 1)],
             &[None, Some(b"NULL"), Some(b""), Some(b"a\\\"b"), Some("漢字".as_bytes())],
         );
         assert_eq!(
-            decode_binary(&bytes, 25).as_deref(),
+            decode_binary(&bytes, 25, false).as_deref(),
             Some(r#"{NULL,"NULL","","a\\\"b","漢字"}"#)
         );
         let integer = 1_i32.to_be_bytes();
@@ -350,18 +360,40 @@ mod tests {
             &[Some(&integer), None, Some(&integer), Some(&integer)],
         );
         assert_eq!(
-            decode_binary(&bytes, 23).as_deref(),
+            decode_binary(&bytes, 23, false).as_deref(),
             Some(r#"[0:1][-1:0]={{"1",NULL},{"1","1"}}"#)
         );
+    }
+
+    #[test]
+    fn value_contract_enum_array_labels_quote_null_text_and_preserve_sql_null() {
+        let bytes = wire(
+            9001,
+            &[(6, 1)],
+            &[
+                Some(b"NULL"),
+                Some(b""),
+                Some(b"a,b"),
+                Some(b"a\"b"),
+                Some("東京".as_bytes()),
+                None,
+            ],
+        );
+
+        assert_eq!(
+            decode_binary(&bytes, 9001, true).as_deref(),
+            Some(r#"{"NULL","","a,b","a\"b","東京",NULL}"#)
+        );
+        assert_eq!(element_text(9001, true, &[0xff]), None);
     }
 
     #[test]
     fn value_contract_malformed_array_dimensions_lengths_types_and_elements_are_refused() {
         let valid = wire(25, &[(1, 1)], &[Some(b"value")]);
         for length in 0..valid.len() {
-            assert_eq!(decode_binary(&valid[..length], 25), None);
+            assert_eq!(decode_binary(&valid[..length], 25, false), None);
         }
-        assert_eq!(decode_binary(&valid, 23), None);
+        assert_eq!(decode_binary(&valid, 23, false), None);
         for (offset, word) in [
             (0, -1_i32),
             (0, 7),
@@ -373,36 +405,36 @@ mod tests {
         ] {
             let mut bytes = valid.clone();
             bytes[offset..offset + 4].copy_from_slice(&word.to_be_bytes());
-            assert_eq!(decode_binary(&bytes, 25), None, "{offset}: {word}");
+            assert_eq!(decode_binary(&bytes, 25, false), None, "{offset}: {word}");
         }
         let mut trailing = valid;
         trailing.push(0);
-        assert_eq!(decode_binary(&trailing, 25), None);
+        assert_eq!(decode_binary(&trailing, 25, false), None);
         let mut forbidden_null = wire(25, &[(1, 1)], &[None]);
         forbidden_null[4..8].copy_from_slice(&0_i32.to_be_bytes());
-        assert_eq!(decode_binary(&forbidden_null, 25), None);
+        assert_eq!(decode_binary(&forbidden_null, 25, false), None);
         for bytes in [
             wire(25, &[(2, i32::MAX)], &[None, None]),
             wire(25, &[(i32::MAX, 1); 6], &[]),
             wire(25, &[(1, 1)], &[Some(&[255])]),
             wire(25, &[(1, 1)], &[Some(b"a\0b")]),
         ] {
-            assert_eq!(decode_binary(&bytes, 25), None);
+            assert_eq!(decode_binary(&bytes, 25, false), None);
         }
-        assert_eq!(decode_binary(&wire(9999, &[], &[]), 9999), None);
-        assert_eq!(element_text(16, &[2]), None);
-        assert_eq!(element_text(23, &[1, 2]), None);
+        assert_eq!(decode_binary(&wire(9999, &[], &[]), 9999, false), None);
+        assert_eq!(element_text(16, false, &[2]), None);
+        assert_eq!(element_text(23, false, &[1, 2]), None);
     }
 
     #[test]
     fn value_contract_array_header_mutations_and_maximum_depth_are_bounded() {
         let bytes = wire(25, &[(1, i32::MIN); 6], &[Some(b"value")]);
-        assert!(decode_binary(&bytes, 25).is_some());
+        assert!(decode_binary(&bytes, 25, false).is_some());
         for offset in 0..bytes.len() {
             for replacement in [0, 1, 127, 128, 254, 255] {
                 let mut mutated = bytes.clone();
                 mutated[offset] = replacement;
-                let _ = decode_binary(&mutated, 25);
+                let _ = decode_binary(&mutated, 25, false);
             }
         }
         let mut state = 12345_u32;
@@ -412,7 +444,7 @@ mod tests {
                 state = state.wrapping_mul(1664525).wrapping_add(1013904223);
                 *byte = (state >> 24) as u8;
             }
-            let _ = decode_binary(&bytes, 25);
+            let _ = decode_binary(&bytes, 25, false);
         }
     }
 

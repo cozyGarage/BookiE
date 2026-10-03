@@ -17,6 +17,7 @@ pub(crate) fn col_to_info(c: &Column) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

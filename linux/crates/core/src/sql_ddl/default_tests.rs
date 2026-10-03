@@ -13,6 +13,7 @@ fn loaded(default: Option<&str>) -> DraftColumn {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     })
 }
 

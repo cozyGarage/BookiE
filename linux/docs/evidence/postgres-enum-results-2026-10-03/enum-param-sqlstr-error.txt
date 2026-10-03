@@ -1,0 +1,17 @@
+cargo test: 1 errors, 0 warnings (1 crates)
+error[E0382]: use of moved value: `sql`
+    --> crates/drivers/postgres/src/lib.rs:1063:31
+     |
+1057 |     let sql = sqlx::AssertSqlSafe(sql).into_sql_str();
+     |         --- move occurs because `sql` has type `SqlStr`, which does not implement the `Copy` trait
+1058 |     let statement = match connection.prepare(sql).await {
+     |                                              --- value moved here
+...
+1063 |                 .prepare_with(sql, &parameter_types)
+     |                               ^^^ value used here after move
+     |
+help: consider cloning the value if the performance cost is acceptable
+     |
+1058 |     let statement = match connection.prepare(sql.clone()).await {
+     |                                                 ++++++++
+[full output: ~/.local/share/rtk/tee/1791024359_cargo_test.log]

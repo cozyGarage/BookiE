@@ -923,6 +923,11 @@ def current_page_csv_export_is_pk_ordered(database, base):
     # full label keeps that from regressing.
     wait_for_node(name="Rows 1 – 100 of 150")
     invoke_accessible_action("win.export-csv")
+    marker_field = wait_for_node(name="Text that means NULL", role=pyatspi.ROLE_TEXT)
+    marker_text = marker_field.queryText()
+    assert marker_text.getText(0, marker_text.characterCount) == "\\N", (
+        "the export dialog must show the marker written for SQL NULL"
+    )
     invoke(wait_for_node(name="Export…", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Export Results", role=FILE_CHOOSER_ROLES)
     set_visible_editable_within(
@@ -947,6 +952,9 @@ def current_page_csv_export_is_pk_ordered(database, base):
         f"{exported_ids[:5]}…{exported_ids[-5:]}"
     )
     exported_notes = {int(row[0]): row[1] for row in rows[1:]}
+    assert all(exported_notes[identifier] == "\\N" for identifier in range(5, 101)), (
+        "CSV file export must use the displayed null marker for SQL NULL cells"
+    )
     for identifier, note in awkward.items():
         assert exported_notes[identifier] == note, (
             f"row {identifier} lost its text through the CSV export: "

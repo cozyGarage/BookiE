@@ -380,7 +380,7 @@ async fn value_contract_json_text_array_is_explicitly_unsupported() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_custom_enum_array_projection_is_rejected() {
+async fn value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
     connection
@@ -406,10 +406,11 @@ async fn value_contract_custom_enum_array_projection_is_rejected() {
     let direct_projection = connection
         .query(&format!("SELECT {expression} AS value"))
         .await
-        .expect_err("SQLx currently fails decoding custom enum-array metadata");
-    let error = format!("{direct_projection:?}");
-    assert!(error.contains("enum_labels"), "{error}");
-    assert!(error.contains("unexpected null"), "{error}");
+        .unwrap();
+    assert_eq!(
+        direct_projection.rows,
+        vec![vec![Value::Text(r#"{"NULL","東京","o'brien",NULL}"#.into())]]
+    );
 }
 
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {

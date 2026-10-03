@@ -692,6 +692,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -706,6 +707,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -838,6 +840,7 @@ mod tests {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             },
             ColumnInfo {
                 name: "b".into(),
@@ -849,6 +852,7 @@ mod tests {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             },
             data_col("name"),
         ];
@@ -878,6 +882,7 @@ mod tests {
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             },
             data_col("name"),
         ];

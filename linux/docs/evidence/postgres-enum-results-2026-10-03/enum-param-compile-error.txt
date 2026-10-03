@@ -1,0 +1,131 @@
+cargo test: 6 errors, 1 warnings (1 crates)
+error[E0255]: the name `PgConnection` is defined multiple times
+   --> crates/drivers/postgres/src/lib.rs:134:1
+    |
+  6 | use sqlx::postgres::{PgArgumentBuffer, PgConnectOptions, PgConnection, PgPoolOptions, PgRow, PgTypeInfo, PgTypeKind};
+    |                                                          ------------ previous import of the type `PgConnection` here
+...
+134 | struct PgConnection {
+    | ^^^^^^^^^^^^^^^^^^^ `PgConnection` redefined here
+    |
+    = note: `PgConnection` must be defined only once in the type namespace of this module
+help: you can use `as` to change the binding name of the import
+    |
+  6 | use sqlx::postgres::{PgArgumentBuffer, PgConnectOptions, PgConnection as OtherPgConnection, PgPoolOptions, PgRow, PgTypeInfo, PgTypeKind};
+    |                                                                       ++++++++++++++++++++
+
+error[E0432]: unresolved import `sqlx::IsNull`
+ --> crates/drivers/postgres/src/lib.rs:8:61
+  |
+8 |     Column, Connection as SqlxConnection, Encode, Executor, IsNull, Pool, Postgres, Row, SqlSafeStr, Statement, Type,
+  |                                                             ^^^^^^ no `IsNull` in the root
+
+warning: unused import: `PgConnection`
+ --> crates/drivers/postgres/src/lib.rs:6:58
+  |
+6 | use sqlx::postgres::{PgArgumentBuffer, PgConnectOptions, PgConnection, PgPoolOptions, PgRow, PgTypeInfo, PgTypeKind};
+  |                                                          ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+    --> crates/drivers/postgres/src/lib.rs:811:40
+     |
+ 811 |         Some(describe_query_parameters(&mut **connection, sql).await?)
+     |              ------------------------- ^^^^^^^^^^^^^^^^^ expected `PgConnection`, found `sqlx::PgConnection`
+     |              |
+     |              arguments to this function are incorrect
+     |
+     = note: `sqlx::PgConnection` and `PgConnection` have similar names, but are actually distinct types
+note: `sqlx::PgConnection` is defined in crate `sqlx_postgres`
+    --> vendor/sqlx-postgres/src/connection/mod.rs:38:1
+     |
+  38 | pub struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+note: `PgConnection` is defined in the current crate
+    --> crates/drivers/postgres/src/lib.rs:134:1
+     |
+ 134 | struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^
+note: function defined here
+    --> crates/drivers/postgres/src/lib.rs:1047:10
+     |
+1047 | async fn describe_query_parameters(
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+1048 |     connection: &mut PgConnection,
+     |     -----------------------------
+
+error[E0308]: mismatched types
+    --> crates/drivers/postgres/src/lib.rs:843:35
+     |
+ 843 |         describe_query_parameters(&mut **connection, sql).await?.enum_types
+     |         ------------------------- ^^^^^^^^^^^^^^^^^ expected `PgConnection`, found `sqlx::PgConnection`
+     |         |
+     |         arguments to this function are incorrect
+     |
+     = note: `sqlx::PgConnection` and `PgConnection` have similar names, but are actually distinct types
+note: `sqlx::PgConnection` is defined in crate `sqlx_postgres`
+    --> vendor/sqlx-postgres/src/connection/mod.rs:38:1
+     |
+  38 | pub struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+note: `PgConnection` is defined in the current crate
+    --> crates/drivers/postgres/src/lib.rs:134:1
+     |
+ 134 | struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^
+note: function defined here
+    --> crates/drivers/postgres/src/lib.rs:1047:10
+     |
+1047 | async fn describe_query_parameters(
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+1048 |     connection: &mut PgConnection,
+     |     -----------------------------
+
+error[E0599]: no method named `prepare` found for mutable reference `&mut PgConnection` in the current scope
+    --> crates/drivers/postgres/src/lib.rs:1052:10
+     |
+1051 |       let statement = connection
+     |  _____________________-
+1052 | |         .prepare(sqlx::AssertSqlSafe(sql))
+     | |         -^^^^^^^ method not found in `&mut PgConnection`
+     | |_________|
+     |
+     |
+     = help: items from traits can only be used if the trait is implemented and in scope
+     = note: the following trait defines an item `prepare`, perhaps you need to implement it:
+             candidate #1: `Executor`
+help: some of the expressions' fields have a method of the same name
+     |
+1052 |         .cancellation_pool.prepare(sqlx::AssertSqlSafe(sql))
+     |          ++++++++++++++++++
+1052 |         .pool.prepare(sqlx::AssertSqlSafe(sql))
+     |          +++++
+
+error[E0308]: mismatched types
+    --> crates/drivers/postgres/src/lib.rs:381:49
+     |
+ 381 |                 match describe_query_parameters(&mut *tx, sql).await {
+     |                       ------------------------- ^^^^^^^^ expected `PgConnection`, found `sqlx::PgConnection`
+     |                       |
+     |                       arguments to this function are incorrect
+     |
+     = note: `sqlx::PgConnection` and `PgConnection` have similar names, but are actually distinct types
+note: `sqlx::PgConnection` is defined in crate `sqlx_postgres`
+    --> vendor/sqlx-postgres/src/connection/mod.rs:38:1
+     |
+  38 | pub struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^^^^^
+note: `PgConnection` is defined in the current crate
+    --> crates/drivers/postgres/src/lib.rs:134:1
+     |
+ 134 | struct PgConnection {
+     | ^^^^^^^^^^^^^^^^^^^
+note: function defined here
+    --> crates/drivers/postgres/src/lib.rs:1047:10
+     |
+1047 | async fn describe_query_parameters(
+     |          ^^^^^^^^^^^^^^^^^^^^^^^^^
+1048 |     connection: &mut PgConnection,
+     |     -----------------------------
+[full output: ~/.local/share/rtk/tee/1791024257_cargo_test.log]

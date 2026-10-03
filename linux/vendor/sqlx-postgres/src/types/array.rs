@@ -270,6 +270,7 @@ where
                 let mut done = false;
                 let mut in_quotes = false;
                 let mut in_escape = false;
+                let mut was_quoted = false;
                 let mut value = String::with_capacity(10);
                 let mut chars = s.chars();
                 let mut elements = Vec::with_capacity(4);
@@ -285,6 +286,7 @@ where
 
                                 '"' => {
                                     in_quotes = !in_quotes;
+                                    was_quoted = true;
                                 }
 
                                 '\\' => {
@@ -307,7 +309,7 @@ where
                         }
                     }
 
-                    let value_opt = if value == "NULL" {
+                    let value_opt = if value == "NULL" && !was_quoted {
                         None
                     } else {
                         Some(value.as_bytes())
@@ -321,10 +323,38 @@ where
                     })?);
 
                     value.clear();
+                    was_quoted = false;
                 }
 
                 Ok(elements)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_array_distinguishes_quoted_null_from_sql_null() {
+        let raw = PgValueRef {
+            value: Some(br#"{"NULL",NULL,"null","",ordinary}"#),
+            row: None,
+            type_info: PgTypeInfo::TEXT_ARRAY,
+            format: PgValueFormat::Text,
+        };
+        let decoded = <Vec<Option<String>> as Decode<Postgres>>::decode(raw).unwrap();
+
+        assert_eq!(
+            decoded,
+            vec![
+                Some("NULL".into()),
+                None,
+                Some("null".into()),
+                Some(String::new()),
+                Some("ordinary".into()),
+            ]
+        );
     }
 }

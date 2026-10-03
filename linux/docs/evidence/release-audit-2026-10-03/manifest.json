@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "baseline": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "completed_utc": "2026-10-03T00:58:52.604695+00:00",
+  "scope": "All baseline tracked Markdown mechanically screened; current guides/ADRs and high-risk source/test claims reviewed. No exhaustive semantic certification.",
+  "document_inventory_before": "inventory-before.json",
+  "document_inventory_after": "inventory-after.json",
+  "crate_graph": "crate-graph.json",
+  "checks": {
+    "missing_first_party_file_links": [],
+    "anchor_candidates": [],
+    "evidence_json_errors": [],
+    "before_missing_cache_references": 114,
+    "before_missing_vendor_references": 1,
+    "production_crate_graph_acyclic": true,
+    "temporary_example_removed": true,
+    "tracked_diff_whitespace_exit_code": 0
+  },
+  "validation": {
+    "initial": "initial-gates/report.json",
+    "after_policy_test": "regression-gates/report.json",
+    "final_checks": "final-checks.json",
+    "postgres_enum": "postgres-enum-result.txt",
+    "scope_limit": "Default full gate excludes DuckDB. Security-policy intentionally ignores native fixtures; app-server/SSH/TLS/PostgreSQL layers execute their own registered cases. No fresh all-driver/values, hosted, installed Wayland/upgrade/rollback, broad mutation or soak certification."
+  },
+  "mutation": {
+    "change": "Temporarily redirected AuditState::disable_governed_writes from connection_uncertain to globally_disabled",
+    "selector": "guard::guard_tests::audit::abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable",
+    "exit_code": 101,
+    "assertion": "!replacement_state.governed_writes_disabled()",
+    "log": "late-generation-mutation.txt",
+    "production_restored": true
+  },
+  "mysql_probe": {
+    "source": "mysql_probe.rs",
+    "build": "mysql-probe-build.txt",
+    "output": "mysql-probe-native.txt",
+    "native_exit_code": 0,
+    "meaning": "Diagnostic successfully reproduced metadata loss and false rollback claim; not a product test pass.",
+    "setup_failures": [
+      "mysql-probe-wrapper-before.txt",
+      "mysql-probe.txt"
+    ],
+    "limits": "Production driver/renderer, no installed GTK interaction or guarded-dispatch reproduction. Cap/rollback-loss findings are source traces, not native runtime proof."
+  },
+  "source_fingerprints": {
+    "linux/crates/drivers/mysql/src/lib.rs": "4b73627004f30d1f9fb139c7def330bd6ad52d1ff6d24249029021bb8534387c",
+    "linux/crates/core/src/error.rs": "39b10cf9a1f311fa1b129e5e1768355fd184e5435d28b15a315828101d6ba6d0",
+    "linux/crates/app/src/ui/error_text.rs": "394772ec7feab0f29076feb44f7854428cce4ded05464072e2eec7e7dfa406d4",
+    "linux/crates/policy/src/guard/panic_boundary.rs": "039bfa84f680c0d2fbc7b07a44f8521e2aceac0834412c1fa4afdc91e5970ce2",
+    "linux/crates/policy/src/audit.rs": "7402c1a0d3f97f1880cd88e3e39b9927ae87c105e82b6d5784ec3922ba5d00f2",
+    "linux/crates/agentd/src/lib.rs": "ce4b9e9a83377c8f86f1efe20c547bd304685fc4f15eaa7a7973bcbab2f3e3eb",
+    "linux/crates/app/src/services/database_service.rs": "d2073c6727418571def7f45e33a2a46703abe2a6612ac24b5ad8a959cf4ff40a",
+    "linux/crates/app/src/services/connection_monitor.rs": "e944005cef70309d88bbbed31cac9d60a96dfa93b50a958d7c695acfc6a61608",
+    "linux/crates/policy/src/guard_tests_audit.rs": "2c097922897f2bb44b482f75a329c94a2fd0e6ef216d1d666efa8aff84d0f935",
+    "linux/crates/drivers/postgres/tests/support/value_contracts.rs": "87556696a784bf35913c70f6120caf96e59fda15d70e82945ad5674f326cdc64"
+  },
+  "retained_file_hashes": {
+    "late-generation-mutation.txt": "982d97b2acb4669e890d888c041b9005de79fdb7201914afa81d3cac82ebec82",
+    "mysql_probe.rs": "f2db93c0380f0b7de2ea198e886bea7aa5f20ec1f8f84c5ba4d11c4a4755a7b5",
+    "mysql-probe.txt": "3a4708b27a0365825b97d79a01b39ea794e7a750746f7ae0b737233571723606",
+    "mysql-probe-wrapper-before.txt": "fb48a032458452cb8bdf539e261c30306fa47e905a3c6076555b78a9332af98b",
+    "mysql-probe-build.txt": "fd737fdb6998ed109773d2c879444ed4ecdfde13957f32afc4b00a8e6bb4d2b6",
+    "final-check-1.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "final-check-2.txt": "1f1f5a047a07fbcb520cefb91854d5a2d284f0f40d93fd06f0acfbd057a74f6b",
+    "final-check-3.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "final-check-4.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "final-check-5.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "final-check-6.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "final-check-7.txt": "72bb1e374b69a0eb3705b530354566353069e455b8f76f0e78dd2f52a5d8b617",
+    "final-checks.json": "165ba2abd500505e9e0ea625bc915a050c0fd23357f00f24706df342a285c5e8",
+    "mysql-probe-native.txt": "6c9086497186d67c087adb85a8729588d5df3bbd67c15c898f5b721726840ad5",
+    "inventory-before.json": "e865b5dbcb4a4a35715fce535adaceb597f17a68a35808e01ce64ebd05d2d69d",
+    "crate-graph.json": "3898a37bc15995eca866f6f60a431cf7c08860bdb5320b429f6d0d4ef0fa2d50",
+    "postgres-enum-result.txt": "4bfab1a9d4f793ffefc84b3af2e1b467028b92db069a0a3cf5b36d9840267671",
+    "inventory-after.json": "41af28960b16e6636d72ae8581afd20417d0ca8552ba7e0f18529d5ea64fb1a9",
+    "initial-gates/full-1.log": "1b6373ac192a725afb84cd335375a687dcff5b2d9d5bc9ec558da2d458c08f75",
+    "initial-gates/security-policy-1.log": "4f184667e8dffb128e3734b037b5ff52984f453874e9b40d5b8da1374b8cbe93",
+    "initial-gates/widgets-1.log": "b908461c307c45fa8a895513c4e51b1c159f4003411240167a5bfa726fd234e1",
+    "initial-gates/app-server-1.log": "fab4e21c693018ee51984eeb066ba1aa99a400b2166c29dc811366ea7d92a885",
+    "initial-gates/packaging-contracts-1.log": "2eddec4d2c1bba4ae92d869556d51f8e8e2458c8b99a05123b06977d9c5c8153",
+    "initial-gates/packaging-contracts-2.log": "da44f83d7f6073ad20cbce1cc5de77a3461a1bd0c63161fc16286a8ab1079cdf",
+    "initial-gates/report.json": "fab233755996f3cb847216c08378a1477d5de7969f1a28537ea4878c7f15cd2d",
+    "regression-gates/full-1.log": "0ae7ce3f70d4a5663f1951901a3bff54b8f4a5d70faf25d84b5d600e5f1e5b1f",
+    "regression-gates/security-policy-1.log": "bfc450d8eea3493e20eec3bc15dc8f3b341ae5748b50c8b8c04e5d1ba27dfc7d",
+    "regression-gates/ssh-1.log": "840680b33d141ac9f7e6bed56c63e57c415dbe1d1202c5891f9616cdedb5fa35",
+    "regression-gates/tls-1.log": "7541bda86a11f2108b534bfb5c26535213a13cd4bea69ecd86e41bba14ac9d4b",
+    "regression-gates/postgres-release-1.log": "7523fc171ee45fa3e00249ce55333eb3fd585da5fc6113d745fe52d63423041d",
+    "regression-gates/report.json": "e82feeca0f6438f1861054c2240894ac74696690f2f93a92f2191076c0183098"
+  }
+}

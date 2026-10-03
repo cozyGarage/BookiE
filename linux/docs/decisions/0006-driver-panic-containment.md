@@ -24,7 +24,11 @@ The workspace lints deny `unwrap`, `expect` and `panic!` in our own code. They s
 
 The guard then reports the fault through an optional `ConnectionFaultSink` installed by whoever owns the connection. `app::services::database_service` implements that sink and wakes the connection monitor, which replaces the connection rather than waiting for the next ping.
 
-The panic payload goes to `tracing` only. It never reaches the returned error, an audit field, or the interface.
+Returned errors, audit fields and UI messages must omit the raw panic payload.
+The current logger sends it to `tracing`, and the default hook can also print it;
+this violates the shared logging privacy rule and remains an implementation gap
+tracked by [the release audit](../release-audit-2026-10-03.md#small-release-tasks).
+Keep operation identity and containment while removing arbitrary payload text.
 
 ## Rationale
 
@@ -50,7 +54,10 @@ The sink is opt-in through `PolicyGuard::with_fault_sink` rather than a required
 
 **Fork the dependency and remove the panics.** This is what upstream `TableProApp/TablePro` did for `tiberius`. It is the real fix for the specific library, and it remains worth adopting, but it does not generalise: the next driver with the same habit reintroduces the hang. Containment and a fork solve different halves, and the fork is now an upgrade rather than a prerequisite.
 
-**A process-level panic hook.** Rejected as redundant. `app::logging::init` writes to stderr, which the GNOME session journals, and `catch_unwind` does not suppress the panic hook, so panics already reach the journal in order. A hook would duplicate output that already exists.
+**A process-level hook for duplicate diagnostics.** Rejected in the original
+decision. `catch_unwind` does not suppress the default hook. Privacy treatment
+of that hook is still required; the rejection of duplicate diagnostics does not
+justify printing arbitrary payloads.
 
 **Wrap each Relm4 command site.** Rejected. It covers only the GTK app, leaves MCP and `agentd` exposed, and relies on every future author remembering.
 

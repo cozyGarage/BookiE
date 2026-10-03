@@ -2,6 +2,10 @@ use thiserror::Error;
 
 use crate::{ColumnInfo, Value};
 
+#[cfg(test)]
+#[path = "sql_dialect/postgres_enum_tests.rs"]
+mod postgres_enum_tests;
+
 pub const MAX_IDENT_BYTES: usize = 256;
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -73,6 +77,25 @@ pub fn placeholder_for(driver_id: &str, index: usize) -> String {
         "mssql" => format!("@P{}", index + 1),
         _ => "?".to_string(),
     }
+}
+
+fn postgres_text_cast_type(column: &ColumnInfo, value: &Value) -> Option<String> {
+    if let Some(enum_type) = &column.enum_type
+        && matches!(value, Value::Text(_) | Value::Null)
+    {
+        return Some(format!(
+            "{}.{}",
+            quote_ident("postgres", &enum_type.schema),
+            quote_ident("postgres", &enum_type.name)
+        ));
+    }
+    if !matches!(value, Value::Text(_)) {
+        return None;
+    }
+    postgres_array_cast_type(&column.data_type)
+        .or_else(|| postgres_temporal_cast_type(&column.data_type))
+        .or_else(|| postgres_numeric_cast_type(&column.data_type))
+        .map(str::to_owned)
 }
 
 pub fn explain_statement(driver_id: &str, sql: &str) -> Option<String> {
@@ -261,10 +284,8 @@ pub fn build_insert_from_draft(
         }
         col_idents.push(quote_ident(driver_id, &col.name));
         let placeholder = placeholder_for(driver_id, params.len());
-        let value_sql = if driver_id == "postgres" && matches!(values[i], Value::Text(_)) {
-            postgres_array_cast_type(&col.data_type)
-                .or_else(|| postgres_temporal_cast_type(&col.data_type))
-                .or_else(|| postgres_numeric_cast_type(&col.data_type))
+        let value_sql = if driver_id == "postgres" {
+            postgres_text_cast_type(col, &values[i])
                 .map(|type_name| format!("{placeholder}::text::{type_name}"))
                 .unwrap_or(placeholder)
         } else {
@@ -309,11 +330,9 @@ pub fn build_keyed_update(
         .iter()
         .map(|(col_idx, new_value)| {
             let placeholder = placeholder_for(driver_id, params.len());
-            let value_sql = if driver_id == "postgres" && matches!(new_value, Value::Text(_)) {
-                postgres_array_cast_type(&columns[*col_idx].data_type)
-                    .or_else(|| postgres_temporal_cast_type(&columns[*col_idx].data_type))
-                    .or_else(|| postgres_numeric_cast_type(&columns[*col_idx].data_type))
-                    .map(|array_type| format!("{placeholder}::text::{array_type}"))
+            let value_sql = if driver_id == "postgres" {
+                postgres_text_cast_type(&columns[*col_idx], new_value)
+                    .map(|type_name| format!("{placeholder}::text::{type_name}"))
                     .unwrap_or(placeholder)
             } else {
                 placeholder
@@ -507,6 +526,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -754,6 +774,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -768,6 +789,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -782,6 +804,7 @@ mod tests {
             is_generated: true,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 

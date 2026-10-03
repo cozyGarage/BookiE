@@ -35,26 +35,9 @@ python3 scripts/run-test-layer.py full app-server values drivers tls \
 This runs the fast workspace gate, app-server and cross-driver value contracts,
 Docker driver/TLS/PostgreSQL fixtures, keyring and dependency policy checks.
 The runner saves a commit-pinned report and logs under `target/quality/`.
-The full layer passed on clean commit `8e7766c`; its report is
-[`20261001T235848303064Z-layers/report.json`](../target/quality/20261001T235848303064Z-layers/report.json).
-The extended layers have retained individual reports from the same review
-sequence; the Docker driver/value runs used the preceding production tree, and
-`8e7766c` only adds XLSX cutoff assertions and review documentation.
-The app-server/value report is
-[`20261001T231537044614Z-layers/report.json`](../target/quality/20261001T231537044614Z-layers/report.json);
-Docker drivers, TLS, PostgreSQL release, keyring and security-policy are in
-[`20261001T232237703877Z-layers/report.json`](../target/quality/20261001T232237703877Z-layers/report.json).
-GTK, audit, workflow/harness and packaging results are retained in the later
-per-layer reports under `target/quality/`; each report records its selected
-layers, source commit and dirty-tree state.
-The October 2 base report is
-[`20261001T232237703877Z-layers/report.json`](../target/quality/20261001T232237703877Z-layers/report.json).
-The GTK widget and UI safety layers, both supply-chain checks, workflow lint,
-test harness, change-contract and Debian packaging layers passed after
-installing Xvfb, `cargo-audit`, `python-atspi`, and `dpkg`. The current
-`linux/target` already reuses compiled artifacts; it was 82 GiB, including
-45 GiB of incremental state, so preserve it for reuse and review cache cleanup
-separately.
+Fresh local results and remaining gaps are owned by
+[the release audit](release-audit-2026-10-03.md); prior October 1–2 counts and
+cache measurements are in [validation history](validation-history.md).
 
 Run `quick` for a short edit loop. Run the pre-push gate after changes that
 touch shared core/value paths or before handing a B3 slice to review. Keep the
@@ -147,7 +130,7 @@ incomplete, never passed. Review every step status, not just the final log line.
 | `security-policy` | Policy/MCP permissions, allowlists, bounds and audit behavior | Non-GTK dependencies; does not prove every server authorization mode |
 | `supply-chain` | Advisory, license and dependency-source policy | `cargo-deny`, `cargo-audit`, network; repository exceptions remain explicit |
 | `widgets` | Named GTK widget regressions in isolated processes | GNOME 50, Xvfb and private D-Bus |
-| `app-server` | Exact registered app numeric-parser PostgreSQL round trip | GNOME 50 build libraries and Docker; hosted GTK fast job |
+| `app-server` | Registered PostgreSQL/MySQL/MongoDB parser, keyed-edit and metadata contracts | GNOME 50 build libraries and Docker; hosted GTK fast job |
 | `keyring` | Registered Secret Service contracts | Private D-Bus, gnome-keyring and libsecret tools |
 | `ui` | Real application actions and database postconditions via AT-SPI | GNOME 50, Xvfb, PyAT-SPI; X11 automation, not Wayland acceptance |
 
@@ -208,8 +191,8 @@ rebuilds; DuckDB's native build is expensive. Run narrow tests before wider laye
 The layer runner holds a nonblocking checkout lock. A second layer runner fails
 before executing commands. Raw Cargo, legacy scripts and mutation tools do not
 take that lock: coordinate them explicitly. Never run concurrent Cargo or mutation
-jobs against a shared target directory. Other agents should use separate worktrees
-and separate targets, or take turns on this checkout. Docker Compose fixtures also
+jobs against a shared target directory. The current single-agent session uses this checkout and cache directly. If
+parallel owners are introduced later, use separate worktrees/targets or take turns. Docker Compose fixtures also
 share project names; serialize fixture runs on a shared Docker daemon even across
 worktrees. Do not clean up another agent's containers or volumes.
 

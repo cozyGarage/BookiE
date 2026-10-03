@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "M linux/crates/policy/src/guard_tests_audit.rs\n M linux/docs/README.md\n M linux/docs/b4-task-board.md\n M linux/docs/bookie-0.2-history.md\n M linux/docs/bookie-0.2-sprint.md\n M linux/docs/code-conventions.md\n M linux/docs/connections.md\n M linux/docs/decisions/0004-libsecret-secret-storage.md\n M linux/docs/decisions/0008-connection-and-session-ownership.md\n M linux/docs/error-handling.md\n M linux/docs/state-management.md\n M linux/docs/testing.md\n M linux/docs/toolchains.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/upstream-sync.md\n M linux/docs/validation-playbook.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/docs/b4-history.md\n?? linux/docs/connections-history.md\n?? linux/docs/evidence/release-audit-2026-10-03/\n?? linux/docs/testing-history.md\n?? linux/docs/validation-history.md",
+  "tracked_diff_sha256": "9be46c0a3e96f1fbaa0e4e4972b64d2d440d14322f5f3909930690daf4460394",
+  "started_utc": "2026-10-03T00:43:30.870937+00:00",
+  "status": "passed",
+  "layers": {
+    "full": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "full"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "full-1.log",
+          "exit_code": 0,
+          "seconds": 108.626
+        }
+      ]
+    },
+    "security-policy": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-policy",
+            "-p",
+            "tablepro-mcp",
+            "--lib",
+            "--tests"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "security-policy-1.log",
+          "exit_code": 0,
+          "seconds": 12.584
+        }
+      ]
+    },
+    "ssh": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-ssh.sh"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "ssh-1.log",
+          "exit_code": 0,
+          "seconds": 99.593
+        }
+      ]
+    },
+    "tls": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-driver-tls.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "tls-1.log",
+          "exit_code": 0,
+          "seconds": 104.549
+        }
+      ]
+    },
+    "postgres-release": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-postgres-release.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "postgres-release-1.log",
+          "exit_code": 0,
+          "seconds": 33.572
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T00:49:29.797595+00:00"
+}

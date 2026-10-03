@@ -20,6 +20,7 @@ fn value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         };
         let parsed = parse_input_for_driver(literal, Some(&column), "postgres")
             .unwrap_or_else(|error| panic!("{data_type}: {error}"));
@@ -42,6 +43,7 @@ fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -53,6 +55,7 @@ fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -84,6 +87,7 @@ fn value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_key
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -95,6 +99,7 @@ fn value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_key
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -126,6 +131,7 @@ fn value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -137,6 +143,7 @@ fn value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -168,6 +175,7 @@ fn value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -179,6 +187,7 @@ fn value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -210,6 +219,7 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -221,6 +231,7 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();

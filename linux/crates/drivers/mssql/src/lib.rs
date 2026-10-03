@@ -701,6 +701,7 @@ fn row_to_column_info(row: &[Value]) -> ColumnInfo {
         is_generated: as_bool(row.get(7)).unwrap_or(false),
         comment: as_text(row.get(10)).filter(|c| !c.is_empty()),
         collation: as_text(row.get(11)).filter(|c| !c.is_empty()),
+        enum_type: None,
     }
 }
 

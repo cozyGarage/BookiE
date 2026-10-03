@@ -1,0 +1,83 @@
+{
+  "baseline": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "completed_utc": "2026-10-03T00:56:14.694175+00:00",
+  "source_files": {
+    "crates/policy/src/guard_tests_audit.rs": "2c097922897f2bb44b482f75a329c94a2fd0e6ef216d1d666efa8aff84d0f935",
+    "crates/drivers/postgres/tests/support/value_contracts.rs": "87556696a784bf35913c70f6120caf96e59fda15d70e82945ad5674f326cdc64"
+  },
+  "checks": [
+    {
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "final-check-1.txt"
+    },
+    {
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-p",
+        "tablepro-policy",
+        "-p",
+        "tablepro-driver-postgres",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "final-check-2.txt"
+    },
+    {
+      "argv": [
+        "bash",
+        "scripts/check-file-size.sh"
+      ],
+      "exit_code": 0,
+      "log": "final-check-3.txt"
+    },
+    {
+      "argv": [
+        "python3",
+        "scripts/check-function-size.py"
+      ],
+      "exit_code": 0,
+      "log": "final-check-4.txt"
+    },
+    {
+      "argv": [
+        "bash",
+        "scripts/check-panic-sites.sh"
+      ],
+      "exit_code": 0,
+      "log": "final-check-5.txt"
+    },
+    {
+      "argv": [
+        "bash",
+        "scripts/check-bounded-operations.sh"
+      ],
+      "exit_code": 0,
+      "log": "final-check-6.txt"
+    },
+    {
+      "argv": [
+        "cargo",
+        "test",
+        "--locked",
+        "-p",
+        "tablepro-policy",
+        "--lib",
+        "abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable"
+      ],
+      "exit_code": 0,
+      "log": "final-check-7.txt"
+    }
+  ]
+}

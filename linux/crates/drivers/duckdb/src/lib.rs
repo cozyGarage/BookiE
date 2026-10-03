@@ -209,6 +209,7 @@ impl Connection for DuckdbConnection {
                         is_generated: false,
                         comment: None,
                         collation: None,
+                        enum_type: None,
                     })
                 })
                 .map_err(map_duck_error)?;
@@ -415,6 +416,7 @@ fn run_query(
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             })
             .collect()
     } else {
@@ -429,6 +431,7 @@ fn run_query(
                 is_generated: false,
                 comment: None,
                 collation: None,
+                enum_type: None,
             })
             .collect()
     };

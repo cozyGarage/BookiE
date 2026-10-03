@@ -1,0 +1,2 @@
+error: crates/core/src/import/cell.rs has 1213 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+file-size: 1 error(s)

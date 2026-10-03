@@ -1,0 +1,4 @@
+projection columns: nonempty=2, shared-empty=0, transaction-empty=0
+batch error: Transaction { statement_index: 2, source: Query { message: "Table 'test.audit_missing_table' doesn't exist", sqlstate: Some("42S02") } }
+persisted rows after claimed rollback: [[Int(1)]]
+UI message: Save failed at statement 3: Query failed (SQLSTATE 42S02): Table 'test.audit_missing_table' doesn't exist. The transaction was rolled back; no rows were changed.

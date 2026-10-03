@@ -1,7 +1,8 @@
 # Flathub submission
 
-TablePro Linux ships as Flatpak (`com.tablepro.linux`). This note is the
-submission checklist for Flathub.
+BookiE has Flatpak build manifests (`com.tablepro.linux`); a manifest build does
+not establish release qualification or Flathub publication. This is the future
+submission checklist; [the sprint](bookie-0.2-sprint.md) owns approval.
 
 ## Manifest
 
@@ -37,6 +38,7 @@ tokens.
 
 The manifests grant `--socket=ssh-auth`, so the built-in SSH client's "SSH agent"
 authentication reaches the host ssh-agent. The system OpenSSH client option needs
-a host `ssh` program, which the sandbox cannot run, so Flatpak builds use the
-built-in client.
+a host `ssh` program. Selecting an unavailable system route must refuse
+explicitly without switching to the built-in client. Automated sandbox refusal
+proof remains [B4 I2](b4-task-board.md#remaining-tasks).
 

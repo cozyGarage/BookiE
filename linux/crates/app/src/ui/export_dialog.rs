@@ -172,6 +172,7 @@ pub(crate) fn present_with_format(
         suggested_name,
         driver_id,
     } = request;
+    let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
     let page = adw::PreferencesPage::new();
 
     let format_group = adw::PreferencesGroup::new();
@@ -205,11 +206,17 @@ pub(crate) fn present_with_format(
     let safe_csv = adw::SwitchRow::builder()
         .title(crate::tr!("Spreadsheet-safe text"))
         .subtitle(crate::tr!(
-            "Prevent text and column names from being interpreted as formulas. Turn off for raw text."
+            "Prefix formula-like text with an apostrophe for spreadsheet safety. Turn off for lossless re-import."
         ))
         .active(true)
         .build();
     csv_group.add(&safe_csv);
+    let null_marker_row = adw::EntryRow::builder()
+        .title(crate::tr!("Text that means NULL"))
+        .build();
+    null_marker_row.set_text(&null_marker);
+    null_marker_row.set_editable(false);
+    csv_group.add(&null_marker_row);
     csv_group.set_visible(!json);
     page.add(&csv_group);
 
@@ -272,6 +279,7 @@ pub(crate) fn present_with_format(
     let toast_overlay_for_export = toast_overlay.clone();
     let dialog_for_export = dialog.clone();
     let include_header_for_export = include_header.clone();
+    let null_marker_for_export = null_marker.clone();
     export_button.connect_clicked(move |_| {
         let format = selected_format(&formats, format_row.selected());
         let include_header = include_header_for_export.is_active();
@@ -286,6 +294,7 @@ pub(crate) fn present_with_format(
                 result: result.clone(),
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
+                null_marker: null_marker_for_export.clone(),
                 sql_target: sql_target.text().to_string(),
             },
         );
@@ -301,6 +310,7 @@ struct SaveRequest {
     result: QueryResult,
     include_header: bool,
     sanitize_formulas: bool,
+    null_marker: String,
     sql_target: String,
 }
 
@@ -312,6 +322,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         result,
         include_header,
         sanitize_formulas,
+        null_marker,
         sql_target,
     } = request;
     let filter = gtk::FileFilter::new();
@@ -338,8 +349,10 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             return;
         };
         let options = tablepro_core::export::CsvOptions {
+            null_to_empty: false,
             header_row: include_header,
             sanitize_formulas,
+            null_marker: Some(null_marker),
             ..Default::default()
         };
         let (schema, table) = insert_target(&sql_target);

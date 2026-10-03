@@ -1,14 +1,10 @@
 # Production readiness audit
 
-Current bug-fix scope and validation: [bug and consistency audit](bug-consistency-2026-09.md). It supersedes older candidate-status statements below; package release approval remains separate.
-
-**Historical audit update**: 2026-09-07. The current source and verification record is the [bug and consistency audit](bug-consistency-2026-09.md).
-
-**State**: useful for development and personal database work, not yet approved for trusted production writes or unattended agents
-
-This audit describes the Linux Rust and GTK repository. [ROADMAP.md](../ROADMAP.md) tracks broader product work. This document focuses on behavior that must be proven before a public release.
-
-Current corrections and exact local/hosted evidence are recorded in [the bug and consistency audit](bug-consistency-2026-09.md). The September audit is historical evidence for its recorded source tree. A passing base SHA does not verify a changed working tree.
+Historical audit updated 2026-09-07. All source, coverage, readiness and
+“current” wording below belongs to that checkpoint. Current release tasks and
+acceptance are owned by [the active sprint](bookie-0.2-sprint.md) and
+[the October 3 release audit](release-audit-2026-10-03.md). Older bugs and counts
+must be rechecked against source before becoming new work or release proof.
 
 ## Verified foundations
 

@@ -1,0 +1,25 @@
+
+running 1 test
+test value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null ... FAILED
+
+failures:
+
+---- value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null stdout ----
+
+thread 'value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null' (2424247) panicked at crates/drivers/mongodb/tests/support/value_contracts.rs:86:5:
+assertion `left == right` failed: a missing field must not become an editable explicit BSON null
+  left: Null
+ right: Undecodable("missing BSON field")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 27 filtered out; finished in 1.03s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.85s
+     Running tests/integration.rs (linux/target/debug/deps/integration-fc39c0a96012db67)
+error: test failed, to rerun pass `-p tablepro-driver-mongodb --test integration`

@@ -1,5 +1,9 @@
 # BookiE 0.1.4 on Arch Linux Omarchy
 
+Historical package guide. Its library requirements describe 0.1.4, not the
+current GNOME 50 source baseline. For 0.2 candidate builds use
+[packaging](../packaging/README.md) and [the sprint](bookie-0.2-sprint.md).
+
 Install from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4). Do not package from a dirty tree. Read [release evidence](release-0.1.4.md) before installation.
 
 The package is an internal Arch candidate, not an AUR or Flathub release. Visible name is BookiE. Commands `bookie` and `bookie-agentd` are installed, with `tablepro` and `tablepro-agentd` aliases. Application ID, D-Bus, XDG paths, and keyring schema stay `com.tablepro.linux` / `tablepro`.
@@ -59,10 +63,9 @@ Building from source is optional when the GitHub Release package is enough. Use 
 
 ```bash
 git clone https://github.com/cozyGarage/BookiE.git
-cd TablePro
-git fetch origin linux
-git checkout linux
-git pull origin linux
+cd BookiE
+git fetch origin tag linux-v0.1.4
+git checkout --detach linux-v0.1.4
 git status
 git rev-parse HEAD
 ```

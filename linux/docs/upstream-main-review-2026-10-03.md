@@ -157,6 +157,12 @@ Test GUI and daemon assembly; transport unit preservation alone is insufficient.
 
 ### U6: MongoDB late fields and export scope
 
+Continuation at `aeac107a4`: `fetch_columns` now scans the collection and
+marks conflicting kinds `mixed`; native driver/app cases cover the named late
+Decimal128 fixture. The sample-only description below is the original review
+baseline. Whole-export scope, census cost and concurrent writes remain open in
+[the B3 board](type-contract-strategy.md), not a request to add another census.
+
 Reference: [#3213](https://github.com/TableProApp/TablePro/commit/0ff3508258).
 Upstream builds its export header from a census of the selected source rather
 than a small initial document sample. [#3194](https://github.com/TableProApp/TablePro/commit/3767a03396)

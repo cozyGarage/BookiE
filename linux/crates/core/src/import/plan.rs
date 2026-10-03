@@ -120,7 +120,8 @@ fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result
     let shape_values = shape_columns
         .iter()
         .map(|column| {
-            if postgres_array_cast_type(&column.data_type).is_some()
+            if column.enum_type.is_some()
+                || postgres_array_cast_type(&column.data_type).is_some()
                 || postgres_numeric_cast_type(&column.data_type).is_some()
                 || postgres_temporal_cast_type(&column.data_type).is_some()
             {
@@ -202,6 +203,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
@@ -241,6 +243,61 @@ mod tests {
         assert_eq!(plan.row_count(), 2);
         assert_eq!(plan.rows.len(), 2);
         assert_eq!(plan.rows[0], vec![Value::Int(1), Value::Text("ada".to_owned())]);
+    }
+
+    #[test]
+    fn postgres_enum_import_plan_uses_catalog_type_for_text_rows() {
+        let mut status = column("status", "value_contract_enum_schema.value_contract_status");
+        status.enum_type = Some(crate::query::QualifiedTypeName {
+            schema: "value_contract_enum_schema".into(),
+            name: "value_contract_status".into(),
+        });
+        let columns = vec![status];
+        let mapping = vec![Some(0)];
+        let sheet = sheet(&[&["NULL"]], &["status"]);
+
+        let plan = build_insert_plan(&target(&columns, &mapping), &sheet, &CsvImportOptions::default()).expect("plan");
+
+        assert!(
+            plan.statement
+                .contains("$1::text::\"value_contract_enum_schema\".\"value_contract_status\"")
+        );
+        assert_eq!(plan.rows, vec![vec![Value::Text("NULL".into())]]);
+    }
+
+    #[test]
+    fn postgres_enum_import_requires_a_null_marker_for_empty_fields() {
+        let mut status = column("status", "value_contract_status");
+        status.enum_type = Some(crate::query::QualifiedTypeName {
+            schema: "value_contract_enum_schema".into(),
+            name: "value_contract_status".into(),
+        });
+        let columns = vec![status];
+        let mapping = vec![Some(0)];
+        let blank_sheet = sheet(&[&[""]], &["status"]);
+
+        let error = build_insert_plan(&target(&columns, &mapping), &blank_sheet, &CsvImportOptions::default())
+            .expect_err("a blank could be either NULL or an empty enum label");
+        let PlanError::Rows { total, first } = error else {
+            panic!("expected the ambiguous blank to be refused");
+        };
+        assert_eq!(total, 1);
+        assert_eq!(first[0].reason, crate::import::CellError::AmbiguousEnumNullOrEmpty);
+
+        let options = CsvImportOptions {
+            null_marker: "\\N".into(),
+            ..CsvImportOptions::default()
+        };
+        let explicit_sheet = sheet(&[&[""], &["\\N"], &["NULL"]], &["status"]);
+        let plan = build_insert_plan(&target(&columns, &mapping), &explicit_sheet, &options).expect("explicit marker");
+        assert_eq!(
+            plan.rows,
+            vec![
+                vec![Value::Text(String::new())],
+                vec![Value::Null],
+                vec![Value::Text("NULL".into())],
+            ]
+        );
     }
 
     #[test]

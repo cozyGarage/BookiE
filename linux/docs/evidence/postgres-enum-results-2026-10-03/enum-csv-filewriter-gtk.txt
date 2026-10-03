@@ -1,0 +1,59 @@
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=2618771 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[2618782]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=2618784 comm="python3 /home/trung/Projects/tablepro/linux/crates")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.4' (uid=1000 pid=2618790 comm="/home/trung/Projects/tablepro/linux/target/release")
+dbus-daemon[2618782]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+fusermount3: failed to access mountpoint /run/user/1000/gvfs: Permission denied
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.4' (uid=1000 pid=2618790 comm="/home/trung/Projects/tablepro/linux/target/release")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.8' (uid=1000 pid=2618863 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.8' (uid=1000 pid=2618863 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.044: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown as a last-resort fallback
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.8' (uid=1000 pid=2618863 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.091: Choosing gtk.portal for org.freedesktop.impl.portal.Access as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.098: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.098: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.098: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.098: Choosing gtk.portal for org.freedesktop.impl.portal.Settings as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.098: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.099: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.099: Choosing gtk.portal for org.freedesktop.impl.portal.Print as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.099: Choosing gtk.portal for org.freedesktop.impl.portal.Notification as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.100: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.102: Choosing gtk.portal for org.freedesktop.impl.portal.Account as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.102: Choosing gtk.portal for org.freedesktop.impl.portal.Email as a last-resort fallback
+
+(/usr/lib/xdg-desktop-portal:2618863): xdg-desktop-portal-WARNING **: 15:31:44.102: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher as a last-resort fallback
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+
+(process:2618784): dbind-WARNING **: 15:31:44.164: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.gtk.vfs.UDisks2VolumeMonitor' requested by ':1.4' (uid=1000 pid=2618790 comm="/home/trung/Projects/tablepro/linux/target/release")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.gtk.vfs.UDisks2VolumeMonitor'
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.gtk.vfs.MTPVolumeMonitor' requested by ':1.4' (uid=1000 pid=2618790 comm="/home/trung/Projects/tablepro/linux/target/release")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.gtk.vfs.MTPVolumeMonitor'
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='org.gtk.vfs.Metadata' requested by ':1.12' (uid=1000 pid=2618885 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'org.gtk.vfs.Metadata'
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Activating service name='ca.desrt.dconf' requested by ':1.12' (uid=1000 pid=2618885 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[2618730]: [session uid=1000 pid=2618730 pidfd=5] Successfully activated service 'ca.desrt.dconf'
+passed: current_page_csv_export_is_pk_ordered
+X connection to :99 broken (explicit kill or server shutdown).
+A connection to the bus can't be made
+A connection to the bus can't be made
+A connection to the bus can't be made

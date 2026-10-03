@@ -39,6 +39,12 @@ mod interval_contract;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
+#[path = "support/enum_contract.rs"]
+mod enum_contract;
+
+#[path = "support/enum_file_export_contract.rs"]
+mod enum_file_export_contract;
+
 #[path = "support/disconnection.rs"]
 mod disconnection;
 
@@ -731,15 +737,26 @@ async fn non_null_decode_failures_are_not_returned_as_null() {
         result.rows[0],
         vec![Value::Null, Value::Null, Value::Null, Value::Int(42)]
     );
+    for expression in [
+        "'5874897-12-31'::date",
+        "'280000-01-01'::timestamp",
+        "'280000-01-01 00:00:00+00'::timestamptz",
+    ] {
+        let result = conn
+            .query(&format!("SELECT {expression}, ({expression})::text"))
+            .await
+            .unwrap();
+        assert!(
+            matches!(result.rows[0][0], Value::Text(_)),
+            "{expression}: {:?}",
+            result.rows[0][0]
+        );
+        assert_eq!(result.rows[0][0], result.rows[0][1], "{expression}");
+    }
     // A single undecodable cell degrades to `Value::Undecodable` instead of
     // aborting the whole result set (or silently becoming NULL): the rest
     // of the row, and other rows in the same result, still come back.
-    for sql in [
-        "SELECT ARRAY[int4range(1, 3)]",
-        "SELECT '5874897-12-31'::date",
-        "SELECT '280000-01-01'::timestamp",
-        "SELECT '280000-01-01 00:00:00+00'::timestamptz",
-    ] {
+    for sql in ["SELECT ARRAY[int4range(1, 3)]"] {
         let result = conn.query(sql).await.unwrap_or_else(|e| panic!("{sql}: {e}"));
         assert!(
             matches!(result.rows[0][0], Value::Undecodable(_)),

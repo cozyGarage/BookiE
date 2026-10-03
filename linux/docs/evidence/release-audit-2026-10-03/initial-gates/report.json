@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-03T00:34:27.389267+00:00",
+  "status": "passed",
+  "layers": {
+    "full": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "full"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "full-1.log",
+          "exit_code": 0,
+          "seconds": 124.313
+        }
+      ]
+    },
+    "security-policy": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-policy",
+            "-p",
+            "tablepro-mcp",
+            "--lib",
+            "--tests"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "security-policy-1.log",
+          "exit_code": 0,
+          "seconds": 20.645
+        }
+      ]
+    },
+    "widgets": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-widgets.sh"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "widgets-1.log",
+          "exit_code": 0,
+          "seconds": 17.115
+        }
+      ]
+    },
+    "app-server": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-isolated-tests.py",
+            "app-server"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "app-server-1.log",
+          "exit_code": 0,
+          "seconds": 50.128
+        }
+      ]
+    },
+    "packaging-contracts": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_arch_candidate.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "git",
+            "tar"
+          ],
+          "status": "passed",
+          "log": "packaging-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 0.114
+        },
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_deb_package.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "dpkg-deb"
+          ],
+          "status": "passed",
+          "log": "packaging-contracts-2.log",
+          "exit_code": 0,
+          "seconds": 0.164
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T00:37:59.870941+00:00"
+}

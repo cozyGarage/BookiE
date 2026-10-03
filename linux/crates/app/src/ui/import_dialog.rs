@@ -365,6 +365,7 @@ fn draft_to_info(draft: &DraftColumn) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

@@ -18,6 +18,7 @@ fn info(comment: Option<&str>) -> ColumnInfo {
         is_generated: false,
         comment: comment.map(str::to_string),
         collation: None,
+        enum_type: None,
     }
 }
 

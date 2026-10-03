@@ -105,6 +105,60 @@ async fn dropped_write_future_poisons_shared_state() {
 }
 
 #[tokio::test]
+async fn abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable() {
+    let journal = AuditState::new();
+    let old_state = Arc::new(journal.new_connection_generation());
+    let dispatched = Arc::new(Notify::new());
+    let pending_guard = gui_guard(
+        Arc::new(BlockingWriteConn {
+            dispatched: dispatched.clone(),
+            release: Arc::new(Notify::new()),
+        }),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        old_state.clone(),
+    );
+    let pending = tokio::spawn(async move { pending_guard.execute("INSERT INTO jobs(id) VALUES (1)").await });
+    tokio::time::timeout(std::time::Duration::from_secs(5), dispatched.notified())
+        .await
+        .expect("old write reached the driver");
+
+    let replacement_state = Arc::new(old_state.new_connection_generation());
+    pending.abort();
+    pending.await.expect_err("old write was abandoned after replacement");
+    assert!(old_state.governed_writes_disabled());
+    assert!(!replacement_state.governed_writes_disabled());
+
+    let old_executes = Arc::new(AtomicUsize::new(0));
+    let old_guard = gui_guard(
+        connection(old_executes.clone(), Arc::new(AtomicUsize::new(0))),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        old_state,
+    );
+    old_guard
+        .execute("INSERT INTO jobs(id) VALUES (2)")
+        .await
+        .expect_err("old generation refuses another write before dispatch");
+    assert_eq!(old_executes.load(Ordering::SeqCst), 0);
+
+    let new_executes = Arc::new(AtomicUsize::new(0));
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let replacement = gui_guard(
+        connection(new_executes.clone(), Arc::new(AtomicUsize::new(0))),
+        audit.clone(),
+        replacement_state,
+    );
+    replacement
+        .execute("INSERT INTO jobs(id) VALUES (3)")
+        .await
+        .expect("replacement remains writable after the late old-generation failure");
+    assert_eq!(new_executes.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        audit.events.lock().unwrap().last().unwrap().terminal_status,
+        AuditTerminalStatus::Succeeded
+    );
+}
+
+#[tokio::test]
 async fn batch_query_error_records_unknown_and_poisons_state() {
     let state = Arc::new(AuditState::new());
     let audit = Arc::new(SequenceAuditSink::new(vec![]));

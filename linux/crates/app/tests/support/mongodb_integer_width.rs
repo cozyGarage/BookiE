@@ -12,6 +12,7 @@ fn column(data_type: &str, nullable: bool) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

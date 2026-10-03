@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+
+running 2 tests
+test import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_rows ... ok
+test import::plan::tests::postgres_enum_import_requires_a_null_marker_for_empty_fields ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 503 filtered out; finished in 0.00s
+

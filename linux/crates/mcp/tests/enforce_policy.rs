@@ -341,6 +341,7 @@ async fn csv_export_escapes_separators_quotes_and_newlines() {
 
     let content = out.get("content").and_then(|v| v.as_str()).unwrap();
     assert_eq!(content, "note,plain\n\"a,b\"\"c\nd\",ok\n");
+    assert_eq!(out["null_marker"], "\\N");
 }
 
 async fn read_only_harness(
@@ -524,6 +525,7 @@ fn column(name: &str) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

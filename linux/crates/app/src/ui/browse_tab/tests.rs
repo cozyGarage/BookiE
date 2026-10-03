@@ -14,6 +14,7 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 
@@ -364,6 +365,10 @@ async fn value_contract_mongodb_run_find_merges_page_types_and_exports_materiali
         Value::Json(serde_json::json!({ "$numberDecimal": decimal.to_string() }))
     );
 
+    assert_decimal_export_formats(&result, &decimal.to_string());
+}
+
+fn assert_decimal_export_formats(result: &QueryResult, decimal: &str) {
     let temp = tempfile::tempdir().unwrap();
     for (format, extension) in [
         (tablepro_core::export::ResultFormat::Csv, "csv"),
@@ -376,10 +381,10 @@ async fn value_contract_mongodb_run_find_merges_page_types_and_exports_materiali
             csv: &csv,
             sql: None,
         };
-        tablepro_core::export::write_result_file(&path, &result, &export, || false, |_| {}).unwrap();
+        tablepro_core::export::write_result_file(&path, result, &export, || false, |_| {}).unwrap();
         let contents = std::fs::read_to_string(path).unwrap();
         assert!(contents.contains("$numberDecimal"), "{extension}: {contents}");
-        assert!(contents.contains(&decimal.to_string()), "{extension}: {contents}");
+        assert!(contents.contains(decimal), "{extension}: {contents}");
     }
 }
 

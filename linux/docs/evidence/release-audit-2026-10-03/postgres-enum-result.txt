@@ -1,0 +1,4 @@
+Command (linux/): rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contracts::value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
+Exit code: 0
+RTK output: cargo test: 1 passed, 69 filtered out (1 suite, 2.08s)
+This is RTK summary output, not a raw Cargo transcript. The exact selector is unchanged; source fingerprints are retained in final-checks.json.

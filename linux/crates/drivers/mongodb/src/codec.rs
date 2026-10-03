@@ -64,6 +64,7 @@ pub(super) fn columns_from_types(mut union: BTreeMap<String, String>) -> Vec<Col
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         });
     }
     for (name, data_type) in union {
@@ -77,6 +78,7 @@ pub(super) fn columns_from_types(mut union: BTreeMap<String, String>) -> Vec<Col
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         });
     }
     columns
@@ -112,7 +114,7 @@ pub(super) fn document_to_row(doc: &Document, columns: &[ColumnInfo]) -> Vec<Val
         .map(|c| match doc.get(&c.name) {
             Some(b) if c.data_type == "mixed" => Value::Json(b.clone().into_canonical_extjson()),
             Some(b) => bson_to_value(b),
-            None => Value::Null,
+            None => Value::Undecodable("missing BSON field".into()),
         })
         .collect()
 }
@@ -254,6 +256,14 @@ mod tests {
     use super::*;
 
     use mongodb::bson::doc;
+
+    #[test]
+    fn missing_field_marker_cannot_be_bound_as_bson_null() {
+        assert!(matches!(
+            value_to_bson(&Value::Undecodable("missing BSON field".into())),
+            Err(DriverError::Unsupported(_))
+        ));
+    }
 
     #[test]
     fn mongodb_date_grid_bindings_refuse_submillisecond_rounding() {

@@ -3,7 +3,8 @@ Patched crates.io snapshots used through `[patch.crates-io]` in the workspace
 re-applying only these edits:
 
 - `sqlx-postgres` 0.9.0: reject SCRAM PBKDF2 iteration counts above 100_000 in
-  `src/connection/sasl.rs` (same cap as postgres-protocol 0.6.12 / RUSTSEC-2026-0179).
+  `src/connection/sasl.rs` (same cap as postgres-protocol 0.6.12 / RUSTSEC-2026-0179),
+  and preserve quoted `NULL` text elements in text arrays in `src/types/array.rs`.
 - `mongodb` 3.9.1: reject SCRAM iteration counts above 100_000 in
   `src/client/auth/scram.rs`, and let the TLS layer verify a hostname
   different from the one it dials, in `src/client/options.rs` and

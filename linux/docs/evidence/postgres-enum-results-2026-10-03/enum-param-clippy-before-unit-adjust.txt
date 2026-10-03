@@ -1,0 +1,53 @@
+cargo clippy: 4 errors, 1 warnings
+
+Errors:
+  error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+    --> crates/drivers/postgres/src/tests.rs:8:9
+     |
+   8 |         bind_pg_params(sqlx::query(sqlx::AssertSqlSafe("SELECT $1")), &params),
+     |         ^^^^^^^^^^^^^^-------------------------------------------------------- argument #3 of type `&[std::option::Option<sqlx::sqlx_postgres::PgTypeInf...
+     |
+  note: function defined here
+    --> crates/drivers/postgres/src/params.rs:84:15
+     |
+  84 | pub(super) fn bind_pg_params<'q>(
+     |               ^^^^^^^^^^^^^^
+  ...
+  87 |     enum_types: &[Option<PgTypeInfo>],
+     |     ---------------------------------
+  help: provide the argument
+
+  error: deref which would be done by auto-deref
+     --> crates/drivers/postgres/src/lib.rs:383:49
+      |
+  383 |                 match describe_query_parameters(&mut *tx, sql, params).await {
+      |                                                 ^^^^^^^^ help: try: `&mut tx`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_auto_deref
+      = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`
+      = help: to override `-D warnings` add `#[allow(clippy::explicit_auto_deref)]`
+
+  error: deref which would be done by auto-deref
+     --> crates/drivers/postgres/src/lib.rs:813:40
+      |
+  813 |         Some(describe_query_parameters(&mut **connection, sql, params).await?)
+      |                                        ^^^^^^^^^^^^^^^^^ help: try: `connection`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_auto_deref
+
+  error: deref which would be done by auto-deref
+     --> crates/drivers/postgres/src/lib.rs:845:35
+      |
+  845 |         describe_query_parameters(&mut **connection, sql, params)
+      |                                   ^^^^^^^^^^^^^^^^^ help: try: `connection`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.98.0/index.html#explicit_auto_deref
+
+  deref which would be done by auto-deref (3x)
+    crates/drivers/postgres/src/lib.rs:383:49
+    crates/drivers/postgres/src/lib.rs:813:40
+    crates/drivers/postgres/src/lib.rs:845:35
+  E0061 (2x)
+    crates/drivers/postgres/src/tests.rs:8:9
+    crates/drivers/postgres/src/params.rs:84:15
+[full output: ~/.local/share/rtk/tee/1791025351_cargo_clippy.log]

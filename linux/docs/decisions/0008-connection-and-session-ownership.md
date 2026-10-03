@@ -45,11 +45,12 @@ failure and unresolved durable recovery obligations remain fail-closed; reconnec
 cannot erase an audit intent or prove whether the server committed a write.
 Old-generation callbacks cannot clear or poison a replacement's state.
 
-This is the accepted target, **not the current implementation claim**. B4 F8
-still owns the state split. F4/F9 shared reconnect/session invalidation is now
-merged through `573435766`, with remaining integrated/installed acceptance on the board;
-F6/I2/I5 and daemon acceptance own the trust/route/audit work. See the
-[current board](../b4-task-board.md) and [source risks](../architecture-consistency-review-2026-10-03.md#remaining-source-risks).
+F8's GUI generation split is merged in `6346a431c`; the daemon still supplies
+one shared `AuditState` to all cached connections. GUI source integration does
+not prove headless parity or installed recovery. F4/F9 reconnect/session
+invalidation and F6 host consent are merged. Remaining transport, daemon,
+audit and installed acceptance live on [the B4 board](../b4-task-board.md),
+with current source findings in [the release audit](../release-audit-2026-10-03.md).
 
 ## Rationale
 

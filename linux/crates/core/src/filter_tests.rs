@@ -185,6 +185,7 @@ fn col(name: &str, data_type: &str) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 
@@ -234,6 +235,57 @@ fn postgres_pattern_search_casts_values_but_typed_comparisons_do_not() {
     let (sql, params) = build_filter_where("postgres", &columns, &set).unwrap().unwrap();
     assert_eq!(sql, "\"value\" = $1");
     assert_eq!(params, vec![Value::Int(12)]);
+}
+
+#[test]
+fn postgres_enum_filters_cast_values_to_the_schema_qualified_type() {
+    let mut column = col("status", "value_contract_enum_schema.value_contract_status");
+    column.enum_type = Some(crate::QualifiedTypeName {
+        schema: "value_contract_enum_schema".into(),
+        name: "value_contract_status".into(),
+    });
+    let columns = [column];
+    let cases = [
+        (
+            FilterOp::Eq,
+            FilterValue::Single("NULL".into()),
+            "\"status\" = $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            vec![Value::Text("NULL".into())],
+        ),
+        (
+            FilterOp::NotEq,
+            FilterValue::Single("NULL".into()),
+            "\"status\" <> $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            vec![Value::Text("NULL".into())],
+        ),
+        (
+            FilterOp::Lt,
+            FilterValue::Single("paused".into()),
+            "\"status\" < $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            vec![Value::Text("paused".into())],
+        ),
+        (
+            FilterOp::In,
+            FilterValue::List(vec!["NULL".into(), "東京".into()]),
+            "\"status\" IN ($1::\"value_contract_enum_schema\".\"value_contract_status\", $2::\"value_contract_enum_schema\".\"value_contract_status\")",
+            vec![Value::Text("NULL".into()), Value::Text("東京".into())],
+        ),
+        (
+            FilterOp::Between,
+            FilterValue::Pair("ready".into(), "paused".into()),
+            "\"status\" BETWEEN $1::\"value_contract_enum_schema\".\"value_contract_status\" AND $2::\"value_contract_enum_schema\".\"value_contract_status\"",
+            vec![Value::Text("ready".into()), Value::Text("paused".into())],
+        ),
+    ];
+    for (op, value, expected_sql, expected_params) in cases {
+        let set = FilterSet {
+            rules: vec![rule("status", op, Some(value))],
+            ..Default::default()
+        };
+        let (sql, params) = build_filter_where("postgres", &columns, &set).unwrap().unwrap();
+        assert_eq!(sql, expected_sql);
+        assert_eq!(params, expected_params);
+    }
 }
 
 #[test]

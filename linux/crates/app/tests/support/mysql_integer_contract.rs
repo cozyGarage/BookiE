@@ -12,6 +12,7 @@ fn col(data_type: &str, primary_key: bool) -> ColumnInfo {
         default_value: None,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

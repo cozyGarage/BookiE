@@ -1,0 +1,1198 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "Intentional uncommitted sprint changes are part of the tested source; this evidence does not describe a frozen candidate SHA.",
+  "scope": [
+    "Decode ordinary PostgreSQL custom-enum scalar values as exact text.",
+    "Decode ordinary PostgreSQL custom-enum arrays as exact PostgreSQL array text, retaining SQL NULL elements distinctly from the label text.",
+    "Preserve ordinary custom-enum labels and SQL NULL through schema-aware keyed grid updates and draft inserts, with native persisted type/value and sibling-row assertions.",
+    "Keep custom-enum catalog metadata internal to ColumnInfo so it does not change the serialized protocol shape.",
+    "The literal enum label NULL is preserved on schema-aware keyed writes and draft inserts, on direct scalar/array results, and on text values explicitly cast through bound parameters; it remains distinct from SQL NULL. Vendored SQLx 0.9.0 now preserves quoted NULL labels during text-array metadata decoding.",
+    "Schema-aware PostgreSQL enum filters cast text parameters to the catalog-qualified enum type for equality, ordering, BETWEEN and IN operators; literal NULL labels remain distinct from SQL NULL.",
+    "Import PostgreSQL custom-enum CSV values through catalog-qualified casts. Refuse default blank enum cells when empty labels and SQL NULL are indistinguishable; preserve both when the importer has an explicit null marker.",
+    "The shared render_json result serializer preserves PostgreSQL enum empty text, literal NULL, Unicode and SQL NULL as distinct JSON values.",
+    "When PostgreSQL expression context identifies a custom enum parameter, infer its server OID for Value::Text and Value::Null across query, direct execute and transaction helpers; preserve existing text behavior when context is ambiguous or plain text.",
+    "Exercise PostgreSQL custom-enum execute_query and export_data JSON/CSV paths through MCP: preserve exact JSON values and server type; return a per-result null marker absent from exported text, then import the exact CSV response with that marker and verify native values/types.",
+    "Cover the core PostgreSQL custom-enum CSV file-writer and schema-aware importer as one round trip: show a collision-free marker in the app export dialog, preserve the destination on ambiguous default blanks, and verify native enum values/types after importing exact raw-text file output, including a formula-shaped label.",
+    "Replay PostgreSQL custom-enum SQL result-file output into a same-type destination and verify values, enum type, NULL distinctions, and quoted adversarial text.",
+    "Exercise PostgreSQL custom-enum values through the core XML result-file writer, preserving literal NULL, empty text, Unicode, SQL NULL, and safely escaped markup/entity text.",
+    "Exercise PostgreSQL custom-enum values through the core HTML result-file writer, preserving literal NULL, empty text, Unicode, SQL NULL, and escaped hostile markup.",
+    "Preserve PostgreSQL custom-enum distinctions through the core Markdown result-file writer: text cells are JSON-quoted, SQL NULL remains unquoted, and table/inline-markup characters are escaped.",
+    "Cover PostgreSQL custom-enum XLSX output: non-empty enum text remains a shared-string cell distinct from SQL NULL, while empty enum labels are explicitly refused with atomic destination preservation.",
+    "Distinguish lossless raw-text PostgreSQL enum CSV from spreadsheet-safe output, including native import behavior when formula prefixing collides with a valid enum label.",
+    "A PostgreSQL 16 native scalar projection of a domain over a custom enum preserves the literal NULL label, Unicode, SQL NULL and the server-reported domain type; other domain consumers remain untested."
+  ],
+  "regressions": [
+    {
+      "selector": "value_contract_custom_enum_projection_preserves_labels_and_null",
+      "assertions": "Direct scalar labels ready/paused, SQL NULL, native pg_typeof text, and array text {\"ready\",\"paused\",NULL}.",
+      "before_fix": "Failed: non-NULL labels decoded as Undecodable(VALUE_CONTRACT_PLAIN_ENUM). See before-fix.txt.",
+      "after_fix": "Passed in the focused enum selection and complete PostgreSQL integration suite."
+    },
+    {
+      "selector": "value_contract_scalar_enum_labels_preserve_exact_text",
+      "assertions": "Direct scalar enum results preserve literal NULL, Unicode, apostrophe labels and SQL NULL with exact pg_typeof text. Explicitly cast bound text values and bound SQL NULL return native enum values. UPDATE RETURNING stores the literal label and its trigger fires exactly once.",
+      "boundary": "SQLx text-array decoding now tracks whether NULL was quoted; the vendor unit regression proves the quoted string stays text while unquoted NULL remains SQL NULL."
+    },
+    {
+      "selector": "value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null",
+      "assertions": "Direct custom enum-array projection preserves literal NULL, Unicode, apostrophe labels and a SQL NULL element as exact canonical PostgreSQL array text; independent server JSON/type oracles remain asserted."
+    },
+    {
+      "selector": "sqlx_postgres_text_array_distinguishes_quoted_null_from_sql_null",
+      "assertions": "Vendored SQLx unit test decodes quoted NULL as Some(\"NULL\"), unquoted NULL as None, lowercase null, empty text and ordinary text distinctly."
+    },
+    {
+      "selector": "array::tests::value_contract_enum_array_labels_quote_null_text_and_preserve_sql_null",
+      "assertions": "Binary enum-array wire values for literal NULL, empty text, comma, quote, Unicode and SQL NULL; invalid UTF-8 is refused."
+    },
+    {
+      "selector": "value_contract_custom_enum_keyed_edit_preserves_label_and_siblings",
+      "assertions": "Fetch schema-qualified catalog enum metadata; keyed-update and draft-insert ordinary and literal NULL labels plus SQL NULL; verify native type and exact sibling values."
+    },
+    {
+      "selector": "postgres_enum_write_casts_quote_catalog_schema_and_type_names",
+      "assertions": "Core builder SQL for keyed update and draft insert quotes a schema with a space and a type name containing a double quote; text and SQL NULL are cast through text to the catalog type."
+    },
+    {
+      "selector": "enum_catalog_metadata_does_not_change_column_info_wire_shape",
+      "assertions": "Serialize ColumnInfo containing PostgreSQL enum metadata, assert enum_type is absent, then deserialize and assert it defaults to None."
+    },
+    {
+      "selector": "unknown_type_falls_through_to_text",
+      "assertions": "The app's PostgreSQL cell parser preserves a schema-qualified custom enum label as Value::Text for the keyed-write consumer."
+    },
+    {
+      "selector": "value_contract_custom_enum_filters_preserve_labels_and_sql_null",
+      "unit_selector": "filter::tests::postgres_enum_filters_cast_values_to_the_schema_qualified_type",
+      "assertions": "Native PostgreSQL filter results verify exact ids, labels and pg_typeof for equality, inequality, enum ordering, BETWEEN and IN using literal NULL and Unicode labels; IS NULL selects only the SQL NULL row. Unit SQL assertions pin schema-qualified casts for equality, inequality, ordering, BETWEEN and IN.",
+      "before_fix": "Core SQL builder emitted status = $1 and failed its expected SQL assertion. Native PostgreSQL failed with SQLSTATE 42883: operator does not exist: value_contract_enum_filter.status = text.",
+      "after_fix": "Focused core and Docker-backed PostgreSQL regressions pass. Full core unit and PostgreSQL integration suites pass."
+    },
+    {
+      "selector": "value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null",
+      "unit_selectors": [
+        "import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_rows",
+        "import::plan::tests::postgres_enum_import_requires_a_null_marker_for_empty_fields"
+      ],
+      "assertions": "Native PostgreSQL CSV export/import covers literal NULL, empty enum label, Unicode, apostrophe, comma, and SQL NULL. Default export blanks are refused before dispatch and the target remains empty. With explicit \\N null marker, the native target values and pg_typeof match the source labels exactly.",
+      "before_fix": "The native integration fixture failed because its INSERT plan emitted an untyped $2 parameter for the custom enum column. The first default-blank probe also showed empty fields were interpreted as empty text, which cannot distinguish an empty enum label from SQL NULL.",
+      "after_fix": "Schema-qualified text-to-enum cast is present. The ambiguous default file is refused without writes; the explicit-marker import succeeds. Focused tests and full affected suites pass."
+    },
+    {
+      "selector": "value_contract_custom_enum_json_and_file_exports_preserve_empty_literal_null_and_sql_null",
+      "assertions": "PostgreSQL 16 returns the enum literal NULL, empty label, Unicode and SQL NULL with pg_typeof. render_json and core write_result_file JSON preserve each value. CSV file output pins quoted empty text versus blank SQL NULL. Cancelling JSON file export after one row leaves the prior destination bytes intact and removes the staged file.",
+      "initial_gap": "The native fixture checked render_json but had no PostgreSQL enum contract for the atomic core file writer.",
+      "after_fix": "Focused native export and cancellation assertions passed; the complete PostgreSQL integration suite passed 77 tests.",
+      "remaining": "Other result-file formats are not covered by this enum case; CSV is an output encoding, not a lossless import claim."
+    },
+    {
+      "selector": "value_contract_custom_enum_parameters_infer_native_type_for_query_and_write",
+      "assertions": "Native PostgreSQL enum comparison finds the literal NULL label; SQL NULL matches only the SQL NULL row; direct UPDATE and transaction UPDATE persist text/Unicode under the enum type; an invalid label reports SQLSTATE 22P02; an untyped plain-text parameter remains PostgreSQL text.",
+      "before_fix": "Reproduced SQLSTATE 42883: operator does not exist: value_contract_enum_bind.state = text. The first full-suite run after inference exposed SQLSTATE 22P03 because SQLx reused the metadata probe statement cache entry for a different bind layout.",
+      "after_fix": "Metadata preparation uses a distinct SQL cache key; the full serial PostgreSQL integration suite passed 77 tests, including this regression and array/numeric neighbors.",
+      "fallback": "Ambiguous parameter descriptions retry with existing Value type information; inferred non-enum parameters continue through the existing typed bind implementations.",
+      "evidence": [
+        "enum-param-before-fix.txt",
+        "enum-param-postgres-cache-collision-before-fix.txt",
+        "enum-param-focused-after-cache-fix.txt",
+        "enum-param-array-neighbor-after-cache-fix.txt",
+        "enum-param-numeric-neighbor-after-cache-fix.txt",
+        "enum-param-postgres-live.txt"
+      ]
+    },
+    {
+      "selector": "postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool",
+      "assertions": "PostgreSQL 16 custom-enum rows flow through the production driver, McpBridge, execute_query and export_data. JSON distinguishes literal NULL, empty text, Unicode and SQL NULL and retains server type. CSV returns a marker absent from exported text (advancing from \\N through \\NN to \\NNN when those enum labels occur); the exact response content is imported with that marker and native enum values/types are verified.",
+      "native_fixture": "PostgreSQL 16 Docker; enum mcp_enum.state has labels NULL, empty, Unicode, \\N and \\NN plus SQL NULL.",
+      "after_fix": "Focused Docker selector passed; exact MCP CSV content round-tripped through the core schema-aware importer into a PostgreSQL enum table. MCP package targets passed with Docker-only tests ignored in the ordinary tier.",
+      "remaining": "Additional enum format/session configurations remain separate consumer cases; core CSV file-writer raw-text round trip is recorded in the following regression.",
+      "output": "enum-mcp-csv-roundtrip.txt"
+    },
+    {
+      "selector": "value_contract_custom_enum_csv_file_export_import_preserves_empty_and_null",
+      "assertions": "Raw-text export/import preserves distinct formula-like enum labels and native type. Spreadsheet-safe export prefixes =1+1; the existing literal label '=1+1 already has that output spelling, so both imported rows become the latter native enum value. The export UI identifies raw text as the lossless re-import option.",
+      "native_fixture": "PostgreSQL 16 Docker; source/target tables use csv_file_enum.state with labels NULL, empty, \u6771\u4eac, \\N and \\NN plus SQL NULL.",
+      "after_fix": "Focused PostgreSQL 16 Docker selector passed with both raw exact round-trip and spreadsheet-safe collision assertions.",
+      "output": "enum-csv-filewriter-postgres-focused.txt",
+      "additional_outputs": [
+        "enum-csv-filewriter-postgres-suite.txt",
+        "enum-csv-filewriter-gtk.txt",
+        "enum-csv-formula-safe-postgres.txt"
+      ],
+      "remaining": "This proves only the core PostgreSQL CSV file-writer/import configuration; other enum format/session combinations remain open."
+    },
+    {
+      "selector": "value_contract_custom_enum_sql_file_export_restores_labels_and_native_type",
+      "assertions": "PostgreSQL 16 SQL file export is replayed into a destination with the same enum type. Verify exact rows/type for literal NULL, empty text, Unicode, SQL NULL, and an apostrophe/semicolon label shaped as DROP TABLE; destination and all rows survive.",
+      "initial_gap": "No native custom-enum SQL result-file export/restore contract existed.",
+      "coverage_kind": "New consumer contract; the focused test passed before any production implementation change."
+    },
+    {
+      "selector": "value_contract_custom_enum_xml_file_export_preserves_labels_null_and_escapes_markup",
+      "assertions": "PostgreSQL 16 native rows assert exact labels and pg_typeof, then core XML file output distinguishes literal NULL, empty text, and SQL NULL and escapes closing-tag markup, quotes, apostrophe, ampersand, and literal entity text.",
+      "coverage_kind": "New native consumer contract; production XML writer was unchanged and the focused test passed against the current implementation."
+    },
+    {
+      "selector": "value_contract_custom_enum_html_file_export_preserves_labels_null_and_escapes_markup",
+      "assertions": "PostgreSQL 16 native rows assert exact labels and pg_typeof, then core HTML output distinguishes literal NULL, empty text, and SQL NULL; an image/event-handler label is escaped and no raw image element appears.",
+      "coverage_kind": "New native consumer contract; the focused test passed against the existing writer without a production implementation change.",
+      "test_module": "enum_file_export_contract"
+    },
+    {
+      "selector": "value_contract_custom_enum_markdown_file_export_preserves_labels_null_and_cell_text",
+      "assertions": "PostgreSQL 16 native rows assert exact enum labels and pg_typeof for literal NULL, empty text, Unicode, a pipe/newline label, entity-looking text, and SQL NULL; generated Markdown pins the exact explicit text encoding and keeps SQL NULL unquoted.",
+      "before_fix": "Failed: both literal enum label NULL and SQL NULL were emitted as NULL; pipe/newline and entity-looking text were not represented with the explicit cell encoding.",
+      "after_fix": "Passed after Markdown text cells switched to JSON string quoting and safe table/inline-markup escaping.",
+      "before_fix_log": "enum-markdown-before-fix.txt",
+      "test_module": "enum_file_export_contract"
+    },
+    {
+      "selector": "value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely",
+      "assertions": "PostgreSQL 16 rows assert exact enum labels and pg_typeof for literal NULL, empty text, Unicode, entity-looking text, formula-shaped text, and SQL NULL. Non-empty rows produce a workbook; including the empty label returns WorkbookEmptyText at row 2, column 2 and preserves existing destination bytes with no staging file.",
+      "coverage_kind": "Native consumer contract. Paired core workbook inspection verifies text labels including NULL and formula-shaped text are shared-string cells, XML-sensitive text is escaped, and SQL NULL has no string cell."
+    },
+    {
+      "selector": "value_contract_domain_over_enum_projection_preserves_labels_and_null",
+      "assertions": "PostgreSQL 16 projects a literal enum label NULL, a Unicode label and SQL NULL through a domain over the enum. Exact values are compared with Value::Text/Value::Null, and pg_typeof independently confirms the domain result type.",
+      "coverage_kind": "New native scalar-projection contract; no production decoder change was needed.",
+      "test_module": "enum_contract"
+    }
+  ],
+  "commands": {
+    "focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum -- --include-ignored --test-threads=1",
+    "keyed_write_focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_keyed_edit_preserves_label_and_siblings -- --include-ignored --test-threads=1",
+    "full_integration": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "workspace_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings",
+    "app_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+    "app_enum_parser": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib unknown_type_falls_through_to_text",
+    "core_unit": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "array_unit": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib array::tests -- --test-threads=1",
+    "clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "ignored_registration_check": "rtk python3 linux/scripts/inventory-ignored-tests.py --check",
+    "format_check": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+    "diff_check": "rtk git diff --check",
+    "enum_contract_moved": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --include-ignored --test-threads=1",
+    "postgres_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "enum_array_support": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null -- --include-ignored --test-threads=1",
+    "enum_scalar_support": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --test-threads=1",
+    "sqlx_array_null_unit": "rtk cargo test --manifest-path linux/Cargo.toml -p sqlx-postgres --lib text_array_distinguishes_quoted_null_from_sql_null --offline",
+    "enum_filter_unit": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core postgres_enum_filters_cast_values_to_the_schema_qualified_type",
+    "enum_filter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_filters_preserve_labels_and_sql_null -- --include-ignored --test-threads=1",
+    "core_unit_after_enum_filter": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "postgres_integration_after_enum_filter": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "workspace_clippy_after_enum_filter": "rtk cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings",
+    "ignored_registration_after_enum_filter": "rtk python3 linux/scripts/inventory-ignored-tests.py --check",
+    "enum_csv_plan": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib postgres_enum_import -- --test-threads=1",
+    "enum_csv_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null -- --include-ignored --test-threads=1",
+    "core_unit_after_enum_csv": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "postgres_integration_after_enum_csv": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "enum_json_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_json_and_file_exports_preserve_empty_literal_null_and_sql_null -- --include-ignored --test-threads=1",
+    "enum_parameter_inference": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_parameters_infer_native_type_for_query_and_write -- --include-ignored --test-threads=1",
+    "full_postgres_integration_after_enum_parameters": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "postgres_clippy_after_enum_parameters": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "postgres_unit_after_enum_parameters": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib",
+    "mcp_enum_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test postgres_custom_enum postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool -- --include-ignored --test-threads=1",
+    "mcp_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --all-targets",
+    "mcp_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-mcp --all-targets -- -D warnings",
+    "enum_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_json_and_file_exports_preserve_empty_literal_null_and_sql_null -- --include-ignored --test-threads=1",
+    "full_postgres_integration_after_filewriter": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "postgres_clippy_after_filewriter": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "enum_sql_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract::value_contract_custom_enum_sql_file_export_restores_labels_and_native_type -- --include-ignored --exact --test-threads=1",
+    "full_postgres_integration_after_sql_filewriter": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "enum_xml_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_xml_file_export_preserves_labels_null_and_escapes_markup -- --include-ignored --exact --test-threads=1",
+    "full_postgres_integration_after_enum_xml": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "postgres_clippy_after_enum_xml": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "format_after_enum_xml": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+    "ignored_inventory_after_enum_xml": "rtk python3 linux/scripts/inventory-ignored-tests.py --check",
+    "enum_html_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_html_file_export_preserves_labels_null_and_escapes_markup -- --include-ignored --exact --test-threads=1",
+    "enum_filewriters_focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract:: -- --include-ignored --test-threads=1",
+    "full_postgres_integration_after_enum_filewriters": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "postgres_clippy_after_enum_filewriters": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "enum_markdown_core_unit": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib export::markdown::tests -- --test-threads=1",
+    "enum_markdown_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_markdown_file_export_preserves_labels_null_and_cell_text -- --include-ignored --exact --test-threads=1",
+    "core_unit_after_enum_markdown": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "full_postgres_integration_after_enum_markdown": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "core_clippy_after_enum_markdown": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core --all-targets -- -D warnings",
+    "enum_xlsx_core_cell_contract": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib export::xlsx::tests::value_contract_workbook_keeps_text_null_labels_as_strings_and_sql_null_blank -- --exact --test-threads=1",
+    "enum_xlsx_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely -- --include-ignored --exact --test-threads=1",
+    "core_unit_after_enum_xlsx": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "full_postgres_integration_after_enum_xlsx": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "core_clippy_after_enum_xlsx": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core --all-targets -- -D warnings",
+    "postgres_clippy_after_enum_xlsx": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "mcp_enum_csv_roundtrip": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test postgres_custom_enum postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool -- --include-ignored --exact --test-threads=1",
+    "mcp_enum_csv_before_fix": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test postgres_custom_enum postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool -- --include-ignored --exact --test-threads=1 (with prior blank-NULL behavior temporarily restored)",
+    "mcp_enum_csv_core_focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib export::csv::tests::csv_writer_uses_explicit_null_marker_without_changing_empty_text -- --exact --test-threads=1",
+    "mcp_enum_csv_core_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "mcp_enum_csv_mcp_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --all-targets",
+    "mcp_enum_csv_core_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core --all-targets -- -D warnings",
+    "mcp_enum_csv_mcp_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-mcp --all-targets -- -D warnings",
+    "enum_csv_filewriter_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_csv_file_export_import_preserves_empty_and_null -- --include-ignored --exact --test-threads=1",
+    "enum_csv_filewriter_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+    "enum_csv_filewriter_core_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+    "enum_csv_filewriter_mcp_native": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test postgres_custom_enum postgres_custom_enum_labels_and_sql_null_survive_mcp_query_tool -- --include-ignored --exact --test-threads=1",
+    "enum_csv_filewriter_app_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib",
+    "enum_csv_filewriter_gtk": "rtk env TABLEPRO_GTK_DBUS_ACTIVE=1 TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/release/tablepro-app TABLEPRO_GTK_SCENARIO=current_page_csv_export_is_pk_ordered rtk dbus-run-session -- rtk bash linux/scripts/test-gtk-safety.sh",
+    "enum_csv_filewriter_workspace_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings",
+    "enum_formula_safe_postgres": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_csv_file_export_import_preserves_empty_and_null -- --include-ignored --test-threads=1",
+    "enum_formula_safe_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "enum_formula_safe_format": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+    "enum_formula_safe_guards": "rtk bash linux/scripts/check-file-size.sh; rtk python3 linux/scripts/check-function-size.py; rtk bash linux/scripts/check-panic-sites.sh; rtk bash linux/scripts/check-bounded-operations.sh; rtk git diff --check",
+    "enum_formula_safe_build": "rtk cargo build --manifest-path linux/Cargo.toml --release -p tablepro-app --bin tablepro-app",
+    "enum_formula_safe_gtk": "rtk env TABLEPRO_GTK_DBUS_ACTIVE=1 TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/release/tablepro-app TABLEPRO_GTK_SCENARIO=current_page_csv_export_is_pk_ordered rtk dbus-run-session -- rtk bash linux/scripts/test-gtk-safety.sh",
+    "domain_over_enum_projection": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_projection_preserves_labels_and_null -- --include-ignored --test-threads=1",
+    "domain_over_enum_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1"
+  },
+  "validation": {
+    "focused": {
+      "status": "passed",
+      "result": "4 passed, 68 filtered out; 1 suite; 7.72 seconds",
+      "output": "focused.txt"
+    },
+    "full_postgres_integration": {
+      "status": "superseded",
+      "result": "73 passed; 1 suite; 165.27 seconds",
+      "output": "integration.txt",
+      "superseded_by": "full_postgres_integration_after_enum_filter"
+    },
+    "keyed_enum_write": {
+      "status": "passed",
+      "result": "1 passed, 71 filtered out; 1 suite; 1.82 seconds",
+      "output": "keyed-write-after-fix.txt"
+    },
+    "array_unit": {
+      "status": "passed",
+      "result": "8 passed, 32 filtered out; 1 suite; 0.75 seconds",
+      "output": "array-unit.txt"
+    },
+    "clippy": {
+      "status": "passed",
+      "result": "No issues found",
+      "output": "clippy.txt"
+    },
+    "workspace_clippy": {
+      "status": "passed",
+      "result": "No issues found across workspace all targets (DuckDB excluded per workspace validation guidance).",
+      "output": "workspace-clippy.txt"
+    },
+    "core_unit": {
+      "status": "passed",
+      "result": "501 passed; 1 suite; 0.73 seconds",
+      "output": "core-unit.txt"
+    },
+    "workspace_unit": {
+      "status": "passed",
+      "result": "1675 passed, 24 ignored; 24 suites; 20.94 seconds (DuckDB excluded).",
+      "output": "workspace-unit.txt"
+    },
+    "app_enum_parser": {
+      "status": "passed",
+      "result": "1 passed, 450 filtered out; 1 suite.",
+      "output": "app-enum-parser.txt"
+    },
+    "app_clippy": {
+      "status": "passed",
+      "result": "No issues found.",
+      "output": "app-clippy.txt"
+    },
+    "ignored_registration": {
+      "status": "passed",
+      "result": "Ignored-test inventory and isolated registrations are current.",
+      "output": "ignored-registration.txt"
+    },
+    "format": {
+      "status": "passed",
+      "result": "cargo fmt --check passed.",
+      "output": "format.txt"
+    },
+    "diff": "passed",
+    "enum_null_refusal_trigger": {
+      "status": "superseded",
+      "result": "1 passed, 72 filtered out; 1 suite; 1.97 seconds",
+      "output": "enum-null-refusal-trigger.txt",
+      "superseded_by": "Direct scalar/array literal-NULL support tests and the SQLx parser regression."
+    },
+    "enum_array_refusal": {
+      "status": "superseded",
+      "result": "1 passed, 72 filtered out; 1 suite; 4.06 seconds",
+      "output": "enum-array-refusal.txt",
+      "superseded_by": "Direct scalar/array literal-NULL support tests and the SQLx parser regression."
+    },
+    "enum_contract_moved": {
+      "status": "superseded",
+      "result": "4 passed, 69 filtered out; 1 suite; 7.90 seconds",
+      "output": "enum-contract-moved.txt",
+      "superseded_by": "Direct scalar/array literal-NULL support tests and the SQLx parser regression."
+    },
+    "postgres_clippy": {
+      "status": "passed",
+      "result": "No issues found across all targets.",
+      "output": "postgres-clippy.txt"
+    },
+    "guards": {
+      "status": "passed",
+      "result": "File size, function size, panic-site and bounded-operation guards passed.",
+      "output": "guards.txt"
+    },
+    "diff_check": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "diff-check.txt"
+    },
+    "full_postgres_integration_before_sqlx_fix": {
+      "status": "superseded",
+      "result": "73 passed; 1 suite; 163.91 seconds; direct label-NULL result was explicitly refused at this checkpoint.",
+      "output": "integration-before-sqlx-fix.txt",
+      "superseded_by": "full_postgres_integration"
+    },
+    "enum_null_support_scalar": {
+      "status": "passed",
+      "result": "1 passed, 72 filtered out; 1 suite; 2.19 seconds. Includes bound enum labels and bound SQL NULL through explicit casts.",
+      "output": "enum-null-support-scalar.txt"
+    },
+    "enum_null_support_array": {
+      "status": "passed",
+      "result": "1 passed, 72 filtered out; 1 suite; 2.07 seconds",
+      "output": "enum-null-support-array.txt"
+    },
+    "sqlx_array_null_unit": {
+      "status": "passed",
+      "result": "1 passed, 167 filtered out; 1 suite; 0.00 seconds",
+      "output": "sqlx-array-null-after-fix.txt"
+    },
+    "sqlx_array_null_mutation": {
+      "status": "failed_as_expected",
+      "result": "The mutation restoring the old unquoted value == NULL check failed the new test: quoted NULL decoded as None instead of Some(\"NULL\").",
+      "output": "sqlx-array-null-before-fix.txt"
+    },
+    "enum_filter_unit": {
+      "status": "passed",
+      "result": "1 passed; 511 filtered out.",
+      "output": "enum-filter-core-focused.txt"
+    },
+    "enum_filter_native": {
+      "status": "passed",
+      "result": "1 passed; 73 filtered out; 2.05 seconds.",
+      "output": "enum-filter-postgres-focused.txt"
+    },
+    "core_unit_after_enum_filter": {
+      "status": "superseded",
+      "result": "502 passed; 0 failed; 0 ignored; 0.72 seconds.",
+      "output": "enum-filter-core-unit.txt",
+      "superseded_by": "core_unit_after_enum_csv"
+    },
+    "full_postgres_integration_after_enum_filter": {
+      "status": "superseded",
+      "result": "74 passed; 0 failed; 0 ignored; 159.91 seconds.",
+      "output": "enum-filter-postgres-suite.txt",
+      "superseded_by": "full_postgres_integration_after_enum_csv"
+    },
+    "workspace_clippy_after_enum_filter": {
+      "status": "passed",
+      "result": "Workspace all-target Clippy passed with DuckDB excluded per repository validation guidance.",
+      "output": "enum-filter-clippy.txt"
+    },
+    "guards_after_enum_filter": {
+      "status": "passed",
+      "result": "File-size, function-size, panic-site and bounded-operation guards passed.",
+      "outputs": [
+        "enum-filter-file-size.txt",
+        "enum-filter-function-size.txt",
+        "enum-filter-panic-sites.txt",
+        "enum-filter-bounded-operations.txt"
+      ]
+    },
+    "format_after_enum_filter": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-filter-format.txt"
+    },
+    "ignored_registration_after_enum_filter": {
+      "status": "passed",
+      "result": "Ignored-test inventory and isolated registrations are current; new fixture appears in generated ledger.",
+      "output": "enum-filter-ignored-inventory.txt"
+    },
+    "diff_check_after_enum_filter": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-filter-diff-check.txt"
+    },
+    "enum_csv_plan": {
+      "status": "passed",
+      "result": "2 passed; 0 failed.",
+      "output": "enum-csv-core-focused.txt"
+    },
+    "enum_csv_native": {
+      "status": "passed",
+      "result": "1 passed; 74 filtered out; 2.31 seconds.",
+      "output": "enum-csv-postgres-focused.txt"
+    },
+    "core_unit_after_enum_csv": {
+      "status": "passed",
+      "result": "504 passed; 0 failed; 0 ignored; 0.75 seconds.",
+      "output": "enum-csv-core-suite.txt"
+    },
+    "full_postgres_integration_after_enum_csv": {
+      "status": "passed",
+      "result": "75 passed; 0 failed; 0 ignored; 179.51 seconds.",
+      "output": "enum-csv-postgres-suite.txt"
+    },
+    "workspace_clippy_after_enum_csv": {
+      "status": "passed",
+      "result": "Workspace all-target Clippy passed with DuckDB excluded per repository validation guidance.",
+      "output": "enum-csv-clippy.txt"
+    },
+    "guards_after_enum_csv": {
+      "status": "passed",
+      "result": "File-size, function-size, panic-site and bounded-operation guards passed.",
+      "outputs": [
+        "enum-csv-file-size.txt",
+        "enum-csv-function-size.txt",
+        "enum-csv-panic-sites.txt",
+        "enum-csv-bounded-operations.txt"
+      ]
+    },
+    "format_after_enum_csv": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-csv-format.txt"
+    },
+    "ignored_registration_after_enum_csv": {
+      "status": "passed",
+      "result": "Ignored-test inventory and isolated registrations are current.",
+      "output": "enum-csv-ignored-inventory.txt"
+    },
+    "diff_check_after_enum_csv": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-csv-diff-check.txt"
+    },
+    "file_size_before_test_trim": {
+      "status": "superseded",
+      "result": "Failed while a temporary cell unit test put cell.rs at 1213 lines, over the 1200 soft limit. The redundant direct test was removed; importer-plan and native tests retain the case.",
+      "output": "enum-csv-file-size-before-test-trim.txt",
+      "superseded_by": "guards_after_enum_csv"
+    },
+    "enum_json_native": {
+      "status": "superseded",
+      "result": "1 passed, 75 filtered out; 1 suite; 2.07 seconds for the prior render_json-only selector.",
+      "output": "enum-json-native.txt",
+      "superseded_by": "enum_filewriter_native"
+    },
+    "full_postgres_integration_after_enum_json": {
+      "status": "passed",
+      "result": "76 passed; 0 failed; 0 ignored; 174.09 seconds. Includes the new JSON consumer regression.",
+      "output": "enum-json-postgres-suite.txt"
+    },
+    "postgres_clippy_after_enum_json": {
+      "status": "passed",
+      "result": "No issues found across PostgreSQL driver all targets.",
+      "output": "enum-json-clippy.txt"
+    },
+    "guards_after_enum_json": {
+      "status": "passed",
+      "result": "File-size, function-size, panic-site and bounded-operation checks passed.",
+      "outputs": [
+        "enum-json-file-size.txt",
+        "enum-json-function-size.txt",
+        "enum-json-panic-sites.txt",
+        "enum-json-bounded-operations.txt"
+      ]
+    },
+    "format_after_enum_json": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-json-format.txt"
+    },
+    "ignored_registration_after_enum_json": {
+      "status": "passed",
+      "result": "New Docker selector is present exactly once in the generated ignored-test inventory.",
+      "output": "enum-json-ignored-inventory.txt"
+    },
+    "diff_check_after_enum_json": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-json-diff-check.txt"
+    },
+    "enum_parameter_inference_after_cache_fix": {
+      "status": "passed",
+      "result": "1 passed, 76 filtered out; 1 suite; 2.15 seconds on the strengthened test.",
+      "output": "enum-param-focused-live.txt",
+      "previous_output": "enum-param-focused-after-cache-fix.txt"
+    },
+    "full_postgres_integration_cache_collision_before_fix": {
+      "status": "superseded",
+      "result": "64 passed, 13 failed; the metadata statement cache collision caused SQLSTATE 22P03 in unrelated array, numeric, text, and enum bind cases.",
+      "output": "enum-param-postgres-cache-collision-before-fix.txt",
+      "superseded_by": "full_postgres_integration_after_enum_parameters"
+    },
+    "full_postgres_integration_after_enum_parameters": {
+      "status": "passed",
+      "result": "77 passed; 1 suite; 180.79 seconds on the current source.",
+      "output": "enum-param-postgres-live.txt"
+    },
+    "postgres_clippy_after_enum_parameters": {
+      "status": "passed",
+      "result": "No issues found across PostgreSQL driver all targets.",
+      "output": "enum-param-clippy-live.txt"
+    },
+    "postgres_unit_after_enum_parameters": {
+      "status": "passed",
+      "result": "40 passed; 1 suite; 0.76 seconds.",
+      "output": "enum-param-unit-live.txt"
+    },
+    "format_after_enum_parameters": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-param-format-live.txt"
+    },
+    "ignored_registration_after_enum_parameters": {
+      "status": "passed",
+      "result": "Ignored-test inventory and isolated registrations are current.",
+      "output": "enum-param-ignored-live.txt"
+    },
+    "diff_check_after_enum_parameters": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-param-diff-live.txt"
+    },
+    "mcp_enum_native": {
+      "status": "passed",
+      "result": "1 passed; 1 suite; 1.99 seconds (PostgreSQL 16 Docker fixture through execute_query and export_data JSON/CSV).",
+      "output": "enum-mcp-export-data-focused.txt",
+      "previous_output": "enum-mcp-postgres-focused.txt"
+    },
+    "mcp_suite": {
+      "status": "passed",
+      "result": "85 passed, 3 ignored; 10 suites; 8.09 seconds. Docker contracts remain ignored in the ordinary package tier.",
+      "output": "enum-mcp-suite.txt"
+    },
+    "mcp_clippy": {
+      "status": "passed",
+      "result": "No issues found across MCP all targets.",
+      "output": "enum-mcp-clippy.txt"
+    },
+    "mcp_format": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-mcp-format.txt"
+    },
+    "mcp_ignored_registration": {
+      "status": "passed",
+      "result": "Generated ignored-test inventory includes the new Docker selector exactly once.",
+      "output": "enum-mcp-inventory.txt",
+      "inventory": "../../ignored-tests.md"
+    },
+    "mcp_diff_check": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-mcp-diff-check.txt"
+    },
+    "enum_filewriter_native": {
+      "status": "passed",
+      "result": "1 passed, 76 filtered out; 1 suite; 2.01 seconds (PostgreSQL 16 Docker fixture).",
+      "output": "enum-filewriter-focused.txt"
+    },
+    "full_postgres_integration_after_filewriter": {
+      "status": "passed",
+      "result": "77 passed; 1 suite; 168.06 seconds on the current source.",
+      "output": "enum-filewriter-postgres-suite.txt"
+    },
+    "postgres_clippy_after_filewriter": {
+      "status": "passed",
+      "result": "No issues found across PostgreSQL driver all targets.",
+      "output": "enum-filewriter-clippy.txt"
+    },
+    "format_after_filewriter": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-filewriter-format.txt"
+    },
+    "ignored_registration_after_filewriter": {
+      "status": "passed",
+      "result": "Generated ignored-test inventory includes the renamed Docker selector exactly once.",
+      "output": "enum-filewriter-inventory.txt",
+      "inventory": "../../ignored-tests.md"
+    },
+    "diff_check_after_filewriter": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-filewriter-diff-check.txt"
+    },
+    "enum_sql_filewriter_native": {
+      "status": "passed",
+      "result": "1 passed, 77 filtered out; 1 suite; 2.03 seconds.",
+      "output": "enum-sql-filewriter-focused.txt"
+    },
+    "full_postgres_integration_after_sql_filewriter": {
+      "status": "passed",
+      "result": "78 passed; 1 suite; 184.50 seconds.",
+      "output": "enum-sql-filewriter-postgres-suite.txt"
+    },
+    "postgres_clippy_after_sql_filewriter": {
+      "status": "passed",
+      "result": "No issues found across PostgreSQL driver all targets.",
+      "output": "enum-sql-filewriter-clippy.txt"
+    },
+    "format_after_sql_filewriter": {
+      "status": "passed",
+      "result": "cargo fmt --all -- --check passed.",
+      "output": "enum-sql-filewriter-format.txt"
+    },
+    "ignored_registration_after_sql_filewriter": {
+      "status": "passed",
+      "result": "Ignored-test inventory and isolated registrations are current.",
+      "output": "enum-sql-filewriter-inventory.txt",
+      "inventory": "../../ignored-tests.md"
+    },
+    "diff_check_after_sql_filewriter": {
+      "status": "passed",
+      "result": "git diff --check passed.",
+      "output": "enum-sql-filewriter-diff-check.txt"
+    },
+    "file_size_after_sql_filewriter": {
+      "status": "passed",
+      "result": "file-size guard passed.",
+      "output": "enum-sql-filewriter-file-size.txt"
+    },
+    "function_size_after_sql_filewriter": {
+      "status": "passed",
+      "result": "function sizes within limits.",
+      "output": "enum-sql-filewriter-function-size.txt"
+    },
+    "panic_sites_after_sql_filewriter": {
+      "status": "passed",
+      "result": "No production panic-site guard violations.",
+      "output": "enum-sql-filewriter-panic-sites.txt"
+    },
+    "bounded_operations_after_sql_filewriter": {
+      "status": "passed",
+      "result": "bounded-operations guard passed.",
+      "output": "enum-sql-filewriter-bounded-operations.txt"
+    },
+    "enum_xml_native": {
+      "status": "passed",
+      "result": "1 passed, 78 filtered out; PostgreSQL 16 Docker fixture.",
+      "log": "enum-xml-focused.txt"
+    },
+    "postgres_integration_after_enum_xml": {
+      "status": "passed",
+      "result": "79 passed, 173.98 seconds.",
+      "log": "enum-xml-postgres-suite.txt"
+    },
+    "clippy_format_inventory_and_guards_after_enum_xml": {
+      "status": "passed",
+      "result": "PostgreSQL all-target Clippy, workspace format check, ignored-test inventory, file/function/panic/bounded-operation guards, and git diff check passed.",
+      "logs": [
+        "enum-xml-clippy.txt",
+        "enum-xml-format.txt",
+        "enum-xml-inventory.txt",
+        "enum-xml-file-size.txt",
+        "enum-xml-function-size.txt",
+        "enum-xml-panic-sites.txt",
+        "enum-xml-bounded-operations.txt",
+        "enum-xml-diff-check.txt"
+      ]
+    },
+    "enum_html_native": {
+      "status": "passed",
+      "result": "1 passed, 79 filtered out; PostgreSQL 16 Docker fixture.",
+      "log": "enum-html-focused.txt"
+    },
+    "enum_filewriters_after_module_split": {
+      "status": "passed",
+      "result": "2 passed, 78 filtered out; PostgreSQL 16 Docker fixtures for XML and HTML.",
+      "log": "enum-filewriters-focused.txt"
+    },
+    "postgres_integration_after_enum_filewriters": {
+      "status": "passed",
+      "result": "80 passed, 173.41 seconds.",
+      "log": "enum-filewriters-postgres-suite.txt"
+    },
+    "enum_html_initial_file_size_guard": {
+      "status": "failed-before-split",
+      "result": "The original enum contract support file reached 1,204 lines, above the 1,200 soft limit. XML and HTML export cases were moved into enum_file_export_contract.rs; subsequent file-size and all remaining guards passed.",
+      "log": "enum-html-file-size.txt",
+      "resolution_log": "enum-filewriters-file-size.txt"
+    },
+    "clippy_format_inventory_and_guards_after_enum_filewriters": {
+      "status": "passed",
+      "result": "PostgreSQL all-target Clippy, workspace format check, ignored-test inventory, file/function/panic/bounded-operation guards, and git diff check passed after the support-module split.",
+      "logs": [
+        "enum-filewriters-clippy.txt",
+        "enum-filewriters-format.txt",
+        "enum-filewriters-inventory.txt",
+        "enum-filewriters-file-size.txt",
+        "enum-filewriters-function-size.txt",
+        "enum-filewriters-panic-sites.txt",
+        "enum-filewriters-bounded-operations.txt",
+        "enum-filewriters-diff-check.txt"
+      ]
+    },
+    "enum_markdown_before_fix": {
+      "status": "failed-as-expected",
+      "result": "Native PostgreSQL test reproduced the NULL collision: the literal label and SQL NULL both emitted NULL.",
+      "log": "enum-markdown-before-fix.txt"
+    },
+    "enum_markdown_after_fix": {
+      "status": "passed",
+      "result": "1 passed, 80 filtered out; PostgreSQL 16 Docker fixture.",
+      "log": "enum-markdown-after-fix.txt"
+    },
+    "core_markdown_unit_after_fix": {
+      "status": "passed",
+      "result": "2 Markdown unit tests passed.",
+      "focused_command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib export::markdown::tests -- --test-threads=1",
+      "log": "enum-markdown-core-focused.txt"
+    },
+    "core_unit_after_enum_markdown": {
+      "status": "passed",
+      "result": "505 passed in the core library suite.",
+      "log": "enum-markdown-core-suite.txt"
+    },
+    "postgres_integration_after_enum_markdown": {
+      "status": "passed",
+      "result": "81 passed, 186.41 seconds.",
+      "log": "enum-markdown-postgres-suite.txt"
+    },
+    "clippy_format_inventory_and_guards_after_enum_markdown": {
+      "status": "passed",
+      "result": "Core and PostgreSQL all-target Clippy, workspace format check, ignored-test inventory, file/function/panic/bounded-operation guards, and diff check passed.",
+      "logs": [
+        "enum-markdown-core-clippy.txt",
+        "enum-markdown-postgres-clippy.txt",
+        "enum-markdown-format.txt",
+        "enum-markdown-inventory.txt",
+        "enum-markdown-file-size.txt",
+        "enum-markdown-function-size.txt",
+        "enum-markdown-panic-sites.txt",
+        "enum-markdown-bounded-operations.txt",
+        "enum-markdown-diff-check.txt"
+      ]
+    },
+    "enum_xlsx_core_cell_contract": {
+      "status": "passed",
+      "result": "1 passed, 505 filtered out.",
+      "log": "enum-xlsx-core-focused.txt"
+    },
+    "enum_xlsx_native": {
+      "status": "passed",
+      "result": "1 passed, 81 filtered out; PostgreSQL 16 Docker fixture.",
+      "log": "enum-xlsx-postgres-focused.txt"
+    },
+    "core_unit_after_enum_xlsx": {
+      "status": "passed",
+      "result": "506 passed in the core library suite.",
+      "log": "enum-xlsx-core-suite.txt"
+    },
+    "postgres_integration_after_enum_xlsx": {
+      "status": "passed",
+      "result": "82 passed, 179.11 seconds.",
+      "log": "enum-xlsx-postgres-suite.txt"
+    },
+    "clippy_format_inventory_and_guards_after_enum_xlsx": {
+      "status": "passed",
+      "result": "Core and PostgreSQL all-target Clippy, workspace format check, ignored-test inventory, file/function/panic/bounded-operation guards, and diff check passed.",
+      "logs": [
+        "enum-xlsx-core-clippy.txt",
+        "enum-xlsx-postgres-clippy.txt",
+        "enum-xlsx-format.txt",
+        "enum-xlsx-inventory.txt",
+        "enum-xlsx-file-size.txt",
+        "enum-xlsx-function-size.txt",
+        "enum-xlsx-panic-sites.txt",
+        "enum-xlsx-bounded-operations.txt",
+        "enum-xlsx-diff-check.txt"
+      ]
+    },
+    "enum_mcp_csv_before_fix": {
+      "status": "failed-as-expected",
+      "result": "The expanded PostgreSQL 16 MCP test failed on the old blank-NULL response: null_marker was empty instead of the required collision-free \\NNN.",
+      "output": "enum-mcp-csv-before-fix.txt"
+    },
+    "enum_mcp_csv_native": {
+      "status": "passed",
+      "result": "1 passed; exact returned CSV and marker imported into PostgreSQL enum rows with native type/value assertions.",
+      "output": "enum-mcp-csv-roundtrip.txt"
+    },
+    "enum_mcp_csv_core_focused": {
+      "status": "passed",
+      "result": "1 passed, 506 filtered out.",
+      "output": "enum-mcp-csv-core-focused.txt"
+    },
+    "enum_mcp_csv_core_suite": {
+      "status": "passed",
+      "result": "507 passed in the core library suite.",
+      "output": "enum-mcp-csv-core-suite.txt"
+    },
+    "enum_mcp_csv_mcp_suite": {
+      "status": "passed",
+      "result": "85 passed, 3 ignored across 10 targets/suites.",
+      "output": "enum-mcp-csv-mcp-suite.txt"
+    },
+    "enum_mcp_csv_clippy": {
+      "status": "passed",
+      "result": "Core and MCP all-target Clippy passed with -D warnings.",
+      "outputs": [
+        "enum-mcp-csv-core-clippy.txt",
+        "enum-mcp-csv-mcp-clippy.txt"
+      ]
+    },
+    "enum_mcp_csv_guards": {
+      "status": "passed",
+      "result": "Formatting, ignored-test inventory, file/function/panic/bounded-operation guards, and git diff check passed.",
+      "outputs": [
+        "enum-mcp-csv-format.txt",
+        "enum-mcp-csv-inventory.txt",
+        "enum-mcp-csv-file-size.txt",
+        "enum-mcp-csv-function-size.txt",
+        "enum-mcp-csv-panic-sites.txt",
+        "enum-mcp-csv-bounded-operations.txt",
+        "enum-mcp-csv-diff-check.txt"
+      ]
+    },
+    "enum_csv_filewriter_native": {
+      "status": "passed",
+      "result": "1 passed, 82 filtered out; PostgreSQL 16 Docker. Default blank file import was refused before writes; explicit marker restored all source values and native enum types.",
+      "output": "enum-csv-filewriter-postgres-focused.txt"
+    },
+    "enum_csv_filewriter_core_suite": {
+      "status": "passed",
+      "result": "508 passed in the core library suite.",
+      "output": "enum-csv-filewriter-core-suite.txt"
+    },
+    "enum_csv_filewriter_postgres_suite": {
+      "status": "passed",
+      "result": "83 passed, 0 failed; serial PostgreSQL 16 integration layer completed in 187.69 seconds.",
+      "output": "enum-csv-filewriter-postgres-suite.txt"
+    },
+    "enum_csv_filewriter_mcp_native": {
+      "status": "passed",
+      "result": "1 passed; confirms shared collision-free marker selection still round-trips the exact MCP CSV response.",
+      "output": "enum-csv-filewriter-mcp-focused.txt"
+    },
+    "enum_csv_filewriter_app_suite": {
+      "status": "passed",
+      "result": "437 passed, 16 ignored, 900 filtered across 3 suites.",
+      "output": "enum-csv-filewriter-app-suite.txt"
+    },
+    "enum_csv_filewriter_gtk": {
+      "status": "passed",
+      "result": "Selected current-page CSV export passed under isolated D-Bus/Xvfb using the rebuilt local release binary. AT-SPI read the displayed marker value (\\N), and exported SQL NULL cells used that value. This is not installed Wayland acceptance.",
+      "output": "enum-csv-filewriter-gtk.txt"
+    },
+    "enum_csv_filewriter_workspace_clippy": {
+      "status": "passed",
+      "result": "Workspace all-target Clippy passed with DuckDB excluded per repository validation guidance.",
+      "output": "enum-csv-filewriter-workspace-clippy.txt"
+    },
+    "enum_csv_filewriter_guards": {
+      "status": "passed",
+      "result": "Workspace formatting, ignored-test inventory, file/function/panic/bounded-operation guards, and diff check passed.",
+      "outputs": [
+        "enum-csv-filewriter-format.txt",
+        "enum-csv-filewriter-inventory.txt",
+        "enum-csv-filewriter-file-size.txt",
+        "enum-csv-filewriter-function-size.txt",
+        "enum-csv-filewriter-panic-sites.txt",
+        "enum-csv-filewriter-bounded-operations.txt",
+        "enum-csv-filewriter-diff-check.txt"
+      ]
+    },
+    "enum_formula_safe_postgres": {
+      "status": "passed",
+      "result": "PostgreSQL 16 native selector passed: 1 passed, 82 filtered. Raw mode restores both formula-shaped labels exactly; safe mode writes the apostrophe-prefixed value for both distinct source labels and verifies native enum type/value.",
+      "output": "enum-csv-formula-safe-postgres.txt"
+    },
+    "enum_formula_safe_clippy": {
+      "status": "passed",
+      "result": "Clippy passed for the app and PostgreSQL driver across all targets with warnings denied.",
+      "output": "enum-csv-formula-safe-clippy.txt"
+    },
+    "enum_formula_safe_format": {
+      "status": "passed",
+      "result": "Workspace Rust formatting check passed.",
+      "output": "enum-csv-formula-safe-format.txt"
+    },
+    "enum_formula_safe_guards": {
+      "status": "passed",
+      "result": "File/function size, panic-site, bounded-operation and diff checks passed.",
+      "output": "enum-csv-formula-safe-guards.txt"
+    },
+    "enum_formula_safe_gtk": {
+      "status": "passed",
+      "result": "The selected current-page CSV GTK safety scenario passed under isolated D-Bus/Xvfb using the rebuilt local release binary. It read the displayed null marker and verified exported values. This is not installed Wayland qualification.",
+      "output": "enum-csv-formula-safe-gtk.txt"
+    },
+    "enum_formula_safe_build": {
+      "status": "passed",
+      "result": "Local release binary rebuilt from the current app source.",
+      "output": "enum-csv-formula-safe-build.txt"
+    },
+    "domain_over_enum_projection": {
+      "status": "passed",
+      "result": "PostgreSQL 16 Docker fixture: 1 passed, 83 filtered out; 1 suite; 1.99 seconds.",
+      "output": "domain-over-enum-focused.txt"
+    },
+    "domain_over_enum_postgres_suite": {
+      "status": "passed",
+      "result": "84 passed; 1 suite; 190.36 seconds, including the new domain-over-enum projection regression.",
+      "output": "domain-over-enum-postgres-suite.txt"
+    }
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/core/src/query.rs": "82d1f98312329506695a79561ecdef4ba2152d2aa2722e92b013addd1d4ad04b",
+    "linux/crates/core/src/lib.rs": "93af0442a85537b00c53569997336c87e4aeced306fe0c1c40ae610e34d1c72e",
+    "linux/crates/core/src/sql_dialect.rs": "c2c494f43cc0dcb73909e3618a0060e5d795dafb8a5b9cd34da45e5928ce625f",
+    "linux/crates/core/src/sql_dialect/postgres_enum_tests.rs": "e77fc4c800ff86383bf96aa2311c4e8746718251627f19520a013b68e7b7d8ce",
+    "linux/crates/app/tests/support/value_parse.rs": "cd97486d94c843681b5ffa54f8c8d20bc857b49dad18943355755fb35de25da6",
+    "linux/crates/drivers/postgres/src/lib.rs": "cc39c092cbe55c1f0fd364a4ee5740a5fa5f38ebcfce92089d1f2386ed8d160b",
+    "linux/crates/drivers/postgres/src/array.rs": "0f4d219eb741cfcc7d4916c5e25880acdafd6f9e56d9f3fbef9ed94ef30e0a28",
+    "linux/crates/drivers/postgres/tests/support/value_contracts.rs": "ba1d9179ccec64c027cf482e7af72698498cd0148cafa9874ad9606ca7c02ff5",
+    "linux/crates/drivers/postgres/tests/integration.rs": "65cb3c47db43e19683f2a6931a63e3729ad6b4872d320a72f6d05d937ad390af",
+    "linux/crates/drivers/postgres/tests/support/array_contract.rs": "723188d7eff6cc146618c1ccfb46429d601280111ab74b8550882d49e6c9f85e",
+    "linux/crates/drivers/postgres/tests/support/enum_contract.rs": "66289741c5c7a70cb0b6c8474240426e34acf5052eaaf6751c72d414bfc9e250",
+    "linux/vendor/sqlx-postgres/src/types/array.rs": "f56af1aef5a9120f7db5aa70ec30fbd7743ba3fc39de8b4e498f51b5736e11e9",
+    "linux/crates/core/src/filter.rs": "d5fb61ac6f2c0a7c90cb8d76a945bf6d49a88658a8a2e20068be8cacdb832a9d",
+    "linux/crates/core/src/filter_tests.rs": "a0c4d47f2149ccdaac1d4d13e4e0f20c5fe04c18bd9fd36ef83969bdd9602d50",
+    "linux/crates/core/src/import/cell.rs": "d6e81788cc04f9488d3cc089f7631152a3995e118293e83e5bc1ac739e4681e9",
+    "linux/crates/core/src/import/plan.rs": "3c008947a740b67aaba931ffeb71a3de1002f3ea533307c398a0cb8361f22d66",
+    "linux/crates/drivers/postgres/src/params.rs": "587613219e9be45451fc0f287affc2d194dda664a3a181aa9f99b55237612a38",
+    "linux/crates/drivers/postgres/src/tests.rs": "25c09cea7ae72f2dc84ad34d71d27abc56b05cd1cdbb085bff864281ec71e306",
+    "linux/Cargo.lock": "f3da9e0c4496b3071a237f85187f5b3d2f550acbcab31fc6a160103b4ec38f47",
+    "linux/crates/mcp/Cargo.toml": "2f294127edb9ddec009bdd5911cc1530747ddf4c0547a6f5c4dac35a82a9a13f",
+    "linux/crates/mcp/src/bridge.rs": "47dcb1fec6800edc0a1b2336cdd0af2fecd1d2431f54de487057ed388559e21f",
+    "linux/crates/mcp/src/tools.rs": "02b1200d446ca0af6cf423b394816cc3670f143114741ef69bcd02b631d5eb1f",
+    "linux/crates/mcp/tests/postgres_custom_enum.rs": "1954ad5621d201e6693e4eed8e67cc18c6506b9ddbe8b13b55918aa36e52ea24",
+    "linux/crates/drivers/postgres/Cargo.toml": "68c472593388dc94e996244842478041e60f46d5f057c1e1fc8c65d32dd63a5b",
+    "linux/docs/b3-test-scenario-survey.md": "06bcdb228e0c1b90e69789f4887b9859c05010f55eb7e3ca8d3fb880d97fc45f",
+    "linux/docs/type-contract-strategy.md": "3c04e4665055ef670ca642d7fd8c61d93b7b6e51e2afbf75e072c8279e6fe05e",
+    "linux/docs/value-contract-history.md": "9f3a67f128d50ef75b0f667aae89b6066afd1d4bb00280e4d78bcd01f570a54d",
+    "linux/docs/release-audit-2026-10-03.md": "d10798fa9769e7efd535d36f3c01d11238150b876861a4d43243dc706bc2deae",
+    "linux/docs/ignored-tests.md": "dba401942d5617352dfb3821e61a27edf6dd5b3b91f58fddb132a0751f9c2e2b",
+    "linux/crates/drivers/postgres/tests/support/enum_file_export_contract.rs": "2731dfaafb2971ff8758349c0ee197cde73bb59e6ff07b41f5dfacba28faba96",
+    "linux/crates/core/src/export/markdown.rs": "dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d",
+    "linux/CHANGELOG.md": "53502e69132557c8ab351abc54ed2da32b029398603acb95b005d2f75747c849",
+    "linux/crates/core/src/export/xlsx.rs": "c8d853991ffdda28bef3e3753e8c28355e07140a533c36be391b56de31165fb2",
+    "linux/crates/core/src/export/csv.rs": "255cb1594087cc106d873bbb9558950cf79c871cfeaebc254992dbdffd784f93",
+    "linux/crates/core/src/export/mod.rs": "22486117c2afdaad0d96072b68e03f9da3ca61ec9afbbcf5352c81af01dedd99",
+    "linux/crates/mcp/src/server.rs": "d11da1306df61be8c731255302522d4fb794144655389c47f19cee6d2d7ea5ab",
+    "linux/crates/mcp/tests/enforce_policy.rs": "b3462deef8929ab90d0f9e7d64541763dc0ffae9677d19147782145f8d90df71",
+    "linux/docs/value-contracts.md": "57401c2e21a78ddd8437b8e07fc12db877877b2497c2fd48c46f62b2795f756d",
+    "linux/docs/b3-review-2026-10-01.md": "c713740c8af5eb7c220e3e76c9a2b9037aa219ccabe6e98c92948ea8006015f2",
+    "linux/crates/app/src/ui/export_dialog.rs": "b9a78ddf48bb5c4adc9b2a6fe9b02ab06149f81d15aed7f0512b941ad9881882",
+    "linux/crates/app/tests/gtk_safety.py": "2fc45a6be0a17551693590e81415ef7fca2ee705199bb97ae971df9b845ab67c"
+  },
+  "retained_evidence_sha256": {
+    "before-fix.txt": "2ab2b6ce81b63c1e03cdb2e1845ecf05944d399fc250883409e25dbc6b2a167d",
+    "focused.txt": "0646207d81d74f65749652062c5bf7dbb457e7c6052c21c0ec9f667d81995849",
+    "integration.txt": "ce28c4acd7df7c3267da3f5b6e3ede8021c9f56e9ab9e49677e1bc0f90cc96da",
+    "keyed-write-before-fix.txt": "51e94f3d397b70da5eeb8925c709f316a6c8ed7632087a15e036d75d9187b921",
+    "keyed-write-after-fix.txt": "de335ab252b3d2b1baffce89a09dc72a56fba26e07e9eb78309667572c911305",
+    "array-unit.txt": "0720c4a6469e21502ac419b803fe5d9d6b99aab739c656e8d77db1808f11fcfb",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "workspace-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "core-unit.txt": "5c94b2ec5b430ddd43cf7a4c4fd07f9b1ba83087c493c834999f17c8e195b80f",
+    "workspace-unit.txt": "5778c67032f88e861f4314034fe1375546949927b1a779e04ca917c4ed6ad2ed",
+    "app-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "app-enum-parser.txt": "42e824ba98ff8a6cd0de8c340f0b4a6909733646d7b21a7d48bde64b2dfaf35a",
+    "enum-null-refusal-trigger.txt": "7b8608e1a8481e6bf9c259231d78a78417ecf5574044343d273f5ce7ab363705",
+    "enum-array-refusal.txt": "12fea69323131ac1144dfa712dfa45278f9f7bac2fffc792d2183802da78a961",
+    "enum-contract-moved.txt": "e7b37b327625c55fc36c3513d7f3ef176de983c7da54bb56421530a9b94b1e0d",
+    "postgres-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "guards.txt": "147ed88bab77c2d8fbf7bb212ae2ba06142914cde7011030cce6a8de6a235bda",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-registration.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "integration-before-sqlx-fix.txt": "0a2a0970cc4846b1850386c3fb02602aa04541dca8d5c24fe1e2197b482e98f7",
+    "enum-null-support-scalar.txt": "099bd082fc9051613ddd31774ea5aec54fd163a295ad0b03c32a6e45774f5b72",
+    "enum-null-support-array.txt": "2d6c20e0fc9f3a926e2f4c0835dc3c1e6dfcfcec16745c69c56b398d1a14e10b",
+    "sqlx-array-null-before-fix.txt": "0ab9dead9c899bdfaac713c0dffb765b05d1dd5f65e0a5f6c64fb527a2b2d89d",
+    "sqlx-array-null-after-fix.txt": "ed67d0c93c6fcd81012354b6193ef60a19f3e8e228021be8070ece758af62275",
+    "enum-filter-core-before-fix.txt": "d8fa1136681b21b5becc453466c8a0c4b3ff3bddc341229e47f2925615283295",
+    "enum-filter-postgres-before-fix.txt": "dcc63148c1ef89e573a8a5c53acb22b4c1d1e41cb8d804cab45fcabc35d57d9c",
+    "enum-filter-core-focused.txt": "8e00915c393989be640bdc685e93b15cc7397fcb7d2dd0b824d01124f886d1fe",
+    "enum-filter-postgres-focused.txt": "b1c589d09da97e961e8865fc6b1fc2a88cc441e271439b67fa8cfdeab90e24e9",
+    "enum-filter-core-unit.txt": "22e498ac7440df21a50f1567c35b523592a7bf788417a18447127eb8772c82ac",
+    "enum-filter-postgres-suite.txt": "992fe1ffa630fa381e18be576f6736f1c75f45cfb0187fd12ae2da385999bf35",
+    "enum-filter-clippy.txt": "9297db2a2398774ad52f41d387d8919b81b569f9901095859509de04f4ac6fbb",
+    "enum-filter-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-filter-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-filter-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-filter-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-filter-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-filter-ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-filter-diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-csv-before-fix.txt": "29077e77fd389a9385dba652f66f49001a2178bb6e93787e0a7598ab13a61082",
+    "enum-csv-empty-default-before-refusal.txt": "ca1ca51b10bc2b0ec3a47558606e287179477c989a8d170f08d251a077437c47",
+    "enum-csv-core-focused.txt": "79d351621f6f66433a2836d602a83e1287ddc0a628f6fd69aaa01e8c01935043",
+    "enum-csv-postgres-focused.txt": "65e53d2f5d865060542d1f895c63efe0d6e268e8c789b20a3db5e8d17e3464ea",
+    "enum-csv-core-suite.txt": "8e80e6b561a41d98acb54803567740019c3bd0a49d8dd6ae737b3c9a46bafd17",
+    "enum-csv-postgres-suite.txt": "6a34d9185b29ab57b0562ab665189dc1efd869be1beffc3fa9771da82cb079ba",
+    "enum-csv-clippy.txt": "b585dd9d69292a031b61862c14217ca75516a6fe2af0e023ed0a5ea21ae7c843",
+    "enum-csv-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-csv-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-csv-file-size-before-test-trim.txt": "f2e22cd1ea5f72b0f2b0ab4177d2af02dbc8c18b62d82a71dc05e5fdabfbfe05",
+    "enum-csv-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-csv-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-csv-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-csv-ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-csv-ignored-inventory-before-refresh.txt": "6bde8eef3221d5b017bc7b37c61f12f0415bcb04e20912f652bfed4cc978de7c",
+    "enum-csv-diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-json-native.txt": "8a7ec2967d1fcab95897244a78c2114b08ed1805eac1345b1d2f5a05ff0af7e9",
+    "enum-json-postgres-suite.txt": "3d94b6204d17be33b8d5c2cb25e4afc574227d195ce2199a287d12bf9652a295",
+    "enum-json-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-json-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-json-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-json-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-json-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-json-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-json-ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-json-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-param-ambiguous-type.txt": "68a831eec457cc23a03401fc3deef8b0a9b81fae64026eddd02528ca3c97e2d3",
+    "enum-param-array-neighbor-after-cache-fix.txt": "6c5610045e381642e270d31d4869074f0c7e280e108dd8becd1ec0ecb2b8d676",
+    "enum-param-before-fix.txt": "f242e3d0537ef484313f0a2cb99b1bde52a28012aece04474ab633f76d3e080d",
+    "enum-param-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-param-clippy-before-unit-adjust.txt": "a4fec1c0e743412e2b13fac2fab7db185876491af89e276c60c2968e0c79571c",
+    "enum-param-clippy-live.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-param-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-param-compile-error.txt": "3081f36610ff3e2e7e1a1f2161f249ed53fe909a90afdc98aaa3df721c629f7c",
+    "enum-param-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-param-diff-live.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-param-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-param-focused-after-cache-fix.txt": "be1850ddb80551b69879b59da956f9e6b4087a988b8c59ec17d8243cd78ba9d2",
+    "enum-param-focused-before-cache-fix.txt": "3d218c99d89797287f922dd0ab41172019c9ffcf0f7566a1e37cb48d40fd79e4",
+    "enum-param-format-live.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-param-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-param-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-param-ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-param-ignored-live.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-param-numeric-neighbor-after-cache-fix.txt": "52658d8097b6236c78d8c4d821649e8e5b3927f7992cae783aa7329f98304769",
+    "enum-param-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-param-postgres-after-cache-fix.txt": "5a30d02f6fb070d59082cb0079e05b17e39ccae712289059d8d79ca5077c52b7",
+    "enum-param-postgres-cache-collision-before-fix.txt": "008204e1c6b24ffff505c467b7f69ae8a3411af069fc6046cabe034e3dd8b297",
+    "enum-param-postgres-live.txt": "465ddb40b4c2408c13ac0e41136c0002ffdc7502b39efa13df7862c18dba18cb",
+    "enum-param-prepare-error.txt": "7b06a312f80e37415de3b82e586bb790dcc4efdff18ebff4de352ef1fadc7d22",
+    "enum-param-sqlsafe-error.txt": "45b1a8ead83b3c7c85139b70ed179e60142b7b1aeb197b67ceef819870cdee8c",
+    "enum-param-sqlstr-error.txt": "e159521e000119662ba06488baa4ca3f4a592abbbdc28624efd4d9939f88aeea",
+    "enum-param-unit-live.txt": "66932505f873587d772ec2287c6333945bd8eb84984fe468a3f17098d5020865",
+    "enum-param-focused-live.txt": "57c8fbf50ffaa27996294257436c34faf9f62258c6e94434489b2434371927e4",
+    "enum-mcp-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-mcp-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-mcp-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-mcp-postgres-focused.txt": "91d1912961d06c8da671fd04b09fa73788b09d367cb998140b15c5a7432f15a5",
+    "enum-mcp-suite.txt": "c9835d15e9a3606d22d91ea4bde4648159e2106894aaa09a9ba9634ca66f9362",
+    "enum-mcp-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-mcp-export-data-focused.txt": "b2b5c6ec5e17d27225b7b6ea3b895d4788dcc042c0bd0036e9b9aa5b6d5a086d",
+    "enum-filewriter-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-filewriter-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-filewriter-focused.txt": "d143cdab1e51ce31e5615f5fc51a8106a64a306ec32730c1adbda47bef77641c",
+    "enum-filewriter-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-filewriter-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-filewriter-postgres-suite.txt": "4677020e87f39d483f9ffb21d681c61371577588454b71679f87c51497ad58f5",
+    "enum-sql-filewriter-focused.txt": "1520f3e8ae40313d9f6fbcc4bc6b48d085ffae5a82c33b2b45a61c1487b6af2a",
+    "enum-sql-filewriter-postgres-suite.txt": "353be4f798405d1ea8b69b809a9a7f93833ad4c98a4765124aa8f088732b1406",
+    "enum-sql-filewriter-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-sql-filewriter-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-sql-filewriter-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-sql-filewriter-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-sql-filewriter-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-sql-filewriter-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-sql-filewriter-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-sql-filewriter-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-xml-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-xml-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-xml-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-xml-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-xml-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-xml-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-xml-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-xml-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-xml-focused.txt": "5e20748ab72201ecce38aab4a407ccfaf6d32d134214bbffba2a90400e352ae4",
+    "enum-xml-postgres-suite.txt": "695971e35aa71d48878a6c7ad1662e50b0b761ac5b8103e1d7016880704acf5b",
+    "enum-html-focused.txt": "ce1f4446b641a7d87c155afaf6f0d3959b55c46238eb4d026647e85f9d285e68",
+    "enum-html-file-size.txt": "794a3770fc2ca8fd6a97ff05d97c50799bc028499e0aa09223744438cb93017d",
+    "enum-filewriters-focused.txt": "9b0718e14a7b7d8ee24ba92cc1b29dff4c7533c84ad460b0c62ca6f82e81bdde",
+    "enum-filewriters-postgres-suite.txt": "f46e41ddb0afc2e3a90e11ac7cd74e17dfab24ede3100e98824dcc9ce527a605",
+    "enum-filewriters-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-filewriters-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-filewriters-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-filewriters-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-filewriters-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-filewriters-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-filewriters-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-filewriters-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-markdown-before-fix.txt": "8d106121e06cb892936483aee8fb21b4f017256603768006622f52e851d402c9",
+    "enum-markdown-after-fix.txt": "c50262b532fd8fd007047272a6a203f412945c7cb0a1ab03a169df08d83d4c98",
+    "enum-markdown-core-suite.txt": "c555407fec6a28056f8d0673ae64f5ad1454160158dd7d11c301055ce7112fc8",
+    "enum-markdown-postgres-suite.txt": "6d16475a9c5c113dd0d776c704bd93ab742c5a2ce477f3ff64784300fdc6bf18",
+    "enum-markdown-core-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-markdown-postgres-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-markdown-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-markdown-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-markdown-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-markdown-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-markdown-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-markdown-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-markdown-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-markdown-core-focused.txt": "849eb4a0d42b957faf787753102552fc2f169a1b8867e0a49e3cce3a5ef795eb",
+    "enum-xlsx-core-focused.txt": "2b3050cfdfa4dfa075853d33afa968a3afa33e62d37d2193a1012c58433fd7ca",
+    "enum-xlsx-postgres-focused.txt": "ac87a5ff23bee8a89ecf9b2b9bcdc975a01e38cd6fcee1c97995b38b13f3b99b",
+    "enum-xlsx-core-suite.txt": "c878e84384d709b9b8257c6c5f74cd8ef67c4552d13555683d8d1ccf548dad23",
+    "enum-xlsx-postgres-suite.txt": "f2e4790b1c62e4d43b65a4a11967bedc64b10375dc1a12137dfcef93d329eb00",
+    "enum-xlsx-core-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-xlsx-postgres-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-xlsx-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-xlsx-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-xlsx-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-xlsx-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-xlsx-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-xlsx-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-xlsx-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-mcp-csv-before-fix.txt": "0feeb4c4295201c567d7acdf859ae5f6df77ce963fb675d05f5d2b0ed352aaa6",
+    "enum-mcp-csv-roundtrip.txt": "dd85cdf999aff175dd0584cbdcfeadbb6b131f8cad06e0e122f446bd30f9595c",
+    "enum-mcp-csv-core-focused.txt": "21713ea406f621f600e66b00166b5e9aaf1378fdca2a23bdae6a3fc9494cd6f9",
+    "enum-mcp-csv-core-suite.txt": "6c09d3c41645ded7b6c4ef1fe268effdda68f427d35f48363262a5574ac20f5a",
+    "enum-mcp-csv-mcp-suite.txt": "d278df4700587445dd05c782819cf1512fcc2e3c883b6ee1b63b03ebe26071fd",
+    "enum-mcp-csv-core-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-mcp-csv-mcp-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-mcp-csv-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-mcp-csv-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-mcp-csv-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-mcp-csv-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-mcp-csv-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-mcp-csv-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-mcp-csv-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-csv-filewriter-postgres-focused.txt": "dd86a73f62101ee70fdfce05b72e6b17b356efb13ea3d63d45458314a23bde54",
+    "enum-csv-filewriter-core-suite.txt": "9c34dfcb50fc53a3614378a9f8471f659b2edb1e4c79e0d85ab429d6af5e0d91",
+    "enum-csv-filewriter-mcp-focused.txt": "5f31c3a7ff7bc4248d6ffebe0a1be9db6fdb0bd3f51c8088068a97a44246ac44",
+    "enum-csv-filewriter-postgres-suite.txt": "f789b4077859e33a9a7e4141e61442afbf3f4274687c2a5b54e4b0b9f83482b4",
+    "enum-csv-filewriter-gtk.txt": "de7ab1683ca49297b1fdfcc4f4e2e6153bdaaac2e02a671e9eb44da406f68dc2",
+    "enum-csv-filewriter-workspace-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-csv-filewriter-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-csv-filewriter-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "enum-csv-filewriter-file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "enum-csv-filewriter-function-size.txt": "811cb5096d29b29bca1478c0531c49c86d696f529bcaa58d90798ba59430f5af",
+    "enum-csv-filewriter-panic-sites.txt": "6ab93deb85fc181e669b30fb7c64538e86433857d5fab838b32152b9e7cbd913",
+    "enum-csv-filewriter-bounded-operations.txt": "41c86b2a530375d0b13367d991664894ffab12564f49442cbe256f3fc61a3f39",
+    "enum-csv-filewriter-diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "enum-csv-filewriter-core-focused.txt": "31b8f6f1ec5860c0a859aaedf7ac3d6d6bd10f27fe6bcf75beaddb48b7873924",
+    "enum-csv-filewriter-app-suite.txt": "94f1577b4b65eab7360ee6b374874250a8ef296e179958e03fc6bc7e1f544093",
+    "enum-csv-formula-safe-postgres.txt": "0acf75edcd08b9d7872615cdd08b01e639867c3fd55d17502afc334427eb3c12",
+    "enum-csv-formula-safe-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "enum-csv-formula-safe-format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "enum-csv-formula-safe-guards.txt": "994cb0ea637c72a0cf126d81b42851bfb6c1a77b655d9458a897462cd6da4916",
+    "enum-csv-formula-safe-gtk.txt": "07c62ec43346ba821828d4e9f7a1725848571958994c829f2074bde79e5b1b97",
+    "enum-csv-formula-safe-build.txt": "538cc7a0349616b5c10f73705bd0502c064078fbe55844cb24265bdaa601dcd7",
+    "domain-over-enum-focused.txt": "e99ea693ecdbd266f69391e82d0e6392659739a1b4cb580e961bd1fa525d9c72",
+    "domain-over-enum-postgres-suite.txt": "39872b0745b5f4dabe8d69680d2c227605a3518628d9d6434da9b53a92d696fd"
+  },
+  "remaining": [
+    "Additional PostgreSQL enum format/session combinations remain open. Core spreadsheet-safe CSV is now proven to be presentation-only and lossy on import; raw-text CSV has the native round-trip contract.",
+    "Complete the broader PostgreSQL custom-enum type/session/configuration and consumer matrix with independent native oracles.",
+    "These focused JSON/XML/HTML/Markdown/XLSX/MCP cases and PostgreSQL driver suite do not close B3\u2019s broader engine/type/consumer matrix or release gates.",
+    "Domain-over-enum support is proven only for scalar result projection; arrays, bindings, writes, filters, imports and exports remain untested."
+  ]
+}

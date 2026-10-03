@@ -130,6 +130,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 

@@ -227,6 +227,27 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_workbook_keeps_text_null_labels_as_strings_and_sql_null_blank() {
+        let (sheet, strings) = workbook_parts(&[
+            Value::Text("NULL".into()),
+            Value::Text("東京".into()),
+            Value::Text("<tag>&amp;".into()),
+            Value::Text("=1+1".into()),
+            Value::Null,
+        ]);
+
+        for row in 2..=5 {
+            assert!(sheet.contains(&format!("<c r=\"A{row}\" t=\"s\">")), "{sheet}");
+        }
+        assert!(strings.contains("<t>NULL</t>"), "{strings}");
+        assert!(strings.contains("<t>東京</t>"), "{strings}");
+        assert!(strings.contains("<t>&lt;tag&gt;&amp;amp;</t>"), "{strings}");
+        assert!(strings.contains("<t>=1+1</t>"), "{strings}");
+        assert!(!sheet.contains("r=\"A6\""), "{sheet}");
+        assert!(!sheet.contains("<f>"), "{sheet}");
+    }
+
+    #[test]
     fn value_contract_workbook_preserves_temporal_precision_and_timezone_as_text() {
         let cases = [
             (Value::Date("1899-12-31".parse().unwrap()), "1899-12-31"),

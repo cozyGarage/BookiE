@@ -1,0 +1,69 @@
+---- array_contract::value_contract_array_grid_edit_preserves_array_elements stdout ----
+
+thread 'array_contract::value_contract_array_grid_edit_preserves_array_elements' (2341781) panicked at crates/drivers/postgres/tests/support/array_contract.rs:436:67:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values stdout ----
+
+thread 'array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values' (2344960) panicked at crates/drivers/postgres/tests/support/array_contract.rs:720:67:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+---- array_contract::value_contract_numeric_array_grid_edit_preserves_elements stdout ----
+
+thread 'array_contract::value_contract_numeric_array_grid_edit_preserves_elements' (2345460) panicked at crates/drivers/postgres/tests/support/array_contract.rs:1019:67:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+---- enum_contract::value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null stdout ----
+
+thread 'enum_contract::value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null' (2348308) panicked at crates/drivers/postgres/tests/support/enum_contract.rs:382:63:
+called `Result::unwrap()` on an `Err` value: Query { message: "incorrect binary data format in bind parameter 1", sqlstate: Some("22P03") }
+
+---- enum_contract::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings stdout ----
+
+thread 'enum_contract::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings' (2348804) panicked at crates/drivers/postgres/tests/support/enum_contract.rs:789:52:
+called `Result::unwrap()` on an `Err` value: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") }
+
+---- enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values stdout ----
+
+thread 'enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values' (2349308) panicked at crates/drivers/postgres/tests/support/enum_contract.rs:472:52:
+called `Result::unwrap()` on an `Err` value: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") }
+
+---- grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys stdout ----
+
+thread 'grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys' (2349972) panicked at crates/drivers/postgres/tests/integration.rs:958:54:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+---- value_contracts::value_contract_vectors_keep_space_separated_elements_through_exports stdout ----
+
+thread 'value_contracts::value_contract_vectors_keep_space_separated_elements_through_exports' (2354971) panicked at crates/drivers/postgres/tests/support/vector_contract.rs:38:10:
+called `Result::unwrap()` on an `Err` value: Query { message: "incorrect binary data format in bind parameter 1", sqlstate: Some("22P03") }
+
+---- value_roundtrip_all_types stdout ----
+
+thread 'value_roundtrip_all_types' (2355300) panicked at crates/drivers/postgres/tests/integration.rs:521:10:
+called `Result::unwrap()` on an `Err` value: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") }
+
+---- wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value stdout ----
+
+thread 'wide_numeric_contract::value_contract_max_precision_numeric_grid_edit_preserves_exact_value' (2355464) panicked at crates/drivers/postgres/tests/support/wide_numeric_contract.rs:112:67:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+---- wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_across_consumers stdout ----
+
+thread 'wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_across_consumers' (2355628) panicked at crates/drivers/postgres/tests/support/wide_numeric_contract.rs:73:10:
+called `Result::unwrap()` on an `Err` value: Query { message: "invalid sign in external \"numeric\" value", sqlstate: Some("22P03") }
+
+---- wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text stdout ----
+
+thread 'wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text' (2355793) panicked at crates/drivers/postgres/tests/support/wide_numeric_contract.rs:152:71:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+---- wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value stdout ----
+
+thread 'wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value' (2355963) panicked at crates/drivers/postgres/tests/support/wide_numeric_contract.rs:27:67:
+called `Result::unwrap()` on an `Err` value: Transaction { statement_index: 0, source: Query { message: "incorrect binary data format in bind parameter 2", sqlstate: Some("22P03") } }
+
+
+test result: FAILED. 64 passed; 13 failed; 0 ignored; 0 measured; 0 filtered out; finished in 179.51s
+[full output: ~/.local/share/rtk/tee/1791024871_cargo_test.log]

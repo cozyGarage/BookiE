@@ -5,24 +5,26 @@ use secrecy::ExposeSecret;
 use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
 use sqlx::{
-    Column, Connection as SqlxConnection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, Type, TypeInfo,
-    ValueRef,
+    Column, Connection as SqlxConnection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef,
 };
 
 use futures::stream::StreamExt;
 
 use tablepro_core::{
     CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult,
-    ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Transport, Value,
-    check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo, Transport,
+    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod array;
 mod catalog;
 mod decode;
 mod numeric;
+mod params;
 mod session;
 mod temporal;
+
+use params::{bind_pg_params, describe_query_parameters, needs_enum_type_inference, pg_parameter_type_infos};
 
 pub struct PgDriver;
 
@@ -221,11 +223,14 @@ impl Connection for PgConnection {
                 a.attgenerated <> '' AS is_generated,
                 pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment,
                 CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
-                    THEN co.collname::text END AS collation
+                    THEN co.collname::text END AS collation,
+                CASE WHEN ty.typtype = 'e' THEN type_ns.nspname END AS enum_schema,
+                CASE WHEN ty.typtype = 'e' THEN ty.typname END AS enum_name
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
              JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
+             LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = ty.typnamespace
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d
                  ON d.adrelid = a.attrelid AND d.adnum = a.attnum
@@ -262,7 +267,9 @@ impl Connection for PgConnection {
                 } else {
                     raw_default.map(normalize_pg_default)
                 };
-                ColumnInfo {
+                let enum_schema = r.try_get::<Option<String>, _>(9).map_err(map_sqlx_error)?;
+                let enum_name = r.try_get::<Option<String>, _>(10).map_err(map_sqlx_error)?;
+                Ok(ColumnInfo {
                     name: r.get::<String, _>(0),
                     data_type: r.get::<String, _>(1),
                     nullable: r.get::<bool, _>(2),
@@ -275,9 +282,12 @@ impl Connection for PgConnection {
                         .unwrap_or(None)
                         .filter(|c| !c.is_empty()),
                     collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
-                }
+                    enum_type: enum_schema
+                        .zip(enum_name)
+                        .map(|(schema, name)| QualifiedTypeName { schema, name }),
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>, DriverError>>()?)
     }
 
     async fn fetch_rows(
@@ -308,21 +318,8 @@ impl Connection for PgConnection {
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
-        let mut stream = query.fetch(&self.pool);
-        let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
-        if result.columns.is_empty() && result.rows.is_empty() {
-            let statement = self
-                .pool
-                .prepare_with(
-                    sqlx::AssertSqlSafe(sql).into_sql_str(),
-                    &pg_parameter_type_infos(params),
-                )
-                .await
-                .map_err(map_sqlx_error)?;
-            result.columns = statement_columns(statement.columns());
-        }
-        Ok(result)
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        query_connection(&mut connection, sql, params).await
     }
 
     async fn query_params_controlled(
@@ -359,11 +356,8 @@ impl Connection for PgConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
-        let result = query.execute(&self.pool).await.map_err(map_sqlx_error)?;
-        Ok(ExecResult {
-            rows_affected: result.rows_affected(),
-        })
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        execute_connection(&mut connection, sql, params).await
     }
 
     async fn execute_params_controlled(
@@ -385,24 +379,24 @@ impl Connection for PgConnection {
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
             let sql = sql.as_str();
-            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
+            let enum_types = if needs_enum_type_inference(params) {
+                match describe_query_parameters(&mut tx, sql, params).await {
+                    Ok(description) => description.enum_types,
+                    Err(error) => return Err(transaction_failure(tx, idx, error).await),
+                }
+            } else {
+                Vec::new()
+            };
+            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &enum_types) {
                 Ok(query) => query,
                 Err(error) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(error),
-                    });
+                    return Err(transaction_failure(tx, idx, error).await);
                 }
             };
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(map_sqlx_error(e)),
-                    });
+                    return Err(transaction_failure(tx, idx, map_sqlx_error(e)).await);
                 }
             }
         }
@@ -553,6 +547,24 @@ impl Connection for PgConnection {
         self.pool.close().await;
         self.cancellation_pool.close().await;
         Ok(())
+    }
+}
+
+async fn transaction_failure(
+    tx: sqlx::Transaction<'static, Postgres>,
+    statement_index: usize,
+    source: DriverError,
+) -> DriverError {
+    match tx.rollback().await {
+        Ok(()) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(source),
+        },
+        Err(error) => DriverError::TransactionRollbackFailed {
+            statement_index,
+            source: Box::new(source),
+            rollback_error: Box::new(map_sqlx_error(error)),
+        },
     }
 }
 
@@ -797,17 +809,29 @@ async fn query_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
+    let description = if needs_enum_type_inference(params) {
+        Some(describe_query_parameters(connection, sql, params).await?)
+    } else {
+        None
+    };
+    let enum_types = description
+        .as_ref()
+        .map_or(&[][..], |description| description.enum_types.as_slice());
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, enum_types)?;
     let mut stream = query.fetch(&mut **connection);
     let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
     drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
-        let parameter_types = pg_parameter_type_infos(params);
-        let statement = connection
-            .prepare_with(sqlx::AssertSqlSafe(sql).into_sql_str(), &parameter_types)
-            .await
-            .map_err(map_sqlx_error)?;
-        result.columns = statement_columns(statement.columns());
+        if let Some(description) = description {
+            result.columns = description.columns;
+        } else {
+            let parameter_types = pg_parameter_type_infos(params);
+            let statement = connection
+                .prepare_with(sqlx::AssertSqlSafe(sql).into_sql_str(), &parameter_types)
+                .await
+                .map_err(map_sqlx_error)?;
+            result.columns = statement_columns(statement.columns());
+        }
     }
     Ok(result)
 }
@@ -817,7 +841,12 @@ async fn execute_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
+    let enum_types = if needs_enum_type_inference(params) {
+        describe_query_parameters(connection, sql, params).await?.enum_types
+    } else {
+        Vec::new()
+    };
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &enum_types)?;
     let result = query.execute(&mut **connection).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),
@@ -850,28 +879,7 @@ fn statement_columns(columns: &[sqlx::postgres::PgColumn]) -> Vec<ColumnInfo> {
             is_generated: false,
             comment: None,
             collation: None,
-        })
-        .collect()
-}
-
-fn pg_parameter_type_infos(params: &[Value]) -> Vec<sqlx::postgres::PgTypeInfo> {
-    params
-        .iter()
-        .map(|param| match param {
-            Value::Null => <Option<&str> as Type<Postgres>>::type_info(),
-            Value::Bool(_) => <bool as Type<Postgres>>::type_info(),
-            Value::Int(_) => <i64 as Type<Postgres>>::type_info(),
-            Value::Float(_) => <f64 as Type<Postgres>>::type_info(),
-            Value::Text(_) => <String as Type<Postgres>>::type_info(),
-            Value::Bytes(_) => <Vec<u8> as Type<Postgres>>::type_info(),
-            Value::Date(_) => <chrono::NaiveDate as Type<Postgres>>::type_info(),
-            Value::Time(_) => <chrono::NaiveTime as Type<Postgres>>::type_info(),
-            Value::DateTime(_) => <chrono::NaiveDateTime as Type<Postgres>>::type_info(),
-            Value::TimestampTz(_) => <chrono::DateTime<chrono::Utc> as Type<Postgres>>::type_info(),
-            Value::Decimal(_) => <rust_decimal::Decimal as Type<Postgres>>::type_info(),
-            Value::Uuid(_) => <uuid::Uuid as Type<Postgres>>::type_info(),
-            Value::Json(_) => <sqlx::types::Json<serde_json::Value> as Type<Postgres>>::type_info(),
-            Value::Undecodable(_) => sqlx::postgres::PgTypeInfo::with_name("TEXT"),
+            enum_type: None,
         })
         .collect()
 }
@@ -909,6 +917,7 @@ where
                     is_generated: false,
                     comment: None,
                     collation: None,
+                    enum_type: None,
                 })
                 .collect();
         }
@@ -933,6 +942,9 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     let raw = row.try_get_raw(idx).map_err(map_sqlx_error)?;
     if raw.is_null() {
         return Ok(Value::Null);
+    }
+    if matches!(raw.type_info().kind(), sqlx::postgres::PgTypeKind::Enum(_)) {
+        return Ok(extract_enum_value(&raw, idx, type_name));
     }
     if matches!(raw.type_info().kind(), sqlx::postgres::PgTypeKind::Array(_)) {
         return Ok(array::decode(&raw).unwrap_or_else(|| undecodable(idx, type_name)));
@@ -988,6 +1000,16 @@ fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, Driv
     Ok(decoded.unwrap_or_else(|_| undecodable(idx, type_name)))
 }
 
+fn extract_enum_value(raw: &sqlx::postgres::PgValueRef<'_>, idx: usize, type_name: &str) -> Value {
+    let label = match raw.format() {
+        sqlx::postgres::PgValueFormat::Binary => raw.as_bytes().ok().and_then(|bytes| std::str::from_utf8(bytes).ok()),
+        sqlx::postgres::PgValueFormat::Text => raw.as_str().ok(),
+    };
+    label
+        .map(|value| Value::Text(value.to_owned()))
+        .unwrap_or_else(|| undecodable(idx, type_name))
+}
+
 fn undecodable(idx: usize, type_name: &str) -> Value {
     tracing::warn!(
         column_index = idx + 1,
@@ -995,39 +1017,6 @@ fn undecodable(idx: usize, type_name: &str) -> Value {
         "postgres column value could not be decoded; showing it as undecodable"
     );
     Value::Undecodable(type_name.to_string())
-}
-
-/// Bind a positional parameter list to a sqlx Postgres query in the
-/// same order as the `params` slice. Centralised here so
-/// `execute_params` and `execute_in_transaction` produce identical
-/// bindings without duplicating the variant match.
-fn bind_pg_params<'q>(
-    mut q: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
-    params: &'q [Value],
-) -> Result<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>, DriverError> {
-    for p in params {
-        q = match p {
-            Value::Null => q.bind(Option::<&str>::None),
-            Value::Bool(b) => q.bind(*b),
-            Value::Int(i) => q.bind(*i),
-            Value::Float(f) => q.bind(*f),
-            Value::Text(s) => q.bind(s.clone()),
-            Value::Bytes(b) => q.bind(b.clone()),
-            Value::Date(d) => q.bind(*d),
-            Value::Time(t) => q.bind(*t),
-            Value::DateTime(dt) => q.bind(*dt),
-            Value::TimestampTz(ts) => q.bind(*ts),
-            Value::Decimal(d) => q.bind(*d),
-            Value::Uuid(u) => q.bind(*u),
-            Value::Json(j) => q.bind(j.clone()),
-            Value::Undecodable(_) => {
-                return Err(DriverError::Unsupported(
-                    "undecodable cell cannot be bound as a parameter".into(),
-                ));
-            }
-        };
-    }
-    Ok(q)
 }
 
 fn quote_ident(name: &str) -> String {
@@ -1087,6 +1076,11 @@ fn is_certificate_failure(err: &std::io::Error) -> bool {
 }
 
 fn map_sqlx_error(err: sqlx::Error) -> DriverError {
+    if is_enum_label_metadata_null(&err) {
+        return DriverError::Unsupported(
+            "PostgreSQL enum result metadata could not be resolved; the result was not read".into(),
+        );
+    }
     use sqlx::Error::*;
     match err {
         Database(e) => {
@@ -1107,6 +1101,13 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
         PoolClosed | PoolTimedOut => DriverError::Disconnected,
         other => DriverError::Internal(format!("{other}")),
     }
+}
+
+fn is_enum_label_metadata_null(err: &sqlx::Error) -> bool {
+    let sqlx::Error::ColumnDecode { index, source } = err else {
+        return false;
+    };
+    index == "\"enum_labels\"" && source.downcast_ref::<sqlx::error::UnexpectedNullError>().is_some()
 }
 
 fn map_sqlx_connect_error(err: sqlx::Error) -> DriverError {

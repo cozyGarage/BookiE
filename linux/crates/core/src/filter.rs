@@ -252,7 +252,7 @@ fn build_rule_sql(
         FilterOp::Eq | FilterOp::NotEq | FilterOp::Lt | FilterOp::LtEq | FilterOp::Gt | FilterOp::GtEq => {
             let raw = require_single(rule)?;
             let value = parse_filter_value(driver_id, col, raw)?;
-            let ph = placeholder_for(driver_id, *placeholder_idx);
+            let ph = filter_placeholder(driver_id, col, *placeholder_idx);
             *placeholder_idx += 1;
             params.push(value);
             let op_sql = match rule.op {
@@ -315,10 +315,10 @@ fn build_rule_sql(
             let (lo, hi) = require_pair(rule)?;
             let lo_v = parse_filter_value(driver_id, col, lo)?;
             let hi_v = parse_filter_value(driver_id, col, hi)?;
-            let ph_lo = placeholder_for(driver_id, *placeholder_idx);
+            let ph_lo = filter_placeholder(driver_id, col, *placeholder_idx);
             *placeholder_idx += 1;
             params.push(lo_v);
-            let ph_hi = placeholder_for(driver_id, *placeholder_idx);
+            let ph_hi = filter_placeholder(driver_id, col, *placeholder_idx);
             *placeholder_idx += 1;
             params.push(hi_v);
             Ok(format!("{col_sql} BETWEEN {ph_lo} AND {ph_hi}"))
@@ -332,7 +332,7 @@ fn build_rule_sql(
             let mut placeholders: Vec<String> = Vec::with_capacity(list.len());
             for raw in list {
                 let parsed = parse_filter_value(driver_id, col, raw)?;
-                placeholders.push(placeholder_for(driver_id, *placeholder_idx));
+                placeholders.push(filter_placeholder(driver_id, col, *placeholder_idx));
                 *placeholder_idx += 1;
                 params.push(parsed);
             }
@@ -344,6 +344,18 @@ fn build_rule_sql(
             Ok(format!("{col_sql} {kw} ({})", placeholders.join(", ")))
         }
     }
+}
+
+fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String {
+    let placeholder = placeholder_for(driver_id, index);
+    let Some(enum_type) = col.enum_type.as_ref().filter(|_| driver_id == "postgres") else {
+        return placeholder;
+    };
+    format!(
+        "{placeholder}::{}.{}",
+        quote_ident("postgres", &enum_type.schema),
+        quote_ident("postgres", &enum_type.name)
+    )
 }
 
 fn require_single(rule: &FilterRule) -> Result<&String, BuildFilterError> {

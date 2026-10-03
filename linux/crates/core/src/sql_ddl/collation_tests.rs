@@ -13,6 +13,7 @@ fn collated(data_type: &str, collation: Option<&str>) -> DraftColumn {
         is_generated: false,
         comment: None,
         collation: collation.map(str::to_string),
+        enum_type: None,
     })
 }
 

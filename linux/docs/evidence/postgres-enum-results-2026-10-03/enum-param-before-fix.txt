@@ -1,0 +1,9 @@
+---- enum_contract::value_contract_custom_enum_parameters_infer_native_type_for_query_and_write stdout ----
+
+thread 'enum_contract::value_contract_custom_enum_parameters_infer_native_type_for_query_and_write' (2335957) panicked at crates/drivers/postgres/tests/support/enum_contract.rs:647:10:
+called `Result::unwrap()` on an `Err` value: Query { message: "operator does not exist: value_contract_enum_bind.state = text", sqlstate: Some("42883") }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 76 filtered out; finished in 2.13s
+[full output: ~/.local/share/rtk/tee/1791024110_cargo_test.log]

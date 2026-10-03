@@ -9,6 +9,12 @@ pub struct TableInfo {
     pub name: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QualifiedTypeName {
+    pub schema: String,
+    pub name: String,
+}
+
 /// Secondary-index metadata for a table. `primary` is set on the
 /// auto-PK index returned by the catalog query so the UI can render
 /// it as read-only (the PK is owned by the column definition, not
@@ -66,6 +72,8 @@ pub struct ColumnInfo {
     pub comment: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collation: Option<String>,
+    #[serde(skip)]
+    pub enum_type: Option<QualifiedTypeName>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -106,4 +114,33 @@ pub struct QueryResult {
 #[derive(Debug, Clone, Copy)]
 pub struct ExecResult {
     pub rows_affected: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ColumnInfo, QualifiedTypeName};
+
+    #[test]
+    fn enum_catalog_metadata_does_not_change_column_info_wire_shape() {
+        let column = ColumnInfo {
+            name: "status".into(),
+            data_type: "status_type".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: Some(QualifiedTypeName {
+                schema: "app".into(),
+                name: "status_type".into(),
+            }),
+        };
+
+        let wire = serde_json::to_value(&column).unwrap();
+        assert!(wire.get("enum_type").is_none());
+        let decoded: ColumnInfo = serde_json::from_value(wire).unwrap();
+        assert_eq!(decoded.enum_type, None);
+    }
 }

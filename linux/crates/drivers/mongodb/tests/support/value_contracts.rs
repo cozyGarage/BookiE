@@ -51,6 +51,47 @@ async fn value_contract_preserves_numbers_and_text_through_json_commands() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_mongodb_missing_fields_remain_distinct_from_bson_null() {
+    use mongodb::bson::{Bson, Document, doc};
+
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect direct BSON fixture client");
+    let collection = client.database("appdb").collection::<Document>("sparse_values");
+    collection
+        .insert_many([doc! { "_id": 1, "value": Bson::Null }, doc! { "_id": 2 }])
+        .await
+        .expect("insert explicit-null and missing-field documents");
+
+    let explicit_null = collection.find_one(doc! { "_id": 1 }).await.unwrap().unwrap();
+    let missing = collection.find_one(doc! { "_id": 2 }).await.unwrap().unwrap();
+    assert_eq!(explicit_null.get("value"), Some(&Bson::Null));
+    assert!(!missing.contains_key("value"));
+
+    let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
+    let result = connection.query("db.sparse_values.find({})").await.unwrap();
+    let id_column = result.columns.iter().position(|column| column.name == "_id").unwrap();
+    let value_column = result.columns.iter().position(|column| column.name == "value").unwrap();
+    let value_for = |id| {
+        result
+            .rows
+            .iter()
+            .find(|row| row[id_column] == Value::Int(id))
+            .map(|row| &row[value_column])
+            .unwrap()
+    };
+
+    assert_eq!(value_for(1), &Value::Null);
+    assert_eq!(
+        value_for(2),
+        &Value::Undecodable("missing BSON field".into()),
+        "a missing field must not become an editable explicit BSON null"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn nested_bson_special_values_keep_exact_extended_json_types() {
     use mongodb::bson::{Binary, DateTime, Decimal128, doc, spec::BinarySubtype};
 
@@ -239,6 +280,7 @@ fn json_column(name: &str) -> tablepro_core::ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 

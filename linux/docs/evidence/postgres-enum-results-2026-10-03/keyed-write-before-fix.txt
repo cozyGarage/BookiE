@@ -1,0 +1,9 @@
+---- value_contracts::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings stdout ----
+
+thread 'value_contracts::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings' (2118890) panicked at crates/drivers/postgres/tests/support/value_contracts.rs:1086:52:
+called `Result::unwrap()` on an `Err` value: Query { message: "column \"status\" is of type value_contract_grid_enum but expression is of type text", sqlstate: Some("42804") }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 71 filtered out; finished in 2.04s
+[full output: ~/.local/share/rtk/tee/1791015575_cargo_test.log]

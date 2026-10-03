@@ -38,16 +38,36 @@ pub(crate) fn markdown_row_line(row: &[Value]) -> String {
 }
 
 fn markdown_cell(value: &str) -> String {
-    value
-        .replace('|', "\\|")
-        .replace("\r\n", "<br>")
-        .replace(['\r', '\n'], "<br>")
+    let normalized = value.replace("\r\n", "\n");
+    let mut escaped = String::with_capacity(normalized.len());
+    for character in normalized.chars() {
+        match character {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '|' => escaped.push_str("\\|"),
+            '\r' | '\n' => escaped.push_str("<br>"),
+            '\\' => escaped.push_str("&#92;"),
+            '`' => escaped.push_str("&#96;"),
+            '*' => escaped.push_str("&#42;"),
+            '_' => escaped.push_str("&#95;"),
+            '~' => escaped.push_str("&#126;"),
+            '[' => escaped.push_str("&#91;"),
+            ']' => escaped.push_str("&#93;"),
+            other => escaped.push(other),
+        }
+    }
+    escaped
 }
 
 fn markdown_value_cell(value: &Value) -> String {
-    let text = match value_to_text(value) {
-        Some(text) => text,
-        None => "NULL".to_string(),
+    let text = match value {
+        Value::Null => return "NULL".to_string(),
+        Value::Text(text) => serde_json::Value::String(text.clone()).to_string(),
+        other => match value_to_text(other) {
+            Some(text) => text,
+            None => "NULL".to_string(),
+        },
     };
     markdown_cell(&text)
 }
@@ -86,13 +106,24 @@ mod tests {
     use crate::export::test_support::column;
 
     #[test]
-    fn markdown_renderer_escapes_pipes_and_preserves_line_breaks() {
+    fn markdown_renderer_quotes_text_and_escapes_table_and_inline_markup() {
         let columns = vec![column("a|b"), column("empty")];
-        let rows = vec![vec![Value::Text("first\r\nsecond|third".into()), Value::Null]];
+        let rows = vec![vec![Value::Text("first\r\nsecond|<tag>&".into()), Value::Null]];
 
         assert_eq!(
             render_markdown(&columns, &rows),
-            "| a\\|b | empty |\n| --- | --- |\n| first<br>second\\|third | NULL |"
+            "| a\\|b | empty |\n| --- | --- |\n| \"first&#92;r&#92;nsecond\\|&lt;tag&gt;&amp;\" | NULL |"
+        );
+    }
+
+    #[test]
+    fn markdown_renderer_distinguishes_text_null_from_sql_null() {
+        let columns = [column("value")];
+        let rows = [vec![Value::Text("NULL".into())], vec![Value::Null]];
+
+        assert_eq!(
+            render_markdown(&columns, &rows),
+            "| value |\n| --- |\n| \"NULL\" |\n| NULL |"
         );
     }
 }

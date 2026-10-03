@@ -34,8 +34,9 @@ futures.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile.workspace = true
 tablepro-driver-mongodb = { path = "../drivers/mongodb" }
+tablepro-driver-postgres = { path = "../drivers/postgres" }
 testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["mongo"] }
+testcontainers-modules = { workspace = true, features = ["mongo", "postgres"] }
 mongodb = { version = "3.8", default-features = false, features = ["compat-3-0-0", "rustls-tls", "dns-resolver"] }
 
 [lints]

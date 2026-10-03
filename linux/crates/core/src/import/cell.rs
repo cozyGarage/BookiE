@@ -31,6 +31,8 @@ pub enum CellError {
     NotBytes,
     #[error("not an interval")]
     NotAnInterval,
+    #[error("empty CSV field is ambiguous for a PostgreSQL enum; set an explicit NULL marker")]
+    AmbiguousEnumNullOrEmpty,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -288,6 +290,9 @@ pub(crate) fn row_to_values_for_driver(
 
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
     let kind = column_kind(&column.data_type);
+    if driver_id == "postgres" && column.enum_type.is_some() && options.null_marker.is_empty() && text.is_empty() {
+        return Err(CellError::AmbiguousEnumNullOrEmpty);
+    }
     if driver_id == "duckdb" && column.data_type.trim().eq_ignore_ascii_case("interval") && text.is_empty() {
         return if options.null_marker.is_empty() {
             Ok(Value::Null)
@@ -588,6 +593,7 @@ mod tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 

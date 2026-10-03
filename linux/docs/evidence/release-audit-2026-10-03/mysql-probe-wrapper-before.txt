@@ -1,0 +1,9 @@
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+error[E0425]: cannot find function `install_crypto_provider` in crate `tablepro_core`
+  --> crates/app/examples/release_audit_mysql_probe.rs:21:20
+   |
+21 |     tablepro_core::install_crypto_provider();
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^ not found in `tablepro_core`
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `tablepro-app` (example "release_audit_mysql_probe") due to 1 previous error

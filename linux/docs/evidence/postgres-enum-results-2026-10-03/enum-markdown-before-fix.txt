@@ -1,0 +1,11 @@
+---- enum_file_export_contract::value_contract_custom_enum_markdown_file_export_preserves_labels_null_and_cell_text stdout ----
+
+thread 'enum_file_export_contract::value_contract_custom_enum_markdown_file_export_preserves_labels_null_and_cell_text' (2511933) panicked at crates/drivers/postgres/tests/support/enum_file_export_contract.rs:221:5:
+assertion `left == right` failed
+  left: "| label | native_type |\n| --- | --- |\n| NULL | value_contract_markdown_enum |\n|  | value_contract_markdown_enum |\n| 東京 | value_contract_markdown_enum |\n| a\\|b<br>c | value_contract_markdown_enum |\n| <tag>&amp; | value_contract_markdown_enum |\n| NULL | value_contract_markdown_enum |\n"
+ right: "| label | native_type |\n| --- | --- |\n| \"NULL\" | \"value_contract_markdown_enum\" |\n| \"\" | \"value_contract_markdown_enum\" |\n| \"東京\" | \"value_contract_markdown_enum\" |\n| \"a\\|b\\nc\" | \"value_contract_markdown_enum\" |\n| \"&lt;tag&gt;&amp;amp;\" | \"value_contract_markdown_enum\" |\n| NULL | \"value_contract_markdown_enum\" |\n"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 80 filtered out; finished in 2.02s
+[full output: ~/.local/share/rtk/tee/1791030972_cargo_test.log]

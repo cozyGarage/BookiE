@@ -1,0 +1,1331 @@
+{
+  "baseline": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "method": "Tracked Markdown UTF-8, SHA256, title/line inventory, inline local Markdown links, GitHub-style heading slugs, exact whitespace-normalized paragraph duplication. Not prose semantic proof; anchor candidates require manual review. External URLs not fetched.",
+  "documents": [
+    {
+      "path": ".github/workflows/daily-repo-status.md",
+      "sha256": "92a7dff4a2e83d462765d4b256f6a4b03a0dcff386a33a1ec16e1d5300cd0c41",
+      "lines": 58,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "d26f0d856a553988d01fb053ea7f2b5387d6f5233dd8dc95b2a9a6fbeff77ed1",
+      "lines": 208,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "sha256": "47ac2935fd017b26b309f225c891273142419ef60e2a6434b83e6da2c8c4c1b8",
+      "lines": 128,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "1304c5ee30124d9093d74d7e394a477cb4c229c4f96996fe868cd1cf3b8b3ebd",
+      "lines": 134,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "PLAN.md",
+      "sha256": "019612de73b6d16c5622cd3dcfb9a97f2462b8a937ed7981ee37d147897e2be0",
+      "lines": 797,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "README.md",
+      "sha256": "d34d8727d2d17224aaed22255a869a8f2c256b26209810de3e3edad6b477637a",
+      "lines": 91,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "external-audit.md",
+      "sha256": "4f004c0307e7bebd5dd3c343bff7fab3093fd528e4c9abea462db914cec88012",
+      "lines": 103,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/ARCHITECTURE.md",
+      "sha256": "418427b84114bc026fb4e36197bbf4c9024c700bc196de4123bca96654e0e3d4",
+      "lines": 167,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/CHANGELOG.md",
+      "sha256": "5de45d8c17d712bc98fc51d7547ed7074a7ba3e6c9bc8977003f6f6ad23909b8",
+      "lines": 435,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/CONTRIBUTING.md",
+      "sha256": "b0e714cc1585780cf4f922f3efffedeb04816f28ba74e8be460f4d1171c0d14a",
+      "lines": 98,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/LICENSE.md",
+      "sha256": "c05bde7d4f8eab4b9f6a6c1d77ee619cdd8f8d18297da24e89b54f98a58e076f",
+      "lines": 7,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/README.md",
+      "sha256": "edcf4e626fad6188c6a9d47f26cbe492059d678fb68e300528fcac264c3a743e",
+      "lines": 163,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/ROADMAP.md",
+      "sha256": "4c08b19da0e25bf2f7b238d2029d5f1366037aa2b577f361fff6a8326e90650e",
+      "lines": 184,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/README.md",
+      "sha256": "6124196496bfc8bbadf5374be9847793ec6d0b7aaf462ad4cbe96384b5b24031",
+      "lines": 62,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/accessibility.md",
+      "sha256": "43ffeab506b5960de6b55b540b36f3f5882a3b9a0ac2e5f0fe7c4f6495aa9402",
+      "lines": 19,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/adding-drivers.md",
+      "sha256": "92b992328aab5beee8fcb2baed0f9fb1a5874362aeac7ecdf505e0b2ef410138",
+      "lines": 104,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/architecture-consistency-2026-10-03-inventory.md",
+      "sha256": "6419169ba6eb1d9798911d8bc8626501f1eb7ce4696a2b8f07ca1a67b4467188",
+      "lines": 133,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/architecture-consistency-review-2026-10-03.md",
+      "sha256": "c3f4405fa1e40e9fb8ddd731267559cd0bb30970af2db13babaa8143038d69e6",
+      "lines": 147,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/b3-review-2026-10-01.md",
+      "sha256": "7ec28711e82056d7341312448aa582b573ab29628095586dcdaea03ee35d3cf6",
+      "lines": 416,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/b3-test-scenario-survey.md",
+      "sha256": "0d42517c319bfcf495d1369421352a758a202076b6ad5d4391c382b983d75a10",
+      "lines": 347,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/b4-history.md",
+      "sha256": "f399470a86f27b29070cb7e147cc678a8677083187d4e8c37aa449a41cf780dd",
+      "lines": 667,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/b4-task-board.md",
+      "sha256": "09bbdcf90d7acdefc3625824ec93151fddb7ca1fd285a3edda9bc0254a2317f8",
+      "lines": 78,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/baseline-review-2026-09-17.md",
+      "sha256": "9db4aec4ea6213f852e8ccb780866efe37e372f4441ea9dc405318efae1d82fd",
+      "lines": 155,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/bookie-0.1.1-plan.md",
+      "sha256": "cd4806ec0c0b9d29327cc1df89501898e364914d2287a797bea37e58ff6be185",
+      "lines": 161,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/bookie-0.2-history.md",
+      "sha256": "2154bcde6426e48e84f29167a526d8966e17a16d71ea31c7b36151ceca911554",
+      "lines": 2308,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/bookie-0.2-sprint.md",
+      "sha256": "097b022abdff5ae4cfe9591d846053e934113437990261919d0d6090c66ba5e6",
+      "lines": 144,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/bug-consistency-2026-09.md",
+      "sha256": "4885141a7f6c1dc6f7373db2a627866be9c81870195ee17345788a10d7a5f3a0",
+      "lines": 69,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/capability-evidence.md",
+      "sha256": "7a79c53e0ed9e37ee3ec8f7d578c13506d7b86ce46f5b88912b348c3bab98cf4",
+      "lines": 50,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/ci-audit-2026-09-27.md",
+      "sha256": "621486e48b3d625219634525d7daa0e4a458c3dddc956a6778263aa157bd9617",
+      "lines": 103,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/code-conventions.md",
+      "sha256": "12854940a49b685e2674ad015bfc3eab156382089cd98a702e79fe61f3f3f52c",
+      "lines": 188,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/connections-history.md",
+      "sha256": "7082e462264844a7d7799ec87dfc658d67c3f173ff421d4b7e33bc96efcfa703",
+      "lines": 314,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/connections.md",
+      "sha256": "a905fd819864c79fd0335d10a3cc3ea6b04a81c159b2baa6b91663c378bc9dad",
+      "lines": 78,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0001-no-plugin-system.md",
+      "sha256": "a97587ba7d97c89ad3f570b43e891520bb34f65e907cd35926aa8ca7a87e512a",
+      "lines": 52,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0002-rust-gtk4-libadwaita.md",
+      "sha256": "b308702c6307767b63fa40ffaff077b782e692b2bf1c15a16b72ef94e4a59eea",
+      "lines": 58,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0003-relm4-architecture.md",
+      "sha256": "aaef777d68a2251413b760514469285841908ade74a2fe2c5b68d413e15dbcda",
+      "lines": 49,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0004-libsecret-secret-storage.md",
+      "sha256": "48dd6f28a142458fb7100c9c5d29647e90e6ac6148211cb2ebeac7469850196e",
+      "lines": 57,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0005-server-side-cancellation.md",
+      "sha256": "e5b7c966e6a69527cd86afcce8c3a7df1dfbab72fa435d6c9252414151d90e9a",
+      "lines": 64,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0006-driver-panic-containment.md",
+      "sha256": "cf869ae855c04502368b413e45edfdbf076d4e23f3699bc021110f03771f26d4",
+      "lines": 64,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0007-type-and-value-preservation.md",
+      "sha256": "4d3b44299e59b8b8421f389db15502ac896bbab7e115be3d09fff85a0827ceb6",
+      "lines": 121,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0008-connection-and-session-ownership.md",
+      "sha256": "3ea9d4880a30a183d6d629420703d9840f6115fca0fd2852ee130249974f8849",
+      "lines": 76,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/0009-persistence-and-identity-compatibility.md",
+      "sha256": "b66580434c65448c2e38297a14f0659d1193d67769ea41120518fba9d6f1aeb5",
+      "lines": 58,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/decisions/README.md",
+      "sha256": "89a3af1dc0ebc31502df29e17b3193bfb9ae5a3fd86520cfc702712c1c15ee75",
+      "lines": 58,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/disconnection-contracts.md",
+      "sha256": "d175e88903d39adf8222c1b6e7da8bc658426c141baf50a473a51f51ed5b9214",
+      "lines": 103,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/driver-maturity.md",
+      "sha256": "76804cd364ebadb525abd4c8ace50472f93d5d17f720c8a00db4f5850e804c89",
+      "lines": 27,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/driver-priority.md",
+      "sha256": "c1b8d8bdcf626ac3d502d34fe897119c468d20419d2d40163d053fbecbb8e49b",
+      "lines": 17,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/error-handling.md",
+      "sha256": "10ef4cf94fbbda41789928bb1f57eff7f30198cc5f1de35b1de20e3b7a48ec97",
+      "lines": 82,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/flathub.md",
+      "sha256": "22006a540baf0108906d1637340a762e9dba58ba742b6bb44d2dfda7a999d5e9",
+      "lines": 44,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/ignored-tests.md",
+      "sha256": "ab9223175d9f59179e652283803d19568f04bc75f56f288ca61ebb0ea75b0b97",
+      "lines": 350,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/manual-verification-0.2-features.md",
+      "sha256": "afb2c014bb8ceff7ba389852d326ea8fe49bc022498458af50f116d6f1edffa1",
+      "lines": 285,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/omarchy.md",
+      "sha256": "6d89cc632483fbff134aee04d9fd8f06cb6c1f75fcfb383967889025329930c6",
+      "lines": 115,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/performance-2026-09.md",
+      "sha256": "78a9cb9f354464c6b831dd80fe08e330058f8f42f0aeb095674742bced8a184b",
+      "lines": 44,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/production-audit.md",
+      "sha256": "a5d0f47d4cab3ad6bc2a75d9d9119a483ca5b467c3126b951f6be02ca84357f4",
+      "lines": 124,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/reconciliation-2026-09-26.md",
+      "sha256": "7aaa28dfacce9fc0140380bbffc83597e6166b3ef70cb72ad4b179ffca1f9f18",
+      "lines": 63,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/regression-audit-2026-09-29.md",
+      "sha256": "24c9584247e8f019c644ef0176b75ae8cb2b20b6b32f39cf6daac6aada4c1f6d",
+      "lines": 151,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/release-0.1.4.md",
+      "sha256": "2e4d73e18a7478eb1d971058f96c7331336ae2a952ff59602db78b8a4ca26614",
+      "lines": 65,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/release-audit-2026-10-03.md",
+      "sha256": "a5ce7dea7fa7870733c4a39201b03de58cb2fb584a7a855636b427f1d167a006",
+      "lines": 194,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/sprint-2026-09-14.md",
+      "sha256": "3d495e0f2d87e3fc9ef79ccbac2753c489e262b3e3fd2a679aa9834a9e8c77e5",
+      "lines": 110,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/sprint-review-2026-09-28.md",
+      "sha256": "d2612ce264f49e178b7362e07850420a6ce900c93792202e443814bb39aa33fd",
+      "lines": 191,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/stabilization-2026-09.md",
+      "sha256": "e6931e22099ff307e78ac5ad42d5117ee06ca7be97d9aa1f80d35180b01e3a6b",
+      "lines": 87,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/state-management.md",
+      "sha256": "e23a5ccd9a7da05677d0ed286f5d033d4a55f28fc4cafae71929d681087fddd3",
+      "lines": 115,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/storage.md",
+      "sha256": "3d72c4e686d6aa050273ac22f083d04983ca3527d280737a4650ece336e5cf70",
+      "lines": 196,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/testing-history.md",
+      "sha256": "84fb9d5981c8cb446e9a84561aefa8ddc7c36906957d0b06fe9d82ec9c12823a",
+      "lines": 70,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/testing.md",
+      "sha256": "cdc710e409dcaa7005f35665a2b3f85d2e616a46c6bbf010ceb0b790956b4e68",
+      "lines": 444,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/toolchains.md",
+      "sha256": "88fd13a2dbe52fe2c11304730ae04e0999fb210e404c73c04c01fa96881fc0d2",
+      "lines": 57,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/type-contract-history.md",
+      "sha256": "8086242aa77d19ef0ca80c7dfaafcf0919a034a7d46ab220f36da7ed7ccc22a7",
+      "lines": 372,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/type-contract-strategy.md",
+      "sha256": "8b27e567920131e1a89286552d055ad04e516a014a53895b89444f9bd664f8eb",
+      "lines": 78,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/upstream-adoption.md",
+      "sha256": "2f9d2898f3f2af952744d2110afed27915a9459c1b734ec29186fcf7b83d10da",
+      "lines": 73,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/upstream-main-review-2026-10-03-inventory.md",
+      "sha256": "eddbc0d0f6852735c5eecc4cc60d04fd5291881ec9b83ab82d7c407d02ce7796",
+      "lines": 273,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/upstream-main-review-2026-10-03.md",
+      "sha256": "296a278d88380950aef80637b9748682365b87a98c2e818047bfcb47598f5f7d",
+      "lines": 218,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/upstream-older-releases-2026-10-03-inventory.md",
+      "sha256": "5f9331c665e8354e4a726474df6c342c85b7eaf29d0667e5a058e595fbf62c46",
+      "lines": 143,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/upstream-older-releases-review-2026-10-03.md",
+      "sha256": "dc42db5052d30e5cdccb86b512893dc16175a6c52415f763f3b39ad7a1cba5db",
+      "lines": 115,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/upstream-sync.md",
+      "sha256": "d63f3677fcb04e786d9e92f12224f1434528048e9db376c194fd06b7964b82d2",
+      "lines": 272,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/upstream-u1-sql-server-2026-10-03.md",
+      "sha256": "8571d6ce3abdbebb7eaaf3bdb5affb3385a83c4513c0a4aaa0da183a9ee2e600",
+      "lines": 103,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/validation-history.md",
+      "sha256": "879eb8b3c6a1b9f4efa0a720bc36357734aae3dee93b94fd83987b5d6fbb0401",
+      "lines": 29,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/validation-playbook.md",
+      "sha256": "60d0cf39bd2a00de3e45d75651313e778e4879c4723d249f153b951cea34ff98",
+      "lines": 286,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/docs/value-contract-history.md",
+      "sha256": "027c3901255f67fa86c9846ee4e12e084f7a9e42c9e227e918254fe4ce1b6acb",
+      "lines": 4029,
+      "vendor": false,
+      "scope": "historical/reference"
+    },
+    {
+      "path": "linux/docs/value-contracts.md",
+      "sha256": "742973a27ad068471c336dcc7142066ba1319ec7b022032dd6e5fe06d22f69bd",
+      "lines": 60,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/flatpak/screenshots/README.md",
+      "sha256": "9a514f8769310c9d08ba6e4482a3e56b1fb19c0fbac0ea02646afc737fa7622e",
+      "lines": 12,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/packaging/README.md",
+      "sha256": "59f0f3d09ac67220c928ef17bb6643c412dbde3e8e32bfd0c06a1cd7ec88c0e2",
+      "lines": 67,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/po/README.md",
+      "sha256": "0554d7dc864fac6a17251df417bd1a0ad8122c498d0d8dcd0315ef9f8444df00",
+      "lines": 53,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/tests/fixtures/postgres-release/README.md",
+      "sha256": "c614f3d8611baa21c9fe74ea6abb577b0fe2e6c263ed37bb5d692e4dc766c3b8",
+      "lines": 58,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/tests/manual-connections/README.md",
+      "sha256": "0f086f8b322eac97c88626835bf2fcf130b1523eb432607b1213d9706764262d",
+      "lines": 72,
+      "vendor": false,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/README.md",
+      "sha256": "7f64589b5225aae36beb4f1e9b77320258eca273acec144d7c99e359aa114f55",
+      "lines": 13,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/mongodb/README.md",
+      "sha256": "12c936aa781731089f20c0e6f73efe59758345599aeaf20ec479970587e2ad18",
+      "lines": 190,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/redis/README.md",
+      "sha256": "9dd58ef99e21165eb783439713a2066e507e8f60c12985b3bdcc77e85b254c8f",
+      "lines": 307,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/options/doc.md",
+      "sha256": "33882b389d8c5733da137d0fdda411188c22e922f79adac9dfdde8b959506f4c",
+      "lines": 185,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/types/bigdecimal-range.md",
+      "sha256": "968dac5676a333f1953df12b9ed1beb930537e6fae190140ac729e8dc16b2749",
+      "lines": 20,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/types/rust_decimal-range.md",
+      "sha256": "50ea63448f02e7f4acb78d9f78f06d435d50460adb9a79223c8626f1e7598e8a",
+      "lines": 10,
+      "vendor": true,
+      "scope": "guide or index; see document authority"
+    }
+  ],
+  "missing_links": [
+    {
+      "document": "linux/docs/b3-test-scenario-survey.md",
+      "line": 189,
+      "target": "../target/quality/20260930T215342621227Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/b3-test-scenario-survey.md",
+      "line": 191,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 242,
+      "target": "../target/quality/20261001T011112385634Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 244,
+      "target": "../target/quality/20261001T011619474080Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 253,
+      "target": "../target/quality/20261001T013200347651Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 268,
+      "target": "../target/quality/20261001T015111955335Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 288,
+      "target": "../target/quality/20261001T023544965607Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1921,
+      "target": "../target/quality/20260930T223807112958Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1923,
+      "target": "../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1926,
+      "target": "../target/quality/20260930T224147348085Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2018,
+      "target": "../target/quality/20260930T122803925695Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2070,
+      "target": "../target/quality/20260930T190433266840Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2078,
+      "target": "../target/quality/20260930T192142875147Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2093,
+      "target": "../target/quality/20260930T195640249113Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2100,
+      "target": "../target/quality/20260930T195202641431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2112,
+      "target": "../target/quality/20260930T200423574515Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2114,
+      "target": "../target/quality/20260930T200925216322Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2127,
+      "target": "../target/quality/20260930T203202118084Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2151,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2152,
+      "target": "../target/quality/20260930T211125388087Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2186,
+      "target": "../target/quality/20260930T224745418261Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2188,
+      "target": "../target/quality/20260930T225139833836Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2228,
+      "target": "../target/quality/20261001T032907972866Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2229,
+      "target": "../target/quality/20261001T032917087566Z-change-contracts/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2257,
+      "target": "../target/quality/20261001T055114378394Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2258,
+      "target": "../target/quality/20261001T055614415328Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 64,
+      "target": "../target/quality/20261001T005701182279Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 85,
+      "target": "../target/quality/20261001T025640026732Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 93,
+      "target": "../target/quality/20261001T042714823272Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 103,
+      "target": "../target/quality/20261001T051127401608Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 188,
+      "target": "../target/quality/20260930T021134930354Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 190,
+      "target": "../target/quality/20260930T110146955489Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 196,
+      "target": "../target/quality/20260930T232244336622Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 199,
+      "target": "../target/quality/20260930T114622059959Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 199,
+      "target": "../target/quality/20260930T114425279874Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 273,
+      "target": "../target/quality/20260930T215342621227Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 275,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 279,
+      "target": "../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 73,
+      "target": "../target/quality/20260930T001431188722Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 74,
+      "target": "../target/quality/20260930T001431188722Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 85,
+      "target": "../target/quality/20260930T002923239431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 94,
+      "target": "../target/quality/20260930T232244336622Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 95,
+      "target": "../target/quality/20260930T232244336622Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 117,
+      "target": "../target/quality/20260930T235608800228Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 119,
+      "target": "../target/quality/20261001T000036771872Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 121,
+      "target": "../target/quality/20261001-clickhouse-datetime64-precision-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 122,
+      "target": "../target/quality/20261001-csv-column-kind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 123,
+      "target": "../target/quality/20261001-json-value-to-json-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 150,
+      "target": "../target/quality/20261001-wide-decimal-metadata-mutants-full-core/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 153,
+      "target": "../target/quality/20261001T002624272378Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 156,
+      "target": "../target/quality/20261001T011112385634Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 158,
+      "target": "../target/quality/20261001T003205886474Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 161,
+      "target": "../target/quality/20261001T011619474080Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 163,
+      "target": "../target/quality/20261001-wide-decimal-csv-mutants-final3/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 175,
+      "target": "../target/quality/20261001T013200347651Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 203,
+      "target": "../target/quality/20260930T230409137178Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 205,
+      "target": "../target/quality/20260930T231132409175Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 244,
+      "target": "../target/quality/20260929T161811049211Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 565,
+      "target": "../target/quality/20260930T021134930354Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 566,
+      "target": "../target/quality/20260930T020929420585Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 573,
+      "target": "../target/quality/20260930T122803925695Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 574,
+      "target": "../target/quality/20260930T122803925695Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 594,
+      "target": "../target/quality/20260930T110146955489Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 603,
+      "target": "../target/quality/20260930T114622059959Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 604,
+      "target": "../target/quality/20260930T114622117990Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 605,
+      "target": "../target/quality/20260930T114425279874Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 611,
+      "target": "../target/quality/20260930T010431493880Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 612,
+      "target": "../target/quality/20260930T011850614654Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 613,
+      "target": "../target/quality/20260930T011850675572Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 614,
+      "target": "../target/quality/20260930T012435775212Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 1108,
+      "target": "../target/quality/20260929T162725389033Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 1989,
+      "target": "../target/quality/20261001T024828271108Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2213,
+      "target": "../target/quality/20261001-postgres-temporal-import-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2214,
+      "target": "../target/quality/20261001-postgres-temporal-import-plan-mutants-final2/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2215,
+      "target": "../target/quality/20261001-postgres-temporal-insert-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2225,
+      "target": "../target/quality/20261001T023544965607Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2703,
+      "target": "../target/quality/20260929T164906704313Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2811,
+      "target": "../target/quality/20260930T141019789442Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2812,
+      "target": "../target/quality/20260930T141439236199Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3170,
+      "target": "../target/quality/20261001T014227751433Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3463,
+      "target": "../target/quality/20260930T185810190323Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3470,
+      "target": "../target/quality/20260930T192623654872Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3506,
+      "target": "../target/quality/20260930T223807112958Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3508,
+      "target": "../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3511,
+      "target": "../target/quality/20260930T224147348085Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3523,
+      "target": "../target/quality/20260930T195202641431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3542,
+      "target": "../target/quality/20260930T200423574515Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3651,
+      "target": "../target/quality/20260930T203202118084Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3668,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3687,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3704,
+      "target": "../target/quality/20260930T213122442487Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3706,
+      "target": "../target/quality/20260930T213517124497Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3717,
+      "target": "../target/quality/20260930T224745418261Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3719,
+      "target": "../target/quality/20260930T225139833836Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3737,
+      "target": "../target/quality/20260930T231755592573Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3815,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3822,
+      "target": "../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3845,
+      "target": "../target/quality/20261001T031547325812Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3846,
+      "target": "../target/quality/20261001T025640026732Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3849,
+      "target": "../target/quality/20261001T032311403470Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3877,
+      "target": "../target/quality/20261001T040526500083Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3878,
+      "target": "../target/quality/20261001T041008834602Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3879,
+      "target": "../target/quality/20261001-duckdb-interval-csv-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3898,
+      "target": "../target/quality/20261001-clickhouse-int128-xlsx-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3901,
+      "target": "../target/quality/20261001T055114378394Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3902,
+      "target": "../target/quality/20261001T055614415328Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3927,
+      "target": "../target/quality/20261001T061341105077Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3928,
+      "target": "../target/quality/20261001T060930854105Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3929,
+      "target": "../target/quality/20261001T060932648747Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3954,
+      "target": "../target/quality/20261001T064515312579Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3955,
+      "target": "../target/quality/20261001T064121314717Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001T071947669210Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001T072421865121Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001-mongodb-integer-width-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/vendor/redis/README.md",
+      "line": 307,
+      "target": "DEVELOPMENT.md",
+      "kind": "vendor"
+    }
+  ],
+  "anchor_candidates": [],
+  "duplicate_paragraphs": [
+    {
+      "text": "Archived 2026-10-03 from `0cf70382eed72c144ea94208dfef5f5706e0a7dd`. The original content below preserves dated decisions, commands, test counts and source evidence. Its words such as \u2018current\u2019, \u2018next\u2019 and \u2018pending\u2019 describe their original checkpoint. Use [the documentation entry point](README.md), [active sprint](bookie-0.2-sprint.md) and [the ADR index](decisions/README.md) for current instructions. Type/value rules are owned by ADR 0007; connection/session and persistence rules by ADRs 0008/0009. Read a relevant heading only; this archive is not mandatory agent startup context.",
+      "documents": [
+        "linux/docs/bookie-0.2-history.md",
+        "linux/docs/type-contract-history.md"
+      ]
+    },
+    {
+      "text": "Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. See [the evidence consistency review](architecture-consistency-review-2026-10-03.md#evidence-audit) and its inventory for exact paths; retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.",
+      "documents": [
+        "linux/docs/validation-playbook.md",
+        "linux/docs/value-contract-history.md"
+      ]
+    }
+  ]
+}

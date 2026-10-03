@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex};
 fn undecodable_cell_cannot_be_bound_as_null() {
     let params = [Value::Undecodable("NUMERIC".into())];
     assert!(matches!(
-        bind_pg_params(sqlx::query(sqlx::AssertSqlSafe("SELECT $1")), &params),
+        bind_pg_params(sqlx::query(sqlx::AssertSqlSafe("SELECT $1")), &params, &[]),
         Err(DriverError::Unsupported(_))
     ));
 }

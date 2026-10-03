@@ -4,16 +4,25 @@
 
 ### Added
 
+- PostgreSQL enum results and browse filters preserve the literal label `NULL` separately from SQL NULL across scalar and array projections and typed comparisons.
+- PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
+
+### Changed
+
+- CSV file and MCP exports show the null marker used for SQL NULL cells and choose one that does not collide with exported text values, so the matching import preserves empty text and marker-shaped labels. Turn off spreadsheet-safe text to round-trip formula-shaped values literally.
+- Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.
 
 ### Fixed
 
+- MySQL query results keep their projected column metadata when no rows match, including inside transactions, and transaction queries obey the shared result cap.
+- MySQL multi-statement saves refuse non-DML statements before dispatch and distinguish rollback failure; successful rollback requests no longer imply that non-transactional table writes were reversed.
 - SQL Server rowversion and temporal period columns are read-only and omitted from generated INSERT statements, so copying or inserting rows does not try to overwrite server-owned values.
 - CSV imports accept the `\x` hexadecimal blob format written by exports, preserving empty blobs and NULL separately.
 - Formula-safe decimal CSV imports reject excess precision instead of rounding it.
 - CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
-- MongoDB browse pages mark BSON fields as mixed when values on the page differ from the metadata sample, keeping lossy mixed-type cells read-only.
+- MongoDB browse pages scan field types with the same cursor used for page rows and keep conflicting BSON values read-only.
 - MySQL pooled connections use UTC for `TIMESTAMP` decoding; dedicated sessions refuse non-UTC `TIMESTAMP` values instead of presenting a wrong instant.
 - SQL Server `money` and `smallmoney` results are refused as undecodable instead of exposing the TDS client's rounded float conversion.
 - SQL Server legacy `datetime` values decode only when their 1/300-second ticks map exactly to nanoseconds; inexact ticks remain undecodable.

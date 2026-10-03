@@ -737,6 +737,7 @@ fn col(data_type: &str, nullable: bool) -> ColumnInfo {
         is_generated: false,
         comment: None,
         collation: None,
+        enum_type: None,
     }
 }
 
@@ -1039,6 +1040,20 @@ fn rejects_invalid_type_specific_input() {
 fn unknown_type_falls_through_to_text() {
     let r = parse_input_for_column("anything goes here", Some(&col("varchar(255)", false))).unwrap();
     assert!(matches!(r, Value::Text(_)));
+
+    let mut enum_column = col("value_contract_enum_schema.value_contract_grid_enum", false);
+    enum_column.enum_type = Some(tablepro_core::QualifiedTypeName {
+        schema: "value_contract_enum_schema".into(),
+        name: "value_contract_grid_enum".into(),
+    });
+    assert_eq!(
+        parse_input_for_driver("paused", Some(&enum_column), "postgres").unwrap(),
+        Value::Text("paused".into())
+    );
+    assert_eq!(
+        parse_input_for_driver("NULL", Some(&enum_column), "postgres").unwrap(),
+        Value::Text("NULL".into())
+    );
 }
 
 #[test]

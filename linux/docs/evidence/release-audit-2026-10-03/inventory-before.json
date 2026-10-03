@@ -1,0 +1,1319 @@
+{
+  "baseline": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "method": "Tracked Markdown UTF-8, SHA256, title/line inventory, inline local Markdown links, GitHub-style heading slugs, exact whitespace-normalized paragraph duplication. Not prose semantic proof; anchor candidates require manual review. External URLs not fetched.",
+  "documents": [
+    {
+      "path": ".github/workflows/daily-repo-status.md",
+      "sha256": "92a7dff4a2e83d462765d4b256f6a4b03a0dcff386a33a1ec16e1d5300cd0c41",
+      "lines": 58,
+      "title": "---",
+      "vendor": false
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "d26f0d856a553988d01fb053ea7f2b5387d6f5233dd8dc95b2a9a6fbeff77ed1",
+      "lines": 208,
+      "title": "# CLAUDE.md",
+      "vendor": false
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "sha256": "47ac2935fd017b26b309f225c891273142419ef60e2a6434b83e6da2c8c4c1b8",
+      "lines": 128,
+      "title": "# Contributor Covenant Code of Conduct",
+      "vendor": false
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "1304c5ee30124d9093d74d7e394a477cb4c229c4f96996fe868cd1cf3b8b3ebd",
+      "lines": 134,
+      "title": "# Contributing to TablePro",
+      "vendor": false
+    },
+    {
+      "path": "PLAN.md",
+      "sha256": "019612de73b6d16c5622cd3dcfb9a97f2462b8a937ed7981ee37d147897e2be0",
+      "lines": 797,
+      "title": "# BookiE Linux development plan",
+      "vendor": false
+    },
+    {
+      "path": "README.md",
+      "sha256": "d34d8727d2d17224aaed22255a869a8f2c256b26209810de3e3edad6b477637a",
+      "lines": 91,
+      "title": "# TablePro",
+      "vendor": false
+    },
+    {
+      "path": "external-audit.md",
+      "sha256": "4f004c0307e7bebd5dd3c343bff7fab3093fd528e4c9abea462db914cec88012",
+      "lines": 103,
+      "title": "# External planning reference",
+      "vendor": false
+    },
+    {
+      "path": "linux/ARCHITECTURE.md",
+      "sha256": "418427b84114bc026fb4e36197bbf4c9024c700bc196de4123bca96654e0e3d4",
+      "lines": 167,
+      "title": "# Architecture",
+      "vendor": false
+    },
+    {
+      "path": "linux/CHANGELOG.md",
+      "sha256": "5de45d8c17d712bc98fc51d7547ed7074a7ba3e6c9bc8977003f6f6ad23909b8",
+      "lines": 435,
+      "title": "# Changelog: TablePro Linux",
+      "vendor": false
+    },
+    {
+      "path": "linux/CONTRIBUTING.md",
+      "sha256": "b0e714cc1585780cf4f922f3efffedeb04816f28ba74e8be460f4d1171c0d14a",
+      "lines": 98,
+      "title": "# Contributing to TablePro Linux",
+      "vendor": false
+    },
+    {
+      "path": "linux/LICENSE.md",
+      "sha256": "c05bde7d4f8eab4b9f6a6c1d77ee619cdd8f8d18297da24e89b54f98a58e076f",
+      "lines": 7,
+      "title": "# License",
+      "vendor": false
+    },
+    {
+      "path": "linux/README.md",
+      "sha256": "edcf4e626fad6188c6a9d47f26cbe492059d678fb68e300528fcac264c3a743e",
+      "lines": 163,
+      "title": "# BookiE",
+      "vendor": false
+    },
+    {
+      "path": "linux/ROADMAP.md",
+      "sha256": "4c08b19da0e25bf2f7b238d2029d5f1366037aa2b577f361fff6a8326e90650e",
+      "lines": 184,
+      "title": "# BookiE roadmap",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/README.md",
+      "sha256": "e1c88e3be218b21a228b7fbd5033689465c1c36fdce3b32f8d70ff97add11a3e",
+      "lines": 54,
+      "title": "# Documentation entry point",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/accessibility.md",
+      "sha256": "43ffeab506b5960de6b55b540b36f3f5882a3b9a0ac2e5f0fe7c4f6495aa9402",
+      "lines": 19,
+      "title": "# Accessibility notes (Stage 6)",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/adding-drivers.md",
+      "sha256": "92b992328aab5beee8fcb2baed0f9fb1a5874362aeac7ecdf505e0b2ef410138",
+      "lines": 104,
+      "title": "# Adding a database driver",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/architecture-consistency-2026-10-03-inventory.md",
+      "sha256": "6419169ba6eb1d9798911d8bc8626501f1eb7ce4696a2b8f07ca1a67b4467188",
+      "lines": 133,
+      "title": "# Documentation and evidence review inventory",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/architecture-consistency-review-2026-10-03.md",
+      "sha256": "c3f4405fa1e40e9fb8ddd731267559cd0bb30970af2db13babaa8143038d69e6",
+      "lines": 147,
+      "title": "# Linux architecture and evidence consistency review",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/b3-review-2026-10-01.md",
+      "sha256": "7ec28711e82056d7341312448aa582b573ab29628095586dcdaea03ee35d3cf6",
+      "lines": 416,
+      "title": "# B3 code and coverage review, October 1",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/b3-test-scenario-survey.md",
+      "sha256": "0d42517c319bfcf495d1369421352a758a202076b6ad5d4391c382b983d75a10",
+      "lines": 347,
+      "title": "# B3 external test-scenario survey",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/b4-task-board.md",
+      "sha256": "b69ff18c90c60d1d7d3632709239555b7c98f60c25cd570556b9dcf5029be1c3",
+      "lines": 659,
+      "title": "# B4 task board: transport and sessions",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/baseline-review-2026-09-17.md",
+      "sha256": "9db4aec4ea6213f852e8ccb780866efe37e372f4441ea9dc405318efae1d82fd",
+      "lines": 155,
+      "title": "# Fork baseline review: September 17, 2026",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/bookie-0.1.1-plan.md",
+      "sha256": "cd4806ec0c0b9d29327cc1df89501898e364914d2287a797bea37e58ff6be185",
+      "lines": 161,
+      "title": "# BookiE 0.1.1 \u2014 next sprint and release plan",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/bookie-0.2-history.md",
+      "sha256": "5aeb8178fb6e4ef2bdb6491162a4bacd053586044c966bbe889ec4181461b9c4",
+      "lines": 2308,
+      "title": "# Historical record: bookie-0.2-sprint.md",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/bookie-0.2-sprint.md",
+      "sha256": "b51298ca8c1702a3121d3d16438a3f3a826f74eb39bdf3b440a75cfb54ce8a4e",
+      "lines": 144,
+      "title": "# BookiE 0.2 active sprint",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/bug-consistency-2026-09.md",
+      "sha256": "4885141a7f6c1dc6f7373db2a627866be9c81870195ee17345788a10d7a5f3a0",
+      "lines": 69,
+      "title": "# Bug and consistency stabilization",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/capability-evidence.md",
+      "sha256": "7a79c53e0ed9e37ee3ec8f7d578c13506d7b86ce46f5b88912b348c3bab98cf4",
+      "lines": 50,
+      "title": "# Capability evidence",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/ci-audit-2026-09-27.md",
+      "sha256": "621486e48b3d625219634525d7daa0e4a458c3dddc956a6778263aa157bd9617",
+      "lines": 103,
+      "title": "# CI evidence audit, 2026-09-27",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/code-conventions.md",
+      "sha256": "f6596b691b04e3a00459347b89881cf0ea579016553dff3b1f320a453b7f59dc",
+      "lines": 184,
+      "title": "# Code conventions",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/connections.md",
+      "sha256": "c8c7cd6f7fc29850e93bcaec7ab5caf6b609d95479a043d32eafd3be0282670a",
+      "lines": 307,
+      "title": "# Connection handling",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0001-no-plugin-system.md",
+      "sha256": "a97587ba7d97c89ad3f570b43e891520bb34f65e907cd35926aa8ca7a87e512a",
+      "lines": 52,
+      "title": "# 0001: Database drivers are statically linked",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0002-rust-gtk4-libadwaita.md",
+      "sha256": "b308702c6307767b63fa40ffaff077b782e692b2bf1c15a16b72ef94e4a59eea",
+      "lines": 58,
+      "title": "# 0002: Rust, GTK4, and libadwaita",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0003-relm4-architecture.md",
+      "sha256": "aaef777d68a2251413b760514469285841908ade74a2fe2c5b68d413e15dbcda",
+      "lines": 49,
+      "title": "# 0003: Relm4 for application architecture",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0004-libsecret-secret-storage.md",
+      "sha256": "e880acde732322708ed7990ffc7b003af5cf95790dc6fee88ec6d6f7d72c4968",
+      "lines": 50,
+      "title": "# 0004: Secret Service through oo7",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0005-server-side-cancellation.md",
+      "sha256": "e5b7c966e6a69527cd86afcce8c3a7df1dfbab72fa435d6c9252414151d90e9a",
+      "lines": 64,
+      "title": "# 0005: Cancellation must reach the database",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0006-driver-panic-containment.md",
+      "sha256": "a568be49acc762d89ddc18f01026c8e825157a48a117f3e89a6f0dd4f90be7c8",
+      "lines": 57,
+      "title": "# 0006: A driver panic is contained, not trusted away",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0007-type-and-value-preservation.md",
+      "sha256": "4d3b44299e59b8b8421f389db15502ac896bbab7e115be3d09fff85a0827ceb6",
+      "lines": 121,
+      "title": "# 0007: Preserve native type and value semantics across consumers",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0008-connection-and-session-ownership.md",
+      "sha256": "9105ebbbaff080bbaf99865d92ca14950333ffb74704fcafa194d0861da1eb7c",
+      "lines": 75,
+      "title": "# 0008: Keep connection identity, session ownership and trust explicit",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/0009-persistence-and-identity-compatibility.md",
+      "sha256": "b66580434c65448c2e38297a14f0659d1193d67769ea41120518fba9d6f1aeb5",
+      "lines": 58,
+      "title": "# 0009: Preserve durable identity and recoverable state during evolution",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/decisions/README.md",
+      "sha256": "89a3af1dc0ebc31502df29e17b3193bfb9ae5a3fd86520cfc702712c1c15ee75",
+      "lines": 58,
+      "title": "# Architecture decision records",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/disconnection-contracts.md",
+      "sha256": "d175e88903d39adf8222c1b6e7da8bc658426c141baf50a473a51f51ed5b9214",
+      "lines": 103,
+      "title": "# Disconnect and cancellation contracts",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/driver-maturity.md",
+      "sha256": "76804cd364ebadb525abd4c8ace50472f93d5d17f720c8a00db4f5850e804c89",
+      "lines": 27,
+      "title": "# Driver maturity",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/driver-priority.md",
+      "sha256": "6a9a05d5e205a0a6269061571bf57645191456c3ac1187e7e48c8d7c8639676e",
+      "lines": 22,
+      "title": "# Adding drivers (order and maturity)",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/error-handling.md",
+      "sha256": "a610f466748d984bba7e17aafa005d669a66de2a291490595f97ab7b30de2ba3",
+      "lines": 129,
+      "title": "# Error handling",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/flathub.md",
+      "sha256": "b961ec339c87cb598e9e5c00224fed57b510b80c2064b99ec0c65415917bd7f6",
+      "lines": 42,
+      "title": "# Flathub submission",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/ignored-tests.md",
+      "sha256": "ab9223175d9f59179e652283803d19568f04bc75f56f288ca61ebb0ea75b0b97",
+      "lines": 350,
+      "title": "# Ignored-test inventory",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/manual-verification-0.2-features.md",
+      "sha256": "afb2c014bb8ceff7ba389852d326ea8fe49bc022498458af50f116d6f1edffa1",
+      "lines": 285,
+      "title": "# Manual verification: the 0.2 upstream feature sprint",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/omarchy.md",
+      "sha256": "eee86f30f6a9d2bf8f7271d5a0903886450b8c016b6ad53449c38e7f85d0ffe7",
+      "lines": 112,
+      "title": "# BookiE 0.1.4 on Arch Linux Omarchy",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/performance-2026-09.md",
+      "sha256": "78a9cb9f354464c6b831dd80fe08e330058f8f42f0aeb095674742bced8a184b",
+      "lines": 44,
+      "title": "# PostgreSQL browse measurements \u2014 September 2026",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/production-audit.md",
+      "sha256": "b4e3b0f3af8be7e7342d07eef26b47484964145f8368a3ef368c5afcfd6bbf02",
+      "lines": 128,
+      "title": "# Production readiness audit",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/reconciliation-2026-09-26.md",
+      "sha256": "7aaa28dfacce9fc0140380bbffc83597e6166b3ef70cb72ad4b179ffca1f9f18",
+      "lines": 63,
+      "title": "# Linux local/remote reconciliation \u2014 2026-09-26",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/regression-audit-2026-09-29.md",
+      "sha256": "24c9584247e8f019c644ef0176b75ae8cb2b20b6b32f39cf6daac6aada4c1f6d",
+      "lines": 151,
+      "title": "# Regression audit, 2026-09-29",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/release-0.1.4.md",
+      "sha256": "2e4d73e18a7478eb1d971058f96c7331336ae2a952ff59602db78b8a4ca26614",
+      "lines": 65,
+      "title": "# BookiE 0.1.4: correctness and executable quality gates",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/sprint-2026-09-14.md",
+      "sha256": "3d495e0f2d87e3fc9ef79ccbac2753c489e262b3e3fd2a679aa9834a9e8c77e5",
+      "lines": 110,
+      "title": "# Linux sprint: security, correctness and SQL character warnings",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/sprint-review-2026-09-28.md",
+      "sha256": "d2612ce264f49e178b7362e07850420a6ce900c93792202e443814bb39aa33fd",
+      "lines": 191,
+      "title": "# Archived sprint review: 2026-09-26 to 2026-09-28",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/stabilization-2026-09.md",
+      "sha256": "e6931e22099ff307e78ac5ad42d5117ee06ca7be97d9aa1f80d35180b01e3a6b",
+      "lines": 87,
+      "title": "# September Linux stabilization audit",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/state-management.md",
+      "sha256": "67d6dac1e3066ce2c1fab8d7a2105be3ecbb79a870944f103238ef4f19396af8",
+      "lines": 169,
+      "title": "# State management with Relm4",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/storage.md",
+      "sha256": "3d72c4e686d6aa050273ac22f083d04983ca3527d280737a4650ece336e5cf70",
+      "lines": 196,
+      "title": "# Storage",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/testing.md",
+      "sha256": "3ef2d8120567f44ea26c99f24bb28471a1fc92fb31f77f15f8ea7985f2e2cba7",
+      "lines": 505,
+      "title": "# Testing",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/toolchains.md",
+      "sha256": "2010bd2fd8ce634e7f3784d9e407e83b5aee1640086d21d206946f227439bee3",
+      "lines": 55,
+      "title": "# Rust toolchains on Arch and Omarchy",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/type-contract-history.md",
+      "sha256": "8086242aa77d19ef0ca80c7dfaafcf0919a034a7d46ab220f36da7ed7ccc22a7",
+      "lines": 372,
+      "title": "# Historical record: type-contract-strategy.md",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/type-contract-strategy.md",
+      "sha256": "94024b1c2073b3f1753a875e339b16b15460b027dcbf512665a2779ec264246c",
+      "lines": 78,
+      "title": "# B3 type and consumer work board",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-adoption.md",
+      "sha256": "2f9d2898f3f2af952744d2110afed27915a9459c1b734ec29186fcf7b83d10da",
+      "lines": 73,
+      "title": "# Upstream adoption through macOS 0.72",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-main-review-2026-10-03-inventory.md",
+      "sha256": "eddbc0d0f6852735c5eecc4cc60d04fd5291881ec9b83ab82d7c407d02ce7796",
+      "lines": 273,
+      "title": "# Upstream main fix inventory: 2026-10-03",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-main-review-2026-10-03.md",
+      "sha256": "9b909eb6022e86ab333a013ef3556823df5620dff7e43be49851de7b0d94aac1",
+      "lines": 212,
+      "title": "# macOS main fixes: Linux applicability review",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-older-releases-2026-10-03-inventory.md",
+      "sha256": "5f9331c665e8354e4a726474df6c342c85b7eaf29d0667e5a058e595fbf62c46",
+      "lines": 143,
+      "title": "# Older TablePro app-release inventory",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-older-releases-review-2026-10-03.md",
+      "sha256": "dc42db5052d30e5cdccb86b512893dc16175a6c52415f763f3b39ad7a1cba5db",
+      "lines": 115,
+      "title": "# Older TablePro app releases: Linux follow-up review",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-sync.md",
+      "sha256": "5204bb0e232b8abbd1f55012541bca3ff79606cf47d1380c57c8ae0b463af5a8",
+      "lines": 268,
+      "title": "# Optional upstream reference review",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/upstream-u1-sql-server-2026-10-03.md",
+      "sha256": "8571d6ce3abdbebb7eaaf3bdb5affb3385a83c4513c0a4aaa0da183a9ee2e600",
+      "lines": 103,
+      "title": "# U1 handoff: SQL Server server-owned columns",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/validation-playbook.md",
+      "sha256": "b9607da85ce5b594b0ae44dcc21269b30065a22226bdb8ceede1dc590176e341",
+      "lines": 303,
+      "title": "# Validation playbook",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/value-contract-history.md",
+      "sha256": "027c3901255f67fa86c9846ee4e12e084f7a9e42c9e227e918254fe4ce1b6acb",
+      "lines": 4029,
+      "title": "# Historical record: value-contracts.md",
+      "vendor": false
+    },
+    {
+      "path": "linux/docs/value-contracts.md",
+      "sha256": "affac9cc0725f86193c1283ea59ccdea1b45ce41de2416f6e74edf51a73e9e51",
+      "lines": 60,
+      "title": "# Type and value evidence index",
+      "vendor": false
+    },
+    {
+      "path": "linux/flatpak/screenshots/README.md",
+      "sha256": "9a514f8769310c9d08ba6e4482a3e56b1fb19c0fbac0ea02646afc737fa7622e",
+      "lines": 12,
+      "title": "# Screenshots for Flathub / AppStream",
+      "vendor": false
+    },
+    {
+      "path": "linux/packaging/README.md",
+      "sha256": "59f0f3d09ac67220c928ef17bb6643c412dbde3e8e32bfd0c06a1cd7ec88c0e2",
+      "lines": 67,
+      "title": "# Packaging",
+      "vendor": false
+    },
+    {
+      "path": "linux/po/README.md",
+      "sha256": "0554d7dc864fac6a17251df417bd1a0ad8122c498d0d8dcd0315ef9f8444df00",
+      "lines": 53,
+      "title": "# Translations",
+      "vendor": false
+    },
+    {
+      "path": "linux/tests/fixtures/postgres-release/README.md",
+      "sha256": "c614f3d8611baa21c9fe74ea6abb577b0fe2e6c263ed37bb5d692e4dc766c3b8",
+      "lines": 58,
+      "title": "# PostgreSQL release fixture",
+      "vendor": false
+    },
+    {
+      "path": "linux/tests/manual-connections/README.md",
+      "sha256": "0f086f8b322eac97c88626835bf2fcf130b1523eb432607b1213d9706764262d",
+      "lines": 72,
+      "title": "# Manual connection fixture",
+      "vendor": false
+    },
+    {
+      "path": "linux/vendor/README.md",
+      "sha256": "7f64589b5225aae36beb4f1e9b77320258eca273acec144d7c99e359aa114f55",
+      "lines": 13,
+      "title": "Patched crates.io snapshots used through `[patch.crates-io]` in the workspace",
+      "vendor": true
+    },
+    {
+      "path": "linux/vendor/mongodb/README.md",
+      "sha256": "12c936aa781731089f20c0e6f73efe59758345599aeaf20ec479970587e2ad18",
+      "lines": 190,
+      "title": "# MongoDB Rust Driver",
+      "vendor": true
+    },
+    {
+      "path": "linux/vendor/redis/README.md",
+      "sha256": "9dd58ef99e21165eb783439713a2066e507e8f60c12985b3bdcc77e85b254c8f",
+      "lines": 307,
+      "title": "# redis-rs",
+      "vendor": true
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/options/doc.md",
+      "sha256": "33882b389d8c5733da137d0fdda411188c22e922f79adac9dfdde8b959506f4c",
+      "lines": 185,
+      "title": "Options and flags which can be used to configure a PostgreSQL connection.",
+      "vendor": true
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/types/bigdecimal-range.md",
+      "sha256": "968dac5676a333f1953df12b9ed1beb930537e6fae190140ac729e8dc16b2749",
+      "lines": 20,
+      "title": "#### Note: `BigDecimal` Has a Larger Range than `NUMERIC`",
+      "vendor": true
+    },
+    {
+      "path": "linux/vendor/sqlx-postgres/src/types/rust_decimal-range.md",
+      "sha256": "50ea63448f02e7f4acb78d9f78f06d435d50460adb9a79223c8626f1e7598e8a",
+      "lines": 10,
+      "title": "#### Note: `rust_decimal::Decimal` Has a Smaller Range than `NUMERIC`",
+      "vendor": true
+    }
+  ],
+  "missing_links": [
+    {
+      "document": "linux/docs/b3-test-scenario-survey.md",
+      "line": 189,
+      "target": "../target/quality/20260930T215342621227Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/b3-test-scenario-survey.md",
+      "line": 191,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 242,
+      "target": "../target/quality/20261001T011112385634Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 244,
+      "target": "../target/quality/20261001T011619474080Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 253,
+      "target": "../target/quality/20261001T013200347651Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 268,
+      "target": "../target/quality/20261001T015111955335Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 288,
+      "target": "../target/quality/20261001T023544965607Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1921,
+      "target": "../target/quality/20260930T223807112958Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1923,
+      "target": "../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 1926,
+      "target": "../target/quality/20260930T224147348085Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2018,
+      "target": "../target/quality/20260930T122803925695Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2070,
+      "target": "../target/quality/20260930T190433266840Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2078,
+      "target": "../target/quality/20260930T192142875147Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2093,
+      "target": "../target/quality/20260930T195640249113Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2100,
+      "target": "../target/quality/20260930T195202641431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2112,
+      "target": "../target/quality/20260930T200423574515Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2114,
+      "target": "../target/quality/20260930T200925216322Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2127,
+      "target": "../target/quality/20260930T203202118084Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2151,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2152,
+      "target": "../target/quality/20260930T211125388087Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2186,
+      "target": "../target/quality/20260930T224745418261Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2188,
+      "target": "../target/quality/20260930T225139833836Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2228,
+      "target": "../target/quality/20261001T032907972866Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2229,
+      "target": "../target/quality/20261001T032917087566Z-change-contracts/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2257,
+      "target": "../target/quality/20261001T055114378394Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/bookie-0.2-history.md",
+      "line": 2258,
+      "target": "../target/quality/20261001T055614415328Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 64,
+      "target": "../target/quality/20261001T005701182279Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 85,
+      "target": "../target/quality/20261001T025640026732Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 93,
+      "target": "../target/quality/20261001T042714823272Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/disconnection-contracts.md",
+      "line": 103,
+      "target": "../target/quality/20261001T051127401608Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 188,
+      "target": "../target/quality/20260930T021134930354Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 190,
+      "target": "../target/quality/20260930T110146955489Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 196,
+      "target": "../target/quality/20260930T232244336622Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 199,
+      "target": "../target/quality/20260930T114622059959Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 199,
+      "target": "../target/quality/20260930T114425279874Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 273,
+      "target": "../target/quality/20260930T215342621227Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 275,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/type-contract-history.md",
+      "line": 279,
+      "target": "../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 73,
+      "target": "../target/quality/20260930T001431188722Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 74,
+      "target": "../target/quality/20260930T001431188722Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 85,
+      "target": "../target/quality/20260930T002923239431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 94,
+      "target": "../target/quality/20260930T232244336622Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 95,
+      "target": "../target/quality/20260930T232244336622Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 117,
+      "target": "../target/quality/20260930T235608800228Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 119,
+      "target": "../target/quality/20261001T000036771872Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 121,
+      "target": "../target/quality/20261001-clickhouse-datetime64-precision-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 122,
+      "target": "../target/quality/20261001-csv-column-kind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 123,
+      "target": "../target/quality/20261001-json-value-to-json-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 150,
+      "target": "../target/quality/20261001-wide-decimal-metadata-mutants-full-core/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 153,
+      "target": "../target/quality/20261001T002624272378Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 156,
+      "target": "../target/quality/20261001T011112385634Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 158,
+      "target": "../target/quality/20261001T003205886474Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 161,
+      "target": "../target/quality/20261001T011619474080Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 163,
+      "target": "../target/quality/20261001-wide-decimal-csv-mutants-final3/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 175,
+      "target": "../target/quality/20261001T013200347651Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 203,
+      "target": "../target/quality/20260930T230409137178Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 205,
+      "target": "../target/quality/20260930T231132409175Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 244,
+      "target": "../target/quality/20260929T161811049211Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 565,
+      "target": "../target/quality/20260930T021134930354Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 566,
+      "target": "../target/quality/20260930T020929420585Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 573,
+      "target": "../target/quality/20260930T122803925695Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 574,
+      "target": "../target/quality/20260930T122803925695Z-layers/drivers-1.log",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 594,
+      "target": "../target/quality/20260930T110146955489Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 603,
+      "target": "../target/quality/20260930T114622059959Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 604,
+      "target": "../target/quality/20260930T114622117990Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 605,
+      "target": "../target/quality/20260930T114425279874Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 611,
+      "target": "../target/quality/20260930T010431493880Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 612,
+      "target": "../target/quality/20260930T011850614654Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 613,
+      "target": "../target/quality/20260930T011850675572Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 614,
+      "target": "../target/quality/20260930T012435775212Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 1108,
+      "target": "../target/quality/20260929T162725389033Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 1989,
+      "target": "../target/quality/20261001T024828271108Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2213,
+      "target": "../target/quality/20261001-postgres-temporal-import-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2214,
+      "target": "../target/quality/20261001-postgres-temporal-import-plan-mutants-final2/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2215,
+      "target": "../target/quality/20261001-postgres-temporal-insert-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2225,
+      "target": "../target/quality/20261001T023544965607Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2703,
+      "target": "../target/quality/20260929T164906704313Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2811,
+      "target": "../target/quality/20260930T141019789442Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 2812,
+      "target": "../target/quality/20260930T141439236199Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3170,
+      "target": "../target/quality/20261001T014227751433Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3463,
+      "target": "../target/quality/20260930T185810190323Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3470,
+      "target": "../target/quality/20260930T192623654872Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3506,
+      "target": "../target/quality/20260930T223807112958Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3508,
+      "target": "../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3511,
+      "target": "../target/quality/20260930T224147348085Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3523,
+      "target": "../target/quality/20260930T195202641431Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3542,
+      "target": "../target/quality/20260930T200423574515Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3651,
+      "target": "../target/quality/20260930T203202118084Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3668,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3687,
+      "target": "../target/quality/20260930T210700047035Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3704,
+      "target": "../target/quality/20260930T213122442487Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3706,
+      "target": "../target/quality/20260930T213517124497Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3717,
+      "target": "../target/quality/20260930T224745418261Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3719,
+      "target": "../target/quality/20260930T225139833836Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3737,
+      "target": "../target/quality/20260930T231755592573Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3815,
+      "target": "../target/quality/20260930T215742792833Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3822,
+      "target": "../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3845,
+      "target": "../target/quality/20261001T031547325812Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3846,
+      "target": "../target/quality/20261001T025640026732Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3849,
+      "target": "../target/quality/20261001T032311403470Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3877,
+      "target": "../target/quality/20261001T040526500083Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3878,
+      "target": "../target/quality/20261001T041008834602Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3879,
+      "target": "../target/quality/20261001-duckdb-interval-csv-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3898,
+      "target": "../target/quality/20261001-clickhouse-int128-xlsx-mutants/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3901,
+      "target": "../target/quality/20261001T055114378394Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3902,
+      "target": "../target/quality/20261001T055614415328Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3927,
+      "target": "../target/quality/20261001T061341105077Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3928,
+      "target": "../target/quality/20261001T060930854105Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3929,
+      "target": "../target/quality/20261001T060932648747Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3954,
+      "target": "../target/quality/20261001T064515312579Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3955,
+      "target": "../target/quality/20261001T064121314717Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001T071947669210Z-values/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001T072421865121Z-layers/report.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/docs/value-contract-history.md",
+      "line": 3978,
+      "target": "../target/quality/20261001-mongodb-integer-width-mutants-final/mutants.out/outcomes.json",
+      "kind": "cache"
+    },
+    {
+      "document": "linux/vendor/redis/README.md",
+      "line": 307,
+      "target": "DEVELOPMENT.md",
+      "kind": "vendor"
+    }
+  ],
+  "anchor_candidates": [
+    {
+      "document": "linux/docs/type-contract-strategy.md",
+      "line": 44,
+      "target": "value-contract-history.md#sql-server-sql-variant-metadata-refusal"
+    },
+    {
+      "document": "linux/docs/type-contract-strategy.md",
+      "line": 47,
+      "target": "value-contract-history.md#redis-pub-sub-and-monitor-stream-refusal-2026-09-29"
+    },
+    {
+      "document": "linux/docs/value-contracts.md",
+      "line": 40,
+      "target": "value-contract-history.md#mongodb-collection-wide-heterogeneity-blocks-grid-editing-2026-10-03"
+    }
+  ],
+  "duplicate_paragraphs": [
+    {
+      "text": "Editor schema completion uses the same session token: allocating a fresh policy wrapper no longer invalidates its cache. Reconnect invalidates pending requests before they are applied.",
+      "documents": [
+        "linux/ARCHITECTURE.md",
+        "linux/docs/state-management.md"
+      ]
+    },
+    {
+      "text": "Archived 2026-10-03 from `0cf70382eed72c144ea94208dfef5f5706e0a7dd`. The original content below preserves dated decisions, commands, test counts and source evidence. Its words such as \u2018current\u2019, \u2018next\u2019 and \u2018pending\u2019 describe their original checkpoint. Use [the documentation entry point](README.md), [active sprint](bookie-0.2-sprint.md) and [the ADR index](decisions/README.md) for current instructions. Type/value rules are owned by ADR 0007; connection/session and persistence rules by ADRs 0008/0009. Read a relevant heading only; this archive is not mandatory agent startup context.",
+      "documents": [
+        "linux/docs/bookie-0.2-history.md",
+        "linux/docs/type-contract-history.md"
+      ]
+    },
+    {
+      "text": "Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. See [the evidence consistency review](architecture-consistency-review-2026-10-03.md#evidence-audit) and its inventory for exact paths; retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.",
+      "documents": [
+        "linux/docs/validation-playbook.md",
+        "linux/docs/value-contract-history.md"
+      ]
+    }
+  ]
+}

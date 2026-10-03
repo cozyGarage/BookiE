@@ -100,19 +100,22 @@ rules. When a module's name needs "and" or "util", split it. This applies at
 file level, which is why `check-file-size.sh` exists: a 1,200-line file has
 almost always accumulated a second responsibility.
 
-**Open/closed.** Adding a database engine must not edit a `match` in `core`,
-`policy`, or `app`. It adds a crate implementing the `core` traits and one line
-in each composition root. If a change requires editing a dialect `match` in
-three crates, the missing abstraction is a trait method, not a fourth arm.
+**Open/closed.** Register engines through static driver crates and the owning
+composition roots, following [the driver guide](adding-drivers.md). Shared SQL
+builders, policy classifiers and grid parsers already have dialect-specific
+branches. Extend those only for a concrete native contract and update affected
+consumers together. Reuse a capability where one exists; repeated dialect
+branches alone do not justify a new abstraction.
 
 **Liskov.** Every `Connection` implementation must honour the trait's documented
 contract, including its failure contract. A driver that cannot cancel server
 side reports that through the capability it advertises. It does not silently
 return `Ok` from a method it did not perform.
 
-**Interface segregation.** Do not widen a trait so one driver can use one new
-method. `ConnectionFaultSink` is a one-method trait for exactly this reason.
-Optional behaviour goes behind a capability query or a separate trait.
+**Interface segregation.** Keep trait additions tied to a concrete consumer.
+Use existing capabilities for optional behavior. A shared method may be extended
+when every wrapper forwards it and unsupported drivers refuse safely; a separate
+trait is useful only when its ownership and callers justify it.
 
 **Dependency inversion.** Dependencies point at `core`. `core` depends on no
 workspace crate, `policy` on `core` only, and domain crates never import GTK or
@@ -149,13 +152,14 @@ Every crate boundary returns a typed `thiserror` enum. A variant names what
 failed in the caller's vocabulary, not the library's. Wrap a foreign error as a
 `#[from]` source rather than formatting it into a string, so the chain survives.
 
-`DriverError::OperationOutcomeUnknown` is reserved for a write whose outcome the
-client genuinely cannot determine. Do not use it for a failure you know did not
-apply, and do not report an ambiguous write as a plain failure.
+`DriverError::OperationOutcomeUnknown` means an interrupted/dispatched operation
+whose terminal outcome cannot be confirmed. Controlled reads can return it too;
+only a governed write poisons write state. Pre-dispatch refusal is a known
+outcome, and an ambiguous write must not become a plain failure.
 
-Never put a secret, a SQL parameter, a connection string, or a panic payload in
-an error that can reach the interface, an audit field, or a log line that is not
-`tracing` at `error` with an explicit field.
+Never put a secret, SQL parameter, connection string, unmasked result or raw
+panic payload in returned errors, audit fields or logs. `tracing` at `error`
+does not make sensitive data safe. See [the privacy rule](error-handling.md#logging).
 
 ## Settled decisions
 
@@ -169,8 +173,8 @@ reason. Do not change it in passing inside a feature commit.
 | How does a service reach a component? | An `Arc`-shared service handle, not a global | [state-management](state-management.md) |
 | Whole-value state versus per-key state | `StateFile<T>` for whole documents, `WorkspaceStore` for per-connection merge | [state-management](state-management.md) |
 | Is a comment allowed? | Only for behaviour outside this repository | `CLAUDE.md` |
-| Optional behaviour on a trait | New one-method trait or a capability query, never a widened trait | this document |
-| A cell the driver could not decode | `Value::Undecodable` carrying the type name, never `Value::Null` | [ADR pending, B3](bookie-0.2-sprint.md) |
+| Optional behaviour on a trait | Existing capability first; shared extension requires concrete callers and wrapper review | this document |
+| A cell the driver could not decode | `Value::Undecodable` carrying the type name, never `Value::Null` | [ADR 0007](decisions/0007-type-and-value-preservation.md) |
 | Cancellation | Reaches the database operation, not just the future | [ADR 0005](decisions/0005-server-side-cancellation.md) |
 
 When a question is answered twice in opposite directions, that is the signal to

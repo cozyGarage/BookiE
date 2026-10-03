@@ -52,4 +52,6 @@ All scripts share `linux/target`. Keep one compiler per checkout: a command that
 
 A narrow `cargo test -p <crate>` can resolve a smaller dependency feature set than a workspace build and compiles those dependencies once. Later runs reuse them. Cargo's workspace feature unification is still unstable on 1.98.
 
-After a toolchain upgrade, `cargo clean` removes artifacts that the new compiler cannot reuse.
+After a toolchain upgrade, retain the cache while measuring what Cargo reuses.
+Review disk usage and targeted artifact retention separately; do not use
+`cargo clean` as a routine validation step.

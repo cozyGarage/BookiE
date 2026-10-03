@@ -1593,10 +1593,11 @@ A PostgreSQL 16 contract defines labels `NULL`, `東京`, and `o'brien`. For
 each label, PostgreSQL's `pg_typeof` confirms the source expression remains the
 custom enum while `enum::text` returns the exact label; SQL-literal re-import
 and an explicitly typed text parameter also preserve it. SQL NULL is checked
-separately from the literal label `NULL`. Directly returning the enum-typed
-column currently fails during SQLx type metadata resolution (`enum_labels`:
-unexpected NULL), so direct enum result decoding remains open; this contract
-does not claim it is supported.
+separately from the literal label `NULL`. At this October 2 checkpoint,
+directly returning the enum-typed column failed during SQLx type metadata
+resolution (`enum_labels`:
+unexpected NULL), so direct decoding remained open at that checkpoint. The
+October 3 support that resolved it is recorded below.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contracts::value_contract_scalar_enum_labels_preserve_exact_text -- --include-ignored --exact --test-threads=1
@@ -1616,13 +1617,13 @@ record this regression.
 
 ### PostgreSQL custom enum array metadata boundary
 
-A PostgreSQL 16 fixture defines enum labels `NULL`, `東京`, and `o'brien`, then
-builds an array containing all three labels plus SQL NULL. Server-side scalar
-projections confirm the exact native array type, PostgreSQL array text, and
-JSON semantics. Selecting the enum array itself fails during SQLx metadata
-resolution (`enum_labels`: unexpected NULL); it does not produce a BookiE
-`Undecodable` value. This records an open decoder/dependency boundary rather
-than claiming unsupported-value handling.
+At this October 2 checkpoint, a PostgreSQL 16 fixture defined enum labels
+`NULL`, `東京`, and `o'brien`, then built an array containing all three labels
+plus SQL NULL. Server-side scalar projections confirmed the exact native array
+type, PostgreSQL array text, and JSON semantics. Selecting the enum array itself
+failed during SQLx metadata resolution (`enum_labels`: unexpected NULL); it did
+not produce a BookiE `Undecodable` value. This recorded the open decoder/dependency
+boundary before the October 3 SQLx parser fix below.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_projection_is_rejected -- --include-ignored --exact --test-threads=1
@@ -1630,6 +1631,195 @@ rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --te
 
 The PostgreSQL 16 contract passed: independent server projections succeeded,
 and direct enum-array projection returned the expected metadata error.
+
+### PostgreSQL direct custom-enum result follow-up (October 3)
+
+The current tree adds direct scalar and array decoding for ordinary custom enum
+labels. A PostgreSQL 16 test checks `ready`, `paused`, SQL NULL, the native
+`pg_typeof` text, and the exact array text `{"ready","paused",NULL}`. The
+decoder uses the enum's UTF-8 wire label and quotes each array label so a SQL
+NULL element remains distinct. Before the fix, the scalar labels were
+`Undecodable`; the retained before-fix output is in
+[`before-fix.txt`](evidence/postgres-enum-results-2026-10-03/before-fix.txt).
+
+At this original October 3 decoder checkpoint, the adversarial scalar fixture
+whose enum label is literally `NULL` still surfaced SQLx's metadata resolution
+error (`enum_labels: unexpected NULL`), and keyed-edit proof remained open.
+  The later October 3 support and write follow-up below supersedes that status.
+The historical sections above retain their original checkpoint results.
+
+### PostgreSQL enum literal-NULL result support (October 3)
+
+SQLx's PostgreSQL text-array decoder removed element quotes, then treated any
+resulting string equal to `NULL` as SQL NULL. The local SQLx 0.9.0 patch now
+tracks whether an element was quoted. Its unit regression distinguishes quoted
+`"NULL"`, unquoted SQL NULL, lowercase `null`, empty text and ordinary text.
+Native Bookie scalar and array projections preserve the enum label `NULL`; a
+native `UPDATE ... RETURNING` stores that label and fires its trigger once.
+Schema-aware keyed updates and draft inserts also preserve it separately from
+SQL NULL. Automatic parameter typing and the remaining enum consumer matrix
+remain open under ADR 0007. Current source fingerprints and native results are
+in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum structured filters (October 3)
+
+Structured browse filters previously emitted `status = $1` for a custom enum
+while binding `$1` as text. A PostgreSQL 16 regression first failed with
+SQLSTATE 42883 (`enum = text`). The filter builder now uses fetched,
+schema-qualified enum metadata to cast values for equality, inequality, range,
+`BETWEEN`, and `IN`/`NOT IN` comparisons. The native fixture checks equality
+and inequality for literal label `NULL`, a Unicode `IN` match, enum ordering
+through `BETWEEN`, and `IS NULL` independently. Results include native type
+oracles; explicit enum `NULL` and SQL NULL remain distinct. The text-pattern
+filter path retains its text cast behavior.
+
+The core unit suite passed 502 tests and the PostgreSQL integration suite passed
+74 tests. Workspace Clippy, file/function/panic/bounded-operation guards,
+formatting and diff checks passed. The initial failures and complete local test
+outputs are retained in the
+[enum evidence directory](evidence/postgres-enum-results-2026-10-03/). At this
+checkpoint automatic parameter inference and enum import/export/MCP consumers
+were still open; the following section closes the named CSV import path.
+
+### PostgreSQL custom-enum CSV import (October 3)
+
+The CSV import plan initially emitted an untyped placeholder for a custom enum
+column, even though it bound the row as text. The native PostgreSQL regression
+first failed with a plan lacking the schema-qualified enum cast. The plan now
+uses catalog metadata to cast the text parameter through the enum type.
+
+The default CSV exporter writes both an empty enum label and SQL NULL as a blank
+field. Because that file cannot distinguish the two values, the importer now
+refuses blank cells for PostgreSQL enum columns when the NULL marker is empty.
+The native contract verifies the target remains unchanged after refusal. With
+an explicit `\N` marker, the same importer preserves an empty label, literal
+`NULL`, Unicode, apostrophe and comma labels, and SQL NULL; PostgreSQL type and
+value oracles confirm the restored rows.
+
+The core unit suite passed 504 tests and the PostgreSQL integration suite passed
+75 tests. Workspace Clippy, formatting, guards, ignored-test inventory and diff
+checks passed. The first failure, result logs and fingerprints are in the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+Other export encodings, automatic parameter inference and enum JSON/MCP
+consumers remained open at this CSV checkpoint; the shared JSON renderer case
+is covered in the following section. Automatic parameter inference and MCP delivery remain
+open.
+
+### PostgreSQL custom-enum JSON rendering (October 3)
+
+A PostgreSQL 16 integration contract projects an enum column containing the
+literal label `NULL`, an empty label, Unicode, and SQL NULL, and checks the
+server-reported enum type for every row. The shared `render_json` serializer preserves the
+labels as JSON strings, including `"NULL"` and `""`, while SQL NULL becomes
+JSON null. The focused native selector passed; current source and output hashes
+are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+This proves the shared row-to-JSON result rendering for this PostgreSQL enum case.
+MCP transport serialization, the file-writer path, automatic parameter
+inference and other enum consumer/configuration combinations remain open under
+ADR 0007.
+
+### PostgreSQL custom-enum parameter type inference (October 3)
+
+The native query/write contract first failed with SQLSTATE 42883 because a
+custom enum comparison received a `TEXT` parameter. PostgreSQL now describes
+parameter types from SQL context before binding text and SQL NULL values. When
+the server infers a custom enum type, Bookie binds the original text bytes or
+SQL NULL with that enum OID. If the SQL leaves the parameter ambiguous, the
+driver retains the existing `Value` type; a plain text parameter remains TEXT.
+
+The PostgreSQL 16 regression checks an enum label `NULL`, a SQL NULL match, a
+direct update, a transactional update, an invalid label rejected with SQLSTATE
+22P02, and an ordinary text parameter. Native `pg_typeof` and row postconditions
+verify stored values and types. The before-fix `enum = text` failure and
+after-fix focused result are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+This closes text/SQL NULL inference where the server can determine a custom
+enum parameter from the expression context. Other dynamic parameter types,
+MCP delivery, the file-writer path, and additional enum configurations remain
+open under ADR 0007.
+
+### PostgreSQL custom-enum MCP and file export delivery (October 3)
+
+A PostgreSQL 16 Docker contract sends enum rows through the production driver,
+`McpBridge`, and the `execute_query` tool dispatcher. The fixture includes the
+literal label `NULL`, an empty label, Unicode, and SQL NULL. The `execute_query`
+response asserts exact JSON values, column order, non-truncated delivery, and
+the server-reported `mcp_enum.state` type for every row. The same fixture checks
+`export_data` JSON against those values and pins CSV output, where empty text is
+quoted as `""` and SQL NULL is an unquoted blank. That CSV encoding is not a
+lossless import promise: PostgreSQL enum import refuses ambiguous default blank
+cells unless given a compatible explicit null marker. The core result-file writer
+produces JSON preserving all four values and CSV with the same quoted-empty vs
+blank-NULL convention. A cancellation after the first row preserves the previous
+JSON destination and leaves no staging file. XML, HTML, and Markdown output now
+have native enum contracts below; XLSX remains open under ADR 0007.
+
+The ignored Docker selector, focused result, full PostgreSQL suite, and current
+source/evidence hashes are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum SQL file export restore (October 3)
+
+A PostgreSQL 16 fixture exports custom-enum query rows through the core SQL
+result-file writer, then replays each generated INSERT into a destination with
+the same enum type. The native postcondition checks `pg_typeof` and exact values
+for literal `NULL`, an empty label, Unicode, SQL NULL, and an apostrophe/
+semicolon label shaped like a `DROP TABLE` statement. The destination table and
+all five rows survive with the original values. The focused Docker contract and
+complete PostgreSQL integration suite passed. XLSX enum file-writer behavior
+remains open; this case does not establish generic
+SQL export compatibility across unrelated destination schemas. See the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum XML file export (October 3)
+
+A PostgreSQL 16 fixture sends custom-enum results through the core XML
+file-writer. Native query assertions verify the server-reported enum type and
+exact labels for literal `NULL`, empty text, Unicode, a markup-shaped label,
+and SQL NULL. The output keeps empty text distinct from the explicit null
+element and escapes markup, quotes, apostrophes, and entity text so a label
+cannot create elements or be normalized into a different literal. The focused
+Docker contract passed. XLSX remains a separate consumer;
+this XML encoding is not an import/restore contract. See the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum HTML file export (October 3)
+
+A PostgreSQL 16 fixture sends enum results through the core HTML file-writer.
+Native rows verify exact labels and `pg_typeof` for literal `NULL`, empty text,
+Unicode, a hostile image/event-handler label, and SQL NULL. The HTML keeps the
+three null/empty/text outcomes distinct and escapes the hostile label as text,
+with no raw image element emitted. The focused Docker contract passed. XLSX
+remains a separate consumer; HTML output is not an import/restore
+contract. See the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum Markdown file export (October 3)
+
+A PostgreSQL 16 fixture sends custom-enum rows through the core Markdown
+file-writer. Native row assertions verify `pg_typeof` and exact values for
+literal `NULL`, empty text, Unicode, a pipe and newline, entity-looking text,
+and SQL NULL. The initial export printed both the text label `NULL` and SQL
+NULL as `NULL`; the retained before-fix output records that collision. Markdown
+text cells now use JSON string quoting, while SQL NULL remains the unquoted
+`NULL` marker. Cell characters that can split the table, form inline markup, or
+look like HTML entities are escaped. The focused core and PostgreSQL tests
+passed, followed by the complete PostgreSQL suite. Markdown output is an
+explicit text encoding, not an import/restore contract. See the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+### PostgreSQL custom-enum XLSX file export (October 3)
+
+A PostgreSQL 16 fixture verifies exact enum labels and `pg_typeof` for literal
+`NULL`, Unicode, entity-looking text, formula-shaped text, SQL NULL, and an
+empty label. Non-empty results produce an XLSX package; the core workbook test
+checks that text labels, including `NULL` and `=1+1`, are stored as shared-string
+cells, XML-sensitive characters remain text, and SQL NULL has no string cell.
+The native fixture confirms that an empty enum label is refused at its exact
+one-based row and column and that the existing workbook remains unchanged with
+no staged file left behind. The XLSX format therefore supports the tested
+non-empty enum labels as text and explicitly refuses empty enum labels; this is
+not a general workbook import/restore claim. See the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL money safe refusal
 
@@ -4024,6 +4214,89 @@ Decimal128 conflicts with earlier strings. The app Docker contract verifies
 first-page String and later-page Decimal128 cells remain read-only, checks the
 `$numberDecimal` marker and confirms the persisted BSON kind and row identity.
 The driver contract checks the late-page value through browse and query. This
-proves the named fixture; full-scan cost and concurrent writes during census
-remain risks. The test is registered in the app-server layer and the driver
-values suite.
+proves the named fixture; full-scan cost and concurrent writes during the scan
+remain risks. The October 3 follow-up below closes the separate census/page
+command gap for browse rows, but does not add snapshot semantics.
+
+### MongoDB missing fields remain distinct from BSON null (October 3)
+
+A native sparse-document contract first failed because the driver returned
+`Value::Null` both for an explicit BSON null and for a field absent from a
+document. The driver now returns `Value::Undecodable("missing BSON field")`
+for the absent field, which stays visibly distinct and cannot be rebound as an
+explicit null. The test independently reads both source documents through the
+MongoDB client, then checks the driver query result by `_id`. The focused Docker
+regression and the full driver package test run passed (65 tests across three
+suites). This closes the representation conflation without claiming a general
+missing-value type in the shared model. Collection census cost and concurrent
+writes during the scan remain open. Commands, initial failure, and fingerprints
+are in the [case manifest](evidence/mongodb-missing-null-results-2026-10-03/manifest.json).
+
+## MCP CSV null markers preserve PostgreSQL enum values (October 3)
+
+CSV file and MCP `export_data` outputs include a null marker chosen to be absent
+from exported values. The marker starts at `\\N` and appends `N` until it no
+longer collides, so enum labels `\\N` and `\\NN` remain text. The app shows
+the marker in its CSV export dialog, and its import dialog accepts the same
+value. Native PostgreSQL contracts import the exact MCP response and core file
+output into schema-aware enum targets, checking literal `NULL`, empty text,
+Unicode, SQL NULL, marker-shaped labels, formula-shaped text in raw mode, and
+`pg_typeof`. Formula-shaped text is prefixed when spreadsheet-safe export is on;
+turning it off preserves the literal value for import. The ordinary blank
+format remains safe: enum import refuses it as ambiguous before any write.
+Clipboard CSV formatting and broader enum format/session coverage remain
+separate cases. This does not add an MCP import tool.
+Commands and fingerprints are in the
+[PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+## Spreadsheet-safe PostgreSQL enum CSV is not reversible (October 3)
+
+A PostgreSQL 16 regression adds both formula-shaped enum label =1+1 and the
+distinct literal label '=1+1. Spreadsheet-safe export prefixes the first label
+with an apostrophe, producing the same CSV field for both source values. The
+schema-aware importer treats both fields as exact enum text, and PostgreSQL
+stores the apostrophe-prefixed label for both rows. This is a valid native enum
+value but a lossy restore. Raw-text export preserves both labels and remains the
+tested lossless import path. The export dialog now says to turn spreadsheet
+safety off for lossless re-import. See the native selector and retained output
+in the [PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+## PostgreSQL domain over enum scalar projection — 2026-10-03
+
+A PostgreSQL 16 native regression creates a domain over a custom enum and
+projects its literal `NULL` label, Unicode label and SQL NULL. The driver returns
+exact text/NULL values while the independent `pg_typeof` column reports the
+domain type. The focused test passed without a production decoder change. This
+proves only scalar result projection; domain arrays, bindings, writes, filters,
+imports and exports remain untested. Exact command and retained output are in
+the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+
+## MongoDB browse metadata and cursor consistency — 2026-10-03
+
+`fetch_rows` now builds collection-wide type metadata and retains requested
+page rows from one cursor. A MongoDB 7 failpoint pauses `getMore` before an
+off-page document is read, then a native update changes its field from String
+to Decimal128. The returned page reports `mixed`, preserves its already-read
+String rows as canonical Extended JSON, and the app refuses their edits. Native
+reads verify the changed Decimal128 and unchanged sibling. A second failpoint
+test skips the first `find` and blocks a second; the browse request completes
+without that second command. The earlier inter-command regression failed with
+stale `string` metadata and is retained as the before-fix result. The final
+app-server layer passed all 12 registered tests.
+
+The consistency contract is best-effort, not snapshot isolation. A deterministic
+failpoint test updates `_id: 0` from String to Decimal128 after the cursor has
+read it but before `getMore`; the returned row and census still say String while
+a native read sees Decimal128. A concurrent change to a document the cursor
+has already passed is therefore outside the metadata guarantee. Like other
+editable database results, a later write can overwrite a concurrent change.
+
+The shell `run_find` path still runs a full type census and then a filtered
+query. It merges types from returned rows, so a selected row that changes kind
+between those commands becomes `mixed`; off-page changes after census are not
+visible to that merge. CSV and JSON export use the materialized query result and
+preserve canonical Extended JSON markers for observed mixed values. Export does
+not refresh data or establish a collection snapshot. A diagnostic Docker test
+measures full-census time for 1,000 and 10,000 documents with a 50-row page;
+results are machine-specific and have no pass/fail threshold. These boundaries
+are covered by [the MongoDB census evidence manifest](evidence/mongodb-census-results-2026-10-03/manifest.json).

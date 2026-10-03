@@ -1,0 +1,23 @@
+
+running 1 test
+test value_contracts::value_contract_custom_enum_projection_preserves_labels_and_null ... FAILED
+
+failures:
+
+---- value_contracts::value_contract_custom_enum_projection_preserves_labels_and_null stdout ----
+
+thread 'value_contracts::value_contract_custom_enum_projection_preserves_labels_and_null' (2083308) panicked at crates/drivers/postgres/tests/support/value_contracts.rs:1013:5:
+assertion `left == right` failed
+  left: [[Undecodable("VALUE_CONTRACT_PLAIN_ENUM"), Text("value_contract_plain_enum")], [Undecodable("VALUE_CONTRACT_PLAIN_ENUM"), Text("value_contract_plain_enum")], [Null, Text("value_contract_plain_enum")]]
+ right: [[Text("ready"), Text("value_contract_plain_enum")], [Text("paused"), Text("value_contract_plain_enum")], [Null, Text("value_contract_plain_enum")]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    value_contracts::value_contract_custom_enum_projection_preserves_labels_and_null
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 70 filtered out; finished in 1.91s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/integration.rs (linux/target/debug/deps/integration-992730161e0870da)
+error: test failed, to rerun pass `-p tablepro-driver-postgres --test integration`

@@ -22,6 +22,10 @@ to the linked U1 follow-up.
 
 ## 2026-09-25: system OpenSSH transport
 
+Historical adoption checkpoint. The route is now assembled by shared transport
+and used by GUI/agentd; current behavior and remaining acceptance are in
+[connection handling](connections.md) and [the B4 board](b4-task-board.md).
+
 `crates/ssh/src/openssh/` ports upstream's system OpenSSH transport as a second
 backend beside the russh `SshTunnel`, which is unchanged. Nothing outside the ssh
 crate uses it yet; wiring it into `transport`, storage, the app and `agentd` is a

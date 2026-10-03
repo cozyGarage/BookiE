@@ -273,7 +273,9 @@ fn tool_description(name: &str) -> &'static str {
         "execute_query" => "Run a read SQL query (writes require tools:write scope and policy approval)",
         "execute_write" => "Run a write with optional transaction preview (preview=true by default)",
         "explain_query" => "Run EXPLAIN on a SQL statement",
-        "export_data" => "Run a query and return CSV or JSON",
+        "export_data" => {
+            "Run a query and return CSV or JSON; CSV responses include the null_marker used for SQL NULL cells"
+        }
         "table_schema" => "Read the columns, primary key, indexes and foreign keys of a table",
         "count_rows" => "Count the rows of a table exactly",
         "browse_table" => "Read a page of table rows by offset and limit",

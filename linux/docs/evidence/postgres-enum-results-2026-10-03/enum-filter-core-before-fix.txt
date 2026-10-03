@@ -1,0 +1,23 @@
+
+running 1 test
+test filter::tests::postgres_enum_filters_cast_values_to_the_schema_qualified_type ... FAILED
+
+failures:
+
+---- filter::tests::postgres_enum_filters_cast_values_to_the_schema_qualified_type stdout ----
+
+thread 'filter::tests::postgres_enum_filters_cast_values_to_the_schema_qualified_type' (2254462) panicked at crates/core/src/filter_tests.rs:276:9:
+assertion `left == right` failed
+  left: "\"status\" = $1"
+ right: "\"status\" = $1::\"value_contract_enum_schema\".\"value_contract_status\""
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    filter::tests::postgres_enum_filters_cast_values_to_the_schema_qualified_type
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 501 filtered out; finished in 0.00s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+error: test failed, to rerun pass `-p tablepro-core --lib`

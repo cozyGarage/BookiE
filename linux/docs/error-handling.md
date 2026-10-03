@@ -17,30 +17,9 @@ Two error styles, applied per layer. Mixing them is a review red flag.
 
 ## `thiserror` patterns
 
-Domain errors are exhaustive enums:
-
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum DriverError {
-    #[error("connection refused")]
-    ConnectionRefused,
-
-    #[error("authentication failed")]
-    AuthFailed,
-
-    #[error("TLS handshake failed: {0}")]
-    Tls(String),
-
-    #[error("query failed: {message}")]
-    Query { message: String, sqlstate: Option<String> },
-
-    #[error("connection closed unexpectedly")]
-    Disconnected,
-
-    #[error("driver internal error: {0}")]
-    Internal(String),
-}
-```
+Use the actual [DriverError](../crates/core/src/error.rs) and
+[StorageError](../crates/storage/src/error.rs) variants. Keep examples from
+becoming a second enum definition that omits cancellation/unknown outcomes.
 
 Rules:
 
@@ -50,24 +29,10 @@ Rules:
 
 ## Driver-side error mapping
 
-Each driver crate maps the underlying crate's errors:
-
-```rust
-fn map_sqlx_error(err: sqlx::Error) -> DriverError {
-    use sqlx::Error::*;
-    match err {
-        Database(e) => DriverError::Query {
-            message: e.message().to_string(),
-            sqlstate: e.code().map(|c| c.to_string()),
-        },
-        Io(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => DriverError::ConnectionRefused,
-        Io(e) if is_certificate_failure(&e) => DriverError::Tls(e.to_string()),
-        Tls(e) => DriverError::Tls(e.to_string()),
-        PoolClosed | PoolTimedOut => DriverError::Disconnected,
-        other => DriverError::Internal(format!("{other}")),
-    }
-}
-```
+Map underlying errors into the existing domain variants. Follow the production
+mapping for the affected driver rather than copying a generic SQLx example;
+connect refusal, established loss, authentication and certificate failure have
+different meanings. Keep native negative controls in the owning driver tier.
 
 The driver does not pass through `sqlx::Error` to callers. Callers see only `DriverError`.
 
@@ -75,21 +40,9 @@ Certificate verification failures reach sqlx as I/O errors, so the PostgreSQL dr
 
 ## UI display
 
-`app` translates `DriverError` and `StorageError` into user-facing messages with full context. The mapping lives in `app::ui::error_message`:
-
-```rust
-fn message_for(err: &DriverError) -> String {
-    match err {
-        DriverError::ConnectionRefused => "Could not reach the database. Is it running?".into(),
-        DriverError::AuthFailed => "Username or password is wrong.".into(),
-        DriverError::Tls(detail) => format!("TLS handshake failed: {detail}"),
-        DriverError::Query { message, sqlstate: Some(s) } => format!("Query failed (SQLSTATE {s}): {message}"),
-        DriverError::Query { message, .. } => format!("Query failed: {message}"),
-        DriverError::Disconnected => "The connection was closed. Try reconnecting.".into(),
-        DriverError::Internal(detail) => format!("Internal driver error: {detail}"),
-    }
-}
-```
+`app` translates domain errors into recovery messages in
+[error_text](../crates/app/src/ui/error_text.rs). Preserve typed categories
+through assembly and wrappers before selecting the user-facing message.
 
 Do not display raw `Debug` or `Display` output for domain errors. Always go through this layer.
 

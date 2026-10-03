@@ -1,0 +1,24 @@
+
+running 1 test
+test import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_and_null_rows ... FAILED
+
+failures:
+
+---- import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_and_null_rows stdout ----
+
+thread 'import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_and_null_rows' (2293189) panicked at crates/core/src/import/plan.rs:265:9:
+assertion `left == right` failed
+  left: [[Text("NULL")], [Text("")]]
+ right: [[Text("NULL")], [Null]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_and_null_rows
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 502 filtered out; finished in 0.00s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.38s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+error: test failed, to rerun pass `-p tablepro-core --lib`

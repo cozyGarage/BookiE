@@ -31,8 +31,16 @@ on historical statements such as “next”, “current” or “pending”.
 | Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
 | Capability backlog / short status | [PLAN](../../PLAN.md) / [ROADMAP](../ROADMAP.md) | Summarize and link; do not duplicate ADRs or progress logs |
 
+## Current audit
+
+[The October 3 release audit](release-audit-2026-10-03.md) checks the merged
+source against decisions, records fresh local gates and gives small remaining
+tasks. Historical inventories retain their original source/date.
+
 ## History and review lookup
 
+- [B4 history](b4-history.md), [connection history](connections-history.md) and
+  [test adoption history](testing-history.md): dated packets and obsolete gaps.
 - [Sprint history](bookie-0.2-history.md): original approved scope, dated
   continuation packets, implementation counts, migration and commit records.
 - [Type-contract history](type-contract-history.md): detailed driver matrices

@@ -1,0 +1,22 @@
+   Compiling tablepro-policy v0.1.0 (/home/trung/Projects/tablepro/linux/crates/policy)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.99s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_policy-4900867f61f3f89e)
+
+running 1 test
+test guard::guard_tests::audit::abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable ... FAILED
+
+failures:
+
+---- guard::guard_tests::audit::abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable stdout ----
+
+thread 'guard::guard_tests::audit::abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable' (304) panicked at crates/policy/src/guard_tests_audit.rs:111:5:
+assertion failed: !replacement_state.governed_writes_disabled()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    guard::guard_tests::audit::abandoning_an_old_write_after_replacement_keeps_the_new_generation_writable
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p tablepro-policy --lib`

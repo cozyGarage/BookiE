@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-03",
+  "branch": "linux",
+  "baseline_commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "case": "MongoDB missing sparse-document fields remain distinct from BSON null",
+  "adr": "0007",
+  "outcome": "Explicit safe marker: absent fields map to Value::Undecodable(\"missing BSON field\"), explicit BSON null maps to Value::Null, and the marker is refused by the MongoDB binding path.",
+  "regressions": [
+    {
+      "selector": "value_contract_mongodb_missing_fields_remain_distinct_from_bson_null",
+      "assertions": "MongoDB 7 stores one document with explicit BSON null and one without the field. Independent native reads verify presence/absence. The driver query is indexed by _id and requires Value::Null versus the distinct missing-field marker.",
+      "before_fix": "Failed: absent field decoded as Value::Null. See before-fix.txt.",
+      "after_fix": "Passed in focused Docker execution and the complete MongoDB crate test run."
+    },
+    {
+      "selector": "codec::tests::missing_field_marker_cannot_be_bound_as_bson_null",
+      "assertions": "The distinct absent-field marker is refused by value_to_bson instead of being converted to BSON null."
+    }
+  ],
+  "commands": {
+    "focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null -- --include-ignored --exact --test-threads=1",
+    "crate": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb -- --include-ignored --test-threads=1",
+    "clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --all-targets -- -D warnings",
+    "format": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+    "ignored_inventory": "rtk python3 linux/scripts/inventory-ignored-tests.py --check",
+    "diff_check": "rtk git diff --check"
+  },
+  "results": {
+    "before_fix": "Expected failure at the absent-field assertion: left Value::Null, right Value::Undecodable(\"missing BSON field\").",
+    "focused": "1 passed, 27 filtered out, 1.07s",
+    "crate": "65 passed across 3 suites, 34.02s",
+    "clippy": "passed; no issues found",
+    "format": "passed",
+    "ignored_inventory": "passed",
+    "diff_check": "passed"
+  },
+  "evidence_sha256": {
+    "before-fix.txt": "19152f001890c177b83a3da8f2f07b71143c850754050fda9bb9d645dce2e2ad",
+    "focused-after.txt": "64a57469c6352d3692c8ce9f73c719f4f9908d140129a64b433fd55b7bfcaaf2",
+    "mongodb-suite.txt": "71cb6cd78cedaee4890d4322bf9207ab700ba6c3c08689793afe9cff2bbe531e",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/mongodb/src/codec.rs": "3c3b2c386a6f545e5c17a01f9aa2209c10713f5277cdd8b8adc9acf8be4586c6",
+    "linux/crates/drivers/mongodb/tests/support/value_contracts.rs": "07547d681ff968c4745ccf681e854f624b50403c0ca8b0b9b61c18a922be46c0",
+    "linux/docs/b3-test-scenario-survey.md": "06bcdb228e0c1b90e69789f4887b9859c05010f55eb7e3ca8d3fb880d97fc45f",
+    "linux/docs/type-contract-strategy.md": "3c04e4665055ef670ca642d7fd8c61d93b7b6e51e2afbf75e072c8279e6fe05e",
+    "linux/docs/value-contract-history.md": "9f3a67f128d50ef75b0f667aae89b6066afd1d4bb00280e4d78bcd01f570a54d",
+    "linux/docs/value-contracts.md": "57401c2e21a78ddd8437b8e07fc12db877877b2497c2fd48c46f62b2795f756d",
+    "linux/docs/release-audit-2026-10-03.md": "d10798fa9769e7efd535d36f3c01d11238150b876861a4d43243dc706bc2deae",
+    "linux/docs/ignored-tests.md": "dba401942d5617352dfb3821e61a27edf6dd5b3b91f58fddb132a0751f9c2e2b"
+  },
+  "remaining": [
+    "The shared Value model has no dedicated Missing variant; this case deliberately uses the existing safe undecodable/refusal marker and does not claim exact generic missing-value support.",
+    "MongoDB browse census cost, writes to already-observed documents during the cursor, and run_find separate-read consistency remain open.",
+    "This case does not close the B3 engine/type/consumer matrix or any B4/installed release gate."
+  ]
+}

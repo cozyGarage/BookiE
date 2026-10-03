@@ -1,0 +1,342 @@
+{
+  "tablepro-app": {
+    "manifest": "linux/crates/app/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-mcp",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-clickhouse",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-duckdb",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mongodb",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mssql",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mysql",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-postgres",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-redis",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-sqlite",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-ssh",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-storage",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-transport",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-core": {
+    "manifest": "linux/crates/core/Cargo.toml",
+    "edges": []
+  },
+  "tablepro-policy": {
+    "manifest": "linux/crates/policy/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-postgres",
+        "kind": "dev-dependencies"
+      }
+    ]
+  },
+  "tablepro-release-tests": {
+    "manifest": "linux/crates/release-tests/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-ssh",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-transport",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-postgres",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-storage",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-mcp",
+        "kind": "dev-dependencies"
+      }
+    ]
+  },
+  "tablepro-mcp": {
+    "manifest": "linux/crates/mcp/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-storage",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mongodb",
+        "kind": "dev-dependencies"
+      }
+    ]
+  },
+  "tablepro-agentd": {
+    "manifest": "linux/crates/agentd/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-ssh",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-storage",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-transport",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-mcp",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-clickhouse",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-duckdb",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mongodb",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mssql",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-mysql",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-postgres",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-redis",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-sqlite",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-ssh": {
+    "manifest": "linux/crates/ssh/Cargo.toml",
+    "edges": []
+  },
+  "tablepro-storage": {
+    "manifest": "linux/crates/storage/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-ssh",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-transport": {
+    "manifest": "linux/crates/transport/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-ssh",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-storage",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-tls-tests": {
+    "manifest": "linux/crates/driver-tls-tests/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-transport",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-driver-clickhouse",
+        "kind": "dev-dependencies"
+      },
+      {
+        "name": "tablepro-driver-mongodb",
+        "kind": "dev-dependencies"
+      },
+      {
+        "name": "tablepro-driver-mssql",
+        "kind": "dev-dependencies"
+      },
+      {
+        "name": "tablepro-driver-mysql",
+        "kind": "dev-dependencies"
+      },
+      {
+        "name": "tablepro-driver-redis",
+        "kind": "dev-dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-clickhouse": {
+    "manifest": "linux/crates/drivers/clickhouse/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-duckdb": {
+    "manifest": "linux/crates/drivers/duckdb/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-mongodb": {
+    "manifest": "linux/crates/drivers/mongodb/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-mssql": {
+    "manifest": "linux/crates/drivers/mssql/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-mysql": {
+    "manifest": "linux/crates/drivers/mysql/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-postgres": {
+    "manifest": "linux/crates/drivers/postgres/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-redis": {
+    "manifest": "linux/crates/drivers/redis/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      }
+    ]
+  },
+  "tablepro-driver-sqlite": {
+    "manifest": "linux/crates/drivers/sqlite/Cargo.toml",
+    "edges": [
+      {
+        "name": "tablepro-core",
+        "kind": "dependencies"
+      },
+      {
+        "name": "tablepro-policy",
+        "kind": "dev-dependencies"
+      }
+    ]
+  }
+}

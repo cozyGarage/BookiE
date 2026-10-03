@@ -72,6 +72,7 @@ impl CsvDecimal {
 #[serde(default)]
 pub struct CsvOptions {
     pub null_to_empty: bool,
+    pub null_marker: Option<String>,
     pub line_break_to_space: bool,
     pub header_row: bool,
     pub sanitize_formulas: bool,
@@ -85,6 +86,7 @@ impl Default for CsvOptions {
     fn default() -> Self {
         Self {
             null_to_empty: true,
+            null_marker: None,
             line_break_to_space: false,
             header_row: true,
             sanitize_formulas: true,
@@ -107,6 +109,18 @@ pub fn render_csv(columns: &[ColumnInfo], rows: &[Vec<Value>], options: &CsvOpti
         output.push_str(options.line_break.as_str());
     }
     output
+}
+
+pub fn unique_csv_null_marker(rows: &[Vec<Value>]) -> String {
+    let mut marker = "\\N".to_string();
+    while rows
+        .iter()
+        .flatten()
+        .any(|value| value_to_text(value).as_deref() == Some(marker.as_str()))
+    {
+        marker.push('N');
+    }
+    marker
 }
 
 pub(crate) fn csv_header_line(columns: &[ColumnInfo], options: &CsvOptions) -> String {
@@ -166,10 +180,22 @@ pub fn write_csv_header(writer: &mut impl Write, columns: &[ColumnInfo]) -> io::
     writeln!(writer, "{}", csv_header_line(columns, &options))
 }
 
+pub fn write_csv_header_with_options(
+    writer: &mut impl Write,
+    columns: &[ColumnInfo],
+    options: &CsvOptions,
+) -> io::Result<()> {
+    writeln!(writer, "{}", csv_header_line(columns, options))
+}
+
 /// Escape and write one CSV data row.
 pub fn write_csv_row(writer: &mut impl Write, row: &[Value]) -> io::Result<()> {
     let options = rfc4180_options(false);
     writeln!(writer, "{}", csv_row_line(row, &options))
+}
+
+pub fn write_csv_row_with_options(writer: &mut impl Write, row: &[Value], options: &CsvOptions) -> io::Result<()> {
+    writeln!(writer, "{}", csv_row_line(row, options))
 }
 
 fn is_plain_decimal(value: &str) -> bool {
@@ -218,6 +244,9 @@ fn format_csv_cell(value: &Value, options: &CsvOptions) -> String {
     options.sanitize_formulas &= matches!(value, Value::Text(_));
     let options = &options;
     let Some(mut text) = value_to_text(value) else {
+        if let Some(marker) = &options.null_marker {
+            return escape_csv_field(marker, options, false);
+        }
         if options.null_to_empty {
             return String::new();
         }
@@ -312,6 +341,26 @@ mod tests {
         let mut buf = Vec::new();
         write_csv_row(&mut buf, &[Value::Text("=SUM(A1)".into()), Value::Null]).unwrap();
         assert_eq!(String::from_utf8(buf).unwrap(), "=SUM(A1),\n");
+    }
+
+    #[test]
+    fn csv_writer_uses_explicit_null_marker_without_changing_empty_text() {
+        let columns = vec![column("value")];
+        let rows = vec![vec![Value::Null], vec![Value::Text(String::new())]];
+        let options = CsvOptions {
+            null_to_empty: false,
+            null_marker: Some("\\N".into()),
+            ..CsvOptions::default()
+        };
+
+        assert_eq!(render_csv(&columns, &rows, &options), "value\n\\N\n\"\"\n");
+    }
+
+    #[test]
+    fn csv_null_marker_skips_values_already_in_the_result() {
+        let rows = vec![vec![Value::Text("\\N".into())], vec![Value::Text("\\NN".into())]];
+
+        assert_eq!(unique_csv_null_marker(&rows), "\\NNN");
     }
 
     #[test]

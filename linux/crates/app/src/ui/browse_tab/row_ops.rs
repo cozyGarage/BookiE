@@ -757,6 +757,7 @@ mod row_identity_tests {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         }
     }
 
