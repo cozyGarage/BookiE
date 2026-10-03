@@ -4647,3 +4647,6 @@ on `enum_shadow_b.items` while `search_path` resolves the colliding
 `enum_shadow_a.status_kind`. The target enum comparisons succeed, the returned
 column retains its qualified native type, and the shadow row remains unchanged.
 See the [direct parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+The same fixture records that `pg_typeof($1)` alongside the enum comparison is
+ambiguous to native `PREPARE` (`42P08`); an explicit qualified parameter cast
+lets the diagnostic query report the target enum type.

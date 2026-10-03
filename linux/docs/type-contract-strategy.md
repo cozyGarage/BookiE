@@ -32,6 +32,10 @@ and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results
 A direct equality, `IN` and `BETWEEN` query with bound text values also resolve
 against the qualified target enum and leave the shadow row untouched; see the
 [query-parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+When `pg_typeof($1)` leaves an enum comparison parameter ambiguous, native
+PostgreSQL preparation returns `42P08`; an explicit qualified enum cast makes
+the parameter type unambiguous. The regression pins both errors and the
+explicit-cast success in that evidence packet.
 
 The PostgreSQL 16 ordinary-enum and domain-over-enum structured filters now
 cover every shared `FilterOp`, including range comparisons, text-pattern
