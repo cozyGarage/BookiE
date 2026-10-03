@@ -1307,4 +1307,35 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
             "operator {operator:?} under shadowed search_path"
         );
     }
+
+    let parameterized = connection
+        .query_params(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM enum_shadow_b.items \
+             WHERE status::enum_shadow_b.status_kind = $1 ORDER BY id",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        parameterized.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("enum_shadow_b.status_kind".into()),
+        ]]
+    );
+
+    let shadow_after = connection
+        .query("SELECT id, status::text, sibling FROM enum_shadow_a.items")
+        .await
+        .unwrap();
+    assert_eq!(
+        shadow_after.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("ready".into()),
+            Value::Text("shadow".into()),
+        ]]
+    );
 }
