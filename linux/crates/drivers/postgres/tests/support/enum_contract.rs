@@ -1308,23 +1308,40 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         );
     }
 
-    let parameterized = connection
-        .query_params(
-            "SELECT id, status::text, pg_typeof(status)::text \
-             FROM enum_shadow_b.items \
-             WHERE status::enum_shadow_b.status_kind = $1 ORDER BY id",
-            &[Value::Text("paused".into())],
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        parameterized.rows,
-        vec![vec![
-            Value::Int(1),
-            Value::Text("paused".into()),
-            Value::Text("enum_shadow_b.status_kind".into()),
-        ]]
-    );
+    for (operator, placeholders, params) in [
+        ("=", "$1", vec![Value::Text("paused".into())]),
+        (
+            "IN",
+            "($1, $2)",
+            vec![Value::Text("ready".into()), Value::Text("paused".into())],
+        ),
+        (
+            "BETWEEN",
+            "$1 AND $2",
+            vec![Value::Text("paused".into()), Value::Text("paused".into())],
+        ),
+    ] {
+        let parameterized = connection
+            .query_params(
+                &format!(
+                    "SELECT id, status::text, pg_typeof(status)::text \
+                     FROM enum_shadow_b.items \
+                     WHERE status::enum_shadow_b.status_kind {operator} {placeholders} ORDER BY id"
+                ),
+                &params,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            parameterized.rows,
+            vec![vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("enum_shadow_b.status_kind".into()),
+            ]],
+            "direct {operator} parameters under shadowed search_path"
+        );
+    }
 
     let shadow_after = connection
         .query("SELECT id, status::text, sibling FROM enum_shadow_a.items")
