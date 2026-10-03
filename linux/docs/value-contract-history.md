@@ -4423,6 +4423,18 @@ domain levels; it does not prove arbitrary depth or other enum/session
 configurations. See the
 [three-level evidence packet](evidence/postgres-three-level-domain-results-2026-10-03/manifest.json).
 
+## PostgreSQL three-level domain query distinctness parameters (2026-10-03)
+
+The three-level fixture now exercises direct `IS DISTINCT FROM` and
+`IS NOT DISTINCT FROM` parameters for text and SQL NULL without an explicit
+parameter cast. `pg_typeof($1)` confirms inference as the qualified leaf enum,
+while `pg_typeof(status)` remains the outer domain. Exact truth tables include
+the literal label `NULL`, empty label, Unicode label and SQL NULL. The focused
+contract and all 10 domain contracts pass, along with Clippy and formatting.
+See the [query-operator evidence](evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
+
+Depths beyond three levels and other enum/session configurations remain open.
+
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
 A SQLite STRICT table can declare `ANY` while storing different runtime kinds

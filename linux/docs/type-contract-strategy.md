@@ -54,6 +54,11 @@ plus [NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-pa
 Other direct query-parameter contexts, session configurations, deeper
 nested-domain depths and other custom/native cases remain open.
 
+The three-level domain chain also covers directly inferred text and SQL NULL
+parameters for both NULL-safe distinctness operators, with `pg_typeof` checks
+for the leaf enum and outer domain. See the
+[three-level query-parameter evidence](evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
+
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
 classes; SQL NULL uses the export's explicit collision-free marker. Untagged

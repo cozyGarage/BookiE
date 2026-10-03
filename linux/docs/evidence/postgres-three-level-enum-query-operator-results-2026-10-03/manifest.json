@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "8770d61538c9d8594052f2791213b20d89ff64f5",
+  "engine": "PostgreSQL 16 via local Docker fixture",
+  "case": "Direct query distinctness parameters on a three-level domain-over-enum column",
+  "change": "Extend the three-level domain chain contract with inferred direct query parameters for IS DISTINCT FROM and IS NOT DISTINCT FROM, using both text labels and SQL NULL.",
+  "contract": [
+    "PostgreSQL infers each bound parameter as the qualified leaf enum without an explicit cast on the parameter.",
+    "The queried column retains its outer three-level domain type.",
+    "All per-row truth values distinguish the literal enum label NULL, an empty label, a Unicode label and SQL NULL."
+  ],
+  "independent_oracle": "PostgreSQL pg_typeof($1), pg_typeof(status) and exact server boolean results for all four fixture rows.",
+  "validation": {
+    "focused_three_level_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_three_level_domain_over_enum_infers_parameters_and_decodes -- --ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "focused.txt"
+    },
+    "domain_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --ignored --test-threads=1",
+      "result": "10 passed",
+      "log": "domain-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "9cbc99cf047417bc7fe31c21209915bce2808b8cf39c00ef7e9d14bf225a8e44",
+    "domain-suite.txt": "2fa2c58c37e0e5d8297a31d61683dc555d702e57101948fd8666512b48ea2d05",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Nested domain chains deeper than three levels and other enum/session configurations remain open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}
