@@ -3,11 +3,13 @@
   "date": "2026-10-03",
   "branch": "linux",
   "base_commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "schema_collision_base_commit": "32aef8fce",
   "working_tree": "Intentional uncommitted sprint changes are part of the tested source; this evidence does not describe a frozen candidate SHA.",
   "scope": [
     "Decode ordinary PostgreSQL custom-enum scalar values as exact text.",
     "Decode ordinary PostgreSQL custom-enum arrays as exact PostgreSQL array text, retaining SQL NULL elements distinctly from the label text.",
     "Preserve ordinary custom-enum labels and SQL NULL through schema-aware keyed grid updates and draft inserts, with native persisted type/value and sibling-row assertions.",
+    "Resolve schema-aware keyed edits against the exact enum type when two schemas contain identically named enum types and tables.",
     "Keep custom-enum catalog metadata internal to ColumnInfo so it does not change the serialized protocol shape.",
     "The literal enum label NULL is preserved on schema-aware keyed writes and draft inserts, on direct scalar/array results, and on text values explicitly cast through bound parameters; it remains distinct from SQL NULL. Vendored SQLx 0.9.0 now preserves quoted NULL labels during text-array metadata decoding.",
     "Schema-aware PostgreSQL enum filters cast text parameters to the catalog-qualified enum type for equality, ordering, BETWEEN and IN operators; literal NULL labels remain distinct from SQL NULL.",
@@ -51,6 +53,13 @@
     {
       "selector": "value_contract_custom_enum_keyed_edit_preserves_label_and_siblings",
       "assertions": "Fetch schema-qualified catalog enum metadata; keyed-update and draft-insert ordinary and literal NULL labels plus SQL NULL; verify native type and exact sibling values."
+    },
+    {
+      "selector": "value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema",
+      "assertions": "Two schemas define status_kind and items. Fetch target-schema metadata, perform one keyed edit, then use pg_typeof and sibling queries to verify the target enum changed and the same-named shadow enum/table stayed unchanged.",
+      "coverage_kind": "PostgreSQL 16 Docker-backed native enum schema-collision regression.",
+      "test_module": "enum_contract",
+      "result": "Focused case passed; all 10 ignored enum_contract integration tests passed; PostgreSQL driver Clippy passed."
     },
     {
       "selector": "postgres_enum_write_casts_quote_catalog_schema_and_type_names",
@@ -219,6 +228,9 @@
   "commands": {
     "focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum -- --include-ignored --test-threads=1",
     "keyed_write_focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_keyed_edit_preserves_label_and_siblings -- --include-ignored --test-threads=1",
+    "schema_shadowed_enum_type": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema -- --ignored --test-threads=1",
+    "schema_shadowed_enum_type_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --ignored --test-threads=1",
+    "schema_shadowed_enum_type_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
     "full_integration": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
     "workspace_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings",
     "app_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
@@ -1165,13 +1177,18 @@
     "linux/crates/core/src/sql_dialect.rs": "c2c494f43cc0dcb73909e3618a0060e5d795dafb8a5b9cd34da45e5928ce625f",
     "linux/crates/core/src/sql_dialect/postgres_enum_tests.rs": "e77fc4c800ff86383bf96aa2311c4e8746718251627f19520a013b68e7b7d8ce",
     "linux/crates/app/tests/support/value_parse.rs": "8214d52ff4345a284cf9f4ccaa3e4b28a138a91053f8d4e2538aa7b8d8029212",
-    "linux/crates/drivers/postgres/src/lib.rs": "2e291e749a1fb5e34964c39dd9107e6da8d1e68bbeb580387397798a245b1753",
+    "linux/crates/drivers/postgres/src/lib.rs": "38610010092ea33d2338c1bd1f7bcea36cc08d7c1fa313d9e5e8b3e3500db5d7",
     "linux/crates/drivers/postgres/src/array.rs": "ea8d630ef5ee5c268381b2b3bd482dd644a53aa2f8e4ccc20bbae6c77e8fa33c",
     "linux/crates/drivers/postgres/tests/support/value_contracts.rs": "ba1d9179ccec64c027cf482e7af72698498cd0148cafa9874ad9606ca7c02ff5",
     "linux/crates/drivers/postgres/tests/integration.rs": "cf00eb8b2dd600f9d61cd68b33b2be607e411ba00cb613b2864e537d98e96881",
     "linux/crates/drivers/postgres/tests/support/array_contract.rs": "723188d7eff6cc146618c1ccfb46429d601280111ab74b8550882d49e6c9f85e",
-    "linux/crates/drivers/postgres/tests/support/enum_contract.rs": "aaf229189adeee0a7f6530b098e3711d28103bd0544abcc41ed51d13562292df",
-    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "e35017d6ec87b90592623718d58b52562fdfe0c2bcd870446a015aff43516053",
+    "linux/crates/drivers/postgres/tests/support/enum_contract.rs": "8f88adeb2784bb08af064947906c5ce8dbc375800a415322358553aab12d37b3",
+    "linux/docs/type-contract-strategy.md": "2bdfadcd9434fc5f605bcab7a39e55a115b55d256c4902f5f76e5c4f0c404aa3",
+    "linux/docs/value-contract-history.md": "8998d8360ab0bffbebab866bccf526653eac6ff8225d94c39a9864b6a70d41b1",
+    "linux/docs/release-audit-2026-10-03.md": "ad4a016fa3bbd32250a1abca248c3a5be1972e0ae4f4d95b98a56a6cbf92ca2f",
+    "linux/docs/b3-test-scenario-survey.md": "53d360b9b5a7492c9954f7f5c1ea6c50915b7c1a84c4d8c7f616c0e036e90244",
+    "linux/docs/ignored-tests.md": "929ddbb6860394b40cdf84ea5f0ba5e2e3e2d1ae5cf69a1264d5a435ae3e20ea",
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "fdc7bcd35a5e413f82296da1fc2d3e50a905485f67a5d0542760115737ab8056",
     "linux/vendor/sqlx-postgres/src/types/array.rs": "f56af1aef5a9120f7db5aa70ec30fbd7743ba3fc39de8b4e498f51b5736e11e9",
     "linux/crates/core/src/filter.rs": "6f9b624c203c11ae260e0cc6445a26ca81516e6a7a13136ac9aa5ea055a22d38",
     "linux/crates/core/src/filter_tests.rs": "e2e9b7b25f2613e106d4e70d8e12a56fd77dfa075f3116111c6fe4f79d48d044",
@@ -1189,7 +1206,7 @@
     "linux/docs/type-contract-strategy.md": "349ef88417a381d1bada0f7633fcb858337a01fa299ca205df030d27e2036ceb",
     "linux/docs/value-contract-history.md": "9d5703ace0cc85782dba06686e1fa58889a739c14bc71bb232451f4b07ae3869",
     "linux/docs/release-audit-2026-10-03.md": "80131d29c35524773fe555d7322e5e3afbb021e2f6cee553c88ee81a53c5c22c",
-    "linux/docs/ignored-tests.md": "b010d93eae21103f6b580f93af37f58ca3e0531cad36f47e4d65bcec5587efa8",
+    "linux/docs/ignored-tests.md": "929ddbb6860394b40cdf84ea5f0ba5e2e3e2d1ae5cf69a1264d5a435ae3e20ea",
     "linux/crates/drivers/postgres/tests/support/enum_file_export_contract.rs": "2731dfaafb2971ff8758349c0ee197cde73bb59e6ff07b41f5dfacba28faba96",
     "linux/crates/core/src/export/markdown.rs": "dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d",
     "linux/CHANGELOG.md": "53502e69132557c8ab351abc54ed2da32b029398603acb95b005d2f75747c849",
@@ -1198,7 +1215,11 @@
     "linux/crates/core/src/export/mod.rs": "22486117c2afdaad0d96072b68e03f9da3ca61ec9afbbcf5352c81af01dedd99",
     "linux/crates/mcp/src/server.rs": "d11da1306df61be8c731255302522d4fb794144655389c47f19cee6d2d7ea5ab",
     "linux/crates/mcp/tests/enforce_policy.rs": "b3462deef8929ab90d0f9e7d64541763dc0ffae9677d19147782145f8d90df71",
-    "linux/docs/value-contracts.md": "57401c2e21a78ddd8437b8e07fc12db877877b2497c2fd48c46f62b2795f756d",
+    "linux/docs/value-contracts.md": "1261bcb5e389822359436320c456a472952f3230c5e0f787c77ec8df40942da8",
+    "linux/docs/type-contract-strategy.md": "2bdfadcd9434fc5f605bcab7a39e55a115b55d256c4902f5f76e5c4f0c404aa3",
+    "linux/docs/value-contract-history.md": "8998d8360ab0bffbebab866bccf526653eac6ff8225d94c39a9864b6a70d41b1",
+    "linux/docs/release-audit-2026-10-03.md": "ad4a016fa3bbd32250a1abca248c3a5be1972e0ae4f4d95b98a56a6cbf92ca2f",
+    "linux/docs/b3-test-scenario-survey.md": "53d360b9b5a7492c9954f7f5c1ea6c50915b7c1a84c4d8c7f616c0e036e90244",
     "linux/docs/b3-review-2026-10-01.md": "c713740c8af5eb7c220e3e76c9a2b9037aa219ccabe6e98c92948ea8006015f2",
     "linux/crates/app/src/ui/export_dialog.rs": "b9a78ddf48bb5c4adc9b2a6fe9b02ab06149f81d15aed7f0512b941ad9881882",
     "linux/crates/app/tests/gtk_safety.py": "2fc45a6be0a17551693590e81415ef7fca2ee705199bb97ae971df9b845ab67c"
@@ -1433,7 +1454,10 @@
     "domain-over-enum-mcp-focused.txt": "9b14527cf73f8c8b9b44e8529f5223b86f381832988abda4c4fd2d33470020f9",
     "domain-over-enum-mcp-suite.txt": "dc32bdc74e681e1c6d6449ac72c36c7be8842ce550e09be6ceb24ca0c6a7d878",
     "domain-over-enum-file-formats-focused.txt": "d8142b9ba490844df12b2a86fddee0830784fd2fa5cf54f664bbc92c9249ea5b",
-    "domain-over-enum-formats-postgres-suite.txt": "4cee3c8c7ac8e1baf32881a5f65872808e99161bc4e0daca52c8cb6203963b12"
+    "domain-over-enum-formats-postgres-suite.txt": "4cee3c8c7ac8e1baf32881a5f65872808e99161bc4e0daca52c8cb6203963b12",
+    "schema-shadowed-type.log": "57e4f0f75fa193917db47368b59cf5bb8bb63c4d5700e5b4f6af9b65937c639b",
+    "schema-shadowed-enum-suite.log": "3c08c294bb7f0bb2bb57cae32935bc6ce6c387a0c8fc4d651ad592291c01f017",
+    "schema-shadowed-enum-clippy.log": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
   },
   "remaining": [
     "Additional PostgreSQL enum format/session combinations remain open. Core spreadsheet-safe CSV is now proven to be presentation-only and lossy on import; raw-text CSV has the native round-trip contract.",

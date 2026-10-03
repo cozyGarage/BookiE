@@ -1053,3 +1053,86 @@ async fn value_contract_custom_enum_keyed_edit_preserves_label_and_siblings() {
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE SCHEMA enum_shadow_a").await.unwrap();
+    connection.execute("CREATE SCHEMA enum_shadow_b").await.unwrap();
+    connection
+        .execute("CREATE TYPE enum_shadow_a.status_kind AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE enum_shadow_b.status_kind AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enum_shadow_a.items (id INT PRIMARY KEY, status enum_shadow_a.status_kind, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enum_shadow_b.items (id INT PRIMARY KEY, status enum_shadow_b.status_kind, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enum_shadow_a.items VALUES (1, 'ready', 'shadow')")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enum_shadow_b.items VALUES (1, 'ready', 'target')")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(Some("enum_shadow_b"), "items").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "enum_shadow_b".into(),
+            name: "status_kind".into(),
+        })
+    );
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_shadow_b"),
+        "items",
+        &columns,
+        &[(1, Value::Text("paused".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_params(&update.0, &update.1).await.unwrap();
+
+    let target = connection
+        .query("SELECT id, status::text, pg_typeof(status)::text, sibling FROM enum_shadow_b.items")
+        .await
+        .unwrap();
+    let shadow = connection
+        .query("SELECT id, status::text, pg_typeof(status)::text, sibling FROM enum_shadow_a.items")
+        .await
+        .unwrap();
+    assert_eq!(
+        target.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("enum_shadow_b.status_kind".into()),
+            Value::Text("target".into()),
+        ]]
+    );
+    assert_eq!(
+        shadow.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("ready".into()),
+            Value::Text("enum_shadow_a.status_kind".into()),
+            Value::Text("shadow".into()),
+        ]]
+    );
+}
