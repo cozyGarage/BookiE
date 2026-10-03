@@ -4510,7 +4510,31 @@ formula-shaped text value. A separate plan-level regression checks ambiguous
 blank and malformed-tag refusal, legacy untagged text behavior and that the
 target remains unchanged when planning refuses. Four core CSV/codec tests and
 the two new app contracts pass alongside the existing three STRICT ANY grid
-contracts. Arbitrary SQLite query exports still report result-column type
-`NULL` for a declared `ANY` column, so they cannot yet select this type-aware
-encoding; installed GTK behavior and other output formats also remain open.
+contracts. At that checkpoint, arbitrary SQLite query exports still reported
+result-column type `NULL` for a declared `ANY` column, so they could not select
+this type-aware encoding; see the follow-up below. Installed GTK behavior and
+other output formats remain open.
 See the [SQLite STRICT ANY CSV evidence](evidence/sqlite-strict-any-csv-results-2026-10-03/manifest.json).
+
+## SQLite STRICT ANY query-result CSV round trip (2026-10-03)
+
+SQLx reports `NULL` for an unrecognized declared type such as SQLite `ANY`,
+even when a query result column comes directly from a table. The SQLite driver
+now uses SQLx's source-column origin to look up that column's declared type with
+`pragma_table_xinfo` on the same connection. Ordinary, bound-parameter and
+transaction queries recover `ANY`; the native test also confirms a computed
+expression does not inherit the source column's type. If the catalog lookup is
+unavailable, the query result remains usable with its original metadata.
+
+The app CSV round trip now exports from `SELECT value FROM source` and uses the
+query result's recovered metadata to write the storage-class tags. Import into a
+separate STRICT `ANY` table preserves INTEGER, REAL, TEXT, BLOB, empty TEXT and
+SQL NULL, verified with native `typeof()` and returned values. The app's five
+focused STRICT ANY contracts, all 44 SQLite driver tests and SQLite driver
+Clippy pass. See the
+[query-result evidence](evidence/sqlite-strict-any-query-csv-results-2026-10-03/manifest.json).
+
+Zero-row results still have no column metadata in the current row-based result
+conversion; computed expressions and attached-schema origins remain untyped
+when SQLx cannot supply a declared type. Other SQLite consumers, output formats
+and installed GTK editing remain open.

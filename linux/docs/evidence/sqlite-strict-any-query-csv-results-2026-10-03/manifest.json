@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "02e646f592b0c1ffffad50a5b7643fc079ff9672",
+  "engine": "SQLite 3.53.4 via libsqlite3-sys pkg-config",
+  "case": "SQLite STRICT ANY direct query result CSV round trip",
+  "previous_gap": "SQLx represented an unrecognized declared ANY result type as NULL, so arbitrary query-result CSV did not activate the tagged storage-class encoding.",
+  "change": "For result columns with SQLx table origins and unknown type metadata, the driver resolves declared type names from pragma_table_xinfo on the same connection. Ambiguous attached-schema origins are left unresolved; computed columns never inherit a source column type.",
+  "contract": [
+    "Direct table-column results expose declared STRICT ANY metadata for ordinary, parameterized and transaction queries.",
+    "App CSV export uses the query result's recovered ANY metadata, then import restores INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL into a separate STRICT ANY table.",
+    "A computed expression does not inherit ANY metadata from its input column.",
+    "The metadata lookup is best-effort and does not change the decoded runtime value."
+  ],
+  "independent_oracle": "Native SQLite typeof(value) and returned Value after importing the query-result CSV into a separate STRICT ANY table.",
+  "validation": {
+    "app_strict_any_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_any_contract -- --test-threads=1",
+      "result": "5 passed",
+      "log": "app-focused.txt"
+    },
+    "sqlite_driver": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "44 passed",
+      "log": "sqlite-driver.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "app-focused.txt": "e1952a7552060a5f81f7b6fb7c30459b9c89ced0f21eb80edcc7a1619367b14d",
+    "sqlite-driver.txt": "297e8acdeded23bcfdf1abefc79b420a1583e39d1ef94f75d753dd141def4cfa",
+    "clippy.txt": "7dc3269cbf154b76d9113d757d020c8ed55de7c6698464c8e7541d04711e8e9e"
+  },
+  "remaining": [
+    "A zero-row SQLite result still has no column metadata in the current row-based result conversion.",
+    "Computed expressions and attached-schema origins remain untyped when SQLx cannot provide a declared type.",
+    "Other SQLite consumers, formats, storage-class/affinity combinations and installed GTK behavior remain open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

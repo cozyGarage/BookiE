@@ -1,0 +1,70 @@
+   Compiling tablepro-driver-sqlite v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/sqlite)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.88s
+     Running unittests src/lib.rs (linux/target/debug/deps/drivers_sqlite-f660bddac85ac240)
+
+running 13 tests
+test tests::driver_metadata ... ok
+test tests::quote_ident_doubles_embedded_quotes ... ok
+test tests::structure_metadata_declarations_match_the_connection_impl ... ok
+test tests::column_named_autoincrement_substring_is_not_flagged ... ok
+test tests::a_value_that_does_not_match_its_declared_column_type_keeps_its_text_instead_of_becoming_null ... ok
+test tests::integer_primary_key_with_default_is_not_auto_increment ... ok
+test tests::composite_primary_key_no_auto_increment ... ok
+test tests::an_expression_column_decodes_by_its_runtime_type ... ok
+test tests::integer_primary_key_no_autoincrement_is_rowid_alias ... ok
+test tests::autoincrement_detected_via_sqlite_sequence ... ok
+test tests::fetch_rows_handles_table_with_embedded_quote ... ok
+test tests::connect_create_and_list_tables ... ok
+test tests::fetch_rows_paginates ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/csv_import.rs (linux/target/debug/deps/csv_import-ef6598a84385795d)
+
+running 7 tests
+test a_scope_cannot_be_spent_on_another_table_of_the_same_database ... ok
+test a_row_the_database_refuses_stops_the_import_and_keeps_what_already_committed ... ok
+test a_cancelled_import_leaves_the_batches_that_already_committed_and_no_more ... ok
+test a_csv_file_loads_into_a_table_that_is_already_there ... ok
+test a_csv_file_creates_the_table_it_is_loaded_into_and_fills_it ... ok
+test csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities ... ok
+test value_contract_csv_binary_export_import_keeps_null_empty_and_every_byte ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/integration.rs (linux/target/debug/deps/integration-cad64fec0084396e)
+
+running 24 tests
+test an_in_memory_database_refuses_a_session ... ok
+test an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digits ... ok
+test direct_query_columns_recover_declared_strict_any_metadata ... ok
+test an_already_cancelled_control_never_reaches_the_database ... ok
+test a_completed_query_is_unaffected_by_the_control ... ok
+test nullable_blob_columns_distinguish_null_empty_and_binary_values ... ok
+test declared_types_preserve_nulls_and_binary_affinity_mismatches ... ok
+test sqlite_columns_report_no_comment ... ok
+test a_foreign_key_to_the_implicit_parent_key_names_the_primary_key_columns ... ok
+test sqlite_real_binding_refuses_negative_zero_and_nan ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test sqlite_real_storage_preserves_float_edge_bits ... ok
+test the_driver_declares_server_side_cancellation ... ok
+test a_session_keeps_temp_tables_and_its_transaction_between_statements ... ok
+test undecodable_parameter_is_rejected_without_writing_null ... ok
+test a_declared_structure_capability_returns_real_catalog_rows ... ok
+test sqlite_numeric_affinity_transitions_survive_bound_edits_and_sql_reimport ... ok
+test fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapply_exactly ... ok
+test a_foreign_key_read_right_after_its_table_is_created_is_listed ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test a_cancelled_session_statement_is_interrupted_and_the_session_stays_usable ... ok
+test a_cancelled_query_is_interrupted_and_the_pool_stays_usable ... ok
+test a_timed_out_write_is_interrupted_and_reports_a_timeout ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
+   Doc-tests drivers_sqlite
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
