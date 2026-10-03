@@ -1,0 +1,2 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixtures: 88 passed (1 suite, 191.80s). Includes the final domain-over-enum CSV contract with exact value/type assertions.

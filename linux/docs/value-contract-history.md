@@ -4279,9 +4279,14 @@ implicit equality between two domain values is unsupported by PostgreSQL and
 is not claimed. Structured equality/IN/IS NULL filters cast the domain column
 and values through the base enum; native results verify exact labels, SQL NULL,
 and the domain type. The catalog metadata also feeds keyed updates and draft
-inserts, with the server verifying the stored domain type. Domain CSV/JSON/file
-exports and nested domain chains remain untested. Exact commands and results
-are in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+inserts, with the server verifying the stored domain type. A raw CSV round-trip
+now exports a domain-over-enum column with an explicit `\\N` NULL marker and
+imports literal `NULL`, empty text, Unicode and SQL NULL into the domain. The
+default blank representation is refused before any target rows are written;
+the imported values and native domain type are checked against the source.
+Domain JSON/file exports, implicit domain parameter inference and nested domain
+chains remain untested. Exact commands and results are in the
+[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ## MongoDB browse metadata and cursor consistency — 2026-10-03
 

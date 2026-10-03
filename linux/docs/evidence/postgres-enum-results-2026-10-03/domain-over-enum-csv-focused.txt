@@ -1,0 +1,3 @@
+Command: rtk cargo test -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type -- --include-ignored --test-threads=1
+PostgreSQL 16 Docker fixture: 1 passed, 87 filtered out (1 suite, 2.11s).
+Raw CSV round-trip preserves literal NULL, empty text, Unicode, SQL NULL and domain type; default ambiguous blanks are refused before writes.

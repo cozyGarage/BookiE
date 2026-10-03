@@ -313,3 +313,103 @@ async fn value_contract_domain_over_enum_filters_preserve_values_and_type() {
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    for sql in [
+        "CREATE SCHEMA value_contract_domain_csv",
+        "CREATE TYPE value_contract_domain_csv.status AS ENUM ('NULL', '', 'ready', '東京')",
+        "CREATE DOMAIN value_contract_domain_csv.status_domain AS value_contract_domain_csv.status",
+        "CREATE TABLE value_contract_domain_csv.source_rows (id INT PRIMARY KEY, label value_contract_domain_csv.status_domain)",
+        "CREATE TABLE value_contract_domain_csv.target_rows (id INT PRIMARY KEY, label value_contract_domain_csv.status_domain)",
+        "INSERT INTO value_contract_domain_csv.source_rows VALUES (1, 'NULL'), (2, ''), (3, 'ready'), (4, '東京'), (5, NULL)",
+    ] {
+        connection.execute(sql).await.unwrap();
+    }
+
+    let source = connection
+        .query("SELECT id, label FROM value_contract_domain_csv.source_rows ORDER BY id")
+        .await
+        .unwrap();
+    let default_csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let default_options = tablepro_core::import::CsvImportOptions::default();
+    let default_sheet = tablepro_core::import::read_csv(default_csv.as_bytes(), &default_options, None).unwrap();
+    let target_columns = connection
+        .fetch_columns(Some("value_contract_domain_csv"), "target_rows")
+        .await
+        .unwrap();
+    assert_eq!(
+        target_columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "value_contract_domain_csv".into(),
+            name: "status".into(),
+        })
+    );
+    let target = tablepro_core::import::ImportTarget {
+        driver_id: "postgres",
+        schema: Some("value_contract_domain_csv"),
+        table: "target_rows",
+        columns: &target_columns,
+        mapping: &[Some(0), Some(1)],
+    };
+    assert!(matches!(
+        tablepro_core::import::build_insert_plan(&target, &default_sheet, &default_options),
+        Err(tablepro_core::import::PlanError::Rows { total: 2, .. })
+    ));
+    let untouched = connection
+        .query("SELECT count(*)::bigint FROM value_contract_domain_csv.target_rows")
+        .await
+        .unwrap();
+    assert_eq!(untouched.rows, vec![vec![Value::Int(0)]]);
+
+    let options = tablepro_core::import::CsvImportOptions {
+        null_marker: "\\N".into(),
+        ..Default::default()
+    };
+    let export_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some("\\N".into()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &export_options);
+    assert_eq!(csv, "id,label\n1,NULL\n2,\"\"\n3,ready\n4,東京\n5,\\N\n");
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &options).unwrap();
+    assert!(
+        plan.statement
+            .contains("$2::text::\"value_contract_domain_csv\".\"status\"")
+    );
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query(
+            "SELECT id, label::text, pg_typeof(label)::text \
+             FROM value_contract_domain_csv.target_rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let domain_type = Value::Text("value_contract_domain_csv.status_domain".into());
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("NULL".into()), domain_type.clone()],
+            vec![Value::Int(2), Value::Text(String::new()), domain_type.clone()],
+            vec![Value::Int(3), Value::Text("ready".into()), domain_type.clone()],
+            vec![Value::Int(4), Value::Text("東京".into()), domain_type],
+            vec![
+                Value::Int(5),
+                Value::Null,
+                Value::Text("value_contract_domain_csv.status_domain".into())
+            ],
+        ]
+    );
+}
