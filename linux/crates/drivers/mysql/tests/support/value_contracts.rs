@@ -573,6 +573,173 @@ async fn mariadb_time_fractional_precision_matrix_respects_round_mode() {
     assert_time_fractional_precision_matrix(&options, "TIME_ROUND_FRACTIONAL", false, true).await;
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_datetime_and_timestamp_fractional_precision_matrix_respects_truncate_mode() {
+    let (_container, options) = start_mysql().await;
+    assert_datetime_and_timestamp_fractional_precision_matrix(&options, "TIME_TRUNCATE_FRACTIONAL", true, false).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_datetime_and_timestamp_fractional_precision_matrix_respects_round_mode() {
+    let (_container, options) = start_mariadb().await;
+    assert_datetime_and_timestamp_fractional_precision_matrix(&options, "TIME_ROUND_FRACTIONAL", false, true).await;
+}
+
+async fn assert_datetime_and_timestamp_fractional_precision_matrix(
+    options: &ConnectOptions,
+    alternate_mode: &str,
+    baseline_rounds: bool,
+    alternate_rounds: bool,
+) {
+    let conn = connect(options.clone()).await;
+    let definitions = (0..=6)
+        .map(|precision| format!("datetime_{precision} DATETIME({precision}) NOT NULL"))
+        .chain((0..=6).map(|precision| format!("timestamp_{precision} TIMESTAMP({precision}) NOT NULL")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    conn.execute(&format!(
+        "CREATE TABLE fractional_temporal_precision_values (id INT PRIMARY KEY, {definitions})"
+    ))
+    .await
+    .unwrap();
+    let columns = conn
+        .fetch_columns(None, "fractional_temporal_precision_values")
+        .await
+        .unwrap();
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled("SET SESSION time_zone = '+00:00'", &[], &control)
+        .await
+        .unwrap();
+
+    let date = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let input_datetime = Value::DateTime(date.and_time(micros_time(3, 4, 5, 789_956)));
+    let input_timestamp = Value::TimestampTz(Utc.from_utc_datetime(&date.and_time(micros_time(3, 4, 5, 789_956))));
+    for (mode, bound_id, literal_id) in [("", 1, 2), (alternate_mode, 3, 4)] {
+        session
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .await
+            .unwrap();
+        for (id, literal) in [(bound_id, false), (literal_id, true)] {
+            let mut row = vec![Value::Int(id)];
+            row.extend((0..=6).map(|_| input_datetime.clone()));
+            row.extend((0..=6).map(|_| input_timestamp.clone()));
+            if literal {
+                let statement = tablepro_core::sql_literal::build_insert_literal(
+                    "mysql",
+                    None,
+                    "fractional_temporal_precision_values",
+                    &columns,
+                    &row,
+                )
+                .unwrap();
+                session
+                    .query_params_controlled(&statement, &[], &control)
+                    .await
+                    .unwrap();
+            } else {
+                let placeholders = (0..row.len()).map(|_| "?").collect::<Vec<_>>().join(", ");
+                session
+                    .query_params_controlled(
+                        &format!("INSERT INTO fractional_temporal_precision_values VALUES ({placeholders})"),
+                        &row,
+                        &control,
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+    }
+
+    let projections = (0..=6)
+        .flat_map(|precision| {
+            [
+                format!("datetime_{precision}"),
+                format!("CAST(datetime_{precision} AS CHAR)"),
+                format!("MICROSECOND(datetime_{precision})"),
+            ]
+        })
+        .chain((0..=6).flat_map(|precision| {
+            [
+                format!("timestamp_{precision}"),
+                format!("CAST(timestamp_{precision} AS CHAR)"),
+                format!("MICROSECOND(timestamp_{precision})"),
+                format!("CAST(UNIX_TIMESTAMP(timestamp_{precision}) * 1000000 AS SIGNED)"),
+            ]
+        }))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let result = session
+        .query_params_controlled(
+            &format!("SELECT id, {projections} FROM fractional_temporal_precision_values ORDER BY id"),
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let expected_row = |id, rounds| {
+        let mut row = vec![Value::Int(id)];
+        for precision in 0..=6 {
+            row.extend(expected_fractional_datetime(precision, rounds, false));
+        }
+        for precision in 0..=6 {
+            row.extend(expected_fractional_datetime(precision, rounds, true));
+        }
+        row
+    };
+    assert_eq!(
+        result.rows,
+        vec![
+            expected_row(1, baseline_rounds),
+            expected_row(2, baseline_rounds),
+            expected_row(3, alternate_rounds),
+            expected_row(4, alternate_rounds),
+        ]
+    );
+    session.close().await.unwrap();
+}
+
+fn expected_fractional_datetime(precision: u32, rounds: bool, timestamp: bool) -> Vec<Value> {
+    let input_micros = i64::from((3 * 60 + 4) * 60 + 5) * 1_000_000 + 789_956;
+    let quantum = 10_i64.pow(6 - precision);
+    let stored_micros = if rounds {
+        (input_micros + quantum / 2) / quantum * quantum
+    } else {
+        input_micros / quantum * quantum
+    };
+    let seconds = (stored_micros / 1_000_000) as u32;
+    let microseconds = (stored_micros % 1_000_000) as u32;
+    let date = NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
+    let value = date
+        .and_hms_micro_opt(seconds / 3600, seconds / 60 % 60, seconds % 60, microseconds)
+        .unwrap();
+    let rendered = if precision == 0 {
+        value.format("%Y-%m-%d %H:%M:%S").to_string()
+    } else {
+        format!(
+            "{}.{}",
+            value.format("%Y-%m-%d %H:%M:%S"),
+            microseconds / quantum as u32
+        )
+    };
+    let mut expected = vec![
+        if timestamp {
+            Value::TimestampTz(Utc.from_utc_datetime(&value))
+        } else {
+            Value::DateTime(value)
+        },
+        Value::Text(rendered),
+        Value::Int(i64::from(microseconds)),
+    ];
+    if timestamp {
+        expected.push(Value::Int(Utc.from_utc_datetime(&value).timestamp_micros()));
+    }
+    expected
+}
+
 async fn assert_time_fractional_precision_matrix(
     options: &ConnectOptions,
     alternate_mode: &str,
