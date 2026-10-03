@@ -1,0 +1,10 @@
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.45s
+     Running tests/integration.rs (linux/target/debug/deps/integration-245109a29f7e15d5)
+
+running 2 tests
+test value_contracts::mariadb_time_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mysql_time_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 16.87s
+

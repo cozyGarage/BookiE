@@ -2892,6 +2892,15 @@ and [MariaDB SQL mode reference](https://mariadb.com/docs/server/server-manageme
 Other temporal types, precisions, consumers and installed typed edits remain
 open.
 
+### MySQL/MariaDB exact-half fractional TIME boundary (2026-10-04)
+
+The native cases insert `12:34:56.789500` into `TIME(3)`, exactly halfway
+between `.789` and `.790`. MySQL rounds to `.790` with
+`TIME_TRUNCATE_FRACTIONAL` absent and truncates to `.789` with that mode set;
+MariaDB truncates to `.789` with `TIME_ROUND_FRACTIONAL` absent and rounds to
+`.790` with it set. Both bound and generated-literal paths assert the returned
+time, cast text and native `MICROSECOND()` value. See the [native evidence](evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json).
+
 ### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
 
 The paired Docker cases apply the same mode matrix to a `DATETIME(3)`

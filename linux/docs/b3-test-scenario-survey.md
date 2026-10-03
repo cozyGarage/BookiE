@@ -126,7 +126,10 @@ round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and
 rounds when enabled. Bound and generated-literal writes are checked against
 native stored values; the TIMESTAMP cases also pin UTC session/epoch semantics.
-Other temporal precisions and consumer paths remain open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+An exact `TIME(3)` half-millisecond case confirms the `.789500` tie rounds to
+`.790` or truncates to `.789` according to each engine's mode. Other temporal
+precisions and consumer paths remain open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+[exact-half evidence](evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json),
 [DATETIME evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json)
 and [TIMESTAMP evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
