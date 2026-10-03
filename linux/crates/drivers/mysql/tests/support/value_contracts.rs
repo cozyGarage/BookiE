@@ -323,6 +323,48 @@ async fn mariadb_time_fractional_storage_respects_round_mode_for_binds_and_liter
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_time_fractional_half_millisecond_boundary_respects_truncate_mode() {
+    let (_container, options) = start_mysql().await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIME(3)",
+        "TIME_TRUNCATE_FRACTIONAL",
+        Value::Time(micros_time(12, 34, 56, 789_500)),
+        790_000,
+        789_000,
+        |microseconds| {
+            (
+                Value::Time(micros_time(12, 34, 56, microseconds)),
+                format!("12:34:56.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_time_fractional_half_millisecond_boundary_respects_round_mode() {
+    let (_container, options) = start_mariadb().await;
+    assert_fractional_storage_mode_for_binds_and_literals(
+        &options,
+        "TIME(3)",
+        "TIME_ROUND_FRACTIONAL",
+        Value::Time(micros_time(12, 34, 56, 789_500)),
+        789_000,
+        790_000,
+        |microseconds| {
+            (
+                Value::Time(micros_time(12, 34, 56, microseconds)),
+                format!("12:34:56.{:03}", microseconds / 1_000),
+            )
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn mysql_datetime_fractional_storage_respects_truncate_mode_for_binds_and_literals() {
     let (_container, options) = start_mysql().await;
     assert_fractional_storage_mode_for_binds_and_literals(
