@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "9d16a9cd8a06d93dd5ba090f0c7f89841a50c64e",
+  "engine": "SQLite via local in-memory fixture",
+  "case": "Computed expression metadata over STRICT ANY",
+  "change": "Extend the direct-query metadata contract with a mixed CASE expression over a STRICT ANY column across ordinary, bound, empty-result and transaction query paths.",
+  "contract": [
+    "A computed expression does not inherit the source column's declared ANY metadata; the result column keeps SQLx's NULL fallback metadata.",
+    "Per-row integer, SQL NULL and text values remain distinct in the returned Value cells.",
+    "SQLite typeof() independently reports integer, null and text for those computed-expression results.",
+    "Bound queries return the same values, and zero-row query/transaction results preserve fallback metadata without inventing rows.",
+    "Direct table-column queries continue to recover declared ANY metadata in ordinary, bound and transaction queries."
+  ],
+  "validation": {
+    "focused_case": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration direct_query_columns_recover_declared_strict_any_metadata",
+      "result": "1 passed",
+      "log": "focused.txt"
+    },
+    "sqlite_integration_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration",
+      "result": "25 passed",
+      "log": "sqlite-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "6212a3de9a2acb1cfa75771e7355fdb55e6e26747369a6a8953a68f14611fc93",
+    "sqlite-suite.txt": "1e6b9aaf338fcb8c7bfca55569fbee9666e0756c1b0f8ae3fbdaa40d504fff65",
+    "clippy.txt": "f61d810162b134b17693bfa0a75dcfaab88ee4ba8264950208a6ba17f758d49d",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Only one mixed CASE expression shape is covered; other computed expressions and consumer combinations remain open.",
+    "This test verifies query result semantics, not grid editing or installed GTK behavior."
+  ]
+}

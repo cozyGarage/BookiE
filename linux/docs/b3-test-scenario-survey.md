@@ -107,14 +107,19 @@ October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.
 Ambiguous blanks and malformed reserved tags are refused. Empty query results
-retain their declared `ANY` metadata and CSV header. Computed expressions,
-ambiguous attached-schema origins, other formats and installed editing remain open; see
+retain their declared `ANY` metadata and CSV header; other expression shapes,
+formats and installed editing remain open. See
 the
 [table CSV case](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)
 and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03),
 with [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
+
+October 4 B3-4 follow-up: one mixed computed `CASE` expression over STRICT
+`ANY` keeps fallback metadata while native `typeof()` proves per-row
+INTEGER/NULL/TEXT classes; other expression shapes remain open. See the
+[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
-colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json).
+colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
 cover all 17 shared structured-filter operators, including text-pattern

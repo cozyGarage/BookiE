@@ -4583,9 +4583,12 @@ INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL with native `typeof()` proof.
 The focused SQLite driver case, all 45 driver tests, five app STRICT ANY
 contracts, Clippy, formatting and diff checks pass. See the
 [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
-Computed expressions without a reportable declared type and ambiguous
-attached-schema origins remain unresolved; other formats, storage-class combinations and
-installed GTK editing remain open.
+One mixed computed `CASE` expression now has a native `typeof()` contract: the
+result keeps SQLx's `NULL` fallback metadata rather than inheriting `ANY`, while
+per-row INTEGER, NULL and TEXT values remain exact. See the October 4
+[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
+Other computed expressions, formats, storage-class combinations and installed
+GTK editing remain open. Attached-schema ambiguity is covered separately below.
 
 ## SQLite attached-schema query origins (2026-10-03)
 
@@ -4601,6 +4604,21 @@ contracts pass, along with Clippy, formatting and diff checks. See the
 
 Other affinity/storage-class combinations, formats and installed GTK editing
 remain open.
+
+## SQLite computed expression over STRICT ANY (2026-10-04)
+
+A mixed `CASE` expression over a STRICT `ANY` column returns an integer, SQL
+NULL and text on separate rows. The driver leaves expression metadata at its
+SQLx fallback `NULL` instead of claiming the input column's declared `ANY`
+type; SQLite `typeof()` independently confirms `integer`, `null` and `text` for
+the respective results. A bound query produces the same rows, while zero-row
+query and transaction results preserve the unknown expression metadata without
+inventing rows. The existing direct-column checks continue to recover `ANY`
+for regular, bound and transaction queries. The focused case and all 25 SQLite
+integration tests pass, along with strict Clippy and formatting. See the
+[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
+
+Other computed-expression shapes and installed consumer paths remain open.
 
 ## PostgreSQL enum structured-filter operator matrix (2026-10-03)
 

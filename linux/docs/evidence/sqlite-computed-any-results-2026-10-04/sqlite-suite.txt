@@ -1,0 +1,36 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running tests/integration.rs (linux/target/debug/deps/integration-cad64fec0084396e)
+
+running 25 tests
+test an_in_memory_database_refuses_a_session ... ok
+test an_auto_decimal_parameter_binds_as_real_unless_only_text_keeps_its_digits ... ok
+test direct_query_columns_resolve_unambiguous_attached_any_origins ... ok
+test direct_query_columns_recover_declared_strict_any_metadata ... ok
+test a_completed_query_is_unaffected_by_the_control ... ok
+test an_already_cancelled_control_never_reaches_the_database ... ok
+test declared_types_preserve_nulls_and_binary_affinity_mismatches ... ok
+test sqlite_columns_report_no_comment ... ok
+test the_driver_declares_server_side_cancellation ... ok
+test sqlite_real_binding_refuses_negative_zero_and_nan ... ok
+test nullable_blob_columns_distinguish_null_empty_and_binary_values ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test sqlite_real_storage_preserves_float_edge_bits ... ok
+test undecodable_parameter_is_rejected_without_writing_null ... ok
+test a_session_keeps_temp_tables_and_its_transaction_between_statements ... ok
+test a_foreign_key_to_the_implicit_parent_key_names_the_primary_key_columns ... ok
+test a_declared_structure_capability_returns_real_catalog_rows ... ok
+test fetched_defaults_keep_no_default_null_empty_and_literal_apart_and_reapply_exactly ... ok
+test sqlite_numeric_affinity_transitions_survive_bound_edits_and_sql_reimport ... ok
+test a_foreign_key_read_right_after_its_table_is_created_is_listed ... ok
+test grid_row_edits_find_rows_by_uuid_composite_and_wide_bigint_keys ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test a_cancelled_session_statement_is_interrupted_and_the_session_stays_usable ... ok
+test a_cancelled_query_is_interrupted_and_the_pool_stays_usable ... ok
+test a_timed_out_write_is_interrupted_and_reports_a_timeout ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s
+
