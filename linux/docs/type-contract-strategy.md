@@ -24,10 +24,11 @@ source/SHA attribution; this summary does not certify the current tree.
 | Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases | One missing format/type/configuration boundary, native kind after writes and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
-The ordinary custom-enum shadow-schema case now also checks a structured `=`
-filter on `enum_shadow_b.items` while `search_path` resolves the same enum name
-in `enum_shadow_a`; native target type/value checks pass. See the
-[focused evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
+The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and
+`BETWEEN` filters on `enum_shadow_b.items` while `search_path` resolves the same
+enum name in `enum_shadow_a`; native target type/value checks pass. See the
+[initial equality evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json)
+and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
 
 The PostgreSQL 16 ordinary-enum and domain-over-enum structured filters now
 cover every shared `FilterOp`, including range comparisons, text-pattern

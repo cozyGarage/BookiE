@@ -4582,3 +4582,15 @@ and diff checks. See the
 [list-parameter evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
 
 Other direct query contexts and session/search_path combinations remain open.
+
+## PostgreSQL schema-shadowed enum list and range filters (2026-10-03)
+
+The same-named enum fixture now checks structured `IN` and `BETWEEN` filters on
+`enum_shadow_b.items` with the connection's `search_path` pointed at
+`enum_shadow_a`. Every placeholder is built from schema-aware enum metadata;
+native type and target/shadow row assertions confirm the operators do not
+resolve through the colliding shadow type. The focused PostgreSQL 16 contract,
+all 10 enum contracts, Clippy, formatting and diff checks pass. See the
+[shadowed-filter matrix evidence](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
+
+The other session/search_path and operator combinations remain open.

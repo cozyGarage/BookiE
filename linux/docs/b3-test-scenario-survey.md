@@ -123,10 +123,11 @@ The direct query parameter contract checks base-enum-cast `=`, `<>`, `<`,
 See the [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
 and [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
 and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
-The same-named enum schema case now applies a structured equality filter under
-the shadowed `search_path` and confirms the filter remains bound to the target
-schema's native type; see the
-[focused evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
+The same-named enum schema case applies structured equality, `IN` and `BETWEEN`
+filters under the shadowed `search_path` and confirms they remain bound to the
+target schema's native type; see the
+[initial equality evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json)
+and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 

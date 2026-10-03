@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "1bef7dae08adde71b42b085763964dc5878e9606",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Qualified enum filters under a same-named search_path collision",
+  "added_coverage": [
+    "With search_path resolving enum_shadow_a.status_kind, structured IN and BETWEEN filters on enum_shadow_b.items bind to enum_shadow_b.status_kind.",
+    "The existing keyed update and equality filter remain in the same fixture; both schemas contain same-named status_kind and items objects.",
+    "Native type and row assertions confirm the target schema value is selected and the shadow row remains unchanged."
+  ],
+  "independent_oracle": "PostgreSQL current_schema(), pg_typeof(status)::text and exact rows from both colliding schemas.",
+  "validation": {
+    "focused_shadowed_filter": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "shadowed-filter.txt"
+    },
+    "enum_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "enum-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "shadowed-filter.txt": "f2600435a6b1d7f635c5ddd40ad85e46f932e026764e73080fb96b8c2ac0590a",
+    "enum-suite.txt": "6b5d9af371d5bafc0c8a560884e83cc5355d6a41711bd26b21c3aa19219c3614",
+    "clippy.txt": "a3f66266dc30cee1081fdcbf4685d0d30ebc43cdcce14d0a3c4c8227a9350810"
+  },
+  "remaining": [
+    "Other session/search_path configurations and combinations with the rest of the enum/operator matrix remain open.",
+    "This case does not close the PostgreSQL enum matrix or B3."
+  ]
+}
