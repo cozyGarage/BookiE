@@ -1,0 +1,23 @@
+
+running 1 test
+test mysql_transaction_queries_are_bounded_and_mark_truncation ... FAILED
+
+failures:
+
+---- mysql_transaction_queries_are_bounded_and_mark_truncation stdout ----
+
+thread 'mysql_transaction_queries_are_bounded_and_mark_truncation' (1717709) panicked at crates/drivers/mysql/tests/integration.rs:632:5:
+assertion `left == right` failed
+  left: 1000001
+ right: 1000000
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mysql_transaction_queries_are_bounded_and_mark_truncation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 37 filtered out; finished in 14.20s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/integration.rs (linux/target/debug/deps/integration-f930fc681b3eb54b)
+error: test failed, to rerun pass `-p tablepro-driver-mysql --test integration`

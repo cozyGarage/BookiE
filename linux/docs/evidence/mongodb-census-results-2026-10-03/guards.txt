@@ -1,0 +1,6 @@
+file-size: ok (soft>1200 requires baseline, hard>1800)
+function sizes within limits
+panic-sites: ok (no new unwrap/expect/panic!/todo!/unimplemented!/unreachable! in production code)
+bounded-operations: ok (every GUI and MCP database call carries an OperationControl)
+ignored-test inventory and isolated registrations: OK
+

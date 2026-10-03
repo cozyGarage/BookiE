@@ -14,6 +14,24 @@ fn gui_guard(connection: Arc<dyn Connection>, audit: Arc<SequenceAuditSink>, sta
     )
 }
 
+#[test]
+fn rollback_failure_is_audited_as_an_unknown_transaction_outcome() {
+    let error = DriverError::TransactionRollbackFailed {
+        statement_index: 1,
+        source: Box::new(DriverError::Query {
+            message: "statement failed".into(),
+            sqlstate: None,
+        }),
+        rollback_error: Box::new(DriverError::Disconnected),
+    };
+
+    assert_eq!(
+        super::super::transaction_error_outcome(&error),
+        (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true)
+    );
+    assert_eq!(super::super::error_category(&error), AuditErrorCategory::Unknown);
+}
+
 #[tokio::test]
 async fn post_execution_audit_failure_poisons_shared_state() {
     let executes = Arc::new(AtomicUsize::new(0));

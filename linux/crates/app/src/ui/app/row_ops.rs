@@ -81,9 +81,14 @@ impl App {
                             // showing the error dialog. The user sees
                             // the row in question without scanning the
                             // whole grid.
-                            if let DriverError::Transaction { statement_index, .. } = &e
-                                && let Some(source) = sources.get(*statement_index).cloned()
-                            {
+                            let failed_statement = match &e {
+                                DriverError::Transaction { statement_index, .. }
+                                | DriverError::TransactionRollbackFailed { statement_index, .. } => {
+                                    Some(*statement_index)
+                                }
+                                _ => None,
+                            };
+                            if let Some(source) = failed_statement.and_then(|index| sources.get(index).cloned()) {
                                 sender_for_cmd.input(AppMsg::FlashErrorRowForTab(tab_id, source));
                             }
                             let msg = error_text::driver_message(&e);

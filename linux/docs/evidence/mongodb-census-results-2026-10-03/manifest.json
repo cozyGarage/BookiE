@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "base_commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "Intentional uncommitted sprint state; this is local evidence, not a frozen release candidate.",
+  "scope": [
+    "MongoDB browse fetch_rows derives collection type metadata and retains requested page rows from one cursor.",
+    "A MongoDB 7 failpoint changes an off-page field before it is read; later type changes in the same cursor are detected and mixed values remain read-only.",
+    "A failpoint mutation after the cursor has already read a document demonstrates best-effort, non-snapshot behavior.",
+    "The shell run_find path performs a separate census and filtered query, merges types from returned rows, and CSV/JSON export preserves materialized Extended JSON values.",
+    "A diagnostic run measures census elapsed time for 1,000 and 10,000 documents with a 50-row page."
+  ],
+  "limits": [
+    "MongoDB scans do not provide snapshot isolation or optimistic conflict detection; a write may overwrite a concurrent change.",
+    "run_find cannot observe type changes to documents outside its returned page after its census.",
+    "Timings are one sample on this local container and are diagnostic only, with no pass/fail threshold.",
+    "The app-server result does not establish installed GTK or release-candidate acceptance."
+  ],
+  "regressions": [
+    {
+      "selector": "value_contract_mongodb_off_page_type_change_during_census_refuses_edit",
+      "test_module": "ui::browse_tab::tests",
+      "assertions": "MongoDB 7 failCommand blocks getMore; a native update changes off-page _id 149 to Decimal128 before the cursor reads it. Assert mixed metadata, canonical kind-preserving values for already-read rows, read-only editing, and native changed/sibling BSON postconditions.",
+      "focused_result": "1 passed; output off-page-during-cursor-after-fix.txt"
+    },
+    {
+      "selector": "value_contract_mongodb_browse_uses_one_find_for_schema_and_page",
+      "test_module": "ui::browse_tab::tests",
+      "assertions": "MongoDB 7 failCommand skips the metadata find and blocks a second find. Assert the browse operation completes without that second find and returns the requested row and type metadata.",
+      "before_fix": "The prior two-command regression reproduced stale string metadata after an off-page mutation; output off-page-before-fix.txt.",
+      "focused_result": "1 passed; output one-find-after-fix.txt"
+    },
+    {
+      "selector": "value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents",
+      "test_module": "ui::browse_tab::tests",
+      "assertions": "MongoDB 7 failpoint blocks getMore after _id 0 has been read; a native update changes String to Decimal128. Assert the page retains stale String metadata/value while native storage has Decimal128, explicitly documenting the non-snapshot boundary.",
+      "focused_result": "Passed in the app-server layer."
+    },
+    {
+      "selector": "value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values",
+      "test_module": "ui::browse_tab::tests",
+      "assertions": "MongoDB 7 failpoint blocks run_find after its collection census; a selected row changes to Decimal128. Assert returned columns become mixed, the row retains canonical Decimal128 Extended JSON, and CSV/JSON exports preserve that marker.",
+      "focused_result": "Passed in the app-server layer."
+    },
+    {
+      "selector": "value_contract_mongodb_census_scan_cost_profile",
+      "test_module": "drivers_mongodb::census_cost",
+      "assertions": "Seed 1,000 and 10,000 documents, request a 50-row page, and report one elapsed full-census sample per collection without asserting timing.",
+      "focused_result": "Passed; 1,000 rows: 6 ms; 10,000 rows: 51 ms."
+    }
+  ],
+  "commands": {
+    "off_page_during_cursor": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_off_page_type_change_during_census_refuses_edit -- --include-ignored --test-threads=1",
+    "single_find": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_browse_uses_one_find_for_schema_and_page -- --include-ignored --test-threads=1",
+    "app_server_layer": "rtk python3 linux/scripts/run-test-layer.py app-server",
+    "app_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+    "guards": "file size; function size; panic sites; bounded operations; cargo fmt --check; ignored-test inventory --check; git diff --check",
+    "census_cost_profile": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mongodb --test integration value_contract_mongodb_census_scan_cost_profile -- --include-ignored --test-threads=1 --nocapture",
+    "app_driver_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app -p tablepro-driver-mongodb --all-targets -- -D warnings"
+  },
+  "validation": {
+    "focused": {
+      "status": "passed",
+      "result": "Both focused Docker selectors passed, one test each.",
+      "outputs": [
+        "off-page-during-cursor-after-fix.txt",
+        "one-find-after-fix.txt"
+      ]
+    },
+    "app_server_layer": {
+      "status": "passed",
+      "result": "14 registered Docker-backed app-server tests passed, including the already-read write, run_find and export consistency cases.",
+      "report": "../../../target/quality/20261003T151349225885Z-layers/report.json",
+      "output": "../../../target/quality/20261003T151349225885Z-layers/app-server-1.log"
+    },
+    "app_clippy": {
+      "status": "passed",
+      "result": "No issues found.",
+      "output": "app-clippy-after-fix.txt"
+    },
+    "guards": {
+      "status": "passed",
+      "result": "Structural guards, formatting, ignored-test inventory and diff check passed.",
+      "output": "guards-after-fix.txt"
+    },
+    "census_cost_profile": {
+      "status": "passed",
+      "result": "MongoDB 7 local container: 1,000 docs + 50-row page = 6 ms; 10,000 docs + 50-row page = 51 ms. Diagnostic single samples only.",
+      "output": "census-cost-profile.txt"
+    },
+    "app_driver_clippy": {
+      "status": "passed",
+      "result": "No warnings; -D warnings.",
+      "output": "app-driver-clippy.txt"
+    }
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/app/src/ui/browse_tab/tests.rs": "800465cb0813612a2a10f04363cb372d3565610df984ea96b4c001dc0736f65a",
+    "linux/crates/drivers/mongodb/src/codec.rs": "33db82f7df0a2e47f92863915c70829364a7d5ee3a271b7c7ad7f147e9eae444",
+    "linux/crates/drivers/mongodb/src/lib.rs": "676351c062aead92b2296cf5f54e53320fe5e6c6e615f6cba63b33e2b40bb397",
+    "linux/crates/drivers/mongodb/tests/integration.rs": "e1495b5db4f6897744833d2ba58e5a057ad52a23f0bbde3483140afa8257a1cb",
+    "linux/crates/drivers/mongodb/tests/support/census_cost.rs": "e5bac4636d29e22dad7f7c26bea6636a90205df209f33241e1154098300cd81c",
+    "linux/scripts/isolated-tests.json": "fa4bcb1ca537e12f8b71b75dacc5a68d3f7912450b9becb189d53bf7fe99029b",
+    "linux/docs/mongodb-consistency-2026-10-03.md": "7d2d61dfa96906989dfe627dcfeb45ff5f779ad609f6c1ac6043832ad02f2ff0"
+  },
+  "retained_evidence_sha256": {
+    "off-page-before-fix.txt": "0dc8fc146b023f4d882751f7c5091672ce1936846afa3fde05f71771f1faf45b",
+    "off-page-during-cursor-after-fix.txt": "e39d061b02eed227a5739df71c90831e262a15d1e9727b6a6028aa8c49474fd4",
+    "one-find-after-fix.txt": "6c2d0f6ccb8f704efb7fec0146c8eced5f5417d95018e5c7905573c24ae64f42",
+    "app-server-1-after-fix.log": "9146c0d7ec2e707884ecf6a50970e40050bdafe52f2fefe7ce953fa87f48780f",
+    "app-server-report-after-fix.json": "f628a3995c3250a021e5b4e7c3b6d0728aa0b424877609c98091c608e039793a",
+    "app-clippy-after-fix.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "guards-after-fix.txt": "14c1556ea9a3b77a846954e9fc4aaa7dbd196ff647829e363945de56108524fa",
+    "census-cost-profile.txt": "6cab7c2e9da9b67a59c42ab3d5d5d8398e198830c12795ad4aa47f38f3e55d73",
+    "app-driver-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+  },
+  "completed_utc": "2026-10-03T15:19:27Z",
+  "read_consistency_contract": "../../mongodb-consistency-2026-10-03.md"
+}

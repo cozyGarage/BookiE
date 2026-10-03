@@ -16,6 +16,9 @@ use testcontainers_modules::testcontainers::runners::AsyncRunner;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
+#[path = "shared/mysql_atomic.rs"]
+mod mysql_atomic;
+
 #[path = "../../shared/connect_refusal.rs"]
 mod connect_refusal;
 

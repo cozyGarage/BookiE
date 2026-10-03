@@ -799,6 +799,7 @@ fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
         | DriverError::Internal(_)
         | DriverError::OperationOutcomeUnknown { .. } => true,
         DriverError::Transaction { source, .. } => is_ambiguous_post_dispatch(source),
+        DriverError::TransactionRollbackFailed { .. } => true,
         DriverError::Query { .. }
         | DriverError::ReadOnly
         | DriverError::PolicyDenied(_)
@@ -822,6 +823,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::TimedOut => AuditErrorCategory::Timeout,
         DriverError::OperationOutcomeUnknown { .. } => AuditErrorCategory::Unknown,
         DriverError::Transaction { .. } => AuditErrorCategory::Transaction,
+        DriverError::TransactionRollbackFailed { .. } => AuditErrorCategory::Unknown,
     }
 }
 

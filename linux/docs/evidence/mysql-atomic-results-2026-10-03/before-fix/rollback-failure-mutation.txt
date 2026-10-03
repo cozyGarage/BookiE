@@ -1,0 +1,9 @@
+---- a_lost_connection_during_a_batch_reports_rollback_failure stdout ----
+
+thread 'a_lost_connection_during_a_batch_reports_rollback_failure' (1734825) panicked at crates/drivers/mysql/tests/integration.rs:806:5:
+rollback failure must be reported separately, got Transaction { statement_index: 0, source: Disconnected }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 39 filtered out; finished in 10.31s
+[full output: ~/.local/share/rtk/tee/1790990333_cargo_test.log]

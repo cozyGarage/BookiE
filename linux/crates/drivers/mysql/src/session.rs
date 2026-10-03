@@ -74,7 +74,7 @@ impl tablepro_core::Session for MysqlSession {
             }
         };
         let mut result = run_server_cancellable(
-            params_into_result(&mut *connection, sql, params, MAX_QUERY_ROWS),
+            params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS),
             request_cancellation(&self.cancellation_pool, self.connection_id),
             confirms_cancellation,
             control,

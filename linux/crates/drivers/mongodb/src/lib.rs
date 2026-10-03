@@ -7,7 +7,9 @@ mod shell;
 mod update;
 
 use async_trait::async_trait;
-use codec::{columns_from_docs, document_to_row, merge_page_types, observe_bson_type, serde_json_to_document};
+use codec::{
+    columns_from_docs, columns_from_types, document_to_row, merge_page_types, observe_bson_type, serde_json_to_document,
+};
 use error::{map_mongo_connect_error, map_mongo_error};
 use futures::TryStreamExt;
 use mongodb::bson::{Document, doc};
@@ -152,6 +154,35 @@ impl MongodbConnection {
     fn db(&self) -> Database {
         self.client.database(&self.database_name)
     }
+
+    async fn columns_and_page(
+        &self,
+        table: &str,
+        page: Option<(u64, u64)>,
+    ) -> Result<(Vec<ColumnInfo>, Vec<Document>), DriverError> {
+        let coll = self.db().collection::<Document>(table);
+        let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
+        let mut types = BTreeMap::new();
+        let mut page_docs = Vec::new();
+        let page_end = page.map(|(offset, limit)| offset.saturating_add(limit));
+        let mut position = 0u64;
+        while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
+            for (key, value) in &doc {
+                observe_bson_type(&mut types, key, value);
+            }
+            if let (Some((offset, _)), Some(end)) = (page, page_end)
+                && position >= offset
+                && position < end
+            {
+                page_docs.push(doc);
+            }
+            position = position.saturating_add(1);
+        }
+        if !types.contains_key("_id") {
+            types.insert("_id".into(), "ObjectId".into());
+        }
+        Ok((columns_from_types(types), page_docs))
+    }
 }
 
 #[async_trait]
@@ -170,46 +201,7 @@ impl Connection for MongodbConnection {
     }
 
     async fn fetch_columns(&self, _schema: Option<&str>, table: &str) -> Result<Vec<ColumnInfo>, DriverError> {
-        let coll = self.db().collection::<Document>(table);
-        // ponytail: exact schema costs one collection scan per page; cache metadata if browse latency warrants it.
-        let mut cursor = coll.find(doc! {}).await.map_err(map_mongo_error)?;
-        let mut union: BTreeMap<String, String> = BTreeMap::new();
-        while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            for (key, value) in doc {
-                observe_bson_type(&mut union, &key, &value);
-            }
-        }
-        if !union.contains_key("_id") {
-            union.insert("_id".into(), "ObjectId".into());
-        }
-        let mut columns: Vec<ColumnInfo> = Vec::with_capacity(union.len());
-        if let Some(ty) = union.remove("_id") {
-            columns.push(ColumnInfo {
-                name: "_id".into(),
-                data_type: ty,
-                nullable: false,
-                primary_key: true,
-                is_auto_increment: false,
-                default_value: None,
-                is_generated: false,
-                comment: None,
-                collation: None,
-            });
-        }
-        for (name, data_type) in union {
-            columns.push(ColumnInfo {
-                name,
-                data_type,
-                nullable: true,
-                primary_key: false,
-                is_auto_increment: false,
-                default_value: None,
-                is_generated: false,
-                comment: None,
-                collation: None,
-            });
-        }
-        Ok(columns)
+        self.columns_and_page(table, None).await.map(|(columns, _)| columns)
     }
 
     async fn fetch_rows(
@@ -219,19 +211,7 @@ impl Connection for MongodbConnection {
         offset: u64,
         limit: u64,
     ) -> Result<QueryResult, DriverError> {
-        let mut columns = self.fetch_columns(None, table).await?;
-        let coll = self.db().collection::<Document>(table);
-        let mut cursor = coll
-            .find(doc! {})
-            .skip(offset)
-            .limit(limit as i64)
-            .await
-            .map_err(map_mongo_error)?;
-        let mut docs = Vec::new();
-        while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            docs.push(doc);
-        }
-        merge_page_types(&mut columns, &docs);
+        let (columns, docs) = self.columns_and_page(table, Some((offset, limit))).await?;
         let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
         Ok(QueryResult {
             columns,

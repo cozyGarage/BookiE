@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "M linux/CHANGELOG.md\n M linux/Cargo.lock\n M linux/crates/app/src/ui/app/row_ops.rs\n M linux/crates/app/src/ui/error_text.rs\n M linux/crates/core/src/connection.rs\n M linux/crates/core/src/error.rs\n M linux/crates/drivers/mysql/Cargo.toml\n M linux/crates/drivers/mysql/src/lib.rs\n M linux/crates/drivers/mysql/src/session.rs\n M linux/crates/drivers/mysql/tests/integration.rs\n M linux/crates/drivers/postgres/src/lib.rs\n M linux/crates/drivers/postgres/tests/support/value_contracts.rs\n M linux/crates/policy/src/guard.rs\n M linux/crates/policy/src/guard_tests_audit.rs\n M linux/docs/README.md\n M linux/docs/b4-task-board.md\n M linux/docs/bookie-0.2-history.md\n M linux/docs/bookie-0.2-sprint.md\n M linux/docs/code-conventions.md\n M linux/docs/connections.md\n M linux/docs/decisions/0004-libsecret-secret-storage.md\n M linux/docs/decisions/0006-driver-panic-containment.md\n M linux/docs/decisions/0008-connection-and-session-ownership.md\n M linux/docs/driver-priority.md\n M linux/docs/error-handling.md\n M linux/docs/flathub.md\n M linux/docs/ignored-tests.md\n M linux/docs/omarchy.md\n M linux/docs/production-audit.md\n M linux/docs/state-management.md\n M linux/docs/testing.md\n M linux/docs/toolchains.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/upstream-main-review-2026-10-03.md\n M linux/docs/upstream-sync.md\n M linux/docs/validation-playbook.md\n M linux/docs/value-contracts.md\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/crates/drivers/mysql/tests/shared/\n?? linux/docs/b4-history.md\n?? linux/docs/connections-history.md\n?? linux/docs/evidence/mysql-atomic-results-2026-10-03/\n?? linux/docs/evidence/release-audit-2026-10-03/\n?? linux/docs/release-audit-2026-10-03.md\n?? linux/docs/testing-history.md\n?? linux/docs/validation-history.md",
+  "tracked_diff_sha256": "ecd484218a598ff329353d3f62748b16c0f1de1d9a65c7167397f061ec74a53c",
+  "started_utc": "2026-10-03T01:23:39.973157+00:00",
+  "status": "passed",
+  "layers": {
+    "quick": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "quick"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "quick-1.log",
+          "exit_code": 0,
+          "seconds": 123.463
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T01:25:43.436807+00:00"
+}

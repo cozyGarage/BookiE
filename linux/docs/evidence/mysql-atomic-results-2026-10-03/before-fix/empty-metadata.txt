@@ -1,0 +1,24 @@
+
+running 1 test
+test empty_query_results_preserve_mysql_projection_metadata ... FAILED
+
+failures:
+
+---- empty_query_results_preserve_mysql_projection_metadata stdout ----
+
+thread 'empty_query_results_preserve_mysql_projection_metadata' (1716805) panicked at crates/drivers/mysql/tests/integration.rs:606:5:
+assertion `left == right` failed
+  left: []
+ right: ["id", "label"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    empty_query_results_preserve_mysql_projection_metadata
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 37 filtered out; finished in 10.34s
+
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.50s
+     Running tests/integration.rs (linux/target/debug/deps/integration-f930fc681b3eb54b)
+error: test failed, to rerun pass `-p tablepro-driver-mysql --test integration`

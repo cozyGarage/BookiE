@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "M linux/CHANGELOG.md\n M linux/Cargo.lock\n M linux/crates/app/src/services/browse_query.rs\n M linux/crates/app/src/services/change_tracker.rs\n M linux/crates/app/src/services/change_tracker_materialize_tests.rs\n M linux/crates/app/src/ui/app/row_ops.rs\n M linux/crates/app/src/ui/browse_tab/row_ops.rs\n M linux/crates/app/src/ui/browse_tab/tests.rs\n M linux/crates/app/src/ui/error_text.rs\n M linux/crates/app/src/ui/export_dialog.rs\n M linux/crates/app/src/ui/filter_strip.rs\n M linux/crates/app/src/ui/grid/column.rs\n M linux/crates/app/src/ui/grid/presentation.rs\n M linux/crates/app/src/ui/import_dialog.rs\n M linux/crates/app/tests/gtk_safety.py\n M linux/crates/app/tests/support/mongodb_integer_width.rs\n M linux/crates/app/tests/support/mysql_integer_contract.rs\n M linux/crates/app/tests/support/mysql_spatial_contract.rs\n M linux/crates/app/tests/support/postgres_array_contract.rs\n M linux/crates/app/tests/support/value_parse.rs\n M linux/crates/core/src/connection.rs\n M linux/crates/core/src/error.rs\n M linux/crates/core/src/export/csv.rs\n M linux/crates/core/src/export/markdown.rs\n M linux/crates/core/src/export/mod.rs\n M linux/crates/core/src/export/xlsx.rs\n M linux/crates/core/src/filter.rs\n M linux/crates/core/src/filter_tests.rs\n M linux/crates/core/src/import/cell.rs\n M linux/crates/core/src/import/csv_import.rs\n M linux/crates/core/src/import/plan.rs\n M linux/crates/core/src/lib.rs\n M linux/crates/core/src/query.rs\n M linux/crates/core/src/sql_ddl/collation_tests.rs\n M linux/crates/core/src/sql_ddl/comment_tests.rs\n M linux/crates/core/src/sql_ddl/default_tests.rs\n M linux/crates/core/src/sql_ddl/tests.rs\n M linux/crates/core/src/sql_dialect.rs\n M linux/crates/core/src/sql_literal.rs\n M linux/crates/core/tests/query_pipeline.rs\n M linux/crates/drivers/clickhouse/src/lib.rs\n M linux/crates/drivers/duckdb/src/lib.rs\n M linux/crates/drivers/mongodb/src/codec.rs\n M linux/crates/drivers/mongodb/src/lib.rs\n M linux/crates/drivers/mongodb/tests/support/value_contracts.rs\n M linux/crates/drivers/mssql/src/codec.rs\n M linux/crates/drivers/mssql/src/lib.rs\n M linux/crates/drivers/mysql/Cargo.toml\n M linux/crates/drivers/mysql/src/lib.rs\n M linux/crates/drivers/mysql/src/session.rs\n M linux/crates/drivers/mysql/tests/integration.rs\n M linux/crates/drivers/postgres/Cargo.toml\n M linux/crates/drivers/postgres/src/array.rs\n M linux/crates/drivers/postgres/src/lib.rs\n M linux/crates/drivers/postgres/src/tests.rs\n M linux/crates/drivers/postgres/tests/integration.rs\n M linux/crates/drivers/postgres/tests/support/array_contract.rs\n M linux/crates/drivers/postgres/tests/support/value_contracts.rs\n M linux/crates/drivers/redis/src/lib.rs\n M linux/crates/drivers/sqlite/src/lib.rs\n M linux/crates/drivers/sqlite/tests/csv_import.rs\n M linux/crates/mcp/Cargo.toml\n M linux/crates/mcp/src/server.rs\n M linux/crates/mcp/src/tools.rs\n M linux/crates/mcp/tests/enforce_policy.rs\n M linux/crates/policy/src/guard.rs\n M linux/crates/policy/src/guard_tests_audit.rs\n M linux/crates/policy/src/mask.rs\n M linux/docs/README.md\n M linux/docs/b3-review-2026-10-01.md\n M linux/docs/b3-test-scenario-survey.md\n M linux/docs/b4-task-board.md\n M linux/docs/bookie-0.2-history.md\n M linux/docs/bookie-0.2-sprint.md\n M linux/docs/code-conventions.md\n M linux/docs/connections.md\n M linux/docs/decisions/0004-libsecret-secret-storage.md\n M linux/docs/decisions/0006-driver-panic-containment.md\n M linux/docs/decisions/0008-connection-and-session-ownership.md\n M linux/docs/driver-priority.md\n M linux/docs/error-handling.md\n M linux/docs/flathub.md\n M linux/docs/ignored-tests.md\n M linux/docs/omarchy.md\n M linux/docs/production-audit.md\n M linux/docs/state-management.md\n M linux/docs/testing.md\n M linux/docs/toolchains.md\n M linux/docs/type-contract-history.md\n M linux/docs/type-contract-strategy.md\n M linux/docs/upstream-main-review-2026-10-03.md\n M linux/docs/upstream-sync.md\n M linux/docs/validation-playbook.md\n M linux/docs/value-contract-history.md\n M linux/docs/value-contracts.md\n M linux/scripts/isolated-tests.json\n M linux/vendor/README.md\n M linux/vendor/sqlx-postgres/src/types/array.rs\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/crates/core/src/sql_dialect/\n?? linux/crates/drivers/mysql/tests/shared/\n?? linux/crates/drivers/postgres/src/params.rs\n?? linux/crates/drivers/postgres/tests/support/enum_contract.rs\n?? linux/crates/drivers/postgres/tests/support/enum_file_export_contract.rs\n?? linux/crates/mcp/tests/postgres_custom_enum.rs\n?? linux/docs/b4-history.md\n?? linux/docs/connections-history.md\n?? linux/docs/evidence/mongodb-census-results-2026-10-03/\n?? linux/docs/evidence/mongodb-missing-null-results-2026-10-03/\n?? linux/docs/evidence/mysql-atomic-results-2026-10-03/\n?? linux/docs/evidence/postgres-enum-results-2026-10-03/\n?? linux/docs/evidence/release-audit-2026-10-03/\n?? linux/docs/release-audit-2026-10-03.md\n?? linux/docs/testing-history.md\n?? linux/docs/validation-history.md",
+  "tracked_diff_sha256": "37f4aa6d919964319cad217a1ac857ad4db792cbc63e287475024512d18c0a23",
+  "started_utc": "2026-10-03T14:47:17.047875+00:00",
+  "status": "passed",
+  "layers": {
+    "app-server": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-isolated-tests.py",
+            "app-server"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "app-server-1.log",
+          "exit_code": 0,
+          "seconds": 61.414
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-03T14:48:18.462526+00:00"
+}

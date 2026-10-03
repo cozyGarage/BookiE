@@ -1,0 +1,11 @@
+---- ui::browse_tab::tests::value_contract_mongodb_off_page_type_change_cannot_stale_browse_metadata stdout ----
+
+thread 'ui::browse_tab::tests::value_contract_mongodb_off_page_type_change_cannot_stale_browse_metadata' (2674910) panicked at crates/app/src/ui/browse_tab/tests.rs:256:9:
+assertion `left == right` failed: an off-page type change between census and page query must not leave stale metadata
+  left: "string"
+ right: "mixed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 452 filtered out; finished in 4.17s
+[full output: ~/.local/share/rtk/tee/1791038020_cargo_test.log]

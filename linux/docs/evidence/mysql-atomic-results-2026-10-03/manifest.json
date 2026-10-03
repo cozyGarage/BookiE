@@ -1,0 +1,205 @@
+{
+  "schema_version": 1,
+  "completed_utc": "2026-10-03T15:14:12Z",
+  "branch": "linux",
+  "base_commit": "aeac107a4de43f627bce283e4bc88f84f2111283",
+  "working_tree": "The current MySQL integration result validates the staged MySQL driver and transaction error path. Older quick/drivers layer reports retain their original fingerprints and are historical context, not current whole-worktree validation.",
+  "scope": [
+    "Preserve MySQL projection metadata when a result contains zero rows.",
+    "Bound MySQL transaction query rows and report truncation.",
+    "Refuse MySQL transaction batch entries unless each parses as one INSERT, UPDATE or DELETE.",
+    "Report rollback failure through driver error, policy audit and UI; do not claim rollback request success reverses non-transactional writes.",
+    "Pin MySQL trigger side effects to non-transactional MyISAM tables: transactional InnoDB writes roll back, but trigger writes to MyISAM survive and the UI warning describes that limit.",
+    "Keep successful DML batches and confirmed rollback behavior covered by native tests."
+  ],
+  "regressions": [
+    {
+      "selector": "mysql_atomic::empty_query_results_preserve_mysql_projection_metadata",
+      "coverage": "Shared query with duplicate aliases, parameterized query, transaction query, and paged table fetch; asserts expected ordered names, empty rows, metadata equality and populated value oracle.",
+      "before_fix": "Failed: empty projection returned [] instead of [id, label].",
+      "after_fix": "Passed in final MySQL integration suite."
+    },
+    {
+      "selector": "mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation",
+      "coverage": "Requests 1,000,001 rows in a transaction and checks MAX_QUERY_ROWS, truncation, metadata and values.",
+      "before_fix": "Failed: returned 1,000,001 rows instead of the 1,000,000 row cap.",
+      "after_fix": "Passed in final MySQL integration suite."
+    },
+    {
+      "selector": "mysql_atomic::implicit_commit_batch_is_refused_before_mysql_dispatch",
+      "coverage": "DDL-containing batch leaves sibling table and schema unchanged; neighboring INSERT/UPDATE/DELETE batch succeeds.",
+      "before_fix": "Failed: DDL reached dispatch and returned a later statement Transaction error.",
+      "after_fix": "Passed in final MySQL integration suite."
+    },
+    {
+      "selector": "mysql_atomic::a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows",
+      "coverage": "Duplicate-key failure after insert reports the failing index and preserves the pre-existing sibling row.",
+      "after_fix": "Passed in final MySQL integration suite."
+    },
+    {
+      "selector": "mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_myisam_trigger_effects",
+      "coverage": "A duplicate-key error rolls back the InnoDB parent insert but the AFTER INSERT trigger's MyISAM side effect persists; paired UI unit coverage warns that non-transactional writes may remain.",
+      "result": "Passed against the local MySQL container. This narrows the rollback contract; it does not promise atomicity across storage engines or side effects."
+    },
+    {
+      "selector": "mysql_atomic::a_lost_connection_during_a_batch_reports_rollback_failure",
+      "coverage": "Kills the active MySQL connection during DML and expects TransactionRollbackFailed.",
+      "before_fix_mutation": "Failed when rollback errors were deliberately discarded; saw Transaction { source: Disconnected }.",
+      "after_fix": "Passed in final MySQL integration suite."
+    }
+  ],
+  "commands": {
+    "before_fix_selectors": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration <selector> -- --include-ignored --test-threads=1",
+    "focused_metadata": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration empty_query_results_preserve_mysql_projection_metadata -- --include-ignored --test-threads=1",
+    "focused_batch": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration implicit_commit_batch_is_refused_before_mysql_dispatch -- --include-ignored --test-threads=1",
+    "myisam_trigger_contract": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration mysql_batch_rollback_does_not_claim_to_reverse_myisam_trigger_effects -- --include-ignored --test-threads=1",
+    "myisam_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings",
+    "mysql_full_integration": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration -- --include-ignored --test-threads=1",
+    "app_rollback_ui": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib <rollback UI selector>",
+    "policy_rollback_audit": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-policy --lib rollback_failure_is_audited_as_an_unknown_transaction_outcome",
+    "quick_layer": "rtk python3 linux/scripts/run-test-layer.py quick",
+    "drivers_layer": "rtk python3 linux/scripts/run-test-layer.py drivers",
+    "clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings",
+    "guards": [
+      "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "rtk bash linux/scripts/check-file-size.sh",
+      "rtk python3 linux/scripts/check-function-size.py",
+      "rtk bash linux/scripts/check-panic-sites.sh",
+      "rtk bash linux/scripts/check-bounded-operations.sh",
+      "rtk git diff --check"
+    ]
+  },
+  "validation": {
+    "mysql_final_integration": {
+      "status": "passed",
+      "result": "41 passed, 0 failed; 514.01 seconds on the current MySQL source fingerprint.",
+      "log": "current-mysql-full-integration.txt"
+    },
+    "focused_latest_regressions": {
+      "status": "passed",
+      "result": "Metadata 1 passed; DDL refusal plus successful DML neighbors 1 passed.",
+      "log": "final-validation.log"
+    },
+    "myisam_trigger_contract": {
+      "status": "passed",
+      "result": "1 passed, 40 filtered out; 1 suite; 10.28 seconds.",
+      "log": "myisam-trigger-contract.txt"
+    },
+    "myisam_clippy": {
+      "status": "passed",
+      "result": "No issues found",
+      "log": "myisam-trigger-clippy.txt"
+    },
+    "app_policy_units": {
+      "status": "passed",
+      "result": "Two UI rollback-message tests and the policy unknown-outcome test passed.",
+      "log": "final-validation.log"
+    },
+    "clippy_and_guards": {
+      "status": "passed",
+      "result": "Clippy, formatting, file/function/panic/bounded-operation guards and diff check passed.",
+      "log": "final-validation.log"
+    },
+    "quick_layer": {
+      "status": "passed",
+      "report": "quick-layer-final-report.json",
+      "log": "quick-layer-final.log",
+      "seconds": 117.405,
+      "prior_run": "quick-layer-report.json"
+    },
+    "drivers_layer": {
+      "status": "passed",
+      "report": "drivers-layer-report.json",
+      "log": "drivers-layer.log",
+      "seconds": 1232.646,
+      "coverage_note": "The retained layer ran the five original MySQL regressions and PostgreSQL integration after its stale expectation was corrected. The later complete MySQL integration run includes the paged-fetch and DELETE additions."
+    },
+    "postgres": {
+      "status": "passed",
+      "result": "70 integration tests passed; the enum expectation recheck also passed.",
+      "integration_log": "postgres-integration.log",
+      "expectation_log": "postgres-expectation-recheck.log",
+      "limit": "Native PostgreSQL rollback-failure acceptance was not specifically tested."
+    },
+    "current_mysql_atomic_recheck": {
+      "status": "passed",
+      "result": "All six MySQL atomic selectors passed against the current MySQL source; current-source Clippy passed. The broader MySQL suite remains tied to the earlier source fingerprint.",
+      "focused_output": "current-mysql-atomic-focused.txt",
+      "clippy_output": "current-mysql-clippy.txt"
+    }
+  },
+  "evidence": {
+    "before_fix": {
+      "empty_metadata": "before-fix/empty-metadata.txt",
+      "implicit_commit": "before-fix/atomic-ddl.txt",
+      "transaction_cap": "before-fix/unbounded-transaction-results.txt",
+      "rollback_failure_mutation": "before-fix/rollback-failure-mutation.txt"
+    },
+    "native_suite_before_extra_neighbors": "native-suite.log",
+    "latest_validation": "final-validation.log",
+    "quick_report": "quick-layer-report.json",
+    "quick_final_report": "quick-layer-final-report.json",
+    "myisam_trigger_contract": "myisam-trigger-contract.txt",
+    "drivers_report": "drivers-layer-report.json",
+    "registered_tests": "../../ignored-tests.md"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/mysql/Cargo.toml": "3e629eb1fb02ac6199427ffad88e0cde215dd6ce2589532e293ce14c9401f8c9",
+    "linux/crates/drivers/mysql/src/lib.rs": "ebbd7da9784134e88535493b9f549cb0fd531183c545fc54dd00c6f3a0c710a8",
+    "linux/crates/drivers/mysql/src/session.rs": "b831d77518ac59ffcc1eb2bf5b75b2efd13cbf51b524f6197030af82dd64f70f",
+    "linux/crates/drivers/mysql/tests/integration.rs": "ca504b068366605985b34bdba45e6534db56d5a5239750de1e6dad4ec6d92b9a",
+    "linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs": "ca2209475810400f7eee6e0292e0358f00c1a08387bf24e201d5c6cb8964c2ed",
+    "linux/crates/core/src/error.rs": "5ea7ba2230a5629ebf3218cf17efcd5ca2a96bd21ca3e39a7571d532afd4979c",
+    "linux/crates/core/src/connection.rs": "3f7c43b8396faa0a837455749e4124ebc53da9e1fe9ec3197958e1ab4757dc96",
+    "linux/crates/app/src/ui/error_text.rs": "0af4a362c1cc1d3d98d547e2b80ba697db18be81b3d883e184577d5d53071b82",
+    "linux/crates/app/src/ui/app/row_ops.rs": "24365f705d17aa19a1b91a3b99ee4b9d1a852675ffac6f37f8aad06e2901c5d7",
+    "linux/crates/policy/src/guard.rs": "4791d728bd6a665ffc35fc3194d934b46e7c459b0ad4989c5f9c1ad4c0606448",
+    "linux/crates/policy/src/guard_tests_audit.rs": "2f264429c9343a36771392fe1f13f57e5970107bccdef377fb3e8de4e9e9d08e"
+  },
+  "retained_evidence_sha256": {
+    "before-fix/empty-metadata.txt": "74783754490e23e04391a996b7517547e2b1783cb8d5d11f4b7940dce1b4a801",
+    "before-fix/atomic-ddl.txt": "26c12e725acb2b578747be9914f5f119e8c39889c39379c263d3b76c57fbe8a0",
+    "before-fix/unbounded-transaction-results.txt": "f2c31839187ae106669e1f16803f8d8bcc0fd639de6ed394a6f169736cd0b427",
+    "before-fix/rollback-failure-mutation.txt": "d29df76c5ec1610e1b78c016626ef4f971ca82ffa6f2e43246e8228692f68ef8",
+    "native-suite.log": "0f07e3b43e4ceb62857ff0e8b0fac898c40d7a8631eb53f95a93706fff591efc",
+    "final-validation.log": "265e4909b4dfac25dbb9ce37f54e94dbe1dbf63f43425101ec5f1478112f5d2e",
+    "drivers-layer-report.json": "457bfe05fd29e9ca4d482a9185ee7111274a00f764821ce21cb3689ba3de09b4",
+    "quick-layer-report.json": "a3823a3f1ae7aa97559adfdc88d0931c52979c49f1552b89f100e669e6ff4a08",
+    "quick-layer-final-report.json": "a212f2f88bbc1fd4c564be78d17cae45efcb548b36454fac1af2347848902a53",
+    "quick-layer-final.log": "745155526286858e7782e7ebd7d21af6f45089c17144528b531ae3008cd837a9",
+    "myisam-trigger-contract.txt": "f94c3c9c3668105167d9a28d0753b510808562deb3deb54e6c685ffd4d26da0e",
+    "../../ignored-tests.md": "dba401942d5617352dfb3821e61a27edf6dd5b3b91f58fddb132a0751f9c2e2b",
+    "myisam-trigger-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+  },
+  "limits": [
+    "The source/test fingerprints describe this dirty working tree, not a frozen candidate SHA.",
+    "No hosted check, installed GTK interaction, native Wayland, package upgrade/rollback, soak or publication acceptance was run.",
+    "The native trigger contract demonstrates the MyISAM exception and the UI warns accurately. Other storage engines and side-effect patterns remain untested; the syntax filter alone cannot establish atomicity.",
+    "PostgreSQL native rollback-failure acceptance remains open."
+  ],
+  "current_source_recheck": {
+    "scope": "Rechecked the current MySQL driver source with all integration tests, the six atomic selectors, and Clippy.",
+    "limits": "The full current-source driver integration target passed; this does not rerun the workspace layers or establish release-candidate acceptance.",
+    "source_fingerprints_sha256": {
+      "linux/crates/drivers/mysql/Cargo.toml": "3e629eb1fb02ac6199427ffad88e0cde215dd6ce2589532e293ce14c9401f8c9",
+      "linux/crates/drivers/mysql/src/lib.rs": "ebbd7da9784134e88535493b9f549cb0fd531183c545fc54dd00c6f3a0c710a8",
+      "linux/crates/drivers/mysql/src/session.rs": "b831d77518ac59ffcc1eb2bf5b75b2efd13cbf51b524f6197030af82dd64f70f",
+      "linux/crates/drivers/mysql/tests/integration.rs": "ca504b068366605985b34bdba45e6534db56d5a5239750de1e6dad4ec6d92b9a",
+      "linux/crates/drivers/mysql/tests/shared/mysql_atomic.rs": "ca2209475810400f7eee6e0292e0358f00c1a08387bf24e201d5c6cb8964c2ed"
+    },
+    "commands": {
+      "focused": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration mysql_atomic:: -- --include-ignored --test-threads=1",
+      "clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings"
+    },
+    "results": {
+      "focused": "6 passed, 35 filtered out, 91.86s",
+      "clippy": "passed; no issues found",
+      "full_integration": "41 passed, 0 failed; 514.01 seconds."
+    },
+    "outputs_sha256": {
+      "current-mysql-atomic-focused.txt": "6a55884a15b16cc981f8d9197d43b5f4dd569670fa6f93b9444bf39e7ac6decf",
+      "current-mysql-clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+      "current-mysql-full-integration.txt": "72b4d05f3d86ba23def900298d8e737c1059a8556c5206b01f24be73b7a0533d"
+    }
+  }
+}

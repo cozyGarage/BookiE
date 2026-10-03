@@ -149,6 +149,328 @@ async fn value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit() {
     assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mongodb_off_page_type_change_during_census_refuses_edit() {
+    use mongodb::bson::{Decimal128, doc};
+    use tablepro_core::OperationControl;
+
+    let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
+
+    native
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "times": 1 },
+            "data": {
+                "failCommands": ["getMore"],
+                "blockConnection": true,
+                "blockTimeMS": 3_000
+            }
+        })
+        .await
+        .unwrap();
+    let page_connection = connection.clone();
+    let page_task = tokio::spawn(async move {
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        page_connection
+            .fetch_rows_controlled(None, "page_census_race", 0, 2, &control)
+            .await
+    });
+
+    assert!(wait_for_mongodb_command(&native, "getMore").await);
+
+    let decimal: Decimal128 = "12345678901234567890.1234567890123".parse().unwrap();
+    collection
+        .update_one(doc! { "_id": 149 }, doc! { "$set": { "value": decimal } })
+        .await
+        .unwrap();
+    native
+        .database("admin")
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
+        .await
+        .unwrap();
+    let page = tokio::time::timeout(std::time::Duration::from_secs(6), page_task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    assert_mongodb_census_race_page(&page);
+
+    let changed = collection.find_one(doc! { "_id": 149 }).await.unwrap().unwrap();
+    let sibling = collection.find_one(doc! { "_id": 1 }).await.unwrap().unwrap();
+    assert_eq!(changed.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+    assert_eq!(
+        sibling.get("value"),
+        Some(&mongodb::bson::Bson::String("sibling".into()))
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents() {
+    use mongodb::bson::{Decimal128, doc};
+    use tablepro_core::OperationControl;
+
+    let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
+
+    native
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "times": 1 },
+            "data": {
+                "failCommands": ["getMore"],
+                "blockConnection": true,
+                "blockTimeMS": 3_000
+            }
+        })
+        .await
+        .unwrap();
+    let page_connection = connection.clone();
+    let page_task = tokio::spawn(async move {
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        page_connection
+            .fetch_rows_controlled(None, "page_census_race", 0, 2, &control)
+            .await
+    });
+
+    assert!(wait_for_mongodb_command(&native, "getMore").await);
+    let decimal: Decimal128 = "12345678901234567890.1234567890123".parse().unwrap();
+    collection
+        .update_one(doc! { "_id": 0 }, doc! { "$set": { "value": decimal } })
+        .await
+        .unwrap();
+    native
+        .database("admin")
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
+        .await
+        .unwrap();
+    let page = tokio::time::timeout(std::time::Duration::from_secs(6), page_task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
+    let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
+    let first_row = page.rows.iter().find(|row| row[id_index] == Value::Int(0)).unwrap();
+    assert_eq!(page.columns[value_index].data_type, "string");
+    assert_eq!(first_row[value_index], Value::Text("before".into()));
+    let persisted = collection.find_one(doc! { "_id": 0 }).await.unwrap().unwrap();
+    assert_eq!(persisted.get("value"), Some(&mongodb::bson::Bson::Decimal128(decimal)));
+    // MongoDB does not give this collection scan snapshot semantics. The
+    // cursor returns the value it read before the concurrent update.
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
+    use mongodb::bson::doc;
+    use tablepro_core::OperationControl;
+
+    let (_container, native, _collection, connection) = mongodb_census_race_fixture().await;
+    native
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "skip": 1 },
+            "data": {
+                "failCommands": ["find"],
+                "blockConnection": true,
+                "blockTimeMS": 3_000
+            }
+        })
+        .await
+        .unwrap();
+    let page_connection = connection.clone();
+    let page_task = tokio::spawn(async move {
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        page_connection
+            .fetch_rows_controlled(None, "page_census_race", 0, 1, &control)
+            .await
+    });
+
+    let second_find_blocked = wait_for_mongodb_command(&native, "find").await;
+    native
+        .database("admin")
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
+        .await
+        .unwrap();
+    let page = tokio::time::timeout(std::time::Duration::from_secs(2), page_task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(
+        !second_find_blocked,
+        "the browse operation must not issue a second page find"
+    );
+    let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(page.columns[value_index].data_type, "string");
+    assert_eq!(page.rows[0][value_index], Value::Text("before".into()));
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values() {
+    use mongodb::bson::{Decimal128, doc};
+    use tablepro_core::OperationControl;
+
+    let (_container, native, collection, connection) = mongodb_census_race_fixture().await;
+    native
+        .database("admin")
+        .run_command(doc! {
+            "configureFailPoint": "failCommand",
+            "mode": { "skip": 1 },
+            "data": {
+                "failCommands": ["find"],
+                "blockConnection": true,
+                "blockTimeMS": 3_000
+            }
+        })
+        .await
+        .unwrap();
+    let page_connection = connection.clone();
+    let query_task = tokio::spawn(async move {
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        page_connection
+            .query_controlled("db.page_census_race.find({\"_id\":0})", &control)
+            .await
+    });
+
+    assert!(wait_for_mongodb_command(&native, "find").await);
+    let decimal: Decimal128 = "12345678901234567890.1234567890123".parse().unwrap();
+    collection
+        .update_one(doc! { "_id": 0 }, doc! { "$set": { "value": decimal } })
+        .await
+        .unwrap();
+    native
+        .database("admin")
+        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
+        .await
+        .unwrap();
+    let result = tokio::time::timeout(std::time::Duration::from_secs(6), query_task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let value_index = result.columns.iter().position(|column| column.name == "value").unwrap();
+    assert_eq!(result.columns[value_index].data_type, "mixed");
+    assert_eq!(
+        result.rows[0][value_index],
+        Value::Json(serde_json::json!({ "$numberDecimal": decimal.to_string() }))
+    );
+
+    let temp = tempfile::tempdir().unwrap();
+    for (format, extension) in [
+        (tablepro_core::export::ResultFormat::Csv, "csv"),
+        (tablepro_core::export::ResultFormat::Json, "json"),
+    ] {
+        let path = temp.path().join(format!("result.{extension}"));
+        let csv = tablepro_core::export::CsvOptions::default();
+        let export = tablepro_core::export::ResultExport {
+            format,
+            csv: &csv,
+            sql: None,
+        };
+        tablepro_core::export::write_result_file(&path, &result, &export, || false, |_| {}).unwrap();
+        let contents = std::fs::read_to_string(path).unwrap();
+        assert!(contents.contains("$numberDecimal"), "{extension}: {contents}");
+        assert!(contents.contains(&decimal.to_string()), "{extension}: {contents}");
+    }
+}
+
+async fn mongodb_census_race_fixture() -> (
+    testcontainers::ContainerAsync<testcontainers_modules::mongo::Mongo>,
+    mongodb::Client,
+    mongodb::Collection<mongodb::bson::Document>,
+    std::sync::Arc<dyn tablepro_core::Connection>,
+) {
+    use mongodb::bson::{Document, doc};
+    use tablepro_core::DatabaseDriver;
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::mongo::Mongo;
+
+    let container = Mongo::default()
+        .with_tag("7")
+        .with_cmd(["mongod", "--setParameter", "enableTestCommands=1", "--bind_ip_all"])
+        .start()
+        .await
+        .unwrap();
+    let host = container.get_host().await.unwrap().to_string();
+    let port = container.get_host_port_ipv4(27017).await.unwrap();
+    let native = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .unwrap();
+    let collection = native.database("appdb").collection::<Document>("page_census_race");
+    let documents = (0..150)
+        .map(|id| doc! { "_id": id, "value": if id == 0 { "before" } else { "sibling" } })
+        .collect::<Vec<_>>();
+    collection.insert_many(documents).await.unwrap();
+    let connection = drivers_mongodb::MongodbDriver
+        .connect(tablepro_core::ConnectOptions {
+            host,
+            port,
+            database: "appdb".into(),
+            tls: tablepro_core::TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into();
+    (container, native, collection, connection)
+}
+
+async fn wait_for_mongodb_command(native: &mongodb::Client, name: &str) -> bool {
+    use mongodb::bson::doc;
+
+    for _ in 0..40 {
+        let current = native
+            .database("admin")
+            .run_command(doc! { "currentOp": 1, "$all": true })
+            .await
+            .unwrap();
+        let command_blocked = current
+            .get_array("inprog")
+            .unwrap()
+            .iter()
+            .filter_map(|operation| operation.as_document())
+            .filter_map(|operation| operation.get_document("command").ok())
+            .any(|command| {
+                if name == "find" {
+                    command.get_str(name).ok() == Some("page_census_race")
+                } else {
+                    command.contains_key(name) && command.get_str("collection").ok() == Some("page_census_race")
+                }
+            });
+        if command_blocked {
+            return true;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+    false
+}
+
+fn assert_mongodb_census_race_page(page: &QueryResult) {
+    let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
+    let id_index = page.columns.iter().position(|column| column.name == "_id").unwrap();
+    assert_eq!(page.rows.len(), 2);
+    let first_row = page.rows.iter().find(|row| row[id_index] == Value::Int(0)).unwrap();
+    let sibling_row = page.rows.iter().find(|row| row[id_index] == Value::Int(1)).unwrap();
+    assert_eq!(
+        first_row[value_index],
+        Value::Json(serde_json::json!("before")),
+        "the page row must retain the value read from the cursor"
+    );
+    assert_eq!(sibling_row[value_index], Value::Json(serde_json::json!("sibling")));
+    assert_eq!(page.columns[value_index].data_type, "mixed");
+    assert_cell_read_only(&page.columns[value_index], &first_row[value_index]);
+}
+
 async fn mongodb_late_mixed_page_fixture() -> (
     testcontainers::ContainerAsync<testcontainers_modules::mongo::Mongo>,
     Box<dyn tablepro_core::Connection>,

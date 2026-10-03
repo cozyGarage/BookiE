@@ -884,5 +884,7 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
     shared_string_at(&strings, index).ok_or_else(|| format!("shared string {index} missing"))
 }
 
+#[path = "support/census_cost.rs"]
+mod census_cost;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;

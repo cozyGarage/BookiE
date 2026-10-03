@@ -2,9 +2,12 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
+use sqlparser::ast::Statement as SqlStatement;
+use sqlparser::dialect::MySqlDialect;
+use sqlparser::parser::Parser;
 use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow};
 use sqlx::pool::PoolConnection;
-use sqlx::{Column, Connection as SqlxConnection, Pool, Row, TypeInfo, ValueRef};
+use sqlx::{Column, Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
 
 use futures::stream::StreamExt;
 
@@ -160,15 +163,18 @@ impl Connection for MysqlConnection {
             "SELECT * FROM {} LIMIT {limit} OFFSET {offset}",
             qualified(schema, table)
         );
-        stream_into_result(&self.pool, &sql, limit as usize).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        params_into_result(&mut connection, &sql, &[], limit as usize).await
     }
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
-        stream_into_result(&self.pool, sql, MAX_QUERY_ROWS).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        params_into_result(&mut connection, sql, &[], MAX_QUERY_ROWS).await
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
-        params_into_result(&self.pool, sql, params, MAX_QUERY_ROWS).await
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS).await
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
@@ -184,7 +190,7 @@ impl Connection for MysqlConnection {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let connection_id = connection_id_controlled(&mut connection, control).await?;
         let result = run_server_cancellable(
-            params_into_result(&mut *connection, sql, params, MAX_QUERY_ROWS),
+            params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS),
             request_cancellation(&self.cancellation_pool, connection_id),
             confirms_cancellation,
             control,
@@ -240,6 +246,7 @@ impl Connection for MysqlConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        validate_atomic_batch(statements)?;
         let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
@@ -247,21 +254,13 @@ impl Connection for MysqlConnection {
             let q = match bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
                 Ok(query) => query,
                 Err(error) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(error),
-                    });
+                    return Err(transaction_failure(tx, idx, error).await);
                 }
             };
             match q.execute(&mut *tx).await {
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(map_sqlx_error(e)),
-                    });
+                    return Err(transaction_failure(tx, idx, map_sqlx_error(e)).await);
                 }
             }
         }
@@ -390,6 +389,48 @@ impl Connection for MysqlConnection {
     }
 }
 
+fn validate_atomic_batch(statements: &[(String, Vec<Value>)]) -> Result<(), DriverError> {
+    let dialect = MySqlDialect {};
+    for (index, (sql, _)) in statements.iter().enumerate() {
+        let parsed = Parser::parse_sql(&dialect, sql).map_err(|_| atomic_batch_refusal(index))?;
+        let [statement] = parsed.as_slice() else {
+            return Err(atomic_batch_refusal(index));
+        };
+        if !matches!(
+            statement,
+            SqlStatement::Insert(_) | SqlStatement::Update { .. } | SqlStatement::Delete(_)
+        ) {
+            return Err(atomic_batch_refusal(index));
+        }
+    }
+    Ok(())
+}
+
+fn atomic_batch_refusal(statement_index: usize) -> DriverError {
+    DriverError::Unsupported(format!(
+        "statement {} cannot be guaranteed atomic on MySQL",
+        statement_index + 1
+    ))
+}
+
+async fn transaction_failure(
+    tx: sqlx::Transaction<'static, MySql>,
+    statement_index: usize,
+    source: DriverError,
+) -> DriverError {
+    match tx.rollback().await {
+        Ok(()) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(source),
+        },
+        Err(error) => DriverError::TransactionRollbackFailed {
+            statement_index,
+            source: Box::new(source),
+            rollback_error: Box::new(map_sqlx_error(error)),
+        },
+    }
+}
+
 struct MysqlTransaction {
     tx: Option<sqlx::Transaction<'static, MySql>>,
 }
@@ -402,41 +443,7 @@ impl tablepro_core::Transaction for MysqlTransaction {
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
         let timestamp_is_utc = timezone_is_utc(&mut **tx).await?;
-        let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(&mut **tx)
-            .await
-            .map_err(map_sqlx_error)?;
-        if rows.is_empty() {
-            return Ok(QueryResult {
-                columns: Vec::new(),
-                rows: Vec::new(),
-                truncated: false,
-            });
-        }
-        let columns: Vec<ColumnInfo> = rows[0]
-            .columns()
-            .iter()
-            .map(|c| ColumnInfo {
-                name: c.name().to_string(),
-                data_type: c.type_info().name().to_string(),
-                nullable: true,
-                primary_key: false,
-                is_auto_increment: false,
-                default_value: None,
-                is_generated: false,
-                comment: None,
-                collation: None,
-            })
-            .collect();
-        let data: Vec<Vec<Value>> = rows
-            .iter()
-            .map(|r| (0..columns.len()).map(|i| extract_value(r, i)).collect())
-            .collect();
-        let mut result = QueryResult {
-            columns,
-            rows: data,
-            truncated: false,
-        };
+        let mut result = params_into_result(tx, sql, &[], MAX_QUERY_ROWS).await?;
         if !timestamp_is_utc {
             refuse_non_utc_timestamps(&mut result);
         }
@@ -474,24 +481,6 @@ impl tablepro_core::Transaction for MysqlTransaction {
     }
 }
 
-async fn stream_into_result<'e, E>(executor: E, sql: &str, limit: usize) -> Result<QueryResult, DriverError>
-where
-    E: sqlx::Executor<'e, Database = MySql>,
-{
-    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(executor);
-    let mut collected: Vec<MySqlRow> = Vec::new();
-    let mut truncated = false;
-    while let Some(row_result) = stream.next().await {
-        let row = row_result.map_err(map_sqlx_error)?;
-        if collected.len() >= limit {
-            truncated = true;
-            break;
-        }
-        collected.push(row);
-    }
-    Ok(rows_into_result(&collected, truncated))
-}
-
 async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
     sqlx::query("SET time_zone = '+00:00'").execute(connection).await?;
     Ok(())
@@ -520,16 +509,8 @@ fn refuse_non_utc_timestamps(result: &mut QueryResult) {
     }
 }
 
-fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
-    let Some(first) = collected.first() else {
-        return QueryResult {
-            columns: Vec::new(),
-            rows: Vec::new(),
-            truncated,
-        };
-    };
-    let columns: Vec<ColumnInfo> = first
-        .columns()
+fn statement_columns(columns: &[sqlx::mysql::MySqlColumn]) -> Vec<ColumnInfo> {
+    columns
         .iter()
         .map(|c| ColumnInfo {
             name: c.name().to_string(),
@@ -541,17 +522,9 @@ fn rows_into_result(collected: &[MySqlRow], truncated: bool) -> QueryResult {
             is_generated: false,
             comment: None,
             collation: None,
+            enum_type: None,
         })
-        .collect();
-    let rows: Vec<Vec<Value>> = collected
-        .iter()
-        .map(|r| (0..columns.len()).map(|i| extract_value(r, i)).collect())
-        .collect();
-    QueryResult {
-        columns,
-        rows,
-        truncated,
-    }
+        .collect()
 }
 
 fn extract_value(row: &MySqlRow, idx: usize) -> Value {
@@ -646,31 +619,34 @@ fn decode_decimal_exact(row: &MySqlRow, idx: usize) -> Option<Value> {
         .ok()
 }
 
-async fn params_into_result<'e, E>(
-    executor: E,
+async fn params_into_result(
+    connection: &mut sqlx::MySqlConnection,
     sql: &str,
     params: &[Value],
     limit: usize,
-) -> Result<QueryResult, DriverError>
-where
-    E: sqlx::Executor<'e, Database = MySql>,
-{
-    if params.is_empty() {
-        return stream_into_result(executor, sql, limit).await;
-    }
+) -> Result<QueryResult, DriverError> {
+    let statement = connection
+        .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
+        .await
+        .map_err(map_sqlx_error)?;
+    let columns = statement_columns(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
-    let mut stream = query.fetch(executor);
-    let mut collected: Vec<MySqlRow> = Vec::new();
+    let mut stream = query.fetch(&mut *connection);
+    let mut rows = Vec::with_capacity(limit.min(1024));
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
-        if collected.len() >= limit {
+        if rows.len() >= limit {
             truncated = true;
             break;
         }
-        collected.push(row);
+        rows.push((0..columns.len()).map(|index| extract_value(&row, index)).collect());
     }
-    Ok(rows_into_result(&collected, truncated))
+    Ok(QueryResult {
+        columns,
+        rows,
+        truncated,
+    })
 }
 
 async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError>
@@ -913,6 +889,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
             .try_get::<Option<String>, _>(8)
             .unwrap_or(None)
             .filter(|c| !c.is_empty()),
+        enum_type: None,
     }
 }
 

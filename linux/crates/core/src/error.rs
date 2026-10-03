@@ -44,11 +44,19 @@ pub enum DriverError {
     /// Returned by `Connection::execute_in_transaction` when one of the
     /// statements failed; the index identifies which statement (so the
     /// UI can highlight the offending row) and `source` carries the
-    /// underlying driver error. The transaction has already been rolled
-    /// back when this is returned — callers don't need to do cleanup.
+    /// underlying driver error. Drivers return this only after confirmed
+    /// rollback; an unconfirmed rollback uses
+    /// [`DriverError::TransactionRollbackFailed`].
     #[error("transaction failed at statement {statement_index}: {source}")]
     Transaction {
         statement_index: usize,
         source: Box<DriverError>,
+    },
+
+    #[error("transaction failed at statement {statement_index}: {source}; rollback also failed: {rollback_error}")]
+    TransactionRollbackFailed {
+        statement_index: usize,
+        source: Box<DriverError>,
+        rollback_error: Box<DriverError>,
     },
 }

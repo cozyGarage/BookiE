@@ -48,6 +48,10 @@ pub(super) fn columns_from_docs(docs: &[Document]) -> Vec<ColumnInfo> {
             observe_bson_type(&mut union, key, value);
         }
     }
+    columns_from_types(union)
+}
+
+pub(super) fn columns_from_types(mut union: BTreeMap<String, String>) -> Vec<ColumnInfo> {
     let mut columns = Vec::new();
     if let Some(ty) = union.remove("_id") {
         columns.push(ColumnInfo {

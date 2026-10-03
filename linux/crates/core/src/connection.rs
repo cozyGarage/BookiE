@@ -208,10 +208,12 @@ pub trait Connection: Send + Sync {
     /// Run a sequence of parameterised statements inside a single
     /// database transaction. Rolls back automatically if any
     /// statement errors; returns `DriverError::Transaction` with the
-    /// failing statement's index. Returns one `rows_affected` value
-    /// per successful statement, in order. Used by the inline-edit
-    /// changeset Save flow so all pending row inserts / updates /
-    /// deletes commit atomically.
+    /// failing statement's index after the rollback request succeeds,
+    /// or `DriverError::TransactionRollbackFailed` if rollback also
+    /// errors. Atomicity still depends on the database and affected
+    /// storage objects; this API cannot make non-transactional tables
+    /// transactional. Returns one `rows_affected` value per successful
+    /// statement, in order. Used by the inline-edit changeset Save flow.
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError>;
     /// Bounded form of [`Connection::execute_in_transaction`]. The
     /// default drops the transaction future on an interruption, which

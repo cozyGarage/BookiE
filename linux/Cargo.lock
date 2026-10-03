@@ -6295,6 +6295,7 @@ dependencies = [
  "rust_decimal",
  "secrecy",
  "serde_json",
+ "sqlparser",
  "sqlx",
  "tablepro-core",
  "testcontainers",

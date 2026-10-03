@@ -56,10 +56,20 @@ pub fn driver_message(error: &DriverError) -> String {
             statement_index,
             source,
         } => {
-            crate::tr!("Save failed at statement {n}: {error}. The transaction was rolled back; no rows were changed.")
+            crate::tr!("Save failed at statement {n}: {error}. The rollback request succeeded; writes to non-transactional tables may remain.")
                 .replace("{n}", &(statement_index + 1).to_string())
                 .replace("{error}", &driver_message(source))
         }
+        DriverError::TransactionRollbackFailed {
+            statement_index,
+            source,
+            rollback_error,
+        } => crate::tr!(
+            "Save failed at statement {n}: {error}. Rollback also failed: {rollback_error}. Database changes may have been applied."
+        )
+        .replace("{n}", &(statement_index + 1).to_string())
+        .replace("{error}", &driver_message(source))
+        .replace("{rollback_error}", &driver_message(rollback_error)),
     }
 }
 
@@ -137,6 +147,36 @@ mod tests {
         assert!(driver_message(&DriverError::ConnectionRefused).contains("Could not reach"));
         assert!(driver_message(&DriverError::AuthFailed).contains("wrong"));
         assert!(driver_message(&DriverError::Disconnected).contains("Try reconnecting"));
+    }
+
+    #[test]
+    fn failed_transaction_rollback_does_not_claim_no_changes() {
+        let message = driver_message(&DriverError::TransactionRollbackFailed {
+            statement_index: 2,
+            source: Box::new(DriverError::Query {
+                message: "statement failed".into(),
+                sqlstate: None,
+            }),
+            rollback_error: Box::new(DriverError::Disconnected),
+        });
+        assert!(message.contains("statement 3"));
+        assert!(message.contains("Rollback also failed"));
+        assert!(message.contains("Database changes may have been applied"));
+        assert!(!message.contains("no rows were changed"));
+    }
+
+    #[test]
+    fn confirmed_rollback_does_not_claim_non_transactional_writes_were_reversed() {
+        let message = driver_message(&DriverError::Transaction {
+            statement_index: 0,
+            source: Box::new(DriverError::Query {
+                message: "statement failed".into(),
+                sqlstate: None,
+            }),
+        });
+        assert!(message.contains("rollback request succeeded"));
+        assert!(message.contains("non-transactional tables may remain"));
+        assert!(!message.contains("no rows were changed"));
     }
 
     #[test]
