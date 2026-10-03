@@ -233,7 +233,7 @@ fn build_rule_sql(
     placeholder_idx: &mut usize,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildFilterError> {
-    let col_sql = quote_ident(driver_id, &col.name);
+    let col_sql = filter_column(driver_id, col);
     // PostgreSQL pattern operators require text. Unknown names include user
     // enums/domains, so only known built-in text types bypass the cast.
     let pattern_sql = if driver_id == "postgres"
@@ -353,6 +353,18 @@ fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String
     };
     format!(
         "{placeholder}::{}.{}",
+        quote_ident("postgres", &enum_type.schema),
+        quote_ident("postgres", &enum_type.name)
+    )
+}
+
+fn filter_column(driver_id: &str, col: &ColumnInfo) -> String {
+    let column = quote_ident(driver_id, &col.name);
+    let Some(enum_type) = col.enum_type.as_ref().filter(|_| driver_id == "postgres") else {
+        return column;
+    };
+    format!(
+        "({column}::{}.{})",
         quote_ident("postgres", &enum_type.schema),
         quote_ident("postgres", &enum_type.name)
     )

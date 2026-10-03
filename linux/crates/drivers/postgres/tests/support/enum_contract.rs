@@ -152,46 +152,6 @@ async fn value_contract_scalar_enum_labels_preserve_exact_text() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_domain_over_enum_projection_preserves_labels_and_null() {
-    let (_container, opts) = start_pg().await;
-    let connection = connect(opts).await;
-    connection
-        .execute("CREATE TYPE value_contract_domain_enum AS ENUM ('NULL', '東京')")
-        .await
-        .unwrap();
-    connection
-        .execute("CREATE DOMAIN value_contract_domain_enum_label AS value_contract_domain_enum")
-        .await
-        .unwrap();
-
-    let result = connection
-        .query(
-            "SELECT label, pg_typeof(label)::text AS native_type FROM (VALUES \
-             ('NULL'::value_contract_domain_enum_label), \
-             ('東京'::value_contract_domain_enum_label), \
-             (NULL::value_contract_domain_enum_label)) AS labels(label)",
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(
-        result.rows,
-        vec![
-            vec![
-                Value::Text("NULL".into()),
-                Value::Text("value_contract_domain_enum_label".into())
-            ],
-            vec![
-                Value::Text("東京".into()),
-                Value::Text("value_contract_domain_enum_label".into())
-            ],
-            vec![Value::Null, Value::Text("value_contract_domain_enum_label".into())],
-        ]
-    );
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
 async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

@@ -4261,15 +4261,27 @@ tested lossless import path. The export dialog now says to turn spreadsheet
 safety off for lossless re-import. See the native selector and retained output
 in the [PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
-## PostgreSQL domain over enum scalar projection — 2026-10-03
+## PostgreSQL domain over enum value consumers — 2026-10-03
 
 A PostgreSQL 16 native regression creates a domain over a custom enum and
 projects its literal `NULL` label, Unicode label and SQL NULL. The driver returns
 exact text/NULL values while the independent `pg_typeof` column reports the
-domain type. The focused test passed without a production decoder change. This
-proves only scalar result projection; domain arrays, bindings, writes, filters,
-imports and exports remain untested. Exact command and retained output are in
-the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+domain type. A companion array contract covers literal `NULL`, empty text,
+Unicode, a comma-containing label and an SQL NULL element; `array_to_json` and
+`pg_typeof` provide independent native value/type oracles. It initially failed
+because the binary decoder treated the domain element OID as unsupported. The
+array decoder now follows domain metadata to its enum base and returns exact
+PostgreSQL array text. The focused contract and full PostgreSQL integration
+suite passed. A separate native contract binds text and SQL NULL through an
+explicit domain cast, then updates a domain column and verifies the stored
+label and `pg_typeof`. This tests explicit-cast parameter and update consumers;
+implicit equality between two domain values is unsupported by PostgreSQL and
+is not claimed. Structured equality/IN/IS NULL filters cast the domain column
+and values through the base enum; native results verify exact labels, SQL NULL,
+and the domain type. The catalog metadata also feeds keyed updates and draft
+inserts, with the server verifying the stored domain type. Domain CSV/JSON/file
+exports and nested domain chains remain untested. Exact commands and results
+are in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ## MongoDB browse metadata and cursor consistency — 2026-10-03
 

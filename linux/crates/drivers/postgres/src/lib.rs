@@ -224,13 +224,15 @@ impl Connection for PgConnection {
                 pg_catalog.col_description(a.attrelid, a.attnum) AS column_comment,
                 CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
                     THEN co.collname::text END AS collation,
-                CASE WHEN ty.typtype = 'e' THEN type_ns.nspname END AS enum_schema,
-                CASE WHEN ty.typtype = 'e' THEN ty.typname END AS enum_name
+                CASE WHEN enum_ty.typtype = 'e' THEN type_ns.nspname END AS enum_schema,
+                CASE WHEN enum_ty.typtype = 'e' THEN enum_ty.typname END AS enum_name
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
              JOIN pg_catalog.pg_type ty ON ty.oid = a.atttypid
-             LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = ty.typnamespace
+             LEFT JOIN pg_catalog.pg_type enum_ty
+                 ON enum_ty.oid = CASE WHEN ty.typtype = 'd' THEN ty.typbasetype ELSE ty.oid END
+             LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = enum_ty.typnamespace
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d
                  ON d.adrelid = a.attrelid AND d.adnum = a.attnum

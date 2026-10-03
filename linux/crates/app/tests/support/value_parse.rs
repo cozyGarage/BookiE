@@ -1054,6 +1054,13 @@ fn unknown_type_falls_through_to_text() {
         parse_input_for_driver("NULL", Some(&enum_column), "postgres").unwrap(),
         Value::Text("NULL".into())
     );
+
+    let mut enum_domain_column = col("value_contract_enum_schema.value_contract_grid_domain", false);
+    enum_domain_column.enum_type = enum_column.enum_type;
+    assert_eq!(
+        parse_input_for_driver("paused", Some(&enum_domain_column), "postgres").unwrap(),
+        Value::Text("paused".into())
+    );
 }
 
 #[test]

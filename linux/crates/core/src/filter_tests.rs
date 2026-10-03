@@ -249,31 +249,31 @@ fn postgres_enum_filters_cast_values_to_the_schema_qualified_type() {
         (
             FilterOp::Eq,
             FilterValue::Single("NULL".into()),
-            "\"status\" = $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            "(\"status\"::\"value_contract_enum_schema\".\"value_contract_status\") = $1::\"value_contract_enum_schema\".\"value_contract_status\"",
             vec![Value::Text("NULL".into())],
         ),
         (
             FilterOp::NotEq,
             FilterValue::Single("NULL".into()),
-            "\"status\" <> $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            "(\"status\"::\"value_contract_enum_schema\".\"value_contract_status\") <> $1::\"value_contract_enum_schema\".\"value_contract_status\"",
             vec![Value::Text("NULL".into())],
         ),
         (
             FilterOp::Lt,
             FilterValue::Single("paused".into()),
-            "\"status\" < $1::\"value_contract_enum_schema\".\"value_contract_status\"",
+            "(\"status\"::\"value_contract_enum_schema\".\"value_contract_status\") < $1::\"value_contract_enum_schema\".\"value_contract_status\"",
             vec![Value::Text("paused".into())],
         ),
         (
             FilterOp::In,
             FilterValue::List(vec!["NULL".into(), "東京".into()]),
-            "\"status\" IN ($1::\"value_contract_enum_schema\".\"value_contract_status\", $2::\"value_contract_enum_schema\".\"value_contract_status\")",
+            "(\"status\"::\"value_contract_enum_schema\".\"value_contract_status\") IN ($1::\"value_contract_enum_schema\".\"value_contract_status\", $2::\"value_contract_enum_schema\".\"value_contract_status\")",
             vec![Value::Text("NULL".into()), Value::Text("東京".into())],
         ),
         (
             FilterOp::Between,
             FilterValue::Pair("ready".into(), "paused".into()),
-            "\"status\" BETWEEN $1::\"value_contract_enum_schema\".\"value_contract_status\" AND $2::\"value_contract_enum_schema\".\"value_contract_status\"",
+            "(\"status\"::\"value_contract_enum_schema\".\"value_contract_status\") BETWEEN $1::\"value_contract_enum_schema\".\"value_contract_status\" AND $2::\"value_contract_enum_schema\".\"value_contract_status\"",
             vec![Value::Text("ready".into()), Value::Text("paused".into())],
         ),
     ];

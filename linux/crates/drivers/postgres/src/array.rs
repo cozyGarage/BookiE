@@ -1,5 +1,5 @@
 use sqlx::ValueRef;
-use sqlx::postgres::{PgTypeKind, PgValueFormat, PgValueRef};
+use sqlx::postgres::{PgTypeInfo, PgTypeKind, PgValueFormat, PgValueRef};
 use tablepro_core::Value;
 
 const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
@@ -14,7 +14,7 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
         return None;
     };
     let element_oid = element.oid()?.0;
-    let enum_element = matches!(element.kind(), PgTypeKind::Enum(_));
+    let enum_element = is_enum_element(element);
     match raw.format() {
         PgValueFormat::Binary => {
             let bytes = raw.as_bytes().ok()?;
@@ -25,6 +25,14 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
             Some(Value::Text(text))
         }
         PgValueFormat::Text => raw.as_str().ok().map(|text| Value::Text(text.into())),
+    }
+}
+
+fn is_enum_element(info: &PgTypeInfo) -> bool {
+    match info.kind() {
+        PgTypeKind::Enum(_) => true,
+        PgTypeKind::Domain(base) => is_enum_element(base),
+        _ => false,
     }
 }
 
