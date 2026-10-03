@@ -24,6 +24,14 @@ source/SHA attribution; this summary does not certify the current tree.
 | Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases | One missing format/type/configuration boundary, native kind after writes and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
+SQLite STRICT `ANY` table CSV now tags INTEGER, REAL, TEXT and BLOB cells so a
+native import can retain their runtime storage classes; SQL NULL uses the
+export's explicit collision-free marker. Untagged text stays text, while a
+blank without a marker and malformed reserved tags are refused. The table-based
+app round trip has a native `typeof()`/value oracle. Arbitrary SQLite query
+exports whose result metadata does not identify declared `ANY`, other formats
+and installed editing remain open; see the [case record](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03).
+
 Rows identify work areas, not completed engine support. State the four ADR 0007
 outcomes per concrete case. The older detailed matrix remains useful for lookup;
 do not re-import its long case descriptions into this board.

@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "8131076999a329cad86f9b22423a17e312d30eb4",
+  "baseline_source_commit": "158fc4ea6b0cf01f345287a20cf9010c0c262a3a",
+  "engine": "SQLite 3.53.4 via libsqlite3-sys pkg-config",
+  "case": "SQLite STRICT ANY table/grid CSV export and import",
+  "baseline": "Before the tagged encoding, native INTEGER 42, REAL -0.0 and BLOB 00ff80 re-imported as TEXT. Numeric-looking TEXT was indistinguishable from INTEGER; empty TEXT and SQL NULL required an explicit marker.",
+  "contract": [
+    "Versioned per-cell tags preserve SQLite INTEGER, REAL, TEXT and BLOB runtime classes across table-based CSV export/import.",
+    "Empty TEXT remains distinct from SQL NULL with an explicit collision-free NULL marker.",
+    "Text resembling a tag or formula survives exactly; legacy untagged fields remain TEXT.",
+    "Malformed reserved tags and blank cells without an explicit NULL marker are refused during planning before any write."
+  ],
+  "outcome": "Exact text fallback: a versioned engine-specific cell representation is reconstructed using destination metadata declaring ANY, then written through SQLite's typed native bindings.",
+  "reproduction": {
+    "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes -- --test-threads=1",
+    "result": "Failed before the change: INTEGER, REAL and BLOB values were restored as TEXT; numeric-looking TEXT and INTEGER both became TEXT.",
+    "log": "before-fix.txt"
+  },
+  "independent_oracle": "Native SQLite typeof(value) and returned Value after importing into a separate STRICT ANY table; source and target use SqliteDriver.",
+  "validation": {
+    "focused_app": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib sqlite_any_contract -- --test-threads=1",
+      "result": "5 passed, 455 filtered out",
+      "log": "app-focused.txt"
+    },
+    "app_library": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib -- --test-threads=1",
+      "result": "442 passed, 20 ignored, 918 filtered out",
+      "log": "app-full.txt"
+    },
+    "core_library": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib",
+      "result": "512 passed",
+      "log": "core-unit.txt"
+    },
+    "sqlite_driver": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "43 passed",
+      "log": "sqlite-driver.txt"
+    },
+    "mcp_library": {
+      "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --lib",
+      "result": "46 passed, 1 ignored, 88 filtered out",
+      "log": "mcp-unit.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-mcp --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "app-focused.txt": "0f4fd2e1fbdcf8a7d01f44db8ddcd8c145c905ae8a5b61bb2e192e28e64a9f16",
+    "app-full.txt": "ecc54c7d54c6f34d7c17b4dfbd2aaa9ab56d9dedd86203981ff7ae5b7ac87407",
+    "core-unit.txt": "de4616a935c78110f78d0ce081d6463e0ec381d1160165f81d276626673fe728",
+    "mcp-unit.txt": "9c5ca09bfa4e6298b8b6fda072afcf67c6e175261c899631903457e5ce9ecf33",
+    "before-fix.txt": "c21a14ee8203b8286c3506b9d6dce4cf03795c64ab67251ac706033be4b46170",
+    "sqlite-driver.txt": "a47d1c11211240d82c7f934e3503c6117b1d7fd8b283301dae9991c117dcb982",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+  },
+  "remaining": [
+    "SQLite arbitrary query results currently expose result-column metadata as NULL for a declared STRICT ANY column; query-result CSV cannot identify the declared ANY type and remains open.",
+    "SQLite's existing REAL bound-value refusal for negative zero remains in force; this case verifies representable REAL values only.",
+    "Other SQLite storage-class/affinity mixtures, output formats beyond CSV and installed GTK behavior remain open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

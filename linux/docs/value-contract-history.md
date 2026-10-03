@@ -4459,3 +4459,35 @@ all app-library tests with the optional DuckDB feature (444 passed, 20
 ignored), Clippy, and the mapped `change-contracts` layer passed. Installed
 GTK behavior remains open. See the
 [DuckDB enum keyed-edit evidence](evidence/duckdb-enum-keyed-results-2026-10-03/manifest.json).
+
+## SQLite STRICT ANY CSV storage-class round trip (2026-10-03)
+
+The first table-based round-trip contract exported a STRICT `ANY` column with
+the generic CSV formatter and re-imported it through the app's native import
+planner. It reproduced a loss: INTEGER `42`, REAL `-0.0`, and BLOB `00ff80` all
+returned as TEXT. Numeric-looking TEXT also could not be distinguished from an
+INTEGER, and empty TEXT from SQL NULL without an explicit marker. The final
+successful native fixture uses REAL `1.5`; SQLite's existing bound-value path
+refuses negative-zero REAL input because it cannot guarantee preserving that
+bit, and this CSV change does not alter that refusal.
+
+CSV values in declared `ANY` columns now use versioned `bookie:sqlite-any:v1:`
+tags for INTEGER, REAL, TEXT and BLOB. Text payloads are tagged too, so text
+that resembles a tag or a spreadsheet formula remains unambiguous. SQL NULL
+uses the export's collision-free marker. SQLite ANY import decodes those tags,
+keeps legacy untagged fields as TEXT, refuses malformed reserved tags, and
+refuses a blank field when no explicit NULL marker separates it from SQL NULL.
+The encoding is used by the column-aware CSV renderer, streamed file writer and
+MCP's column-aware row writer.
+
+The native app regression exports and imports a STRICT `ANY` table, then checks
+`typeof(value)` plus the returned value for INTEGER, REAL, numeric-looking and
+empty TEXT, SQL NULL, nonempty/empty BLOB, a tag-shaped text value and a
+formula-shaped text value. A separate plan-level regression checks ambiguous
+blank and malformed-tag refusal, legacy untagged text behavior and that the
+target remains unchanged when planning refuses. Four core CSV/codec tests and
+the two new app contracts pass alongside the existing three STRICT ANY grid
+contracts. Arbitrary SQLite query exports still report result-column type
+`NULL` for a declared `ANY` column, so they cannot yet select this type-aware
+encoding; installed GTK behavior and other output formats also remain open.
+See the [SQLite STRICT ANY CSV evidence](evidence/sqlite-strict-any-csv-results-2026-10-03/manifest.json).
