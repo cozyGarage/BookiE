@@ -4499,6 +4499,17 @@ three-layer parameter cases. Domain chains deeper than four layers and other
 enum/session combinations remain open. See the
 [four-domain-layer evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
 
+## PostgreSQL five-domain-layer enum contract (2026-10-04)
+
+A PostgreSQL 16 native case extends the chain to five nested domains. Fetched
+metadata resolves to the schema-qualified enum leaf; a schema-aware keyed edit,
+server-inferred enum comparison/update parameters, and a typed equality filter
+preserve the five-layer outer domain. An invalid label is refused with SQLSTATE
+`22P02`, and independent stored-value/type checks confirm no partial change and
+preserve the neighboring SQL NULL. All 12 domain contracts passed, including
+the four-level case. Chains deeper than five and other enum/session combinations
+remain untested. See the [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
+
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
 A SQLite STRICT table can declare `ANY` while storing different runtime kinds

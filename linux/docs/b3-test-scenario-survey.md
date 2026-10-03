@@ -174,8 +174,10 @@ A separate four-domain-layer contract verifies recursive enum-leaf metadata,
 keyed edit, server-inferred enum query/update parameters, typed filter and
 preservation of a SQL NULL sibling. A combined `pg_typeof($1)`/enum-comparison
 query is explicitly refused with SQLSTATE `42P08`; an explicit cast is the
-passing control. Depths beyond
-four domain layers remain open; see the [native evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
+passing control. A five-domain follow-up verifies metadata, keyed edit,
+inferred parameters, filter, invalid-label refusal and native sibling values.
+Depths beyond five layers remain open; see the [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json)
+and [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 
