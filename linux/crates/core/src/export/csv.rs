@@ -579,8 +579,8 @@ mod tests {
         value_column.data_type = "DOUBLE PRECISION".into();
         let columns = [value_column];
 
-        // Fixed xorshift seed makes this a reproducible spread across signs,
-        // mantissas and finite exponents without an extra property-test dependency.
+        // Fixed xorshift seed gives reproducible raw finite-bit samples,
+        // including subnormals, without an extra property-test dependency.
         let mut state = 0x6a09_e667_f3bc_c909_u64;
         let mut expected = vec![
             f64::from_bits(0x3fef_ffff_ffff_ffff),
@@ -590,13 +590,16 @@ mod tests {
             f64::from_bits(0x7fef_ffff_ffff_fffe),
             f64::from_bits(0xffef_ffff_ffff_fffe),
         ];
-        for _ in 0..256 {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            let exponent = ((state >> 52) % 0x7fe) + 1;
-            let bits = (state & !(0x7ff_u64 << 52)) | (exponent << 52);
-            expected.push(f64::from_bits(bits));
+        for _ in 0..65_536 {
+            loop {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                if ((state >> 52) & 0x7ff) != 0x7ff {
+                    expected.push(f64::from_bits(state));
+                    break;
+                }
+            }
         }
         let mantissas = [0, 1, 1 << 51, (1 << 52) - 2, (1 << 52) - 1];
         for sign in [0, 1_u64 << 63] {
@@ -606,6 +609,8 @@ mod tests {
                 }
             }
         }
+        assert_eq!(expected.len(), 86_012);
+        assert!(expected.iter().all(|value| value.is_finite()));
         let rows = expected
             .iter()
             .map(|value| vec![Value::Float(*value)])
