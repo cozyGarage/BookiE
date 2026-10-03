@@ -207,6 +207,14 @@
       "test_module": "domain_contract"
     },
     {
+      "selector": "value_contract_domain_over_enum_query_comparison_infers_parameter_type",
+      "assertions": "Raw domain = $1 returns PostgreSQL SQLSTATE 42883. Casting the domain column to its base enum allows text and NULL parameters to be inferred as that enum; pg_typeof($1), pg_typeof(status), comparison outcomes and NULL behavior are asserted.",
+      "probe_finding": "The first test draft expected the raw domain comparison to work; PostgreSQL rejected the operator during query parsing. The final contract records that as the explicit server refusal and verifies the supported base-enum comparison path.",
+      "result": "Focused test passed; the domain_contract group passed all 10 Docker-backed tests.",
+      "coverage_kind": "Native domain-over-enum comparison parameter context, including explicit refusal and inferred supported path.",
+      "test_module": "domain_contract"
+    },
+    {
       "selector": "value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type",
       "assertions": "PostgreSQL 16 SQL result-file output replays literal NULL, empty text, Unicode, a statement-shaped label and SQL NULL into a same-domain table. Exact expected values and pg_typeof verify native preservation; a neighboring table remains unchanged.",
       "coverage_kind": "New native domain SQL file-writer/replay consumer contract; no production change was needed.",
@@ -320,6 +328,9 @@
     "domain_over_enum_csv_round_trip": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type -- --include-ignored --test-threads=1",
     "domain_over_enum_csv_postgres_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
     "domain_over_enum_assignment_parameter_inference": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_assignment_infers_parameter_type -- --include-ignored --test-threads=1",
+    "domain_over_enum_query_comparison_inference": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_query_comparison_infers_parameter_type -- --ignored --test-threads=1",
+    "domain_over_enum_query_comparison_suite": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --ignored --test-threads=1",
+    "domain_over_enum_query_comparison_clippy": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
     "domain_over_enum_json_file": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_projection_preserves_labels_and_null -- --include-ignored --test-threads=1",
     "domain_over_enum_sql_file_replay": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type -- --include-ignored --test-threads=1",
     "domain_over_enum_mcp": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-mcp --test postgres_custom_enum postgres_domain_over_enum_values_survive_mcp_query_export_and_csv_import -- --include-ignored --exact --test-threads=1",
@@ -1183,12 +1194,12 @@
     "linux/crates/drivers/postgres/tests/integration.rs": "cf00eb8b2dd600f9d61cd68b33b2be607e411ba00cb613b2864e537d98e96881",
     "linux/crates/drivers/postgres/tests/support/array_contract.rs": "723188d7eff6cc146618c1ccfb46429d601280111ab74b8550882d49e6c9f85e",
     "linux/crates/drivers/postgres/tests/support/enum_contract.rs": "8f88adeb2784bb08af064947906c5ce8dbc375800a415322358553aab12d37b3",
-    "linux/docs/type-contract-strategy.md": "2bdfadcd9434fc5f605bcab7a39e55a115b55d256c4902f5f76e5c4f0c404aa3",
-    "linux/docs/value-contract-history.md": "8998d8360ab0bffbebab866bccf526653eac6ff8225d94c39a9864b6a70d41b1",
-    "linux/docs/release-audit-2026-10-03.md": "ad4a016fa3bbd32250a1abca248c3a5be1972e0ae4f4d95b98a56a6cbf92ca2f",
+    "linux/docs/type-contract-strategy.md": "65386d38089104cb4114a2f0ad25088905d65ba2e62a09e192f4634862b88672",
+    "linux/docs/value-contract-history.md": "459959bebee0f57ec8fb259a9b1b7640ae4cc118c212841d0aacacdd03f02a16",
+    "linux/docs/release-audit-2026-10-03.md": "91aff0735246f01c6131a44aafda6c23e7222d8f702546830445895584639ddd",
     "linux/docs/b3-test-scenario-survey.md": "53d360b9b5a7492c9954f7f5c1ea6c50915b7c1a84c4d8c7f616c0e036e90244",
-    "linux/docs/ignored-tests.md": "929ddbb6860394b40cdf84ea5f0ba5e2e3e2d1ae5cf69a1264d5a435ae3e20ea",
-    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "fdc7bcd35a5e413f82296da1fc2d3e50a905485f67a5d0542760115737ab8056",
+    "linux/docs/ignored-tests.md": "d553e559a5d2a2e26d5b58fba79323b798d186a3ecc52d550dcd483cf595f138",
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "733c2fcd96564eea6b7124561c4763818fb88eff5920b82ba02b983ca0c98db5",
     "linux/vendor/sqlx-postgres/src/types/array.rs": "f56af1aef5a9120f7db5aa70ec30fbd7743ba3fc39de8b4e498f51b5736e11e9",
     "linux/crates/core/src/filter.rs": "6f9b624c203c11ae260e0cc6445a26ca81516e6a7a13136ac9aa5ea055a22d38",
     "linux/crates/core/src/filter_tests.rs": "e2e9b7b25f2613e106d4e70d8e12a56fd77dfa075f3116111c6fe4f79d48d044",
@@ -1202,11 +1213,6 @@
     "linux/crates/mcp/src/tools.rs": "02b1200d446ca0af6cf423b394816cc3670f143114741ef69bcd02b631d5eb1f",
     "linux/crates/mcp/tests/postgres_custom_enum.rs": "7c5a4aea907b6279477834800ef66f4a371a9d950b0d3b7971a6cea232f292f5",
     "linux/crates/drivers/postgres/Cargo.toml": "68c472593388dc94e996244842478041e60f46d5f057c1e1fc8c65d32dd63a5b",
-    "linux/docs/b3-test-scenario-survey.md": "173ba8cc6f853757e2ad9cb1972afe4bba3c14be7322c5ad42def423554f5772",
-    "linux/docs/type-contract-strategy.md": "349ef88417a381d1bada0f7633fcb858337a01fa299ca205df030d27e2036ceb",
-    "linux/docs/value-contract-history.md": "9d5703ace0cc85782dba06686e1fa58889a739c14bc71bb232451f4b07ae3869",
-    "linux/docs/release-audit-2026-10-03.md": "80131d29c35524773fe555d7322e5e3afbb021e2f6cee553c88ee81a53c5c22c",
-    "linux/docs/ignored-tests.md": "929ddbb6860394b40cdf84ea5f0ba5e2e3e2d1ae5cf69a1264d5a435ae3e20ea",
     "linux/crates/drivers/postgres/tests/support/enum_file_export_contract.rs": "2731dfaafb2971ff8758349c0ee197cde73bb59e6ff07b41f5dfacba28faba96",
     "linux/crates/core/src/export/markdown.rs": "dc0e5b79166eb2f23d75708f9e62ac06189b0b0ea29330a24fdea9511ac34b0d",
     "linux/CHANGELOG.md": "53502e69132557c8ab351abc54ed2da32b029398603acb95b005d2f75747c849",
@@ -1216,10 +1222,6 @@
     "linux/crates/mcp/src/server.rs": "d11da1306df61be8c731255302522d4fb794144655389c47f19cee6d2d7ea5ab",
     "linux/crates/mcp/tests/enforce_policy.rs": "b3462deef8929ab90d0f9e7d64541763dc0ffae9677d19147782145f8d90df71",
     "linux/docs/value-contracts.md": "1261bcb5e389822359436320c456a472952f3230c5e0f787c77ec8df40942da8",
-    "linux/docs/type-contract-strategy.md": "2bdfadcd9434fc5f605bcab7a39e55a115b55d256c4902f5f76e5c4f0c404aa3",
-    "linux/docs/value-contract-history.md": "8998d8360ab0bffbebab866bccf526653eac6ff8225d94c39a9864b6a70d41b1",
-    "linux/docs/release-audit-2026-10-03.md": "ad4a016fa3bbd32250a1abca248c3a5be1972e0ae4f4d95b98a56a6cbf92ca2f",
-    "linux/docs/b3-test-scenario-survey.md": "53d360b9b5a7492c9954f7f5c1ea6c50915b7c1a84c4d8c7f616c0e036e90244",
     "linux/docs/b3-review-2026-10-01.md": "c713740c8af5eb7c220e3e76c9a2b9037aa219ccabe6e98c92948ea8006015f2",
     "linux/crates/app/src/ui/export_dialog.rs": "b9a78ddf48bb5c4adc9b2a6fe9b02ab06149f81d15aed7f0512b941ad9881882",
     "linux/crates/app/tests/gtk_safety.py": "2fc45a6be0a17551693590e81415ef7fca2ee705199bb97ae971df9b845ab67c"
@@ -1457,12 +1459,15 @@
     "domain-over-enum-formats-postgres-suite.txt": "4cee3c8c7ac8e1baf32881a5f65872808e99161bc4e0daca52c8cb6203963b12",
     "schema-shadowed-type.log": "57e4f0f75fa193917db47368b59cf5bb8bb63c4d5700e5b4f6af9b65937c639b",
     "schema-shadowed-enum-suite.log": "3c08c294bb7f0bb2bb57cae32935bc6ce6c387a0c8fc4d651ad592291c01f017",
-    "schema-shadowed-enum-clippy.log": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+    "schema-shadowed-enum-clippy.log": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a",
+    "domain-query-inference-focused.log": "b9b10c3110cf4c6e72a51c1cf479aa290ba28d5c746d94955794145b5f140093",
+    "domain-query-inference-suite.log": "ad473d8d42b71c856c420cb8341f2a25642e96c4948955d61a7815a16ac2064e",
+    "domain-query-inference-clippy.log": "836a3f8164a657554971674d1a93581a4759fb7920fb50f5cace55f18b7dbc10"
   },
   "remaining": [
     "Additional PostgreSQL enum format/session combinations remain open. Core spreadsheet-safe CSV is now proven to be presentation-only and lossy on import; raw-text CSV has the native round-trip contract.",
     "Complete the broader PostgreSQL custom-enum type/session/configuration and consumer matrix with independent native oracles.",
     "These focused JSON/XML/HTML/Markdown/XLSX/MCP cases and PostgreSQL driver suite do not close B3\u2019s broader engine/type/consumer matrix or release gates.",
-    "Domain-over-enum support is proven for scalar/array results, structured filters, keyed updates, draft inserts, the app text parser, explicit-cast parameters, assignment-inferred text/SQL NULL updates and raw CSV export/import with explicit NULL markers; parameter inference outside assignment writes, additional session/configuration combinations and nested domain chains remain untested."
+    "Domain-over-enum support is proven for scalar/array results, structured filters, keyed updates, draft inserts, the app text parser, explicit-cast parameters, assignment-inferred text/SQL NULL updates, base-enum comparison query inference, and raw CSV export/import with explicit NULL markers. Other operator contexts, additional session/configuration combinations and nested domain chains remain open."
   ]
 }

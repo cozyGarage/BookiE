@@ -275,6 +275,108 @@ async fn value_contract_domain_over_enum_assignment_infers_parameter_type() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_query")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_domain_query.state AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_query.state_domain \
+             AS value_contract_domain_query.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_query.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_query.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_domain_query.rows VALUES \
+             (1, 'ready'), (2, 'paused'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let uncast = connection
+        .query_params(
+            "SELECT id, status = $1, pg_typeof($1)::text, pg_typeof(status)::text \
+             FROM value_contract_domain_query.rows ORDER BY id",
+            &[Value::Text("ready".into())],
+        )
+        .await
+        .expect_err("raw domain equality has no domain-to-unknown operator");
+    assert!(matches!(
+        uncast,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "42883"
+    ));
+
+    let result = connection
+        .query_params(
+            "SELECT id, status::value_contract_domain_query.state = $1, \
+             pg_typeof($1)::text, pg_typeof(status)::text \
+             FROM value_contract_domain_query.rows ORDER BY id",
+            &[Value::Text("ready".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Bool(true),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Bool(false),
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text("value_contract_domain_query.state".into()),
+                Value::Text("value_contract_domain_query.state_domain".into()),
+            ],
+        ]
+    );
+
+    let null_result = connection
+        .query_params(
+            "SELECT status::value_contract_domain_query.state = $1, \
+             pg_typeof($1)::text, pg_typeof(status)::text \
+             FROM value_contract_domain_query.rows WHERE id = 1",
+            &[Value::Null],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        null_result.rows,
+        vec![vec![
+            Value::Null,
+            Value::Text("value_contract_domain_query.state".into()),
+            Value::Text("value_contract_domain_query.state_domain".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_three_level_domain_over_enum_infers_parameters_and_decodes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

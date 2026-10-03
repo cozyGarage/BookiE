@@ -4306,8 +4306,11 @@ the exact emitted CSV with its marker and checks native domain values/types.
 XML/HTML/Markdown file outputs preserve NULL/empty distinctions, Unicode and
 escaped hostile labels. XLSX writes the non-empty domain labels as a workbook
 and refuses the empty label while preserving the existing destination.
-Additional PostgreSQL domain/session format combinations, parameter inference
-outside assignment writes and nested domain chains remain untested.
+Additional PostgreSQL domain/session format combinations, other operator
+contexts and nested domain chains remain untested. A new query comparison case
+proves raw `domain = $1` is rejected by PostgreSQL with SQLSTATE 42883, while
+casting the column to its base enum lets PostgreSQL infer the enum type for
+bound text and SQL NULL parameters; `pg_typeof` and row outcomes are checked.
 Exact commands and results are in the
 [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
 
