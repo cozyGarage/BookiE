@@ -118,9 +118,10 @@ operators, list complements and both NULL checks. Exact row labels and native
 enum/domain types are asserted. Direct query-parameter operator contexts and
 session configurations remain open; see the
 [complete filter matrix](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
-The direct query parameter contract also checks base-enum-cast `=`, `<>` and
-`BETWEEN`; raw domain equality remains explicitly refused. See the
-[query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
+The direct query parameter contract checks base-enum-cast `=`, `<>`, `<`,
+`<=`, `>`, `>=` and `BETWEEN`; raw domain equality remains explicitly refused.
+See the [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
+and [ordering-operator evidence](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
 The same-named enum schema case now applies a structured equality filter under
 the shadowed `search_path` and confirms the filter remains bound to the target
 schema's native type; see the

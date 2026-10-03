@@ -4555,3 +4555,18 @@ checks. See the
 This closes structured-filter operator coverage for these enum fixtures. Direct
 query-parameter operator contexts, session/search_path combinations, deeper
 domain chains and other enum/native value consumers remain open.
+
+## PostgreSQL domain-over-enum query ordering parameters (2026-10-03)
+
+The direct query comparison contract now exercises `<`, `<=`, `>` and `>=` on
+a domain-over-enum column cast to its base enum. PostgreSQL infers the bound text
+parameter as the qualified base enum for each operator; `pg_typeof($1)`,
+`pg_typeof(status)` and per-row truth values (including SQL NULL propagation)
+are asserted. The same fixture retains `=`, `<>`, both `BETWEEN` bounds, SQL NULL
+parameter inference and the explicit SQLSTATE 42883 refusal for raw domain
+equality. The focused PostgreSQL 16 case and all 10 domain contracts pass, along
+with Clippy, formatting and diff checks. See the
+[ordering-parameter evidence](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
+
+Direct query parameters for list operators and other session/search_path
+combinations remain untested.

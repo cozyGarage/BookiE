@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-03",
+  "branch": "linux",
+  "source_commit": "ada104a7fea77c81db4af60ad6ff2e5f1de6dae7",
+  "engine": "PostgreSQL 16 Alpine in a local Docker fixture",
+  "case": "Server-inferred query parameter types for domain-over-enum comparisons",
+  "added_coverage": [
+    "A direct domain comparison remains explicitly refused with SQLSTATE 42883.",
+    "Casting the domain column to its base enum permits PostgreSQL to infer text parameters for <, <=, > and >= in addition to the existing =, <>, and BETWEEN cases.",
+    "For every ordering operator, pg_typeof($1)::text is the qualified base enum, pg_typeof(status)::text is the domain, and result values include SQL NULL propagation."
+  ],
+  "independent_oracle": "PostgreSQL 16 pg_typeof() results and exact per-row comparison truth values for enum-backed domain rows including SQL NULL.",
+  "validation": {
+    "focused_parameter_operator_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_query_comparison_infers_parameter_type -- --include-ignored --test-threads=1",
+      "result": "1 passed, 93 filtered out",
+      "log": "parameter-operators.txt"
+    },
+    "domain_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "10 passed, 84 filtered out",
+      "log": "domain-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "No issues found",
+      "log": "clippy.txt"
+    },
+    "format_and_diff_checks": "cargo fmt --all -- --check and git diff --check passed"
+  },
+  "log_sha256": {
+    "parameter-operators.txt": "b115d25ab93f8448fbf30256d0dafc2cb922647bad364183357d9b7b1dca0c44",
+    "domain-suite.txt": "cab302c891c12f725cfbd44e94bd3b14adf053a8b50d3cd5de1a7630c10c7ebd",
+    "clippy.txt": "25684e9665a15a09a4d13b453333ea2b6f1f73e96f782e4f62d810f4d912a26f"
+  },
+  "remaining": [
+    "Raw direct query parameters for other operators, list comparisons, session/search_path combinations and other domain/base types remain open.",
+    "This case does not close the PostgreSQL enum matrix or B3."
+  ]
+}
