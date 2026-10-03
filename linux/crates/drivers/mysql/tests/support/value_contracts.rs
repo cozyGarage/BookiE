@@ -135,6 +135,76 @@ async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_expo
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn strict_zero_date_modes_refuse_invalid_dates_without_writing() {
+    let (_container, options) = start_mysql().await;
+    let conn = connect(options).await;
+    conn.execute("CREATE TABLE strict_dates (id INT PRIMARY KEY, value DATE NOT NULL)")
+        .await
+        .unwrap();
+
+    let mut session = conn.open_session().await.unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    session
+        .query_params_controlled(
+            "SET SESSION sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let mode = session
+        .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+        .await
+        .unwrap();
+    assert!(
+        matches!(&mode.rows[0][0], Value::Text(mode) if mode.contains("STRICT_TRANS_TABLES") && mode.contains("NO_ZERO_DATE") && mode.contains("NO_ZERO_IN_DATE"))
+    );
+
+    for (id, value) in [(1, "0000-00-00"), (2, "2024-00-15")] {
+        let error = session
+            .query_params_controlled(
+                &format!("INSERT INTO strict_dates VALUES ({id}, '{value}')"),
+                &[],
+                &control,
+            )
+            .await
+            .expect_err("strict zero-date modes must reject zero and incomplete dates");
+        assert!(
+            matches!(
+                &error,
+                tablepro_core::DriverError::Query {
+                    sqlstate: Some(code), ..
+                } if code == "22007"
+            ),
+            "id {id}, date {value}: {error:?}"
+        );
+    }
+
+    session
+        .query_params_controlled("INSERT INTO strict_dates VALUES (3, '2024-02-15')", &[], &control)
+        .await
+        .unwrap();
+    let stored = session
+        .query_params_controlled(
+            "SELECT id, value, CAST(value AS CHAR) FROM strict_dates ORDER BY id",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![vec![
+            Value::Int(3),
+            Value::Date(NaiveDate::from_ymd_opt(2024, 2, 15).unwrap()),
+            text("2024-02-15"),
+        ]]
+    );
+    session.close().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn session_non_utc_time_zone_refuses_mysql_timestamp_instant() {
     let (_container, options) = start_mysql().await;
     let conn = connect(options).await;
