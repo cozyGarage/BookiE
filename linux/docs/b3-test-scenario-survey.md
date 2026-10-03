@@ -138,7 +138,8 @@ and [list/range follow-up](evidence/postgres-shadowed-enum-filter-matrix-results
 A direct bound equality, `IN` and `BETWEEN` query under the same collision also
 select the target enum row and leave the shadow row unchanged; see [query parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
 For diagnostics using polymorphic `pg_typeof($1)`, native preparation reports
-ambiguous parameter type `42P08`; the explicit target-enum cast is covered too.
+ambiguous parameter type `42P08`, which the driver preserves across its text
+fallback; the explicit target-enum cast is covered too.
 
 ### B3-P1 current coverage verdict — September 30
 
