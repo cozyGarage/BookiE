@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "244880e009e620f6cd0401594a8385d8e983c0ab",
+  "case": "Four nested PostgreSQL domains over a custom enum",
+  "test": "domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values",
+  "contract": [
+    "PostgreSQL 16 column metadata resolves four nested domains to the schema-qualified enum leaf.",
+    "A schema-aware keyed edit changes the stored label; pg_typeof confirms the four-layer outer domain.",
+    "The typed equality filter selects the updated row and preserves an adjacent SQL NULL row.",
+    "Independent PostgreSQL value and pg_typeof queries confirm stored labels, SQL NULL and native outer-domain type."
+  ],
+  "validation": {
+    "domain_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "11 passed, 0 failed",
+      "log": "domain-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "domain-tests.txt": "5ac33d417d6fb3e5391b6f9e162daea2f92f43b1ea2708b271f7cdf33f608e2f",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Domain chains deeper than four layers remain open.",
+    "Other enum session/configuration combinations remain open.",
+    "This contract does not close the broader B3 matrix."
+  ]
+}

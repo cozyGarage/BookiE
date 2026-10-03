@@ -4451,7 +4451,20 @@ the literal label `NULL`, empty label, Unicode label and SQL NULL. The focused
 contract and all 10 domain contracts pass, along with Clippy and formatting.
 See the [query-operator evidence](evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
 
-Depths beyond three levels and other enum/session configurations remain open.
+At the October 3 checkpoint, depths beyond three levels and other enum/session
+configurations remained open.
+
+## PostgreSQL four-domain-layer enum consumer contract (2026-10-04)
+
+A new PostgreSQL 16 integration case builds four nested domains over one enum.
+It verifies that fetched column metadata resolves to the schema-qualified enum
+leaf, a keyed update stores a new label at the four-layer outer domain, and a
+typed equality filter selects that row. Independent `pg_typeof` and value
+queries confirm the outer domain type and that a sibling SQL NULL remains
+unchanged. All 11 PostgreSQL domain contracts passed, including the existing
+three-layer parameter cases. Domain chains deeper than four layers and other
+enum/session combinations remain open. See the
+[four-domain-layer evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
 
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 

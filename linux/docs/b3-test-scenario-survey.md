@@ -163,6 +163,10 @@ The three-level domain chain now checks inferred direct text and SQL NULL
 parameters for both NULL-safe distinctness operators, with leaf enum and outer
 domain `pg_typeof` assertions. See [three-level query evidence](evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
 
+A separate four-domain-layer contract verifies recursive enum-leaf metadata,
+keyed edit, typed filter and preservation of a SQL NULL sibling. Depths beyond
+four domain layers remain open; see the [native evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
+
 ### B3-P1 current coverage verdict — September 30
 
 Temporal follow-up (2026-10-02): ClickHouse now checks both a one-hour New York
