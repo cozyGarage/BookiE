@@ -1343,6 +1343,54 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
         );
     }
 
+    let ambiguous_native = connection
+        .execute(
+            "PREPARE enum_shadow_ambiguous_parameter AS \
+             SELECT pg_typeof($1)::text FROM enum_shadow_b.items \
+             WHERE status::enum_shadow_b.status_kind = $1",
+        )
+        .await
+        .expect_err("PostgreSQL cannot infer a type shared only with pg_typeof");
+    assert!(matches!(
+        ambiguous_native,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "42P08"
+    ));
+
+    let ambiguous_driver = connection
+        .query_params(
+            "SELECT id, pg_typeof($1)::text FROM enum_shadow_b.items \
+             WHERE status::enum_shadow_b.status_kind = $1",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .expect_err("ambiguous parameter type must not compare enum with text");
+    assert!(matches!(
+        ambiguous_driver,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "42883"
+    ));
+
+    let explicitly_typed = connection
+        .query_params(
+            "SELECT id, pg_typeof($1::enum_shadow_b.status_kind)::text, \
+             pg_typeof(status)::text FROM enum_shadow_b.items \
+             WHERE status::enum_shadow_b.status_kind = $1::enum_shadow_b.status_kind",
+            &[Value::Text("paused".into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        explicitly_typed.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("enum_shadow_b.status_kind".into()),
+            Value::Text("enum_shadow_b.status_kind".into()),
+        ]]
+    );
+
     let shadow_after = connection
         .query("SELECT id, status::text, sibling FROM enum_shadow_a.items")
         .await
