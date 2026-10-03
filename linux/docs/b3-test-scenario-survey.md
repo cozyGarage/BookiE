@@ -129,10 +129,13 @@ native stored values; the TIMESTAMP cases also pin UTC session/epoch semantics.
 An exact `TIME(3)` half-millisecond case confirms the `.789500` tie rounds to
 `.790` or truncates to `.789` according to each engine's mode. Matching exact-
 half `DATETIME(3)` and `TIMESTAMP(3)` cases now pin the same engine-specific
-round/truncate behavior. Other temporal precisions and consumer paths remain
-open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+round/truncate behavior. New `TIME(0)` through `TIME(6)` coverage checks each
+fractional precision under both engine defaults and the alternate mode, through
+bound and generated-literal inserts. Other `DATETIME`/`TIMESTAMP` precisions,
+configurations and consumer paths remain open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
 [TIME exact-half evidence](evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json),
 [DATETIME/TIMESTAMP exact-half evidence](evidence/mysql-fractional-half-boundary-matrix-results-2026-10-04/manifest.json),
+[TIME precision matrix](evidence/mysql-time-precision-matrix-results-2026-10-04/manifest.json),
 [DATETIME evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json)
 and [TIMESTAMP evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 

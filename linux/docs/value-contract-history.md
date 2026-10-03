@@ -2911,6 +2911,15 @@ generated-literal paths assert the stored native value, cast text and
 `MICROSECOND()` result. TIMESTAMP runs set the session timezone to UTC and
 check epoch microseconds. See the [native evidence](evidence/mysql-fractional-half-boundary-matrix-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB TIME fractional precision matrix (2026-10-04)
+
+The native cases insert `12:34:56.789956` into `TIME(0)` through `TIME(6)`.
+MySQL's default rounds at each declared precision and
+`TIME_TRUNCATE_FRACTIONAL` truncates; MariaDB's default truncates and
+`TIME_ROUND_FRACTIONAL` rounds. Both bound and generated-literal paths assert
+the returned `Value::Time`, cast text and `MICROSECOND()` result for every
+precision. See the [native evidence](evidence/mysql-time-precision-matrix-results-2026-10-04/manifest.json).
+
 ### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
 
 The paired Docker cases apply the same mode matrix to a `DATETIME(3)`
