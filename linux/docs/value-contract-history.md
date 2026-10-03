@@ -4429,8 +4429,12 @@ row remains unchanged. The initial run corrected the test oracle: DuckDB reports
 the declared ENUM type through `typeof(status)` even for a NULL value, while the
 decoded cell remains `Value::Null`.
 
-The focused app contract and all app-library tests with the optional DuckDB
-feature passed (444 passed, 20 ignored); Clippy and the mapped
-`change-contracts` layer passed. This covers nonempty keyed label edits. Empty
-enum-label grid input semantics and installed GTK behavior remain open. See the
+The grid parser keeps blank input as SQL NULL and accepts `''` as the explicit
+input for an empty enum label; SQL single-quote escaping is also decoded before
+the value reaches the keyed-update builder. The native contract checks both
+paths, confirms the saved native ENUM type and sibling values, and still
+refuses an invalid label without changing the keyed row. The focused contract,
+all app-library tests with the optional DuckDB feature (444 passed, 20
+ignored), Clippy, and the mapped `change-contracts` layer passed. Installed
+GTK behavior remains open. See the
 [DuckDB enum keyed-edit evidence](evidence/duckdb-enum-keyed-results-2026-10-03/manifest.json).

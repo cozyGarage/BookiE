@@ -96,6 +96,12 @@ pub(super) fn parse_input_for_grid_cell(
     driver_id: &str,
     current_value: Option<&Value>,
 ) -> Result<Value, String> {
+    if driver_id == "duckdb"
+        && col.is_some_and(|column| column.data_type.trim().to_ascii_uppercase().starts_with("ENUM"))
+        && let Some(label) = parse_sql_single_quoted_string(text.trim())
+    {
+        return Ok(Value::Text(label));
+    }
     if !text.is_empty()
         && driver_id == "sqlite"
         && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
@@ -111,6 +117,26 @@ pub(super) fn parse_input_for_grid_cell(
         // text means the user intended a different storage class.
     }
     parse_input_for_driver(text, col, driver_id)
+}
+
+fn parse_sql_single_quoted_string(text: &str) -> Option<String> {
+    if text.len() < 2 {
+        return None;
+    }
+    let inner = text.strip_prefix('\'')?.strip_suffix('\'')?;
+    let mut label = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        if ch != '\'' {
+            label.push(ch);
+            continue;
+        }
+        if chars.next()? != '\'' {
+            return None;
+        }
+        label.push('\'');
+    }
+    Some(label)
 }
 
 fn parse_postgres_extended_temporal_input(
