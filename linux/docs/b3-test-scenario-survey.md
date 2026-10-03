@@ -114,10 +114,10 @@ the
 and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03),
 with [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
 
-October 4 B3-4 follow-up: one mixed computed `CASE` expression over STRICT
-`ANY` keeps fallback metadata while native `typeof()` proves per-row
-INTEGER/NULL/TEXT classes; other expression shapes remain open. See the
-[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
+October 4 B3-4 follow-up: mixed `CASE` and `COALESCE` expressions over STRICT
+`ANY` keep fallback metadata while native `typeof()` proves per-row storage
+classes; other expression shapes remain open. See the [CASE evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json)
+and [COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
 colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 

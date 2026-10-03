@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "0e633e1df70b972c34122f79ee402230531dd9e9",
+  "case": "SQLite COALESCE expression over a STRICT ANY column",
+  "test": "computed_coalesce_over_strict_any_keeps_fallback_metadata_and_storage_classes",
+  "contract": [
+    "COALESCE(value, fallback-text) over mixed INTEGER, SQL NULL and TEXT storage returns exact INTEGER/TEXT/TEXT values.",
+    "SQLite typeof() independently confirms each result storage class.",
+    "Computed column metadata remains SQLx fallback NULL rather than claiming declared ANY.",
+    "Ordinary and bound query paths return the same exact values and metadata."
+  ],
+  "validation": {
+    "focused_integration": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration computed_coalesce_over_strict_any_keeps_fallback_metadata_and_storage_classes -- --exact",
+      "result": "1 passed",
+      "suite_log": "integration.txt"
+    },
+    "sqlite_integration_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration",
+      "result": "26 passed, 0 failed, 0 ignored",
+      "log": "integration.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "integration.txt": "da9c1ac81ad79e35db83fa32430f14049ae0041b92d61e64a37e4fa6c374d8a2",
+    "clippy.txt": "1f22649c061859814ee4e146f200737ec43e9b086488b95b8cfc126d86d6cd2e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other SQLite computed-expression shapes remain open.",
+    "Other storage-class and affinity combinations, consumers and installed editing remain open.",
+    "This case does not close the B3 matrix."
+  ]
+}

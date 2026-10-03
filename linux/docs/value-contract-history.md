@@ -4599,10 +4599,16 @@ INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL with native `typeof()` proof.
 The focused SQLite driver case, all 45 driver tests, five app STRICT ANY
 contracts, Clippy, formatting and diff checks pass. See the
 [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
-One mixed computed `CASE` expression now has a native `typeof()` contract: the
-result keeps SQLx's `NULL` fallback metadata rather than inheriting `ANY`, while
-per-row INTEGER, NULL and TEXT values remain exact. See the October 4
-[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
+Mixed `CASE` and `COALESCE` expressions now have native `typeof()` contracts.
+The CASE result covers INTEGER, SQL NULL and TEXT; COALESCE covers INTEGER,
+fallback TEXT and stored TEXT. Both retain SQLx's `NULL` fallback metadata
+instead of inheriting the input column's declared `ANY` type. CASE is checked
+through a bound query; a separate zero-row expression query and transaction
+query preserve fallback metadata. COALESCE is checked through ordinary and bound
+queries. Direct-column queries continue recovering `ANY`.
+All 26 SQLite integration tests pass with strict Clippy and formatting. See the
+[CASE evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json) and
+[COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
 Other computed expressions, formats, storage-class combinations and installed
 GTK editing remain open. Attached-schema ambiguity is covered separately below.
 
