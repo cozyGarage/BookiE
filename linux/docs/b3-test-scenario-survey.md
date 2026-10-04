@@ -112,10 +112,13 @@ retains a SQL NULL row; see the [enum-order evidence](evidence/postgres-enum-ord
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
 
 October 4 B3-4 follow-up: a local DuckDB enum CSV round trip now preserves the
-empty label, literal `NULL`, Unicode, a quoted label, a formula-shaped label
+empty label, literal `NULL`, Unicode, a quoted label, formula-shaped labels
 and SQL NULL using a collision-free null marker. Native `typeof`, exact label
 text and `IS NULL` checks verify the imported enum values; a pre-existing
-destination row remains unchanged. See the [DuckDB enum CSV evidence](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
+destination row remains unchanged. The spreadsheet-safe CSV path prefixes
+formula-like text, and import planning confirms that `=1+1` collides with the
+valid label `'=1+1`; that encoding is for spreadsheet presentation, while raw
+CSV is the lossless restore format. See the [DuckDB enum CSV evidence](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
 
 October 4 B3-1 follow-up: one PostgreSQL `text[]` result now passes through the
 XML, HTML and Markdown file writers; the SQL writer is replayed into PostgreSQL

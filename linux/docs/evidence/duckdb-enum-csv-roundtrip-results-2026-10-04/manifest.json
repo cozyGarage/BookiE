@@ -2,13 +2,14 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "cb78fa019e65cb759660836a27563f84940d41db",
+  "source_commit": "8a9b2742a15178718c4a41d7b81d7b2004074597",
   "engine": "Bundled DuckDB, in-memory",
   "case": "DuckDB ENUM raw CSV export/import round trip",
   "test": "ui::browse_tab::value_parse::duckdb_enum_contract::value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null",
   "contract": [
     "The local app contract exports DuckDB ENUM results using raw-text CSV and a collision-free explicit SQL NULL marker, then plans and executes a typed CSV import.",
-    "Empty text, the literal NULL label, Unicode, a quoted label, a formula-shaped label and SQL NULL retain their exact values and native ENUM type after import.",
+    "Empty text, the literal NULL label, Unicode, a quoted label, formula-shaped labels and SQL NULL retain their exact values and native ENUM type after raw-mode import.",
+    "Spreadsheet-safe CSV prefixes a formula-shaped label; importing it collides with the valid enum label that already begins with an apostrophe. This mode is for spreadsheet presentation, not lossless restore.",
     "A pre-existing destination row is unchanged; native typeof, exact VARCHAR labels and the SQL NULL predicate provide the post-import oracle."
   ],
   "validation": {
@@ -35,12 +36,12 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "log_sha256": {
-    "focused.txt": "fddd97c4e904c3abc7c86d831b38053aef7624027531b3cb628d68e410c90ae1",
-    "app-lib.txt": "8d59dc48bc3075eb60813b5141692060e8ef3ee04280e0598c450cdc34f06c1b",
-    "clippy.txt": "bf3c59931c48cee37fae3572ff68b302d684c70e9562f32af4ca7bd888256e6f",
-    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "focused.txt": "b694da10f87ed7e7accbd6d5e9bd8c636d0634708da4a76249c612d0deb351a6",
+    "app-lib.txt": "297451947c4a2f5cda35e59fbf5e3392203f1392cfdd995587fa2a1c2272c8e7",
+    "clippy.txt": "8f567aca8e02c54a84b3b337139cafa75dea0a3a54060d7cee76762fef8466f8",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
   },
   "remaining": [
-    "Formula-sanitized DuckDB CSV behavior, other consumer/configuration combinations and installed GTK editing remain open; this case does not close B3 or qualify 0.2.0."
+    "Other DuckDB consumer/configuration combinations and installed GTK editing remain open; this case does not close B3 or qualify 0.2.0."
   ]
 }
