@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "04105106b",
+  "source_commit": "8887bc85d",
   "case": "MySQL/MariaDB ENUM and SET consumers across SQL modes",
   "engines": {
     "mysql": "testcontainers-modules default mysql:8.1 image",
@@ -17,6 +17,7 @@
     "ENUM and SET fixtures cover apostrophe and backslash labels, multiple selected SET members, literal NULL, empty text, and SQL NULL.",
     "SQL files replay and typed CSV export/import preserve ENUM/SET values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined modes on both engines.",
     "CSV uses a collision-free NULL marker so an empty SET stays distinct from SQL NULL; JSON preserves each value.",
+    "XML, HTML, and Markdown escape markup-shaped ENUM and SET labels under each SQL mode.",
     "XLSX refuses the empty SET text and leaves an existing destination unchanged.",
     "Each mode checks native ENUM ordinals, SET masks, label bytes and both copied tables against the source."
   ],
