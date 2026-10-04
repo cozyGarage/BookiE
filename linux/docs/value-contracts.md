@@ -52,6 +52,11 @@ Calc round trip as exact text. Native `array_send` bytes match after binding the
 driver's quoted array text, and the re-saved cells remain strings without
 formulas ([evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+A PostgreSQL `date[]` workbook preserves a BC date, year 10000, both date
+infinities and SQL NULL through Calc's XLSX/ODS/XLSX round trip. The native
+parameter rebind matches both `array_to_json` and `array_send`
+([evidence](evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).

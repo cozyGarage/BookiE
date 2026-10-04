@@ -210,6 +210,13 @@ and XML verifier are retained in the
 [UUID-array Calc evidence packet](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json).
 Other PostgreSQL array shapes and consumer matrices remain open.
 
+October 5 B3-2 consumer follow-up: PostgreSQL `date[]` with a BC date, year
+10000, both infinities and SQL NULL survives the pinned Calc XLSX-to-ODS-to-XLSX
+round trip as exact text, without formulas. Native `array_to_json` and
+`array_send` match after rebinding. See the
+[date-array Calc evidence](evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json).
+Other temporal-array shapes and consumers remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current
