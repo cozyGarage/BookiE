@@ -264,6 +264,7 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
 
     let safe_options = tablepro_core::export::CsvOptions {
         null_to_empty: false,
+        sanitize_formulas: true,
         null_marker: Some(import_options.null_marker.clone()),
         ..Default::default()
     };
