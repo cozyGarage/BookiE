@@ -97,6 +97,144 @@ async fn value_contract_domain_over_enum_array_functions_infer_parameter_type() 
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_array_append_prepend_keep_target_under_shadowed_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_functions")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_functions_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_functions.state \
+             AS ENUM ('ready', 'NULL', 'paused')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_functions_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_shadowed_array_functions.state_domain \
+             AS value_contract_shadowed_array_functions.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_shadowed_array_functions.rows \
+             (id INT PRIMARY KEY, status value_contract_shadowed_array_functions.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_shadowed_array_functions.rows \
+             VALUES (1, 'ready'), (2, 'NULL'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let schema = "value_contract_shadowed_array_functions";
+    let enum_type = format!("{schema}.state");
+    let result_array = format!("{schema}.state[]");
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(
+            "SET LOCAL search_path TO value_contract_shadowed_array_functions_shadow, public",
+        )
+        .await
+        .unwrap();
+
+    for (expression, native_function) in [
+        (
+            "array_append(ARRAY[status], $1)",
+            "array_append(ARRAY[status], {value})",
+        ),
+        (
+            "array_prepend($1, ARRAY[status])",
+            "array_prepend({value}, ARRAY[status])",
+        ),
+    ] {
+        for (parameter, native_value) in [
+            (
+                Value::Text("paused".into()),
+                format!("'paused'::{enum_type}"),
+            ),
+            (Value::Text("NULL".into()), format!("'NULL'::{enum_type}")),
+            (Value::Null, format!("NULL::{enum_type}")),
+        ] {
+            let native = transaction
+                .query(&format!(
+                    "SELECT id, array_to_json({})::text, \
+                     pg_typeof({})::text, encode(array_send({}), 'hex') \
+                     FROM {schema}.rows ORDER BY id",
+                    native_function.replace("{value}", &native_value),
+                    native_function.replace("{value}", &native_value),
+                    native_function.replace("{value}", &native_value),
+                ))
+                .await
+                .unwrap();
+            let result = transaction
+                .query_params(
+                    &format!(
+                        "SELECT id, array_to_json({expression})::text, \
+                         pg_typeof($1)::text, pg_typeof({expression})::text, \
+                         encode(array_send({expression}), 'hex') \
+                         FROM {schema}.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = native
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text(enum_type.clone()),
+                        Value::Text(result_array.clone()),
+                        row[3].clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(result.rows, expected, "{expression} with {parameter:?}");
+        }
+
+        transaction.execute("SAVEPOINT invalid_array_function_parameter").await.unwrap();
+        let invalid = transaction
+            .query_params(
+                &format!(
+                    "SELECT {expression} FROM {schema}.rows WHERE id = 1"
+                ),
+                &[Value::Text("shadow-only".into())],
+            )
+            .await
+            .expect_err("a label found only in the shadow enum must be rejected by the target enum");
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+        );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT invalid_array_function_parameter")
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_enum_array_remove_infers_scalar_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
