@@ -1048,6 +1048,116 @@ async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 2), (1, 9), (2, 1.25), (2, 2.5), \
+             (3, 'zebra'), (3, 'alpha'), (4, X'00FF'), (4, X'0001'), \
+             (5, NULL), (5, NULL), (6, 9), (6, '1'), \
+             (7, 'zebra'), (7, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, MIN(value) AS result, \
+                    typeof(MIN(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(2), Value::Text("integer".into())],
+            vec![Value::Int(2), Value::Float(1.25), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Text("alpha".into()), Value::Text("text".into())],
+            vec![Value::Int(4), Value::Bytes(vec![0, 1]), Value::Text("blob".into())],
+            vec![Value::Int(5), Value::Null, Value::Text("null".into())],
+            vec![Value::Int(6), Value::Int(9), Value::Text("integer".into())],
+            vec![
+                Value::Int(7),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(2),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.25),
+                Value::Text("real".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("alpha".into()),
+                Value::Text("text".into())
+            ],
+            vec![
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 1]),
+                Value::Text("blob".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(9),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
