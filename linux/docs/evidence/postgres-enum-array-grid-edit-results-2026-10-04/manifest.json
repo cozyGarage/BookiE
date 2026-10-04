@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "4c8551978",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "custom enum[] grid parser and keyed edit preserve labels and refuse invalid values safely",
+  "tests": [
+    "value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qualified_cast",
+    "array_contract::value_contract_custom_enum_array_grid_edit_preserves_labels_and_siblings"
+  ],
+  "contract": [
+    "The app grid parser keeps a custom enum-array cell as exact array text and the keyed update builder applies the schema-qualified enum[] cast.",
+    "A live keyed edit preserves literal NULL, empty text, Unicode, comma-containing labels and SQL NULL elements against native pg_typeof, array_dims, array_to_json and array_send oracles.",
+    "An invalid enum label is rejected without changing the edited row; the sibling row retains its exact array_send bytes."
+  ],
+  "validation": {
+    "native_array_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "18 passed, 0 failed",
+      "log": "postgres-tests.txt"
+    },
+    "app_parser_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qualified_cast -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "app-test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Installed grid interaction, other PostgreSQL array families and additional enum/session configurations remain open in B3."
+  ]
+}

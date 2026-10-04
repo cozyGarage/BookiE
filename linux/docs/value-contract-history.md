@@ -5256,6 +5256,17 @@ checks pass and the sibling row remains unchanged. All 17 PostgreSQL
 array-contract tests, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json).
 
+## PostgreSQL custom enum-array grid edit contract, 2026-10-04
+
+The app parser keeps a custom enum-array edit as exact text and the keyed
+update builder applies its schema-qualified type cast. A PostgreSQL 16 Docker
+case preserves literal `NULL`, empty text, Unicode, comma-containing labels
+and SQL NULL elements against native type, dimensions, JSON and wire oracles.
+An invalid label is refused without mutation and the sibling row retains its
+wire bytes. All 18 PostgreSQL array-contract tests, the focused app-parser test,
+strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

@@ -1,0 +1,2 @@
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qualified_cast ... ok
+test result: ok. 1 passed; 0 failed

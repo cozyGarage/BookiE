@@ -30,6 +30,8 @@ two-dimensional shapes, literal `NULL` and empty labels, Unicode, and sibling
 row preservation ([shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).
 The CSV import also selects the table's enum when an identically named type in
 another schema shadows it through `search_path` ([evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
+Custom enum-array grid edits now have app-parser and native keyed-write
+coverage, including invalid-label refusal and sibling preservation ([evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
