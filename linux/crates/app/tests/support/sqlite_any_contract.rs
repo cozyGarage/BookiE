@@ -1948,3 +1948,171 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.5), (3, '42'), (4, ''), (5, X'00FF'), \
+             (6, 'not numeric'), (7, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT, bytes TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, CAST(value AS BLOB) AS result, \
+                    typeof(CAST(value AS BLOB)) AS storage_class, \
+                    hex(CAST(value AS BLOB)) AS bytes \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Bytes(b"42".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("3432".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Bytes(b"1.5".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("312E35".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Bytes(b"42".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("3432".into())
+            ],
+            vec![
+                Value::Int(4),
+                Value::Bytes(vec![]),
+                Value::Text("blob".into()),
+                Value::Text(String::new())
+            ],
+            vec![
+                Value::Int(5),
+                Value::Bytes(vec![0x00, 0xff]),
+                Value::Text("blob".into()),
+                Value::Text("00FF".into())
+            ],
+            vec![
+                Value::Int(6),
+                Value::Bytes(b"not numeric".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("6E6F74206E756D65726963".into()),
+            ],
+            vec![
+                Value::Int(7),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text(String::new())
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2), Some(3)],
+    )
+    .await;
+
+    let restored = connection
+        .query(
+            "SELECT position, typeof(result), result, storage_class, bytes, hex(result) \
+             FROM restored ORDER BY position",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("blob".into()),
+                Value::Bytes(b"42".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("3432".into()),
+                Value::Text("3432".into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("blob".into()),
+                Value::Bytes(b"1.5".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("312E35".into()),
+                Value::Text("312E35".into())
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("blob".into()),
+                Value::Bytes(b"42".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("3432".into()),
+                Value::Text("3432".into())
+            ],
+            vec![
+                Value::Int(4),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![]),
+                Value::Text("blob".into()),
+                Value::Text(String::new()),
+                Value::Text(String::new())
+            ],
+            vec![
+                Value::Int(5),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0x00, 0xff]),
+                Value::Text("blob".into()),
+                Value::Text("00FF".into()),
+                Value::Text("00FF".into())
+            ],
+            vec![
+                Value::Int(6),
+                Value::Text("blob".into()),
+                Value::Bytes(b"not numeric".to_vec()),
+                Value::Text("blob".into()),
+                Value::Text("6E6F74206E756D65726963".into()),
+                Value::Text("6E6F74206E756D65726963".into()),
+            ],
+            vec![
+                Value::Int(7),
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text(String::new()),
+                Value::Text(String::new())
+            ],
+        ]
+    );
+}
