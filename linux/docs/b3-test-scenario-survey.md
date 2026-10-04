@@ -12,7 +12,7 @@ review sampled eight test files in four projects and two issue reports. The
 strict selected-contract report passed 133 tests across 11 suites at the source
 tip, with no missing suites; this is not a fresh execution of every crate test
 or installed-app workflow. Evidence:
-`target/quality/20260929T215946474345Z-values/report.json` (`dirty: false`).
+`target/quality/20260929T215946474345Z-values/report.json` (`dirty: false`; raw report unavailable in this checkout).
 No external source code or fixtures were copied.
 
 ### B3-P6 mutation follow-up — September 29
@@ -22,7 +22,7 @@ mutations because that isolated test only asserted spatial refusal. An ordinary
 VARCHAR positive-control contract now proves regular text columns remain
 editable. Running the full app library suite against the editability guard caught
 all 11 generated mutants, with no misses, timeouts or unviable changes. Evidence:
-`target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json`.
+`target/quality/20260929-grid-editability-positive-control-mutants-final/mutants.out/outcomes.json` (raw report unavailable in this checkout).
 
 The MongoDB Decimal128 edit audit also found Rust `Decimal` rejected valid
 34-digit inputs. The app now validates the fallback with BSON Decimal128 and
@@ -477,9 +477,9 @@ budgets, other export combinations and installed editing remain open. The
 current checkout passed all 12 `value_contract_mongodb_` app tests, including
 all five census/browse consistency cases ([current evidence](evidence/mongodb-current-census-results-2026-10-04/manifest.json)).
 Earlier full-layer reports:
-[`20260930T215342621227Z-values/report.json`](../target/quality/20260930T215342621227Z-values/report.json)
+`20260930T215342621227Z-values/report.json` (raw report unavailable in this checkout: `../target/quality/20260930T215342621227Z-values/report.json`)
 and
-[`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+`20260930T215742792833Z-layers/report.json` (raw report unavailable in this checkout: `../target/quality/20260930T215742792833Z-layers/report.json`).
 
 One ClickHouse nested-value combination is now covered beyond the existing
 UInt128 containers: an array of tuples containing `Decimal(38, 9)` and

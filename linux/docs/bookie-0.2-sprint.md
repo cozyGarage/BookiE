@@ -52,8 +52,8 @@ The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These
 reports capture the dirty merge worktree with `origin/linux` at `6346a431c`
 integrated on top of local commit `cdcfcb0`, before the merge commit:
-[quick CI](../target/quality/20261003T001826192859Z-quick/report.json) and
-[values layer](../target/quality/20261003T002033438424Z-values/report.json).
+quick CI (local ignored report, not portable: `../target/quality/20261003T001826192859Z-quick/report.json`) and
+values layer (local ignored report, not portable: `../target/quality/20261003T002033438424Z-values/report.json`).
 
 ## B3 work packets
 
