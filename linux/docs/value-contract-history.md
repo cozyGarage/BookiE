@@ -5048,3 +5048,13 @@ inside words; this case pins the lexer's word-character delimiter path. See the
 [MySQL client delimiter documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
 The focused app test, strict Clippy and formatting pass. See the [evidence
 manifest](evidence/mysql-word-delimiter-results-2026-10-04/manifest.json).
+
+## MySQL malformed routine human policy decision, 2026-10-04
+
+The malformed-routine parser regression now evaluates the same `Unparseable`
+facts under both principals. Agents are denied with `fail_closed_unparseable`;
+the default local human policy returns `RequireApproval`, and the explicit
+`human_approve_unparseable = false` override returns the documented human allow
+decision. This pins the policy decision only; the GTK approval interaction
+remains open. The focused app test, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json).

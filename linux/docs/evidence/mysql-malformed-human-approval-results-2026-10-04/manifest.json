@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "16a28289a0ae284d415d6b707a60e59f2c2a03a4",
+  "engine": "Local MySQL dialect parser plus policy decision; no server required",
+  "case": "Principal-specific policy for an unparseable MySQL routine",
+  "test": "ui::editor::statement_cursor::tests::malformed_mysql_delimited_routine_blocks_the_whole_script",
+  "contract": [
+    "The malformed routine remains unparseable, blocks whole-script execution planning, and does not expose placeholders from its unterminated string or trailing query.",
+    "The agent is denied with fail_closed_unparseable.",
+    "A human receives RequireApproval with fail_closed_unparseable under the default local policy; setting human_approve_unparseable=false explicitly allows the human decision."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app malformed_mysql_delimited_routine_blocks_the_whole_script -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "314d5bc93def070d9d54a2eb9e61b4b8201146f1b486239529737667f33a3c97",
+    "clippy.txt": "021eee006928a4e915fa9785ed4c94ec1ad8bd183492eaa604c26c7dfb780336",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "The GTK approval interaction and other human policy configurations are not exercised by this policy-decision assertion."
+  ]
+}
