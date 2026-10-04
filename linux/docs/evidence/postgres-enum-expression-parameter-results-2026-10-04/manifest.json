@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "27bbd8a13c8c7c65b3334999203cbc5f5d379dda",
+  "source_commit": "d44f5b9aaee5e6a5dba477b7384208a77964dab5",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "Custom enum text and SQL NULL parameter inference in COALESCE and array_append expressions",
   "test": "enum_parameter_context_contract::value_contract_enum_parameters_infer_in_coalesce_and_array_append",
@@ -11,6 +11,7 @@
     "A SQL NULL parameter is inferred as the enum in both COALESCE argument positions; the first position falls back to the column, and the second remains SQL NULL for a SQL NULL source cell.",
     "A text parameter appended to ARRAY[enum_column] is independently inferred as the enum element type and produces a custom enum array.",
     "Text and SQL NULL parameters appended to ARRAY[enum_column] are inferred as the enum element type and preserve their value/NULL in the native enum array.",
+    "An invalid label is refused with PostgreSQL SQLSTATE 22P02 through both COALESCE and array_append parameter contexts.",
     "PostgreSQL pg_typeof assertions verify scalar and array result types; source rows remain unchanged."
   ],
   "validation": {
@@ -32,8 +33,8 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "test.txt": "1cc91eb8acefa9bcc472dc15d893d67d00d97639fda5bfcaa8c7baeef4ae1171",
-    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "test.txt": "9bdda5745d5fd536d473252a2e9f8cc2874690c96d0e26b4ac09f94ed09c4ffd",
+    "clippy.txt": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [

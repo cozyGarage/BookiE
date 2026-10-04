@@ -91,7 +91,8 @@ deeper than seven layers and other custom/native cases remain open.
 
 PostgreSQL 16 also infers text and SQL NULL as the custom enum in both argument
 positions of `COALESCE` and in `array_append(ARRAY[enum_column], $1)`. Native
-`pg_typeof`, exact values, NULL behavior and unchanged source rows are asserted
+`pg_typeof`, exact values, NULL behavior, native `22P02` invalid-label refusals
+and unchanged source rows are asserted
 ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
 
 The three-level domain chain also covers directly inferred text and SQL NULL
