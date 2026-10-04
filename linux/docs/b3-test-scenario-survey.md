@@ -200,6 +200,11 @@ SQL NULL through the same Calc re-save. Native type, `array_to_json` and
 `array_send` are checked before and after rebinding
 ([Calc evidence](evidence/postgres-time-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 consumer follow-up: PostgreSQL `timetz[]` now preserves fractional
+wall times, both maximum legal offsets and SQL NULL through the same Calc
+re-save. Native type, `array_to_json` and `array_send` match after rebinding
+([Calc evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 October 4 B3-1 follow-up: a PostgreSQL `bytea[]` containing non-UTF-8 bytes,
 empty bytea and SQL NULL now passes JSON, CSV, XLSX and replayed SQL file
 writers. Native element hex, `array_to_json` and `array_send` oracles verify

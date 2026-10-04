@@ -68,6 +68,11 @@ A PostgreSQL `time[]` workbook preserves midnight, fractional microseconds,
 The native parameter rebind matches both `array_to_json` and `array_send`
 ([evidence](evidence/postgres-time-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+A PostgreSQL `timetz[]` workbook preserves fractional wall times, the largest
+positive and negative offsets, and SQL NULL through Calc's XLSX/ODS/XLSX round
+trip. The native parameter rebind matches both `array_to_json` and `array_send`
+([evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
