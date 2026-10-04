@@ -3012,6 +3012,16 @@ non-NULL ordinal/bytes separately from the SQL NULL row. Additional SQL modes
 remain open; see the
 [grid evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
 
+### MySQL/MariaDB ENUM and SET strict ANSI_QUOTES combinations (2026-10-04)
+
+The file-consumer and app keyed-edit matrices add four configurations: each of
+`STRICT_TRANS_TABLES` and `STRICT_ALL_TABLES`, combined with `ANSI_QUOTES`, with
+and without `NO_BACKSLASH_ESCAPES`. The expanded twelve-mode tests pass on
+MySQL 8.1 and MariaDB 11. Native ENUM ordinals, SET masks, exact label bytes,
+invalid-value refusal and untouched siblings remain asserted. Other SQL modes
+and session settings remain open. See the [file-consumer evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json)
+and [grid-edit evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
+
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
 The existing MySQL and MariaDB SQL export round trip also runs with

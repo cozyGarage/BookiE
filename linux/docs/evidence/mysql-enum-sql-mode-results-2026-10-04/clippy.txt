@@ -1,3 +1,2 @@
-    Checking tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
     Checking tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.28s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s
