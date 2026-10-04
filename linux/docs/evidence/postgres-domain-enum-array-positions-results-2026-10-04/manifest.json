@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "3d612e10d7b2226e4f6204afb60635abe1eec79e",
+  "case": "PostgreSQL inferred scalar enum parameter for array_positions with repeated matches, NULL elements, and a same-named shadow enum in search_path",
+  "focused_command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_array_positions_infers_scalar_parameter_and_matches_null -- --include-ignored --test-threads=1",
+  "focused_result": "1 passed; native expected positions are []/[1,4]/[] for text and [3]/[3]/[1,3,4] for SQL NULL.",
+  "value_tier_command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "value_tier_result": "passed; 304 selected contracts across 11 suites, including 106 PostgreSQL contracts; no missing suites.",
+  "report": "report.json",
+  "worktree": "The runner reported dirty=true because the pre-existing .b4-f4f9-* directories and this untracked evidence packet were present; the tracked source revision was the source_commit.",
+  "checks": {
+    "postgres_clippy": "passed: cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "format": "passed: cargo fmt --all -- --check",
+    "ignored_test_inventory": "passed: python3 scripts/inventory-ignored-tests.py --check",
+    "diff_check": "passed: git diff --check"
+  },
+  "sha256": {
+    "clippy.txt": "630b39c8f72d287aa1f2ed475fa1d8bd06895f01f2ce9442ad90829cd5488516",
+    "compile.txt": "2a7443271380b6c4cbf72fa5a5f4712b83b7b49694ccef33e60d8731a819da63",
+    "crates-app.txt": "605a7e06b8363b7cb46cc60830134dab2a6034def030bbfc884a234bd169c116",
+    "crates-core.txt": "7885642bc2453c4830c168210f074fc6c58976dffdde1e58280003a6202e8bd8",
+    "crates-drivers-clickhouse.txt": "b5f93b1a74c0ec5523586f7685aed10fa310b4e7e6b05c693da4213d0ee0a913",
+    "crates-drivers-duckdb.txt": "5734bacf34d014858d002b6bc82485998cc9d15cd2a27e46e7a4ab8d19dbaffe",
+    "crates-drivers-mongodb.txt": "d3eaaf44c55bf78ae33daf9356ba616a15038b202a182c8ddbcda04e69528d80",
+    "crates-drivers-mssql.txt": "d3c1c34e13eaa4ffd81bc9e26ee6dc917412b7a6d3e77ad4c534d2381a69dce9",
+    "crates-drivers-mysql.txt": "9da5cc253c9f3af3c48d367b294e8a4b6d787f34a98efbd4f4d2703c2e314925",
+    "crates-drivers-postgres.txt": "48f505fa4b4ee5dece816886956ef2cdf1597fbb02ec32d52bfcf8ec89b91535",
+    "crates-drivers-redis.txt": "49299bbb76be44891179ddb9c33db9ffcf3e145840f525d25171533bd410fbcc",
+    "crates-drivers-sqlite.txt": "bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539",
+    "crates-mcp.txt": "b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused.txt": "867805b2005d0e010429cf7d2786964c6bf71237d215e4a7560d227857b78de8",
+    "full-value-tier.txt": "c5b70606cc828ef892b1db99559fcc0df62fedb88678eddead071ec44285308f",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "report.json": "c15600351c9c7f926645ea8c1e0dc8f120af0683982281e01fced6ed9435fe7d"
+  }
+}

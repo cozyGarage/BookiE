@@ -1,0 +1,98 @@
+{
+  "revision": "3d612e10d7b2226e4f6204afb60635abe1eec79e",
+  "dirty": true,
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--workspace",
+    "--features",
+    "tablepro-app/duckdb",
+    "--lib",
+    "--test",
+    "integration",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "compile": {
+    "exit_code": 0,
+    "seconds": 2.332,
+    "fresh_artifacts": 746,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0"
+    ]
+  },
+  "missing_suites": [],
+  "suites": {
+    "crates/app/Cargo.toml": {
+      "tests": 49,
+      "exit_code": 0,
+      "seconds": 100.124,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.27,
+      "log": "crates-core.log"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 27.738,
+      "log": "crates-drivers-clickhouse.log"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 2.119,
+      "log": "crates-drivers-duckdb.log"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 15,
+      "exit_code": 0,
+      "seconds": 10.933,
+      "log": "crates-drivers-mongodb.log"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 33.379,
+      "log": "crates-drivers-mssql.log"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 28,
+      "exit_code": 0,
+      "seconds": 323.071,
+      "log": "crates-drivers-mysql.log"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 106,
+      "exit_code": 0,
+      "seconds": 235.688,
+      "log": "crates-drivers-postgres.log"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 1.617,
+      "log": "crates-drivers-redis.log"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "crates-drivers-sqlite.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": false,
+  "passed": true
+}

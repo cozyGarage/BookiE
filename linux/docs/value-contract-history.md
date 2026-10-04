@@ -5815,3 +5815,12 @@ check repeated-value positions and PostgreSQL's NULL-element matching; the
 bound parameter and integer-array result types are asserted. A same-named shadow
 enum leads the transaction `search_path` to check schema resolution. See the
 [evidence manifest](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
+
+## GTK + DuckDB value tier with PostgreSQL enum `array_positions`, 2026-10-04
+
+At source revision `3d612e10d7b2226e4f6204afb60635abe1eec79e`, the strict local
+GTK + DuckDB value tier passed 304 selected contracts across all 11 suites,
+including 106 PostgreSQL contracts and no missing suites. The PostgreSQL suite
+includes the inferred enum `array_positions` contract under shadowed
+`search_path`; the raw report and per-suite logs are retained in the
+[evidence packet](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
