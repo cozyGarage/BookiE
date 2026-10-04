@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "e22c03a00423b179256111804f3bb5ee74d8474b",
+  "case": "PostgreSQL domain-over-enum array_append and array_prepend with a shadowed search_path",
+  "environment": "PostgreSQL Docker integration fixture; local Cargo cache reused",
+  "scenario": {
+    "test": "value_contract_domain_over_enum_array_append_prepend_keep_target_under_shadowed_path",
+    "functions": [
+      "array_append",
+      "array_prepend"
+    ],
+    "assertions": [
+      "A same-named shadow enum leads transaction search_path while table and target enum remain schema-qualified.",
+      "Inferred text and SQL NULL parameters retain the target enum type and match qualified native expression results.",
+      "array_to_json results and array_send bytes match native target-enum results.",
+      "The literal enum label NULL remains distinct from an SQL NULL parameter.",
+      "A label present only in the shadow enum is rejected with native PostgreSQL SQLSTATE 22P02."
+    ]
+  },
+  "results": {
+    "focused_test": {
+      "passed": 1,
+      "failed": 0,
+      "filtered": 136,
+      "log": "focused.txt"
+    },
+    "postgres_value_contracts": {
+      "passed": 108,
+      "failed": 0,
+      "filtered": 29,
+      "duration_seconds": 244.95,
+      "log": "postgres-value-contracts.txt"
+    },
+    "clippy": {
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "commands": {
+    "focused_test": "cargo test -p tablepro-driver-postgres --test integration append_prepend_keep_target_under_shadowed_path -- --ignored --nocapture",
+    "postgres_value_contracts": "cargo test -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+    "clippy": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "format": "cargo fmt --all -- --check",
+    "ignored_test_inventory": "python3 scripts/inventory-ignored-tests.py --check",
+    "diff_check": "git diff --check"
+  },
+  "sha256": {
+    "focused.txt": "5748f1bbcac029278422215707c9aae9a77cc37c1fd347be7a16a38203a4452d",
+    "postgres-value-contracts.txt": "ac9a967141c703489c5c2c582069ec9c8dba49b56f2073d8a7b91995d6bc3e3c",
+    "clippy.txt": "70f5fe1b8d3691021573abd70f20bad5cf851ded2b9248187470324793777052",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}

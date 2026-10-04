@@ -183,6 +183,10 @@ confirms that a SQL NULL parameter matches a NULL array element
 `array_replace` exercises two inferred parameters together for text, SQL NULL,
 and their search/replacement combinations, with native result and enum-type
 oracles ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
+`array_append` and `array_prepend` now also preserve inferred target-enum binding
+when a same-named shadow enum leads transaction `search_path`; the contract
+checks native typed results, `pg_typeof`, result bytes, literal `NULL` versus
+SQL NULL and invalid-label refusal ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
 
 PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
 when replayed with (`standard_conforming_strings=on`, `backslash_quote=safe_encoding`)

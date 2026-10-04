@@ -1,0 +1,2 @@
+linux/docs/evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/focused.txt:8: new blank line at EOF.
+linux/docs/evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/postgres-value-contracts.txt:115: new blank line at EOF.

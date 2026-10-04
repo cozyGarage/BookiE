@@ -172,6 +172,13 @@ non-default lower bounds, empty arrays, SQL NULL arrays and NULL elements while 
 same-named shadow enum leads `search_path`. Native array wire bytes are
 asserted; see the [evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json). Other PostgreSQL array contexts remain open.
 
+October 4 B3 function follow-up: `array_append` and `array_prepend` preserve
+inferred target enum binding under a same-named shadow enum in `search_path`.
+Native typed results, `pg_typeof`, result bytes, literal `NULL` versus SQL NULL,
+and target-enum invalid-label refusal are covered; all 108 selected PostgreSQL
+value contracts pass ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
+Other PostgreSQL function contexts and the broader B3 matrix remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

@@ -36,6 +36,10 @@ All six PostgreSQL array comparison operators now cover inferred domain-over-enu
 array parameters, NULL arrays, NULL elements, empty arrays and lower-bound-sensitive
 comparisons against native results and wire bytes while a same-named shadow enum
 leads transaction `search_path` ([evidence](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json)).
+The `array_append` and `array_prepend` function contexts now also preserve the
+target enum type under a same-named shadow enum, verified with typed native
+results, `pg_typeof`, result wire bytes, text labels including literal `NULL`,
+SQL NULL and native invalid-label SQLSTATE ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
 Other inferred array operator/function contexts remain candidates; these cases
 do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
