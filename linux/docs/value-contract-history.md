@@ -5026,3 +5026,12 @@ draft writes (including SQL NULL), typed equality filtering, invalid-label
 refusal, exact outer-domain type/value and an untouched SQL NULL sibling. The
 focused test, strict Clippy and formatting pass. Deeper chains and other
 enum/session combinations remain open; see the [evidence manifest](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
+
+## PostgreSQL enum metadata after session search_path changes, 2026-10-04
+
+A PostgreSQL 16 transaction changes ordinary session `search_path` twice on
+the same backend, confirms the active schema each time, and then fetches and
+updates an enum column whose qualified target schema differs from the final
+shadow schema. Native type/value checks verify the target row changed and the
+shadow row did not. The transaction rolls back its session changes. The focused
+test, strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).

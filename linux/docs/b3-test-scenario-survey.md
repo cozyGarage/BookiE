@@ -250,6 +250,9 @@ beyond eight layers and other enum/session combinations remain open; see the
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
 plus the [eight-level follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
+A separate same-backend transaction changes ordinary session `search_path`
+twice, then verifies target enum metadata and keyed writes under the final
+shadowed path; see the [session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
 
 ### B3-P1 current coverage verdict — September 30
 
