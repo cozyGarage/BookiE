@@ -342,7 +342,8 @@ preservation of a SQL NULL sibling. A combined `pg_typeof($1)`/enum-comparison
 query is explicitly refused with SQLSTATE `42P08`; an explicit cast is the
 passing control. A five-domain follow-up verifies metadata, keyed edit,
 inferred parameters, filter, invalid-label refusal and native sibling values.
-A follow-up exercises 6-, 7-, 8-, 9-, 10-, 63-, 64-, 65- and 128-layer domains
+A follow-up exercises 6-, 7-, 8-, 9-, 10-, 63-, 64-, 65-, 128-, 129- and
+256-layer domains
 with a same-named shadow enum on the session `search_path`; a same-backend
 transaction changes `search_path` twice and repeats typed writes/filter checks
 using previously fetched metadata. Rollback and exact outer type/value with
@@ -350,8 +351,8 @@ NULL preserved are asserted. Raw inferred SQL NULL updates preserve the outer
 domain type through 63 layers; invalid text labels reach PostgreSQL and are
 refused. At 64 or more layers, valid text, invalid text and SQL NULL return an
 explicit unsupported operation both before and after schema-aware work in the
-same backend. Schema-aware writes and filters pass through 128 layers. Other
-domain depths and enum/session combinations remain open; see the
+same backend. Schema-aware writes and filters pass through 256 layers. Domain
+depths beyond 256 and other enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
@@ -359,6 +360,8 @@ plus the [eight-level follow-up](evidence/postgres-eight-domain-results-2026-10-
 and [nine-level follow-up](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
 A [deep-domain boundary contract](evidence/postgres-deep-domain-results-2026-10-04/manifest.json)
 records support through 63 layers and safe refusal at the 64-layer parameter-resolution limit.
+A [follow-up through 256 layers](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json)
+extends schema-aware metadata, writes and filters through 256 layers while confirming raw-parameter refusal from 64 layers.
 A separate same-backend transaction changes ordinary session `search_path`
 twice, then verifies target enum metadata and keyed writes under the final
 shadowed path; see the [session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "ec72a49cad1ad2283d65f7764afea40b78a1d318",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Shadowed-search_path enum metadata and consumer behavior through 256 nested domains",
+  "test": "domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path",
+  "contract": [
+    "The native contract checks domain-over-enum chains at depths 6, 7, 8, 9, 10, 63, 64, 65, 128, 129 and 256 while search_path resolves a same-named shadow enum.",
+    "At every tested depth, recursive catalog metadata resolves the target enum leaf; schema-aware keyed updates, label and SQL NULL draft inserts, typed equality filters, and exact outer-domain/native value checks succeed.",
+    "At depths through 63, raw inferred SQL NULL updates succeed with the outer domain type preserved, and an invalid raw text label is refused by PostgreSQL with SQLSTATE 22P02.",
+    "At depths 64 and above, raw inferred SQL NULL and both valid and invalid text are refused as Unsupported, including after schema-aware operations have warmed the same-backend transaction.",
+    "Same-backend search_path changes and rollback checks preserve exact native values and types at every tested depth."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "14 passed, 0 failed; deep contract covers depths 6, 7, 8, 9, 10, 63, 64, 65, 128, 129 and 256",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed before the source commit",
+      "log": null
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "9055f55b4b55c52f31debb29827db6ab694fe2169594afbf17e33661bcc5c6ea",
+    "clippy.txt": "112c4fc18fd67098b878d3b26b103538c8d25f65619c4a5fd9c697ec5c7b323b"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "4463ad9d73311bbba4301961869107ab86130ac4315a69d0c5cb3ba7f79e1d43"
+  },
+  "remaining": [
+    "Domain depths above 256, additional inferred parameter value types at or beyond 64 levels, and other enum/session configurations remain open."
+  ]
+}
