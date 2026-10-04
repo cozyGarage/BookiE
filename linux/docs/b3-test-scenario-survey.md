@@ -392,8 +392,10 @@ literal `NULL` label after the SQLx text-array parser fix. DuckDB off-microsecon
 grid edits now refuse before write, while native sub-microsecond binding and
 additional nested combinations remain unsupported or untested. SQL Server's
 legacy `datetime`, `money`/`smallmoney` and `sql_variant` have visible refusals;
-exact support remains open. Additional MySQL SQL modes and DDL/session
-interactions, ClickHouse additional nested and temporal combinations, SQLite
+exact support remains open. The enum literal matrix covers four modes on both
+MySQL and MariaDB ([evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json));
+additional MySQL SQL modes and DDL/session interactions, ClickHouse additional
+nested and temporal combinations, SQLite
 installed-grid transitions, and broad
 cross-format parity remain untested. MongoDB keeps canonical Extended JSON for
 supported nested/mixed values and now has native-server ObjectId, millisecond

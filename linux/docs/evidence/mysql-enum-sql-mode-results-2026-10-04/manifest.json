@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "1c144f00c",
+  "case": "MySQL/MariaDB ENUM SQL-literal exports across SQL modes",
+  "engines": {
+    "mysql": "testcontainers-modules default mysql:8.1 image",
+    "mariadb": "mariadb:11"
+  },
+  "tests": [
+    "enum_sql_mode_contract::value_contract_enum_sql_literals_survive_mysql_sql_modes",
+    "enum_sql_mode_contract::value_contract_enum_sql_literals_survive_mariadb_sql_modes"
+  ],
+  "contract": [
+    "Generated SQL INSERTs reproduce enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined SQL modes on both engines.",
+    "The fixture covers an apostrophe label, a backslash label, literal NULL, empty text, and SQL NULL.",
+    "Each mode checks expected native enum ordinals and label bytes, then compares copied ordinals and bytes to the source."
+  ],
+  "validation": {
+    "mysql": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration enum_sql_mode_contract::value_contract_enum_sql_literals_survive_mysql_sql_modes -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+    "log": "mysql.txt"
+    },
+    "mariadb": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration enum_sql_mode_contract::value_contract_enum_sql_literals_survive_mariadb_sql_modes -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+    "log": "mariadb.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other enum consumers and SQL mode/session combinations remain open.",
+    "This bounded case does not close B3 or qualify the 0.2.0 release."
+  ]
+}
