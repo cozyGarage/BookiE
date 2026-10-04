@@ -8,4 +8,3 @@ test value_contract_nonexistent_datetime64_input_matches_server_normalization ..
 test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
 
 test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; finished in 34.82s
-

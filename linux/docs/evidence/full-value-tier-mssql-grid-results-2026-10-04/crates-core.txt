@@ -60,4 +60,3 @@ test sql_literal::tests::value_contract_numeric_literals_avoid_implicit_decimal_
 test sql_literal::tests::value_contract_postgres_dates_preserve_eras_and_extended_years ... ok
 
 test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 467 filtered out; finished in 3.13s
-

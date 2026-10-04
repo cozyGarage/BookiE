@@ -17,4 +17,3 @@ test value_contracts::value_contract_undefined_grid_edit_preserves_native_bson .
 test value_contracts::xlsx_nested_cell_requires_its_own_date_and_binary_markers ... ok
 
 test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 10.93s
-

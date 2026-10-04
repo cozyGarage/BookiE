@@ -52,4 +52,3 @@ test ui::grid::presentation::tests::mysql_bit_and_spatial_cells_follow_their_dec
 test ui::grid::types::tests::mysql_bit_widths_choose_an_editor_matching_the_value_contract ... ok
 
 test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 449 filtered out; finished in 119.60s
-

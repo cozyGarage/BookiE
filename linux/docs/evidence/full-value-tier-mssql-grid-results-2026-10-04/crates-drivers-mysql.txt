@@ -30,4 +30,3 @@ test value_contracts::value_contract_preserves_scalar_boundaries_through_paramet
 test value_contracts::value_contract_text_exports_survive_with_and_without_backslash_escapes ... ok
 
 test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 310.54s
-

@@ -6,4 +6,3 @@ test value_contract_resp3_attribute_wire_frame_survives_the_request_response_con
 test value_contract_resp3_hash_map_preserves_binary_fields_and_values ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 1.65s
-

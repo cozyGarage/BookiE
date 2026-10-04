@@ -109,4 +109,3 @@ test wide_numeric_contract::value_contract_numeric_special_grid_edits_match_serv
 test wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value ... ok
 
 test result: ok. 107 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 232.19s
-

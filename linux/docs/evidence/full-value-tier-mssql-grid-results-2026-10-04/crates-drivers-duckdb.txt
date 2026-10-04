@@ -32,4 +32,3 @@ test value_contract_timestamptz_filter_preserves_offset_origin_instant ... ok
 test value_contract_wide_map_refuses_lossy_consumers_with_native_oracle ... ok
 
 test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 2.07s
-
