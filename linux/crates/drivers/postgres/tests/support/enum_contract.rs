@@ -691,6 +691,115 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_backslashes() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let schema = "value_contract_enum_csv_edges";
+    let enum_type = "value_contract_enum_csv_edges.status";
+    connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+
+    let labels = ["double \" quote", "line one\nline two", "back\\slash", "=1+1"];
+    let literals = labels
+        .iter()
+        .map(|label| tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text((*label).into())).unwrap())
+        .collect::<Vec<_>>();
+    connection
+        .execute(&format!("CREATE TYPE {enum_type} AS ENUM ({})", literals.join(", ")))
+        .await
+        .unwrap();
+    for table in ["source_rows", "target_rows"] {
+        connection
+            .execute(&format!(
+                "CREATE TABLE {schema}.{table} (id INT PRIMARY KEY, status {enum_type})"
+            ))
+            .await
+            .unwrap();
+    }
+
+    for (id, status) in labels
+        .iter()
+        .map(|label| Value::Text((*label).into()))
+        .chain(std::iter::once(Value::Null))
+        .enumerate()
+    {
+        connection
+            .execute_params(
+                &format!("INSERT INTO {schema}.source_rows VALUES ($1, $2::{enum_type})"),
+                &[Value::Int(id as i64 + 1), status],
+            )
+            .await
+            .unwrap();
+    }
+
+    let source = connection
+        .query(&format!("SELECT id, status FROM {schema}.source_rows ORDER BY id"))
+        .await
+        .unwrap();
+    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        sanitize_formulas: false,
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    assert!(csv.contains("\"double \"\" quote\""));
+    assert!(csv.contains("\"line one\nline two\""));
+    assert!(csv.contains("=1+1"), "raw text must retain formula-shaped enum labels");
+
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker,
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection.fetch_columns(Some(schema), "target_rows").await.unwrap();
+    let target = tablepro_core::import::ImportTarget {
+        driver_id: "postgres",
+        schema: Some(schema),
+        table: "target_rows",
+        columns: &columns,
+        mapping: &[Some(0), Some(1)],
+    };
+    let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &import_options).unwrap();
+    assert!(
+        plan.statement
+            .contains("$2::text::\"value_contract_enum_csv_edges\".\"status\"")
+    );
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query(&format!(
+            "SELECT id, status::text, pg_typeof(status)::text, \
+             encode(convert_to(status::text, 'UTF8'), 'hex') \
+             FROM {schema}.target_rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    let expected = labels
+        .iter()
+        .map(|label| Some(*label))
+        .chain(std::iter::once(None))
+        .enumerate()
+        .map(|(index, status)| {
+            let value = status.map_or(Value::Null, |text| Value::Text(text.into()));
+            let bytes = status.map_or(Value::Null, |text| {
+                Value::Text(text.as_bytes().iter().map(|byte| format!("{byte:02x}")).collect())
+            });
+            vec![
+                Value::Int(index as i64 + 1),
+                value,
+                Value::Text(enum_type.into()),
+                bytes,
+            ]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(restored.rows, expected);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_null_label_and_sql_null_write_as_distinct_values() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
