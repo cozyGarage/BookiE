@@ -1099,6 +1099,9 @@ fn map_sqlx_error(err: sqlx::Error) -> DriverError {
             "PostgreSQL enum result metadata could not be resolved; the result was not read".into(),
         );
     }
+    if matches!(&err, sqlx::Error::Protocol(message) if message.starts_with("unable to resolve type OIDs:")) {
+        return DriverError::Unsupported("PostgreSQL type hierarchy exceeds the driver's resolvable depth".into());
+    }
     use sqlx::Error::*;
     match err {
         Database(e) => {

@@ -1208,12 +1208,15 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_six_through_nine_domain_levels_over_enum_ignore_shadowed_search_path() {
+async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path() {
     let (_container, opts) = start_pg().await;
     assert_domain_level_contract(opts.clone(), 6).await;
     assert_domain_level_contract(opts.clone(), 7).await;
     assert_domain_level_contract(opts.clone(), 8).await;
-    assert_domain_level_contract(opts, 9).await;
+    assert_domain_level_contract(opts.clone(), 9).await;
+    assert_domain_level_contract(opts.clone(), 10).await;
+    assert_domain_level_contract(opts.clone(), 63).await;
+    assert_domain_level_contract(opts, 64).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -1319,12 +1322,23 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .expect_err(&format!(
             "invalid enum label must be refused through {levels} domain layers"
         ));
-    assert!(matches!(
-        invalid,
-        tablepro_core::DriverError::Query {
-            sqlstate: Some(code), ..
-        } if code == "22P02"
-    ));
+    if levels == 64 {
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "depth {levels}: {invalid:?}"
+        );
+    } else {
+        assert!(
+            matches!(
+                &invalid,
+                tablepro_core::DriverError::Query {
+                    sqlstate: Some(code), ..
+                } if code == "22P02"
+            ),
+            "depth {levels}: {invalid:?}"
+        );
+    }
 
     let filtered = FilterSet {
         rules: vec![FilterRule {
