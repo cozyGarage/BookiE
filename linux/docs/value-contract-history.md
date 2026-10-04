@@ -5513,3 +5513,13 @@ XLSX re-save with identical array text. Native `pg_typeof`, `array_to_json`,
 empty element and SQL NULL. The standard-library OOXML/ODS checker confirms the
 cell remains text and is not a formula. Other array families and spreadsheet
 applications remain open. See the [evidence manifest](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json).
+
+## SQLite computed BLOB cast through typed CSV, 2026-10-04
+
+A SQLite expression casts STRICT `ANY` source values to BLOB, producing
+computed bytes from INTEGER, REAL, TEXT and BLOB inputs while SQL NULL remains
+NULL. The result's runtime class is `NULL` metadata, so the consumer relies on
+per-row native `typeof()` and exact `hex()` oracles. Typed CSV import into a
+second STRICT `ANY` table preserves every result byte and storage class,
+including empty BLOB and SQL NULL. The focused contract, DuckDB-enabled app
+library suite, strict Clippy and formatting pass. See the [evidence manifest](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).

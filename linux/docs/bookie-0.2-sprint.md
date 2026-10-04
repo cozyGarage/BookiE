@@ -98,6 +98,11 @@ starts with an apostrophe; it is for presentation, not restore. Other DuckDB
 consumer parity remains open; see the [evidence
 manifest](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
 
+October 4 B3-4 follow-up: SQLite `CAST(value AS BLOB)` results over STRICT
+`ANY` now round-trip through typed CSV with native storage-class and byte
+checks, covering numeric/text casts, empty bytes, binary bytes and SQL NULL.
+See the [evidence manifest](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
+
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3
