@@ -339,7 +339,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         .query_params_controlled(
             "CREATE TABLE maria_enum_set_grid (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\\\slash'),
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash', ''),
                 perms SET('read', 'write', 'slash\\\\path')
             )",
             &[],
@@ -350,7 +350,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
     session
         .query_params_controlled(
             "INSERT INTO maria_enum_set_grid VALUES
-                (1, 'happy', 'read'), (2, 'happy', 'write')",
+                (1, 'happy', 'read'), (2, 'happy', 'write'), (3, NULL, NULL)",
             &[],
             &control,
         )
@@ -387,6 +387,77 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         );
         assert!(parse_input_for_driver("unknown", Some(&columns[mood]), "mysql").is_err());
         assert!(parse_input_for_driver("read,unknown", Some(&columns[perms]), "mysql").is_err());
+        if mode.is_empty() {
+            let blank_mood = parse_input_for_driver("", Some(&columns[mood]), "mysql").unwrap();
+            let blank_perms = parse_input_for_driver("", Some(&columns[perms]), "mysql").unwrap();
+            assert_eq!(blank_mood, Value::Null);
+            assert_eq!(blank_perms, Value::Null);
+            let blank_update = tablepro_core::sql_dialect::build_keyed_update(
+                "mysql",
+                None,
+                "maria_enum_set_grid",
+                &columns,
+                &[(mood, blank_mood), (perms, blank_perms)],
+                &[Value::Int(1)],
+            )
+            .unwrap();
+            session
+                .query_params_controlled(&blank_update.0, &blank_update.1, &control)
+                .await
+                .unwrap();
+            let blank_state = session
+                .query_params_controlled(
+                    "SELECT IF(mood IS NULL, 'null', 'value'), IF(perms IS NULL, 'null', 'value')
+                     FROM maria_enum_set_grid WHERE id = 1",
+                    &[],
+                    &control,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                blank_state.rows[0],
+                vec![Value::Text("null".into()), Value::Text("null".into())]
+            );
+
+            let empty_mood = parse_input_for_driver("''", Some(&columns[mood]), "mysql").unwrap();
+            let empty_perms = parse_input_for_driver("''", Some(&columns[perms]), "mysql").unwrap();
+            assert_eq!(empty_mood, Value::Text(String::new()));
+            assert_eq!(empty_perms, Value::Text(String::new()));
+            let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+                "mysql",
+                None,
+                "maria_enum_set_grid",
+                &columns,
+                &[(mood, empty_mood), (perms, empty_perms)],
+                &[Value::Int(1)],
+            )
+            .unwrap();
+            session
+                .query_params_controlled(&empty_update.0, &empty_update.1, &control)
+                .await
+                .unwrap();
+            let empty_state = session
+                .query_params_controlled(
+                    "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood),
+                            IF(perms IS NULL, 'null', 'value'), CAST(perms + 0 AS CHAR), HEX(perms)
+                     FROM maria_enum_set_grid WHERE id = 1",
+                    &[],
+                    &control,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                empty_state.rows[0],
+                vec![
+                    Value::Text("value".into()),
+                    Value::Text("4".into()),
+                    Value::Text(String::new()),
+                    Value::Text("value".into()),
+                    Value::Text("0".into()),
+                    Value::Text(String::new()),
+                ]
+            );
+        }
         let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
         let perms_value = parse_input_for_driver("read,slash\\path", Some(&columns[perms]), "mysql").unwrap();
         let update = tablepro_core::sql_dialect::build_keyed_update(
@@ -433,6 +504,11 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 Value::Text("7772697465".into()),
             ],
             "sibling changed in mode {mode:?}"
+        );
+        assert_eq!(
+            rows[2],
+            vec![Value::Int(3), Value::Null, Value::Null, Value::Null, Value::Null],
+            "SQL NULL row changed in mode {mode:?}"
         );
     }
     session.close().await.unwrap();
