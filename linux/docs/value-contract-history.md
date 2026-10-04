@@ -5824,3 +5824,13 @@ including 106 PostgreSQL contracts and no missing suites. The PostgreSQL suite
 includes the inferred enum `array_positions` contract under shadowed
 `search_path`; the raw report and per-suite logs are retained in the
 [evidence packet](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
+
+
+## PostgreSQL domain-over-enum array equality parameters, 2026-10-04
+
+A Docker regression verifies that `labels = $1` infers the full domain-over-enum
+array type. Native PostgreSQL controls check equality for duplicate rows, a
+non-default lower bound, an empty array, a SQL NULL array and a NULL element;
+parameter `array_send` bytes match the native typed value. This records PostgreSQL
+array dimensional-bound semantics as well as inferred parameter typing. See the
+[evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json).

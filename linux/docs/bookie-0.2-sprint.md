@@ -153,6 +153,12 @@ same-named shadow enum leads `search_path`; text and SQL NULL cases pass. Other
 inferred array contexts and the wider B3 matrix remain open
 ([evidence](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json)).
 
+October 4 B3 follow-up: domain-over-enum array equality infers the full
+domain-array parameter type and preserves equality semantics for duplicates,
+non-default lower bounds, empty arrays, SQL NULL arrays and NULL elements. Native
+array wire bytes and comparison results are asserted; see the
+[evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json). Other PostgreSQL array contexts remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

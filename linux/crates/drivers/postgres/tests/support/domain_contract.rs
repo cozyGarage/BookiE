@@ -10,6 +10,8 @@ include!("domain_contract_parts/array_cat.rs");
 
 include!("domain_contract_parts/array_positions.rs");
 
+include!("domain_contract_parts/array_equality.rs");
+
 include!("domain_contract_parts/deep_domains.rs");
 
 #[tokio::test]
