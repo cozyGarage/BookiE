@@ -4578,9 +4578,10 @@ driver now accepts a single-collection DELETE with a bound equality/AND filter
 and executes `delete_one`. The app materializer adds every materialized
 non-primary-key value to that filter; BSON NULL guards require an existing
 non-array NULL field, and the missing-field marker becomes `$exists: false`.
-The native contract proves an unchanged row is deleted, while a concurrent
-string change, explicit NULL becoming missing, and explicit NULL becoming an
-array containing NULL all return zero deleted rows and preserve the new values.
+The native contract proves an unchanged row is deleted, while concurrent
+changes to the payload, an untouched sibling field, explicit NULL becoming
+missing, and explicit NULL becoming an array containing NULL all return zero
+deleted rows and preserve the new values.
 This guards the visible row snapshot rather than providing document-version or
 snapshot isolation: ABA changes and fields added outside the materialized
 column set remain open. See the [evidence manifest](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json).

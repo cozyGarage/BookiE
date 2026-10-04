@@ -20,8 +20,9 @@ BSON NULL becoming an array containing NULL
 ([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
 MongoDB keyed row deletes now compare every materialized non-key field in the
 same `delete_one` filter. The MongoDB 7 case confirms unchanged rows delete,
-while a concurrent string change, explicit NULL becoming missing, and explicit
-NULL becoming an array containing NULL all conflict and survive
+while a concurrent string change, an untouched sibling-field change, explicit
+NULL becoming missing, and explicit NULL becoming an array containing NULL all
+conflict and survive
 ([evidence](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json)).
 Neither write nor delete guards detect ABA changes; the broader B3 matrix stays
 open.

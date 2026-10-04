@@ -12,12 +12,14 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
     let collection = client.database("appdb").collection::<Document>("stale_grid_deletes");
     let unchanged_id = ObjectId::new();
     let row_id = ObjectId::new();
+    let sibling_row_id = ObjectId::new();
     let null_row_id = ObjectId::new();
     let null_array_row_id = ObjectId::new();
     collection
         .insert_many([
             doc! { "_id": unchanged_id, "payload": "unchanged", "sibling": "stable" },
             doc! { "_id": row_id, "payload": "before", "sibling": "stable" },
+            doc! { "_id": sibling_row_id, "payload": "same", "sibling": "before" },
             doc! { "_id": null_row_id, "payload": mongodb::bson::Bson::Null, "sibling": "null-row" },
             doc! { "_id": null_array_row_id, "payload": mongodb::bson::Bson::Null, "sibling": "null-array-row" },
         ])
@@ -43,12 +45,20 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
     };
     let unchanged = find_row(unchanged_id);
     let row = find_row(row_id);
+    let sibling_row = find_row(sibling_row_id);
     let null_row = find_row(null_row_id);
     let null_array_row = find_row(null_array_row_id);
     collection
         .update_one(doc! { "_id": row_id }, doc! { "$set": { "payload": "concurrent" } })
         .await
         .expect("make concurrent edit after grid read");
+    collection
+        .update_one(
+            doc! { "_id": sibling_row_id },
+            doc! { "$set": { "sibling": "concurrent sibling" } },
+        )
+        .await
+        .expect("change an untouched sibling field after the grid read");
     collection
         .update_one(doc! { "_id": null_row_id }, doc! { "$unset": { "payload": "" } })
         .await
@@ -74,6 +84,7 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
     let statements = [
         unchanged.as_slice(),
         row.as_slice(),
+        sibling_row.as_slice(),
         null_row.as_slice(),
         null_array_row.as_slice(),
     ]
@@ -84,7 +95,7 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
         .expect("stale deletes must report conflicts");
     assert_eq!(
         affected,
-        [1, 0, 0, 0],
+        [1, 0, 0, 0, 0],
         "unchanged delete succeeds and stale snapshots conflict"
     );
 
@@ -104,6 +115,13 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
         .expect("stale delete must leave row present");
     assert_eq!(persisted.get_str("payload").unwrap(), "concurrent");
     assert_eq!(persisted.get_str("sibling").unwrap(), "stable");
+    let persisted_sibling = collection
+        .find_one(doc! { "_id": sibling_row_id })
+        .await
+        .expect("read native persisted sibling-change document")
+        .expect("row with a concurrent sibling change must survive");
+    assert_eq!(persisted_sibling.get_str("payload").unwrap(), "same");
+    assert_eq!(persisted_sibling.get_str("sibling").unwrap(), "concurrent sibling");
     let persisted_null = collection
         .find_one(doc! { "_id": null_row_id })
         .await

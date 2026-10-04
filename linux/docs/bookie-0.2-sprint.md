@@ -149,8 +149,8 @@ removed field and an array containing NULL. Stale deletes, ABA changes, and the 
 
 October 4 B3 MongoDB delete follow-up: parameterized keyed deletes are now
 supported and guard all materialized non-key values. Native coverage proves
-unchanged rows delete and stale string, missing-field, and BSON NULL-to-array
-changes survive. ABA changes and the broader B3 matrix remain open
+unchanged rows delete and stale string, untouched sibling, missing-field, and
+BSON NULL-to-array changes survive. ABA changes and the broader B3 matrix remain open
 ([evidence](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json)).
 
 October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected

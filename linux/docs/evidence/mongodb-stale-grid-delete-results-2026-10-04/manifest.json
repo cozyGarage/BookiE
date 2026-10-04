@@ -9,9 +9,9 @@
   "outcome": "Parameterized keyed MongoDB deletes now compare every materialized non-key value and use delete_one. Unchanged rows delete; stale snapshots report zero deleted rows and preserve concurrent changes.",
   "contract": [
     "A failing-first run confirms that the pre-fix MongoDB driver rejected the app's parameterized keyed DELETE as unsupported.",
-    "Reads four documents through the BookiE MongoDB driver; one remains unchanged, while native concurrent writes change one string, remove one explicit BSON NULL field, and change another explicit BSON NULL to an array containing NULL.",
-    "Builds parameterized deletes from each complete materialized row. The unchanged row is deleted, and the three stale deletes each report zero deleted rows.",
-    "Checks the concurrent string, missing field, and NULL-containing array remain persisted after the stale deletes.",
+    "Reads five documents through the BookiE MongoDB driver; one remains unchanged, while native concurrent writes change a payload, change an untouched sibling field, remove one explicit BSON NULL field, and change another explicit BSON NULL to an array containing NULL.",
+    "Builds parameterized deletes from each complete materialized row. The unchanged row is deleted, and the four stale deletes each report zero deleted rows.",
+    "Checks the concurrent payload, sibling field, missing field, and NULL-containing array remain persisted after the stale deletes.",
     "Unit contracts verify the materializer guards all non-key original values, explicit NULL and missing-field predicates remain distinct, and other undecodable snapshots are refused."
   ],
   "validation": {
