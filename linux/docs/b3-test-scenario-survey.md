@@ -2,11 +2,11 @@
 
 ### October 4 follow-up
 
-The PostgreSQL inferred enum-array `ANY($1)` context is now covered by a
-Docker-backed contract with native array type and wire-byte oracles. Its exact
-commit and cross-driver run are recorded in the
-[evidence packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
-Other inferred array contexts remain open.
+PostgreSQL inferred enum-array binding is covered for domain-over-enum `ANY`,
+containment and overlap operators, including either operand position for
+containment and overlap. Native array type, operator results and wire bytes are
+checked; other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
+and [operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source

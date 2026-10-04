@@ -107,6 +107,13 @@ NULL/empty distinctions, invalid labels, and pre-dispatch refusal. Commit
 B3 remains open because other inferred array contexts and the broader engine,
 consumer, and configuration matrix are not covered.
 
+October 4 B3 follow-up: domain-over-enum inferred enum-array contracts now also
+cover containment and overlap with the parameter in either operand position.
+The PostgreSQL integration suite passes all 129 tests, and the ignored-test
+inventory now lists 437 declarations. Evidence and run logs are in the
+[array-operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
+B3 remains open for other array contexts and the broader matrix.
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

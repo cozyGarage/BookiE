@@ -5676,3 +5676,14 @@ dispatch. This new inferred path encodes PostgreSQL's binary array protocol;
 existing explicitly cast text parameters remain a separate path. The exact
 regression and all 99 PostgreSQL value contracts pass in the GTK + DuckDB
 value tier. See the [evidence manifest](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
+
+## PostgreSQL inferred enum-array operators, 2026-10-04
+
+The same domain-over-enum source now exercises inferred enum-array parameters
+through containment (`<@` and `@>`) and overlap (`&&`), placing the parameter on
+both sides of each operator. Cases include ordinary and adversarial labels,
+literal `NULL` versus SQL NULL, empty arrays, and native invalid-label errors.
+For each valid input, an independently cast native array provides operator
+results and `array_send` bytes; `pg_typeof($1)` and the source domain type are
+also asserted. The complete Docker-backed PostgreSQL integration suite passes
+129 tests. See the [evidence manifest](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).

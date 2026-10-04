@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "c2a53b9e53db22d68891ed2780165c53bb994f08",
+  "branch": "linux",
+  "focused_contract": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs::value_contract_domain_over_enum_array_operators_infer_parameter_type_in_both_positions",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+  "result": {
+    "passed": 129,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0,
+    "seconds": 290.68
+  },
+  "coverage": [
+    "containment: ARRAY[enum] <@ $1",
+    "containment: $1 @> ARRAY[enum]",
+    "overlap: ARRAY[enum] && $1",
+    "overlap: $1 && ARRAY[enum]",
+    "ordinary, empty, NULL and adversarial enum labels",
+    "independent native typed-array operator results and array_send wire bytes",
+    "inferred and source-domain type assertions",
+    "invalid-label SQLSTATE 22P02 in both containment operand positions"
+  ],
+  "additional_checks": {
+    "cargo fmt --all -- --check": "passed",
+    "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings": "passed",
+    "python3 scripts/inventory-ignored-tests.py --check": "passed; 437 declarations",
+    "bash scripts/check-file-size.sh": "passed",
+    "git diff --check": "passed"
+  },
+  "log": "postgres-integration.txt",
+  "checksums": "sha256sums.txt",
+  "scope_limit": "These contracts cover selected enum-array operator contexts only. The remaining PostgreSQL and B3 engine/type/consumer/configuration matrix, B4 acceptance and B7 release qualification remain open."
+}
