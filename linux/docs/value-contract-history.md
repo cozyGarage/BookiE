@@ -5650,3 +5650,15 @@ contract pins that behavior without changing production code. The focused case
 and all 16 domain contracts, PostgreSQL Clippy, formatting, file-size and
 ignored-test inventory checks pass. See the
 [evidence manifest](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).
+
+## PostgreSQL domain-over-enum array functions, 2026-10-04
+
+A PostgreSQL 16 Docker contract covers inferred text and SQL NULL parameters in
+`array_append(ARRAY[status], $1)` and `array_prepend($1, ARRAY[status])`. Exact
+values are checked for ready, paused and SQL NULL source rows. `pg_typeof`
+records the native distinction: the array constructor preserves `state_domain[]`,
+parameter inference and function output use the base `state` enum and `state[]`,
+and the source column remains `state_domain`. The entire domain contract group
+passes (17 tests), with PostgreSQL Clippy, formatting, ignored-test inventory,
+file-size and diff checks. See the
+[evidence manifest](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json).

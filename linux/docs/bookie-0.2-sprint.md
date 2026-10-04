@@ -151,6 +151,9 @@ October 4 B3-1 follow-up: a PostgreSQL 16 contract now covers domain-over-enum
 PostgreSQL resolves the parameter/result to the base enum while the source
 column remains the domain; all 16 domain contracts pass. See the
 [COALESCE evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).
+A companion array-function contract covers `array_append`/`array_prepend`,
+text/NULL inference and native input/result array types; all 17 domain contracts
+pass ([evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).
 
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL

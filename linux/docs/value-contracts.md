@@ -120,6 +120,9 @@ PostgreSQL domain-over-enum `COALESCE` now has parameter inference coverage in
 both argument positions for text and SQL NULL; the base-enum result and outer
 domain source type are independently checked
 ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+A companion `array_append`/`array_prepend` contract checks inferred text/SQL NULL
+parameters and domain-array versus base-enum-array types
+([evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).
 
 A PostgreSQL 16 transaction also changes ordinary session `search_path` twice
 on one backend, then verifies target-schema enum metadata and keyed-write safety

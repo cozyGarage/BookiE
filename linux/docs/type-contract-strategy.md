@@ -181,6 +181,9 @@ A domain-over-enum `COALESCE` contract now covers text and SQL NULL in both
 argument positions. PostgreSQL infers the parameter and expression as the base
 enum while the source column remains the outer domain, verified with `pg_typeof`
 and exact rows ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+The same text/NULL inference now covers `array_append` and `array_prepend`: the
+input constructor retains `state_domain[]`, while the polymorphic function result
+uses `state[]` ([array-function evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).
 
 The three-level domain chain also covers directly inferred text and SQL NULL
 parameters for both NULL-safe distinctness operators, with `pg_typeof` checks

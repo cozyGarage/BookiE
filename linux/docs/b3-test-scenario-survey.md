@@ -778,3 +778,6 @@ October 4 B3-1 follow-up: PostgreSQL domain-over-enum `COALESCE` now checks
 text and SQL NULL parameters in both argument positions. `pg_typeof` pins the
 server's base-enum expression/parameter result while the source column remains
 the outer domain ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+A companion contract covers text and SQL NULL in `array_append` and
+`array_prepend`, including domain-array input and base-enum-array output
+([evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).

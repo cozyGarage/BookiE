@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "a56f1c44e7f11d41f3878896fce813af829da8ca",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum array_append and array_prepend parameter inference",
+  "test": "domain_contract::value_contract_domain_over_enum_array_functions_infer_parameter_type",
+  "outcome": "PostgreSQL infers text and SQL NULL parameters as the base enum; ARRAY[status] retains the domain array type while array_append/array_prepend return the base enum array.",
+  "contract": [
+    "Tests both array_append(ARRAY[status], $1) and array_prepend($1, ARRAY[status]).",
+    "Exercises text and SQL NULL parameters across ready, paused and SQL NULL source rows.",
+    "Checks exact array JSON, pg_typeof($1), pg_typeof(ARRAY[status]), pg_typeof(function result), and pg_typeof(status)."
+  ],
+  "validation": {
+    "domain_contract_suite": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "17 passed, 0 failed",
+      "log": "domain-tests.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "file_size": {
+      "command": "bash scripts/check-file-size.sh",
+      "result": "passed",
+      "log": "file-size.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "source_worktree": "The test was run after source commit a56f1c44e. Two pre-existing .b4-f4f9-* scratch directories remain untracked outside this evidence packet.",
+  "remaining": [
+    "Other PostgreSQL query contexts, enum/session configurations, remaining engines/types/consumers and the broader B3 matrix remain open; this case does not qualify 0.2.0."
+  ],
+  "sha256": {
+    "domain-tests.txt": "cccc19806cc592c37c0abe116bb3f0813eba2d710a5c933d62a537016ff5306e",
+    "clippy.txt": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}

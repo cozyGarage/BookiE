@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 17 tests
+test domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path ... ok
+test domain_contract::value_contract_domain_enum_array_csv_import_uses_target_type_under_shadowed_search_path ... ok
+test domain_contract::value_contract_domain_over_enum_array_functions_infer_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_assignment_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_coalesce_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_file_formats_preserve_values_and_refuse_empty_xlsx ... ok
+test domain_contract::value_contract_domain_over_enum_filters_preserve_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_nullif_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_parameters_preserve_native_type ... ok
+test domain_contract::value_contract_domain_over_enum_projection_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_query_comparison_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type ... ok
+test domain_contract::value_contract_five_domain_levels_over_enum_preserve_metadata_and_values ... ok
+test domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values ... ok
+test domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out; finished in 44.12s
