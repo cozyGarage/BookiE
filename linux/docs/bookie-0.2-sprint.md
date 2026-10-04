@@ -97,6 +97,16 @@ added, all 293 selected contracts still pass across the same 11 suites. The
 source revision is `b165a0c7`; the report, suite logs and hashes are retained in
 [the follow-up evidence](evidence/full-value-tier-postgres-coalesce-results-2026-10-04/manifest.json).
 
+October 4 follow-up: PostgreSQL now binds an inferred enum-array parameter for
+the domain-over-enum `ANY($1)` query context. The failing-first Docker contract
+covers text parsing, multidimensional bounds, native array type/wire bytes,
+NULL/empty distinctions, invalid labels, and pre-dispatch refusal. Commit
+`cf633a51d` passes all 99 PostgreSQL contracts and the GTK + DuckDB value tier
+(11 suites); the aggregate report and suite logs are in the
+[evidence packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
+B3 remains open because other inferred array contexts and the broader engine,
+consumer, and configuration matrix are not covered.
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

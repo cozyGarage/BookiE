@@ -1,5 +1,13 @@
 # B3 external test-scenario survey
 
+### October 4 follow-up
+
+The PostgreSQL inferred enum-array `ANY($1)` context is now covered by a
+Docker-backed contract with native array type and wire-byte oracles. Its exact
+commit and cross-driver run are recorded in the
+[evidence packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
+Other inferred array contexts remain open.
+
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source
 `35d457fa488768a5204a26d785c90114073d4acd` and documentation tip `62dc257c7`.

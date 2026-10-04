@@ -1,0 +1,32 @@
+
+running 28 tests
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes ... ok
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mysql_sql_modes ... ok
+test value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_all_digits ... ok
+test value_contracts::mariadb_datetime_and_timestamp_fractional_precision_matrix_respects_round_mode ... ok
+test value_contracts::mariadb_datetime_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_datetime_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mariadb_strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
+test value_contracts::mariadb_time_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_time_fractional_precision_matrix_respects_round_mode ... ok
+test value_contracts::mariadb_time_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mariadb_timestamp_fractional_half_millisecond_boundary_respects_round_mode ... ok
+test value_contracts::mariadb_timestamp_fractional_storage_respects_round_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_datetime_and_timestamp_fractional_precision_matrix_respects_truncate_mode ... ok
+test value_contracts::mysql_datetime_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_datetime_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_time_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_time_fractional_precision_matrix_respects_truncate_mode ... ok
+test value_contracts::mysql_time_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::mysql_timestamp_fractional_half_millisecond_boundary_respects_truncate_mode ... ok
+test value_contracts::mysql_timestamp_fractional_storage_respects_truncate_mode_for_binds_and_literals ... ok
+test value_contracts::native_time_zero_date_and_year_values_survive_reads_parameters_and_exports ... ok
+test value_contracts::session_non_utc_time_zone_refuses_mysql_timestamp_instant ... ok
+test value_contracts::strict_zero_date_modes_refuse_invalid_dates_without_writing ... ok
+test value_contracts::value_contract_bit_enum_set_and_geometry_survive_reads_parameters_and_exports ... ok
+test value_contracts::value_contract_mariadb_text_exports_survive_with_and_without_backslash_escapes ... ok
+test value_contracts::value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_and_writes ... ok
+test value_contracts::value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contracts::value_contract_text_exports_survive_with_and_without_backslash_escapes ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 315.48s

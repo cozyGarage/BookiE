@@ -5662,3 +5662,17 @@ and the source column remains `state_domain`. The entire domain contract group
 passes (17 tests), with PostgreSQL Clippy, formatting, ignored-test inventory,
 file-size and diff checks. See the
 [evidence manifest](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json).
+
+## PostgreSQL inferred enum-array parameter in `ANY`, 2026-10-04
+
+A PostgreSQL 16 Docker contract compares a domain-over-enum column cast to its
+base enum against uncast `ANY($1)`. The inferred enum-array parameter is checked
+with ordinary, empty, and NULL arrays; literal `NULL`, empty, quoted, comma,
+and backslash labels; and a two-dimensional array with lower bounds 0 and 3.
+Assertions compare `pg_typeof`, source-domain type, exact `array_send` bytes
+against a native array, and SQLSTATE `22P02` for an invalid label. An array
+whose declared bounds disagree with its contents returns `Unsupported` before
+dispatch. This new inferred path encodes PostgreSQL's binary array protocol;
+existing explicitly cast text parameters remain a separate path. The exact
+regression and all 99 PostgreSQL value contracts pass in the GTK + DuckDB
+value tier. See the [evidence manifest](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).

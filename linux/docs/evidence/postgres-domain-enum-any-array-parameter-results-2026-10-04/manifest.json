@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "cf633a51db54b7e705c7e62b115199db0a4adb8a",
+  "branch": "linux",
+  "change": "Infer and encode PostgreSQL enum-array parameters for domain-over-enum predicates using ANY($1).",
+  "focused_contract": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs::value_contract_domain_over_enum_any_infers_array_parameter_type",
+  "run": {
+    "command": "rtk proxy bash scripts/test-value-contracts.sh --gtk --duckdb",
+    "report": "value-tier-report.json",
+    "report_revision": "cf633a51db54b7e705c7e62b115199db0a4adb8a",
+    "report_dirty": true,
+    "dirty_note": "The report marks the checkout dirty because pre-existing sibling .b4-f4f9-target and .b4-f4f9-tmp scratch directories are visible to Git. Tracked source at the reported revision was clean; these scratch directories were left untouched.",
+    "gtk": true,
+    "duckdb": true,
+    "unit_only": false,
+    "missing_suites": [],
+    "selected_contracts": 295,
+    "suite_count": 11,
+    "passed": true,
+    "suite_results": {
+      "app": 49,
+      "core": 58,
+      "clickhouse": 6,
+      "duckdb": 30,
+      "mongodb": 13,
+      "mssql": 6,
+      "mysql": 28,
+      "postgres": 99,
+      "redis": 4,
+      "sqlite": 1,
+      "mcp": 1
+    }
+  },
+  "focused_contract_result": "passed; present in crates-drivers-postgres.txt",
+  "additional_checks": [
+    "cargo fmt --all -- --check: passed",
+    "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings: passed",
+    "cargo test --locked -p tablepro-driver-postgres --test integration domain_contract::value_contract_domain_over_enum_any_infers_array_parameter_type -- --include-ignored --exact --test-threads=1: passed",
+    "python3 scripts/inventory-ignored-tests.py --check: passed",
+    "bash scripts/check-file-size.sh: passed",
+    "git diff --check: passed"
+  ],
+  "scope_limit": "This proves one inferred parameter context only. Other array operators/functions and the remaining B3 native type, consumer, configuration, installed-platform, B4, and release acceptance work remain open.",
+  "checksums": "sha256sums.txt"
+}
