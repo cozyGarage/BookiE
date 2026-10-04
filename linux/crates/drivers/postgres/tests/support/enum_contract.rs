@@ -1513,9 +1513,14 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
 
     let mut transaction = connection.begin().await.unwrap();
     transaction
-        .execute("SET LOCAL search_path TO enum_shadow_a")
+        .execute("SET search_path TO enum_shadow_b, enum_shadow_a")
         .await
         .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("enum_shadow_b".into())]]
+    );
+    transaction.execute("SET search_path TO enum_shadow_a").await.unwrap();
     assert_eq!(
         transaction.query("SELECT current_schema()::text").await.unwrap().rows,
         vec![vec![Value::Text("enum_shadow_a".into())]]
