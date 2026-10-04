@@ -1,0 +1,2 @@
+numeric[] precision, scale, NaN, infinities and SQL NULL are unchanged in XLSX, ODS and Calc re-saved XLSX; no formulas
+{"1234567890123456789012345678901234567890","0.123456789012345678901234567891","1.2300","NaN","Infinity","-Infinity",NULL}

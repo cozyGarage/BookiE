@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "a5c75aace7ed103493a6ec9f0a4b83764b8e70e2",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL numeric[] XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_numeric_array_file_exports_preserve_exact_text",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The PostgreSQL numeric[] contains a 40-digit integer, high-scale decimal, scale-preserving 1.2300, NaN, positive/negative Infinity and SQL NULL. Native array_to_json and array_send oracles confirm the exact array values and bytes after binding and SQL replay.",
+    "BookieE writes the numeric[] representation into an XLSX shared-string cell without a formula.",
+    "LibreOffice Calc opens the workbook and saves ODS, then reopens and saves XLSX; the exact 122-character cell remains unchanged across all three artifacts."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=/home/trung/Projects/tablepro/linux/docs/evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/source.xlsx cargo test --locked --package tablepro-driver-postgres --test integration array_contract::value_contract_numeric_array_file_exports_preserve_exact_text -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "In the pinned Debian image, apt installs libreoffice-calc; Calc opens source.xlsx and saves calc-roundtrip.ods.",
+        "Calc reopens calc-roundtrip.ods and saves calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks require a shared-string cell in both XLSX files, a string cell in ODS, exact array text equality, and no formulas.",
+      "checker": "verify_roundtrip.py",
+      "result": "All three artifacts contain the same exact text cell; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --locked --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "992e22a0bbad79e76cf38f2bd04237a1cb8b2c494f2589494c637f89fa0a6f64",
+    "calc-roundtrip.ods": "fd4c970b63e4eefde3659a55f7fcf388909e682ca826734aaceae52b0ab44117",
+    "calc-roundtrip.xlsx": "44890b0954714807fc6c768ecb3c8a6c1e3acf5eb471d8daf5ff84f14c7625f9"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "65c8c7cc0230f744245eba0c5374ddeb716b3231d6d0ee0ef301b38eaf2fc247",
+    "libreoffice-roundtrip.txt": "3caea8e3b5bda4157f2763a8232dbef653dbe76bb85a214a47c4102fdf75e86d",
+    "consumer-check.txt": "cdbc5fbf549268863baf888663bec827f4df3dd3ceada525ab9f459efb585941",
+    "clippy.txt": "cd90ae10fbf33fb2af81be7dda77ebfa68804b434d0b1869897335eb05900334",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "checker_sha256": "1c5f32c9c2c1f0bd084d8b2609427f64b3fff8982c72e7be7701a0eb7705666a",
+  "remaining": [
+    "Calc re-import for other PostgreSQL array families and other spreadsheet applications remains open in B3."
+  ]
+}
