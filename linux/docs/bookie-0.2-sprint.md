@@ -92,6 +92,12 @@ packages. The runner's 9 unit tests also pass. The durable report and raw suite
 logs, including the original timeout, are in the
 [full value-tier evidence](evidence/full-value-tier-results-2026-10-04/manifest.json).
 
+October 4 follow-up: after the SQL Server legacy `datetime` grid edit fix, the
+GTK + DuckDB value tier passed 307 selected contracts across all 11 suites with
+no missing suites. The report used source `72f937b0`; its `dirty: true` flag is
+from the two pre-existing B4 scratch directories. The portable report, suite
+logs and checksums are in the [run evidence](evidence/full-value-tier-mssql-grid-results-2026-10-04/manifest.json).
+
 October 4 follow-up: with the PostgreSQL domain-over-enum `COALESCE` contract
 added, all 293 selected contracts still pass across the same 11 suites. The
 source revision is `b165a0c7`; the report, suite logs and hashes are retained in

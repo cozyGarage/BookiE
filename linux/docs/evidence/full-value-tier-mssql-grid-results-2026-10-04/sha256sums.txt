@@ -1,0 +1,13 @@
+f7d5287878cf984fdb1752637b1b91bff444aa2ab6fafb8fcabbd7a0aa29548b  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/compile.txt
+022818b8ffa03fe341832df3574169f87780fd228c22bc149e2ab87aea416054  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-app.txt
+b852e9d44bc52f75f850e6a075b9da469cfcc1e94632d7fe18b84f57ed5a3a0f  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-core.txt
+71c851b71259e076192ad30422d6e93ed007f712469fa853cf69e843552607c8  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-clickhouse.txt
+4a9715dc00265f60dcd073791984b50ff7f0de89560e39224993e4152b0676e9  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-duckdb.txt
+be0add5648775157f5169d0692c701f65b1f001ce20cdda2012460e6eda0bc80  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-mongodb.txt
+5d6fa832b51a2ea4036aec40b09783a211878fd5b9f273db828f94357669ba0b  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-mssql.txt
+3b7fc3b998d442e690429fc1f6cdef980d1117aaad5101aa03b0440b7f46d946  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-mysql.txt
+3557c9430df65e745f1f255d7d6fb8fd49b832344015c43bd75e2c270b4b469a  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-postgres.txt
+0b17f805fce729ad6a48b63b5aaa083f6711b09156a090a8874ae72c93db0cbb  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-redis.txt
+fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-sqlite.txt
+32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-mcp.txt
+1ee0c0245b9b4c90951694adb0eeba69567646515c9106861404d36b4baed389  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/value-tier-report.json

@@ -1,0 +1,102 @@
+{
+  "revision": "72f937b0feb8d1eeb7c880aed213f5e9d57d0b3e",
+  "dirty": true,
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--workspace",
+    "--features",
+    "tablepro-app/duckdb",
+    "--lib",
+    "--test",
+    "integration",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "compile": {
+    "exit_code": 0,
+    "seconds": 13.791,
+    "fresh_artifacts": 740,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/agentd#tablepro-agentd@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/app#tablepro-app@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/driver-tls-tests#tablepro-driver-tls-tests@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/mssql#tablepro-driver-mssql@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0"
+    ]
+  },
+  "missing_suites": [],
+  "suites": {
+    "crates/app/Cargo.toml": {
+      "tests": 50,
+      "exit_code": 0,
+      "seconds": 119.684,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.17,
+      "log": "crates-core.log"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 34.875,
+      "log": "crates-drivers-clickhouse.log"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 2.119,
+      "log": "crates-drivers-duckdb.log"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 15,
+      "exit_code": 0,
+      "seconds": 10.983,
+      "log": "crates-drivers-mongodb.log"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 7,
+      "exit_code": 0,
+      "seconds": 38.786,
+      "log": "crates-drivers-mssql.log"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 28,
+      "exit_code": 0,
+      "seconds": 310.557,
+      "log": "crates-drivers-mysql.log"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 107,
+      "exit_code": 0,
+      "seconds": 232.235,
+      "log": "crates-drivers-postgres.log"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 1.667,
+      "log": "crates-drivers-redis.log"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "crates-drivers-sqlite.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": false,
+  "passed": true
+}

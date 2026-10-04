@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "72f937b0feb8d1eeb7c880aed213f5e9d57d0b3e",
+  "branch": "linux",
+  "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+  "report": "value-tier-report.json",
+  "report_dirty": true,
+  "dirty_note": "The report marks the checkout dirty because the two pre-existing sibling .b4-f4f9-target and .b4-f4f9-tmp scratch directories are visible to Git. Tracked files were at source commit 72f937b0; the scratch directories were left untouched.",
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": false,
+  "missing_suites": [],
+  "selected_contracts": 307,
+  "suite_count": 11,
+  "passed": true,
+  "suite_results": {
+    "app": 50,
+    "core": 58,
+    "clickhouse": 6,
+    "duckdb": 30,
+    "mongodb": 15,
+    "mssql": 7,
+    "mysql": 28,
+    "postgres": 107,
+    "redis": 4,
+    "sqlite": 1,
+    "mcp": 1
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 13.791,
+    "fresh_artifacts": 740,
+    "rebuilt_packages": 5
+  },
+  "logs": "one text file per reported suite plus compile.txt and value-tier-report.json",
+  "checksums": "sha256sums.txt",
+  "scope_limit": "The selected GTK + DuckDB value-contract tier does not cover the full workspace, installed packages, B4 acceptance or B7 qualification."
+}
