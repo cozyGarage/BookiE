@@ -97,6 +97,95 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression =
+        r#"ARRAY['NULL', NULL, '', 'comma,value', E'quote"slash\\', '東京 😀', '</value><injected a="1">&']::text[]"#;
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("text[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, {expression}::text, \
+                    array_to_json({expression})::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("text[]".into()));
+    assert_eq!(result.rows[0][0], oracle.rows[0][1]);
+    let round_trip = connection
+        .query_params(
+            "SELECT encode(array_send($1::text[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(round_trip.rows[0][0], oracle.rows[0][3]);
+    let Value::Text(native_json) = &oracle.rows[0][2] else {
+        panic!("native array_to_json returned {:?}", oracle.rows[0][2]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
+        serde_json::json!([
+            "NULL",
+            null,
+            "",
+            "comma,value",
+            "quote\"slash\\",
+            "東京 😀",
+            "</value><injected a=\"1\">&"
+        ])
+    );
+
+    let directory = tempfile::tempdir().unwrap();
+    let options = tablepro_core::export::CsvOptions::default();
+    for (extension, format, marker) in [
+        (
+            "xml",
+            tablepro_core::export::ResultFormat::Xml,
+            "&lt;/value&gt;&lt;injected",
+        ),
+        (
+            "html",
+            tablepro_core::export::ResultFormat::Html,
+            "&lt;/value&gt;&lt;injected",
+        ),
+        (
+            "md",
+            tablepro_core::export::ResultFormat::Markdown,
+            "&lt;/value&gt;&lt;injected",
+        ),
+    ] {
+        let path = directory.path().join(format!("array.{extension}"));
+        tablepro_core::export::write_result_file(
+            &path,
+            &result,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &options,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let output = std::fs::read_to_string(path).unwrap();
+        assert!(output.contains(marker), "{extension}: {output}");
+        assert!(!output.contains("</value><injected"), "{extension}: {output}");
+        assert!(output.contains("NULL"), "{extension}: {output}");
+        assert!(output.contains("comma,value"), "{extension}: {output}");
+        assert!(output.contains("quote"), "{extension}: {output}");
+        assert!(output.contains("slash"), "{extension}: {output}");
+        assert!(output.contains("東京 😀"), "{extension}: {output}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
