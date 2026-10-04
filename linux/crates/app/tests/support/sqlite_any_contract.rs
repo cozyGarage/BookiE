@@ -1045,6 +1045,103 @@ async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 7), (1, 9), (2, 1.25), (2, 2.5), \
+             (3, '12'), (3, '3'), (4, '1.5'), \
+             (5, 'alpha'), (5, X'00FF'), (6, NULL), (6, NULL), \
+             (7, 1), (7, 2.5)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, SUM(value) AS result, \
+                    typeof(SUM(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(16), Value::Text("integer".into())],
+            vec![Value::Int(2), Value::Float(3.75), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Int(15), Value::Text("integer".into())],
+            vec![Value::Int(4), Value::Float(1.5), Value::Text("real".into())],
+            vec![Value::Int(5), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(6), Value::Null, Value::Text("null".into())],
+            vec![Value::Int(7), Value::Float(3.5), Value::Text("real".into())],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![
+                match &row[1] {
+                    Value::Int(_) => Value::Text("integer".into()),
+                    Value::Float(_) => Value::Text("real".into()),
+                    Value::Null => Value::Text("null".into()),
+                    other => panic!("unexpected SUM result: {other:?}"),
+                },
+                row[1].clone(),
+                row[2].clone(),
+            ])
+            .collect::<Vec<_>>()
+    );
+
+    let overflow = connection
+        .query(
+            "SELECT SUM(value) FROM (\
+                 SELECT 9223372036854775807 AS value UNION ALL SELECT 1 AS value\
+             )",
+        )
+        .await
+        .unwrap_err();
+    assert!(overflow.to_string().contains("integer overflow"), "{overflow}");
+}
+
+#[tokio::test]
 async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
