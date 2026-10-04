@@ -840,3 +840,103 @@ async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
         vec![vec![Value::Int(0)]]
     );
 }
+
+#[tokio::test]
+async fn sqlite_nullif_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.5), (3, 'keep'), (4, 'drop'), \
+             (5, X'00FF'), (6, NULL), (7, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, NULLIF(value, 'drop') AS result, \
+                    typeof(NULLIF(value, 'drop')) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("integer".into()),
+            Value::Text("real".into()),
+            Value::Text("text".into()),
+            Value::Text("null".into()),
+            Value::Text("blob".into()),
+            Value::Text("null".into()),
+            Value::Text("text".into()),
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(42),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.5),
+                Value::Text("real".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("keep".into()),
+                Value::Text("text".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}
