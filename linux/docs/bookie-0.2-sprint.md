@@ -128,6 +128,11 @@ in the 130-test PostgreSQL integration run
 It also records PostgreSQL's native `42883` refusal for scalar equality against
 `ANY(domain_array)` at depth 63; containment isolates the parameter binding path.
 
+October 4 B3 function follow-up: inferred text and SQL NULL parameters to
+`array_remove` pass for domain-over-enum inputs, with typed native query results
+and `pg_typeof` oracles. Other PostgreSQL array functions and the broader B3
+matrix remain open ([evidence](evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json)).
+
 October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
 contracts across all 11 suites, including 101 PostgreSQL contracts with the
 new array-operator and depth-boundary cases. The exact-revision report and raw

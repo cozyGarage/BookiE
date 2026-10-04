@@ -172,6 +172,11 @@ combination; restored UTF-8 bytes and native enum type are checked independently
 Separate PostgreSQL expression contexts now infer text and SQL NULL enum
 parameters in `COALESCE` and `array_append` ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)). A `NULLIF(enum_column, $1)` follow-up checks inferred type, NULL/match behavior and invalid-label refusal ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)). A domain-over-enum case records the raw `42883` refusal and passing qualified base-enum cast control under a shadowed `search_path` ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 
+Inferred text and SQL NULL parameters to PostgreSQL `array_remove` now have
+domain-over-enum coverage against explicitly typed native-query results, with
+parameter and result enum types checked independently
+([evidence](evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json)).
+
 PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
 when replayed with (`standard_conforming_strings=on`, `backslash_quote=safe_encoding`)
 and (`standard_conforming_strings=off`, `backslash_quote=off`); the writer uses

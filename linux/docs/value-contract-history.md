@@ -5663,6 +5663,16 @@ passes (17 tests), with PostgreSQL Clippy, formatting, ignored-test inventory,
 file-size and diff checks. See the
 [evidence manifest](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum `array_remove` parameter inference, 2026-10-04
+
+A PostgreSQL 16 Docker contract covers inferred text and SQL NULL parameters in
+`array_remove(ARRAY[status::state], $1)` when `status` is a domain over an enum.
+An independently typed query supplies each output array; `pg_typeof` checks
+that the parameter is the base enum and the result is the base enum array. Both
+parameter forms pass in ready, paused and SQL NULL source rows. The case extends
+the inferred array-function matrix without changing production binding code;
+other function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json).
+
 ## PostgreSQL inferred enum-array parameter in `ANY`, 2026-10-04
 
 A PostgreSQL 16 Docker contract compares a domain-over-enum column cast to its
