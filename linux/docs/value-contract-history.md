@@ -4675,8 +4675,19 @@ text that resembles the reserved tag prefix. `typeof()` confirms the typed
 columns keep their declared behavior. Seven SQLite app `ANY` contracts, 514
 core tests plus 10 query-pipeline tests, all 47 SQLite driver tests, strict
 Clippy and formatting passed. Spreadsheet-app re-import and other computed
-expression shapes remain open. See the
+expression consumers remain open; CASE consumer coverage is recorded below. See the
 [typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
+
+## SQLite computed CASE STRICT ANY CSV round trip (2026-10-04)
+
+An app-level native contract exports a computed `CASE` result over STRICT
+`ANY` through the result-file CSV writer, imports it into typed SQLite
+destinations, and checks persisted values with `typeof()`. INTEGER, branch
+TEXT, SQL NULL, BLOB bytes, and text matching the reserved type-tag prefix all
+survive; the CASE result keeps conservative fallback metadata. Eight SQLite app
+`ANY` contracts passed with strict Clippy and formatting. COALESCE and other
+computed-expression consumer paths remain open. See the
+[CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 ## DuckDB enum keyed grid edit, 2026-10-03
 
