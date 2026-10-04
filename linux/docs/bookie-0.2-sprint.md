@@ -106,6 +106,15 @@ out of extraction, remains malformed after formatting and is denied to agents
 by fail-closed policy. Other dialects and installed SQL editor interaction
 remain open; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
 
+October 4 B3-5 follow-up: a Docker-backed GTK scenario now checks MySQL
+unparseable-routine approval text, deny-before-dispatch, and Allow Once against
+the native routine catalog. It exposed the pooled MySQL query path missing the
+text-protocol fallback already used by explicit sessions; both now share it.
+The [retained evidence](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json)
+includes the pre-fix error and passing GTK, strict unit, Clippy, and format
+results. Other dialect executable-identity/malformed-tail cases and additional
+MySQL delimiter forms remain open.
+
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL
 with native ENUM type and an untouched destination row. Spreadsheet-safe mode

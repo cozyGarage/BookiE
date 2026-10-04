@@ -1,0 +1,53 @@
+{
+  "revision": "a9c61d3d639f64dc9ce5cab03d48e4f8093859c3",
+  "dirty": true,
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--workspace",
+    "--features",
+    "tablepro-app/duckdb",
+    "--lib",
+    "--test",
+    "integration",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "compile": {
+    "exit_code": 0,
+    "seconds": 8.425,
+    "fresh_artifacts": 741,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/agentd#tablepro-agentd@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/app#tablepro-app@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/driver-tls-tests#tablepro-driver-tls-tests@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/mysql#tablepro-driver-mysql@0.1.0"
+    ]
+  },
+  "missing_suites": [],
+  "suites": {
+    "crates/app/Cargo.toml": {
+      "tests": 47,
+      "exit_code": 0,
+      "seconds": 107.65,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.219,
+      "log": "crates-core.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": true,
+  "passed": true
+}

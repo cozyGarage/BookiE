@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "df6db31fd267abaf8324e420f0456ed158d8043d",
+  "test_report_commit": "a9c61d3d639f64dc9ce5cab03d48e4f8093859c3",
+  "tested_diff_sha256": "758b7b325533b859767cbdf0f9f469f4dea04ace6696608947c70599c1b41750",
+  "case": "MySQL unparseable routine approval dialog and dispatch through GTK",
+  "contract": [
+    "The MySQL-backed GTK editor presents the unparseable statement class and exact SQL to the human approval dialog.",
+    "Deny prevents CREATE PROCEDURE dispatch; information_schema confirms that no routine was created.",
+    "Allow Once dispatches an unparameterized CREATE PROCEDURE successfully; information_schema confirms the routine exists.",
+    "Pooled MySQL queries use the same text-protocol retry for prepared-protocol unsupported errors as explicit sessions."
+  ],
+  "fixture": {
+    "engine": "MySQL 8.0.46",
+    "image": "mysql:8.0",
+    "authentication": "fixture-only password in an isolated private Secret Service",
+    "network": "ephemeral host port bound to 127.0.0.1",
+    "cleanup": "container and private D-Bus runtime removed by the runner"
+  },
+  "baseline_failure": {
+    "source_commit": "a9c61d3d639f64dc9ce5cab03d48e4f8093859c3",
+    "observed_error": "This command is not supported in the prepared statement protocol yet",
+    "evidence": [
+      "pre-fix-result.json",
+      "pre-fix-accessibility.txt",
+      "pre-fix-stderr.txt"
+    ]
+  },
+  "validation": {
+    "gtk_mysql_approval_layer": {
+      "command": "python3 scripts/run-test-layer.py gtk-mysql-approval",
+      "result": "passed",
+      "duration_seconds": 50.801,
+      "report": "layer-report.json",
+      "log": "layer.log.txt"
+    },
+    "strict_unit_values": {
+      "command": "bash scripts/test-value-contracts.sh --gtk --duckdb --unit-only",
+      "result": "passed",
+      "selected_contracts": 106,
+      "compiled_workspace_suites": 11,
+      "executed_suites": 3,
+      "report": "strict-unit-report.json"
+    },
+    "mysql_session_approval_contract": {
+      "command": "cargo test --locked -p tablepro-app --features duckdb --lib services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution -- --ignored --exact",
+      "result": "1 passed, 0 failed",
+      "log": "mysql-session-test.txt"
+    },
+    "cargo_check": {
+      "command": "cargo check --locked -p tablepro-driver-mysql -p tablepro-app",
+      "result": "passed"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-app --features duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "repository_guards": {
+      "file_size": "passed; file-size.txt",
+      "ignored_test_inventory": "passed; ignored-inventory.txt",
+      "python_compile": "passed",
+      "runner_shell_syntax": "passed",
+      "git_diff_check": "passed"
+    }
+  },
+  "remaining": [
+    "Installed Arch/Wayland and Debian/GNOME GTK acceptance remain open.",
+    "Executable-identity and malformed-tail cases for other dialects remain open.",
+    "Additional MySQL delimiter forms and the wider B3 matrix remain open."
+  ],
+  "sha256": {
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "layer-report.json": "ddfa1520fad5084e85088915c4fda343f6ca552a11a3f8c71bd200bd73c5455b",
+    "layer.log.txt": "219f10869d12cc646449b9716b6ec86777281af8f45a5b15f1a41ea90ae89e89",
+    "mysql-session-test.txt": "057a84245c5266b7aab75825721c18758cc9f0a61d6870fce6c577d7328fe94c",
+    "pre-fix-accessibility.txt": "891f3885144f818ea7f7439d84d9153cc6f8673fd55c0e2a736f5d7d8a2c3a74",
+    "pre-fix-result.json": "624fcb11f2dfb6c9afa95d412f8fbf7b49e515e88f9914f3528c96403d1be9ae",
+    "pre-fix-stderr.txt": "d3940d8360cea3f88e22e7e7907b0ed142d0e29014f20fde973eb6152740bfcb",
+    "strict-unit-report.json": "c3a25734d36279bf782fe148238a2ff497c126c91530d261793e89c866d7f1c9"
+  }
+}

@@ -1,0 +1,20 @@
+2026-10-04T13:23:42.992851Z  INFO starting tablepro-app drivers=7
+2026-10-04T13:23:42.995943Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+2026-10-04T13:23:42.996173Z  INFO system OpenSSH connections are unavailable error=ssh: the tablepro-askpass helper is not installed
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-04T13:23:43.174338Z  INFO registered win.disconnect enabled=false
+
+(com.tablepro.linux:190996): Gtk-CRITICAL **: 15:23:43.202: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-04T13:23:43.588787Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+(com.tablepro.linux:190996): Gtk-CRITICAL **: 15:23:43.594: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:190996): Gtk-CRITICAL **: 15:23:43.597: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-04T13:23:44.840022Z  INFO workspace ready driver=mysql table_count=0 view_count=0
+
+(com.tablepro.linux:190996): Gtk-CRITICAL **: 15:23:44.851: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:190996): Gtk-CRITICAL **: 15:23:44.854: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-04T13:23:46.556753Z  INFO script run complete n_ok=0 n_err=1 total_ms=861
+2026-10-04T13:23:48.061100Z  INFO script run complete n_ok=0 n_err=1 total_ms=856

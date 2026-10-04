@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "a9c61d3d639f64dc9ce5cab03d48e4f8093859c3",
+  "working_tree": "M linux/crates/app/tests/gtk_safety.py\n M linux/crates/drivers/mysql/src/lib.rs\n M linux/crates/drivers/mysql/src/session.rs\n M linux/scripts/ci-local.sh\n M linux/scripts/test-layers.json\n?? .b4-f4f9-target/\n?? .b4-f4f9-tmp/\n?? linux/scripts/test-gtk-mysql-approval.sh",
+  "tracked_diff_sha256": "758b7b325533b859767cbdf0f9f469f4dea04ace6696608947c70599c1b41750",
+  "started_utc": "2026-10-04T13:25:42.900727+00:00",
+  "status": "passed",
+  "layers": {
+    "gtk-mysql-approval": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mysql-approval.sh"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "gtk-mysql-approval-1.log",
+          "exit_code": 0,
+          "seconds": 50.801
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-04T13:26:33.702013+00:00"
+}

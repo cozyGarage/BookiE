@@ -5583,3 +5583,18 @@ safe parameter, and formatting preserves the malformed tail and batch
 delimiters. Policy classifies the script as unparseable/write and denies it to
 an agent. The focused app regression and strict unit-only GTK+DuckDB values
 runner pass; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
+
+## MySQL unparseable routine approval through GTK, 2026-10-04
+
+The GTK harness opens a real MySQL 8.0 connection and shows the exact
+unparseable `CREATE PROCEDURE` class and SQL in the approval dialog. Denial
+leaves no routine in `information_schema`; Allow Once creates a separate
+routine, checked through the MySQL client. The first run exposed a production
+gap: approved unparameterized DDL used the pooled query path, which sent it via
+the prepared-statement protocol and MySQL rejected it. The existing explicit
+session path already retried this specific server error through text protocol;
+both paths now share that fallback. The retained pre-fix accessibility tree
+shows the protocol error, and the post-fix GTK layer, strict unit-only values
+tier, Clippy, formatting and repository guards pass. This local GTK/Xvfb case
+does not qualify installed Wayland behavior or other dialects; see the
+[evidence manifest](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json).
