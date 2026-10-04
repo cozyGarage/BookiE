@@ -197,8 +197,11 @@ October 4 B3-3/B3-4 follow-up: SQLite `json_extract()` over STRICT `ANY`
 produces dynamic INTEGER, REAL, TEXT and SQL NULL results from one expression.
 The contract distinguishes JSON integer, real, string, boolean, null, object,
 array and missing-path kinds with native `json_type()` while `typeof()` verifies
-the result carrier; typed CSV re-import preserves storage classes and keeps
-JSON null distinct from a missing path in the companion kind column. See the
+the result carrier. JSON export keeps large integers numeric and preserves
+text/null distinctions; XLSX uses numeric cells for numeric results and shared
+strings for extracted text without formulas. Typed CSV re-import preserves
+storage classes and keeps JSON null distinct from a missing path in the
+companion kind column. Spreadsheet-app re-import remains open. See the
 [JSON extraction evidence](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
 
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`

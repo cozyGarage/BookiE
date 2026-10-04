@@ -5122,7 +5122,10 @@ converted to INTEGER, an object and an array returned as text, JSON null, and a
 missing path. Native `typeof()` and `json_type()` checks keep the extracted
 storage class distinct from the source JSON kind; typed CSV round-trip restores
 the carrier and records JSON null separately from a missing path. All 13
-selected SQLite app contracts, strict Clippy and formatting pass. See the
+selected SQLite app contracts, strict Clippy and formatting pass. JSON export
+keeps large integers numeric and preserves extracted strings; XLSX uses numeric
+cells for numeric results and shared strings for text, with no formulas.
+Spreadsheet-app re-import remains open. See the
 [evidence manifest](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
 
 ## PostgreSQL numeric array file-writer contract, 2026-10-04

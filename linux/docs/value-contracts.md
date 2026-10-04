@@ -95,8 +95,11 @@ BLOB and NULL groups through typed CSV, checked by native `typeof()` and exact
 BLOB-byte comparisons ([evidence](evidence/sqlite-max-any-results-2026-10-04/manifest.json)).
 
 SQLite `json_extract()` over STRICT `ANY` preserves dynamic numeric/text/NULL
-storage classes through typed CSV import; native `typeof()` and `json_type()`
-distinguish JSON null from a missing path ([evidence](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json)).
+storage classes through JSON and XLSX export and typed CSV re-import. JSON keeps
+large integers numeric and distinguishes JSON null from a missing path through
+the companion kind column; XLSX uses numeric cells for numeric results and
+shared strings for extracted text without formulas. Native `typeof()` and
+`json_type()` remain the independent SQLite oracles ([evidence](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json)).
 
 ## Evidence updates
 
