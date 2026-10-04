@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "6281152a9",
+  "source_commit": "8e8efa97a",
   "engine": "MySQL 8.1 in Docker via testcontainers",
   "case": "MySQL ENUM and SET parser/keyed edit across SQL modes",
   "tests": [
@@ -12,6 +12,7 @@
   "contract": [
     "Grid parsing validates values against the declared ENUM/SET members, including apostrophe and backslash metadata, and refuses unknown labels or members.",
     "Bound keyed edits preserve ENUM label bytes and a multi-member SET mask under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES and combined SQL modes.",
+    "Blank input retains shared SQL NULL/required-field behavior, while explicit `''` selects an empty ENUM label or the empty SET value; native ordinals/masks distinguish empty values from NULL.",
     "The native server control demonstrates that permissive mode otherwise coerces an unknown ENUM label to its error value and drops an unknown SET member; the control updates are rolled back.",
     "An untouched sibling row retains its native ordinals, masks and label bytes in every mode."
   ],
@@ -45,7 +46,6 @@
   },
   "remaining": [
     "MariaDB app-grid edits and additional SQL modes remain untested.",
-    "Blank input retains shared SQL NULL/required-field behavior, so selecting an empty ENUM label in the grid remains open.",
     "This case does not close B3 or qualify the 0.2.0 release."
   ]
 }

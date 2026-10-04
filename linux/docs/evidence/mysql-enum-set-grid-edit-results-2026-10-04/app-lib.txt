@@ -497,4 +497,4 @@ test ui::welcome_view::tests::an_empty_arrangement_renders_no_sections ... ok
 test ui::welcome_view::tests::connections_without_a_group_render_as_one_ungrouped_section ... ok
 test ui::welcome_view::tests::each_group_becomes_its_own_section_in_arranged_order ... ok
 
-test result: ok. 460 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; finished in 0.31s
+test result: ok. 460 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; finished in 0.30s
