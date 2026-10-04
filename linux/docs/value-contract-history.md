@@ -5611,3 +5611,16 @@ unparseable/write routine classification. The focused app selector, strict
 unit-only GTK+DuckDB values tier, Clippy and formatting pass. Other MySQL
 delimiter forms remain open; see the
 [evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
+
+## ClickHouse malformed heredoc consumer contract, 2026-10-04
+
+ClickHouse's shared SQL scanner now skips `$tag$...$tag$` heredocs, including
+an unterminated body through end of input, matching the script lexer. Core
+coverage proves placeholders inside closed and malformed bodies are hidden;
+the app consumer contract checks planner diagnostics, whole-script execution
+refusal, safe-prefix parameter extraction, malformed-tail retention through
+formatting, and unparseable/write classification with fail-closed agent denial.
+The initial contract failed because the generic scanner only recognized
+PostgreSQL dollar quotes. The focused core and app selectors, strict unit-only
+GTK+DuckDB values tier, Clippy, formatting and repository guards pass. See the
+[evidence manifest](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).

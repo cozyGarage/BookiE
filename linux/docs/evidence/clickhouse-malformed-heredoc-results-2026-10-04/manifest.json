@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "45f759745e320eb4e9378a7fde5427b316edaad1",
+  "case": "ClickHouse malformed heredoc blocks script consumers and hides body parameters",
+  "tests": [
+    "params::tests::clickhouse_heredocs_hide_placeholders_through_their_close_or_end_of_input",
+    "ui::editor::statement_cursor::tests::value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers"
+  ],
+  "contract": [
+    "Closed ClickHouse heredocs hide body placeholders while later query parameters remain extractable.",
+    "An unterminated heredoc hides all body placeholders through end of input.",
+    "The app planner reports the malformed tail and whole-script execution planning refuses it.",
+    "Formatting retains the malformed heredoc payload and the formatted plan remains diagnostic.",
+    "Policy classifies the SQL as unparseable/write and denies an agent under fail_closed_unparseable."
+  ],
+  "initial_failure": "The app consumer contract initially extracted :tail from an unterminated ClickHouse heredoc. The shared scanner recognized PostgreSQL dollar quotes only, while ClickHouse script planning already recognized heredocs.",
+  "validation": {
+    "focused_core_test": {
+      "command": "cargo test --locked -p tablepro-core --lib clickhouse_heredocs_hide_placeholders_through_their_close_or_end_of_input -- --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "core-test.log"
+    },
+    "focused_app_test": {
+      "command": "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers -- --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "app-test.log"
+    },
+    "strict_unit_values": {
+      "command": "bash scripts/test-value-contracts.sh --gtk --duckdb --unit-only",
+      "result": "passed",
+      "selected_contracts": 108,
+      "app_contracts": 49,
+      "core_contracts": 58,
+      "mcp_contracts": 1,
+      "compiled_workspace_suites": 11,
+      "executed_suites": 3,
+      "report": "strict-values/report.json"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-app --features duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.log"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.log"
+    },
+    "repository_guards": {
+      "file_size": "passed; file-size.log",
+      "ignored_test_inventory": "passed; ignored-inventory.log",
+      "git_diff_check": "passed"
+    }
+  },
+  "limits": [
+    "This is a parser/consumer contract and does not execute SQL against a ClickHouse server.",
+    "Other dialect executable-identity and malformed-tail cases remain open, along with installed GTK acceptance."
+  ],
+  "sha256": {
+    "app-test.log": "021567e8d08065f6dee84a6847df960b2a0de3792a4ca93a94cc513040eb0b4e",
+    "core-test.log": "5a41c1d26c2e1af758916b535d39536e9729f48208e934589a8ac4be8b54a74f",
+    "clippy.log": "8d8a92ec3fd0e3a8c4b2b854ad57b4196c38a3b4e49cee823ab2f443df2697f9",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "file-size.log": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "ignored-inventory.log": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "strict-values/report.json": "d6cbf7077f0688ec71ec26a98acc8d86bb9fb691f304ca18840b3a05e3b11654"
+  }
+}

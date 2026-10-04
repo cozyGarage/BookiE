@@ -119,6 +119,13 @@ October 4 B3-5 follow-up: the MySQL `\d //` shorthand now has a named consumer
 contract across planning, formatting, parameter extraction and policy
 classification. See the [evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
 
+October 4 B3-5 follow-up: ClickHouse's shared parameter scanner now recognizes
+the same `$tag$...$tag$` heredoc rule as the script lexer, so placeholders
+inside closed or unterminated bodies are not extracted. An app contract checks
+planner diagnostics, whole-script refusal, safe-prefix parameters, formatter
+retention and fail-closed policy; see the
+[ClickHouse malformed-heredoc evidence](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).
+
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL
 with native ENUM type and an untouched destination row. Spreadsheet-safe mode

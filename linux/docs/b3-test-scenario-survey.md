@@ -754,6 +754,14 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   binding under a non-UTC session with native JSON and wire-byte oracles
   ([evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
 
+October 4 B3-5 follow-up: ClickHouse malformed heredocs now block whole-script
+execution, suppress placeholders inside the unterminated body, survive
+formatting as a malformed tail, and classify as unparseable/write with
+fail-closed agent denial. The app contract exposed that shared parameter
+extraction handled PostgreSQL dollar quotes but not ClickHouse's
+`$tag$...$tag$` heredocs; the shared scanner now follows the existing ClickHouse
+lexer rule ([evidence](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json)).
+
 
 October 4 B3-5 follow-up: the GTK harness now opens a real MySQL 8.0 fixture, shows the unparseable routine SQL/class in the approval dialog, checks Deny leaves no routine, and checks Allow Once creates one. The regression exposed pooled MySQL execution returning `This command is not supported in the prepared statement protocol yet` for approved routine DDL; pooled and session queries now share the existing text-protocol fallback. The pre-fix accessibility snapshot and post-fix local release-layer run are retained in the [GTK/MySQL evidence](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json). The separate [native MySQL approval test](evidence/mysql-unparseable-approval-results-2026-10-04/manifest.json) still records the guarded-session router contract.
 
