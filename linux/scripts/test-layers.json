@@ -210,6 +210,21 @@
         }
       ]
     },
+    "gtk-mysql-approval": {
+      "purpose": "Human approval dialog policy and dispatch against a native MySQL fixture",
+      "prerequisites": "GNOME 50; Docker with mysql:8.0; gnome-keyring; libsecret tools; Xvfb; PyAT-SPI; private D-Bus",
+      "hosted_gate": "Local release gate",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-mysql-approval.sh"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit"
+        }
+      ]
+    },
     "values": {
       "purpose": "Exact shared values across eight drivers, GTK and DuckDB",
       "prerequisites": "Rust 1.98; GNOME 50 development stack; Docker; disk space for DuckDB",

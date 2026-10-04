@@ -189,10 +189,12 @@ impl Connection for MysqlConnection {
     ) -> Result<QueryResult, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let connection_id = connection_id_controlled(&mut connection, control).await?;
-        let result = run_server_cancellable(
-            params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS),
-            request_cancellation(&self.cancellation_pool, connection_id),
-            confirms_cancellation,
+        let result = session::query_with_text_fallback(
+            &mut connection,
+            &self.cancellation_pool,
+            connection_id,
+            sql,
+            params,
             control,
         )
         .await;

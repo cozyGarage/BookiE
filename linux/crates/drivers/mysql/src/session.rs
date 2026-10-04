@@ -49,6 +49,33 @@ pub(crate) async fn open(
     }))
 }
 
+pub(crate) async fn query_with_text_fallback(
+    connection: &mut PoolConnection<MySql>,
+    cancellation_pool: &Pool<MySql>,
+    connection_id: u64,
+    sql: &str,
+    params: &[Value],
+    control: &OperationControl,
+) -> Result<QueryResult, DriverError> {
+    let mut result = run_server_cancellable(
+        params_into_result(connection, sql, params, MAX_QUERY_ROWS),
+        request_cancellation(cancellation_pool, connection_id),
+        confirms_cancellation,
+        control,
+    )
+    .await;
+    if params.is_empty() && result.as_ref().is_err_and(needs_text_protocol) {
+        result = run_server_cancellable(
+            text_protocol(connection, sql),
+            request_cancellation(cancellation_pool, connection_id),
+            confirms_cancellation,
+            control,
+        )
+        .await;
+    }
+    result
+}
+
 #[async_trait]
 impl tablepro_core::Session for MysqlSession {
     async fn query_params_controlled(
@@ -73,22 +100,15 @@ impl tablepro_core::Session for MysqlSession {
                 return Err(error);
             }
         };
-        let mut result = run_server_cancellable(
-            params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS),
-            request_cancellation(&self.cancellation_pool, self.connection_id),
-            confirms_cancellation,
+        let mut result = query_with_text_fallback(
+            &mut connection,
+            &self.cancellation_pool,
+            self.connection_id,
+            sql,
+            params,
             control,
         )
         .await;
-        if params.is_empty() && result.as_ref().is_err_and(needs_text_protocol) {
-            result = run_server_cancellable(
-                text_protocol(&mut connection, sql),
-                request_cancellation(&self.cancellation_pool, self.connection_id),
-                confirms_cancellation,
-                control,
-            )
-            .await;
-        }
         if !timestamp_is_utc && let Ok(result) = &mut result {
             refuse_non_utc_timestamps(result);
         }

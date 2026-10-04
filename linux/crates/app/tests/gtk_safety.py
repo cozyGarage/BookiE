@@ -21,6 +21,8 @@ APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
 CONNECTION_B_NAME = "Safety SQLite B"
 BROKEN_CONNECTION_NAME = "Broken SQLite"
+MYSQL_CONNECTION_NAME = "Safety MySQL"
+MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -554,6 +556,24 @@ def write_fixture(base, audit_available=True, environment="prod"):
             }
         ],
     }
+    mysql_port = os.environ.get("TABLEPRO_GTK_MYSQL_PORT")
+    if mysql_port:
+        connections["connections"].append(
+            {
+                "id": MYSQL_CONNECTION_ID,
+                "name": MYSQL_CONNECTION_NAME,
+                "driver_id": "mysql",
+                "host": os.environ.get("TABLEPRO_GTK_MYSQL_HOST", "127.0.0.1"),
+                "port": int(mysql_port),
+                "database": "bookie_test",
+                "username": "root",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
     (tablepro_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
     (tablepro_config / "preferences.json").write_text(
         json.dumps(
@@ -715,6 +735,72 @@ def unparseable_routine_requests_human_approval(database, _base):
     invoke(wait_for_node(name="Deny", role=pyatspi.ROLE_PUSH_BUTTON))
     wait_for_node(name="Approve once", present=False)
     assert_database_count_stable(database, 0)
+
+
+def mysql_unparseable_routine_dialog_denial_preserves_database(database, _base):
+    container = os.environ["TABLEPRO_GTK_MYSQL_CONTAINER"]
+    open_saved_connection(MYSQL_CONNECTION_NAME)
+    wait_for_frame_containing(f"{MYSQL_CONNECTION_NAME} — BookiE")
+    invoke(wait_for_node(name="Open SQL editor"))
+    wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+
+    denied_name = "bookie_gtk_unparseable_denied"
+    run_sql(f"CREATE PROCEDURE {denied_name}() SELECT 1")
+    wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("Class: Unparseable")
+    wait_for_node_containing(f"CREATE PROCEDURE {denied_name}() SELECT 1")
+    invoke(wait_for_node(name="Deny", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Approve once", present=False)
+    assert_mysql_routine_count(container, denied_name, 0)
+
+    approved_name = "bookie_gtk_unparseable_approved"
+    run_sql(f"CREATE PROCEDURE {approved_name}() SELECT 1")
+    wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("Class: Unparseable")
+    wait_for_node_containing(f"CREATE PROCEDURE {approved_name}() SELECT 1")
+    invoke(wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Approve once", present=False)
+    wait_for_mysql_routine_count(container, approved_name, 1)
+    assert_database_count_stable(database, 0, seconds=0.2)
+
+
+def mysql_routine_count(container, routine_name):
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            container,
+            "mysql",
+            "--user=root",
+            "--password=tablepro_test",
+            "--batch",
+            "--skip-column-names",
+            "bookie_test",
+            "--execute",
+            "SELECT COUNT(*) FROM information_schema.routines "
+            f"WHERE routine_schema = DATABASE() AND routine_name = '{routine_name}'",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return int(result.stdout.strip())
+
+
+def wait_for_mysql_routine_count(container, routine_name, expected, timeout=WAIT_SECONDS):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if mysql_routine_count(container, routine_name) == expected:
+            return
+        time.sleep(POLL_SECONDS)
+    actual = mysql_routine_count(container, routine_name)
+    raise AssertionError(f"expected {expected} MySQL routines named {routine_name}, found {actual}")
+
+
+def assert_mysql_routine_count(container, routine_name, expected):
+    actual = mysql_routine_count(container, routine_name)
+    assert actual == expected, f"expected {expected} MySQL routines named {routine_name}, found {actual}"
 
 
 def approve_once_prompts_again(database, _base):
@@ -1302,6 +1388,8 @@ def main():
         switched_connection_keeps_workspace_tabs_after_debounce,
         switching_one_window_leaves_the_other_windows_edits,
     ]
+    if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
+        scenarios.append(mysql_unparseable_routine_dialog_denial_preserves_database)
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))

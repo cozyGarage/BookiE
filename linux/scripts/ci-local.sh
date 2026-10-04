@@ -86,6 +86,8 @@ run_release() {
   "$ROOT/scripts/test-postgres-release.sh"
   echo "==> Installed GTK safety flows"
   "$ROOT/scripts/test-gtk-safety.sh"
+  echo "==> MySQL-backed GTK approval dialog"
+  python3 scripts/run-test-layer.py gtk-mysql-approval
   cargo test --locked -p tablepro-driver-duckdb
   cargo build --locked -p tablepro-app --features duckdb
   cargo deny check
