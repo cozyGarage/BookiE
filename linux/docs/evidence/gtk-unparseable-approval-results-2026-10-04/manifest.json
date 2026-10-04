@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "bc30778ede6edf373d9b302cbc3cceaa8a0cab13",
+  "engine": "BookiE release binary under isolated D-Bus, Xvfb and AT-SPI; SQLite safety fixture",
+  "case": "GTK approval dialog for unparseable human SQL and planner refusal for malformed SQL",
+  "tests": [
+    "malformed_sql_is_blocked_before_approval",
+    "unparseable_routine_requests_human_approval"
+  ],
+  "contract": [
+    "A lexically malformed SQL script displays the planner's unterminated quote/comment status, does not display an approval dialog and leaves the database unchanged.",
+    "A complete CREATE PROCEDURE statement classified Unparseable displays the GTK approval dialog with class and SQL text; denying it leaves the database unchanged.",
+    "All 29 GTK safety scenarios pass in the captured run. This exercises the shared GTK/policy approval route with a SQLite fixture, not execution of a stored routine on a MySQL server."
+  ],
+  "validation": {
+    "command": "rtk proxy env TMPDIR=/home/trung/Projects/tablepro/linux/target/tmp bash linux/scripts/test-gtk-safety.sh",
+    "result": "29 scenarios passed; exit status 0",
+    "log": "gtk-safety.txt"
+  },
+  "log_sha256": {
+    "gtk-safety.txt": "e61c11c4702fbdd4ca5db63296511d9b8df56f1704b3274018d92eb9589c3070"
+  },
+  "remaining": [
+    "The GTK dialog uses a SQLite fixture; approval routing for a MySQL-backed connection and MySQL routine execution remain unverified."
+  ]
+}

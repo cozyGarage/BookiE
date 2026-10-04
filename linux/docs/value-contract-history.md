@@ -5056,5 +5056,19 @@ facts under both principals. Agents are denied with `fail_closed_unparseable`;
 the default local human policy returns `RequireApproval`, and the explicit
 `human_approve_unparseable = false` override returns the documented human allow
 decision. This pins the policy decision only; the GTK approval interaction
-remains open. The focused app test, strict Clippy and formatting pass. See the
+is now exercised with a SQLite fixture: a complete unparseable procedure reaches
+the dialog, and denial leaves data unchanged. The same GTK harness confirms
+lexically malformed SQL is stopped by the editor planner before approval.
+MySQL-backed dialog routing remains open. The focused app test, strict Clippy
+and formatting pass. See the
 [evidence manifest](evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json).
+
+## GTK approval dialog for unparseable human SQL, 2026-10-04
+
+The full GTK safety harness runs the release binary under isolated D-Bus,
+Xvfb and AT-SPI. A complete `CREATE PROCEDURE` classified `Unparseable` shows
+the approval dialog with its class and SQL text; denying it leaves the database
+unchanged. A separate unterminated SQL script displays the planner error and
+does not open approval. All 29 GTK safety scenarios pass. The UI case uses a
+SQLite fixture and does not prove approval routing through a MySQL-backed
+connection. See the [evidence manifest](evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json).
