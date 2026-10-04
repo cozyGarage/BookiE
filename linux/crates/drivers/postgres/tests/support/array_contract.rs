@@ -255,6 +255,162 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY[1234567890123456789012345678901234567890::numeric, \
+        0.123456789012345678901234567891::numeric, 1.2300::numeric, \
+        'NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric, NULL]::numeric[]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("numeric[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, {expression}::text, \
+                    array_to_json({expression})::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("numeric[]".into()));
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("numeric[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    let Value::Text(native_text) = &oracle.rows[0][1] else {
+        panic!("numeric[] native text oracle returned {:?}", oracle.rows[0][1]);
+    };
+    assert_eq!(
+        driver_text,
+        r#"{"1234567890123456789012345678901234567890","0.123456789012345678901234567891","1.2300","NaN","Infinity","-Infinity",NULL}"#
+    );
+    assert_eq!(
+        native_text,
+        "{1234567890123456789012345678901234567890,0.123456789012345678901234567891,1.2300,NaN,Infinity,-Infinity,NULL}"
+    );
+    let Value::Text(native_json) = &oracle.rows[0][2] else {
+        panic!("numeric[] array_to_json oracle returned {:?}", oracle.rows[0][2]);
+    };
+    let json_elements = serde_json::from_str::<serde_json::Value>(native_json).unwrap();
+    assert_eq!(json_elements.as_array().unwrap().len(), 7);
+    assert!(json_elements[0].is_number());
+    assert!(json_elements[1].is_number());
+    assert!(json_elements[2].is_number());
+    assert_eq!(json_elements[3], "NaN");
+    assert_eq!(json_elements[4], "Infinity");
+    assert_eq!(json_elements[5], "-Infinity");
+    assert!(json_elements[6].is_null());
+
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::numeric[])::text, \
+                    encode(array_send($1::text::numeric[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][2]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let json_path = directory.path().join("numeric-array.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json_file: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json_file[0]["value"], *driver_text);
+
+    let csv_path = directory.path().join("numeric-array.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    let xlsx_path = directory.path().join("numeric-array.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+    assert!(shared_strings.contains(driver_text), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
+    connection
+        .execute("CREATE TABLE numeric_array_filewriter_target (value numeric[])")
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("numeric-array.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "numeric_array_filewriter_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    connection
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = connection
+        .query(
+            "SELECT value::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM numeric_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows, vec![oracle.rows[0][1..].to_vec()]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
