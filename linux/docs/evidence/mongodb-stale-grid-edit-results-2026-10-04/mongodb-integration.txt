@@ -1,1 +1,36 @@
-cargo test: 30 passed (1 suite, 35.82s)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running tests/integration.rs (target/debug/deps/integration-fc39c0a96012db67)
+
+running 30 tests
+test a_cancelled_mongodb_read_leaves_the_client_usable ... ok
+test a_dropped_collection_stops_being_listed ... ok
+test a_filtered_delete_removes_only_the_matching_documents ... ok
+test a_lost_mongodb_server_is_reported_as_disconnected ... ok
+test an_aggregate_pipeline_groups_documents ... ok
+test an_inserted_document_is_listed_browsed_and_found ... ok
+test an_unavailable_mongodb_server_is_classified_as_connection_refused ... ok
+test an_unsupported_statement_is_refused_rather_than_silently_ignored ... ok
+test browsing_a_missing_collection_is_empty_rather_than_an_error ... ok
+test census_cost::value_contract_mongodb_census_scan_cost_profile ... ok
+test collection_scan_finds_mixed_values_beyond_sample_and_page ... ok
+test connection_loss_during_cursor_get_more_fails_the_whole_query ... ok
+test decimal128_csv_round_trip_through_typed_grid_edit_keeps_native_bson ... ok
+test mixed_string_and_decimal128_columns_keep_values_and_refuse_lossy_edit_metadata ... ok
+test mixed_string_decimal128_exports_preserve_bson_kind ... ok
+test negative_decimal128_csv_formula_marker_round_trips_as_native_decimal128 ... ok
+test stale_grid_edit_contract::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change ... ok
+test value_contracts::a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson ... ok
+test value_contracts::nested_bson_special_values_keep_exact_extended_json_types ... ok
+test value_contracts::value_contract_binary_subtypes_survive_native_grid_edits ... ok
+test value_contracts::value_contract_db_pointer_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_generic_binary_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_javascript_code_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null ... ok
+test value_contracts::value_contract_object_id_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_preserves_numbers_and_text_through_json_commands ... ok
+test value_contracts::value_contract_server_generated_bson_column_survives_grid_edit ... ok
+test value_contracts::value_contract_undefined_grid_edit_preserves_native_bson ... ok
+test value_contracts::xlsx_nested_cell_requires_its_own_date_and_binary_markers ... ok
+test wrong_mongodb_credentials_are_classified_as_auth_failed ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.38s
