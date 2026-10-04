@@ -56,6 +56,7 @@ PostgreSQL domain-over-enum arrays now also have a bound text-parameter contract
 for literal `NULL`, empty text, Unicode, comma-containing labels and SQL NULL,
 verified against native `array_send` bytes ([parameter evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)); a separate 2×2 parameter case preserves lower bounds 0 and 3 ([bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json)).
 CSV import now preserves the domain element type and enforces its CHECK constraints ([import evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json)).
+It also resolves the target schema when `search_path` contains a same-named shadow domain ([shadowed-path import evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
 The app parser and keyed grid edit use the same qualified domain-array cast; invalid values roll back without changing the row ([grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 Structured equality filters use the qualified domain-array type and match native array values ([filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
 

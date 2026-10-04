@@ -38,6 +38,8 @@ Default CSV now likewise imports blank as a SQL NULL array and `{}` as an empty
 array; scalar enum blank refusal remains in place ([evidence](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json)).
 Arrays of domains over enums now import through their qualified domain-array
 type, preserving domain checks and native array bytes ([evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json)).
+That import also remains bound to the target schema when `search_path` starts
+with an identically named shadow domain ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
 The same type also has app-parser and live keyed-grid coverage with domain-check
 refusal and rollback ([evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 Structured equality filtering is checked against native array JSON and wire

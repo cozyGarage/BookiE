@@ -1,0 +1,2 @@
+rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.24s

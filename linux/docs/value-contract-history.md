@@ -5303,6 +5303,11 @@ A structured equality filter also binds this array as its qualified domain
 array type and matches native values, JSON and wire bytes. The domain-contract
 group, full core suite, strict Clippy and formatting pass ([filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
 
+CSV import is also tested with a same-named domain in another schema placed
+first in `search_path`. The generated insert still casts to the target table's
+qualified domain-array type, preserves native type, JSON and wire bytes, and
+leaves the sibling row intact ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

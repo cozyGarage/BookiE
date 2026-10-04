@@ -676,3 +676,5 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   and keyed grid edit also retain the domain array cast and roll back invalid
   values without changing the stored row; structured equality filters match
   native domain arrays ([import evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json), [grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json), [filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
+  A same-named domain earlier in `search_path` does not redirect CSV import
+  from the target table's schema ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
