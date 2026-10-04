@@ -394,7 +394,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL)")
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL), (3, '42'), (4, '=1+1'), (5, '''=1+1')")
         .await
         .unwrap();
     let result = connection
@@ -453,6 +453,50 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     assert!(shared_strings.contains("<t>42</t>"), "{shared_strings}");
     assert!(shared_strings.contains("<t>=1+1</t>"), "{shared_strings}");
     assert!(shared_strings.contains("<t>'=1+1</t>"), "{shared_strings}");
+
+    let table_result = connection
+        .query("SELECT id AS position, value AS result, typeof(value) AS storage_class FROM flexible ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(table_result.columns[1].data_type, "ANY");
+    let table_workbook_path = directory.path().join("sqlite-table-any.xlsx");
+    write_result_file(
+        &table_workbook_path,
+        &table_result,
+        &ResultExport {
+            format: ResultFormat::Xlsx,
+            csv: &CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    if let Some(path) = std::env::var_os("BOOKIEE_XLSX_TABLE_REIMPORT_ARTIFACT") {
+        std::fs::copy(&table_workbook_path, path).unwrap();
+    }
+    let mut table_archive = zip::ZipArchive::new(std::fs::File::open(table_workbook_path).unwrap()).unwrap();
+    let mut table_sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut table_archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut table_sheet,
+    )
+    .unwrap();
+    let mut table_shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut table_archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut table_shared_strings,
+    )
+    .unwrap();
+    assert!(table_sheet.contains("<c r=\"B2\"><v>42</v></c>"), "{table_sheet}");
+    assert!(!table_sheet.contains("r=\"B3\""), "{table_sheet}");
+    assert!(table_sheet.contains("<c r=\"B4\" t=\"s\">"), "{table_sheet}");
+    assert!(table_sheet.contains("<c r=\"B5\" t=\"s\">"), "{table_sheet}");
+    assert!(table_sheet.contains("<c r=\"B6\" t=\"s\">"), "{table_sheet}");
+    assert!(!table_sheet.contains("<f>"), "{table_sheet}");
+    assert!(table_shared_strings.contains("<t>42</t>"), "{table_shared_strings}");
+    assert!(table_shared_strings.contains("<t>=1+1</t>"), "{table_shared_strings}");
+    assert!(table_shared_strings.contains("<t>'=1+1</t>"), "{table_shared_strings}");
 }
 
 #[tokio::test]
