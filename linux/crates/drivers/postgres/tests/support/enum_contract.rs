@@ -205,6 +205,45 @@ async fn value_contract_custom_enum_preserves_maximum_multibyte_label_bytes() {
             ])
             .collect::<Vec<_>>()
     );
+
+    let expression = format!("ARRAY[{}::value_contract_enum_byte_boundary, NULL]", literals[1]);
+    let array_result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    let array_oracle = connection
+        .query(&format!(
+            "SELECT {expression}::text, pg_typeof({expression})::text, \
+                    array_to_json({expression})::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(array_result.columns[0].data_type, "value_contract_enum_byte_boundary[]");
+    assert_eq!(
+        array_result.rows[0][0],
+        Value::Text(format!("{{\"{}\",NULL}}", labels[1]))
+    );
+    assert_eq!(array_oracle.rows[0][0], Value::Text(format!("{{{},NULL}}", labels[1])));
+    assert_eq!(
+        array_oracle.rows[0][1],
+        Value::Text("value_contract_enum_byte_boundary[]".into())
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(match &array_oracle.rows[0][2] {
+            Value::Text(json) => json,
+            other => panic!("native array_to_json result: {other:?}"),
+        })
+        .unwrap(),
+        serde_json::json!([labels[1], null])
+    );
+    let array_round_trip = connection
+        .query_params(
+            "SELECT encode(array_send($1::text::value_contract_enum_byte_boundary[]), 'hex')",
+            std::slice::from_ref(&array_result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(array_round_trip.rows[0][0], array_oracle.rows[0][3]);
 }
 
 #[tokio::test]
