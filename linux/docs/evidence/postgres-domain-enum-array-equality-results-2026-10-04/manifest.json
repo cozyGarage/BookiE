@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "cb63f5303e18f48db17236e4df03f2aae33c34c8",
+  "source_commit": "47613590ea20e22ce4bd78c4159e3e4d4b9c5223",
   "case": "PostgreSQL domain-over-enum array parameters across all six comparison operators",
   "environment": "PostgreSQL 16 local Docker integration fixture; cached build reused",
   "scenario": {
@@ -21,6 +21,7 @@
       "An array with lower bound 0 compares differently from the default-bound array with identical elements.",
       "Empty arrays, SQL NULL arrays, and arrays containing NULL are distinct cases.",
       "pg_typeof($1) is the schema-qualified domain-over-enum array type.",
+      "A same-named shadow enum leads transaction search_path while the qualified target schema is not on the path.",
       "encode(array_send($1), hex) matches PostgreSQL native typed-array wire bytes."
     ]
   },
@@ -62,11 +63,11 @@
     "diff_check": "git diff --check"
   },
   "sha256": {
-    "clippy.txt": "1f1fe690dc2cedb4a1890650cb6a4170cd308a6942a65267f2d7155a409066fd",
+    "clippy.txt": "2463f964b0bff47f57419363f284f0e54dc2c600792d5b8354370812f10f2184",
     "diff-check.txt": "e40b21b83eec86b9151852fef28a4d53b0a512e745c496acd049c9b41c229a59",
     "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
-    "focused.txt": "ece55909909c2f17349542325b4189cda1125d492a672112a33994a43070ed2e",
+    "focused.txt": "4dd45ad186db609297ca338713dec8aa8c8625848a021a755012f9d746dac938",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "postgres-value-contracts.txt": "724210358883dbb56634e36dfeae3afbc78007ce247a7fa703909826ed8e781f"
+    "postgres-value-contracts.txt": "82f4c134e1aaedad8ffdd572b2f25555c4c120c5819e0c607de612a1a6ff41d0"
   }
 }
