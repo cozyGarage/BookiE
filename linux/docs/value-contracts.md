@@ -99,6 +99,11 @@ ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving
 a type behind ([accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json), [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json)).
 Native enum ordering also follows declaration order rather than lexical text sorting ([ordering evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
 
+Raw PostgreSQL enum CSV export, parsing and schema-aware typed import also
+preserve labels containing double quotes, embedded line breaks and backslashes,
+along with formula-shaped text and SQL NULL; restored UTF-8 bytes and native
+enum type are checked independently ([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
+
 Separate PostgreSQL expression contexts now infer text and SQL NULL enum
 parameters in `COALESCE` and `array_append` ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)). A `NULLIF(enum_column, $1)` follow-up checks inferred type, NULL/match behavior and invalid-label refusal ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)). A domain-over-enum case records the raw `42883` refusal and passing qualified base-enum cast control under a shadowed `search_path` ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 

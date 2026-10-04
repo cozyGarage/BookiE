@@ -5443,3 +5443,14 @@ The qualified target-domain array cast succeeds; native type, JSON and
 The focused Docker test, strict Clippy and formatting pass. Other domain-array
 types, session/search_path combinations, enum boundaries and consumers remain
 open in B3. See the [evidence manifest](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json).
+
+## PostgreSQL enum CSV quote and line-break round trip, 2026-10-04
+
+A PostgreSQL 16 contract exports custom enum labels containing a double quote,
+an embedded line break and a backslash through raw CSV, parses the multiline
+records, then imports with the schema-aware enum cast and a collision-free SQL
+NULL marker. A formula-shaped label remains raw for lossless import. Restored
+rows match exact text, UTF-8 bytes, native enum type and SQL NULL. The focused
+test, strict Clippy and formatting pass. Other CSV configurations and
+spreadsheet-specific import behavior remain open. See the
+[evidence manifest](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json).
