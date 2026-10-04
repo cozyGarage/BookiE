@@ -778,10 +778,19 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
             assert!(csv.contains("\"line one\nline two\""));
             assert!(csv.contains("=1+1"), "raw text must retain formula-shaped enum labels");
 
+            let detected = tablepro_core::import::detect_format(csv.as_bytes());
+            assert_eq!(
+                detected,
+                tablepro_core::import::CsvFormat {
+                    delimiter,
+                    has_header: true,
+                },
+                "{delimiter:?}/{line_break:?}"
+            );
+            let detected_options: tablepro_core::import::CsvImportOptions = detected.into();
             let import_options = tablepro_core::import::CsvImportOptions {
-                delimiter,
                 null_marker: null_marker.clone(),
-                ..Default::default()
+                ..detected_options
             };
             let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
             assert_eq!(sheet.rows.len(), expected.len(), "{delimiter:?}/{line_break:?}");
