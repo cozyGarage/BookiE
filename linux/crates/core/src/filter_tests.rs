@@ -313,6 +313,27 @@ fn postgres_enum_array_filters_cast_the_parameter_to_the_array_type() {
 }
 
 #[test]
+fn postgres_domain_enum_array_filters_cast_the_parameter_to_the_domain_array_type() {
+    let mut column = col("labels", "value_contract_domain_array_label[]");
+    column.enum_type = Some(crate::QualifiedTypeName {
+        schema: "value_contract_domain_schema".into(),
+        name: "value_contract_domain_array_label".into(),
+    });
+    let columns = [column];
+    let literal = r#"{"NULL","",東京,NULL}"#;
+    let set = FilterSet {
+        rules: vec![rule("labels", FilterOp::Eq, Some(FilterValue::Single(literal.into())))],
+        ..Default::default()
+    };
+    let (sql, params) = build_filter_where("postgres", &columns, &set).unwrap().unwrap();
+    assert_eq!(
+        sql,
+        r#""labels" = $1::"value_contract_domain_schema"."value_contract_domain_array_label"[]"#
+    );
+    assert_eq!(params, vec![Value::Text(literal.into())]);
+}
+
+#[test]
 fn empty_set_returns_none() {
     let result = build_filter_where("postgres", &[], &FilterSet::default()).unwrap();
     assert!(result.is_none());

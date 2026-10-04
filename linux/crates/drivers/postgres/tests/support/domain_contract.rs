@@ -275,6 +275,39 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         .unwrap();
     assert_eq!(saved_grid.rows, grid_native.rows);
 
+    let filters = FilterSet {
+        rules: vec![FilterRule {
+            column: "labels".into(),
+            op: FilterOp::Eq,
+            value: Some(FilterValue::Single(edited.into())),
+        }],
+        ..Default::default()
+    };
+    let (predicate, params) = tablepro_core::filter::build_filter_where("postgres", &columns, &filters)
+        .unwrap()
+        .unwrap();
+    assert!(predicate.contains("$1::\"public\".\"value_contract_domain_array_label\"[]"));
+    let filtered = connection
+        .query_params(
+            &format!(
+                "SELECT id, pg_typeof(labels)::text, array_to_json(labels)::text, \
+                        encode(array_send(labels), 'hex') \
+                 FROM value_contract_domain_array_import WHERE {predicate}"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![
+            Value::Int(1),
+            grid_native.rows[0][0].clone(),
+            grid_native.rows[0][1].clone(),
+            grid_native.rows[0][2].clone()
+        ]]
+    );
+
     let invalid_grid = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
         None,
