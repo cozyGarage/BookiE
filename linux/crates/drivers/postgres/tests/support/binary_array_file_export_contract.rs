@@ -102,6 +102,9 @@ async fn value_contract_bytea_array_file_exports_preserve_binary_elements() {
         |_| {},
     )
     .unwrap();
+    if let Some(path) = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT") {
+        std::fs::copy(&xlsx_path, path).unwrap();
+    }
     let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
     let mut sheet = String::new();
     std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
