@@ -121,6 +121,12 @@ is one array family. Other array types, spreadsheet-application re-import and
 additional enum configurations remain open. See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: a PostgreSQL `bytea[]` containing non-UTF-8 bytes,
+empty bytea and SQL NULL now passes JSON, CSV, XLSX and replayed SQL file
+writers. Native element hex, `array_to_json` and `array_send` oracles verify
+the binary values and type after replay. Other array families and session
+combinations remain open; see the [bytea[] evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json).
+
 October 4 B3-1 follow-up: one custom PostgreSQL `enum[]` result now passes
 through JSON, CSV, XLSX and SQL file writers with labels `NULL`, empty text,
 Unicode, comma, quote and markup, alongside SQL NULL. Native type, `array_to_json`

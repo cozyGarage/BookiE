@@ -44,6 +44,10 @@ coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 Other array families and spreadsheet-application re-import remain open.
 
+A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
+has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
+JSON and wire oracles ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
+
 The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and
 `BETWEEN` filters on `enum_shadow_b.items` while `search_path` resolves the same
 enum name in `enum_shadow_a`; native target type/value checks pass. See the

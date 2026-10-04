@@ -29,6 +29,9 @@ Detailed native oracles, exact selectors and dated results are preserved in
 then search that ledger/test for the specific type and consumer; one starting
 point does not represent all support for that engine.
 
+A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
+elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
+
 One compound SQLite STRICT `ANY` workbook now preserves numeric `42`, text
 `42` and blank SQL NULL through a LibreOffice Calc import, ODS save and XLSX
 re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manifest.json)).
