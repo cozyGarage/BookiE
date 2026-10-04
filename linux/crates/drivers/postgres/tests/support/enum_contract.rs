@@ -1162,6 +1162,98 @@ async fn value_contract_custom_enum_sql_file_export_restores_labels_and_native_t
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_string_modes() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let label = r"back\nslash";
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.into())).unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE value_contract_enum_string_mode AS ENUM ({literal})"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_enum_string_source \
+             (id INT PRIMARY KEY, label value_contract_enum_string_mode)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_enum_string_restore \
+             (id INT PRIMARY KEY, label value_contract_enum_string_mode)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute_params(
+            "INSERT INTO value_contract_enum_string_source VALUES (1, $1::value_contract_enum_string_mode)",
+            &[Value::Text(label.into())],
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query("SELECT id, label FROM value_contract_enum_string_source ORDER BY id")
+        .await
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let sql_path = directory.path().join("enum-string-mode.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "value_contract_enum_string_restore",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let sql = std::fs::read_to_string(&sql_path).unwrap();
+    assert!(
+        sql.contains(r#"E'back\\nslash'"#),
+        "backslashes must use a mode-independent SQL literal: {sql}"
+    );
+
+    for setting in ["on", "off"] {
+        let mut transaction = connection.begin().await.unwrap();
+        transaction
+            .execute(&format!("SET LOCAL standard_conforming_strings = {setting}"))
+            .await
+            .unwrap();
+        for statement in sql.lines() {
+            transaction.execute(statement).await.unwrap();
+        }
+        let restored = transaction
+            .query(
+                "SELECT id, label::text, pg_typeof(label)::text \
+                 FROM value_contract_enum_string_restore ORDER BY id",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            restored.rows,
+            vec![vec![
+                Value::Int(1),
+                Value::Text(label.into()),
+                Value::Text("value_contract_enum_string_mode".into()),
+            ]],
+            "standard_conforming_strings={setting}"
+        );
+        transaction.rollback().await.unwrap();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_parameters_infer_native_type_for_query_and_write() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

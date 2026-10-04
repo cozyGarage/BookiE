@@ -78,7 +78,7 @@ mod tests {
             render_in_clause("mysql", &rows, 0).sql,
             "(_utf8mb4 X'785c27204f5220313d31202d2d20')"
         );
-        assert_eq!(render_in_clause("postgres", &rows, 0).sql, "('x\\'' OR 1=1 -- ')");
+        assert_eq!(render_in_clause("postgres", &rows, 0).sql, "(E'x\\\\'' OR 1=1 -- ')");
         assert!(render_in_clause("redis", &rows, 0).sql.is_empty());
         assert_eq!(render_in_clause("redis", &rows, 0).skipped, 1);
         let time = Value::Time("12:34:56.123456".parse().unwrap());

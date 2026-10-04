@@ -71,9 +71,10 @@ fn clickhouse_datetime64_fits_precision(stamp: chrono::NaiveDateTime, precision:
 /// Escaping is dialect-specific and getting it wrong is not cosmetic.
 /// MySQL and ClickHouse treat a backslash as an escape character inside
 /// a string literal, so a value ending in one would consume the closing
-/// quote and let the rest of the value parse as SQL. PostgreSQL, SQLite
-/// and SQL Server treat a backslash as an ordinary character, where
-/// doubling it would corrupt the value instead.
+/// quote and let the rest of the value parse as SQL. PostgreSQL's regular
+/// string behavior depends on `standard_conforming_strings`; backslash-bearing
+/// literals use explicit `E''` syntax so their value is independent of session
+/// settings. SQLite and SQL Server treat backslash as an ordinary character.
 ///
 /// Row values come from the database, which the project treats as
 /// untrusted input.
@@ -158,6 +159,10 @@ fn string_literal(driver_id: &str, text: &str) -> String {
     if driver_id == "mysql" && text.contains(['\\', '\0']) {
         return format!("_utf8mb4 X'{}'", crate::export::hex_encode(text.as_bytes()));
     }
+    if driver_id == "postgres" && text.contains('\\') {
+        let escaped = text.replace('\\', "\\\\").replace('\'', "''");
+        return format!("E'{escaped}'");
+    }
     quote_literal(driver_id, text)
 }
 
@@ -234,6 +239,14 @@ pub fn build_insert_literal(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn postgres_backslash_literals_do_not_depend_on_session_mode() {
+        assert_eq!(
+            render_sql_literal("postgres", &Value::Text(r"back\nslash\end'quote".into())).unwrap(),
+            r#"E'back\\nslash\\end''quote'"#
+        );
+    }
 
     #[test]
     fn value_contract_postgres_dates_preserve_eras_and_extended_years() {
@@ -444,13 +457,16 @@ mod tests {
             render_sql_literal("clickhouse", &Value::Text(BREAKOUT.into())).unwrap(),
             "'x\\\\'' OR 1=1 -- '"
         );
-        for driver_id in ["postgres", "sqlite"] {
-            assert_eq!(
-                render_sql_literal(driver_id, &Value::Text(BREAKOUT.into())).unwrap(),
-                "'x\\'' OR 1=1 -- '",
-                "{driver_id} must keep a backslash literal"
-            );
-        }
+        assert_eq!(
+            render_sql_literal("postgres", &Value::Text(BREAKOUT.into())).unwrap(),
+            "E'x\\\\'' OR 1=1 -- '",
+            "PostgreSQL must use an explicit escape string"
+        );
+        assert_eq!(
+            render_sql_literal("sqlite", &Value::Text(BREAKOUT.into())).unwrap(),
+            "'x\\'' OR 1=1 -- '",
+            "SQLite must keep a backslash literal"
+        );
     }
 
     #[test]
@@ -501,9 +517,10 @@ mod tests {
                 .collect::<Option<Vec<u8>>>()?;
             return Some((String::from_utf8(bytes).ok()?, rendered.chars().count()));
         }
-        let backslash_escapes = matches!(driver_id, "mysql" | "clickhouse");
+        let postgres_escape_string = driver_id == "postgres" && rendered.starts_with("E'");
+        let backslash_escapes = matches!(driver_id, "mysql" | "clickhouse") || postgres_escape_string;
         let characters: Vec<char> = rendered.chars().collect();
-        let prefix = usize::from(driver_id == "mssql");
+        let prefix = usize::from(driver_id == "mssql" || postgres_escape_string);
         if characters.get(prefix) != Some(&'\'') {
             return None;
         }
