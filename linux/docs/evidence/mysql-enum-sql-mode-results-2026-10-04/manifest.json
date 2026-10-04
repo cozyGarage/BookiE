@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "1c144f00c",
-  "case": "MySQL/MariaDB ENUM SQL-literal exports across SQL modes",
+  "source_commit": "30d2a1a2b",
+  "case": "MySQL/MariaDB ENUM SQL file exports across SQL modes",
   "engines": {
     "mysql": "testcontainers-modules default mysql:8.1 image",
     "mariadb": "mariadb:11"
@@ -13,7 +13,7 @@
     "enum_sql_mode_contract::value_contract_enum_sql_literals_survive_mariadb_sql_modes"
   ],
   "contract": [
-    "Generated SQL INSERTs reproduce enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined SQL modes on both engines.",
+    "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined SQL modes on both engines.",
     "The fixture covers an apostrophe label, a backslash label, literal NULL, empty text, and SQL NULL.",
     "Each mode checks expected native enum ordinals and label bytes, then compares copied ordinals and bytes to the source."
   ],

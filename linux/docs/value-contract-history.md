@@ -2969,9 +2969,9 @@ literals are checked against returned `Value::TimestampTz`, UTC cast text,
 `sql_mode` is cleared for the baseline. Other temporal precisions and consumer
 paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
-### MySQL/MariaDB ENUM SQL-literal exports across SQL modes (2026-10-04)
+### MySQL/MariaDB ENUM SQL-file exports across SQL modes (2026-10-04)
 
-MySQL and MariaDB copy six ENUM values through generated SQL INSERTs under the
+MySQL and MariaDB replay SQL export files containing six ENUM values under the
 default mode, `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and both modes together.
 The labels include an apostrophe, a backslash, literal `NULL`, and empty text,
 plus a SQL NULL row. Each mode checks server-native ENUM ordinals and label
