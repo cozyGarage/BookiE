@@ -1208,14 +1208,11 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values() {
+async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_search_path() {
     let (_container, opts) = start_pg().await;
-    let connection = connect(opts).await;
-    connection
-        .execute("CREATE SCHEMA value_contract_six_domains")
-        .await
-        .unwrap();
-    connection
+    let setup = connect(opts.clone()).await;
+    setup.execute("CREATE SCHEMA value_contract_six_domains").await.unwrap();
+    setup
         .execute("CREATE TYPE value_contract_six_domains.state AS ENUM ('ready', 'paused')")
         .await
         .unwrap();
@@ -1223,7 +1220,7 @@ async fn value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_
     let mut base_type = "state".to_owned();
     for level in 1..=6 {
         let domain = format!("state_domain_{level}");
-        connection
+        setup
             .execute(&format!(
                 "CREATE DOMAIN value_contract_six_domains.{domain} \
                  AS value_contract_six_domains.{base_type}"
@@ -1232,17 +1229,34 @@ async fn value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_
             .unwrap();
         base_type = domain;
     }
-    connection
+    setup
         .execute(&format!(
             "CREATE TABLE value_contract_six_domains.rows \
              (id INT PRIMARY KEY, status value_contract_six_domains.{base_type})"
         ))
         .await
         .unwrap();
-    connection
+    setup
         .execute("INSERT INTO value_contract_six_domains.rows VALUES (1, 'ready'), (2, NULL), (3, 'ready')")
         .await
         .unwrap();
+
+    setup.execute("CREATE SCHEMA value_contract_six_shadow").await.unwrap();
+    setup
+        .execute("CREATE TYPE value_contract_six_shadow.state AS ENUM ('ready')")
+        .await
+        .unwrap();
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO value_contract_six_shadow")
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = connect(opts).await;
+    assert_eq!(
+        connection.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("value_contract_six_shadow".into())]]
+    );
 
     let columns = connection
         .fetch_columns(Some("value_contract_six_domains"), "rows")
