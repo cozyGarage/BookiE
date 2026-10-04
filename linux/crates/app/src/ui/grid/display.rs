@@ -34,7 +34,7 @@ fn value_to_text(value: &Value, cap: impl Fn(&str) -> String) -> String {
         },
         Value::Date(d) => d.format("%Y-%m-%d").to_string(),
         Value::Time(t) => t.format("%H:%M:%S").to_string(),
-        Value::DateTime(dt) => dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+        Value::DateTime(dt) => dt.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
         Value::TimestampTz(ts) => ts.format("%Y-%m-%d %H:%M:%S%:z").to_string(),
         Value::Decimal(d) => d.to_string(),
         Value::Uuid(u) => u.to_string(),
@@ -249,6 +249,11 @@ mod tests {
 
         let datetime = chrono::NaiveDateTime::new(date, time);
         assert_eq!(value_to_display_text(&Value::DateTime(datetime)), "2026-04-26 14:30:00");
+        let fractional = datetime + chrono::Duration::milliseconds(10);
+        assert_eq!(
+            value_to_display_text(&Value::DateTime(fractional)),
+            "2026-04-26 14:30:00.010"
+        );
 
         let tz = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(datetime, chrono::Utc);
         assert_eq!(

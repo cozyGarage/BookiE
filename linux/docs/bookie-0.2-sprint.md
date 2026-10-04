@@ -212,6 +212,12 @@ and canonical style-126 text for the others. Native SQL Server tests compare
 all 300 ticks with server text and verify parameter and SQL-literal restore by
 the stored 8-byte value; see the [evidence manifest](evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
 
+October 4 B3-4 follow-up: the SQL Server app parser/keyed-grid path now keeps
+representative fallback and exact legacy `datetime` ticks byte-for-byte across
+a no-op edit and preserves an untouched sibling. The grid display now includes
+nonzero `DateTime` fractions, which was required to keep exact ticks editable.
+See the [grid evidence](evidence/mssql-legacy-datetime-grid-edit-results-2026-10-04/manifest.json).
+
 October 4 B3-5 follow-up: a Docker-backed GTK scenario now checks MySQL
 unparseable-routine approval text, deny-before-dispatch, and Allow Once against
 the native routine catalog. It exposed the pooled MySQL query path missing the

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "0a607644cfe6828acb02ca7616d3ea7191443468",
+  "engine": "SQL Server Docker via testcontainers_modules::mssql_server::MssqlServer",
+  "case": "Legacy datetime text and typed tick no-op edits through the app grid parser",
+  "contract": [
+    "The app grid formatter displays text fallback values verbatim and preserves the nonzero fractional seconds of typed DateTime values.",
+    "The parser reads the displayed SQL Server legacy datetime value, the keyed-update builder targets the row by its primary key, and bound updates leave native varbinary(8) values unchanged.",
+    "Coverage includes a 1/300-second tick rendered as .003 text, a 2/300-second tick rendered as .007 text, an exact .010 typed tick, and an untouched sibling row. All rows and native bytes are identical before and after the no-op edits."
+  ],
+  "validation": {
+    "native_app_grid_contract": {
+      "command": "rtk cargo test -p tablepro-app --lib ui::browse_tab::value_parse::mssql_legacy_datetime_contract::value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings -- --ignored --exact",
+      "result": "1 passed; SQL Server native bytes and sibling row preserved",
+      "log": "app-grid-edit.txt",
+      "log_sha256": "3ad818ebb5eabae41b598baa642dec28bb3e7edb893c3ada52e43fa2a6f36207"
+    },
+    "app_lib_suite": {
+      "command": "rtk cargo test -p tablepro-app --lib",
+      "result": "468 passed, 25 ignored",
+      "log": "app-lib-suite.txt",
+      "log_sha256": "9232c43fea620e5632a0ca94a3f223e1fbf76b61269e3bdcad891250e31826c7"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt",
+      "log_sha256": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt",
+      "log_sha256": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7"
+    },
+    "diff_check": {
+      "command": "rtk proxy git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "remaining": [
+    "This representative app-grid contract does not cover every temporal precision, timezone/session configuration, spreadsheet format or installed GTK workflow.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

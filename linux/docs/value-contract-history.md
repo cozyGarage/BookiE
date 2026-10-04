@@ -1104,6 +1104,18 @@ All three focused Docker tests passed locally, including parity through the
 session batch API. Portable command logs and source fingerprints
 are in [the evidence packet](evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
 
+The app grid follow-up verifies the displayed text fallback and typed
+fractional datetime through the app parser and keyed-update builder. It checks
+native `varbinary(8)` values and an untouched sibling before/after the no-op
+edit. This exposed and fixed the grid display's omission of nonzero fractional
+seconds for `Value::DateTime`.
+
+```sh
+rtk cargo test -p tablepro-app --lib ui::browse_tab::value_parse::mssql_legacy_datetime_contract::value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings -- --ignored --exact
+```
+
+The SQL Server Docker contract passed; see the [app grid evidence](evidence/mssql-legacy-datetime-grid-edit-results-2026-10-04/manifest.json).
+
 ## SQL Server money float-decoding refusal
 
 A Docker regression first reproduced SQL Server `money` as
