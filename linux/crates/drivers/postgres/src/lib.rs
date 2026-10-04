@@ -408,15 +408,15 @@ impl Connection for PgConnection {
         let mut affected = Vec::with_capacity(statements.len());
         for (idx, (sql, params)) in statements.iter().enumerate() {
             let sql = sql.as_str();
-            let enum_types = if needs_enum_type_inference(params) {
+            let inferred_text_types = if needs_enum_type_inference(params) {
                 match describe_query_parameters(&mut tx, sql, params).await {
-                    Ok(description) => description.enum_types,
+                    Ok(description) => description.inferred_text_types,
                     Err(error) => return Err(transaction_failure(tx, idx, error).await),
                 }
             } else {
                 Vec::new()
             };
-            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &enum_types) {
+            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &inferred_text_types) {
                 Ok(query) => query,
                 Err(error) => {
                     return Err(transaction_failure(tx, idx, error).await);
@@ -843,10 +843,10 @@ async fn query_connection(
     } else {
         None
     };
-    let enum_types = description
+    let inferred_text_types = description
         .as_ref()
-        .map_or(&[][..], |description| description.enum_types.as_slice());
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, enum_types)?;
+        .map_or(&[][..], |description| description.inferred_text_types.as_slice());
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, inferred_text_types)?;
     let mut stream = query.fetch(&mut **connection);
     let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
     drop(stream);
@@ -870,12 +870,14 @@ async fn execute_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
-    let enum_types = if needs_enum_type_inference(params) {
-        describe_query_parameters(connection, sql, params).await?.enum_types
+    let inferred_text_types = if needs_enum_type_inference(params) {
+        describe_query_parameters(connection, sql, params)
+            .await?
+            .inferred_text_types
     } else {
         Vec::new()
     };
-    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &enum_types)?;
+    let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &inferred_text_types)?;
     let result = query.execute(&mut **connection).await.map_err(map_sqlx_error)?;
     Ok(ExecResult {
         rows_affected: result.rows_affected(),

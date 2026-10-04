@@ -3,10 +3,11 @@ use sqlx::postgres::{PgArgumentBuffer, PgConnection, PgTypeInfo, PgTypeKind};
 use sqlx::{Encode, Executor, Postgres, SqlSafeStr, Statement, Type};
 use tablepro_core::{ColumnInfo, DriverError, Value};
 
+use crate::array::MAX_ARRAY_TEXT_BYTES;
 use crate::{map_sqlx_error, statement_columns};
 
 pub(super) struct PgParameterDescription {
-    pub(super) enum_types: Vec<Option<PgTypeInfo>>,
+    pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
     pub(super) columns: Vec<ColumnInfo>,
 }
 
@@ -48,32 +49,48 @@ pub(super) async fn describe_query_parameters(
         .parameters()
         .and_then(|types| types.left())
         .unwrap_or_default();
-    let enum_types = parameters.iter().map(enum_type_info).collect::<Result<Vec<_>, _>>()?;
+    let inferred_text_types = parameters
+        .iter()
+        .map(inferred_text_type_info)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(PgParameterDescription {
-        enum_types,
+        inferred_text_types,
         columns: statement_columns(statement.columns()),
     })
 }
 
-fn enum_type_info(type_info: &PgTypeInfo) -> Result<Option<PgTypeInfo>, DriverError> {
-    let mut current = type_info.clone();
-    let mut domain_depth = 0;
-    loop {
-        match current.kind() {
-            PgTypeKind::Enum(_) => {
-                if domain_depth >= 64 {
-                    return Err(DriverError::Unsupported(
-                        "PostgreSQL enum domain hierarchy exceeds the driver's resolvable depth".into(),
-                    ));
-                }
-                return Ok(Some(current));
+fn inferred_text_type_info(type_info: &PgTypeInfo) -> Result<Option<PgTypeInfo>, DriverError> {
+    inferred_text_type_info_at(type_info, 0)
+}
+
+fn inferred_text_type_info_at(type_info: &PgTypeInfo, domain_depth: usize) -> Result<Option<PgTypeInfo>, DriverError> {
+    match type_info.kind() {
+        PgTypeKind::Enum(_) => {
+            if domain_depth >= 64 {
+                return Err(DriverError::Unsupported(
+                    "PostgreSQL enum domain hierarchy exceeds the driver's resolvable depth".into(),
+                ));
             }
-            PgTypeKind::Domain(base) => {
-                domain_depth += 1;
-                current = base.clone();
-            }
-            _ => return Ok(None),
+            Ok(Some(type_info.clone()))
         }
+        PgTypeKind::Domain(base) => inferred_text_type_info_at(base, domain_depth + 1),
+        PgTypeKind::Array(element) if is_enum_element(element, 0)? => Ok(Some(type_info.clone())),
+        _ => Ok(None),
+    }
+}
+
+fn is_enum_element(type_info: &PgTypeInfo, domain_depth: usize) -> Result<bool, DriverError> {
+    match type_info.kind() {
+        PgTypeKind::Enum(_) => {
+            if domain_depth >= 64 {
+                return Err(DriverError::Unsupported(
+                    "PostgreSQL enum domain hierarchy exceeds the driver's resolvable depth".into(),
+                ));
+            }
+            Ok(true)
+        }
+        PgTypeKind::Domain(base) => is_enum_element(base, domain_depth + 1),
+        _ => Ok(false),
     }
 }
 
@@ -81,23 +98,75 @@ pub(super) fn needs_enum_type_inference(params: &[Value]) -> bool {
     params.iter().any(|param| matches!(param, Value::Null | Value::Text(_)))
 }
 
-struct PgEnumParameter<'a> {
+struct PgInferredTextParameter<'a> {
     value: Option<&'a str>,
     type_info: PgTypeInfo,
+    enum_array: Option<Option<PgArrayText>>,
 }
 
-impl Type<Postgres> for PgEnumParameter<'_> {
+impl<'a> PgInferredTextParameter<'a> {
+    fn new(value: Option<&'a str>, type_info: PgTypeInfo) -> Result<Self, DriverError> {
+        let enum_array = match type_info.kind() {
+            PgTypeKind::Array(element) if is_enum_element(element, 0)? => {
+                Some(value.map(parse_enum_array_text).transpose()?)
+            }
+            _ => None,
+        };
+        Ok(Self {
+            value,
+            type_info,
+            enum_array,
+        })
+    }
+}
+
+impl Type<Postgres> for PgInferredTextParameter<'_> {
     fn type_info() -> PgTypeInfo {
         <String as Type<Postgres>>::type_info()
     }
 
     fn compatible(type_info: &PgTypeInfo) -> bool {
-        matches!(type_info.kind(), PgTypeKind::Enum(_))
+        match type_info.kind() {
+            PgTypeKind::Enum(_) => true,
+            PgTypeKind::Domain(base) => Self::compatible(base),
+            PgTypeKind::Array(element) => is_enum_element(element, 0).unwrap_or(false),
+            _ => false,
+        }
     }
 }
 
-impl Encode<'_, Postgres> for PgEnumParameter<'_> {
+impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
     fn encode_by_ref(&self, buffer: &mut PgArgumentBuffer) -> Result<IsNull, sqlx::error::BoxDynError> {
+        if let Some(elements) = &self.enum_array {
+            let Some(elements) = elements else {
+                return Ok(IsNull::Yes);
+            };
+            let PgTypeKind::Array(element_type) = self.type_info.kind() else {
+                return Err("inferred enum-array parameter lost its array type".into());
+            };
+            let element_oid = element_type
+                .oid()
+                .ok_or("inferred enum-array element has no PostgreSQL OID")?;
+            let dimensions = i32::try_from(elements.dimensions.len()).map_err(|_| "too many enum-array dimensions")?;
+            buffer.extend(&dimensions.to_be_bytes());
+            buffer.extend(&0_i32.to_be_bytes());
+            buffer.extend(&element_oid.0.to_be_bytes());
+            for (length, lower_bound) in &elements.dimensions {
+                buffer.extend(&length.to_be_bytes());
+                buffer.extend(&lower_bound.to_be_bytes());
+            }
+            for element in &elements.elements {
+                match element {
+                    Some(value) => {
+                        let length = i32::try_from(value.len()).map_err(|_| "enum label is too large")?;
+                        buffer.extend(&length.to_be_bytes());
+                        buffer.extend(value.as_bytes());
+                    }
+                    None => buffer.extend(&(-1_i32).to_be_bytes()),
+                }
+            }
+            return Ok(IsNull::No);
+        }
         match self.value {
             Some(value) => {
                 buffer.extend(value.as_bytes());
@@ -116,22 +185,241 @@ impl Encode<'_, Postgres> for PgEnumParameter<'_> {
     }
 }
 
+struct PgArrayText {
+    dimensions: Vec<(i32, i32)>,
+    elements: Vec<Option<String>>,
+}
+
+enum PgArrayNode {
+    Array(Vec<PgArrayNode>),
+    Element(Option<String>),
+}
+
+fn parse_enum_array_text(text: &str) -> Result<PgArrayText, DriverError> {
+    if text.len() > MAX_ARRAY_TEXT_BYTES {
+        return Err(DriverError::Unsupported(
+            "PostgreSQL enum-array parameter exceeds the 16 MiB limit".into(),
+        ));
+    }
+    let mut parser = PgArrayTextParser {
+        chars: text.chars().peekable(),
+    };
+    let declared_dimensions = parser.dimensions()?;
+    let node = parser.array()?;
+    if parser.chars.next().is_some() {
+        return Err(DriverError::Unsupported(
+            "invalid PostgreSQL enum-array parameter syntax".into(),
+        ));
+    }
+    let (shape, elements) = flatten_enum_array(node)?;
+    if shape.len() > 6 {
+        return Err(DriverError::Unsupported(
+            "PostgreSQL enum arrays support at most six dimensions".into(),
+        ));
+    }
+    let lengths = shape
+        .iter()
+        .map(|length| {
+            i32::try_from(*length).map_err(|_| DriverError::Unsupported("enum array dimension is too large".into()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let dimensions = if lengths == [0] && declared_dimensions.is_empty() {
+        Vec::new()
+    } else if declared_dimensions.is_empty() {
+        lengths.into_iter().map(|length| (length, 1)).collect()
+    } else {
+        if declared_dimensions
+            .iter()
+            .map(|(length, _)| *length)
+            .collect::<Vec<_>>()
+            != lengths
+        {
+            return Err(DriverError::Unsupported(
+                "enum-array bounds do not match the array contents".into(),
+            ));
+        }
+        declared_dimensions
+    };
+    Ok(PgArrayText { dimensions, elements })
+}
+
+struct PgArrayTextParser<'a> {
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
+}
+
+impl PgArrayTextParser<'_> {
+    fn dimensions(&mut self) -> Result<Vec<(i32, i32)>, DriverError> {
+        let mut dimensions = Vec::new();
+        while self.chars.peek() == Some(&'[') {
+            self.chars.next();
+            let lower = self.integer()?;
+            if self.chars.next() != Some(':') {
+                return Err(DriverError::Unsupported("invalid PostgreSQL enum-array bounds".into()));
+            }
+            let upper = self.integer()?;
+            if self.chars.next() != Some(']') {
+                return Err(DriverError::Unsupported("invalid PostgreSQL enum-array bounds".into()));
+            }
+            let length = upper
+                .checked_sub(lower)
+                .and_then(|length| length.checked_add(1))
+                .filter(|length| *length >= 0)
+                .ok_or_else(|| DriverError::Unsupported("invalid PostgreSQL enum-array bounds".into()))?;
+            dimensions.push((length, lower));
+            if dimensions.len() > 6 {
+                return Err(DriverError::Unsupported(
+                    "PostgreSQL enum arrays support at most six dimensions".into(),
+                ));
+            }
+        }
+        if !dimensions.is_empty() && self.chars.next() != Some('=') {
+            return Err(DriverError::Unsupported("invalid PostgreSQL enum-array bounds".into()));
+        }
+        Ok(dimensions)
+    }
+
+    fn integer(&mut self) -> Result<i32, DriverError> {
+        let mut text = String::new();
+        while self
+            .chars
+            .peek()
+            .is_some_and(|character| character.is_ascii_digit() || *character == '-')
+        {
+            text.push(self.chars.next().unwrap_or_default());
+        }
+        text.parse()
+            .map_err(|_| DriverError::Unsupported("invalid PostgreSQL enum-array bounds".into()))
+    }
+
+    fn array(&mut self) -> Result<PgArrayNode, DriverError> {
+        if self.chars.next() != Some('{') {
+            return Err(DriverError::Unsupported(
+                "PostgreSQL enum-array parameters require brace syntax".into(),
+            ));
+        }
+        let mut values = Vec::new();
+        if self.chars.peek() == Some(&'}') {
+            self.chars.next();
+            return Ok(PgArrayNode::Array(values));
+        }
+        loop {
+            values.push(if self.chars.peek() == Some(&'{') {
+                self.array()?
+            } else {
+                PgArrayNode::Element(self.element()?)
+            });
+            match self.chars.next() {
+                Some(',') => {}
+                Some('}') => return Ok(PgArrayNode::Array(values)),
+                _ => {
+                    return Err(DriverError::Unsupported(
+                        "invalid PostgreSQL enum-array parameter syntax".into(),
+                    ));
+                }
+            }
+        }
+    }
+
+    fn element(&mut self) -> Result<Option<String>, DriverError> {
+        let quoted = self.chars.peek() == Some(&'"');
+        let mut value = String::new();
+        if quoted {
+            self.chars.next();
+            loop {
+                match self.chars.next() {
+                    Some('"') => break,
+                    Some('\\') => value.push(
+                        self.chars
+                            .next()
+                            .ok_or_else(|| DriverError::Unsupported("invalid PostgreSQL enum-array escape".into()))?,
+                    ),
+                    Some(character) => value.push(character),
+                    None => {
+                        return Err(DriverError::Unsupported(
+                            "unterminated quoted PostgreSQL enum-array label".into(),
+                        ));
+                    }
+                }
+            }
+        } else {
+            while let Some(&character) = self.chars.peek() {
+                if matches!(character, ',' | '}') {
+                    break;
+                }
+                self.chars.next();
+                if character == '\\' {
+                    value.push(
+                        self.chars
+                            .next()
+                            .ok_or_else(|| DriverError::Unsupported("invalid PostgreSQL enum-array escape".into()))?,
+                    );
+                } else if matches!(character, '{' | '"' | '[' | ']') {
+                    return Err(DriverError::Unsupported("invalid PostgreSQL enum-array element".into()));
+                } else {
+                    value.push(character);
+                }
+            }
+            value = value.trim().to_owned();
+        }
+        Ok((quoted || !value.eq_ignore_ascii_case("NULL")).then_some(value))
+    }
+}
+
+fn flatten_enum_array(node: PgArrayNode) -> Result<(Vec<usize>, Vec<Option<String>>), DriverError> {
+    let PgArrayNode::Array(values) = node else {
+        return Err(DriverError::Unsupported(
+            "PostgreSQL enum-array root must be an array".into(),
+        ));
+    };
+    let Some(first) = values.first() else {
+        return Ok((vec![0], Vec::new()));
+    };
+    if matches!(first, PgArrayNode::Element(_)) {
+        if values.iter().any(|value| !matches!(value, PgArrayNode::Element(_))) {
+            return Err(DriverError::Unsupported(
+                "ragged PostgreSQL enum arrays are unsupported".into(),
+            ));
+        }
+        let length = values.len();
+        let elements = values
+            .into_iter()
+            .map(|value| match value {
+                PgArrayNode::Element(value) => value,
+                PgArrayNode::Array(_) => None,
+            })
+            .collect();
+        return Ok((vec![length], elements));
+    }
+    let outer_length = values.len();
+    let mut child_shape = None;
+    let mut elements = Vec::new();
+    for value in values {
+        let (shape, mut child_elements) = flatten_enum_array(value)?;
+        if child_shape.as_ref().is_some_and(|expected| expected != &shape) {
+            return Err(DriverError::Unsupported(
+                "ragged PostgreSQL enum arrays are unsupported".into(),
+            ));
+        }
+        child_shape = Some(shape);
+        elements.append(&mut child_elements);
+    }
+    let mut shape = child_shape.unwrap_or_default();
+    shape.insert(0, outer_length);
+    Ok((shape, elements))
+}
+
 pub(super) fn bind_pg_params<'q>(
     mut query: sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>,
     params: &'q [Value],
-    enum_types: &[Option<PgTypeInfo>],
+    inferred_text_types: &[Option<PgTypeInfo>],
 ) -> Result<sqlx::query::Query<'q, Postgres, sqlx::postgres::PgArguments>, DriverError> {
     for (index, value) in params.iter().enumerate() {
-        let enum_type = enum_types.get(index).and_then(Option::as_ref);
-        query = match (value, enum_type) {
-            (Value::Null, Some(type_info)) => query.bind(PgEnumParameter {
-                value: None,
-                type_info: type_info.clone(),
-            }),
-            (Value::Text(value), Some(type_info)) => query.bind(PgEnumParameter {
-                value: Some(value),
-                type_info: type_info.clone(),
-            }),
+        let inferred_type = inferred_text_types.get(index).and_then(Option::as_ref);
+        query = match (value, inferred_type) {
+            (Value::Null, Some(type_info)) => query.bind(PgInferredTextParameter::new(None, type_info.clone())?),
+            (Value::Text(value), Some(type_info)) => {
+                query.bind(PgInferredTextParameter::new(Some(value), type_info.clone())?)
+            }
             (Value::Null, None) => query.bind(Option::<&str>::None),
             (Value::Bool(value), _) => query.bind(*value),
             (Value::Int(value), _) => query.bind(*value),

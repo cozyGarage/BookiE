@@ -2,7 +2,7 @@ use sqlx::ValueRef;
 use sqlx::postgres::{PgTypeInfo, PgTypeKind, PgValueFormat, PgValueRef};
 use tablepro_core::Value;
 
-const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
+pub(super) const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
 // PostgreSQL sends int2vector and oidvector in array wire format, but their text input accepts only
 // space-separated values, so array text for them could not be imported again.
 const INT2VECTOR_OID: u32 = 22;
