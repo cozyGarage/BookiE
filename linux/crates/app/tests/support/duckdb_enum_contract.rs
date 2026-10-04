@@ -113,3 +113,74 @@ async fn value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_sibling
         ]
     );
 }
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
+async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_null() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE mood_null_label AS ENUM ('NULL', 'ready')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE mood_null_labels (id INTEGER PRIMARY KEY, status mood_null_label)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO mood_null_labels VALUES (1, 'ready'), (2, NULL)")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "mood_null_labels").await.unwrap();
+    let status_index = columns.iter().position(|column| column.name == "status").unwrap();
+    let literal_null = parse_input_for_grid_cell("NULL", Some(&columns[status_index]), "duckdb", None).unwrap();
+    assert_eq!(literal_null, Value::Text("NULL".into()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "duckdb",
+        None,
+        "mood_null_labels",
+        &columns,
+        &[(status_index, literal_null)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id, typeof(status), status::VARCHAR, \
+                    CASE WHEN status IS NULL THEN 'null' ELSE 'value' END \
+             FROM mood_null_labels ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let Value::Text(enum_type) = &result.rows[0][1] else {
+        panic!("expected DuckDB ENUM type, got {:?}", result.rows[0][1]);
+    };
+    assert!(enum_type.starts_with("ENUM"), "{enum_type}");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text(enum_type.clone()),
+                Value::Text("NULL".into()),
+                Value::Text("value".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text(enum_type.clone()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+        ]
+    );
+}
