@@ -8,6 +8,16 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
         .await
         .unwrap();
     connection
+        .execute("CREATE SCHEMA value_contract_domain_array_equality_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_array_equality_shadow.state AS ENUM ('shadow')",
+        )
+        .await
+        .unwrap();
+    connection
         .execute(
             "CREATE TYPE value_contract_domain_array_equality.state AS ENUM \
              ('ready', 'paused')",
@@ -44,6 +54,13 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
         .await
         .unwrap();
 
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(
+            "SET LOCAL search_path TO value_contract_domain_array_equality_shadow, public",
+        )
+        .await
+        .unwrap();
     let cases = [
         (
             Value::Text(r#"{"ready","paused"}"#.into()),
@@ -72,7 +89,7 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
         ),
     ];
     for (parameter, native_array, expected_equality) in cases {
-        let native = connection
+        let native = transaction
             .query(&format!(
                 "SELECT id, labels = {native_array}, labels <> {native_array}, \
                  labels < {native_array}, labels <= {native_array}, \
@@ -108,7 +125,7 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
             })
             .collect::<Vec<_>>();
 
-        let result = connection
+        let result = transaction
             .query_params(
                 "SELECT id, labels = $1, labels <> $1, labels < $1, labels <= $1, \
                  labels > $1, labels >= $1, encode(array_send($1), 'hex'), \
@@ -120,4 +137,5 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
             .unwrap();
         assert_eq!(result.rows, expected_values, "array equality with {parameter:?}");
     }
+    transaction.rollback().await.unwrap();
 }

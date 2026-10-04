@@ -10,7 +10,7 @@ source, including NULL/empty/special labels and a same-named shadow enum earlier
 in `search_path`; `array_positions` covers inferred text/NULL scalar parameters,
 repeated positions and NULL-element matching under that shadowed path
 ([array_cat evidence](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json),
-[array_positions evidence](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json)); all six array comparison operators also check inferred domain-array typing, native parameter wire bytes, NULL arrays/elements, empty arrays and lower-bound-sensitive results ([evidence](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json)); other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
+[array_positions evidence](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json)); all six array comparison operators also check inferred domain-array typing, native parameter wire bytes, NULL arrays/elements, empty arrays and lower-bound-sensitive results under a same-named shadow enum `search_path` ([evidence](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json)); other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
 and [operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 The operator matrix also runs with a same-named shadow enum first in
 `search_path` ([configuration packet](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).

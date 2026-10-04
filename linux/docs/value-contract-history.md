@@ -5831,7 +5831,8 @@ includes the inferred enum `array_positions` contract under shadowed
 A Docker regression verifies that `labels = $1`, `<>`, `<`, `<=`, `>` and `>=`
 infer the full domain-over-enum array type. Native PostgreSQL controls check
 comparison results for duplicate rows, a non-default lower bound, an empty array,
-a SQL NULL array and a NULL element; parameter `array_send` bytes match the native
-typed value. This records PostgreSQL array dimensional-bound semantics as well
-as inferred parameter typing. See the
+a SQL NULL array and a NULL element. The target schema is absent from
+`search_path`, where a same-named shadow enum leads. Parameter `array_send`
+bytes match the native typed value. This records PostgreSQL array dimensional-bound
+semantics as well as inferred parameter typing. See the
 [evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json).

@@ -155,9 +155,9 @@ inferred array contexts and the wider B3 matrix remain open
 
 October 4 B3 follow-up: all six PostgreSQL array comparison operators infer the
 domain-over-enum array parameter type and preserve native results for duplicates,
-non-default lower bounds, empty arrays, SQL NULL arrays and NULL elements. Native
-array wire bytes are asserted; see the
-[evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json). Other PostgreSQL array contexts remain open.
+non-default lower bounds, empty arrays, SQL NULL arrays and NULL elements while a
+same-named shadow enum leads `search_path`. Native array wire bytes are
+asserted; see the [evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json). Other PostgreSQL array contexts remain open.
 
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
