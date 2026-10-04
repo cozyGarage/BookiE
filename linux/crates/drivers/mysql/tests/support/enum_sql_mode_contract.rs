@@ -69,14 +69,13 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
     }
     setup.close().await.unwrap();
 
-    for mode in MODES {
+    for (suffix, mode) in MODES.into_iter().enumerate() {
         let connection = connect_in_mode(&options, mode).await;
         connection.execute("DELETE FROM enum_mode_copy").await.unwrap();
-        let rows = connection
+        let source = connection
             .query("SELECT id, mood FROM enum_mode_source ORDER BY id")
             .await
-            .unwrap()
-            .rows;
+            .unwrap();
         let native = connection
             .query("SELECT id, CAST(mood + 0 AS CHAR), HEX(mood) FROM enum_mode_source ORDER BY id")
             .await
@@ -101,16 +100,36 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
-        let columns = connection.fetch_columns(None, "enum_mode_copy").await.unwrap();
-        for row in &rows {
-            let statement =
-                tablepro_core::sql_literal::build_insert_literal("mysql", None, "enum_mode_copy", &columns, row)
-                    .unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "tablepro-enum-sql-{}-{:?}-{suffix}.sql",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let csv = tablepro_core::export::CsvOptions::default();
+        tablepro_core::export::write_result_file(
+            &path,
+            &source,
+            &tablepro_core::export::ResultExport {
+                format: tablepro_core::export::ResultFormat::Sql,
+                csv: &csv,
+                sql: Some(tablepro_core::export::SqlTarget {
+                    driver_id: "mysql",
+                    schema: None,
+                    table: "enum_mode_copy",
+                }),
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let sql = std::fs::read_to_string(&path).unwrap();
+        for statement in sql.lines() {
             connection
-                .execute(&statement)
+                .execute(statement)
                 .await
                 .unwrap_or_else(|error| panic!("sql_mode {mode:?}; {statement}: {error}"));
         }
+        std::fs::remove_file(path).unwrap();
         let matching = connection
             .query(
                 "SELECT COUNT(*) FROM enum_mode_source s JOIN enum_mode_copy c ON s.id = c.id \
