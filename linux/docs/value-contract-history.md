@@ -2988,9 +2988,9 @@ SET, and SQL NULL. Typed CSV uses an explicit collision-free null marker so
 the empty SET stays distinct from SQL NULL. Each mode checks native ENUM
 ordinals, SET masks, label bytes and both copied tables against the source.
 JSON preserves every value. XML, HTML and Markdown escape markup-shaped ENUM
-and SET labels in all six modes. XLSX refuses the empty SET text and leaves a
+and SET labels in all eight modes, including STRICT_ALL_TABLES with and without NO_BACKSLASH_ESCAPES. XLSX refuses the empty SET text and leaves a
 pre-existing destination unchanged. Both focused Docker tests, strict Clippy
-and formatting pass. SQL modes beyond these six combinations and other enum/set
+and formatting pass. SQL modes beyond these eight combinations and other enum/set
 consumers remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
 The app edit path now validates ENUM labels and SET members against MySQL's

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "6a8ca1960",
-  "case": "MySQL/MariaDB ENUM and SET consumers across SQL modes",
+  "source_commit": "9f48469f6",
+  "case": "MySQL/MariaDB ENUM and SET consumers across eight SQL modes",
   "engines": {
     "mysql": "testcontainers-modules default mysql:8.1 image",
     "mariadb": "mariadb:11"
@@ -13,24 +13,24 @@
     "enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes"
   ],
   "contract": [
-    "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, their combination, STRICT_TRANS_TABLES, and STRICT_TRANS_TABLES with NO_BACKSLASH_ESCAPES on both engines.",
+    "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, their combination, STRICT_TRANS_TABLES and STRICT_ALL_TABLES, each strict mode with NO_BACKSLASH_ESCAPES, on both engines.",
     "ENUM and SET fixtures cover apostrophe and backslash labels, multiple selected SET members, literal NULL, empty text, and SQL NULL.",
-    "SQL files replay and typed CSV export/import preserve ENUM/SET values under the same six modes on both engines.",
+    "SQL files replay and typed CSV export/import preserve ENUM/SET values under all eight modes on both engines.",
     "CSV uses a collision-free NULL marker so an empty SET stays distinct from SQL NULL; JSON preserves each value.",
-    "XML, HTML, and Markdown escape markup-shaped ENUM and SET labels under each of the six SQL modes.",
+    "XML, HTML, and Markdown escape markup-shaped ENUM and SET labels under each of the eight SQL modes.",
     "XLSX refuses the empty SET text and leaves an existing destination unchanged.",
     "Each mode checks native ENUM ordinals, SET masks, label bytes and both copied tables against the source."
   ],
   "validation": {
     "mysql": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mysql_sql_modes -- --include-ignored --exact --test-threads=1",
-      "result": "1 passed, 0 failed",
-    "log": "mysql.txt"
+      "result": "1 passed, 0 failed across eight modes",
+      "log": "mysql.txt"
     },
     "mariadb": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --test integration enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes -- --include-ignored --exact --test-threads=1",
-      "result": "1 passed, 0 failed",
-    "log": "mariadb.txt"
+      "result": "1 passed, 0 failed across eight modes",
+      "log": "mariadb.txt"
     },
     "clippy": {
       "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings",
@@ -45,7 +45,23 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "SQL mode/session combinations beyond the six tested values and additional enum/SET consumers remain open.",
+    "SQL mode/session combinations beyond the eight tested values and additional enum/SET consumers remain open.",
     "This bounded case does not close B3 or qualify the 0.2.0 release."
-  ]
+  ],
+  "sql_modes": [
+    "",
+    "NO_BACKSLASH_ESCAPES",
+    "ANSI_QUOTES",
+    "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+    "STRICT_TRANS_TABLES",
+    "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+    "STRICT_ALL_TABLES",
+    "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES"
+  ],
+  "log_sha256": {
+    "mysql.txt": "3d67ec4e59e42924a4892d68427d3cd5f181309a5137e8fbb8328227b1489b1b",
+    "mariadb.txt": "0c867cf364132966b52102d44454d140ffe6b69051350ddb423c5b92601c69e2",
+    "clippy.txt": "36a26425cc1f6cd0d217e47bdcde4f95374297cdbf0379441950776eea952c73",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
 }
