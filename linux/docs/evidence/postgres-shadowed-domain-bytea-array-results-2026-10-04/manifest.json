@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "00e6274c4",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-bytea array keyed edit with same-named shadow domain",
+  "test": "domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes",
+  "contract": [
+    "A same-named domain in the first search_path schema has a stricter CHECK than the target domain, so an unqualified cast would reject the four-byte element.",
+    "An explicit cast to the shadow domain returns SQLSTATE 23514 inside a savepoint; rollback to the savepoint leaves the transaction usable for the target edit.",
+    "The schema-aware keyed update emits a qualified target-domain array cast and succeeds while the shadow schema is active on the same transaction backend.",
+    "The stored target domain type, JSON value and array_send bytes match the pre-edit target oracle, and the sibling row remains unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other domain-array base types, session/search_path configurations, enum boundaries and consumers remain open in B3."
+  ]
+}

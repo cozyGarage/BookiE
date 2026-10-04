@@ -1,6 +1,6 @@
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
     Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on build directory
+    Blocking waiting for file lock on package cache
     Checking tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.23s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.11s

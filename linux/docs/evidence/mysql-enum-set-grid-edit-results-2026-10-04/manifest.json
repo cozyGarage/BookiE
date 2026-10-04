@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "0cbfa6b81",
+  "source_commit": "097716a44",
   "engines": {
     "mysql": "MySQL 8.1 in Docker via testcontainers",
     "mariadb": "MariaDB 11 in Docker via testcontainers"
@@ -19,6 +19,7 @@
     "Blank input retains shared SQL NULL/required-field behavior, while explicit `''` selects an empty ENUM label or the empty SET value; native ordinals/masks distinguish empty values from NULL.",
     "The native server control demonstrates that permissive mode otherwise coerces an unknown ENUM label to its error value and drops an unknown SET member; the control updates are rolled back.",
     "An untouched sibling row retains its native ordinals, masks and label bytes in every mode.",
+    "The literal label `NULL` is accepted as a non-NULL ENUM value on both engines; its ordinal and bytes are checked separately from the SQL NULL row.",
     "MariaDB 11 reports the declared ENUM/SET members in column metadata; valid apostrophe/backslash values bind and retain their native ordinals, masks and bytes in the same four modes, while invalid labels and members are refused."
   ],
   "validation": {

@@ -3005,7 +3005,9 @@ strict Clippy, focused parser test and MySQL 8 Docker test passed. A matching
 MariaDB 11 app edit now checks all four modes, native label bytes and SET masks,
 invalid-value refusal and sibling preservation. It also distinguishes blank SQL
 NULL from explicit `''` empty ENUM and SET values against native ordinals/masks.
-Additional SQL modes remain open; see the
+Both engine paths also key-edit the declared literal label `NULL` and verify its
+non-NULL ordinal/bytes separately from the SQL NULL row. Additional SQL modes
+remain open; see the
 [grid evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
@@ -5409,3 +5411,14 @@ replayed SQL restores native text, JSON elements and wire bytes under the same
 style. The rollback leaves the destination empty. All 14 array-contract tests,
 strict Clippy and formatting pass. Other interval styles remain untested. See
 the [evidence manifest](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
+
+## PostgreSQL domain-over-bytea array edit with shadowed search_path, 2026-10-04
+
+A PostgreSQL 16 contract adds a same-named `payload` domain to a shadow schema
+with a one-byte limit, while the target domain permits four bytes. A keyed edit
+runs in a transaction whose `search_path` resolves the stricter domain first.
+The qualified target-domain array cast succeeds; native type, JSON and
+`array_send` bytes match the target oracle, and the sibling row stays unchanged.
+The focused Docker test, strict Clippy and formatting pass. Other domain-array
+types, session/search_path combinations, enum boundaries and consumers remain
+open in B3. See the [evidence manifest](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json).

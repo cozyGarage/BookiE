@@ -56,6 +56,9 @@ Domain arrays over `bytea` preserve non-UTF-8 bytes, empty elements and NULL
 through qualified binding and keyed edits; domain CHECK refusal preserves the
 row and its sibling, with native JSON/wire oracles
 ([evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json)).
+The keyed edit also succeeds with a stricter same-named domain first in
+`search_path`, proving the generated cast resolves to the target schema
+([shadowed-path evidence](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
