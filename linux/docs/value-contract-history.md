@@ -5451,7 +5451,8 @@ an embedded line break and a backslash through raw CSV, parses the multiline
 records, then imports with the schema-aware enum cast and a collision-free SQL
 NULL marker. A formula-shaped label remains raw for lossless import. All four
 supported delimiters crossed with LF, CRLF and CR record endings pass (12
-combinations). Restored rows match exact text, UTF-8 bytes, native enum type and
-SQL NULL. The focused test, strict Clippy and formatting pass. Other session
-configurations and spreadsheet-specific import behavior remain open. See the
+combinations), and format auto-detection identifies the right delimiter and
+header for each one. Restored rows match exact text, UTF-8 bytes, native enum
+type and SQL NULL. The focused test, strict Clippy and formatting pass. Other
+session configurations and spreadsheet-specific import behavior remain open. See the
 [evidence manifest](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json).

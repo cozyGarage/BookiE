@@ -26,8 +26,8 @@ source/SHA attribution; this summary does not certify the current tree.
 
 The PostgreSQL enum CSV importer now also has a round trip for double quotes,
 an embedded line break, backslashes and formula-shaped text across four
-delimiters and three record endings, with a collision-free SQL NULL marker and
-native UTF-8 byte/type assertions ([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
+delimiters and three record endings; auto-detection identifies each format,
+and native UTF-8 byte/type assertions verify import ([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
 
 PostgreSQL custom enum-array CSV import now has native round trips for NULL
 arrays versus empty arrays and NULL elements, lower-bound-zero and

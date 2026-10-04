@@ -102,8 +102,9 @@ Native enum ordering also follows declaration order rather than lexical text sor
 Raw PostgreSQL enum CSV export, parsing and schema-aware typed import also
 preserve labels containing double quotes, embedded line breaks and backslashes,
 along with formula-shaped text and SQL NULL across all four supported delimiters
-and LF/CRLF/CR record endings. Restored UTF-8 bytes and native enum type are
-checked independently ([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
+and LF/CRLF/CR record endings. Import format auto-detection identifies every
+combination; restored UTF-8 bytes and native enum type are checked independently
+([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
 
 Separate PostgreSQL expression contexts now infer text and SQL NULL enum
 parameters in `COALESCE` and `array_append` ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)). A `NULLIF(enum_column, $1)` follow-up checks inferred type, NULL/match behavior and invalid-label refusal ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)). A domain-over-enum case records the raw `42883` refusal and passing qualified base-enum cast control under a shadowed `search_path` ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
