@@ -55,6 +55,8 @@ The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE consumer evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
+The CASE workbook path now refuses empty TEXT without replacing the existing
+destination ([XLSX refusal evidence](evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json)).
 Computed COALESCE JSON output checks number/string distinctions, and XLSX output
 checks numeric/shared-string cell kinds, including BLOB text encoding
 ([consumer evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json)).

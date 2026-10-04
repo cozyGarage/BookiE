@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
+
+running 9 tests
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_blob_values_are_read_only_and_keep_exact_bytes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class ... ok
+test ui::browse_tab::value_parse::sqlite_any_contract::sqlite_strict_any_null_and_new_cells_use_text_unless_blank ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 458 filtered out; finished in 0.03s
+
+     Running unittests src/main.rs (linux/target/debug/deps/tablepro_app-e736dfc4eb4836ac)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/logging.rs (linux/target/debug/deps/logging-a7070b60be793032)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+

@@ -127,12 +127,15 @@ with [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-1
 October 4 B3-4 follow-up: mixed `CASE` and `COALESCE` expressions over STRICT
 `ANY` keep fallback metadata while native `typeof()` proves per-row storage
 classes. A `CASE` result also round-trips INTEGER, TEXT, BLOB and NULL through
-the app CSV writer/importer with native storage-class checks. COALESCE also
+the app CSV writer/importer with native storage-class checks; an empty TEXT
+CASE result round-trips separately from NULL in CSV and is refused by XLSX
+without replacing the existing workbook. COALESCE also
 round-trips INTEGER, REAL, fallback TEXT, BLOB and stored TEXT; JSON keeps
 numeric versus string values, and XLSX uses numeric cells for INTEGER/REAL and
 text cells for fallback/stored TEXT, BLOB encoding and tag-prefix text. Spreadsheet re-import and other
 expression consumers remain open. See the [CASE metadata evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json),
 [CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),
+[CASE XLSX refusal evidence](evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json),
 [COALESCE metadata evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json)
 and [COALESCE CSV evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json),
 [XLSX evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).

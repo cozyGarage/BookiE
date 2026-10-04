@@ -4689,6 +4689,12 @@ survive; the CASE result keeps conservative fallback metadata. Eight SQLite app
 expression consumer paths remain open. See the
 [CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
+The CASE fixture now includes empty TEXT. CSV export/import keeps it distinct
+from SQL NULL and restores the native storage class. XLSX refuses the empty
+cell, reports the correct data row and column, and leaves a pre-existing
+destination untouched with no temporary artifact left behind. See the [XLSX
+refusal evidence](evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json).
+
 ## SQLite computed COALESCE STRICT ANY CSV round trip (2026-10-04)
 
 An app-level result-file contract exports `coalesce(value, 'fallback')` over

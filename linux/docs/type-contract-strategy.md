@@ -27,6 +27,9 @@ source/SHA attribution; this summary does not certify the current tree.
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
+The CASE path also verifies empty TEXT round-trips separately from NULL in CSV
+and that XLSX refuses the ambiguous cell without replacing the destination;
+see the [refusal evidence](evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json).
 The COALESCE JSON output checks numeric versus string values, and the XLSX output
 checks numeric versus shared-string cells and BLOB text encoding against its
 computed runtime kinds; see the [consumer evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).
