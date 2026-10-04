@@ -152,6 +152,63 @@ async fn value_contract_scalar_enum_labels_preserve_exact_text() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_preserves_maximum_multibyte_label_bytes() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let labels = ["x".repeat(63), "界".repeat(21)];
+    let literals = labels
+        .iter()
+        .map(|label| tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.clone())).unwrap())
+        .collect::<Vec<_>>();
+    connection
+        .execute(&format!(
+            "CREATE TYPE value_contract_enum_byte_boundary AS ENUM ({})",
+            literals.join(", ")
+        ))
+        .await
+        .unwrap();
+
+    let catalog = connection
+        .query(
+            "SELECT enumlabel::text, octet_length(enumlabel::text) \
+             FROM pg_enum \
+             WHERE enumtypid = 'value_contract_enum_byte_boundary'::regtype \
+             ORDER BY enumsortorder",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        catalog.rows,
+        labels
+            .iter()
+            .map(|label| vec![Value::Text(label.clone()), Value::Int(63)])
+            .collect::<Vec<_>>()
+    );
+
+    let result = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text \
+             FROM unnest(enum_range(NULL::value_contract_enum_byte_boundary)) \
+             WITH ORDINALITY AS labels(value, ordinal) \
+             ORDER BY ordinal",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_enum_byte_boundary");
+    assert_eq!(
+        result.rows,
+        labels
+            .iter()
+            .map(|label| vec![
+                Value::Text(label.clone()),
+                Value::Text("value_contract_enum_byte_boundary".into())
+            ])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
