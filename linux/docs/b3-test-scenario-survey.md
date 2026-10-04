@@ -302,6 +302,8 @@ A separately bound text-array parameter explicitly cast to a domain-over-enum
 array preserves literal `NULL`, empty text, Unicode, comma-containing text and
 SQL NULL against native `array_send` and JSON oracles; invalid elements retain
 SQLSTATE `22P02` ([evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)).
+A 2×2 bound array with lower bounds 0 and 3 also preserves exact dimensions,
+enum values and SQL NULL ([bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json)).
 A `NULLIF(enum_column, $1)` follow-up checks matching, non-matching and SQL NULL
 parameters, native inferred/result enum types, invalid-label SQLSTATE `22P02`
 and unchanged rows ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).

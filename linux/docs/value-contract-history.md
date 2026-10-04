@@ -1653,6 +1653,12 @@ Unicode, a comma-containing label and SQL NULL. The decoded array, JSON,
 array; an invalid element is rejected with SQLSTATE `22P02`. See the
 [evidence manifest](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json).
 
+The same typed parameter path now checks a 2×2 array with lower bounds 0 and 3.
+The result asserts exact array text, dimensions, JSON shape, outer domain-array
+type and each bound while distinguishing the literal `NULL`, empty text,
+Unicode and SQL NULL. See the
+[bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json).
+
 At this original October 3 decoder checkpoint, the adversarial scalar fixture
 whose enum label is literally `NULL` still surfaced SQLx's metadata resolution
 error (`enum_labels: unexpected NULL`), and keyed-edit proof remained open.

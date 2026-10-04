@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "3cb2a9abc98cd9f570d6e35e30554c1165298f6e",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Domain-over-enum array parameter with multidimensional non-default bounds",
+  "test": "domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null",
+  "contract": [
+    "An explicitly cast bound text array preserves a 2x2 domain-over-enum array with lower bounds 0 and 3.",
+    "The array includes the literal enum label NULL, empty text, Unicode and SQL NULL; the exact array text, array_dims, JSON, pg_typeof, lower bounds and upper bounds are asserted.",
+    "The same contract also checks ordinary one-dimensional bound-array values against a native constructor and rejects invalid enum elements with SQLSTATE 22P02."
+  ],
+  "validation": {
+    "focused_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed before the source commit",
+      "log": null
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "a6557791e1ca3676639b5bc5218f3b8ac50f66f44f0f0ffbd2cffe7b542da4fc",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "cc79103839740ab875ea7dcfd75c94a345d07afd2d3289d61ad335729ab53d62"
+  },
+  "remaining": [
+    "Other enum-array dimensions/bounds, parameter contexts and spreadsheet-application re-import remain open."
+  ]
+}
