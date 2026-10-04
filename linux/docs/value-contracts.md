@@ -120,6 +120,9 @@ Inferred enum-array parameters also preserve type and wire bytes with 62- and
 63-layer enum-domain elements. Text and SQL NULL array parameters at 64 layers
 return an explicit unsupported result; the array container consumes part of
 the type resolver's depth budget ([evidence](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
+PostgreSQL's scalar `= ANY(domain_array)` operator lookup itself returns
+`42883` at depth 63; that native refusal is recorded separately from the
+working containment bind path.
 
 PostgreSQL domain-over-enum `COALESCE` now has parameter inference coverage in
 both argument positions for text and SQL NULL; the base-enum result and outer

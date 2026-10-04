@@ -1,6 +1,6 @@
 {
   "date": "2026-10-04",
-  "source_commit": "ca6e3e0e6beeb2bc76599a5a5573f5b050d1745b",
+  "source_commit": "d39a530ee74fb4c8fe63a7021f1551cb04b3d35d",
   "branch": "linux",
   "focused_contract": "crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary",
   "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
@@ -9,7 +9,7 @@
     "failed": 0,
     "ignored": 0,
     "filtered_out": 0,
-    "seconds": 291.09
+    "seconds": 288.08
   },
   "supported_depths": [62, 63],
   "explicit_refusal_depth": 64,
@@ -20,6 +20,7 @@
     "pg_typeof(source-column) outer domain name",
     "exact array_send bytes"
   ],
+  "native_boundary": "PostgreSQL returns SQLSTATE 42883 for scalar equality against ANY(domain-array) at depth 63. The test records this native operator-resolution refusal and rolls back to a savepoint before checking array containment binding.",
   "additional_checks": {
     "cargo fmt --all -- --check": "passed",
     "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings": "passed",

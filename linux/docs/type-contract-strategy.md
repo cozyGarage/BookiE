@@ -24,6 +24,9 @@ and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-resu
 An inferred enum-array parameter with domain elements is covered through 63
 domain layers and explicitly refused at 64 for both text and SQL NULL. The
 array type's own hierarchy is included in this boundary; see the [depth evidence](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).
+At 63 layers PostgreSQL itself rejects scalar equality with `ANY(domain_array)`
+as `42883`; the test keeps that native limitation distinct from containment
+binding coverage.
 
 | Owner / engine | Retain established contracts | Remaining scope to select one case from |
 | --- | --- | --- |

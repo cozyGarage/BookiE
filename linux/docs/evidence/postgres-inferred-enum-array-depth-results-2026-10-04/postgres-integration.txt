@@ -133,4 +133,4 @@ test wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_a
 test wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text ... ok
 test wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value ... ok
 
-test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 291.09s
+test result: ok. 130 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 288.08s

@@ -5705,7 +5705,10 @@ At 62 and 63 domain layers, text arrays and SQL NULL arrays preserve the exact
 domain-array type and `array_send` bytes against native typed-array controls.
 At 64 layers, text and SQL NULL return explicit unsupported results before
 dispatch. Unlike scalar enum parameters, the array container participates in
-the type resolver's depth budget. The full Docker-backed PostgreSQL integration
+the type resolver's depth budget. At depth 63, PostgreSQL itself returns
+SQLSTATE `42883` for scalar equality against `ANY(domain_array)`; the regression
+records this native operator-resolution refusal and uses array containment for
+the parameter-boundary oracle. The full Docker-backed PostgreSQL integration
 suite passes 130 tests. See the [evidence manifest](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).
 
 ## GTK + DuckDB value tier with enum-array operator/depth cases, 2026-10-04
