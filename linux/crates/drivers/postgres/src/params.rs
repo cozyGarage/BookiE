@@ -292,6 +292,15 @@ impl PgArrayTextParser<'_> {
     }
 
     fn array(&mut self) -> Result<PgArrayNode, DriverError> {
+        self.array_at_depth(1)
+    }
+
+    fn array_at_depth(&mut self, depth: usize) -> Result<PgArrayNode, DriverError> {
+        if depth > 6 {
+            return Err(DriverError::Unsupported(
+                "PostgreSQL enum arrays support at most six dimensions".into(),
+            ));
+        }
         if self.chars.next() != Some('{') {
             return Err(DriverError::Unsupported(
                 "PostgreSQL enum-array parameters require brace syntax".into(),
@@ -304,7 +313,7 @@ impl PgArrayTextParser<'_> {
         }
         loop {
             values.push(if self.chars.peek() == Some(&'{') {
-                self.array()?
+                self.array_at_depth(depth + 1)?
             } else {
                 PgArrayNode::Element(self.element()?)
             });
@@ -463,4 +472,22 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
             Value::Undecodable(_) => PgTypeInfo::with_name("TEXT"),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_enum_array_text;
+    use tablepro_core::DriverError;
+
+    #[test]
+    fn inferred_enum_array_text_rejects_nesting_beyond_postgres_dimension_limit() {
+        assert!(parse_enum_array_text("{{{{{{ready}}}}}}").is_ok());
+
+        let deeply_nested = format!("{}ready{}", "{".repeat(10_000), "}".repeat(10_000));
+
+        assert!(matches!(
+            parse_enum_array_text(&deeply_nested),
+            Err(DriverError::Unsupported(message)) if message.contains("at most six dimensions")
+        ));
+    }
 }
