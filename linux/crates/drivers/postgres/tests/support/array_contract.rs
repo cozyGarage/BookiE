@@ -183,6 +183,41 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
         assert!(output.contains("東京 😀"), "{extension}: {output}");
     }
 
+    let xlsx_path = directory.path().join("array.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+    assert!(
+        shared_strings.contains("\"NULL\",NULL,\"\",\"comma,value\""),
+        "{shared_strings}"
+    );
+    assert!(shared_strings.contains("quote"), "{shared_strings}");
+    assert!(shared_strings.contains("東京 😀"), "{shared_strings}");
+    assert!(
+        shared_strings.contains("&lt;/value&gt;&lt;injected"),
+        "{shared_strings}"
+    );
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     connection
         .execute("CREATE TABLE array_filewriter_target (value text[])")
         .await
