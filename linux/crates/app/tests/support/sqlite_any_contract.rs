@@ -1448,6 +1448,97 @@ async fn sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_total_any_csv_round_trip_preserves_real_results() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 7), (1, 9), (2, 1.25), (2, 2.5), \
+             (3, '12'), (3, '3'), (4, '1.5'), \
+             (5, 'alpha'), (5, X'00FF'), (6, NULL), (6, NULL), \
+             (7, 1), (7, 2.5), \
+             (8, 9223372036854775807), (8, 1)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, TOTAL(value) AS result, \
+                    typeof(TOTAL(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    let expected = [
+        (1, 16.0),
+        (2, 3.75),
+        (3, 15.0),
+        (4, 1.5),
+        (5, 0.0),
+        (6, 0.0),
+        (7, 3.5),
+        (8, i64::MAX as f64 + 1.0),
+    ];
+    let expected_rows = expected
+        .iter()
+        .map(|(group_id, value)| vec![Value::Int(*group_id), Value::Float(*value), Value::Text("real".into())])
+        .collect::<Vec<_>>();
+    assert_eq!(result.rows, expected_rows);
+
+    let empty = connection
+        .query("SELECT TOTAL(value), typeof(TOTAL(value)) FROM flexible WHERE group_id = 999")
+        .await
+        .unwrap();
+    assert_eq!(empty.rows, vec![vec![Value::Float(0.0), Value::Text("real".into())]]);
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        expected
+            .iter()
+            .map(|(_, value)| vec![
+                Value::Text("real".into()),
+                Value::Float(*value),
+                Value::Text("real".into()),
+            ])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
