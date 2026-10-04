@@ -655,8 +655,9 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
 - PostgreSQL 16 server oracles now cover `int4multirange` text, hull, component
   count and NULL, but SQLx fails direct projection while resolving `typtype`
   code `m`; this is an upstream metadata blocker, not a BookiE value refusal.
-- B3-1 enum follow-up: custom enum-array CSV import now resolves the direct
-  array element's catalog type and emits a schema-qualified `enum[]` cast.
-  Literal `NULL`, empty text, Unicode, quoted/comma/markup labels, SQL NULL and
-  an existing sibling row are checked against native type, JSON and wire-byte
-  oracles ([evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json)).
+- B3-1 enum follow-up: custom enum-array CSV import resolves the direct array
+  element's catalog type and emits a schema-qualified `enum[]` cast. The tests
+  preserve literal `NULL`, empty text, Unicode, quoted/comma/markup labels,
+  SQL NULL arrays and elements, empty arrays, a lower-bound-zero array,
+  two-dimensional shape and an existing sibling row against native type, JSON,
+  dimensions and wire-byte oracles ([label evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json), [shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).

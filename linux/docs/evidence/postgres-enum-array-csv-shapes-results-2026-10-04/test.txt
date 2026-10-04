@@ -1,0 +1,2 @@
+test array_contract::value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape ... ok
+test result: ok. 16 passed; 0 failed; 0 ignored; 96 filtered out

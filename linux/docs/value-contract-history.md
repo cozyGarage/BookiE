@@ -5235,6 +5235,17 @@ row remains unchanged. The PostgreSQL array contract group, focused core tests,
 strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json).
 
+## PostgreSQL custom enum-array CSV shape and NULL contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract uses an explicit CSV null marker to distinguish
+a SQL NULL array from an empty array and an array containing a SQL NULL element.
+It also preserves a custom enum array with lower bound zero, a literal `NULL`
+label, an empty label, and Unicode, plus a two-dimensional array. Native
+`pg_typeof`, `array_dims`, `array_to_json` and `array_send` values match after
+import, and an existing sibling row retains its wire bytes. All 16 PostgreSQL
+array-contract tests, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

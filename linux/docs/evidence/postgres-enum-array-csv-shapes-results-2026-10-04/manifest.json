@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "43d7e64b9",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "custom enum[] CSV import preserves null distinctions, lower bounds and dimensions",
+  "test": "array_contract::value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape",
+  "contract": [
+    "An explicit CSV null marker distinguishes a SQL NULL array from an empty array and a one-element array containing SQL NULL.",
+    "A custom enum array with lower bound zero preserves its literal NULL label, SQL NULL element, empty label and Unicode element.",
+    "A two-dimensional custom enum array retains its dimensions, native type and JSON semantics after CSV import.",
+    "Native pg_typeof, array_dims, array_to_json and array_send values are compared before and after import; a pre-existing sibling row retains its exact wire bytes."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "16 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, spreadsheet-application re-import, installed array editing and additional enum/session configurations remain open in B3."
+  ]
+}

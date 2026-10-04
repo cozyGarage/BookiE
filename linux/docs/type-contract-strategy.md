@@ -24,6 +24,11 @@ source/SHA attribution; this summary does not certify the current tree.
 | Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases; grid context-menu CSV uses a collision-free SQL NULL marker ([serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json)); 86,012 finite-f64 values now round-trip through CSV and JSON with exact bits ([corpus evidence](evidence/finite-float-consumer-results-2026-10-04/manifest.json)) | Remaining format/type/configuration boundaries, native kind after writes, clipboard/spreadsheet parity, exhaustive finite-f64 enumeration and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
+PostgreSQL custom enum-array CSV import now has native round trips for NULL
+arrays versus empty arrays and NULL elements, lower-bound-zero and
+two-dimensional shapes, literal `NULL` and empty labels, Unicode, and sibling
+row preservation ([shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).
+
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
