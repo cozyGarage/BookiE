@@ -105,6 +105,48 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
+        let json: serde_json::Value =
+            serde_json::from_str(&tablepro_core::export::render_json(&source.columns, &source.rows)).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!([
+                {"id": 1, "mood": "happy"},
+                {"id": 2, "mood": "it's ok"},
+                {"id": 3, "mood": "back\\slash"},
+                {"id": 4, "mood": "NULL"},
+                {"id": 5, "mood": ""},
+                {"id": 6, "mood": null}
+            ]),
+            "JSON export under sql_mode {mode:?}"
+        );
+        let xlsx_path = std::env::temp_dir().join(format!(
+            "tablepro-enum-xlsx-{}-{:?}-{suffix}.xlsx",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::write(&xlsx_path, b"previous workbook").unwrap();
+        let csv = tablepro_core::export::CsvOptions::default();
+        let xlsx_error = tablepro_core::export::write_result_file(
+            &xlsx_path,
+            &source,
+            &tablepro_core::export::ResultExport {
+                format: tablepro_core::export::ResultFormat::Xlsx,
+                csv: &csv,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap_err();
+        assert!(
+            matches!(
+                xlsx_error,
+                tablepro_core::export::ExportError::WorkbookEmptyText { row: 5, column: 2 }
+            ),
+            "sql_mode {mode:?}: {xlsx_error:?}"
+        );
+        assert_eq!(std::fs::read(&xlsx_path).unwrap(), b"previous workbook");
+        std::fs::remove_file(xlsx_path).unwrap();
 
         let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
         let csv_options = tablepro_core::export::CsvOptions {
