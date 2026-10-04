@@ -248,3 +248,51 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
     assert!(sql.contains("$1::text::pg_catalog.timestamptz[]"));
     assert_eq!(params[0], Value::Text(literal.into()));
 }
+
+#[test]
+fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qualified_cast() {
+    let literal = r#"{"NULL","",東京,"a,b",NULL}"#;
+    let column = ColumnInfo {
+        name: "labels".into(),
+        data_type: "enum_array_schema.label[]".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: Some(tablepro_core::QualifiedTypeName {
+            schema: "enum_array_schema".into(),
+            name: "label".into(),
+        }),
+    };
+    let parsed = parse_input_for_driver(literal, Some(&column), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let columns = vec![
+        ColumnInfo {
+            name: "id".into(),
+            data_type: "integer".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+        },
+        column,
+    ];
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_array_schema"),
+        "items",
+        &columns,
+        &[(1, parsed)],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert!(sql.contains("$1::text::\"enum_array_schema\".\"label\"[]"));
+    assert_eq!(params, vec![Value::Text(literal.into()), Value::Int(2)]);
+}

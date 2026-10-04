@@ -1547,6 +1547,116 @@ async fn value_contract_custom_enum_array_csv_import_uses_target_type_under_shad
     transaction.commit().await.unwrap();
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_siblings() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA enum_array_grid").await.unwrap();
+    connection
+        .execute("CREATE TYPE enum_array_grid.label AS ENUM ('NULL', '', '東京', 'a,b', 'sibling', 'ready')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enum_array_grid.items \
+             (id integer PRIMARY KEY, labels enum_array_grid.label[])",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO enum_array_grid.items VALUES \
+             (1, ARRAY['sibling'::enum_array_grid.label]), \
+             (2, ARRAY['ready'::enum_array_grid.label])",
+        )
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query("SELECT encode(array_send(labels), 'hex') FROM enum_array_grid.items WHERE id = 1")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+
+    let mut columns = connection
+        .fetch_columns(Some("enum_array_grid"), "items")
+        .await
+        .unwrap();
+    let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+    let labels_index = columns.iter().position(|column| column.name == "labels").unwrap();
+    assert_eq!(
+        columns[labels_index].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "enum_array_grid".into(),
+            name: "label".into(),
+        })
+    );
+    columns[id_index].primary_key = true;
+    let edited = r#"{"NULL","",東京,"a,b",NULL}"#;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_array_grid"),
+        "items",
+        &columns,
+        &[(labels_index, Value::Text(edited.into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert!(update.0.contains("$1::text::\"enum_array_grid\".\"label\"[]"));
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let native = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, labels::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM (SELECT ARRAY[\
+                 'NULL'::enum_array_grid.label, ''::enum_array_grid.label, \
+                 '東京'::enum_array_grid.label, 'a,b'::enum_array_grid.label, \
+                 NULL::enum_array_grid.label\
+             ] AS labels) AS source",
+        )
+        .await
+        .unwrap();
+    let saved = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, labels::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM enum_array_grid.items WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.rows, native.rows);
+
+    let invalid = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_array_grid"),
+        "items",
+        &columns,
+        &[(labels_index, Value::Text("{not-a-label}".into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert!(connection.execute_in_transaction(&[invalid]).await.is_err());
+    let unchanged = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, labels::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM enum_array_grid.items WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(unchanged.rows, native.rows);
+    assert_eq!(
+        connection
+            .query("SELECT encode(array_send(labels), 'hex') FROM enum_array_grid.items WHERE id = 1")
+            .await
+            .unwrap()
+            .rows[0][0],
+        sibling_wire
+    );
+}
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")
