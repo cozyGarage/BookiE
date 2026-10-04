@@ -5341,6 +5341,15 @@ integration target, strict Clippy and formatting pass; repository size guards
 retain unrelated existing violations. See the
 [evidence manifest](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain arrays over text, numeric and timestamptz, 2026-10-04
+
+A PostgreSQL 16 transaction projects arrays of domains over text, numeric and
+timestamptz while the session timezone is Asia/Kathmandu. Qualified text
+bindings reproduce the native array JSON and wire bytes, including empty and
+literal `NULL` text, numeric scale, two instants in a DST fold, infinity and
+NULL elements. The focused contract, strict Clippy and formatting pass. See the
+[matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

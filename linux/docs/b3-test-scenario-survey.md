@@ -689,3 +689,6 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   elements; the decoder now uses the domain base OID and the regression checks
   bound/grid writes, a rejected CHECK value and unchanged siblings
   ([evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
+  Text, numeric and timestamptz domain arrays also round-trip through typed
+  binding under a non-UTC session with native JSON and wire-byte oracles
+  ([evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).

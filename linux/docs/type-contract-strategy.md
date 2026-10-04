@@ -49,6 +49,9 @@ coverage plus typed SQL replay checked against native type, JSON and wire
 oracles ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
 A UUID-domain array now decodes by its base OID, with a typed keyed edit, CHECK
 refusal and sibling preservation ([evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
+Text, numeric and timestamptz domain arrays also pass qualified binding and
+native JSON/wire comparisons in a non-UTC session
+([matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
