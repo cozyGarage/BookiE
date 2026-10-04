@@ -2,7 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "0a607644cfe6828acb02ca7616d3ea7191443468",
+  "source_commit": "8296b1ae3b329792b8de4b5399e0a9cfce8c77ca",
+  "source_diff_sha256": "19e49dd34e82b64cfc259637b5f06d2a2352d4cc2590e89ad932f8d9165489a1",
   "engine": "SQL Server Docker via testcontainers_modules::mssql_server::MssqlServer",
   "case": "Legacy datetime text and typed tick no-op edits through the app grid parser",
   "contract": [
