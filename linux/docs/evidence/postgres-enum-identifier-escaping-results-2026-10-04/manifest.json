@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "2c4a137718a0aa6dec64fb9fbbf5b8a716626169",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Custom enum metadata and SQL with embedded-quote identifiers",
+  "test": "enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter",
+  "contract": [
+    "The test schema, enum type and table names contain spaces and embedded double quotes; metadata returns their exact unescaped names.",
+    "Generated keyed update and structured equality filter correctly double embedded identifier quotes in SQL.",
+    "Native pg_typeof text preserves PostgreSQL's quoted qualified type spelling, and the update leaves the sibling row unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "d43023ed66d831cd8829dee841792553532f784ef618b09d4ebdbd18832acbad",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL session/search_path and identifier configurations remain open; this case does not close the enum or broader B3 matrix."
+  ]
+}

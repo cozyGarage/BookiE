@@ -110,10 +110,10 @@ refusal preserves the destination. Other workbook shapes and applications
 remain open ([evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json)).
 
 October 4 B3-1 follow-up: PostgreSQL custom enum metadata, keyed updates and
-structured equality filters now cover schema/type/table names requiring SQL
-identifier quoting, with native type and sibling-row assertions. Other
-identifier and session/search_path combinations remain open
-([evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json)).
+structured equality filters cover schema/type/table names with spaces and
+embedded double quotes, with native type and sibling-row assertions. Other
+identifier and session/search_path combinations remain open ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
+[quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
 
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);

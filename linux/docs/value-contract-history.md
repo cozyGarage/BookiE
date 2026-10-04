@@ -5533,4 +5533,8 @@ discovered with exact qualified enum metadata. A generated keyed update changes
 only the target row; the native type remains the quoted schema/type name, and a
 structured equality filter selects that row. The sibling row remains unchanged.
 Identifiers containing embedded quotes and other session/search_path
-combinations remain open. See the [evidence manifest](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
+combinations remain open in this first spaces-only case. A follow-up now embeds
+double quotes in all three identifiers and confirms metadata, keyed update and
+filter SQL escape them correctly while preserving the native type and sibling
+row ([evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
+See the [spaces-case manifest](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
