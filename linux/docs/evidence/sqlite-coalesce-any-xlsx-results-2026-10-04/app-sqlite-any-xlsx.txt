@@ -1,5 +1,4 @@
-   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.05s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
 running 9 tests

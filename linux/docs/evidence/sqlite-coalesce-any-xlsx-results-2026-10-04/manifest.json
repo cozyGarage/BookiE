@@ -2,15 +2,16 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "5e28b6b8967ee10e61687a2050da535c11c020d5",
+  "source_commit": "42f376f78d91cb32366cd9ed421d471d88384168",
   "engine": "SQLite in-memory STRICT ANY fixture",
-  "case": "XLSX cell-kind serialization of computed COALESCE results over STRICT ANY",
+  "case": "JSON and XLSX serialization of computed COALESCE results over STRICT ANY",
   "test": "sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes",
   "contract": [
     "The computed COALESCE result retains conservative fallback metadata while native typeof() confirms INTEGER, REAL, fallback TEXT, stored TEXT, BLOB and tag-prefix-shaped TEXT rows.",
     "The result-file writer stores INTEGER and REAL results as numeric XLSX cells and fallback/stored/tag-prefix text and BLOB's \\x00ff representation as shared strings.",
+    "JSON result-file output represents INTEGER/REAL as JSON numbers, fallback/stored/tag-prefix text and BLOB encoding as JSON strings, and includes the runtime storage-class text.",
     "The workbook has no formula cells; source SQL NULL produces the explicit fallback TEXT cell, while the existing CSV import path verifies native destination storage classes and exact BLOB bytes.",
-    "This proves the computed COALESCE XLSX cell-kind path; spreadsheet-application re-import, other computed-expression shapes and installed editing remain open."
+    "This proves computed COALESCE JSON value shapes and XLSX cell kinds; spreadsheet-application re-import, other computed-expression shapes and installed editing remain open."
   ],
   "validation": {
     "app_sqlite_any_contracts": {
@@ -31,8 +32,8 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "app-sqlite-any-xlsx.txt": "d390b357e16f7356cf6c9338108c994eed98b4a9dafb43f6b2a16a8686e17e78",
-    "clippy.txt": "794dd72bb04e382571f2cdb128f36d221f72a587ad9636f005d0aadd5008676a",
+    "app-sqlite-any-xlsx.txt": "5e393474842d3eeb2ee289317a2489892a1fa147055db1b0aa28836e35fb5781",
+    "clippy.txt": "5990d6a107c8664f681388363e6f49ad082da9796aab1640d731a836b1593577",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
