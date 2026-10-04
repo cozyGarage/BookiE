@@ -32,18 +32,18 @@
   "worktree": "The runner recorded dirty=true because the two pre-existing .b4-f4f9-* scratch directories were untracked; tracked source matched source_commit.",
   "report": "report.json",
   "sha256": {
-    "report.json": "19d7f93a4b3d25e90ce111af8ec5c98c1edee52894aceee2726316004bfd148b",
-    "compile.log": "03a769a68f2f6d0b9e78e08767a2833ace38a8828e1916ffc5a30812910ee8ff",
-    "crates-app.log": "941fd679b0e772fee03a4669d221623961519e5401d6432c0b7c34d0b09df212",
-    "crates-core.log": "f6e57b8bd124f485c33cd416754092b3532bb4d0dce521e6917ba7f5b01a3558",
-    "crates-drivers-clickhouse.log": "b1f04a2c86c1caee1ff4c87b39ef364726bcddaa1c08492aa22d3b7242ce2e49",
-    "crates-drivers-duckdb.log": "c8af069e560885633d1ac64f9895c353576e9bdd26b132f049d174c1ffdbcf41",
-    "crates-drivers-mongodb.log": "4dfbd8213e6c9cd958354965456111838284586e489932c970e8da934d6d5708",
-    "crates-drivers-mssql.log": "2d0eba0b4fe6a7f3594b07daaa29d1c7cc782bbb084ef853ace4da5e544830eb",
-    "crates-drivers-mysql.log": "a36d5e6c2d26792de50a770e6af2a934bbfdb37e90b954ea171a039287fc01b6",
-    "crates-drivers-postgres.log": "5ff42f2c866c3549b83bbf602592f3f5977fa522a61d5031860139f653f8edd0",
-    "crates-drivers-redis.log": "9ee54c9a01f82fffef722302f7d07f3af49ea5065f92ec4f8eca17d9eeb9f5e0",
-    "crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
-    "crates-mcp.log": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062"
+    "report.json": "b630b1394aca66f5cb1715c3e57700ae28e019212b6f8902975d79bf1238c190",
+    "compile.txt": "03a769a68f2f6d0b9e78e08767a2833ace38a8828e1916ffc5a30812910ee8ff",
+    "crates-app.txt": "467974e1db218fecc3bb777813ae3836a46106a4eec4f1c3fa95cd794e75895e",
+    "crates-core.txt": "fce49b0c117cb3205c2fbb0cc19425097f5850bc3b1123d6193f5863fff810c0",
+    "crates-drivers-clickhouse.txt": "5ddcb2689430ca59773bef31046fc2b3974ca9ed97946ccd798a6990a8fbdc70",
+    "crates-drivers-duckdb.txt": "a662c7230da2beab479b565cb6b122a3f8aeff9894742e7686ccf3f9a9e204e9",
+    "crates-drivers-mongodb.txt": "06cbff38c0ae1b1853d38c1469ba4b026c116565ae1d098191fa21d52b595b26",
+    "crates-drivers-mssql.txt": "c20493f90a4fe646e85b479222dd1c3263f57a73591ee0a5d362fe8e3c59a043",
+    "crates-drivers-mysql.txt": "ebad539dc1fe5b7d7293704b5ed87b743542777291b401a366ca6801431d094d",
+    "crates-drivers-postgres.txt": "3591ac3ada531004d1cfda476a0fc1c46591519ee1d85e090bb3a93d2e93c8f2",
+    "crates-drivers-redis.txt": "bc5a033333dd2da05ced909c10b0fad05110a3fa01b5af8b55e3aa0fe23fb361",
+    "crates-drivers-sqlite.txt": "bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539",
+    "crates-mcp.txt": "b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8"
   }
 }

@@ -1,0 +1,8 @@
+
+running 4 tests
+test value_contract_preserves_integer_and_text_command_arguments ... ok
+test value_contract_redis_stream_commands_are_refused_without_consuming_the_connection ... ok
+test value_contract_resp3_attribute_wire_frame_survives_the_request_response_connection ... ok
+test value_contract_resp3_hash_map_preserves_binary_fields_and_values ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 1.62s
