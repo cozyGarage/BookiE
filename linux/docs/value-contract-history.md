@@ -5491,3 +5491,13 @@ prior kinds. The focused app regression, strict Clippy, formatting and
 standard-library OOXML/ODS checker pass. Other spreadsheet applications and
 workbook shapes remain unverified.
 See the [evidence manifest](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json).
+
+## PostgreSQL bytea[] XLSX through Calc, 2026-10-04
+
+A PostgreSQL `bytea[]` containing non-UTF-8 bytes, empty bytea and SQL NULL is
+written as an XLSX string cell and survives LibreOffice Calc's ODS save and
+XLSX re-save with identical array text. Native `pg_typeof`, `array_to_json`,
+`array_send` and per-element hex checks establish the binary values, order,
+empty element and SQL NULL. The standard-library OOXML/ODS checker confirms the
+cell remains text and is not a formula. Other array families and spreadsheet
+applications remain open. See the [evidence manifest](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json).

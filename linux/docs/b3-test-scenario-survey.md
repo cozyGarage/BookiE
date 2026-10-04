@@ -118,15 +118,18 @@ and checked against native values. PostgreSQL `pg_typeof`, array text,
 content and round-trip oracles; hostile markup and Unicode exercise the text
 writers; XLSX asserts a text cell and the expected shared-string content. This
 is one array family. Other array types, spreadsheet-application re-import
-beyond the custom `enum[]` case, and additional enum configurations remain open.
+beyond the custom `enum[]` and `bytea[]` cases, and additional enum
+configurations remain open.
 See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
 October 4 B3-1 follow-up: a PostgreSQL `bytea[]` containing non-UTF-8 bytes,
 empty bytea and SQL NULL now passes JSON, CSV, XLSX and replayed SQL file
 writers. Native element hex, `array_to_json` and `array_send` oracles verify
-the binary values and type after replay. Other array families and session
-combinations remain open; see the [bytea[] evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json).
+the binary values and type after replay. The XLSX text cell also survives a
+LibreOffice Calc ODS/XLSX re-save unchanged. Other array families and session
+combinations remain open; see the [bytea[] file-writer evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)
+and [Calc re-import evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json).
 
 October 4 B3-1 follow-up: one custom PostgreSQL `enum[]` result now passes
 through JSON, CSV, XLSX and SQL file writers with labels `NULL`, empty text,

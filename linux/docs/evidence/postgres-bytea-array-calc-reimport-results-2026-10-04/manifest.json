@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "172fda47718da5ccd93cf4bac68a56fa81f3ae7b",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL bytea[] XLSX re-import through LibreOffice Calc",
+  "test": "binary_array_file_export_contract::value_contract_bytea_array_file_exports_preserve_binary_elements",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The PostgreSQL bytea[] contains non-UTF-8 bytes 00ff275c, empty bytea and SQL NULL. Native pg_typeof, array_to_json, array_send, and unnest element-hex checks verify type, bytes, ordering, empty value and NULL.",
+    "BookieE exports the bytea[] textual form into an XLSX shared-string cell without a formula.",
+    "LibreOffice Calc opens the workbook and saves ODS, then reopens ODS and saves XLSX; the cell remains a string with identical content.",
+    "The retained array text is {\"\\\\x00ff275c\",\"\\\\x\",NULL}; the two binary elements and SQL NULL remain separately represented."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration binary_array_file_export_contract::value_contract_bytea_array_file_exports_preserve_binary_elements -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "In the pinned Debian image, install libreoffice-calc; Calc opens source.xlsx and saves calc-roundtrip.ods.",
+        "Calc reopens calc-roundtrip.ods and saves calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks require an XLSX shared-string cell and ODS string cell, exact array text equality across all formats, and no formula elements.",
+      "checker": "verify_roundtrip.py",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "40198b5cdeb7a0a14e6aa46fc7e8ce988fe9a88a13b01a53c4f4ac1f1f0591c0",
+    "calc-roundtrip.ods": "9fd40e89b502626f3187c02554faa32ee6a737ad835d62c6a20dbeb62142d9cd",
+    "calc-roundtrip.xlsx": "6cd72944257c1fbb232d5d12ea0c4662f768ee0d23c07473be26382dbda9fa7c"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "1b335fda9441e5c30bf2649a8ce9025675b482a9ad35c4e457013216c73a3759",
+    "libreoffice-roundtrip.txt": "91bd789300c5dc4fe2e2c29db7321e13ba2c9786255152614ea81183ba504f1b",
+    "consumer-check.txt": "b4c02b4b40eb5b9fc9bd4bc99bc1570147a57b253592ff2e8cb09a833abd16da",
+    "clippy.txt": "d7931bcac2e8adb44102729d4d8aa2748cacf90d9b795bf58149112b18c61550",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Spreadsheet-application re-import for other PostgreSQL array families and other spreadsheet applications remains open in B3."
+  ],
+  "checker_sha256": "2f99a86c9c0642b4dc51bbe5a8c226fd59c6d778947262d0368ca6d0f98a5e44"
+}

@@ -36,6 +36,10 @@ A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
 quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
 
+A PostgreSQL `bytea[]` XLSX cell containing binary bytes, empty bytea and SQL
+NULL also survives Calc's ODS/XLSX re-save with its string contents unchanged
+([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
+
 A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
 elements and its declared type through decoding, qualified binding and keyed
 edits; invalid values are refused without changing either row
