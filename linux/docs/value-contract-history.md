@@ -3001,8 +3001,10 @@ the native oracle distinguishes those values from SQL NULL. A separate permissiv
 control demonstrates why the guard is required: MySQL otherwise turns an
 unknown ENUM label into ordinal zero and silently drops an unknown SET member.
 The control runs inside a transaction and rolls back. The app library suite,
-strict Clippy, focused parser test and MySQL 8 Docker test passed. MariaDB app
-edits and additional SQL modes remain open; see the
+strict Clippy, focused parser test and MySQL 8 Docker test passed. A matching
+MariaDB 11 app edit now checks all four modes, native label bytes and SET masks,
+invalid-value refusal and sibling preservation. MariaDB empty-versus-NULL grid
+postconditions and additional SQL modes remain open; see the
 [grid evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30

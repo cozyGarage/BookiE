@@ -2,19 +2,24 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "8e8efa97a",
-  "engine": "MySQL 8.1 in Docker via testcontainers",
+  "source_commit": "f4ad62e86",
+  "engines": {
+    "mysql": "MySQL 8.1 in Docker via testcontainers",
+    "mariadb": "MariaDB 11 in Docker via testcontainers"
+  },
   "case": "MySQL ENUM and SET parser/keyed edit across SQL modes",
   "tests": [
     "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_and_set_parser_preserves_labels",
-    "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
+    "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes",
+    "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes"
   ],
   "contract": [
     "Grid parsing validates values against the declared ENUM/SET members, including apostrophe and backslash metadata, and refuses unknown labels or members.",
     "Bound keyed edits preserve ENUM label bytes and a multi-member SET mask under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES and combined SQL modes.",
     "Blank input retains shared SQL NULL/required-field behavior, while explicit `''` selects an empty ENUM label or the empty SET value; native ordinals/masks distinguish empty values from NULL.",
     "The native server control demonstrates that permissive mode otherwise coerces an unknown ENUM label to its error value and drops an unknown SET member; the control updates are rolled back.",
-    "An untouched sibling row retains its native ordinals, masks and label bytes in every mode."
+    "An untouched sibling row retains its native ordinals, masks and label bytes in every mode.",
+    "MariaDB 11 reports the declared ENUM/SET members in column metadata; valid apostrophe/backslash values bind and retain their native ordinals, masks and bytes in the same four modes, while invalid labels and members are refused."
   ],
   "validation": {
     "parser_test": {
@@ -27,9 +32,14 @@
       "result": "1 passed, 0 failed",
       "log": "mysql.txt"
     },
+    "mariadb_keyed_edit": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "mariadb.txt"
+    },
     "app_library_suite": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib -- --test-threads=1",
-      "result": "460 passed, 0 failed, 22 ignored",
+      "result": "460 passed, 0 failed, 23 ignored",
       "log": "app-lib.txt"
     },
     "clippy": {
@@ -45,7 +55,7 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "MariaDB app-grid edits and additional SQL modes remain untested.",
+    "MariaDB blank/empty edit postconditions and SQL modes beyond the four tested values remain open.",
     "This case does not close B3 or qualify the 0.2.0 release."
   ]
 }

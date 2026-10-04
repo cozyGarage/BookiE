@@ -1,7 +1,7 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
-running 482 tests
+running 483 tests
 test config::tests::app_id_extends_the_schema_id ... ok
 test config::tests::app_id_is_valid ... ok
 test config::tests::default_env_prefers_the_build_time_value ... ok
@@ -102,13 +102,13 @@ test services::preferences::tests::gsettings_keyfile_backend_survives_a_process_
 running 1 test
 test services::preferences::tests::gsettings_keyfile_child ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 481 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 482 filtered out; finished in 0.00s
 
 
 running 1 test
 test services::preferences::tests::gsettings_keyfile_child ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 481 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 482 filtered out; finished in 0.00s
 
 ok
 test services::preferences::tests::gsettings_keyfile_child ... ok
@@ -252,6 +252,7 @@ test ui::browse_tab::tests::value_contract_mongodb_run_find_merges_page_types_an
 test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width ... ignored, requires docker
 test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths ... ok
 test ui::browse_tab::value_parse::mongodb_nested_edit_contract::value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity ... ignored, requires docker
+test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes ... ignored, requires docker
 test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_and_set_parser_preserves_labels ... ok
 test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes ... ignored, requires docker
 test ui::browse_tab::value_parse::mysql_integer_contract::value_contract_mysql_integer_parser_enforces_signed_and_unsigned_widths ... ok
@@ -497,4 +498,4 @@ test ui::welcome_view::tests::an_empty_arrangement_renders_no_sections ... ok
 test ui::welcome_view::tests::connections_without_a_group_render_as_one_ungrouped_section ... ok
 test ui::welcome_view::tests::each_group_becomes_its_own_section_in_arranged_order ... ok
 
-test result: ok. 460 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 460 passed; 0 failed; 23 ignored; 0 measured; 0 filtered out; finished in 0.30s
