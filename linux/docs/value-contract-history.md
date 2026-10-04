@@ -2971,13 +2971,15 @@ paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp
 
 ### MySQL/MariaDB ENUM SQL-file exports across SQL modes (2026-10-04)
 
-MySQL and MariaDB replay SQL export files containing six ENUM values under the
-default mode, `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and both modes together.
+MySQL and MariaDB replay SQL export files and import typed CSV containing six
+ENUM values under the default mode, `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and
+both modes together.
 The labels include an apostrophe, a backslash, literal `NULL`, and empty text,
-plus a SQL NULL row. Each mode checks server-native ENUM ordinals and label
-bytes, then compares copied ordinals and bytes with the source. Both focused
-Docker tests, strict Clippy and formatting pass. Other ENUM consumers and SQL
-mode combinations remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
+plus a SQL NULL row. Typed CSV uses an explicit collision-free null marker to
+keep empty text distinct from SQL NULL. Each mode checks server-native ENUM
+ordinals and label bytes, then compares both copied tables with the source.
+Both focused Docker tests, strict Clippy and formatting pass. Other ENUM
+consumers and SQL mode combinations remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
