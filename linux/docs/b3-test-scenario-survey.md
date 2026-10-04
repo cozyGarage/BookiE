@@ -275,6 +275,9 @@ The direct query parameter contract checks base-enum-cast `=`, `<>`, `<`,
 See the [query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json)
 and [ordering](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json)
 and [list-operator evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+October 4 B3-1 follow-up: text and SQL NULL parameters infer as the custom enum
+in both `COALESCE` argument positions and in `array_append(ARRAY[enum_column], $1)`.
+Native type/value oracles and unchanged source rows are checked ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
 The same fixture now covers `IS DISTINCT FROM` and `IS NOT DISTINCT FROM` with
 text and SQL NULL parameters, checking server-inferred enum types and exact
 NULL-safe results; see [distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).

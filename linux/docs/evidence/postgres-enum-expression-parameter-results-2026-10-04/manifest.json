@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "27bbd8a13c8c7c65b3334999203cbc5f5d379dda",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Custom enum text and SQL NULL parameter inference in COALESCE and array_append expressions",
+  "test": "enum_parameter_context_contract::value_contract_enum_parameters_infer_in_coalesce_and_array_append",
+  "contract": [
+    "A text parameter is inferred as the custom enum in both COALESCE($1, enum_column) and COALESCE(enum_column, $1); the second position is consumed when the source enum cell is SQL NULL.",
+    "A SQL NULL parameter is inferred as the enum in both COALESCE argument positions; the first position falls back to the column, and the second remains SQL NULL for a SQL NULL source cell.",
+    "A text parameter appended to ARRAY[enum_column] is independently inferred as the enum element type and produces a custom enum array.",
+    "Text and SQL NULL parameters appended to ARRAY[enum_column] are inferred as the enum element type and preserve their value/NULL in the native enum array.",
+    "PostgreSQL pg_typeof assertions verify scalar and array result types; source rows remain unchanged."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_enum_parameters_infer_in_coalesce_and_array_append -- --include-ignored --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "1cc91eb8acefa9bcc472dc15d893d67d00d97639fda5bfcaa8c7baeef4ae1171",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other direct query-parameter contexts, enum session/search_path configurations, deeper domain chains, additional parameter types at depth 64 and other custom/native cases remain open."
+  ]
+}

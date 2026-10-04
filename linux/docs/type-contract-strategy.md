@@ -89,6 +89,11 @@ plus [NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-pa
 Other direct query-parameter contexts, session configurations, domain chains
 deeper than seven layers and other custom/native cases remain open.
 
+PostgreSQL 16 also infers text and SQL NULL as the custom enum in both argument
+positions of `COALESCE` and in `array_append(ARRAY[enum_column], $1)`. Native
+`pg_typeof`, exact values, NULL behavior and unchanged source rows are asserted
+([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
+
 The three-level domain chain also covers directly inferred text and SQL NULL
 parameters for both NULL-safe distinctness operators, with `pg_typeof` checks
 for the leaf enum and outer domain. See the
