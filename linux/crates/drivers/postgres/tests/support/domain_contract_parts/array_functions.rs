@@ -808,11 +808,63 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
             })
             .collect::<Vec<_>>();
         assert_eq!(remove.rows, expected_remove, "array_remove {parameter:?}");
+
+        for (expression, native_expression) in [
+            (
+                "array_append($1, status::value_contract_shadowed_array_input.state)",
+                format!("array_append({native_array}, status::{enum_type})"),
+            ),
+            (
+                "array_prepend(status::value_contract_shadowed_array_input.state, $1)",
+                format!("array_prepend(status::{enum_type}, {native_array})"),
+            ),
+        ] {
+            let native = transaction
+                .query(&format!(
+                    "SELECT id, array_to_json({native_expression})::text, \
+                     pg_typeof({native_expression})::text, \
+                     encode(array_send({native_expression}), 'hex'), \
+                     encode(array_send({native_array}), 'hex') \
+                     FROM {schema}.rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            let result = transaction
+                .query_params(
+                    &format!(
+                        "SELECT id, array_to_json({expression})::text, \
+                         pg_typeof($1)::text, pg_typeof({expression})::text, \
+                         encode(array_send({expression}), 'hex'), \
+                         encode(array_send($1), 'hex') \
+                         FROM {schema}.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = native
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text(array_type.clone()),
+                        Value::Text(array_type.clone()),
+                        row[3].clone(),
+                        row[4].clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(result.rows, expected, "{expression} with {parameter:?}");
+        }
     }
 
     for expression in [
         "array_position($1, status::value_contract_shadowed_array_input.state)",
         "array_remove($1, status::value_contract_shadowed_array_input.state)",
+        "array_append($1, status::value_contract_shadowed_array_input.state)",
+        "array_prepend(status::value_contract_shadowed_array_input.state, $1)",
     ] {
         transaction.execute("SAVEPOINT invalid_array_input").await.unwrap();
         let invalid = transaction
