@@ -166,8 +166,8 @@ and checked against native values. PostgreSQL `pg_typeof`, array text,
 content and round-trip oracles; hostile markup and Unicode exercise the text
 writers; XLSX asserts a text cell and the expected shared-string content. This
 is one array family. Other array types, spreadsheet-application re-import
-beyond the `enum[]`, `bytea[]`, `timestamptz[]`, `interval[]`, `numeric[]` and
-`float8[]` cases, and additional enum configurations remain open.
+beyond the `enum[]`, domain-over-enum `[]`, `bytea[]`, `timestamptz[]`,
+`interval[]`, `numeric[]` and `float8[]` cases, and additional enum configurations remain open.
 See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
@@ -189,7 +189,8 @@ Calc re-import cases cover `enum[]`, `bytea[]`, `timestamptz[]` and `interval[]`
 ([enum[]](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
 [bytea[]](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json),
 [timestamptz[]](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json),
-[interval[]](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
+[interval[]](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json),
+[domain-over-enum[]](evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
 See the [enum-array file-writer evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
 October 4 B3-4 follow-up: a PostgreSQL scalar custom-enum XLSX result now

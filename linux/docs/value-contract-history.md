@@ -5836,3 +5836,14 @@ a SQL NULL array and a NULL element. The target schema is absent from
 bytes match the native typed value. This records PostgreSQL array dimensional-bound
 semantics as well as inferred parameter typing. See the
 [evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json).
+
+
+## PostgreSQL domain-over-enum array workbook re-import through Calc, 2026-10-04
+
+The domain-over-enum array file-writer contract now accepts an artifact path so
+the generated XLSX can be tested by a real spreadsheet application. LibreOffice
+Calc 26.8.0.3 in the pinned Debian image opened the 50-code-point array-text
+cell, saved ODS, then reopened and saved XLSX. The shared-string XLSX cells and
+ODS string cell are identical; the text contains the literal `NULL`, empty label,
+Unicode, comma, quote, markup, formula-shaped label and SQL NULL marker. The
+[verification packet](evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json) retains all artifacts and logs.

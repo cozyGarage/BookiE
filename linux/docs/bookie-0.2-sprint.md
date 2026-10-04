@@ -233,6 +233,12 @@ domain layers while a same-named shadow enum leads `search_path`. The adjacent
 unsupported from 64 layers. See the
 [259-layer evidence](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json).
 
+October 4 B3-1/B3-4 follow-up: a PostgreSQL domain-over-enum array XLSX cell
+survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save as the same 50-code-point
+string, including literal `NULL`, empty text, Unicode, separators, markup, a
+formula-shaped label and SQL NULL. See the [evidence packet](
+evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json).
+
 October 4 B3-1 follow-up: a PostgreSQL 16 contract now covers domain-over-enum
 `COALESCE` with text and SQL NULL in both argument positions. It verifies
 PostgreSQL resolves the parameter/result to the base enum while the source
