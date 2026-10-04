@@ -5,7 +5,10 @@
 PostgreSQL inferred enum-array binding is covered for domain-over-enum `ANY`,
 containment and overlap operators, including either operand position for
 containment and overlap. Native array type, operator results and wire bytes are
-checked; other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
+checked. `array_cat` now covers text and SQL NULL array parameters against a
+domain-over-enum source, including NULL/empty/special labels and a same-named
+shadow enum earlier in `search_path`
+([evidence](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json)); other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
 and [operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 The operator matrix also runs with a same-named shadow enum first in
 `search_path` ([configuration packet](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).

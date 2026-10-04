@@ -26,6 +26,9 @@ result types ([evidence](evidence/postgres-domain-enum-array-remove-results-2026
 `array_replace` now covers two inferred scalar parameter slots together,
 including NULL search/replacement values and both parameter types
 ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
+`array_cat` now covers inferred text and SQL NULL array parameters for a
+domain-over-enum source under a same-named shadow enum in `search_path`
+([evidence](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json)).
 Other inferred array operator/function contexts remain candidates; these cases
 do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

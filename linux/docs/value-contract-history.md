@@ -5784,3 +5784,14 @@ missing suites. PostgreSQL contributes 101 contracts, including inferred
 enum-array operators under shadowed `search_path` and the 62/63/64 domain-depth
 boundary. The raw report and suite logs are retained in the
 [evidence packet](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
+
+## PostgreSQL inferred domain-over-enum `array_cat` parameter, 2026-10-04
+
+`array_cat(ARRAY[status::base_enum], $1)` accepts inferred enum-array text and
+SQL NULL parameters when `status` has a domain-over-enum type. The contract
+preserves the enum array's native result values and `pg_typeof`
+results for NULL elements, empty arrays, SQL NULL arrays, literal `NULL`, empty,
+comma, quote and backslash labels. It also runs with a same-named shadow enum
+first in `search_path`. Native explicit-array expressions provide the result
+oracle. The focused contract passed; the PostgreSQL selected value suite is
+recorded with the [evidence manifest](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json).
