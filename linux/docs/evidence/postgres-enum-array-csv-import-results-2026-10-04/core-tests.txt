@@ -1,0 +1,3 @@
+test filter::tests::postgres_enum_array_filters_cast_the_parameter_to_the_array_type ... ok
+test sql_dialect::postgres_enum_tests::postgres_enum_array_writes_cast_text_to_the_qualified_array_type ... ok
+test result: ok. 2 passed; 0 failed

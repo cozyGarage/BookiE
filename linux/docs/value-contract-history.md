@@ -5224,6 +5224,17 @@ escaping markup. Replayed SQL restores native array text, JSON elements and
 wire bytes. The focused test, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
+## PostgreSQL custom enum-array CSV import contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract imports a custom `enum[]` from CSV with literal
+`NULL`, empty text, Unicode, comma, quote, markup and SQL NULL labels. Catalog
+metadata resolves the enum element type, and the insert plan uses a
+schema-qualified array cast. Native `pg_typeof`, `array_to_json` and
+`array_send` verify restored type, values and exact bytes; an existing sibling
+row remains unchanged. The PostgreSQL array contract group, focused core tests,
+strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

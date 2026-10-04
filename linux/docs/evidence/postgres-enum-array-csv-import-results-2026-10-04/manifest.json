@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "a1ba2c98f",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "custom enum[] CSV import preserves labels, native type and sibling rows",
+  "test": "array_contract::value_contract_custom_enum_array_csv_import_preserves_labels_and_siblings",
+  "contract": [
+    "Catalog metadata identifies a direct custom enum array's qualified element type.",
+    "CSV import builds a schema-qualified enum[] parameter cast and preserves literal NULL, empty text, Unicode, comma, quote, markup and SQL NULL labels.",
+    "Native pg_typeof, array_to_json and array_send checks verify the imported value; a pre-existing sibling row retains its wire bytes."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "15 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "focused_core_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core postgres_enum_array -- --nocapture",
+      "result": "2 passed, 0 failed",
+      "log": "core-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, consumers and enum/session configurations remain open in B3."
+  ]
+}
