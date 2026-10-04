@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "9a20f7565",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum array result through file writers and SQL replay",
+  "test": "domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type",
+  "contract": [
+    "A domain-over-enum array remains a lossless text fallback that can be rebound to the qualified domain-array type with matching array_to_json and array_send oracles.",
+    "JSON, CSV, XML, HTML, Markdown and XLSX preserve the array text, and SQL export replays into a domain-array column with matching native type, canonical text, JSON and wire bytes."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "repository_guards": {
+      "result": "file-size and function-size guards report existing unrelated violations; the new test file is below the file-size limit",
+      "log": "repository-guards.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL domain-array and custom-type consumer/configuration combinations remain open in B3."
+  ]
+}

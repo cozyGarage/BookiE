@@ -59,6 +59,7 @@ CSV import now preserves the domain element type and enforces its CHECK constrai
 It also resolves the target schema when `search_path` contains a same-named shadow domain ([shadowed-path import evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
 The app parser and keyed grid edit use the same qualified domain-array cast; invalid values roll back without changing the row ([grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 Structured equality filters use the qualified domain-array type and match native array values ([filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
+JSON, CSV, XML, HTML, Markdown and XLSX exports preserve domain-over-enum array text, and SQL replay restores the native type, JSON values and array wire bytes ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
 through ten levels, plus 63, 64, 65, 128, 129 and 256 levels. Raw inferred text and SQL

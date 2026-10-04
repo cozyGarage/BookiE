@@ -44,6 +44,9 @@ The same type also has app-parser and live keyed-grid coverage with domain-check
 refusal and rollback ([evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 Structured equality filtering is checked against native array JSON and wire
 values ([evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
+The same array now has JSON, CSV, XML, HTML, Markdown and XLSX file-writer
+coverage plus typed SQL replay checked against native type, JSON and wire
+oracles ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)

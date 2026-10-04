@@ -5224,6 +5224,16 @@ escaping markup. Replayed SQL restores native array text, JSON elements and
 wire bytes. The focused test, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum array file-writer contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports a domain-over-enum array containing
+literal `NULL`, empty text, Unicode, comma, quote, markup, a formula-like label
+and SQL NULL through JSON, CSV, XML, HTML, Markdown and XLSX. A qualified text
+binding matches native `array_to_json` and `array_send` oracles. Replayed SQL
+restores the domain-array type, JSON values and wire bytes. Strict PostgreSQL
+Clippy and formatting pass; repository size guards report existing unrelated
+violations. See the [evidence manifest](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json).
+
 ## PostgreSQL custom enum-array CSV import contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract imports a custom `enum[]` from CSV with literal

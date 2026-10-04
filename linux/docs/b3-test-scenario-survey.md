@@ -678,3 +678,6 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   native domain arrays ([import evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json), [grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json), [filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
   A same-named domain earlier in `search_path` does not redirect CSV import
   from the target table's schema ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
+  JSON, CSV, XML, HTML, Markdown and XLSX file writers now retain the array
+  representation; SQL replay restores the native domain-array type and bytes
+  ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
