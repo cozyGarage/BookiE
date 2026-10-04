@@ -4,13 +4,15 @@ use tablepro_core::{ConnectOptions, Connection, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 
-const MODES: [&str; 6] = [
+const MODES: [&str; 8] = [
     "",
     "NO_BACKSLASH_ESCAPES",
     "ANSI_QUOTES",
     "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     "STRICT_TRANS_TABLES",
     "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+    "STRICT_ALL_TABLES",
+    "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES",
 ];
 
 async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connection> {
@@ -36,6 +38,11 @@ async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connec
         active.split(',').any(|value| value.trim() == "STRICT_TRANS_TABLES"),
         mode.split(',').any(|value| value.trim() == "STRICT_TRANS_TABLES"),
         "STRICT_TRANS_TABLES mode mismatch: {active}"
+    );
+    assert_eq!(
+        active.split(',').any(|value| value.trim() == "STRICT_ALL_TABLES"),
+        mode.split(',').any(|value| value.trim() == "STRICT_ALL_TABLES"),
+        "STRICT_ALL_TABLES mode mismatch: {active}"
     );
     connection
 }
