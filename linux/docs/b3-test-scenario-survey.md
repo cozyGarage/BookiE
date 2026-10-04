@@ -113,9 +113,10 @@ retains a SQL NULL row; see the [enum-order evidence](evidence/postgres-enum-ord
 
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
-against `typeof()` and exact `hex()` bytes. Typed CSV re-import into another
-STRICT `ANY` table preserves those storage classes and bytes. See the [CAST
-evidence](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
+against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
+escaped text, XLSX stores them as shared strings, and typed CSV re-import into
+another STRICT `ANY` table preserves the storage classes and bytes. See the
+[CAST evidence](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
 
 October 4 B3-4 follow-up: a local DuckDB enum CSV round trip now preserves the
 empty label, literal `NULL`, Unicode, a quoted label, formula-shaped labels

@@ -25,8 +25,9 @@ source/SHA attribution; this summary does not certify the current tree.
 | Shared consumers | Named parameters, export/import, grid/filter, JSON/MCP and workbook cases; grid context-menu CSV uses a collision-free SQL NULL marker ([serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json)); 86,012 finite-f64 values now round-trip through CSV and JSON with exact bits ([corpus evidence](evidence/finite-float-consumer-results-2026-10-04/manifest.json)) | Remaining format/type/configuration boundaries, native kind after writes, clipboard/spreadsheet parity, exhaustive finite-f64 enumeration and refused-operation postconditions |
 | Evidence / mutation | Registered fixtures, independent oracles and existing scoped mutation results | Portable raw proof for missing reports; genuine survivors/timeouts and uncovered consumers remain open |
 
-SQLite computed `CAST(value AS BLOB)` results now round-trip through typed CSV
-with native storage-class and exact-byte checks
+SQLite computed `CAST(value AS BLOB)` results now have JSON and XLSX text-cell
+assertions plus typed CSV restore, all checked against native storage classes
+and exact bytes
 ([evidence](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json));
 other computed-expression shapes remain open.
 

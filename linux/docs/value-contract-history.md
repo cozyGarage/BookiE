@@ -5519,7 +5519,9 @@ applications remain open. See the [evidence manifest](evidence/postgres-bytea-ar
 A SQLite expression casts STRICT `ANY` source values to BLOB, producing
 computed bytes from INTEGER, REAL, TEXT and BLOB inputs while SQL NULL remains
 NULL. The result's runtime class is `NULL` metadata, so the consumer relies on
-per-row native `typeof()` and exact `hex()` oracles. Typed CSV import into a
-second STRICT `ANY` table preserves every result byte and storage class,
-including empty BLOB and SQL NULL. The focused contract, DuckDB-enabled app
+per-row native `typeof()` and exact `hex()` oracles. JSON preserves the bytes
+in escaped text and XLSX writes non-NULL computed BLOB results as shared
+strings. Typed CSV import into a second STRICT `ANY` table preserves every
+result byte and storage class, including empty BLOB and SQL NULL. The focused
+contract, DuckDB-enabled app
 library suite, strict Clippy and formatting pass. See the [evidence manifest](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
