@@ -2,19 +2,20 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "563649eb6ec563097701e2ea7630cf81ccd68f7c",
-  "case": "MySQL app temporal parser-to-keyed-grid edit with native value and sibling-row oracles",
+  "source_commit": "d59d5a3978c48e8881622754c323d2212c7a2e0c",
+  "case": "MySQL app temporal grid edit and CSV/JSON export/import instant round trip",
   "engine": "testcontainers-modules 0.15.0 default MySQL image tag 8.1",
   "test": [
     "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keeps_fractional_input_typed",
-    "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings"
+    "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings",
+    "import::cell::tests::mysql_timestamp_csv_import_restores_the_utc_instant"
   ],
   "contract": [
-    "The app parser maps TIME(6) input to Value::Time and DATETIME(6)/TIMESTAMP(6) input to Value::DateTime.",
-    "The test creates a TIME(6), DATETIME(6), TIMESTAMP(6) table and sets the dedicated MySQL session timezone to +00:00.",
-    "Parser output flows through the shared keyed-update builder and executes on the MySQL connection.",
-    "Native reads assert each edited value, CAST(value AS CHAR), MICROSECOND(value), and TIMESTAMP epoch microseconds.",
-    "A second row retains its original values, verifying keyed identity and sibling preservation."
+    "The app parser maps TIME(6) input to Value::Time and DATETIME(6)/TIMESTAMP(6) grid-edit input to Value::DateTime.",
+    "The app keyed-update builder persists all three temporal values; native reads verify exact values, cast text, microseconds, UTC TIMESTAMP epoch, and an unchanged sibling row.",
+    "A native MySQL query result exports exact fractional TIME/DATETIME text and UTC RFC3339 TIMESTAMP text through CSV and JSON.",
+    "The CSV import plan restores timestamp(6) RFC3339 text as Value::TimestampTz for MySQL and the resulting bound inserts read back equal to the exported native rows.",
+    "Driver-aware MySQL timestamp parsing leaves generic and PostgreSQL timestamp-without-time-zone parsing as Value::DateTime."
   ],
   "references": [
     "../../decisions/0007-type-and-value-preservation.md",
@@ -26,13 +27,18 @@
       "result": "1 passed, 0 failed",
       "log": "focused.txt"
     },
-    "parser_and_docker_contracts": {
+    "app_parser_grid_and_round_trip": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app mysql_temporal_contract:: -- --include-ignored --test-threads=1",
       "result": "2 passed, 0 failed",
       "log": "app-temporal-suite.txt"
     },
+    "core_importer": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core mysql_timestamp_csv_import_restores_the_utc_instant",
+      "result": "1 passed, 0 failed",
+      "log": "core-import.txt"
+    },
     "clippy": {
-      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-app --all-targets -- -D warnings",
       "result": "passed",
       "log": "clippy.txt"
     },
@@ -42,17 +48,24 @@
       "log": "fmt.txt"
     },
     "inventory": "rtk proxy python3 linux/scripts/inventory-ignored-tests.py --check passed",
-    "diff_check": "rtk git diff --check passed"
+    "diff_check": "rtk git diff --check passed",
+    "core_import_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core import::",
+      "result": "89 passed, 0 failed",
+      "log": "core-import-suite.txt"
+    }
   },
   "log_sha256": {
-    "focused.txt": "7f36ed7eb16f5520f11ba382af25839fb798d0854e1ae3202e68b0b4a5f7c78c",
-    "app-temporal-suite.txt": "279dfd5a0adf56685b476c517a94bb1697584c55a8ae95ccd60930608299ef2a",
-    "clippy.txt": "8a2933ae25e59188be988ea6218274cb341f13d8bc4b533f57b12ececd4be8b3",
-    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    "focused.txt": "9f310cd0cc0a95be1bc5dd4325108224b33e294d253c5309695ce2e86938078d",
+    "app-temporal-suite.txt": "79d98000484f4a27cd16d155c032ed277d90be5ab827bc21ce392a6d670a7722",
+    "core-import.txt": "3067b77db85a9c0fe7384fa444b29931a858c1b2371db6bd3496db2dad059d58",
+    "clippy.txt": "0f91001b556852d82ae9cc0fe2a05f1b1a441977f55379dec1a1e7ff308452fe",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "core-import-suite.txt": "fcdf1b0db0897a28c7600a33e0567d99158d59e55b17862439a37ab01e85a146"
   },
   "remaining": [
-    "Installed GTK editing and other MySQL format consumers remain open.",
-    "MySQL TIMESTAMP is interpreted in the explicit UTC session; other session-timezone/edit expectations remain open.",
+    "Installed GTK temporal editing and XLSX or other format consumers remain open.",
+    "MySQL TIMESTAMP import uses the driver UTC pool contract; other session-timezone, engines, and temporal consumer combinations remain open.",
     "This bounded contract does not close B3 or qualify the 0.2.0 release."
   ]
 }

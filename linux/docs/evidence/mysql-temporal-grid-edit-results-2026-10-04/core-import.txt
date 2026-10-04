@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+
+running 1 test
+test import::cell::tests::mysql_timestamp_csv_import_restores_the_utc_instant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 512 filtered out; finished in 0.00s
+
+     Running tests/query_pipeline.rs (linux/target/debug/deps/query_pipeline-14d9d81ec12462f1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+

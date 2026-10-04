@@ -1,0 +1,102 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_core-cfcfb5702e5943f9)
+
+running 89 tests
+test import::cell::tests::an_empty_field_stays_an_empty_string_for_a_text_column ... ok
+test import::cell::tests::a_mapped_field_is_parsed_into_the_columns_type ... ok
+test import::cell::tests::a_row_error_names_the_line_and_column_and_carries_no_cell_text ... ok
+test import::cell::tests::a_field_that_does_not_fit_its_column_names_the_failure_without_its_contents ... ok
+test import::cell::tests::binary_takes_hexadecimal_with_or_without_the_engine_prefix ... ok
+test import::cell::tests::a_null_marker_the_user_set_is_null_even_for_text ... ok
+test import::cell::tests::an_unmapped_column_becomes_null_so_the_server_default_applies ... ok
+test import::cell::tests::an_unknown_type_is_read_as_text_rather_than_refused ... ok
+test import::cell::tests::a_catalog_type_name_reads_as_the_value_shape_it_stores ... ok
+test import::cell::tests::an_empty_field_is_null_for_a_column_that_is_not_text ... ok
+test import::cell::tests::booleans_read_the_spellings_the_engines_export ... ok
+test import::cell::tests::clickhouse_wide_integer_csv_cells_remain_exact_text ... ok
+test import::cell::tests::declared_decimal_scale_can_equal_precision_when_all_digits_are_fractional ... ok
+test import::cell::tests::duckdb_interval_restores_only_formula_marked_canonical_text ... ok
+test import::cell::tests::formula_marker_is_removed_from_negative_decimal_cells_only_for_decimal_columns ... ok
+test import::cell::tests::formula_marker_is_removed_only_from_valid_signed_wide_integer_cells ... ok
+test import::cell::tests::postgres_array_csv_cells_remain_text_instead_of_being_parsed_as_scalars ... ok
+test import::cell::tests::formula_safe_wide_decimal_import_removes_only_its_marker ... ok
+test import::cell::tests::sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers ... ok
+test import::cell::tests::the_temporal_types_parse_the_forms_an_export_writes ... ok
+test import::cell::tests::mysql_timestamp_csv_import_restores_the_utc_instant ... ok
+test import::cell::tests::value_contract_mssql_datetimeoffset_csv_cells_preserve_the_original_offset_and_scale ... ok
+test import::cell::tests::value_contract_formula_safe_decimal_import_rejects_excess_precision ... ok
+test import::cell::tests::value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text ... ok
+test import::cell::tests::value_contract_postgres_temporal_sentinels_restore_only_recognized_csv_formula_markers ... ok
+test import::cell::tests::value_contract_wide_decimal_csv_cells_remain_exact_text_when_decimal_cannot_hold_them ... ok
+test import::cell::tests::value_contract_duckdb_csv_preserves_extended_calendar_values_exactly ... ok
+test import::cell::tests::value_contract_wide_integer_decimal_csv_cells_use_declared_precision_for_text_fallback ... ok
+test import::cell::tests::wide_decimal_text_fallback_refuses_values_outside_declared_precision_and_scale ... ok
+test import::cell::tests::wide_decimal_text_fallback_rejects_malformed_numeric_tokens ... ok
+test import::cell::tests::value_contract_parser_preserves_boundaries_and_rejects_rounding ... ok
+test import::csv_import::tests::a_file_that_is_not_utf8_says_where_it_stops_being_text ... ok
+test import::csv_import::tests::a_byte_order_mark_is_not_part_of_the_first_column_name ... ok
+test import::csv_import::tests::a_doubled_quote_inside_a_quoted_field_is_one_quote ... ok
+test import::csv_import::tests::a_mapping_matches_on_name_whatever_the_case_or_spacing ... ok
+test import::csv_import::tests::a_long_row_keeps_the_fields_the_header_did_not_name ... ok
+test import::csv_import::tests::a_header_row_names_the_fields ... ok
+test import::csv_import::tests::a_file_with_no_header_gets_names_from_the_positions ... ok
+test import::csv_import::tests::a_file_that_fits_the_limit_is_not_called_truncated ... ok
+test import::csv_import::tests::a_short_row_is_padded_rather_than_refused ... ok
+test import::csv_import::tests::file_size_limit_accepts_exact_boundary_and_refuses_one_byte_more ... ok
+test import::csv_import::tests::csv_format_conversion_preserves_delimiter_and_header_choice ... ok
+test import::csv_import::tests::a_preview_stops_at_the_limit_and_says_so ... ok
+test import::csv_import::tests::a_comma_file_is_detected_as_comma_delimited ... ok
+test import::csv_import::tests::a_quoted_field_keeps_its_delimiters_and_newlines ... ok
+test import::csv_import::tests::public_import_limits_keep_their_documented_units ... ok
+test import::csv_import::tests::carriage_returns_do_not_survive_into_the_last_field ... ok
+test import::infer::tests::a_field_of_ones_and_zeroes_is_a_number_not_a_boolean ... ok
+test import::csv_import::tests::read_csv_file_refuses_oversized_sparse_files_from_metadata ... ok
+test import::infer::tests::a_field_whose_every_value_is_a_whole_number_is_an_integer ... ok
+test import::infer::tests::a_header_longer_than_the_identifier_limit_is_cut_to_it ... ok
+test import::infer::tests::a_header_that_is_not_a_usable_name_gets_a_positional_one ... ok
+test import::csv_import::tests::a_file_whose_first_row_is_data_is_not_read_as_having_a_header ... ok
+test import::csv_import::tests::an_empty_file_has_no_columns ... ok
+test import::infer::tests::an_inferred_column_never_constrains_what_the_file_can_hold ... ok
+test import::csv_import::tests::read_csv_file_observes_delimiter_header_and_preview_options ... ok
+test import::csv_import::tests::more_columns_than_the_limit_are_refused ... ok
+test import::csv_import::tests::a_semicolon_file_is_detected_as_semicolon_delimited ... ok
+test import::infer::tests::blank_and_null_marker_cells_do_not_widen_numeric_inference ... ok
+test import::csv_import::tests::the_maximum_column_count_is_accepted ... ok
+test import::infer::tests::an_empty_field_is_text_rather_than_a_guess_from_nothing ... ok
+test import::infer::tests::one_value_that_does_not_fit_widens_the_whole_column_to_text ... ok
+test import::infer::tests::repeated_headers_do_not_produce_two_columns_with_one_name ... ok
+test import::csv_import::tests::a_single_column_file_falls_back_to_the_comma ... ok
+test import::infer::tests::repeated_headers_at_the_identifier_limit_keep_a_unique_suffix ... ok
+test import::infer::tests::sqlite_import_types_preserve_storage_affinity_for_numeric_and_binary_kinds ... ok
+test import::infer::tests::only_the_sample_is_read_so_a_long_file_still_opens_at_once ... ok
+test import::plan::tests::a_file_with_nothing_mapped_or_nothing_in_it_is_refused ... ok
+test import::infer::tests::every_engine_gets_a_type_name_it_parses ... ok
+test import::infer::tests::the_narrowest_kind_that_fits_every_value_wins ... ok
+test import::plan::tests::a_column_the_engine_fills_itself_is_never_written ... ok
+test import::csv_import::tests::a_tab_file_is_detected_as_tab_delimited ... ok
+test import::plan::tests::a_mapped_column_with_a_server_default_stays_in_the_statement_for_every_row ... ok
+test import::plan::tests::an_identifier_that_carries_a_quote_is_escaped_rather_than_closed ... ok
+test import::plan::tests::the_batches_a_plan_offers_are_bounded_and_cover_every_row ... ok
+test import::plan::tests::an_unmapped_column_is_left_out_so_its_own_default_applies ... ok
+test import::plan::tests::an_identifier_that_is_empty_or_carries_a_control_character_is_refused ... ok
+test import::plan::tests::value_contract_postgres_wide_numeric_csv_rows_share_text_cast_parameters ... ok
+test import::plan::tests::every_row_binds_to_the_same_statement ... ok
+test import::plan::tests::value_contract_postgres_temporal_csv_rows_share_text_cast_parameters ... ok
+test import::plan::tests::numeric_affinity_text_fallback_is_sqlite_only ... ok
+test import::plan::tests::postgres_enum_import_plan_uses_catalog_type_for_text_rows ... ok
+test import::plan::tests::only_the_first_failures_are_listed_and_the_rest_are_counted ... ok
+test import::plan::tests::rows_that_cannot_be_read_stop_the_plan_and_are_reported_without_their_contents ... ok
+test import::plan::tests::value_contract_postgres_array_csv_insert_uses_allowlisted_native_cast ... ok
+test import::plan::tests::postgres_enum_import_requires_a_null_marker_for_empty_fields ... ok
+test import::csv_import::tests::a_file_over_the_size_limit_is_refused_before_it_is_parsed ... ok
+test import::csv_import::tests::a_field_over_the_length_limit_is_refused_and_names_the_line ... ok
+test import::csv_import::tests::a_field_at_the_length_limit_is_accepted ... ok
+
+test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 424 filtered out; finished in 0.02s
+
+     Running tests/query_pipeline.rs (linux/target/debug/deps/query_pipeline-14d9d81ec12462f1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+

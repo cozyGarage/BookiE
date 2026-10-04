@@ -4863,6 +4863,10 @@ The app parser turns edited TIME(6), DATETIME(6) and TIMESTAMP(6) text into
 typed values, and the shared keyed-update builder persists all three through
 the MySQL driver. Native reads assert the updated values, exact fractional
 microseconds and the untouched sibling row. TIMESTAMP uses an explicit UTC
-session and an epoch-microsecond oracle; parser tests also pin MySQL
-TIMESTAMP input as `Value::DateTime`. Installed grid interaction and other
-format consumers remain open. See the [native app-edit evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
+session and an epoch-microsecond oracle; parser tests pin its edit input as
+`Value::DateTime`. The same live result exports exact CSV/JSON temporal text and
+imports from CSV back into MySQL with native equality. The importer uses the
+target driver to restore MySQL `timestamp(6)` RFC3339 text as
+`Value::TimestampTz`, while generic/PostgreSQL naive timestamps remain
+`Value::DateTime`. Installed grid interaction and other format consumers remain
+open. See the [native app-edit and export/import evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).

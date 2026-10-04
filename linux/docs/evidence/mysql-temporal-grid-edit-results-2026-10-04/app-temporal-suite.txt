@@ -1,11 +1,11 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-40541dde40605043)
 
 running 2 tests
 test ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keeps_fractional_input_typed ... ok
 test ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 461 filtered out; finished in 10.29s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 461 filtered out; finished in 11.21s
 
      Running unittests src/main.rs (linux/target/debug/deps/tablepro_app-10b06267e4605309)
 
