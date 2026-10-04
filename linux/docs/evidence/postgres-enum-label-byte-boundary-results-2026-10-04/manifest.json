@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "536a42b7f55a18b438f3ddea26bc3696321a6fb4",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Maximum 63-byte PostgreSQL custom-enum labels, including multibyte UTF-8",
+  "test": "enum_contract::value_contract_custom_enum_preserves_maximum_multibyte_label_bytes",
+  "contract": [
+    "A 63-byte ASCII label and a 21-character three-byte UTF-8 label are both preserved at the PostgreSQL enum label byte limit.",
+    "pg_enum.enumlabel and octet_length provide an independent catalog/value oracle for exact label bytes and the 63-byte boundary.",
+    "enum_range and pg_typeof confirm direct result decoding retains each exact label as the declared custom enum type without byte or character truncation.",
+    "This proves the maximum accepted label boundary; overlength declaration behavior and other enum consumer/session configurations remain open."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres value_contract_custom_enum_preserves_maximum_multibyte_label_bytes -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "postgres-enum-label-byte-boundary.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "postgres-enum-label-byte-boundary.txt": "4f169bb4549b914f1cb972b596922de911aea96cc2a31e61c48f4e4ed82559d6",
+    "clippy.txt": "ab6a8136e95b0e77c885d04c12367b40aeaeb0e3eca010a4298664b5df56869e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "PostgreSQL enum labels exceeding 63 bytes are not tested; other enum operators, consumer formats, and session/search_path combinations remain open."
+  ]
+}

@@ -47,6 +47,9 @@ point does not represent all support for that engine.
 The PostgreSQL shadowed-search-path enum/domain write case now covers six and
 seven nested domain levels; see the [native evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
 
+The maximum 63-byte custom-enum label is verified for both ASCII and
+three-byte UTF-8 text against PostgreSQL's catalog and typed results ([boundary evidence](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)).
+
 One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
 replayed SQL against native array text, JSON elements and wire bytes; see the
 [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).

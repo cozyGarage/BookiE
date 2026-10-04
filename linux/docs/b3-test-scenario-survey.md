@@ -92,6 +92,9 @@ The PostgreSQL enum CSV case now distinguishes raw-text restore from
 spreadsheet-safe output. Formula protection can make two distinct enum labels
 collide after import; the export dialog directs users to turn it off for
 lossless re-import. Further enum consumer and session combinations remain open.
+A PostgreSQL 16 boundary test now preserves both a 63-byte ASCII label and a
+21-character three-byte UTF-8 label against `pg_enum` and typed-result oracles;
+overlength label refusal remains open. See the [enum byte-boundary evidence](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
 
 | Priority | Candidate | Existing evidence / gap | Next test and oracle |
 | --- | --- | --- | --- |

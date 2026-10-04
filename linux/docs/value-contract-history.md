@@ -4988,3 +4988,13 @@ This proves one array family through four presentation formats, SQL replay and
 workbook text-cell output; other array families and spreadsheet-application
 re-import remain open. The focused test, strict Clippy and format check passed. See the [evidence
 manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+
+## PostgreSQL custom-enum 63-byte label boundary, 2026-10-04
+
+A PostgreSQL 16 Docker fixture creates a custom enum with a 63-byte ASCII label
+and a 21-character UTF-8 label that also occupies 63 bytes. `pg_enum` and
+`octet_length` assert the exact catalog labels and byte lengths; `enum_range`
+then returns both through the native driver with the declared enum type intact.
+The focused case, strict Clippy and formatting pass. This covers the maximum
+accepted label length; overlength refusal and other enum consumer/session cases
+remain open. See the [evidence manifest](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
