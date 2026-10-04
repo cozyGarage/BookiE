@@ -186,6 +186,13 @@ checks. Spreadsheet-app re-import remains open. See the
 [export evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json)
 and [typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
+October 4 B3-4 follow-up: grouped SQLite `MAX()` results over STRICT `ANY`
+preserve per-group INTEGER, REAL, TEXT, BLOB and NULL runtime classes despite
+fallback result metadata. Typed CSV export/import restores each class, exact
+BLOB bytes, and reserved-tag-shaped text; source and restored `typeof()` values
+are the native oracle. Other computed expressions, consumer formats and
+spreadsheet-app re-import remain open. See the [MAX evidence](evidence/sqlite-max-any-results-2026-10-04/manifest.json).
+
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and

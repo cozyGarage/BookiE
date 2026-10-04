@@ -90,6 +90,10 @@ Computed COALESCE JSON output checks number/string distinctions, and XLSX output
 checks numeric/shared-string cell kinds, including BLOB text encoding
 ([consumer evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json)).
 
+SQLite grouped `MAX()` over STRICT `ANY` now round-trips INTEGER, REAL, TEXT,
+BLOB and NULL groups through typed CSV, checked by native `typeof()` and exact
+BLOB-byte comparisons ([evidence](evidence/sqlite-max-any-results-2026-10-04/manifest.json)).
+
 ## Evidence updates
 
 Add or update one named case in the ledger with the ADR 0007 outcome, native

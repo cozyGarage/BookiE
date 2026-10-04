@@ -5105,6 +5105,15 @@ BLOB bytes and a text value shaped like the reserved tag; native `typeof()` is
 the oracle. The focused app test, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/sqlite-nullif-any-results-2026-10-04/manifest.json).
 
+## SQLite MAX over computed STRICT ANY result round trip, 2026-10-04
+
+Grouped `MAX(value)` projections over STRICT `ANY` return INTEGER, REAL, TEXT,
+BLOB and SQL NULL from separate groups while result metadata remains the
+computed fallback. Typed CSV export/import preserves each runtime class, exact
+BLOB bytes and text matching the reserved tag; native `typeof()` checks both
+source and restored cells. All 12 selected SQLite app contracts, strict Clippy
+and formatting pass. See the [evidence manifest](evidence/sqlite-max-any-results-2026-10-04/manifest.json).
+
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit

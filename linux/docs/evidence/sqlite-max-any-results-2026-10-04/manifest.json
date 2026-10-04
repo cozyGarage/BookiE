@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "5722ee7604b91eb8bff3c822f7f351f9af35f566",
+  "engine": "SQLite STRICT ANY (in-memory native SQLite driver)",
+  "case": "grouped MAX() result storage classes through typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "Grouped MAX(value) over STRICT ANY emits INTEGER, REAL, TEXT, BLOB and SQL NULL rows while result metadata remains the computed fallback.",
+    "Source typeof() and exact expected values distinguish each group's runtime storage class; the text group includes text matching the reserved tag syntax.",
+    "The app's typed CSV export/import restores every storage class and exact BLOB bytes into a STRICT ANY destination, verified again with native typeof()."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_ -- --test-threads=1",
+      "result": "12 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "ede73bfa5e1622d14d2c3a6d1c5a4244bf238078f62f806df72a466d45dd12bc",
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression shapes, consumer formats, spreadsheet-app re-import and installed editing remain open."
+  ]
+}
