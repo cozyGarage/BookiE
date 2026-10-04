@@ -224,7 +224,9 @@ Schema/type/table identifiers with spaces and embedded quotes pass metadata
 discovery, a keyed edit and structured equality filtering with exact native
 type and sibling-row checks ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
 [quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json));
-other identifier forms and additional session/search_path combinations remain open.
+the same-name target/shadow type collision also passes keyed edit and filtering
+with the role's default `search_path` aimed at the shadow schema ([shadow-path evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json));
+other identifier forms and transaction/session `search_path` permutations remain open.
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage

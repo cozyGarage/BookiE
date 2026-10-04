@@ -173,6 +173,12 @@ The generated keyed edit and structured equality filter preserve the exact
 native enum type and leave the sibling row unchanged; see the [spaces case](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json)
 and [identifier-escaping follow-up](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: the quoted target enum now competes with a same-named
+shadow enum in the pool role's default `search_path`. The shadow enum lacks the
+target-only label, so schema-qualified keyed writes and structured equality
+filters must resolve the target type; native type/OID and untouched-shadow-row
+checks pass ([evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json)).
+
 October 4 B3-1 follow-up: one PostgreSQL `timestamptz[]` with both sides of a
 New York fall-back hour, a BC instant, infinities and SQL NULL now passes
 through JSON, CSV, XLSX and replayed SQL. Native `array_to_json` semantics and

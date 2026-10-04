@@ -5538,3 +5538,14 @@ double quotes in all three identifiers and confirms metadata, keyed update and
 filter SQL escape them correctly while preserving the native type and sibling
 row ([evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
 See the [spaces-case manifest](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
+
+## PostgreSQL enum target under shadowed search_path, 2026-10-04
+
+The quoted target enum and a same-named shadow enum have different labels; the
+shadow type rejects the target-only `paused` value. The test role defaults its
+`search_path` to the shadow schema before BookiE opens the pool. Metadata is
+fetched for the target table, then the generated keyed update and structured
+equality filter select the target enum. Native `pg_typeof` text and `regtype`
+OID comparisons identify each type, while target siblings and the shadow row
+remain unchanged. Other transaction/session path permutations remain open. See
+the [evidence manifest](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json).

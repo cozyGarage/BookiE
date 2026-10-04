@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "b7fc58d8f903d6fb695820ba50d24bdf52fe7e6c",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Schema-qualified enum update and filter under a quoted shadow search_path",
+  "test": "enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter",
+  "contract": [
+    "Target and shadow schemas each define a type with spaces and embedded double quotes and the same type name; the shadow enum omits the target-only paused label.",
+    "Every pooled connection inherits the shadow schema from the test role's default search_path, while the test fetches metadata for the target table.",
+    "Generated keyed update and structured equality filter accept paused by resolving the target enum; native pg_typeof and regtype OID equality identify the target type, and target siblings plus the shadow row remain unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "3ca0e567c515d45c80bbad1ba482af8c0d13a8d983996265fa26d98c3d05ef09",
+    "clippy.txt": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Additional transaction-local, session-local and role/search_path permutations remain open; this case does not close PostgreSQL enum configuration coverage or B3."
+  ]
+}

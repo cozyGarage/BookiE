@@ -115,6 +115,11 @@ embedded double quotes, with native type and sibling-row assertions. Other
 identifier and session/search_path combinations remain open ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
 [quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
 
+October 4 B3-1 follow-up: a same-named PostgreSQL enum under the pool role's
+default shadowed `search_path` cannot accept the target-only label; qualified
+keyed edit and filter paths select the target type and preserve the shadow row
+([evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json)).
+
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3
