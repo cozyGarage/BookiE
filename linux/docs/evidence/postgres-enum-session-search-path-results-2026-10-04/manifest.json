@@ -2,13 +2,13 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "c1f5c0ca9135c17bf854452c84f923274460e8a3",
+  "source_commit": "17d41e3621c0ae9a0f24f09647ebedffb278a22b",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "Same-session enum metadata with repeated search_path changes in a transaction",
   "test": "enum_contract::value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema",
   "contract": [
     "A transaction changes search_path from enum_shadow_b, enum_shadow_a to enum_shadow_a on the same backend and confirms current_schema after each change.",
-    "Under the final shadowed path, schema-aware metadata and keyed updates still resolve enum_shadow_b.status_kind for enum_shadow_b.items.",
+    "The schema-aware enum metadata fetched for enum_shadow_b.items remains valid for a keyed update after the transaction changes search_path twice; the target enum remains qualified as enum_shadow_b.status_kind.",
     "The native target and shadow rows retain their expected types and values; the transaction-local session changes are rolled back."
   ],
   "validation": {
@@ -30,8 +30,8 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "postgres-enum-session-search-path.txt": "b300e8e5458d52c6a3e3dd933ae30f2a41dcc4f25e6f007c7c1946ef9fe19580",
-    "clippy.txt": "88df934953f494a4c4861871c404f0544c51da634d1776574f188255bebf630c",
+    "postgres-enum-session-search-path.txt": "567c2219b72a1b48c186db78b9c53fcec19e61f2918e9f816d71602d65fbbe2f",
+    "clippy.txt": "25684e9665a15a09a4d13b453333ea2b6f1f73e96f782e4f62d810f4d912a26f",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
