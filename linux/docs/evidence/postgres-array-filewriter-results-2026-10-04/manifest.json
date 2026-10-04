@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "4b57b546ca93726f44dfe1af7ec5ff6763c45fad",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Text array native-value and XML/HTML/Markdown file-writer contract",
+  "test": "array_contract::value_contract_text_array_file_exports_preserve_text_and_escape_markup",
+  "contract": [
+    "A text[] containing literal NULL, SQL NULL, empty text, comma, quote, backslash, Unicode and hostile markup retains its PostgreSQL array text and native text[] type.",
+    "PostgreSQL array_to_json supplies an independent element oracle that distinguishes literal NULL from SQL NULL; array_send bytes match after a bound text[] round trip.",
+    "The XML, HTML and Markdown result-file writers retain Unicode and escape markup so the text[] payload cannot inject markup into the output.",
+    "This covers one array family and three presentation formats; other array families and workbook/SQL writer behavior remain open."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres value_contract_text_array_file_exports_preserve_text_and_escape_markup -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "postgres-array-filewriter.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "postgres-array-filewriter.txt": "121887424d6f45fb3d9ee8b779f66f85b8db6b091d89e2c6054a63679d2b0a9a",
+    "clippy.txt": "438e022dc94fa2149b10f9af3c93a0c675059d8ec58e966f21163ca6ded3ddfb",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, other result-file formats including XLSX and SQL, broader enum/session configurations, and the remaining B3 engine/type/consumer matrix are unproven."
+  ]
+}

@@ -103,6 +103,14 @@ lossless re-import. Further enum consumer and session combinations remain open.
 | B3/B4 | Result delivery and session state | The shared value path rejects incomplete rows instead of inventing NULL cells; PostgreSQL Docker and DuckDB local contracts preserve zero-row metadata, duplicate column names and row order; the row cap is checked at exactly `MAX_QUERY_ROWS` and one row over. SQL Server returns only the first result set but drains later sets, reports a later-set error, and remains usable afterward. All six remote drivers classify established server loss as `Disconnected`; setup-time refusal remains distinct. PostgreSQL and MySQL verify pool recovery; SQL Server, MongoDB, Redis and ClickHouse reconnect and complete a fresh operation after restart. Mid-stream/page loss now has explicit whole-operation failure contracts for PostgreSQL, MySQL, SQL Server, MongoDB cursor `getMore`, Redis browse-page key reads, and ClickHouse row streams. PostgreSQL ordinary cancellation `57014` remains a query error, and ClickHouse graceful shutdown remains a server cancellation error. A consolidated matrix now records each driver’s cancellation, reconnect and session-state expectations and maps them to the drivers or sandbox runner. Broader late-result completeness and acceptance scenarios remain open. | Add any remaining late-result completeness scenarios; assert row order/count, completeness, connection/session state and user-visible outcome at each affected consumer. |
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
 
+October 4 B3-1 follow-up: one PostgreSQL `text[]` result now passes through the
+XML, HTML and Markdown file writers. PostgreSQL `pg_typeof`, array text,
+`array_to_json` elements and `array_send` bytes provide independent type,
+content and bound-round-trip oracles; hostile markup and Unicode exercise the
+writer output. This is one array family and a presentation export case. Other
+array types and file-writer formats, including workbook cell semantics, remain
+open. See the [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.

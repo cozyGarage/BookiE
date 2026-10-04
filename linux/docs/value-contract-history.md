@@ -4960,3 +4960,15 @@ target driver to restore MySQL `timestamp(6)` RFC3339 text as
 `Value::TimestampTz`, while generic/PostgreSQL naive timestamps remain
 `Value::DateTime`. Installed grid interaction and other format consumers remain
 open. See the [native app-edit and export/import evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
+
+## PostgreSQL text array XML, HTML and Markdown file writers, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports one `text[]` containing a literal
+`NULL`, SQL NULL, empty text, comma, quote, backslash, Unicode and hostile
+markup through the XML, HTML and Markdown result-file writers. Native
+`pg_typeof`, `array_to_json`, canonical array text and `array_send` bytes check
+the type, element distinctions, content and bound-array round trip. The file
+outputs preserve Unicode and escape the markup payload. This proves one array
+family and three presentation formats; other array families and workbook/SQL
+file-writer semantics remain open. The focused test, strict Clippy and format
+check passed. See the [evidence manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
