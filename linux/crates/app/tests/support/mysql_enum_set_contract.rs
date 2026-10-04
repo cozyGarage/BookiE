@@ -304,3 +304,136 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
     }
     session.close().await.unwrap();
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use testcontainers::core::{IntoContainerPort, WaitFor};
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers::{GenericImage, ImageExt};
+
+    let container = GenericImage::new("mariadb", "11")
+        .with_exposed_port(3306.tcp())
+        .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
+        .with_env_var("MARIADB_ROOT_PASSWORD", "tablepro_test")
+        .with_env_var("MARIADB_DATABASE", "test")
+        .start()
+        .await
+        .unwrap();
+    let connection = drivers_mysql::MysqlDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(3306).await.unwrap(),
+            database: "test".into(),
+            username: "root".into(),
+            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            tls: TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let mut session = connection.open_session().await.unwrap();
+    session
+        .query_params_controlled(
+            "CREATE TABLE maria_enum_set_grid (
+                id INT PRIMARY KEY,
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash'),
+                perms SET('read', 'write', 'slash\\\\path')
+            )",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    session
+        .query_params_controlled(
+            "INSERT INTO maria_enum_set_grid VALUES
+                (1, 'happy', 'read'), (2, 'happy', 'write')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "maria_enum_set_grid").await.unwrap();
+    let mood = columns.iter().position(|column| column.name == "mood").unwrap();
+    let perms = columns.iter().position(|column| column.name == "perms").unwrap();
+    let modes = [
+        "",
+        "NO_BACKSLASH_ESCAPES",
+        "ANSI_QUOTES",
+        "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+    ];
+    for mode in modes {
+        session
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .await
+            .unwrap();
+        let active = session
+            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+            .await
+            .unwrap();
+        let Value::Text(active) = &active.rows[0][0] else {
+            panic!("unexpected sql_mode: {:?}", active.rows[0][0]);
+        };
+        assert_eq!(
+            active.split(',').any(|value| value == "NO_BACKSLASH_ESCAPES"),
+            mode.contains("NO_BACKSLASH_ESCAPES")
+        );
+        assert_eq!(
+            active.split(',').any(|value| value == "ANSI_QUOTES"),
+            mode.contains("ANSI_QUOTES")
+        );
+        assert!(parse_input_for_driver("unknown", Some(&columns[mood]), "mysql").is_err());
+        assert!(parse_input_for_driver("read,unknown", Some(&columns[perms]), "mysql").is_err());
+        let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
+        let perms_value = parse_input_for_driver("read,slash\\path", Some(&columns[perms]), "mysql").unwrap();
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "mysql",
+            None,
+            "maria_enum_set_grid",
+            &columns,
+            &[(mood, mood_value), (perms, perms_value)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        session
+            .query_params_controlled(&update.0, &update.1, &control)
+            .await
+            .unwrap();
+        let rows = session
+            .query_params_controlled(
+                "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
+                 FROM maria_enum_set_grid ORDER BY id",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(
+            rows[0],
+            vec![
+                Value::Int(1),
+                Value::Text("2".into()),
+                Value::Text("69742773206F6B".into()),
+                Value::Text("5".into()),
+                Value::Text("726561642C736C6173685C70617468".into()),
+            ],
+            "mode {mode:?}"
+        );
+        assert_eq!(
+            rows[1],
+            vec![
+                Value::Int(2),
+                Value::Text("1".into()),
+                Value::Text("6861707079".into()),
+                Value::Text("2".into()),
+                Value::Text("7772697465".into()),
+            ],
+            "sibling changed in mode {mode:?}"
+        );
+    }
+    session.close().await.unwrap();
+}
