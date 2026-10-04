@@ -46,8 +46,9 @@ point does not represent all support for that engine.
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six,
-seven and eight nested domain levels; see the [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
-and [eight-level evidence](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
+seven, eight and nine nested domain levels; see the [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
+[eight-level evidence](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
+and [nine-level evidence](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
 
 A PostgreSQL 16 transaction also changes ordinary session `search_path` twice
 on one backend, then verifies target-schema enum metadata and keyed-write safety

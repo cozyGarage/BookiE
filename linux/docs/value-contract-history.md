@@ -5027,6 +5027,15 @@ refusal, exact outer-domain type/value and an untouched SQL NULL sibling. The
 focused test, strict Clippy and formatting pass. Deeper chains and other
 enum/session combinations remain open; see the [evidence manifest](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
 
+## PostgreSQL nine-domain-layer enum contract, 2026-10-04
+
+The same shadowed-`search_path` domain-over-enum contract now also runs at nine
+nested domains. It verifies enum-leaf metadata, schema-aware keyed and draft
+writes (including SQL NULL), typed equality filtering, invalid-label refusal,
+exact outer-domain type/value and an untouched SQL NULL sibling. The focused
+test, strict Clippy and formatting pass. Greater depths and other enum/session
+combinations remain open; see the [evidence manifest](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
+
 ## PostgreSQL enum metadata after session search_path changes, 2026-10-04
 
 A PostgreSQL 16 transaction changes ordinary session `search_path` twice on
