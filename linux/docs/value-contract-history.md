@@ -5449,8 +5449,8 @@ A local DuckDB contract exports and re-imports enum labels through CSV using an
 explicit collision-free null marker and raw-text mode. Empty text, literal
 `NULL`, Unicode, a quoted label, formula-shaped labels and SQL NULL retain
 their values and native `ENUM` type. An unrelated existing destination row
-remains unchanged. Spreadsheet-safe mode prefixes `=1+1`, but importing that
-output collides with the valid label `'=1+1`; the safe encoding is for
+remains unchanged. Spreadsheet-safe mode prefixes `=1+1`, and its typed import
+plan maps that text to the same label as `'=1+1`; the safe encoding is for
 presentation, while raw CSV is required for lossless restore. The focused
 contract, all-feature app library suite, strict Clippy and formatting pass.
 Installed GTK editing remains open; see the [evidence manifest](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).

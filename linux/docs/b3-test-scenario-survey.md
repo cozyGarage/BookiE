@@ -116,7 +116,7 @@ empty label, literal `NULL`, Unicode, a quoted label, formula-shaped labels
 and SQL NULL using a collision-free null marker. Native `typeof`, exact label
 text and `IS NULL` checks verify the imported enum values; a pre-existing
 destination row remains unchanged. The spreadsheet-safe CSV path prefixes
-formula-like text, and import planning confirms that `=1+1` collides with the
+formula-like text, and its typed import plan maps `=1+1` to the same text as the
 valid label `'=1+1`; that encoding is for spreadsheet presentation, while raw
 CSV is the lossless restore format. See the [DuckDB enum CSV evidence](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
 

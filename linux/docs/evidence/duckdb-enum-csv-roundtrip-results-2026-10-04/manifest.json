@@ -9,7 +9,7 @@
   "contract": [
     "The local app contract exports DuckDB ENUM results using raw-text CSV and a collision-free explicit SQL NULL marker, then plans and executes a typed CSV import.",
     "Empty text, the literal NULL label, Unicode, a quoted label, formula-shaped labels and SQL NULL retain their exact values and native ENUM type after raw-mode import.",
-    "Spreadsheet-safe CSV prefixes a formula-shaped label; importing it collides with the valid enum label that already begins with an apostrophe. This mode is for spreadsheet presentation, not lossless restore.",
+    "Spreadsheet-safe CSV prefixes a formula-shaped label; the typed import plan then maps it and the valid enum label that already begins with an apostrophe to the same value. This mode is for spreadsheet presentation, not lossless restore.",
     "A pre-existing destination row is unchanged; native typeof, exact VARCHAR labels and the SQL NULL predicate provide the post-import oracle."
   ],
   "validation": {
