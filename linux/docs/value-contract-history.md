@@ -4572,6 +4572,18 @@ preserve the neighboring SQL NULL. All 12 domain contracts passed, including
 the four-level case. Chains deeper than five and other enum/session combinations
 remain untested. See the [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
+## PostgreSQL six-domain-layer enum contract (2026-10-04)
+
+A PostgreSQL 16 native case extends the enum chain to six nested domains.
+Catalog metadata resolves to the qualified enum leaf, and a schema-aware
+keyed edit plus typed equality filter preserve the six-layer outer domain.
+An invalid label is refused with SQLSTATE `22P02`; native value/type checks
+confirm the row is unchanged and its SQL NULL sibling remains intact. The
+focused case and all 13 PostgreSQL domain contracts passed, along with Clippy,
+formatting and ignored-test inventory checks. Chains deeper than six layers and
+other enum/session combinations remain untested. See the
+[six-domain-layer evidence](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
+
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
 A SQLite STRICT table can declare `ANY` while storing different runtime kinds
