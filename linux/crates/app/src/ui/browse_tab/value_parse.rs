@@ -120,6 +120,7 @@ fn parse_mysql_enum_set_labels(data_type: &str) -> Option<Vec<String>> {
 }
 
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
+    // Keep blank input as SQL NULL, while `''` explicitly selects an empty ENUM/SET value.
     if driver_id == "mysql"
         && text == "''"
         && let Some(result) = parse_mysql_enum_set_input("", col)
