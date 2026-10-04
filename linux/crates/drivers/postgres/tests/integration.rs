@@ -45,6 +45,9 @@ mod value_contracts;
 #[path = "support/enum_contract.rs"]
 mod enum_contract;
 
+#[path = "support/enum_parameter_context_contract.rs"]
+mod enum_parameter_context_contract;
+
 #[path = "support/quoted_enum_identifier_contract.rs"]
 mod quoted_enum_identifier_contract;
 
