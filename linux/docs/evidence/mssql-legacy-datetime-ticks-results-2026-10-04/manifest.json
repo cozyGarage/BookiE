@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "12856cb51c80b0d9f747fe8798992605cc0edc08",
-  "source_diff_sha256": "a57f2974b9420c4fe90e2d90266b33ef325a0e10bd578da7adf7aa46b9736420",
+  "source_commit": "f0262d1e8b988aad5b18452d371fe17d4ea3f1c8",
+  "source_diff_sha256": "1613252a25f257eda903a8b3f1ac6edbbe6ae2e465fa20f99c408e47276324e8",
   "engine": "SQL Server Docker via testcontainers_modules::mssql_server::MssqlServer",
   "case": "Exact result, SQL-literal and parameter round trips for legacy SQL Server datetime ticks",
   "contract": [
