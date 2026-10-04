@@ -5114,6 +5114,17 @@ BLOB bytes and text matching the reserved tag; native `typeof()` checks both
 source and restored cells. All 12 selected SQLite app contracts, strict Clippy
 and formatting pass. See the [evidence manifest](evidence/sqlite-max-any-results-2026-10-04/manifest.json).
 
+## SQLite JSON extraction over STRICT ANY result round trip, 2026-10-04
+
+One `json_extract(document, '$.v')` projection over STRICT `ANY` returns
+INTEGER, REAL, TEXT and SQL NULL rows, including a 64-bit integer, a boolean
+converted to INTEGER, an object and an array returned as text, JSON null, and a
+missing path. Native `typeof()` and `json_type()` checks keep the extracted
+storage class distinct from the source JSON kind; typed CSV round-trip restores
+the carrier and records JSON null separately from a missing path. All 13
+selected SQLite app contracts, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
+
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit

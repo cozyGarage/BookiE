@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "ea3051e0d7228b2d3e2d495360961815390a5494",
+  "engine": "SQLite STRICT ANY with native JSON functions (in-memory)",
+  "case": "json_extract() dynamic storage classes through typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "A single json_extract(document, '$.v') expression returns INTEGER, REAL, TEXT and SQL NULL values from STRICT ANY documents.",
+    "The corpus includes maximum signed 64-bit integer, real, numeric-looking string, JSON boolean, JSON null, object, array, reserved-tag-shaped string and a missing path.",
+    "Native typeof() verifies the SQLite result storage class while json_type() independently verifies the source JSON kind; explicit JSON null remains distinguishable from a missing path.",
+    "Typed CSV export/import restores the result carrier, exact JSON-derived text and kind marker into STRICT ANY and preserves SQL NULL."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_ -- --test-threads=1",
+      "result": "13 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "ea5adfd598a4c3adf0d18907f236ad0a5d0e7fc38eabe8ee7b6c945252f860c8",
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other JSON consumers, computed expressions, spreadsheet-app re-import and installed editing remain open."
+  ]
+}
