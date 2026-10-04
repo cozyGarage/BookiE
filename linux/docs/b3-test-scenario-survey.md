@@ -160,6 +160,13 @@ Calc re-import cases cover `enum[]`, `bytea[]`, `timestamptz[]` and `interval[]`
 [interval[]](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
 See the [enum-array file-writer evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
+October 4 B3-4 follow-up: a PostgreSQL scalar custom-enum XLSX result now
+survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save. Literal `NULL`, Unicode,
+markup and formula-shaped labels remain text, SQL NULL remains blank, and an
+empty enum label is refused without replacing the destination workbook. Other
+spreadsheet applications and enum cell shapes remain open; see the
+[scalar-enum Calc evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json).
+
 October 4 B3-1 follow-up: one PostgreSQL `timestamptz[]` with both sides of a
 New York fall-back hour, a BC instant, infinities and SQL NULL now passes
 through JSON, CSV, XLSX and replayed SQL. Native `array_to_json` semantics and

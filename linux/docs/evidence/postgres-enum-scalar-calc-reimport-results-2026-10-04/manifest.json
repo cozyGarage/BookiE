@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "25aff1351",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL scalar enum XLSX re-import through LibreOffice Calc",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 (Debian package 4:26.8.0.3-2)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "test": "enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely",
+  "contract": [
+    "The PostgreSQL result contains the literal NULL label, Unicode, markup, formula-shaped text and SQL NULL; native enum type/value assertions pass.",
+    "BookiE writes non-NULL enum labels as XLSX shared strings without formulas, leaves SQL NULL blank, and refuses an empty label without replacing the existing workbook.",
+    "LibreOffice Calc opens the workbook and saves ODS, then reopens and saves XLSX; literal NULL, Unicode, markup and formula-shaped labels remain identical strings, and SQL NULL remains blank."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=/home/trung/Projects/tablepro/linux/docs/evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "In the pinned Debian image, apt installs libreoffice-calc; Calc opens source.xlsx and saves recheck/source.ods.",
+        "Calc reopens recheck/source.ods and saves recheck/source.xlsx, retained as calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "command": "rtk proxy python3 linux/docs/evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/verify_roundtrip.py",
+      "result": "BookiE XLSX, Calc ODS and Calc XLSX preserve all tested scalar labels; SQL NULL stays blank.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "92b6bd8933e6b9e1b985e7b5288a632b791b9b1f7fcbbf331db15950112cff7d",
+    "recheck/source.ods": "2cabcf14a7247c9bf4cd5e89d8dab0f6d838c0c9bfe74c19dcf1ac12c2b222ab",
+    "calc-roundtrip.xlsx": "7a1119cefd499523969a05bd5b2c9bb3920521c276c072aed235e7ed06a54118"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "afb921666af2b54eb110ad0ca116d4bfa3f3481bea46839cd9b509636097af9c",
+    "libreoffice-roundtrip.txt": "7217764c4a3c8d39e5cc616b7119926bea85c640796b1ad9e6b70aabd771e537",
+    "consumer-check.txt": "0ed47537411c8065393405a198fb919cbec9a76eb3ac73a08abb7d1d411c0026",
+    "clippy.txt": "ab6a8136e95b0e77c885d04c12367b40aeaeb0e3eca010a4298664b5df56869e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other spreadsheet applications and enum cell shapes remain open in B3; this single scalar enum Calc case does not close the engine/type/consumer/configuration matrix."
+  ]
+}
