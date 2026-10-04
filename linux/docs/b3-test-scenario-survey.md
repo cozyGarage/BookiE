@@ -357,8 +357,9 @@ NULL preserved are asserted. Raw inferred SQL NULL updates preserve the outer
 domain type through 63 layers; invalid text labels reach PostgreSQL and are
 refused. At 64 or more layers, valid text, invalid text and SQL NULL return an
 explicit unsupported operation both before and after schema-aware work in the
-same backend. Schema-aware writes and filters pass through 256 layers. Domain
-depths beyond 256 and other enum/session combinations remain open; see the
+same backend. Schema-aware writes and filters pass through 256 layers, with a
+separate shadowed-session contract now extending that boundary to 257. Domain
+depths beyond 257 and other enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
@@ -368,6 +369,9 @@ A [deep-domain boundary contract](evidence/postgres-deep-domain-results-2026-10-
 records support through 63 layers and safe refusal at the 64-layer parameter-resolution limit.
 A [follow-up through 256 layers](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json)
 extends schema-aware metadata, writes and filters through 256 layers while confirming raw-parameter refusal from 64 layers.
+A [257-layer follow-up](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json)
+confirms target enum metadata, schema-aware keyed writes and filters under a
+shadowed `search_path`, plus explicit raw-parameter refusal.
 A separate same-backend transaction changes ordinary session `search_path`
 twice, then verifies target enum metadata and keyed writes under the final
 shadowed path; see the [session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).

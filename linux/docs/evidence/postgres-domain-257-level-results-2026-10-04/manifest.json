@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "3db9f2c91",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "schema-aware enum-leaf resolution at 257 nested domains under a shadowed search_path",
+  "test": "domain_depth_boundary_contract::value_contract_domain_over_enum_257_levels_preserve_schema_aware_values",
+  "contract": [
+    "Catalog metadata identifies the target enum leaf through 257 domain layers while another schema's same-named enum is first in search_path.",
+    "Schema-aware keyed edits and filters preserve the outer 257th domain and a NULL sibling, including a SET LOCAL shadowed search_path change; rollback restores the pre-transaction row values.",
+    "Raw inferred enum text at this depth returns the documented unsupported result without changing stored rows."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_depth_boundary_contract::value_contract_domain_over_enum_257_levels_preserve_schema_aware_values -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Domain depths beyond 257 and other enum/session configurations remain open in B3."
+  ]
+}

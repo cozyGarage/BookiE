@@ -5081,6 +5081,16 @@ All 13 PostgreSQL domain-contract tests, strict Clippy and formatting pass.
 Other domain depths and session configurations remain open; see the
 [deep-domain evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum 257-layer boundary, 2026-10-04
+
+A PostgreSQL 16 contract extends schema-aware enum-leaf metadata, keyed writes
+and filters to 257 nested domains with a same-named enum first in
+`search_path`. A transaction-level shadowed path still updates the outermost
+domain correctly and preserves a SQL NULL sibling; rollback restores the
+pre-transaction values. Raw inferred enum text stays an explicit unsupported
+result at this depth. See the
+[257-layer evidence](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json).
+
 ## PostgreSQL enum metadata after session search_path changes, 2026-10-04
 
 A PostgreSQL 16 transaction changes ordinary session `search_path` twice on

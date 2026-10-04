@@ -62,11 +62,11 @@ Structured equality filters use the qualified domain-array type and match native
 JSON, CSV, XML, HTML, Markdown and XLSX exports preserve domain-over-enum array text, and SQL replay restores the native type, JSON values and array wire bytes ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
-through ten levels, plus 63, 64, 65, 128, 129 and 256 levels. Raw inferred text and SQL
+through ten levels, plus 63, 64, 65, 128, 129, 256 and 257 levels. Raw inferred text and SQL
 NULL parameters work through 63 levels; at 64 or more levels they return
 explicit unsupported results, including after schema-aware work warms the
-same-backend transaction. Schema-aware writes and filters pass through 256
-levels; see the [deep-domain
+same-backend transaction. Schema-aware writes and filters pass through 257
+levels ([257-level evidence](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json)); see the [deep-domain
 boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [129/256-level follow-up](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
 [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
