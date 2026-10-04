@@ -103,6 +103,43 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
             Value::Text("value_contract_domain_array_label[]".into()),
         ]]
     );
+
+    let bound_array = connection
+        .query_params(
+            "SELECT $1::value_contract_domain_array_label[] AS labels, \
+             array_to_json($1::value_contract_domain_array_label[])::text, \
+             pg_typeof($1::value_contract_domain_array_label[])::text, \
+             array_send($1::value_contract_domain_array_label[])",
+            &[Value::Text(r#"{"NULL","","東京","a,b",NULL}"#.into())],
+        )
+        .await
+        .unwrap();
+    let native_array = connection
+        .query(
+            "SELECT labels, array_to_json(labels)::text, pg_typeof(labels)::text, array_send(labels) \
+             FROM (SELECT ARRAY[\
+                 'NULL'::value_contract_domain_array_label, \
+                 ''::value_contract_domain_array_label, \
+                 '東京'::value_contract_domain_array_label, \
+                 'a,b'::value_contract_domain_array_label, \
+                 NULL::value_contract_domain_array_label\
+             ] AS labels) AS native",
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound_array.rows, native_array.rows);
+
+    let invalid_array = connection
+        .query_params(
+            "SELECT $1::value_contract_domain_array_label[]",
+            &[Value::Text(r#"{"NULL","not-a-label"}"#.into())],
+        )
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        invalid_array,
+        tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"
+    ));
 }
 
 #[tokio::test]
