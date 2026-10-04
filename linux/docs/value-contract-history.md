@@ -5103,3 +5103,13 @@ bindable. JSON, CSV and XLSX preserve the driver's exact text representation;
 XLSX uses a string cell without a formula. Replayed SQL restores canonical
 PostgreSQL array text, JSON elements and wire bytes. The focused test, strict
 Clippy and formatting pass. See the [evidence manifest](evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json).
+
+## PostgreSQL custom enum-array file-writer contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports a custom `enum[]` containing literal
+`NULL`, empty text, Unicode, comma, quote, markup and SQL NULL. The server's
+`array_to_json` and `array_send` oracles verify the driver's text after binding;
+JSON, CSV and XLSX preserve that text, with XLSX using a string cell and
+escaping markup. Replayed SQL restores native array text, JSON elements and
+wire bytes. The focused test, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).

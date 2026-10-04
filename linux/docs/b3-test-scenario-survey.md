@@ -121,6 +121,15 @@ is one array family. Other array types, spreadsheet-application re-import and
 additional enum configurations remain open. See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: one custom PostgreSQL `enum[]` result now passes
+through JSON, CSV, XLSX and SQL file writers with labels `NULL`, empty text,
+Unicode, comma, quote and markup, alongside SQL NULL. Native type, `array_to_json`
+and `array_send` oracles verify the bound representation; replayed SQL restores
+the same native text, JSON elements and wire bytes. XLSX stores a string cell
+and XML-escapes markup. Other array families/configurations and
+spreadsheet-application re-import remain open. See the [enum-array file-writer
+evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
+
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.

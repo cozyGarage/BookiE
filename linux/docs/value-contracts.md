@@ -66,6 +66,11 @@ A `numeric[]` file-writer contract checks high precision, scale, NaN, infinities
 and SQL NULL through JSON, CSV, XLSX and replayed SQL. Native JSON and wire
 oracles confirm that the driver's quoted element text remains bindable ([evidence](evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json)).
 
+A custom enum-array file-writer contract preserves empty text, literal `NULL`,
+Unicode, comma, quote, markup and SQL NULL through JSON, CSV, XLSX and replayed
+SQL. Native `array_to_json` and `array_send` checks verify bound and restored
+values ([evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json)).
+
 The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
