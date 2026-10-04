@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
+
+running 12 tests
+test ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page ... ok
+test ui::browse_tab::tests::value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents ... ok
+test ui::browse_tab::tests::value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit ... ok
+test ui::browse_tab::tests::value_contract_mongodb_off_page_type_change_during_census_refuses_edit ... ok
+test ui::browse_tab::tests::value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values ... ok
+test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width ... ok
+test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths ... ok
+test ui::browse_tab::value_parse::mongodb_nested_edit_contract::value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_date_grid_edit_preserves_millisecond_instant ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_date_parser_preserves_milliseconds_and_refuses_rounding ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_parser_preserves_wide_precision ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 466 filtered out; finished in 17.73s
+

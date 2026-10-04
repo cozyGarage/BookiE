@@ -454,9 +454,13 @@ second `find` and asserts browse completes with one find. Before the change,
 the off-page inter-command race left the metadata `string`; that failure is
 retained in the [MongoDB census evidence](evidence/mongodb-census-results-2026-10-03/manifest.json).
 This does not provide snapshot semantics for writes to documents already read
-by the cursor. Full-scan cost, `run_find`'s separate schema/query reads, export
-scope and installed editing remain open. The final app-server layer passed all
-12 registered tests, including both MongoDB cursor cases. Reports:
+by the cursor; a concurrent write can still be overwritten. `run_find` merges
+type changes in selected rows between its census and query, while off-page
+changes after census remain invisible. Larger-scale full-scan performance
+budgets, other export combinations and installed editing remain open. The
+current checkout passed all 12 `value_contract_mongodb_` app tests, including
+all five census/browse consistency cases ([current evidence](evidence/mongodb-current-census-results-2026-10-04/manifest.json)).
+Earlier full-layer reports:
 [`20260930T215342621227Z-values/report.json`](../target/quality/20260930T215342621227Z-values/report.json)
 and
 [`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).

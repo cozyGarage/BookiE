@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "9254e306c51b56eb387eda76471000f9076ba35f",
+  "engine": "MongoDB 7 in Docker via testcontainers",
+  "case": "Current-checkout MongoDB census, browse and run_find consistency regressions",
+  "test_filter": "value_contract_mongodb_",
+  "assertions": [
+    "Collection-wide metadata discovers mixed BSON kinds and makes unsafe edits read-only.",
+    "A type change to a not-yet-read off-page document is included in same-cursor metadata and does not mutate the sibling.",
+    "A mutation to a document already read by the cursor returns the earlier value and confirms that scans do not provide snapshot isolation.",
+    "Browse uses one find for schema and page; it does not issue a second page find.",
+    "run_find merges a selected-page type change observed after its separate census and preserves canonical Extended JSON through materialized CSV and JSON exports."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mongodb_ -- --include-ignored --test-threads=1",
+      "result": "12 passed, 0 failed; includes all five census/browse consistency tests and seven MongoDB BSON parser/edit contracts",
+      "log": "census-regressions.txt"
+    }
+  },
+  "log_sha256": {
+    "census-regressions.txt": "8fc99f935f3a11a7d430a60869f2a7b41c1094db2307c88a8de7b3a194cb2a7d"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/app/src/ui/browse_tab/tests.rs": "fc313449c0cbab4b31cea2d3eec60f63ad15232371e552845cbaa1a7af073336",
+    "linux/crates/drivers/mongodb/src/lib.rs": "676351c062aead92b2296cf5f54e53320fe5e6c6e615f6cba63b33e2b40bb397",
+    "linux/crates/drivers/mongodb/tests/integration.rs": "e1495b5db4f6897744833d2ba58e5a057ad52a23f0bbde3483140afa8257a1cb"
+  },
+  "remaining": [
+    "The census is best-effort, not snapshot-isolated; writes can overwrite concurrent changes to already-read documents.",
+    "run_find does not detect type changes to off-page documents after its census.",
+    "Full-scan performance budgets at larger collection sizes, additional export combinations and installed editing remain unqualified."
+  ]
+}

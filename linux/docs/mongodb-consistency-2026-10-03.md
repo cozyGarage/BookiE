@@ -24,5 +24,12 @@ diagnostic measured one sample with a 50-row page: 6 ms for 1,000 documents and
 51 ms for 10,000 documents. These figures depend on the local container and are
 not thresholds or latency guarantees.
 
+October 4 current-checkout revalidation: all 12 `value_contract_mongodb_`
+app tests passed, including the five census/browse race cases and the seven
+BSON parser/edit contracts. This confirms selected-row `run_find` type merging
+and export behavior on the current source; it does not change the off-page or
+non-snapshot limits above. See the
+[current regression evidence](evidence/mongodb-current-census-results-2026-10-04/manifest.json).
+
 The app-server tests, driver timing test, and retained output are listed in the
 [MongoDB census evidence manifest](evidence/mongodb-census-results-2026-10-03/manifest.json).
