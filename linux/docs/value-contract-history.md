@@ -5083,3 +5083,12 @@ text inside the quoted routine string remain part of the body. The MySQL client
 supports quoted delimiter arguments; see the [client command documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
 The focused app test, strict Clippy and formatting pass. See the [evidence
 manifest](evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json).
+
+## SQLite NULLIF computed STRICT ANY result round trip, 2026-10-04
+
+A `NULLIF(value, 'drop')` projection over STRICT `ANY` yields INTEGER, REAL,
+TEXT, BLOB and SQL NULL rows while result metadata stays at its computed
+fallback. A CSV export/import round trip preserves each runtime class, exact
+BLOB bytes and a text value shaped like the reserved tag; native `typeof()` is
+the oracle. The focused app test, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/sqlite-nullif-any-results-2026-10-04/manifest.json).
