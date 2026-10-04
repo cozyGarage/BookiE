@@ -556,7 +556,7 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
         .execute(
             "INSERT INTO flexible VALUES \
              (1, 42), (2, NULL), (3, NULL), (4, X'00FF'), \
-             (5, 'bookie:sqlite-any:v1:integer:9')",
+             (5, 'bookie:sqlite-any:v1:integer:9'), (6, '')",
         )
         .await
         .unwrap();
@@ -586,8 +586,34 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
             Value::Text("null".into()),
             Value::Text("blob".into()),
             Value::Text("text".into()),
+            Value::Text("text".into()),
         ]
     );
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-case-any.xlsx");
+    std::fs::write(&workbook_path, b"existing workbook").unwrap();
+    let error = tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            tablepro_core::export::ExportError::WorkbookEmptyText { row: 6, column: 2 }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(std::fs::read(&workbook_path).unwrap(), b"existing workbook");
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
@@ -611,6 +637,7 @@ async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
                 Value::Text("text".into()),
                 Value::Text("bookie:sqlite-any:v1:integer:9".into()),
             ],
+            vec![Value::Text("text".into()), Value::Text(String::new())],
         ]
     );
 }
