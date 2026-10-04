@@ -33,13 +33,14 @@ async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connec
     connection
 }
 
-async fn assert_enum_literal_export_modes(options: ConnectOptions) {
+async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
     let setup = connect(options.clone()).await;
     setup
         .execute(
             r#"CREATE TABLE enum_mode_source (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\slash', 'NULL', '')
+                mood ENUM('happy', 'it''s ok', 'back\\slash', 'NULL', ''),
+                perms SET('read', 'write', 'slash\\path', 'NULL')
             )"#,
         )
         .await
@@ -52,20 +53,21 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         .execute("CREATE TABLE enum_csv_copy LIKE enum_mode_source")
         .await
         .unwrap();
-    for (id, label) in [
-        (1, Some("happy")),
-        (2, Some("it's ok")),
-        (3, Some("back\\slash")),
-        (4, Some("NULL")),
-        (5, Some("")),
-        (6, None),
+    for (id, label, permissions) in [
+        (1, Some("happy"), Some("read")),
+        (2, Some("it's ok"), Some("write,slash\\path")),
+        (3, Some("back\\slash"), Some("NULL")),
+        (4, Some("NULL"), Some("")),
+        (5, Some(""), Some("slash\\path")),
+        (6, None, None),
     ] {
         setup
             .execute_params(
-                "INSERT INTO enum_mode_source VALUES (?, ?)",
+                "INSERT INTO enum_mode_source VALUES (?, ?, ?)",
                 &[
                     Value::Int(id),
                     label.map_or(Value::Null, |value| Value::Text(value.into())),
+                    permissions.map_or(Value::Null, |value| Value::Text(value.into())),
                 ],
             )
             .await
@@ -78,30 +80,55 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         connection.execute("DELETE FROM enum_mode_copy").await.unwrap();
         connection.execute("DELETE FROM enum_csv_copy").await.unwrap();
         let source = connection
-            .query("SELECT id, mood FROM enum_mode_source ORDER BY id")
+            .query("SELECT id, mood, perms FROM enum_mode_source ORDER BY id")
             .await
             .unwrap();
         let native = connection
-            .query("SELECT id, CAST(mood + 0 AS CHAR), HEX(mood) FROM enum_mode_source ORDER BY id")
+            .query(
+                "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), \
+                 CAST(perms + 0 AS CHAR), HEX(perms) FROM enum_mode_source ORDER BY id",
+            )
             .await
             .unwrap();
         assert_eq!(
             native.rows,
             vec![
-                vec![Value::Int(1), Value::Text("1".into()), Value::Text("6861707079".into())],
+                vec![
+                    Value::Int(1),
+                    Value::Text("1".into()),
+                    Value::Text("6861707079".into()),
+                    Value::Text("1".into()),
+                    Value::Text("72656164".into()),
+                ],
                 vec![
                     Value::Int(2),
                     Value::Text("2".into()),
-                    Value::Text("69742773206F6B".into())
+                    Value::Text("69742773206F6B".into()),
+                    Value::Text("6".into()),
+                    Value::Text("77726974652C736C6173685C70617468".into()),
                 ],
                 vec![
                     Value::Int(3),
                     Value::Text("3".into()),
-                    Value::Text("6261636B5C736C617368".into())
+                    Value::Text("6261636B5C736C617368".into()),
+                    Value::Text("8".into()),
+                    Value::Text("4E554C4C".into()),
                 ],
-                vec![Value::Int(4), Value::Text("4".into()), Value::Text("4E554C4C".into())],
-                vec![Value::Int(5), Value::Text("5".into()), Value::Text(String::new())],
-                vec![Value::Int(6), Value::Null, Value::Null],
+                vec![
+                    Value::Int(4),
+                    Value::Text("4".into()),
+                    Value::Text("4E554C4C".into()),
+                    Value::Text("0".into()),
+                    Value::Text(String::new()),
+                ],
+                vec![
+                    Value::Int(5),
+                    Value::Text("5".into()),
+                    Value::Text(String::new()),
+                    Value::Text("4".into()),
+                    Value::Text("736C6173685C70617468".into()),
+                ],
+                vec![Value::Int(6), Value::Null, Value::Null, Value::Null, Value::Null],
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
@@ -110,12 +137,12 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         assert_eq!(
             json,
             serde_json::json!([
-                {"id": 1, "mood": "happy"},
-                {"id": 2, "mood": "it's ok"},
-                {"id": 3, "mood": "back\\slash"},
-                {"id": 4, "mood": "NULL"},
-                {"id": 5, "mood": ""},
-                {"id": 6, "mood": null}
+                {"id": 1, "mood": "happy", "perms": "read"},
+                {"id": 2, "mood": "it's ok", "perms": "write,slash\\path"},
+                {"id": 3, "mood": "back\\slash", "perms": "NULL"},
+                {"id": 4, "mood": "NULL", "perms": ""},
+                {"id": 5, "mood": "", "perms": "slash\\path"},
+                {"id": 6, "mood": null, "perms": null}
             ]),
             "JSON export under sql_mode {mode:?}"
         );
@@ -141,7 +168,7 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         assert!(
             matches!(
                 xlsx_error,
-                tablepro_core::export::ExportError::WorkbookEmptyText { row: 5, column: 2 }
+                tablepro_core::export::ExportError::WorkbookEmptyText { row: 4, column: 3 }
             ),
             "sql_mode {mode:?}: {xlsx_error:?}"
         );
@@ -161,7 +188,7 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         };
         let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
         let columns = connection.fetch_columns(None, "enum_csv_copy").await.unwrap();
-        let mapping = [Some(0), Some(1)];
+        let mapping = [Some(0), Some(1), Some(2)];
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "mysql",
@@ -211,8 +238,12 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         let matching = connection
             .query(
                 "SELECT COUNT(*) FROM enum_mode_source s \
-                 JOIN enum_mode_copy f ON s.id = f.id AND s.mood + 0 <=> f.mood + 0 AND HEX(s.mood) <=> HEX(f.mood) \
-                 JOIN enum_csv_copy c ON s.id = c.id AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood)",
+                 JOIN enum_mode_copy f ON s.id = f.id \
+                   AND s.mood + 0 <=> f.mood + 0 AND HEX(s.mood) <=> HEX(f.mood) \
+                   AND s.perms + 0 <=> f.perms + 0 AND HEX(s.perms) <=> HEX(f.perms) \
+                 JOIN enum_csv_copy c ON s.id = c.id \
+                   AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood) \
+                   AND s.perms + 0 <=> c.perms + 0 AND HEX(s.perms) <=> HEX(c.perms)",
             )
             .await
             .unwrap();
@@ -223,14 +254,14 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_enum_sql_literals_survive_mysql_sql_modes() {
+async fn value_contract_enum_and_set_consumers_survive_mysql_sql_modes() {
     let (_container, options) = start_mysql().await;
-    assert_enum_literal_export_modes(options).await;
+    assert_enum_and_set_export_modes(options).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_enum_sql_literals_survive_mariadb_sql_modes() {
+async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
     let (_container, options) = start_mariadb().await;
-    assert_enum_literal_export_modes(options).await;
+    assert_enum_and_set_export_modes(options).await;
 }
