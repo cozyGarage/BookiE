@@ -268,49 +268,36 @@ async fn value_contract_mongodb_census_is_not_a_snapshot_for_already_read_docume
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_mongodb_browse_uses_one_find_for_schema_and_page() {
-    use mongodb::bson::doc;
     use tablepro_core::OperationControl;
 
     let (_container, native, _collection, connection) = mongodb_census_race_fixture().await;
-    native
-        .database("admin")
-        .run_command(doc! {
-            "configureFailPoint": "failCommand",
-            "mode": { "skip": 1 },
-            "data": {
-                "failCommands": ["find"],
-                "blockConnection": true,
-                "blockTimeMS": 3_000
-            }
-        })
+    let before = mongodb_find_command_count(&native).await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+    let page = connection
+        .fetch_rows_controlled(None, "page_census_race", 0, 1, &control)
         .await
         .unwrap();
-    let page_connection = connection.clone();
-    let page_task = tokio::spawn(async move {
-        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
-        page_connection
-            .fetch_rows_controlled(None, "page_census_race", 0, 1, &control)
-            .await
-    });
-
-    let second_find_blocked = wait_for_mongodb_command(&native, "find").await;
-    native
-        .database("admin")
-        .run_command(doc! { "configureFailPoint": "failCommand", "mode": "off" })
-        .await
-        .unwrap();
-    let page = tokio::time::timeout(std::time::Duration::from_secs(2), page_task)
-        .await
-        .unwrap()
-        .unwrap()
-        .unwrap();
-    assert!(
-        !second_find_blocked,
-        "the browse operation must not issue a second page find"
-    );
+    let after = mongodb_find_command_count(&native).await;
+    assert_eq!(after - before, 1, "schema and page data must share one find cursor");
     let value_index = page.columns.iter().position(|column| column.name == "value").unwrap();
     assert_eq!(page.columns[value_index].data_type, "string");
     assert_eq!(page.rows[0][value_index], Value::Text("before".into()));
+}
+
+async fn mongodb_find_command_count(native: &mongodb::Client) -> i64 {
+    native
+        .database("admin")
+        .run_command(mongodb::bson::doc! { "serverStatus": 1 })
+        .await
+        .unwrap()
+        .get_document("metrics")
+        .unwrap()
+        .get_document("commands")
+        .unwrap()
+        .get_document("find")
+        .unwrap()
+        .get_i64("total")
+        .unwrap()
 }
 
 #[tokio::test]
