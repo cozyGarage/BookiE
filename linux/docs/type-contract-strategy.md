@@ -98,6 +98,8 @@ PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
 UTF-8 scalar and array labels plus refusal of a 64-byte label without partial type creation; see
 the [accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)
 and [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
+An ordering contract checks non-lexical enum sorting against `pg_enum.enumsortorder`
+and native enum types ([ordering evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage

@@ -5008,3 +5008,12 @@ ASCII label, one byte over the server's 63-byte limit. PostgreSQL refuses the
 DDL with SQLSTATE `42602`; `to_regtype` confirms that no type was left behind.
 The focused case, strict Clippy and formatting pass. See the [evidence
 manifest](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
+
+## PostgreSQL custom-enum declared ordering, 2026-10-04
+
+A PostgreSQL 16 fixture declares enum labels in `zulu`, `alpha`, `middle` order
+so catalog order differs from lexical text order. `pg_enum.enumsortorder` is
+the independent ordering oracle; a shuffled result containing duplicates and
+SQL NULL confirms `ORDER BY label NULLS LAST` follows the native enum order,
+preserves the custom enum result type, and leaves NULL last. The focused test,
+strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-order-results-2026-10-04/manifest.json).

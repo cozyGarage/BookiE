@@ -50,6 +50,7 @@ seven nested domain levels; see the [native evidence](evidence/postgres-seven-do
 PostgreSQL custom-enum scalar and array labels at 63 bytes are verified for
 ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving
 a type behind ([accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json), [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json)).
+Native enum ordering also follows declaration order rather than lexical text sorting ([ordering evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
 
 One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
 replayed SQL against native array text, JSON elements and wire bytes; see the

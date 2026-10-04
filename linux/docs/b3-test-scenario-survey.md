@@ -97,6 +97,9 @@ A PostgreSQL 16 boundary test now preserves both a 63-byte ASCII label and a
 against `pg_enum`, JSON-element and wire oracles; an overlength 64-byte label is
 refused with SQLSTATE 42602 and leaves no type behind. See the [accepted-boundary evidence](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)
 and [overlength-refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
+A separate PostgreSQL enum ordering case proves `ORDER BY` uses declared
+`enumsortorder` (`zulu`, `alpha`, `middle`) rather than lexical label order and
+retains a SQL NULL row; see the [enum-order evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json).
 
 | Priority | Candidate | Existing evidence / gap | Next test and oracle |
 | --- | --- | --- | --- |
