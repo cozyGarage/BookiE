@@ -139,6 +139,11 @@ pub fn column_kind(data_type: &str) -> ColumnKind {
     ColumnKind::Text
 }
 
+fn is_mysql_timestamp_type(data_type: &str) -> bool {
+    let data_type = data_type.trim().to_ascii_lowercase();
+    data_type == "timestamp" || data_type.starts_with("timestamp(")
+}
+
 fn temporal_kind(base: &str, lowered: &str) -> Option<ColumnKind> {
     // SQL Server datetimeoffset stores the original UTC offset as part of the
     // value. Value::TimestampTz normalizes offsets to UTC, so CSV import must
@@ -293,7 +298,11 @@ pub(crate) fn row_to_values_for_driver(
 }
 
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {
-    let kind = column_kind(&column.data_type);
+    let kind = if driver_id == "mysql" && is_mysql_timestamp_type(&column.data_type) {
+        ColumnKind::TimestampTz
+    } else {
+        column_kind(&column.data_type)
+    };
     if driver_id == "sqlite" && crate::sqlite_any_csv::is_any_type(&column.data_type) {
         if text == options.null_marker {
             return if options.null_marker.is_empty() {
@@ -685,6 +694,40 @@ mod tests {
         assert_eq!(column_kind("BINARY(16)"), ColumnKind::Bytes);
         assert_eq!(column_kind("VARBINARY(32)"), ColumnKind::Bytes);
         assert_eq!(column_kind("IMAGE"), ColumnKind::Bytes);
+    }
+
+    #[test]
+    fn mysql_timestamp_csv_import_restores_the_utc_instant() {
+        let options = CsvImportOptions::default();
+        let mysql_timestamp = column("instant", "timestamp(6)");
+        let expected: Value = Value::TimestampTz("2024-01-02T03:04:05.123456+00:00".parse().unwrap());
+        assert_eq!(
+            value_for("2024-01-02T03:04:05.123456+00:00", &mysql_timestamp, &options, "mysql"),
+            Ok(expected.clone())
+        );
+        assert_eq!(
+            value_for("2024-01-02 03:04:05.123456", &mysql_timestamp, &options, "mysql"),
+            Ok(expected),
+            "an offset-free MySQL timestamp CSV cell denotes its UTC-session wall time"
+        );
+
+        let mysql_datetime = column("local_at", "datetime(6)");
+        assert!(value_for("2024-01-02T03:04:05.123456+00:00", &mysql_datetime, &options, "mysql").is_err());
+        assert_eq!(
+            value_for(
+                "2024-01-02 03:04:05.123456",
+                &column("local_at", "timestamp without time zone"),
+                &options,
+                "postgres"
+            ),
+            Ok(Value::DateTime(
+                NaiveDate::from_ymd_opt(2024, 1, 2)
+                    .unwrap()
+                    .and_hms_micro_opt(3, 4, 5, 123_456)
+                    .unwrap()
+            )),
+            "driver-aware MySQL handling must not change PostgreSQL naive timestamps"
+        );
     }
 
     #[test]

@@ -191,5 +191,79 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
             ],
         ]
     );
+
+    let export = session
+        .query_params_controlled(
+            "SELECT id, clock, local_at, instant FROM temporal_grid_edit ORDER BY id",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv = tablepro_core::export::render_csv(&export.columns, &export.rows, &csv_options);
+    assert_eq!(
+        csv,
+        "id,clock,local_at,instant\n\
+         1,12:34:56.123456,2024-01-02 03:04:05.123456,2024-01-02T03:04:05.123456+00:00\n\
+         2,04:05:06.987654,2024-02-03 04:05:06.987654,2024-02-03T04:05:06.987654+00:00\n"
+    );
+    let json: serde_json::Value =
+        serde_json::from_str(&tablepro_core::export::render_json(&export.columns, &export.rows)).unwrap();
+    assert_eq!(json[0]["clock"], "12:34:56.123456");
+    assert_eq!(json[0]["local_at"], "2024-01-02 03:04:05.123456");
+    assert_eq!(json[0]["instant"], "2024-01-02T03:04:05.123456+00:00");
+
+    session
+        .query_params_controlled(
+            "CREATE TABLE temporal_grid_imported LIKE temporal_grid_edit",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let import_columns = connection.fetch_columns(None, "temporal_grid_imported").await.unwrap();
+    let sheet = tablepro_core::import::read_csv(
+        csv.as_bytes(),
+        &tablepro_core::import::CsvImportOptions::default(),
+        None,
+    )
+    .unwrap();
+    let mapping = vec![Some(0), Some(1), Some(2), Some(3)];
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "temporal_grid_imported",
+            columns: &import_columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &tablepro_core::import::CsvImportOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        plan.rows,
+        export
+            .rows
+            .iter()
+            .map(|row| vec![row[0].clone(), row[1].clone(), row[2].clone(), row[3].clone()])
+            .collect::<Vec<_>>()
+    );
+    for row in &plan.rows {
+        session
+            .query_params_controlled(&plan.statement, row, &control)
+            .await
+            .unwrap();
+    }
+    let imported = session
+        .query_params_controlled(
+            "SELECT id, clock, local_at, instant FROM temporal_grid_imported ORDER BY id",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(imported.rows, export.rows);
     session.close().await.unwrap();
 }
