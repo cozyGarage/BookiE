@@ -73,7 +73,7 @@ pub struct ColumnInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collation: Option<String>,
     /// The custom PostgreSQL enum type for a scalar enum column, or the
-    /// element type for an array whose direct element type is a custom enum.
+    /// qualified enum/domain element type for an array of custom values.
     #[serde(skip)]
     pub enum_type: Option<QualifiedTypeName>,
 }

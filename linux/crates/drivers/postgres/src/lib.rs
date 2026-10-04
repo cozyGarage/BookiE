@@ -238,7 +238,7 @@ impl Connection for PgConnection {
                      WHERE candidate.oid = CASE
                          WHEN ty.typcategory = 'A' AND EXISTS (
                              SELECT 1 FROM pg_catalog.pg_type element
-                             WHERE element.oid = ty.typelem AND element.typtype = 'e'
+                             WHERE element.oid = ty.typelem AND element.typtype IN ('e', 'd')
                          ) THEN ty.typelem
                          ELSE ty.oid
                      END
@@ -252,6 +252,11 @@ impl Connection for PgConnection {
                  SELECT typnamespace, typname
                  FROM type_chain
                  WHERE typtype = 'e'
+                    OR (ty.typcategory = 'A' AND oid = ty.typelem AND typtype = 'd')
+                 ORDER BY CASE
+                     WHEN ty.typcategory = 'A' AND oid = ty.typelem AND typtype = 'd' THEN 0
+                     ELSE 1
+                 END
                  LIMIT 1
              ) enum_ty ON TRUE
              LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = enum_ty.typnamespace
