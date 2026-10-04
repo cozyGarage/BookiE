@@ -48,6 +48,10 @@ A PostgreSQL `interval[]` XLSX cell preserves mixed-sign intervals,
 microseconds, zero intervals and SQL NULL through Calc's ODS/XLSX re-save as
 exact text ([evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
 
+A PostgreSQL `numeric[]` XLSX cell preserves wide precision, scale, NaN,
+infinities and SQL NULL as one exact text value through Calc's ODS/XLSX re-save
+([evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json)).
+
 A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
 elements and its declared type through decoding, qualified binding and keyed
 edits; invalid values are refused without changing either row

@@ -112,8 +112,8 @@ One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 Other array families remain open; spreadsheet-application re-import is covered
-for `enum[]`, `bytea[]`, `timestamptz[]` and `interval[]` XLSX cells, with other
-shapes unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
+for `enum[]`, `bytea[]`, `timestamptz[]`, `interval[]` and `numeric[]` XLSX
+cells, with other shapes unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
 [bytea[] evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)
 and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json),
 [interval[] evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).

@@ -5549,3 +5549,14 @@ equality filter select the target enum. Native `pg_typeof` text and `regtype`
 OID comparisons identify each type, while target siblings and the shadow row
 remain unchanged. Other transaction/session path permutations remain open. See
 the [evidence manifest](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json).
+
+## PostgreSQL numeric[] XLSX through Calc, 2026-10-04
+
+A PostgreSQL `numeric[]` containing a 40-digit integer, high-scale decimal,
+scale-preserving `1.2300`, NaN, both infinities and SQL NULL is exported as one
+XLSX shared-string cell. LibreOffice Calc 26.8.0.3 saves the workbook as ODS,
+then reopens and saves XLSX; Python standard-library OOXML/ODS checks confirm
+the exact 122-character array text remains unchanged and no formula is added.
+The focused Docker contract, strict Clippy, formatting and round-trip checker
+pass. Other array families and spreadsheet applications remain open. See the
+[evidence manifest](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json).

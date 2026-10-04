@@ -251,7 +251,9 @@ async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
-    let xlsx_path = directory.path().join("numeric-array.xlsx");
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("numeric-array.xlsx"));
     tablepro_core::export::write_result_file(
         &xlsx_path,
         &result,
