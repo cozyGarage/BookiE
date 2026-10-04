@@ -1644,6 +1644,15 @@ NULL element remains distinct. Before the fix, the scalar labels were
 `Undecodable`; the retained before-fix output is in
 [`before-fix.txt`](evidence/postgres-enum-results-2026-10-03/before-fix.txt).
 
+### PostgreSQL domain-over-enum array text parameter, 2026-10-04
+
+A domain-over-enum array is also tested through an explicitly cast text
+parameter. The input distinguishes the literal label `NULL`, empty text,
+Unicode, a comma-containing label and SQL NULL. The decoded array, JSON,
+`pg_typeof` and `array_send` bytes match an independently constructed native
+array; an invalid element is rejected with SQLSTATE `22P02`. See the
+[evidence manifest](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json).
+
 At this original October 3 decoder checkpoint, the adversarial scalar fixture
 whose enum label is literally `NULL` still surfaced SQLx's metadata resolution
 error (`enum_labels: unexpected NULL`), and keyed-edit proof remained open.

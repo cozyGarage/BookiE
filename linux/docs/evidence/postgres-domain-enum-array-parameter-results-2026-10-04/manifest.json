@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "3582b25fe6a9e2cc994052750830a627b8ece393",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Explicitly typed text parameter for a domain-over-enum array",
+  "test": "domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null",
+  "contract": [
+    "An explicitly cast text parameter decodes as a domain-over-enum array containing the literal label NULL, empty text, Unicode, a comma-containing label, and SQL NULL.",
+    "The full driver result, array_to_json, pg_typeof and array_send bytes exactly match an independently constructed native PostgreSQL array.",
+    "An invalid array element is rejected by PostgreSQL with SQLSTATE 22P02."
+  ],
+  "validation": {
+    "focused_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed before the source commit",
+      "log": null
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "8d48a3136c6d66c5602d966b880c99dfe1f01abd6e9871564cbd1d7b7292d592",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/postgres/tests/support/domain_contract.rs": "4c954dffdd0f1cd264b9eb1a038139d54cd2bd5d3c7d585045295c0094658171"
+  },
+  "remaining": [
+    "Other custom enum array consumers, session configurations and spreadsheet-application re-import remain open."
+  ]
+}

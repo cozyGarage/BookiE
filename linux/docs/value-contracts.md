@@ -52,6 +52,10 @@ re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manife
 | Script planning and approval | [MySQL delimiter consumer agreement](value-contract-history.md#mysql-delimiter-consumer-agreement-2026-09-28), [word-character delimiter boundary](evidence/mysql-word-delimiter-results-2026-10-04/manifest.json), [quoted delimiter consumer agreement](evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json), [malformed-routine fail-closed contract](value-contract-history.md#mysql-malformed-routine-delimiter-fails-closed-2026-09-30), [human policy decision](evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json), [GTK approval route](evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json) |
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
+PostgreSQL domain-over-enum arrays now also have a bound text-parameter contract
+for literal `NULL`, empty text, Unicode, comma-containing labels and SQL NULL,
+verified against native `array_send` bytes ([evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)).
+
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
 through ten levels, plus 63, 64, 65, 128, 129 and 256 levels. Raw inferred text and SQL
 NULL parameters work through 63 levels; at 64 or more levels they return

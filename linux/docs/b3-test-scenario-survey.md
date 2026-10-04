@@ -298,6 +298,10 @@ October 4 B3-1 follow-up: text and SQL NULL parameters infer as the custom enum
 in both `COALESCE` argument positions and in `array_append(ARRAY[enum_column], $1)`.
 Native type/value oracles, `22P02` invalid-label refusals and unchanged source
 rows are checked ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
+A separately bound text-array parameter explicitly cast to a domain-over-enum
+array preserves literal `NULL`, empty text, Unicode, comma-containing text and
+SQL NULL against native `array_send` and JSON oracles; invalid elements retain
+SQLSTATE `22P02` ([evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)).
 A `NULLIF(enum_column, $1)` follow-up checks matching, non-matching and SQL NULL
 parameters, native inferred/result enum types, invalid-label SQLSTATE `22P02`
 and unchanged rows ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).

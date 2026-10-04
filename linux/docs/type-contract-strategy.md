@@ -133,6 +133,7 @@ operations pass through 256 layers. Domain depths beyond 256 and other
 enum/session configurations remain open; see the
 [deep-domain boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [129/256-layer follow-up](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
+[domain-over-enum array parameter evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json),
 [six/seven-domain evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
 [eight-domain follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
 and the [nine-domain follow-up](evidence/postgres-nine-domain-results-2026-10-04/manifest.json),
