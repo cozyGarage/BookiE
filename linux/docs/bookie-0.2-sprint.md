@@ -141,6 +141,12 @@ October 4 B3 follow-up: `array_replace` verifies both inferred scalar parameter
 slots for domain-over-enum arrays, including NULL search and replacement values
 ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
 
+October 4 B3 MongoDB follow-up: stale keyed edits now compare original values of
+edited fields in the atomic update filter. A MongoDB 7 regression preserves a
+concurrent value and distinguishes explicit BSON NULL from a concurrently
+removed field. Stale deletes, ABA changes, and the broader B3 matrix remain open
+([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
+
 October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
 contracts across all 11 suites, including 101 PostgreSQL contracts with the
 new array-operator and depth-boundary cases. The exact-revision report and raw

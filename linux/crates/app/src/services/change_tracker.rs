@@ -32,7 +32,7 @@ use uuid::Uuid;
 
 use tablepro_core::{
     ColumnInfo, Value,
-    sql_dialect::{build_insert_from_draft, build_keyed_delete, build_keyed_update},
+    sql_dialect::{build_insert_from_draft, build_keyed_delete, build_keyed_update, build_mongodb_keyed_update},
 };
 
 #[path = "change_tracker_row_identity.rs"]
@@ -516,12 +516,12 @@ impl TabChangeTracker {
         }
         // Group updates by row_key so each row becomes ONE UPDATE
         // (a multi-cell edit on one row is one statement, not N).
-        let mut per_row: HashMap<RowKey, Vec<(usize, Value)>> = HashMap::new();
+        let mut per_row: HashMap<RowKey, Vec<(usize, Value, Value)>> = HashMap::new();
         for ((row_key, col), edit) in &self.updates {
             per_row
                 .entry(row_key.clone())
                 .or_default()
-                .push((*col, edit.new_value.clone()));
+                .push((*col, edit.prev_value.clone(), edit.new_value.clone()));
         }
         // `per_row` is a HashMap, so iterating it emits statements in an
         // order that changes between processes. Two windows saving
@@ -529,7 +529,7 @@ impl TabChangeTracker {
         // and deadlock against each other, and a partial failure could
         // report a different row each run. Sort by primary key so the
         // batch is reproducible and every client locks in one order.
-        let mut per_row: Vec<(RowKey, Vec<(usize, Value)>)> = per_row.into_iter().collect();
+        let mut per_row: Vec<(RowKey, Vec<(usize, Value, Value)>)> = per_row.into_iter().collect();
         per_row.sort_by(|left, right| left.0.cmp(&right.0));
         for (row_key, mut edits) in per_row {
             edits.sort_by_key(|e| e.0);
@@ -537,9 +537,22 @@ impl TabChangeTracker {
                 continue;
             };
             let pk_values = readable_pk_values(pk_keyvalues)?;
-            out.push(build_keyed_update(
-                driver_id, schema, table, columns, &edits, &pk_values,
-            )?);
+            if driver_id == "mongodb" {
+                out.push(build_mongodb_keyed_update(schema, table, columns, &edits, &pk_values)?);
+            } else {
+                let new_values = edits
+                    .iter()
+                    .map(|(column, _, new_value)| (*column, new_value.clone()))
+                    .collect::<Vec<_>>();
+                out.push(build_keyed_update(
+                    driver_id,
+                    schema,
+                    table,
+                    columns,
+                    &new_values,
+                    &pk_values,
+                )?);
+            }
             sources.push(StatementSource::Update {
                 row_key: row_key.clone(),
             });
@@ -821,6 +834,41 @@ mod tests {
         assert!(matches!(sources[1], StatementSource::Update { .. }));
         assert!(stmts[2].0.starts_with("DELETE"));
         assert!(matches!(sources[2], StatementSource::Delete { .. }));
+    }
+
+    #[test]
+    fn mongodb_materialize_guards_edited_fields_with_the_original_value() {
+        let mut t = TabChangeTracker::new();
+        let columns = vec![pk_col("_id"), data_col("payload")];
+        let key = rk(&[Value::Text("id-1".into())]);
+        t.track_cell_edit(key, 1, Value::Text("before".into()), Value::Text("edited".into()));
+
+        let (statements, _) = t.materialize("mongodb", Some("appdb"), "records", &columns).unwrap();
+
+        assert_eq!(
+            statements[0].0,
+            "UPDATE \"appdb\".\"records\" SET \"payload\" = ? WHERE \"_id\" = ? AND \"payload\" = ?"
+        );
+        assert_eq!(
+            statements[0].1,
+            vec![
+                Value::Text("edited".into()),
+                Value::Text("id-1".into()),
+                Value::Text("before".into())
+            ]
+        );
+
+        let mut explicit_null = TabChangeTracker::new();
+        explicit_null.track_cell_edit(
+            rk(&[Value::Text("id-2".into())]),
+            1,
+            Value::Null,
+            Value::Text("edited".into()),
+        );
+        let (statements, _) = explicit_null
+            .materialize("mongodb", Some("appdb"), "records", &columns)
+            .unwrap();
+        assert_eq!(statements[0].1[2], Value::Null);
     }
 
     #[test]

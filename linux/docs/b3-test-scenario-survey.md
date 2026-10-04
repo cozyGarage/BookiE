@@ -12,6 +12,13 @@ The operator matrix also runs with a same-named shadow enum first in
 The inferred array-element domain chain also covers 62/63 supported layers and
 an explicit 64-layer refusal ([depth packet](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
 
+MongoDB keyed grid edits now compare each edited field with its value from the
+materialized result in the atomic update filter. A failing-first MongoDB 7 case
+reproduces last-write-wins, then verifies conflict counts and preservation for
+a concurrent string change and explicit BSON NULL becoming missing
+([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
+This field-level compare-and-set does not cover stale deletes or ABA changes.
+
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source
 `35d457fa488768a5204a26d785c90114073d4acd` and documentation tip `62dc257c7`.

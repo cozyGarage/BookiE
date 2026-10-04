@@ -888,3 +888,6 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
 mod census_cost;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
+
+#[path = "support/stale_grid_edit_contract.rs"]
+mod stale_grid_edit_contract;

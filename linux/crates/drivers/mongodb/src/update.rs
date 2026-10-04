@@ -148,7 +148,11 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
                 ));
             };
             let value = take_placeholder(right, params, index)?;
-            Ok(doc! { field: value })
+            if matches!(value, Bson::Null) {
+                Ok(doc! { field: { "$type": 10 } })
+            } else {
+                Ok(doc! { field: value })
+            }
         }
         Expr::IsNull(inner) => {
             let Some(field) = identifier_from_expr(inner) else {

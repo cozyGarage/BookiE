@@ -6,6 +6,11 @@ use crate::{ColumnInfo, Value};
 #[path = "sql_dialect/postgres_enum_tests.rs"]
 mod postgres_enum_tests;
 
+#[path = "sql_dialect/updates.rs"]
+mod updates;
+
+pub use updates::{build_keyed_update, build_mongodb_keyed_update};
+
 pub const MAX_IDENT_BYTES: usize = 256;
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -316,44 +321,6 @@ pub fn build_insert_from_draft(
     Ok((sql, params))
 }
 
-pub fn build_keyed_update(
-    driver_id: &str,
-    schema: Option<&str>,
-    table: &str,
-    columns: &[ColumnInfo],
-    edits: &[(usize, Value)],
-    pk_values: &[Value],
-) -> Result<(String, Vec<Value>), BuildSqlError> {
-    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
-    if edits.is_empty() {
-        return Err(BuildSqlError::NothingToUpdate);
-    }
-    if edits.iter().any(|(col_idx, _)| *col_idx >= columns.len()) {
-        return Err(BuildSqlError::StaleColumns);
-    }
-    let mut params: Vec<Value> = Vec::with_capacity(edits.len() + pk_values.len());
-    let set_clauses: Vec<String> = edits
-        .iter()
-        .map(|(col_idx, new_value)| {
-            let placeholder = placeholder_for(driver_id, params.len());
-            let value_sql = if driver_id == "postgres" {
-                postgres_text_cast_type(&columns[*col_idx], new_value)
-                    .map(|type_name| format!("{placeholder}::text::{type_name}"))
-                    .unwrap_or(placeholder)
-            } else {
-                placeholder
-            };
-            let clause = format!("{} = {}", quote_ident(driver_id, &columns[*col_idx].name), value_sql);
-            params.push(new_value.clone());
-            clause
-        })
-        .collect();
-    let where_clause = keyed_where_clause(driver_id, columns, &pk_indexes, pk_values, &mut params);
-    let qualified = qualified_table(driver_id, schema, table);
-    let sql = build_update(driver_id, &qualified, &set_clauses.join(", "), &where_clause);
-    Ok((sql, params))
-}
-
 pub(crate) fn postgres_array_cast_type(data_type: &str) -> Option<&'static str> {
     let lowered = data_type.trim().to_ascii_lowercase();
     let element = lowered.strip_suffix("[]")?;
@@ -442,7 +409,7 @@ pub fn build_keyed_delete(
     Ok((format!("DELETE FROM {qualified} WHERE {where_clause}"), params))
 }
 
-fn checked_pk_indexes(columns: &[ColumnInfo], pk_values: &[Value]) -> Result<Vec<usize>, BuildSqlError> {
+pub(super) fn checked_pk_indexes(columns: &[ColumnInfo], pk_values: &[Value]) -> Result<Vec<usize>, BuildSqlError> {
     let pk_indexes = collect_pk_indexes(columns);
     if pk_indexes.is_empty() {
         return Err(BuildSqlError::NoPrimaryKey);
@@ -453,7 +420,7 @@ fn checked_pk_indexes(columns: &[ColumnInfo], pk_values: &[Value]) -> Result<Vec
     Ok(pk_indexes)
 }
 
-fn keyed_where_clause(
+pub(super) fn keyed_where_clause(
     driver_id: &str,
     columns: &[ColumnInfo],
     pk_indexes: &[usize],
@@ -476,7 +443,7 @@ fn keyed_where_clause(
     clauses.join(" AND ")
 }
 
-fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
+pub(super) fn qualified_table(driver_id: &str, schema: Option<&str>, table: &str) -> String {
     match schema {
         Some(s) => format!("{}.{}", quote_ident(driver_id, s), quote_ident(driver_id, table)),
         None => quote_ident(driver_id, table),

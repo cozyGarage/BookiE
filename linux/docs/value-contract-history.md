@@ -4547,8 +4547,26 @@ The consistency contract is best-effort, not snapshot isolation. A deterministic
 failpoint test updates `_id: 0` from String to Decimal128 after the cursor has
 read it but before `getMore`; the returned row and census still say String while
 a native read sees Decimal128. A concurrent change to a document the cursor
-has already passed is therefore outside the metadata guarantee. Like other
-editable database results, a later write can overwrite a concurrent change.
+has already passed is therefore outside the metadata guarantee. MongoDB grid
+updates now compare the displayed original value for each edited field in the
+same atomic update filter, so a same-field concurrent change reports a conflict
+instead of being overwritten. This value guard does not detect an ABA change
+that returns the field to its original value; stale deletes still use the row
+key alone and remain open.
+
+## MongoDB stale grid edits use atomic original-value guards — 2026-10-04
+
+A failing-first MongoDB 7 contract reads two documents, then changes one field
+through a native client before saving the stale grid values through BookiE. The
+first run matched the `_id` alone, returned one affected row and overwrote the
+newer value. The fixed app materializer includes each edited field's original
+value in the same `update_one` filter; both stale writes now match zero rows.
+The contract verifies a concurrent string edit remains stored and that a
+concurrent removal of an explicitly NULL field stays missing. MongoDB equality
+against a NULL guard is translated to `$type: 10`, preserving the distinction
+between explicit BSON NULL and a missing field. This is per-edited-field
+compare-and-set, not document-version tracking: ABA changes and stale deletes
+remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
 
 The shell `run_find` path still runs a full type census and then a filtered
 query. It merges types from returned rows, so a selected row that changes kind
