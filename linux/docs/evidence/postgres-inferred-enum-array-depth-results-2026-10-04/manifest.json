@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "ca6e3e0e6beeb2bc76599a5a5573f5b050d1745b",
+  "branch": "linux",
+  "focused_contract": "crates/drivers/postgres/tests/support/domain_depth_boundary_contract.rs::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+  "result": {
+    "passed": 130,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0,
+    "seconds": 291.09
+  },
+  "supported_depths": [62, 63],
+  "explicit_refusal_depth": 64,
+  "refused_values": ["inferred text array", "SQL NULL array"],
+  "oracle": [
+    "native array containment result",
+    "pg_typeof($1) domain-array name",
+    "pg_typeof(source-column) outer domain name",
+    "exact array_send bytes"
+  ],
+  "additional_checks": {
+    "cargo fmt --all -- --check": "passed",
+    "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings": "passed",
+    "python3 scripts/inventory-ignored-tests.py --check": "passed",
+    "bash scripts/check-file-size.sh": "passed",
+    "git diff --check": "passed"
+  },
+  "log": "postgres-integration.txt",
+  "checksums": "sha256sums.txt",
+  "scope_limit": "This records the tested domain-array depth limit only. The remaining PostgreSQL and cross-engine B3 matrix, B4 acceptance and B7 release qualification remain open."
+}

@@ -5697,3 +5697,13 @@ still infer the target enum-array type and match native literal-array results
 and `array_send` bytes. Invalid target labels return SQLSTATE `22P02` in both
 containment positions; savepoints isolate the expected server errors. The full
 PostgreSQL integration suite passes 129 tests. See the [evidence manifest](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
+
+## PostgreSQL inferred enum-array domain-depth boundary, 2026-10-04
+
+An array containment query infers arrays whose elements are nested enum domains.
+At 62 and 63 domain layers, text arrays and SQL NULL arrays preserve the exact
+domain-array type and `array_send` bytes against native typed-array controls.
+At 64 layers, text and SQL NULL return explicit unsupported results before
+dispatch. Unlike scalar enum parameters, the array container participates in
+the type resolver's depth budget. The full Docker-backed PostgreSQL integration
+suite passes 130 tests. See the [evidence manifest](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).

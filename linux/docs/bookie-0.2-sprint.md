@@ -120,6 +120,12 @@ shadow enum precedes it in `search_path`. The complete PostgreSQL suite passes
 129 tests ([evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
 This closes only the tested array-operator/search-path combination.
 
+October 4 B3 depth follow-up: inferred enum-array parameters round-trip through
+62 and 63 nested enum domains, then return explicit unsupported results at 64
+for text and SQL NULL. The test compares native type and wire bytes and passes
+in the 130-test PostgreSQL integration run
+([evidence](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

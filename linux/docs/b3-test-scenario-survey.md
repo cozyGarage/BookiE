@@ -9,6 +9,8 @@ checked; other inferred array contexts remain open. See the [ANY packet](evidenc
 and [operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 The operator matrix also runs with a same-named shadow enum first in
 `search_path` ([configuration packet](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
+The inferred array-element domain chain also covers 62/63 supported layers and
+an explicit 64-layer refusal ([depth packet](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source
