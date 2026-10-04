@@ -1216,7 +1216,9 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 9).await;
     assert_domain_level_contract(opts.clone(), 10).await;
     assert_domain_level_contract(opts.clone(), 63).await;
-    assert_domain_level_contract(opts, 64).await;
+    assert_domain_level_contract(opts.clone(), 64).await;
+    assert_domain_level_contract(opts.clone(), 65).await;
+    assert_domain_level_contract(opts, 128).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
@@ -1322,7 +1324,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .expect_err(&format!(
             "invalid enum label must be refused through {levels} domain layers"
         ));
-    if levels == 64 {
+    if levels >= 64 {
         assert!(
             matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
@@ -1334,7 +1336,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
                 &[Value::Null],
             )
             .await
-            .expect_err("raw inferred SQL NULL must be refused at the resolver depth limit");
+            .expect_err(&format!("raw inferred SQL NULL must be refused at depth {levels}"));
         assert!(
             matches!(&null_inference, tablepro_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
@@ -1547,12 +1549,23 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .expect_err(&format!(
             "{levels}-level target domain rejects invalid labels under shadowed search_path"
         ));
-    assert!(matches!(
-        invalid,
-        tablepro_core::DriverError::Query {
-            sqlstate: Some(code), ..
-        } if code == "22P02"
-    ));
+    if levels > 64 {
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "depth {levels}: {invalid:?}"
+        );
+    } else {
+        assert!(
+            matches!(
+                &invalid,
+                tablepro_core::DriverError::Query {
+                    sqlstate: Some(code), ..
+                } if code == "22P02"
+            ),
+            "depth {levels}: {invalid:?}"
+        );
+    }
     transaction.rollback().await.unwrap();
 
     let after_rollback = connection
