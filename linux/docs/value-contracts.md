@@ -57,6 +57,12 @@ infinities and SQL NULL through Calc's XLSX/ODS/XLSX round trip. The native
 parameter rebind matches both `array_to_json` and `array_send`
 ([evidence](evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+A PostgreSQL `timestamp[]` workbook preserves a BC timestamp, year 10000, the
+maximum finite timestamp, both infinities and SQL NULL through Calc's
+XLSX/ODS/XLSX round trip. The native parameter rebind matches both
+`array_to_json` and `array_send`
+([evidence](evidence/postgres-timestamp-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).

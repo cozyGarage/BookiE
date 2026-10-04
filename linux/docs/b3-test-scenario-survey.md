@@ -188,6 +188,12 @@ XLSX-to-ODS-to-XLSX re-save with exact text, string cell types and no formulas.
 The native result and rebound parameter match `array_send`
 ([Calc evidence](evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 consumer follow-up: a PostgreSQL `timestamp[]` containing a BC
+timestamp, year 10000, the maximum finite timestamp, both infinities and SQL
+NULL survives the same Calc re-save with exact text, string cell types and no
+formulas; native `array_to_json` and `array_send` match after rebinding
+([Calc evidence](evidence/postgres-timestamp-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 October 4 B3-1 follow-up: a PostgreSQL `bytea[]` containing non-UTF-8 bytes,
 empty bytea and SQL NULL now passes JSON, CSV, XLSX and replayed SQL file
 writers. Native element hex, `array_to_json` and `array_send` oracles verify
