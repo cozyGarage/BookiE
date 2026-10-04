@@ -1359,7 +1359,9 @@ async fn value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path
     assert_domain_level_contract(opts.clone(), 63).await;
     assert_domain_level_contract(opts.clone(), 64).await;
     assert_domain_level_contract(opts.clone(), 65).await;
-    assert_domain_level_contract(opts, 128).await;
+    assert_domain_level_contract(opts.clone(), 128).await;
+    assert_domain_level_contract(opts.clone(), 129).await;
+    assert_domain_level_contract(opts, 256).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
