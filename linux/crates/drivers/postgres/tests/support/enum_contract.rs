@@ -736,22 +736,6 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
         .await
         .unwrap();
     let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
-    let csv_options = tablepro_core::export::CsvOptions {
-        null_to_empty: false,
-        null_marker: Some(null_marker.clone()),
-        sanitize_formulas: false,
-        ..Default::default()
-    };
-    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    assert!(csv.contains("\"double \"\" quote\""));
-    assert!(csv.contains("\"line one\nline two\""));
-    assert!(csv.contains("=1+1"), "raw text must retain formula-shaped enum labels");
-
-    let import_options = tablepro_core::import::CsvImportOptions {
-        null_marker,
-        ..Default::default()
-    };
-    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection.fetch_columns(Some(schema), "target_rows").await.unwrap();
     let target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
@@ -760,23 +744,6 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
         columns: &columns,
         mapping: &[Some(0), Some(1)],
     };
-    let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &import_options).unwrap();
-    assert!(
-        plan.statement
-            .contains("$2::text::\"value_contract_enum_csv_edges\".\"status\"")
-    );
-    for row in &plan.rows {
-        connection.execute_params(&plan.statement, row).await.unwrap();
-    }
-
-    let restored = connection
-        .query(&format!(
-            "SELECT id, status::text, pg_typeof(status)::text, \
-             encode(convert_to(status::text, 'UTF8'), 'hex') \
-             FROM {schema}.target_rows ORDER BY id"
-        ))
-        .await
-        .unwrap();
     let expected = labels
         .iter()
         .map(|label| Some(*label))
@@ -795,7 +762,54 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_ba
             ]
         })
         .collect::<Vec<_>>();
-    assert_eq!(restored.rows, expected);
+
+    for delimiter in tablepro_core::export::CsvDelimiter::ALL {
+        for line_break in tablepro_core::export::CsvLineBreak::ALL {
+            let csv_options = tablepro_core::export::CsvOptions {
+                null_to_empty: false,
+                null_marker: Some(null_marker.clone()),
+                sanitize_formulas: false,
+                delimiter,
+                line_break,
+                ..Default::default()
+            };
+            let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+            assert!(csv.contains("\"double \"\" quote\""));
+            assert!(csv.contains("\"line one\nline two\""));
+            assert!(csv.contains("=1+1"), "raw text must retain formula-shaped enum labels");
+
+            let import_options = tablepro_core::import::CsvImportOptions {
+                delimiter,
+                null_marker: null_marker.clone(),
+                ..Default::default()
+            };
+            let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+            assert_eq!(sheet.rows.len(), expected.len(), "{delimiter:?}/{line_break:?}");
+
+            connection
+                .execute(&format!("TRUNCATE TABLE {schema}.target_rows"))
+                .await
+                .unwrap();
+            let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &import_options).unwrap();
+            assert!(
+                plan.statement
+                    .contains("$2::text::\"value_contract_enum_csv_edges\".\"status\"")
+            );
+            for row in &plan.rows {
+                connection.execute_params(&plan.statement, row).await.unwrap();
+            }
+
+            let restored = connection
+                .query(&format!(
+                    "SELECT id, status::text, pg_typeof(status)::text, \
+                     encode(convert_to(status::text, 'UTF8'), 'hex') \
+                     FROM {schema}.target_rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            assert_eq!(restored.rows, expected, "{delimiter:?}/{line_break:?}");
+        }
+    }
 }
 
 #[tokio::test]
