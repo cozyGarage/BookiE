@@ -1,1 +1,2 @@
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.35s
+    Checking tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.60s

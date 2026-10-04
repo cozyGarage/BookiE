@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "9ae355780864edb6872867333d5a57bfd2efdf71",
+  "source_commit": "8488844d0aa3cb3c82957b504c546b0e8e69cf1c",
   "engine": "MongoDB 7 in Docker via testcontainers",
   "case": "stale MongoDB grid deletes preserve concurrent document changes",
   "test": "stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change",
@@ -71,17 +71,17 @@
     "Concurrent fields added outside the materialized column set are not guarded.",
     "The case does not establish collection snapshot isolation or atomicity across a multi-statement batch and does not qualify the 0.2.0 release."
   ],
-  "source_worktree": "Implementation and docs were committed at 9ae355780864edb6872867333d5a57bfd2efdf71 before the retained tests. Evidence logs and manifest are committed separately.",
+  "source_worktree": "Implementation and docs were committed at 9ae355780864edb6872867333d5a57bfd2efdf71. The expanded native sibling-field case and matching docs are committed at 8488844d0aa3cb3c82957b504c546b0e8e69cf1c; the complete retained test set was rerun at that commit. Evidence logs and manifest are committed separately.",
   "sha256": {
-    "app-tests.txt": "912cd084b3d362c50d21b01950d35ad200b2f595ae75432ac1b8a95a1ae92007",
+    "app-tests.txt": "36f4629fb88c304617afe29d6c1adfa333719ffa86d67b9bfcdfffac047937e0",
     "before-fix.txt": "e16857b1b611737cb7fcf2d85d523cfc66a48d0b5dd1ae2f95910f63c38c81be",
-    "clippy.txt": "b2c020f27a01faabb96e5d55c11fd219cf7c484c9cf34b3342bfc8444d934c89",
-    "core-tests.txt": "c3ba755254346d342108cfe8aedc1fcc42baa22068a849b2bbed4db368a2e646",
+    "clippy.txt": "1cffdad0cdf4f7beb221af0c851e4f4e124afbaf0efd63536eda099617b386b3",
+    "core-tests.txt": "9132720c2489b9e37d25335d63fb174e4178f2fe7e1a40a639f6c7e24f04c592",
     "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
     "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
     "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
-    "focused-test.txt": "5939aa54bd6559d3efccc440d29b108934f4f6fba8b594d62ad203818b83235f",
+    "focused-test.txt": "83bff6d34355ee59b866fa604e1f64b07be5a0d8ecdb8c425b23cb3e8da8e3b6",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "mongodb-integration.txt": "857bd25cdff61f79192ec7e89df1a514943e7804d2229355f2201aca9532a6c1"
+    "mongodb-integration.txt": "5b1cdc04229445d6be990742feabec7d3f38fdf2f11d29870669f0b3c3df87bc"
   }
 }

@@ -1,7 +1,7 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
      Running tests/integration.rs (target/debug/deps/integration-fc39c0a96012db67)
 
 running 1 test
 test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.79s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 0.82s
