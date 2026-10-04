@@ -74,6 +74,16 @@ during the run and the two existing B4 scratch directories; the final code is
 at `b80347facbc6671265fac9a87ed852de261582ea`. The new MySQL approval case is
 selected by the runner's `value_contract_` prefix.
 
+After the PostgreSQL float8-array Calc contract, the full strict values runner
+`./scripts/test-value-contracts.sh --gtk --duckdb` passed 288 selected contracts
+across all 11 suites, including 95 PostgreSQL contracts; GTK and DuckDB were
+enabled and no suites were missing. The PostgreSQL suite includes
+`array_contract::value_contract_float8_array_file_exports_preserve_bits`. The
+portable run report and suite logs are retained in
+[evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/strict-values/report.json).
+The runner reported the pre-commit revision `7f807cd7` with a dirty worktree;
+the tested source change is committed at `8bb51d3c0`.
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

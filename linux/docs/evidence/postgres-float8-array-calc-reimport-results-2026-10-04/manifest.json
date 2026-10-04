@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "8bb51d3c00594f4f5f59e7b82e6fb5d72547d5f4",
+  "case": "PostgreSQL float8[] exact-value XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_float8_array_file_exports_preserve_bits",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "contract": [
+    "The float8[] contains 1.0000000000000002, negative zero, the minimum subnormal, NaN, positive/negative Infinity and SQL NULL.",
+    "Native float8send checks exact wire bits for the adjacent value, negative zero and minimum subnormal; rebinding the driver text preserves array_send bytes.",
+    "PostgreSQL array_to_json renders negative zero as 0; float8send, not JSON, is the sign-bit oracle.",
+    "The XLSX shared-string cell survives LibreOffice Calc ODS save and XLSX re-save as identical 390-character text without formulas."
+  ],
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "validation": {
+    "focused_postgres_contract": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked --package tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_file_exports_preserve_bits -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "strict_values_tier": {
+      "command": "rtk proxy bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed",
+      "total_contracts": 288,
+      "suite_count": 11,
+      "missing_suites": [],
+      "gtk": true,
+      "duckdb": true,
+      "compile_seconds": 9.647,
+      "fresh_artifacts": 741,
+      "rebuilt_packages": [
+        "path+file:///home/trung/Projects/tablepro/linux/crates/agentd#tablepro-agentd@0.1.5",
+        "path+file:///home/trung/Projects/tablepro/linux/crates/app#tablepro-app@0.1.5",
+        "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0",
+        "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/sqlite#tablepro-driver-sqlite@0.1.0"
+      ],
+      "report_revision_before_commit": "7f807cd7cc000389db427aa4e2584ad7cbbbc305",
+      "report_working_tree_dirty": true,
+      "source_commit": "8bb51d3c00594f4f5f59e7b82e6fb5d72547d5f4",
+      "suites": [
+        {
+          "suite": "crates/app/Cargo.toml",
+          "tests": 46,
+          "exit_code": 0,
+          "seconds": 110.712,
+          "log": "strict-values/crates-app.log"
+        },
+        {
+          "suite": "crates/core/Cargo.toml",
+          "tests": 58,
+          "exit_code": 0,
+          "seconds": 3.22,
+          "log": "strict-values/crates-core.log"
+        },
+        {
+          "suite": "crates/drivers/clickhouse/Cargo.toml",
+          "tests": 6,
+          "exit_code": 0,
+          "seconds": 28.691,
+          "log": "strict-values/crates-drivers-clickhouse.log"
+        },
+        {
+          "suite": "crates/drivers/duckdb/Cargo.toml",
+          "tests": 30,
+          "exit_code": 0,
+          "seconds": 2.168,
+          "log": "strict-values/crates-drivers-duckdb.log"
+        },
+        {
+          "suite": "crates/drivers/mongodb/Cargo.toml",
+          "tests": 13,
+          "exit_code": 0,
+          "seconds": 9.781,
+          "log": "strict-values/crates-drivers-mongodb.log"
+        },
+        {
+          "suite": "crates/drivers/mssql/Cargo.toml",
+          "tests": 6,
+          "exit_code": 0,
+          "seconds": 45.863,
+          "log": "strict-values/crates-drivers-mssql.log"
+        },
+        {
+          "suite": "crates/drivers/mysql/Cargo.toml",
+          "tests": 28,
+          "exit_code": 0,
+          "seconds": 288.547,
+          "log": "strict-values/crates-drivers-mysql.log"
+        },
+        {
+          "suite": "crates/drivers/postgres/Cargo.toml",
+          "tests": 95,
+          "exit_code": 0,
+          "seconds": 213.259,
+          "log": "strict-values/crates-drivers-postgres.log"
+        },
+        {
+          "suite": "crates/drivers/redis/Cargo.toml",
+          "tests": 4,
+          "exit_code": 0,
+          "seconds": 1.667,
+          "log": "strict-values/crates-drivers-redis.log"
+        },
+        {
+          "suite": "crates/drivers/sqlite/Cargo.toml",
+          "tests": 1,
+          "exit_code": 0,
+          "seconds": 0.016,
+          "log": "strict-values/crates-drivers-sqlite.log"
+        },
+        {
+          "suite": "crates/mcp/Cargo.toml",
+          "tests": 1,
+          "exit_code": 0,
+          "seconds": 0.016,
+          "log": "strict-values/crates-mcp.log"
+        }
+      ],
+      "report": "strict-values/report.json",
+      "source_commit_contains_tested_change": true
+    },
+    "calc_round_trip": {
+      "steps": [
+        "In the pinned Debian image, install libreoffice-calc; Calc opens source.xlsx and saves calc-roundtrip.ods.",
+        "Calc reopens calc-roundtrip.ods and saves calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks require identical A2 text across both XLSX files and ODS, shared-string/string cell kinds, edge tokens, and no formula elements.",
+      "checker": "verify_roundtrip.py",
+      "result": "All artifacts preserve the exact 390-character text cell; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --locked --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "eb9ec346e5a0340445d01313307d03e773f4435194be74426119e86f7726216a",
+    "calc-roundtrip.ods": "3c3addfa5cffe02b7dd89c1ccf8edacb8ab25b60b943d5fad6cd71b428c4c077",
+    "calc-roundtrip.xlsx": "a7466da14b34b8aebdc6a2d9b544b0aa49836358b27e77b466bc9814e9c7d1bd"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "e35d9bc61db2b8443db5233db23f7e4841099e43aae4b33715f11962ec498d27",
+    "libreoffice-roundtrip.txt": "3caea8e3b5bda4157f2763a8232dbef653dbe76bb85a214a47c4102fdf75e86d",
+    "consumer-check.txt": "61a9c0b6ef592172e820f446606b122bb1c1e2c5f2b87455f7fc6485e7b5451a",
+    "clippy.txt": "03364add5b1f59ba2a0267ee0f15196b3e8cca57094e794d5069c0edb6346a57",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "strict-values/compile.log": "c4ebaff3d67d06a7d231f2c993e86773620d74329383ad6feb1ae4e23948e8bb",
+    "strict-values/report.json": "f1259d964d1d85ea92d14c438026a5556953ffb54cc1efa7ac03bb24183fb842",
+    "strict-values/crates-app.log": "b1a80dda1f3466bf8d8f326c1a75355fb5601daed46d2f3e3fc71fe5b062d4df",
+    "strict-values/crates-core.log": "9b30f3b19101fa541a176ad99327a15b91d17cc4480f480688947162b5d881ae",
+    "strict-values/crates-drivers-clickhouse.log": "cdb83e6d46bea45a048253c0abc8cb9a3c8e00b06820654112150f4e09396b51",
+    "strict-values/crates-drivers-duckdb.log": "6652adc9eecf2f07476ea3172c13af4be131fca7fbc4cfaee31696c851c795d6",
+    "strict-values/crates-drivers-mongodb.log": "a44988ab360c5efa1f94133a5d5bede7b1212c6d6d13c8f06d091e60455a2d90",
+    "strict-values/crates-drivers-mssql.log": "2dcc76cbcfdc21e1154a9960a88fd21f6b3fc8dc7f697442ab94ce1eba3127df",
+    "strict-values/crates-drivers-mysql.log": "e5bd178f35e5d2222fc651c1842cda0e51de2f3481a769a7fe6955aedd672b57",
+    "strict-values/crates-drivers-postgres.log": "5355d05f6163c9d63775eaf6d23c0b090529706705045e8508aa2ed45d3b9ac7",
+    "strict-values/crates-drivers-redis.log": "9abd63f3fb9d66f7108f120c20e19eb862bb3d9134ac97c200b8eb6f792f42c5",
+    "strict-values/crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
+    "strict-values/crates-mcp.log": "312d73e9ed2da80416054caa64429f9de83b801a97a715fad3481492d47272c5"
+  },
+  "checker_sha256": "7b55538110922a10bd0f4eef6d0b93c8543ac1afadd027177bda102433144c14",
+  "remaining": [
+    "Other PostgreSQL array families and spreadsheet applications remain open in B3; the broader engine/type/consumer/configuration matrix is not closed."
+  ]
+}
