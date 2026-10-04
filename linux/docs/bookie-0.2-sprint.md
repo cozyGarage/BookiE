@@ -234,6 +234,12 @@ legal offsets, fractional wall times and SQL NULL survives the pinned Calc
 round trip as text. Native `array_to_json` and `array_send` match after binding.
 See the [timetz-array Calc evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json).
 
+October 5 local GTK + DuckDB value tier: all 316 selected tests passed across
+all 11 suites, with no missing suites. PostgreSQL contributed 115 contracts;
+the current MySQL/MariaDB suite contributed 28. Compile reused 746 cached
+artifacts and rebuilt one package. The runner marked the tree dirty because the
+preserved B4 scratch directories remain outside `linux/`; see the [run packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-05/manifest.json).
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

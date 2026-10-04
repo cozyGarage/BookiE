@@ -5879,3 +5879,15 @@ cell, saved ODS, then reopened and saved XLSX. The shared-string XLSX cells and
 ODS string cell are identical; the text contains the literal `NULL`, empty label,
 Unicode, comma, quote, markup, formula-shaped label and SQL NULL marker. The
 [verification packet](evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json) retains all artifacts and logs.
+
+
+## GTK + DuckDB value tier with temporal array Calc cases, 2026-10-05
+
+At source revision `ab529307ef667c0587413822727ec6978c2e9087`, the local GTK +
+DuckDB value tier passed 316 selected tests across all 11 suites, with no
+missing suites. PostgreSQL passed 115 contracts, including Calc boundary cases
+for `date[]`, `timestamp[]`, `time[]` and `timetz[]`; MySQL/MariaDB passed 28.
+Compilation reused 746 fresh artifacts and rebuilt one package. The runner
+recorded `dirty: true`; `git status` showed only the two preserved B4 scratch
+directories outside `linux/`. The report and all per-suite logs are retained in
+the [evidence packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-05/manifest.json).

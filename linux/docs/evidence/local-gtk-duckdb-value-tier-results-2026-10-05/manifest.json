@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "ab529307ef667c0587413822727ec6978c2e9087",
+  "source_tree_dirty": true,
+  "dirty_tree_note": "The run recorded dirty=true. Immediately before the run, git status showed only the two preserved untracked B4 scratch directories .b4-f4f9-target/ and .b4-f4f9-tmp/ outside linux/. They were left untouched per project instructions.",
+  "case": "Local GTK + DuckDB value-contract tier across all 11 suites",
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "result": {
+    "passed": 316,
+    "failed": 0,
+    "suites": 11,
+    "missing_suites": [],
+    "gtk": true,
+    "duckdb": true
+  },
+  "suite_results": {
+    "crates/app/Cargo.toml": {
+      "tests": 51,
+      "exit_code": 0,
+      "seconds": 118.062,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.269,
+      "log": "crates-core.log"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 29.239,
+      "log": "crates-drivers-clickhouse.log"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 2.119,
+      "log": "crates-drivers-duckdb.log"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 15,
+      "exit_code": 0,
+      "seconds": 11.234,
+      "log": "crates-drivers-mongodb.log"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 7,
+      "exit_code": 0,
+      "seconds": 38.389,
+      "log": "crates-drivers-mssql.log"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 28,
+      "exit_code": 0,
+      "seconds": 323.274,
+      "log": "crates-drivers-mysql.log"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 115,
+      "exit_code": 0,
+      "seconds": 261.276,
+      "log": "crates-drivers-postgres.log"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 1.567,
+      "log": "crates-drivers-redis.log"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "crates-drivers-sqlite.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 2.629,
+    "fresh_artifacts": 746,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0"
+    ]
+  },
+  "logs_sha256": {
+    "report.json": "cea3adf519eb08466273f0e41c96f725f7b1de8f8c0a56df75c1e255520677f6",
+    "compile.log": "d3a9220f786a25e9491d0ff669e28efebe0ccf33dd5fb6b5d476d8d036b53e6a",
+    "crates-app.log": "7b8b5dc6aac49ba0e37fbb9ace97031f73947616df52aebd7d48f6ae5573594d",
+    "crates-core.log": "2dca3cde70adf7f8dfc2bc03d7eb97044e1c7862417890d03fad34a7041afafd",
+    "crates-drivers-clickhouse.log": "25d30d3636c2b4df6ebc99e5c649eeda1a3a44092f08acd53d522e7c113045a0",
+    "crates-drivers-duckdb.log": "a1b261e898a984afc6c228c87ed907e756992ec75454744b2dbd5096754eb301",
+    "crates-drivers-mongodb.log": "6d28c04eb2dae218e03bb36cf9e3ffe983adb5eb4452909716e6be484e6b4a25",
+    "crates-drivers-mssql.log": "50347cd294dbb8eefa833ea720fb808f624af76df6d488835fb42fb67e14b86b",
+    "crates-drivers-mysql.log": "2fdf2dfadb3c2a28ba598d7c628e28c24fb40d23989cf4b0e6e9d63cd49a17f3",
+    "crates-drivers-postgres.log": "14de567a1240221abf8d3d2634badaa04ea3eaa04d0b3344d15bd0522676cd63",
+    "crates-drivers-redis.log": "b9d1516463bb84d49021f9200b729ee1677720a36343a6d92a78d0bd9b342958",
+    "crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
+    "crates-mcp.log": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062",
+    "runner-output.txt": "6128341c5c36b44c925b74461e30bf2e6fd0714b59b773501294078cd3e17846"
+  }
+}
