@@ -71,11 +71,11 @@ edit, inferred query/update parameters, a typed filter and invalid-label
 refusal while preserving the outer domain and a SQL NULL sibling. See the
 [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
-A six-level contract checks recursive enum-leaf metadata, a schema-aware keyed
-edit, a typed equality filter, invalid-label refusal and exact outer-domain
-type/value while preserving a SQL NULL sibling. All 13 PostgreSQL domain
-contracts passed. Deeper chains and other enum/session configurations remain
-open; see the [six-domain-layer evidence](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
+A six-level contract checks recursive enum-leaf metadata, schema-aware keyed
+and draft writes (including SQL NULL), a typed equality filter, invalid-label
+refusal and exact outer-domain type/value while preserving a SQL NULL sibling.
+All 13 PostgreSQL domain contracts passed. Deeper chains and other
+enum/session configurations remain open; see the [six-domain-layer evidence](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage

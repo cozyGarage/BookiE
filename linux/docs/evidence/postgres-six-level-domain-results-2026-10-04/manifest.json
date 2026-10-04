@@ -2,20 +2,21 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "1bde043972429f1d8a6d8b9018e7711432539bd0",
+  "source_commit": "514b0453b632d2caba79581ee2331ba1d65bd8c4",
   "case": "Six nested PostgreSQL domains over a custom enum",
   "engine": "PostgreSQL 16 (Docker)",
-  "test": "domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_values",
+  "test": "domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values",
   "contract": [
     "Catalog metadata resolves the six-domain column to the schema-qualified enum leaf.",
     "A schema-aware keyed edit preserves the six-layer outer domain type.",
+    "Draft inserts preserve an enum label and SQL NULL as the six-layer outer domain type.",
     "A typed equality filter selects the edited row with the exact outer pg_typeof value.",
     "An invalid enum label is rejected with SQLSTATE 22P02 and does not mutate the stored row.",
     "Independent native value/type queries confirm the exact values, outer domain type, and unchanged SQL NULL sibling."
   ],
   "validation": {
     "focused": {
-      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_values -- --include-ignored --exact --test-threads=1",
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values -- --include-ignored --exact --test-threads=1",
       "result": "1 passed, 0 failed",
       "log": "focused.txt"
     },
@@ -38,9 +39,9 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "focused.txt": "08c9f8352b654ff9d494b7dd0c15010cc2dc0c34d7824363eea4b5650ce1a742",
-    "domain-tests.txt": "ce9562089095421e8255f0c3c58ce8f224ac74b4f5be315f75ff54ab5e2e005e",
-    "clippy.txt": "479f652cd01a401c95e348aeceb7243ddc05bf52ff08a542a56e08bd1c42a585",
+    "focused.txt": "08283d57c52359bcb22f0881681b56e739ec16a3f87b6b6232a42f311048d6d7",
+    "domain-tests.txt": "4fedf6268b802e848980239ed018609c2b028fd8a9e5f834b94c60c392ea0f3d",
+    "clippy.txt": "88df934953f494a4c4861871c404f0544c51da634d1776574f188255bebf630c",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
