@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "18efd849dd058cb06735f494405b18aab0d511f9",
+  "case": "PostgreSQL domain-over-enum array equality with inferred domain-array parameters",
+  "environment": "PostgreSQL 16 local Docker integration fixture; cached build reused",
+  "scenario": {
+    "test": "value_contract_domain_over_enum_array_equality_infers_parameter_and_bounds",
+    "assertions": [
+      "Native equality results cover duplicate matching rows and NULL propagation.",
+      "An array with lower bound 0 compares unequal to the otherwise identical default-bound array and equal to the corresponding [0:1] parameter.",
+      "Empty arrays, SQL NULL arrays, and arrays containing NULL are distinct cases.",
+      "pg_typeof($1) is the schema-qualified domain-over-enum array type.",
+      "encode(array_send($1), hex) matches PostgreSQL native typed-array wire bytes."
+    ]
+  },
+  "results": {
+    "focused_test": {
+      "passed": 1,
+      "failed": 0,
+      "log": "focused.txt"
+    },
+    "postgres_value_contracts": {
+      "passed": 107,
+      "failed": 0,
+      "filtered": 29,
+      "log": "postgres-value-contracts.txt"
+    },
+    "clippy": {
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "commands": {
+    "focused": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_array_equality_infers_parameter_and_bounds -- --include-ignored --test-threads=1",
+    "postgres_value_contracts": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+    "clippy": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+    "format": "cargo fmt --all -- --check",
+    "ignored_inventory": "python3 scripts/inventory-ignored-tests.py --check",
+    "diff_check": "git diff --check"
+  },
+  "sha256": {
+    "clippy.txt": "d7ce00f1aa81b846f8ffa4834de3afcb087447f181a069acbcd5750c2232b75f",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused.txt": "24f66e240580da51de0dc845a3fd04d31825b7556e22f8397b3bd22e6eb82555",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "postgres-value-contracts.txt": "d6d519912afd2c87c4a4b4a61048e52fc9a2736a5054925144aae061a6bfaa53"
+  }
+}
