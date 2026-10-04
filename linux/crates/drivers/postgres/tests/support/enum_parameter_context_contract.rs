@@ -23,19 +23,24 @@ async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
     connection
         .execute(
             "CREATE TABLE value_contract_enum_parameter_context.rows \
-             (id INT PRIMARY KEY, state value_contract_enum_parameter_context.state NOT NULL)",
+             (id INT PRIMARY KEY, state value_contract_enum_parameter_context.state)",
         )
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO value_contract_enum_parameter_context.rows VALUES (1, 'ready'), (2, 'paused')")
+        .execute("INSERT INTO value_contract_enum_parameter_context.rows VALUES (1, 'ready'), (2, NULL)")
         .await
         .unwrap();
 
     let enum_type = "value_contract_enum_parameter_context.state";
-    for (parameter, expected_coalesced, expected_array) in [
-        (Value::Text("NULL".into()), "NULL", r#"["ready","NULL"]"#),
-        (Value::Null, "ready", "[\"ready\",null]"),
+    for (parameter, expected_coalesced, expected_array, expected_fallback) in [
+        (
+            Value::Text("NULL".into()),
+            "NULL",
+            r#"["ready","NULL"]"#,
+            Value::Text("NULL".into()),
+        ),
+        (Value::Null, "ready", "[\"ready\",null]", Value::Null),
     ] {
         let coalesced = connection
             .query_params(
@@ -51,6 +56,19 @@ async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
                 Value::Text(expected_coalesced.into()),
                 Value::Text(enum_type.into()),
             ]]
+        );
+
+        let fallback = connection
+            .query_params(
+                "SELECT COALESCE(state, $1)::text, pg_typeof(COALESCE(state, $1))::text \
+                 FROM value_contract_enum_parameter_context.rows WHERE id = 2",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            fallback.rows,
+            vec![vec![expected_fallback, Value::Text(enum_type.into())]]
         );
 
         let appended = connection
@@ -86,11 +104,7 @@ async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
                 Value::Text("ready".into()),
                 Value::Text(enum_type.into())
             ],
-            vec![
-                Value::Int(2),
-                Value::Text("paused".into()),
-                Value::Text(enum_type.into())
-            ],
+            vec![Value::Int(2), Value::Null, Value::Text(enum_type.into())],
         ]
     );
 }
