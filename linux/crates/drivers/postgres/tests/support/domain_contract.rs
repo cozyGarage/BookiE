@@ -4,6 +4,8 @@ use crate::{connect, start_pg};
 
 include!("domain_contract_parts/basic_domains.rs");
 
+include!("domain_contract_parts/array_functions.rs");
+
 include!("domain_contract_parts/deep_domains.rs");
 
 #[tokio::test]
