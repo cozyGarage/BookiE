@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "9ae355780864edb6872867333d5a57bfd2efdf71",
+  "engine": "MongoDB 7 in Docker via testcontainers",
+  "case": "stale MongoDB grid deletes preserve concurrent document changes",
+  "test": "stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change",
+  "outcome": "Parameterized keyed MongoDB deletes now compare every materialized non-key value and use delete_one. Unchanged rows delete; stale snapshots report zero deleted rows and preserve concurrent changes.",
+  "contract": [
+    "A failing-first run confirms that the pre-fix MongoDB driver rejected the app's parameterized keyed DELETE as unsupported.",
+    "Reads four documents through the BookiE MongoDB driver; one remains unchanged, while native concurrent writes change one string, remove one explicit BSON NULL field, and change another explicit BSON NULL to an array containing NULL.",
+    "Builds parameterized deletes from each complete materialized row. The unchanged row is deleted, and the three stale deletes each report zero deleted rows.",
+    "Checks the concurrent string, missing field, and NULL-containing array remain persisted after the stale deletes.",
+    "Unit contracts verify the materializer guards all non-key original values, explicit NULL and missing-field predicates remain distinct, and other undecodable snapshots are refused."
+  ],
+  "validation": {
+    "before_fix": {
+      "source_commit": "5a4f51dd0",
+      "result": "failed as expected: parameterized keyed DELETE returned Unsupported",
+      "log": "before-fix.txt"
+    },
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-mongodb --test integration value_contract_stale_grid_delete_preserves_concurrent_document_change -- --include-ignored --test-threads=1",
+      "result": "1 passed",
+      "log": "focused-test.txt"
+    },
+    "mongodb_integration": {
+      "command": "cargo test --locked -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1",
+      "result": "31 passed, 0 failed",
+      "log": "mongodb-integration.txt"
+    },
+    "app_library": {
+      "command": "cargo test --locked -p tablepro-app --lib",
+      "result": "466 passed, 24 ignored",
+      "log": "app-tests.txt"
+    },
+    "core_library": {
+      "command": "cargo test --locked -p tablepro-core --lib",
+      "result": "525 passed, 0 failed",
+      "log": "core-tests.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-core -p tablepro-app -p tablepro-driver-mongodb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --check --all",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "file_size": {
+      "command": "bash scripts/check-file-size.sh",
+      "result": "passed",
+      "log": "file-size.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "limitations": [
+    "The snapshot guard does not detect ABA changes that restore all materialized values.",
+    "Concurrent fields added outside the materialized column set are not guarded.",
+    "The case does not establish collection snapshot isolation or atomicity across a multi-statement batch and does not qualify the 0.2.0 release."
+  ],
+  "source_worktree": "Implementation and docs were committed at 9ae355780864edb6872867333d5a57bfd2efdf71 before the retained tests. Evidence logs and manifest are committed separately.",
+  "sha256": {
+    "app-tests.txt": "912cd084b3d362c50d21b01950d35ad200b2f595ae75432ac1b8a95a1ae92007",
+    "before-fix.txt": "e16857b1b611737cb7fcf2d85d523cfc66a48d0b5dd1ae2f95910f63c38c81be",
+    "clippy.txt": "b2c020f27a01faabb96e5d55c11fd219cf7c484c9cf34b3342bfc8444d934c89",
+    "core-tests.txt": "c3ba755254346d342108cfe8aedc1fcc42baa22068a849b2bbed4db368a2e646",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused-test.txt": "5939aa54bd6559d3efccc440d29b108934f4f6fba8b594d62ad203818b83235f",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "mongodb-integration.txt": "857bd25cdff61f79192ec7e89df1a514943e7804d2229355f2201aca9532a6c1"
+  }
+}

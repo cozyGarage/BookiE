@@ -1,0 +1,13 @@
+Failing-first run against source commit 5a4f51dd0, with the stale-delete test
+scaffold added in the working tree before implementation:
+
+test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change ... FAILED
+
+stale delete must be supported and report its conflict:
+Transaction {
+    statement_index: 0,
+    source: Unsupported("MongoDB execute_params does not support bound parameters")
+}
+
+The regression demonstrated that the application's parameterized keyed DELETE
+never reached MongoDB. The test command exited 101, as expected.
