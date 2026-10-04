@@ -126,6 +126,11 @@ for text and SQL NULL. The test compares native type and wire bytes and passes
 in the 130-test PostgreSQL integration run
 ([evidence](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
 
+October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
+contracts across all 11 suites, including 101 PostgreSQL contracts with the
+new array-operator and depth-boundary cases. The exact-revision report and raw
+logs are in the [value-tier packet](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

@@ -5707,3 +5707,12 @@ At 64 layers, text and SQL NULL return explicit unsupported results before
 dispatch. Unlike scalar enum parameters, the array container participates in
 the type resolver's depth budget. The full Docker-backed PostgreSQL integration
 suite passes 130 tests. See the [evidence manifest](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).
+
+## GTK + DuckDB value tier with enum-array operator/depth cases, 2026-10-04
+
+At source revision `d76dddc35b2a477782cce4d83bbeaa81f7fc0ce2`, the selected
+GTK + DuckDB value tier passes 297 contracts across all 11 suites, with no
+missing suites. PostgreSQL contributes 101 contracts, including inferred
+enum-array operators under shadowed `search_path` and the 62/63/64 domain-depth
+boundary. The raw report and suite logs are retained in the
+[evidence packet](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
