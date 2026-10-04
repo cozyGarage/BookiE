@@ -6,7 +6,7 @@ use crate::{connect, start_pg};
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
+async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
     connection
@@ -89,8 +89,43 @@ async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
         );
     }
 
+    for (parameter, expected_ready) in [
+        (Value::Text("ready".into()), Value::Null),
+        (Value::Text("paused".into()), Value::Text("ready".into())),
+        (Value::Null, Value::Text("ready".into())),
+    ] {
+        let compared = connection
+            .query_params(
+                "SELECT id, NULLIF(state, $1)::text, \
+                        pg_typeof(NULLIF(state, $1))::text, pg_typeof($1)::text \
+                 FROM value_contract_enum_parameter_context.rows ORDER BY id",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            compared.rows,
+            vec![
+                vec![
+                    Value::Int(1),
+                    expected_ready,
+                    Value::Text(enum_type.into()),
+                    Value::Text(enum_type.into()),
+                ],
+                vec![
+                    Value::Int(2),
+                    Value::Null,
+                    Value::Text(enum_type.into()),
+                    Value::Text(enum_type.into()),
+                ],
+            ],
+            "NULLIF parameter {parameter:?}"
+        );
+    }
+
     for sql in [
         "SELECT COALESCE($1, state) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
+        "SELECT NULLIF(state, $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
         "SELECT array_append(ARRAY[state], $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
     ] {
         let error = connection
