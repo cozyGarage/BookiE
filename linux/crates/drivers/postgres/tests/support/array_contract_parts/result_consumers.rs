@@ -160,6 +160,82 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY[\
+        '550e8400-e29b-41d4-a716-446655440000'::uuid, \
+        '12345678-1234-5678-90ab-1234567890ab'::uuid, NULL]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("uuid[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, {expression}::text, \
+             array_to_json({expression})::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("uuid[]".into()));
+    assert_eq!(
+        oracle.rows[0][2],
+        Value::Text(
+            r#"["550e8400-e29b-41d4-a716-446655440000","12345678-1234-5678-90ab-1234567890ab",null]"#.into()
+        )
+    );
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::uuid[])::text, \
+             encode(array_send($1::text::uuid[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][2]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("uuid-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut sheet,
+    )
+    .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("uuid[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+    assert!(shared_strings.contains(driver_text), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
