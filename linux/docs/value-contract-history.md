@@ -2981,16 +2981,17 @@ paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp
 
 MySQL and MariaDB replay SQL export files and import typed CSV containing six
 rows spanning ENUM and SET under the default mode, `NO_BACKSLASH_ESCAPES`,
-`ANSI_QUOTES`, and both modes together. Values include apostrophe and
+`ANSI_QUOTES`, both modes together, `STRICT_TRANS_TABLES`, and strict mode with
+`NO_BACKSLASH_ESCAPES`. Values include apostrophe and
 backslash labels, multiple selected SET members, literal `NULL`, the empty
 SET, and SQL NULL. Typed CSV uses an explicit collision-free null marker so
 the empty SET stays distinct from SQL NULL. Each mode checks native ENUM
 ordinals, SET masks, label bytes and both copied tables against the source.
 JSON preserves every value. XML, HTML and Markdown escape markup-shaped ENUM
-and SET labels in all four modes. XLSX refuses the empty SET text and leaves a
+and SET labels in all six modes. XLSX refuses the empty SET text and leaves a
 pre-existing destination unchanged. Both focused Docker tests, strict Clippy
-and formatting pass. Other enum/set consumers and SQL mode combinations remain
-open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
+and formatting pass. SQL modes beyond these six combinations and other enum/set
+consumers remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
 The app edit path now validates ENUM labels and SET members against MySQL's
 declared `column_type` before binding. A parser-to-keyed-edit contract preserves

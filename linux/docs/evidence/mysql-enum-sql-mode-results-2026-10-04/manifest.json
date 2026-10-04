@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "8887bc85d",
+  "source_commit": "6a8ca1960",
   "case": "MySQL/MariaDB ENUM and SET consumers across SQL modes",
   "engines": {
     "mysql": "testcontainers-modules default mysql:8.1 image",
@@ -13,11 +13,11 @@
     "enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes"
   ],
   "contract": [
-    "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined SQL modes on both engines.",
+    "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, their combination, STRICT_TRANS_TABLES, and STRICT_TRANS_TABLES with NO_BACKSLASH_ESCAPES on both engines.",
     "ENUM and SET fixtures cover apostrophe and backslash labels, multiple selected SET members, literal NULL, empty text, and SQL NULL.",
-    "SQL files replay and typed CSV export/import preserve ENUM/SET values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined modes on both engines.",
+    "SQL files replay and typed CSV export/import preserve ENUM/SET values under the same six modes on both engines.",
     "CSV uses a collision-free NULL marker so an empty SET stays distinct from SQL NULL; JSON preserves each value.",
-    "XML, HTML, and Markdown escape markup-shaped ENUM and SET labels under each SQL mode.",
+    "XML, HTML, and Markdown escape markup-shaped ENUM and SET labels under each of the six SQL modes.",
     "XLSX refuses the empty SET text and leaves an existing destination unchanged.",
     "Each mode checks native ENUM ordinals, SET masks, label bytes and both copied tables against the source."
   ],
@@ -45,7 +45,7 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "Other enum/SET consumers and SQL mode/session combinations remain open.",
+    "SQL mode/session combinations beyond the six tested values and additional enum/SET consumers remain open.",
     "This bounded case does not close B3 or qualify the 0.2.0 release."
   ]
 }
