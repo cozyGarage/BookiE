@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "ea45cedb2",
+  "engine": "SQLite STRICT ANY compound result exported by BookieE; LibreOffice Calc on Debian testing",
+  "case": "Formula-shaped text stays text through BookieE XLSX output and LibreOffice Calc ODS/XLSX re-save",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The compound result contains integer 42, text 42, SQL NULL, formula-shaped text =1+1, and formula-shaped text '=1+1; native typeof() labels identify the runtime kind for every row.",
+    "BookieE emits integer 42 as a numeric XLSX cell, text values as shared strings, and SQL NULL as a blank cell. The XLSX contains no formula elements.",
+    "LibreOffice Calc opens the workbook and saves ODS, then reopens ODS and saves XLSX. The formula-shaped text values remain strings in both formats, and Calc creates no formulas.",
+    "The integer, numeric-looking text and blank NULL keep their respective kinds through the same Calc round trip."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-app --lib ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds -- --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "Open source.xlsx with LibreOffice Calc and save as calc-roundtrip.ods.",
+        "Reopen calc-roundtrip.ods with LibreOffice Calc and save as calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks over ODS content.xml and XLSX worksheet/shared strings; assert exact values and cell kinds, blank NULL, and no formula elements.",
+      "checker": "verify_roundtrip.py",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "5c58d3207ab14bd61aca48d98e3459d697d8d443c2cd65ed157cb731eef80fc9",
+    "calc-roundtrip.ods": "9b339da49176e9ca12ccca11a14f9b45e26a5272f09682d40dd2cae3104a2129",
+    "calc-roundtrip.xlsx": "33ea1d1348f654c8a8eb84c43cf9d777fb8d1d4a77b96666ec10dbfb6c78f166"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "353d94aa0bab5ca43b23077b22af707ad07fe06a2f3005c3fe0abc066a77d8ab",
+    "libreoffice-roundtrip.txt": "1fcbfb70f772f2566b85f8a0675360a9f2c195a3b443316bec03cadb7bb013d2",
+    "consumer-check.txt": "46b612bf6ece456bc6323f7633be1ccefd19738c1c551c2e7947b368bee15116",
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other spreadsheet applications and versions, workbook shapes, broader format combinations and installed GTK grid editing remain open in B3/B7."
+  ],
+  "checker_sha256": "315c56915653a08d3da04fe801c7a58c2b270cd19616e0f0d4549cfa94c778f8"
+}

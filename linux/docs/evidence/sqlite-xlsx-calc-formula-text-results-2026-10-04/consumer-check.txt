@@ -1,0 +1,3 @@
+source.xlsx: expected values preserved; B4 blank; no formula cells
+calc-roundtrip.xlsx: expected values preserved; B4 blank; no formula cells
+calc-roundtrip.ods: numeric/text/blank kinds and formula-shaped strings preserved; no formulas

@@ -5468,3 +5468,14 @@ backslashes now uses explicit `E''` syntax and doubles each backslash; ordinary
 values retain regular quoted-literal output. The native focused tests, core and
 app suites, strict Clippy and formatting pass. Other session settings and SQL
 literal edge cases remain open. See the [evidence manifest](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json).
+
+## SQLite STRICT ANY formula-shaped text through Calc, 2026-10-04
+
+The compound SQLite STRICT `ANY` result workbook now includes text `=1+1` and
+`'=1+1` alongside integer `42`, text `42` and SQL NULL. The BookiE XLSX writer
+stores both formula-shaped values as shared strings without formula elements.
+LibreOffice Calc 26.8.0.3 preserves their text kind through ODS save and XLSX
+re-save; the numeric, text and blank cells retain their prior kinds. The focused
+app regression, strict Clippy, formatting and standard-library OOXML/ODS checker
+pass. Other spreadsheet applications and workbook shapes remain unverified.
+See the [evidence manifest](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json).
