@@ -2,21 +2,21 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "8c6cae59e14a70ea55c93390ae9b65b9f6bc18fa",
+  "source_commit": "fb5bde8b0da1fff047b92a58aa8372c007f1aea4",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
-  "case": "shadowed-search_path enum metadata and consumer behavior through 64 nested domains",
+  "case": "shadowed-search_path enum metadata and consumer behavior through 128 nested domains",
   "test": "domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path",
   "contract": [
-    "The native contract checks domain-over-enum chains at depths 6, 7, 8, 9, 10, 63 and 64 while search_path resolves a same-named shadow enum.",
+    "The native contract checks domain-over-enum chains at depths 6, 7, 8, 9, 10, 63, 64, 65 and 128 while search_path resolves a same-named shadow enum.",
     "At every tested depth, recursive catalog metadata resolves the target enum leaf; schema-aware keyed updates, label and SQL NULL draft inserts, typed equality filters, and exact outer-domain/native value checks succeed.",
     "At depths through 63, raw inferred SQL NULL updates succeed with the outer domain type preserved, and an invalid raw text label is refused by PostgreSQL with SQLSTATE 22P02.",
-    "At depth 64, SQLx cannot resolve inferred text or SQL NULL parameter type OIDs within its 64-step resolver limit; BookieE maps both failures to an explicit Unsupported result instead of an internal error, and neither operation mutates the row.",
+    "At depths 64, 65 and 128, raw inferred SQL NULL and both valid and invalid text are refused as Unsupported, including after schema-aware operations have warmed the same-backend transaction.",
     "Same-backend search_path changes and rollback checks preserve exact native values and types at every tested depth."
   ],
   "validation": {
     "native_contract_group": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
-      "result": "13 passed, 0 failed; deep contract covers depths 6, 7, 8, 9, 10, 63 and 64",
+      "result": "13 passed, 0 failed; deep contract covers depths 6, 7, 8, 9, 10, 63, 64, 65 and 128",
       "log": "test.txt"
     },
     "clippy": {
@@ -32,11 +32,11 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "test.txt": "4af09568833f69bc6584f485d947b02c35e366e0c80d4d5f1109bae6b0fbe75f",
-    "clippy.txt": "d57a20aa6fc1822000898e9ab61661f998fcc722228bd7a391eb64e024b817c1",
+    "test.txt": "28212d1ca8125fba1e4b4d44a7591a4e5211b34746726befa379eb92b1aafb43",
+    "clippy.txt": "76fbb696c67683d8ec8b24c094f09186dec3151bded3d42f36741dbeaed2283a",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
-    "Other domain-chain depths, additional parameter value types at 64 nested domains, deeper-than-64 domains, and other enum/session configurations remain open."
+    "Other domain-chain depths, additional inferred parameter value types at or beyond 64 nested domains, deeper-than-128 domains, and other enum/session configurations remain open."
   ]
 }

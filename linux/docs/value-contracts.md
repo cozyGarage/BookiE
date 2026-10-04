@@ -53,10 +53,11 @@ re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manife
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
-through ten levels, plus 63 and 64 levels. Raw inferred text and SQL NULL
-parameters work through 63 levels; at 64 levels they return explicit
-unsupported results at SQLx's type-resolver limit while schema-aware writes and
-filters pass; see the [deep-domain
+through ten levels, plus 63, 64, 65 and 128 levels. Raw inferred text and SQL
+NULL parameters work through 63 levels; at 64 or more levels they return
+explicit unsupported results, including after schema-aware work warms the
+same-backend transaction. Schema-aware writes and filters pass through 128
+levels; see the [deep-domain
 boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
 [eight-level evidence](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
