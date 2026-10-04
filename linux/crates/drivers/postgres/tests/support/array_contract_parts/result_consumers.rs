@@ -86,7 +86,9 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
         assert!(output.contains("東京 😀"), "{extension}: {output}");
     }
 
-    let xlsx_path = directory.path().join("array.xlsx");
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("array.xlsx"));
     tablepro_core::export::write_result_file(
         &xlsx_path,
         &result,
