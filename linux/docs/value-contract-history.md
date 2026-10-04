@@ -4104,7 +4104,9 @@ oracles match the driver result; JSON/CSV output and CSV parsing preserve the
 same value. Type-less SQL literal and parameter consumers refuse it, and a
 keyed MergeTree grid edit is rejected with the stored id, value, type and JSON
 unchanged. The focused Docker contract, strict ClickHouse Clippy and formatting
-passed. Other nested/type and XLSX combinations remain open; see the
+passed. The shared XLSX writer's nested Extended JSON exact-text test also
+passes, but ClickHouse-specific workbook parity and spreadsheet-app re-import
+remain open, as do other nested/type combinations; see the
 [evidence manifest](evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json).
 
 ## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30

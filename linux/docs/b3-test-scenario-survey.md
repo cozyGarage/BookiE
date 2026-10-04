@@ -551,7 +551,9 @@ The ClickHouse nested consumer contract now covers 16 shapes, including
 preservation, type-less SQL/bind refusal and unchanged MergeTree storage are
 asserted ([follow-up evidence](evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json)).
 Both numeric-key Map/Array nesting orders are covered; other nested
-combinations and XLSX remain open.
+combinations remain open. The shared core XLSX writer has a passing exact-text
+test for nested Extended JSON; ClickHouse-specific workbook parity and
+spreadsheet-app re-import remain open.
 
 DuckDB now has separate native-oracle refusal contracts for `UBIGINT[]` and a
 `STRUCT` containing wide `UBIGINT` fields and NULL. The new STRUCT contract is
