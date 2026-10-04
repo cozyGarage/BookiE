@@ -115,6 +115,10 @@ includes the pre-fix error and passing GTK, strict unit, Clippy, and format
 results. Other dialect executable-identity/malformed-tail cases and additional
 MySQL delimiter forms remain open.
 
+October 4 B3-5 follow-up: the MySQL `\d //` shorthand now has a named consumer
+contract across planning, formatting, parameter extraction and policy
+classification. See the [evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
+
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL
 with native ENUM type and an untouched destination row. Spreadsheet-safe mode

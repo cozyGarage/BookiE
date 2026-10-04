@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "39aa7b1f1bfbc8bfa0b7c81c865a4e5bc7639399",
+  "unit_report_commit": "99b7e07aca84cda7b9e0a0ff71b6344cb752f28f",
+  "case": "MySQL short delimiter directive preserves routine and query identity",
+  "test": "ui::editor::statement_cursor::tests::value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity",
+  "contract": [
+    "The parser-supported \\d // and \\d ; directives are retained through script planning and formatting.",
+    "The routine body remains a single statement and the trailing SELECT remains distinct after formatting.",
+    "A placeholder inside the routine string is not extracted; the following query parameter is retained.",
+    "Post-format policy still classifies the routine as Unparseable/write and the trailing statement as SELECT."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "strict_unit_values": {
+      "command": "bash scripts/test-value-contracts.sh --gtk --duckdb --unit-only",
+      "result": "passed",
+      "selected_contracts": 107,
+      "compiled_workspace_suites": 11,
+      "executed_suites": 3,
+      "app_contracts": 48,
+      "core_contracts": 58,
+      "mcp_contracts": 1,
+      "report": "strict-unit-report.json"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-app --features duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": "passed; ignored-inventory.txt",
+    "git_diff_check": "passed"
+  },
+  "limits": [
+    "This is a SQL planning/consumer contract; it does not execute the procedure on a MySQL server.",
+    "Other MySQL delimiter forms, dialect executable-identity cases, and installed GTK acceptance remain open."
+  ],
+  "sha256": {
+    "clippy.txt": "b2c020f27a01faabb96e5d55c11fd219cf7c484c9cf34b3342bfc8444d934c89",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused-test.txt": "6d444abd32f328df1964604163944bf40ea55f1df0a86a49495854706b2513c4",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "strict-unit-report.json": "557dead1bd1461ad4eb479c614890a34cf357513c76ecfbe4ea56dadab16f5e1"
+  }
+}

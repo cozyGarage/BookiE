@@ -756,3 +756,10 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
 
 
 October 4 B3-5 follow-up: the GTK harness now opens a real MySQL 8.0 fixture, shows the unparseable routine SQL/class in the approval dialog, checks Deny leaves no routine, and checks Allow Once creates one. The regression exposed pooled MySQL execution returning `This command is not supported in the prepared statement protocol yet` for approved routine DDL; pooled and session queries now share the existing text-protocol fallback. The pre-fix accessibility snapshot and post-fix local release-layer run are retained in the [GTK/MySQL evidence](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json). The separate [native MySQL approval test](evidence/mysql-unparseable-approval-results-2026-10-04/manifest.json) still records the guarded-session router contract.
+
+October 4 B3-5 follow-up: MySQL's `\d` delimiter shorthand with a `//` token
+now has editor-consumer coverage. Planner and formatter retain both shorthand
+directives; the routine body stays one statement, only the following SELECT
+placeholder is extracted, and post-format classification keeps the routine
+unparseable/write. The app selector passes in the strict unit values layer; see
+the [short-delimiter evidence](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).

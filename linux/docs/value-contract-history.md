@@ -5598,3 +5598,16 @@ shows the protocol error, and the post-fix GTK layer, strict unit-only values
 tier, Clippy, formatting and repository guards pass. This local GTK/Xvfb case
 does not qualify installed Wayland behavior or other dialects; see the
 [evidence manifest](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json).
+
+## MySQL short `\d` delimiter directive, 2026-10-04
+
+An editor consumer contract covers the parser-supported `\d //` shorthand
+around a stored procedure and its `\d ;` reset. Whole-script planning keeps the
+routine body together and preserves the following SELECT as a distinct
+statement; named-parameter extraction does not expose a routine-body placeholder
+and retains the later query parameter. Formatting preserves both directives,
+and post-format planning and policy keep the same statement count and
+unparseable/write routine classification. The focused app selector, strict
+unit-only GTK+DuckDB values tier, Clippy and formatting pass. Other MySQL
+delimiter forms remain open; see the
+[evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
