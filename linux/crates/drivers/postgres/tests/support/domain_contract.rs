@@ -129,6 +129,34 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         .unwrap();
     assert_eq!(bound_array.rows, native_array.rows);
 
+    let bounded_array = connection
+        .query_params(
+            "SELECT $1::value_contract_domain_array_label[] AS labels, \
+             array_dims($1::value_contract_domain_array_label[])::text, \
+             array_to_json($1::value_contract_domain_array_label[])::text, \
+             pg_typeof($1::value_contract_domain_array_label[])::text, \
+             array_lower($1::value_contract_domain_array_label[], 1), \
+             array_upper($1::value_contract_domain_array_label[], 1), \
+             array_lower($1::value_contract_domain_array_label[], 2), \
+             array_upper($1::value_contract_domain_array_label[], 2)",
+            &[Value::Text(r#"[0:1][3:4]={{"NULL",""},{"東京",NULL}}"#.into())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        bounded_array.rows,
+        vec![vec![
+            Value::Text("[0:1][3:4]={{\"NULL\",\"\"},{\"東京\",NULL}}".into()),
+            Value::Text("[0:1][3:4]".into()),
+            Value::Text("[[\"NULL\",\"\"],[\"東京\",null]]".into()),
+            Value::Text("value_contract_domain_array_label[]".into()),
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(3),
+            Value::Int(4),
+        ]]
+    );
+
     let invalid_array = connection
         .query_params(
             "SELECT $1::value_contract_domain_array_label[]",
