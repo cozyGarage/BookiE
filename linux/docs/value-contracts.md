@@ -44,6 +44,9 @@ point does not represent all support for that engine.
 | Mutation and infrastructure | [Scoped re-audit](value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](regression-audit-2026-09-29.md), [B3 review](b3-review-2026-10-01.md) |
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
+The PostgreSQL shadowed-search-path enum/domain write case now covers six and
+seven nested domain levels; see the [native evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
+
 ## Evidence updates
 
 Add or update one named case in the ledger with the ADR 0007 outcome, native

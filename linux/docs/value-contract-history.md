@@ -4586,6 +4586,17 @@ formatting and ignored-test inventory checks. Chains deeper than six layers and
 other enum/session combinations remain untested. See the
 [six-domain-layer evidence](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
+## PostgreSQL seven-domain-layer enum contract (2026-10-04)
+
+The shadowed-search-path contract now runs at both six and seven nested domain
+levels. Each depth checks enum-leaf metadata, a same-named narrower shadow
+enum, keyed update, draft inserts with label and SQL NULL, typed filtering,
+invalid-label refusal (`22P02`), stored outer-domain type/value and an unchanged
+NULL sibling. The combined native PostgreSQL 16 test passed, as did PostgreSQL
+driver Clippy and formatting. Chains deeper than seven and other enum/session
+combinations remain untested. See the
+[six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
+
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
 A SQLite STRICT table can declare `ANY` while storing different runtime kinds
