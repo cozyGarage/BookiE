@@ -186,6 +186,14 @@ labels in either slot; all 109 selected PostgreSQL value contracts pass
 ([evidence](evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
 Other PostgreSQL contexts and the broader B3 matrix remain open.
 
+October 5 B3 function follow-up: `array_position($1, enum_value)` and
+`array_remove($1, enum_value)` now verify inference for the array parameter
+itself under a same-named shadow enum. Native result and wire oracles include
+lower-bound, empty/NULL array, NULL element and literal `NULL` cases; all 110
+selected PostgreSQL value contracts pass
+([evidence](evidence/postgres-domain-enum-array-input-functions-shadowed-results-2026-10-05/manifest.json)).
+Other PostgreSQL contexts and the broader B3 matrix remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

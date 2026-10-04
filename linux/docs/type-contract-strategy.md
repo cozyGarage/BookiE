@@ -29,6 +29,10 @@ including NULL search/replacement values and both parameter types
 The same two-slot context now also has a shadowed-`search_path` contract: both
 parameters retain the qualified target enum type, native array bytes match,
 and shadow-only labels fail in either slot ([evidence](evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
+The first array argument is now covered too: `array_position($1, enum_value)`
+and `array_remove($1, enum_value)` infer the target enum array under that path,
+including lower bounds, empty/NULL arrays, NULL elements and shadow-only label
+refusal ([evidence](evidence/postgres-domain-enum-array-input-functions-shadowed-results-2026-10-05/manifest.json)).
 `array_cat` now covers inferred text and SQL NULL array parameters for a
 domain-over-enum source under a same-named shadow enum in `search_path`
 ([evidence](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json)).
