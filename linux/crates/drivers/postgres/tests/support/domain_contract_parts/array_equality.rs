@@ -74,41 +74,44 @@ async fn value_contract_domain_over_enum_array_equality_infers_parameter_and_bou
     for (parameter, native_array, expected_equality) in cases {
         let native = connection
             .query(&format!(
-                "SELECT id, labels = {native_array}, \
+                "SELECT id, labels = {native_array}, labels <> {native_array}, \
+                 labels < {native_array}, labels <= {native_array}, \
+                 labels > {native_array}, labels >= {native_array}, \
                  encode(array_send({native_array}), 'hex') \
                  FROM value_contract_domain_array_equality.rows ORDER BY id"
             ))
             .await
             .unwrap();
+        for (row, equal) in native.rows.iter().zip(expected_equality) {
+            assert_eq!(
+                row[1],
+                equal.map(Value::Bool).unwrap_or(Value::Null),
+                "native equality for {native_array}"
+            );
+        }
         let expected_values = expected_equality
             .into_iter()
             .enumerate()
-            .map(|(index, equal)| {
+            .map(|(index, _)| {
+                let row = &native.rows[index];
                 vec![
-                    Value::Int(index as i64 + 1),
-                    equal.map(Value::Bool).unwrap_or(Value::Null),
-                    native.rows[index][2].clone(),
+                    row[0].clone(),
+                    row[1].clone(),
+                    row[2].clone(),
+                    row[3].clone(),
+                    row[4].clone(),
+                    row[5].clone(),
+                    row[6].clone(),
+                    row[7].clone(),
                     Value::Text("value_contract_domain_array_equality.state_domain[]".into()),
                 ]
             })
             .collect::<Vec<_>>();
-        let expected_native = native
-            .rows
-            .into_iter()
-            .map(|row| vec![row[0].clone(), row[1].clone(), row[2].clone()])
-            .collect::<Vec<_>>();
-        assert_eq!(
-            expected_native,
-            expected_values
-                .iter()
-                .map(|row| vec![row[0].clone(), row[1].clone(), row[2].clone()])
-                .collect::<Vec<_>>(),
-            "native equality for {native_array}"
-        );
 
         let result = connection
             .query_params(
-                "SELECT id, labels = $1, encode(array_send($1), 'hex'), \
+                "SELECT id, labels = $1, labels <> $1, labels < $1, labels <= $1, \
+                 labels > $1, labels >= $1, encode(array_send($1), 'hex'), \
                  pg_typeof($1)::text \
                  FROM value_contract_domain_array_equality.rows ORDER BY id",
                 std::slice::from_ref(&parameter),
