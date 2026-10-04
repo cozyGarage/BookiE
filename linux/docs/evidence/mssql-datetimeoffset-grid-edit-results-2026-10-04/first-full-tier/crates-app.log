@@ -1,0 +1,68 @@
+
+running 51 tests
+test services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution ... ok
+test ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page ... FAILED
+test ui::browse_tab::tests::value_contract_mongodb_census_is_not_a_snapshot_for_already_read_documents ... ok
+test ui::browse_tab::tests::value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit ... ok
+test ui::browse_tab::tests::value_contract_mongodb_off_page_type_change_during_census_refuses_edit ... ok
+test ui::browse_tab::tests::value_contract_mongodb_run_find_merges_page_types_and_exports_materialized_values ... ok
+test ui::browse_tab::value_parse::duckdb_enum_contract::value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null ... ok
+test ui::browse_tab::value_parse::duckdb_enum_contract::value_contract_duckdb_enum_keyed_edit_preserves_native_type_and_siblings ... ok
+test ui::browse_tab::value_parse::duckdb_enum_contract::value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_null ... ok
+test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width ... ok
+test ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_integer_parser_preserves_int32_and_int64_widths ... ok
+test ui::browse_tab::value_parse::mongodb_nested_edit_contract::value_contract_mongodb_nested_document_edit_preserves_extended_bson_and_row_identity ... ok
+test ui::browse_tab::value_parse::mssql_datetimeoffset_contract::value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings ... ok
+test ui::browse_tab::value_parse::mssql_legacy_datetime_contract::value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings ... ok
+test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes ... ok
+test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_and_set_parser_preserves_labels ... ok
+test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes ... ok
+test ui::browse_tab::value_parse::mysql_integer_contract::value_contract_mysql_integer_parser_enforces_signed_and_unsigned_widths ... ok
+test ui::browse_tab::value_parse::mysql_integer_contract::value_contract_mysql_unsigned_integer_grid_edits_refuse_coercion_and_preserve_u64 ... ok
+test ui::browse_tab::value_parse::mysql_spatial_contract::value_contract_mysql_spatial_grid_refusal_preserves_native_bytes ... ok
+test ui::browse_tab::value_parse::mysql_spatial_contract::value_contract_mysql_spatial_parser_refuses_lossy_text_edits ... ok
+test ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keeps_fractional_input_typed ... ok
+test ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_keyed_update_builder ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_the_builder ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qualified_cast ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain_cast ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_zero_text ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the_keyed_update_builder ... ok
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_update_builder ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_extended_calendar_grid_edits_preserve_native_values ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_extended_calendar_values_parse_as_exact_text ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_extended_timestamptz_grid_edits_preserve_instants ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_time_and_timestamp_parsers_refuse_submicro_edits ... ok
+test ui::browse_tab::value_parse::tests::duckdb_temporal_edit_contract::value_contract_duckdb_timestamptz_parser_refuses_submicro_edits ... ok
+test ui::browse_tab::value_parse::tests::value_contract_duckdb_interval_grid_edit_preserves_native_components ... ok
+test ui::browse_tab::value_parse::tests::value_contract_duckdb_timestamptz_grid_edit_refuses_submicro_rounding ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_date_grid_edit_preserves_millisecond_instant ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_date_parser_preserves_milliseconds_and_refuses_rounding ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_grid_edit_preserves_wide_precision ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mongodb_decimal128_parser_preserves_wide_precision ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mysql_bit_parser_edits_preserve_native_values ... ok
+test ui::browse_tab::value_parse::tests::value_contract_mysql_bit_parser_enforces_declared_width_and_safe_range ... ok
+test ui::browse_tab::value_parse::tests::value_contract_parser_preserves_boundaries_and_rejects_rounding ... ok
+test ui::editor::statement_cursor::tests::value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers ... ok
+test ui::editor::statement_cursor::tests::value_contract_mssql_malformed_tail_blocks_the_whole_go_script ... ok
+test ui::editor::statement_cursor::tests::value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity ... ok
+test ui::grid::presentation::tests::mysql_bit_and_spatial_cells_follow_their_decoded_value_contract ... ok
+test ui::grid::types::tests::mysql_bit_widths_choose_an_editor_matching_the_value_contract ... ok
+
+failures:
+
+---- ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page stdout ----
+
+thread 'ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page' (1242917) panicked at crates/app/src/ui/browse_tab/tests.rs:307:5:
+the browse operation must not issue a second page find
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ui::browse_tab::tests::value_contract_mongodb_browse_uses_one_find_for_schema_and_page
+
+test result: FAILED. 50 passed; 1 failed; 0 ignored; 0 measured; 450 filtered out; finished in 116.74s
+
