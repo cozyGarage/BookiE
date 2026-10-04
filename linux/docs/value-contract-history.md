@@ -5560,3 +5560,16 @@ the exact 122-character array text remains unchanged and no formula is added.
 The focused Docker contract, strict Clippy, formatting and round-trip checker
 pass. Other array families and spreadsheet applications remain open. See the
 [evidence manifest](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json).
+
+## PostgreSQL float8[] exact-value XLSX through Calc, 2026-10-04
+
+A PostgreSQL `float8[]` contract covers an adjacent value, negative zero, the
+minimum subnormal, NaN, both infinities and SQL NULL. `float8send` verifies the
+negative-zero and subnormal bit patterns; rebinding the driver's text must
+match PostgreSQL's `array_send` bytes. PostgreSQL `array_to_json` renders
+negative zero as `0`, so the test does not use JSON as its sign-bit oracle. The
+XLSX array cell survives LibreOffice Calc 26.8.0.3's ODS save and XLSX re-save
+as identical 390-character text without formulas. The focused contract, strict
+Clippy, formatting and OOXML/ODS checker pass. Other array families and
+spreadsheet applications remain open. See the
+[evidence manifest](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json).

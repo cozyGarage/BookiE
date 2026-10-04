@@ -316,6 +316,98 @@ async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_float8_array_file_exports_preserve_bits() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY[1.0000000000000002::float8, '-0'::float8, \
+        '4.9406564584124654e-324'::float8, 'NaN'::float8, 'Infinity'::float8, \
+        '-Infinity'::float8, NULL]::float8[]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("float8[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("double precision[]".into()));
+    let Value::Text(native_json) = &oracle.rows[0][1] else {
+        panic!("float8[] array_to_json returned {:?}", oracle.rows[0][1]);
+    };
+    let elements = serde_json::from_str::<serde_json::Value>(native_json).unwrap();
+    let elements = elements.as_array().unwrap();
+    assert_eq!(elements.len(), 7);
+    assert_eq!(elements[0].as_f64().unwrap().to_bits(), 1.0000000000000002f64.to_bits());
+    assert_eq!(elements[2].as_f64().unwrap().to_bits(), 1);
+    assert_eq!(elements[3], "NaN");
+    assert_eq!(elements[4], "Infinity");
+    assert_eq!(elements[5], "-Infinity");
+    assert!(elements[6].is_null());
+
+    let element_wire = connection
+        .query(&format!(
+            "SELECT ordinality, item IS NULL, encode(float8send(item), 'hex') \
+             FROM unnest({expression}) WITH ORDINALITY AS element(item, ordinality) ORDER BY ordinality"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(element_wire.rows[0][2], Value::Text("3ff0000000000001".into()));
+    // array_to_json renders negative zero as 0; float8send is the lossless oracle.
+    assert_eq!(element_wire.rows[1][2], Value::Text("8000000000000000".into()));
+    assert_eq!(element_wire.rows[2][2], Value::Text("0000000000000001".into()));
+    assert_eq!(element_wire.rows[6][1], Value::Bool(true));
+    assert_eq!(element_wire.rows[6][2], Value::Null);
+
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::float8[])::text, encode(array_send($1::text::float8[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][1]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("float8-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("float8[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+    assert!(shared_strings.contains(driver_text), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

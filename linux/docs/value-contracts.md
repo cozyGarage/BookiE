@@ -52,6 +52,10 @@ A PostgreSQL `numeric[]` XLSX cell preserves wide precision, scale, NaN,
 infinities and SQL NULL as one exact text value through Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json)).
 
+A PostgreSQL `float8[]` XLSX cell preserves an adjacent double, negative zero,
+the minimum subnormal, NaN, infinities and SQL NULL as exact text through the
+same Calc round trip ([evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json)).
+
 A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
 elements and its declared type through decoding, qualified binding and keyed
 edits; invalid values are refused without changing either row
