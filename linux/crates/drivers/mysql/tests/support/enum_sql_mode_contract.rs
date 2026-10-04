@@ -48,6 +48,10 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         .execute("CREATE TABLE enum_mode_copy LIKE enum_mode_source")
         .await
         .unwrap();
+    setup
+        .execute("CREATE TABLE enum_csv_copy LIKE enum_mode_source")
+        .await
+        .unwrap();
     for (id, label) in [
         (1, Some("happy")),
         (2, Some("it's ok")),
@@ -72,6 +76,7 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
     for (suffix, mode) in MODES.into_iter().enumerate() {
         let connection = connect_in_mode(&options, mode).await;
         connection.execute("DELETE FROM enum_mode_copy").await.unwrap();
+        connection.execute("DELETE FROM enum_csv_copy").await.unwrap();
         let source = connection
             .query("SELECT id, mood FROM enum_mode_source ORDER BY id")
             .await
@@ -100,6 +105,37 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
+
+        let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+        let csv_options = tablepro_core::export::CsvOptions {
+            null_to_empty: false,
+            null_marker: Some(null_marker.clone()),
+            ..tablepro_core::export::CsvOptions::default()
+        };
+        let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+        let import_options = tablepro_core::import::CsvImportOptions {
+            null_marker,
+            ..tablepro_core::import::CsvImportOptions::default()
+        };
+        let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+        let columns = connection.fetch_columns(None, "enum_csv_copy").await.unwrap();
+        let mapping = [Some(0), Some(1)];
+        let plan = tablepro_core::import::build_insert_plan(
+            &tablepro_core::import::ImportTarget {
+                driver_id: "mysql",
+                schema: None,
+                table: "enum_csv_copy",
+                columns: &columns,
+                mapping: &mapping,
+            },
+            &sheet,
+            &import_options,
+        )
+        .unwrap();
+        for row in &plan.rows {
+            connection.execute_params(&plan.statement, row).await.unwrap();
+        }
+
         let path = std::env::temp_dir().join(format!(
             "tablepro-enum-sql-{}-{:?}-{suffix}.sql",
             std::process::id(),
@@ -132,8 +168,9 @@ async fn assert_enum_literal_export_modes(options: ConnectOptions) {
         std::fs::remove_file(path).unwrap();
         let matching = connection
             .query(
-                "SELECT COUNT(*) FROM enum_mode_source s JOIN enum_mode_copy c ON s.id = c.id \
-                 AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood)",
+                "SELECT COUNT(*) FROM enum_mode_source s \
+                 JOIN enum_mode_copy f ON s.id = f.id AND s.mood + 0 <=> f.mood + 0 AND HEX(s.mood) <=> HEX(f.mood) \
+                 JOIN enum_csv_copy c ON s.id = c.id AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood)",
             )
             .await
             .unwrap();
