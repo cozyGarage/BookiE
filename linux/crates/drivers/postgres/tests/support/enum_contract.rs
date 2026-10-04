@@ -1873,6 +1873,106 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE SCHEMA \"Enum Shelf\"").await.unwrap();
+    connection
+        .execute("CREATE TYPE \"Enum Shelf\".\"State Kind\" AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE \"Enum Shelf\".\"Row Box\" \
+             (id INT PRIMARY KEY, status \"Enum Shelf\".\"State Kind\", sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO \"Enum Shelf\".\"Row Box\" \
+             VALUES (1, 'ready', 'target'), (2, 'ready', 'sibling')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(Some("Enum Shelf"), "Row Box").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "Enum Shelf".into(),
+            name: "State Kind".into(),
+        })
+    );
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("Enum Shelf"),
+        "Row Box",
+        &columns,
+        &[(1, Value::Text("paused".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_params(&update.0, &update.1).await.unwrap();
+
+    let rows = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text, sibling \
+             FROM \"Enum Shelf\".\"Row Box\" ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        rows.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+                Value::Text("target".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("ready".into()),
+                Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+                Value::Text("sibling".into()),
+            ],
+        ]
+    );
+
+    let filters = tablepro_core::FilterSet {
+        rules: vec![tablepro_core::FilterRule {
+            column: "status".into(),
+            op: tablepro_core::FilterOp::Eq,
+            value: Some(tablepro_core::FilterValue::Single("paused".into())),
+        }],
+        ..Default::default()
+    };
+    let (where_sql, params) = tablepro_core::build_filter_where("postgres", &columns, &filters)
+        .unwrap()
+        .unwrap();
+    let filtered = connection
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM \"Enum Shelf\".\"Row Box\" WHERE {where_sql}"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("paused".into()),
+            Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
     let (_container, opts) = start_pg().await;
     let setup = connect(opts.clone()).await;
