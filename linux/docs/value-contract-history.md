@@ -4998,3 +4998,11 @@ then returns both through the native driver with the declared enum type intact.
 The focused case, strict Clippy and formatting pass. This covers the maximum
 accepted label length; overlength refusal and other enum consumer/session cases
 remain open. See the [evidence manifest](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
+
+## PostgreSQL overlength custom-enum label refusal, 2026-10-04
+
+A PostgreSQL 16 Docker contract attempts to create an enum with a 64-byte
+ASCII label, one byte over the server's 63-byte limit. PostgreSQL refuses the
+DDL with SQLSTATE `42602`; `to_regtype` confirms that no type was left behind.
+The focused case, strict Clippy and formatting pass. See the [evidence
+manifest](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).

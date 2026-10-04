@@ -94,9 +94,10 @@ the same contract. Chains deeper than seven and other enum/session configuration
 remain open; see the [six/seven-domain evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
 and the [six-domain checkpoint](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
-PostgreSQL custom-enum results now also cover the maximum 63-byte label with
-ASCII and multibyte UTF-8 values, checked against `pg_enum` byte lengths; see
-the [enum boundary evidence](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
+PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
+UTF-8 labels plus refusal of a 64-byte label without partial type creation; see
+the [accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)
+and [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
