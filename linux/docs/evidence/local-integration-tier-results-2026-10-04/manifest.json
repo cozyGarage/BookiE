@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "d783182f972036e8af1521b0e3d44acd54cf77a7",
+  "command": "rtk proxy bash scripts/ci-local.sh integration",
+  "toolchain": {
+    "rustc": "1.98.1 (48a229cea 2026-09-01)",
+    "cargo": "1.98.1 (797e8a9bc 2026-08-05)"
+  },
+  "result": "passed",
+  "exit_code": 0,
+  "test_summaries": [
+    "33 passed, 0 failed",
+    "29 passed, 0 failed",
+    "34 passed, 0 failed",
+    "61 passed, 0 failed",
+    "123 passed, 0 failed",
+    "8 passed, 0 failed",
+    "1 passed, 0 failed",
+    "3 passed, 0 failed",
+    "1 passed, 0 failed",
+    "1 passed, 0 failed",
+    "9 passed, 0 failed",
+    "12 passed, 0 failed"
+  ],
+  "total_tests_passed": 315,
+  "test_scope": [
+    "PostgreSQL, MySQL/MariaDB, SQL Server, ClickHouse, Redis and MongoDB Docker-backed driver integration suites",
+    "MCP MongoDB Extended JSON and PostgreSQL policy/session suites",
+    "PostgreSQL Unix-socket and agent-provider socket checks",
+    "SSH agent-authentication and OpenSSH session suites"
+  ],
+  "log": "output.log",
+  "log_sha256": "d4ed51bd5ea41bcd397988ed2de51acba84c63d0bb1c597fc62b9bfb729b32a8",
+  "manual_gates_remaining": [
+    "Installed Arch/Wayland acceptance",
+    "Debian/GNOME installed acceptance",
+    "Package upgrade and rollback",
+    "Frozen-candidate soak"
+  ],
+  "scope_limit": "This local integration tier does not qualify B3, B4 or the 0.2.0 release; full fast/unit, TLS, GTK installed, Flatpak, candidate and soak gates remain separate."
+}

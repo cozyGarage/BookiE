@@ -120,6 +120,11 @@ default shadowed `search_path` cannot accept the target-only label; qualified
 keyed edit and filter paths select the target type and preserve the shadow row
 ([evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json)).
 
+October 4 local integration gate: all 315 tests passed at
+`d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,
+policy/session, PostgreSQL socket and SSH suites. B3/B4 and release acceptance
+remain open ([run evidence](evidence/local-integration-tier-results-2026-10-04/manifest.json)).
+
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3
