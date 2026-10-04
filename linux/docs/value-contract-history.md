@@ -5282,6 +5282,17 @@ scalar value. The full core suite, PostgreSQL array contract group, strict
 Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum array CSV import, 2026-10-04
+
+CSV import now recognizes a custom domain as the direct element type of a
+PostgreSQL array and emits a schema-qualified cast to that domain array. A
+PostgreSQL 16 contract preserves literal `NULL`, empty text, Unicode,
+comma-containing labels and SQL NULL elements against native type, JSON and
+wire-byte oracles. A domain CHECK rejects a forbidden label with SQLSTATE
+23514 without inserting the row. The PostgreSQL enum and domain contract
+groups, full core suite, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

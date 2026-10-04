@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "23f95b5ce",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "CSV import of arrays whose elements are domains over enums",
+  "test": "domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null",
+  "contract": [
+    "Catalog metadata resolves the array element's qualified domain type rather than reducing the cast to the base enum.",
+    "The CSV insert plan casts text to the schema-qualified domain array, preserving literal NULL, empty text, Unicode, comma-containing labels and SQL NULL elements with native type, JSON and wire-byte equality.",
+    "A domain CHECK rejects a forbidden enum value with SQLSTATE 23514, and the failed row is not inserted."
+  ],
+  "validation": {
+    "domain_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "14 passed, 0 failed",
+      "log": "domain-tests.txt"
+    },
+    "enum_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_contract:: -- --include-ignored --test-threads=1",
+      "result": "14 passed, 0 failed",
+      "log": "enum-tests.txt"
+    },
+    "core": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core",
+      "result": "517 unit tests and 10 query-pipeline tests passed",
+      "log": "core-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other custom array element types, other consumers and additional PostgreSQL session configurations remain open in B3."
+  ]
+}

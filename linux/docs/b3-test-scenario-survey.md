@@ -670,3 +670,6 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   update builder, with native type/value checks, invalid-label no-mutation and
   sibling wire-byte assertions; blank input remains SQL NULL while `{}` stores
   an empty array ([edit evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json), [NULL/empty evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
+- B3-1 domain-array follow-up: CSV import now retains a domain-over-enum array's
+  qualified element domain, round-trips native values and bytes, and refuses a
+  value rejected by the domain CHECK without inserting its row ([evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json)).

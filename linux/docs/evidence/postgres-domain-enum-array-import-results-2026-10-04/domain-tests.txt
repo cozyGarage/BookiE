@@ -1,0 +1,2 @@
+test domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null ... ok
+test result: ok. 14 passed; 0 failed; 0 ignored; 100 filtered out
