@@ -179,6 +179,13 @@ and target-enum invalid-label refusal are covered; all 108 selected PostgreSQL
 value contracts pass ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
 Other PostgreSQL function contexts and the broader B3 matrix remain open.
 
+October 5 B3 function follow-up: `array_replace` now checks both inferred
+parameter slots when a same-named shadow enum leads `search_path`. Native result
+and wire-byte oracles cover literal `NULL`, SQL NULL and invalid shadow-only
+labels in either slot; all 109 selected PostgreSQL value contracts pass
+([evidence](evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
+Other PostgreSQL contexts and the broader B3 matrix remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

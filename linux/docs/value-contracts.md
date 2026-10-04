@@ -183,6 +183,9 @@ confirms that a SQL NULL parameter matches a NULL array element
 `array_replace` exercises two inferred parameters together for text, SQL NULL,
 and their search/replacement combinations, with native result and enum-type
 oracles ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
+The same function now preserves both parameter types under a same-named shadow
+enum in `search_path`; native results and wire bytes match, and labels found only
+in the shadow are refused in either slot ([evidence](evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
 `array_append` and `array_prepend` now also preserve inferred target-enum binding
 when a same-named shadow enum leads transaction `search_path`; the contract
 checks native typed results, `pg_typeof`, result bytes, literal `NULL` versus
