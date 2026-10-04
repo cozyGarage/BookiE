@@ -393,7 +393,8 @@ grid edits now refuse before write, while native sub-microsecond binding and
 additional nested combinations remain unsupported or untested. SQL Server's
 legacy `datetime`, `money`/`smallmoney` and `sql_variant` have visible refusals;
 exact support remains open. MySQL and MariaDB enum SQL-file and typed CSV
-round trips cover four modes ([evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json));
+round trips plus JSON preservation and safe XLSX refusal cover four modes
+([evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json));
 additional MySQL SQL modes and DDL/session interactions, ClickHouse additional
 nested and temporal combinations, SQLite
 installed-grid transitions, and broad

@@ -2969,7 +2969,7 @@ literals are checked against returned `Value::TimestampTz`, UTC cast text,
 `sql_mode` is cleared for the baseline. Other temporal precisions and consumer
 paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
-### MySQL/MariaDB ENUM SQL-file exports across SQL modes (2026-10-04)
+### MySQL/MariaDB ENUM consumers across SQL modes (2026-10-04)
 
 MySQL and MariaDB replay SQL export files and import typed CSV containing six
 ENUM values under the default mode, `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and
@@ -2978,6 +2978,8 @@ The labels include an apostrophe, a backslash, literal `NULL`, and empty text,
 plus a SQL NULL row. Typed CSV uses an explicit collision-free null marker to
 keep empty text distinct from SQL NULL. Each mode checks server-native ENUM
 ordinals and label bytes, then compares both copied tables with the source.
+JSON preserves all labels and SQL NULL. XLSX explicitly refuses the empty
+label and leaves a pre-existing destination file unchanged.
 Both focused Docker tests, strict Clippy and formatting pass. Other ENUM
 consumers and SQL mode combinations remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 

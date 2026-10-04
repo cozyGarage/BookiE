@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "113163497",
-  "case": "MySQL/MariaDB ENUM SQL-file and CSV round trips across SQL modes",
+  "source_commit": "f0f3ea54c",
+  "case": "MySQL/MariaDB ENUM consumers across SQL modes",
   "engines": {
     "mysql": "testcontainers-modules default mysql:8.1 image",
     "mariadb": "mariadb:11"
@@ -16,6 +16,7 @@
     "Generated SQL export files replay with the same enum values under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, and combined SQL modes on both engines.",
     "The fixture covers an apostrophe label, a backslash label, literal NULL, empty text, and SQL NULL.",
     "Typed CSV export and import uses a collision-free NULL marker so empty enum text stays distinct from SQL NULL.",
+    "JSON output preserves every label and SQL NULL; XLSX refuses the empty-text label and leaves an existing destination unchanged.",
     "Each mode checks expected native enum ordinals and label bytes, then compares both copied tables to the source."
   ],
   "validation": {
