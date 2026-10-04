@@ -1208,22 +1208,29 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_search_path() {
+async fn value_contract_six_and_seven_domain_levels_over_enum_ignore_shadowed_search_path() {
     let (_container, opts) = start_pg().await;
+    assert_domain_level_contract(opts.clone(), 6).await;
+    assert_domain_level_contract(opts, 7).await;
+}
+
+async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
+    let schema = format!("value_contract_{levels}_domains");
+    let shadow_schema = format!("value_contract_{levels}_shadow");
     let setup = connect(opts.clone()).await;
-    setup.execute("CREATE SCHEMA value_contract_six_domains").await.unwrap();
+    setup.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
     setup
-        .execute("CREATE TYPE value_contract_six_domains.state AS ENUM ('ready', 'paused')")
+        .execute(&format!("CREATE TYPE {schema}.state AS ENUM ('ready', 'paused')"))
         .await
         .unwrap();
 
     let mut base_type = "state".to_owned();
-    for level in 1..=6 {
+    for level in 1..=levels {
         let domain = format!("state_domain_{level}");
         setup
             .execute(&format!(
-                "CREATE DOMAIN value_contract_six_domains.{domain} \
-                 AS value_contract_six_domains.{base_type}"
+                "CREATE DOMAIN {schema}.{domain} \
+                 AS {schema}.{base_type}"
             ))
             .await
             .unwrap();
@@ -1231,23 +1238,25 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
     }
     setup
         .execute(&format!(
-            "CREATE TABLE value_contract_six_domains.rows \
-             (id INT PRIMARY KEY, status value_contract_six_domains.{base_type})"
+            "CREATE TABLE {schema}.rows \
+             (id INT PRIMARY KEY, status {schema}.{base_type})"
         ))
         .await
         .unwrap();
     setup
-        .execute("INSERT INTO value_contract_six_domains.rows VALUES (1, 'ready'), (2, NULL), (3, 'ready')")
+        .execute(&format!(
+            "INSERT INTO {schema}.rows VALUES (1, 'ready'), (2, NULL), (3, 'ready')"
+        ))
         .await
         .unwrap();
 
-    setup.execute("CREATE SCHEMA value_contract_six_shadow").await.unwrap();
+    setup.execute(&format!("CREATE SCHEMA {shadow_schema}")).await.unwrap();
     setup
-        .execute("CREATE TYPE value_contract_six_shadow.state AS ENUM ('ready')")
+        .execute(&format!("CREATE TYPE {shadow_schema}.state AS ENUM ('ready')"))
         .await
         .unwrap();
     setup
-        .execute("ALTER ROLE postgres SET search_path TO value_contract_six_shadow")
+        .execute(&format!("ALTER ROLE postgres SET search_path TO {shadow_schema}"))
         .await
         .unwrap();
     drop(setup);
@@ -1255,23 +1264,20 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
     let connection = connect(opts).await;
     assert_eq!(
         connection.query("SELECT current_schema()::text").await.unwrap().rows,
-        vec![vec![Value::Text("value_contract_six_shadow".into())]]
+        vec![vec![Value::Text(shadow_schema.clone())]]
     );
 
-    let columns = connection
-        .fetch_columns(Some("value_contract_six_domains"), "rows")
-        .await
-        .unwrap();
+    let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
         Some(tablepro_core::QualifiedTypeName {
-            schema: "value_contract_six_domains".into(),
+            schema: schema.clone(),
             name: "state".into(),
         })
     );
     let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
-        Some("value_contract_six_domains"),
+        Some(&schema),
         "rows",
         &columns,
         &[(1, Value::Text("paused".into()))],
@@ -1282,7 +1288,7 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
 
     let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
         "postgres",
-        Some("value_contract_six_domains"),
+        Some(&schema),
         "rows",
         &columns,
         &[Value::Int(4), Value::Text("paused".into())],
@@ -1291,7 +1297,7 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
     connection.execute_params(&insert_sql, &insert_params).await.unwrap();
     let (insert_null_sql, insert_null_params) = tablepro_core::sql_dialect::build_insert_from_draft(
         "postgres",
-        Some("value_contract_six_domains"),
+        Some(&schema),
         "rows",
         &columns,
         &[Value::Int(5), Value::Null],
@@ -1304,11 +1310,13 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
 
     let invalid = connection
         .execute_params(
-            "UPDATE value_contract_six_domains.rows SET status = $1 WHERE id = 3",
+            &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
             &[Value::Text("not a label".into())],
         )
         .await
-        .expect_err("invalid enum label must be refused through six domain layers");
+        .expect_err(&format!(
+            "invalid enum label must be refused through {levels} domain layers"
+        ));
     assert!(matches!(
         invalid,
         tablepro_core::DriverError::Query {
@@ -1331,7 +1339,7 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
         .query_params(
             &format!(
                 "SELECT id, status::text, pg_typeof(status)::text \
-                 FROM value_contract_six_domains.rows WHERE {where_sql} ORDER BY id"
+                 FROM {schema}.rows WHERE {where_sql} ORDER BY id"
             ),
             &params,
         )
@@ -1343,24 +1351,23 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
             vec![
                 Value::Int(1),
                 Value::Text("paused".into()),
-                Value::Text("value_contract_six_domains.state_domain_6".into()),
+                Value::Text(format!("{schema}.state_domain_{levels}")),
             ],
             vec![
                 Value::Int(4),
                 Value::Text("paused".into()),
-                Value::Text("value_contract_six_domains.state_domain_6".into()),
+                Value::Text(format!("{schema}.state_domain_{levels}")),
             ],
         ]
     );
 
     let stored = connection
-        .query(
-            "SELECT id, status::text, pg_typeof(status)::text \
-             FROM value_contract_six_domains.rows ORDER BY id",
-        )
+        .query(&format!(
+            "SELECT id, status::text, pg_typeof(status)::text FROM {schema}.rows ORDER BY id"
+        ))
         .await
         .unwrap();
-    let outer_domain = Value::Text("value_contract_six_domains.state_domain_6".into());
+    let outer_domain = Value::Text(format!("{schema}.state_domain_{levels}"));
     assert_eq!(
         stored.rows,
         vec![
@@ -1370,12 +1377,12 @@ async fn value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_searc
             vec![
                 Value::Int(4),
                 Value::Text("paused".into()),
-                Value::Text("value_contract_six_domains.state_domain_6".into()),
+                Value::Text(format!("{schema}.state_domain_{levels}")),
             ],
             vec![
                 Value::Int(5),
                 Value::Null,
-                Value::Text("value_contract_six_domains.state_domain_6".into()),
+                Value::Text(format!("{schema}.state_domain_{levels}")),
             ],
         ]
     );
