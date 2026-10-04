@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "07f3da38c2f015b8563497ca523e092be9ec42ba",
+  "case": "PostgreSQL uuid[] XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport",
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "The uuid[] fixture contains two UUID values and SQL NULL; native pg_typeof, array_to_json and array_send provide independent type, semantic and wire-byte oracles.",
+    "BookiE's valid quoted UUID array text is rebound through a typed cast and preserves native array JSON and array_send bytes even though PostgreSQL's uuid[]::text uses an unquoted spelling.",
+    "The XLSX cell is a shared string and contains the complete 84-character array text without a formula.",
+    "LibreOffice Calc opens XLSX and saves ODS, then reopens ODS and saves XLSX; exact cell text and string cell kinds remain unchanged."
+  ],
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "validation": {
+    "native_export_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-packet-path>/source.xlsx cargo test -p tablepro-driver-postgres --test integration array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "postgres_value_contracts": {
+      "command": "cargo test -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+      "passed": 111,
+      "failed": 0,
+      "filtered": 29,
+      "duration_seconds": 248.0,
+      "log": "postgres-value-contracts.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "Install libreoffice-calc in the pinned Debian container.",
+        "Open source.xlsx in Calc and save calc-roundtrip.ods.",
+        "Open calc-roundtrip.ods in Calc and save calc-roundtrip.xlsx."
+      ],
+      "version_log": "calc-version.txt",
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks the exact A2 cell text, XLSX shared-string and ODS string cell kinds, representative UUID/NULL tokens, and absence of formula elements.",
+      "result": "All 84 characters preserved; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "ac0bd90dd881615ca3c6d141d1d52137f37a0fcd610be282ea139887c8159cae",
+    "calc-roundtrip.ods": "7d76e99e3e8a9c24486d21511110bd9681ffc5adb8aa56cb38054da1490bd77a",
+    "calc-roundtrip.xlsx": "32146780c22a60bde67bc81f9a39c1816053fd1aff338e342c22400eb5594bb6"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "17ada895fd95452bd9e28fd972e3f0f8e352fbb9a22e540186df7ed248e12ca6",
+    "postgres-value-contracts.txt": "4abe5257131832a8fa8810fd8acd1e44ffe4fa1da36a4f652c49380ae9cc683a",
+    "calc-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
+    "libreoffice-roundtrip.txt": "727452b13c67af14fe76c2b542c25a4062871bcf6bae5f7d07a7a87360e0a9ac",
+    "consumer-check.txt": "c211e0435ab1c5d4c9ff5311614be3af6d960650551c73dc62ff222fbea4020e",
+    "clippy.txt": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "checker_sha256": "51ebd073634f00ce3fac16e97f8ae867f1e079ddfc070b1ef7b804697a80f642"
+}

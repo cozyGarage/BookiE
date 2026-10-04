@@ -1,0 +1,8 @@
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.78s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 139 filtered out; finished in 2.03s

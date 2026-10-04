@@ -47,6 +47,11 @@ through LibreOffice Calc's XLSX-to-ODS-to-XLSX re-save. The shared/string cell
 types remain text and no formulas are created
 ([evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+A PostgreSQL `uuid[]` workbook preserves two UUIDs and SQL NULL through the same
+Calc round trip as exact text. Native `array_send` bytes match after binding the
+driver's quoted array text, and the re-saved cells remain strings without
+formulas ([evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).

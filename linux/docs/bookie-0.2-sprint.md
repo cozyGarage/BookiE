@@ -202,6 +202,14 @@ XML verifier are retained in the
 [text-array Calc evidence packet](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json).
 Other PostgreSQL array families, spreadsheet applications and B3 matrices remain open.
 
+October 5 B3 consumer follow-up: PostgreSQL `uuid[]` XLSX output survives the
+same pinned LibreOffice Calc XLSX-to-ODS-to-XLSX re-save as 84-character text.
+Native array rebinding preserves exact wire bytes despite PostgreSQL and
+BookiE using different valid UUID-array literal quote spellings. The artifacts
+and XML verifier are retained in the
+[UUID-array Calc evidence packet](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json).
+Other PostgreSQL array shapes and consumer matrices remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current

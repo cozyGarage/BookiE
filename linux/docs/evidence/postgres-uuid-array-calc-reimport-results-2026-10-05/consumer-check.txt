@@ -1,0 +1,1 @@
+uuid[] text (84 characters), shared-string/string types and no-formula checks passed through Calc ODS/XLSX re-save
