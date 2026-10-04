@@ -4968,7 +4968,9 @@ A PostgreSQL 16 Docker contract exports one `text[]` containing a literal
 markup through the XML, HTML and Markdown result-file writers. Native
 `pg_typeof`, `array_to_json`, canonical array text and `array_send` bytes check
 the type, element distinctions, content and bound-array round trip. The file
-outputs preserve Unicode and escape the markup payload. This proves one array
-family and three presentation formats; other array families and workbook/SQL
-file-writer semantics remain open. The focused test, strict Clippy and format
-check passed. See the [evidence manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+outputs preserve Unicode and escape the markup payload. The SQL file is replayed
+into a target table and checked against the native text, JSON element and wire
+oracles. This proves one array family through three presentation formats and
+SQL replay; other array families and workbook cell semantics remain open. The
+focused test, strict Clippy and format check passed. See the [evidence
+manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).

@@ -104,12 +104,13 @@ lossless re-import. Further enum consumer and session combinations remain open.
 | B4 acceptance | Secure connection and authorization | TLS fixture crates and policy/MCP enforcement tests exist; this survey has not audited their full matrix. | Trusted/untrusted/expired certificates, endpoint identity through SSH, bad credentials, lost sessions, read-only operations, scopes/allowlists and audit outcomes. Explicitly map supported mechanisms per engine. |
 
 October 4 B3-1 follow-up: one PostgreSQL `text[]` result now passes through the
-XML, HTML and Markdown file writers. PostgreSQL `pg_typeof`, array text,
+XML, HTML and Markdown file writers; the SQL writer is replayed into PostgreSQL
+and checked against native values. PostgreSQL `pg_typeof`, array text,
 `array_to_json` elements and `array_send` bytes provide independent type,
-content and bound-round-trip oracles; hostile markup and Unicode exercise the
-writer output. This is one array family and a presentation export case. Other
-array types and file-writer formats, including workbook cell semantics, remain
-open. See the [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+content and round-trip oracles; hostile markup and Unicode exercise the text
+writers. This is one array family. Other array types, XLSX cell semantics and
+additional enum configurations remain open. See the [array file-writer
+evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
