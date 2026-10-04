@@ -1234,6 +1234,121 @@ async fn sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 10), (2, 1.5), (3, '42'), (4, '1.5'), \
+             (5, 'alpha'), (6, X'00FF'), (7, NULL), \
+             (8, 9223372036854775807), (9, 3), (10, 0)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, added ANY, addition_class TEXT, \
+                 halved ANY, half_class TEXT, divided_by_zero ANY, zero_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, value + 1 AS added, typeof(value + 1) AS addition_class, \
+                    value / 2 AS halved, typeof(value / 2) AS half_class, \
+                    value / 0 AS divided_by_zero, typeof(value / 0) AS zero_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(result.columns[3].data_type, "NULL");
+    assert_eq!(result.columns[5].data_type, "NULL");
+    let expected_row = |id: i64, added: Value, addition_class: &str, halved: Value, half_class: &str| {
+        vec![
+            Value::Int(id),
+            added,
+            Value::Text(addition_class.into()),
+            halved,
+            Value::Text(half_class.into()),
+            Value::Null,
+            Value::Text("null".into()),
+        ]
+    };
+    assert_eq!(
+        result.rows,
+        vec![
+            expected_row(1, Value::Int(11), "integer", Value::Int(5), "integer"),
+            expected_row(2, Value::Float(2.5), "real", Value::Float(0.75), "real"),
+            expected_row(3, Value::Int(43), "integer", Value::Int(21), "integer"),
+            expected_row(4, Value::Float(2.5), "real", Value::Float(0.75), "real"),
+            expected_row(5, Value::Int(1), "integer", Value::Int(0), "integer"),
+            expected_row(6, Value::Int(1), "integer", Value::Int(0), "integer"),
+            expected_row(7, Value::Null, "null", Value::Null, "null"),
+            expected_row(
+                8,
+                Value::Float(i64::MAX as f64 + 1.0),
+                "real",
+                Value::Int(4_611_686_018_427_387_903),
+                "integer",
+            ),
+            expected_row(9, Value::Int(4), "integer", Value::Int(1), "integer"),
+            expected_row(10, Value::Int(1), "integer", Value::Int(0), "integer"),
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2), Some(3), Some(4), Some(5), Some(6)],
+    )
+    .await;
+
+    let restored = connection
+        .query(
+            "SELECT typeof(added), added, addition_class, typeof(halved), halved, half_class, \
+                    typeof(divided_by_zero), divided_by_zero, zero_class \
+             FROM restored ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![
+                row[2].clone(),
+                row[1].clone(),
+                row[2].clone(),
+                row[4].clone(),
+                row[3].clone(),
+                row[4].clone(),
+                row[6].clone(),
+                row[5].clone(),
+                row[6].clone(),
+            ])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
