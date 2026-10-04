@@ -2,22 +2,24 @@
   "schema_version": 1,
   "date": "2026-10-05",
   "branch": "linux",
-  "source_commit": "bf81b82fbc90270470f430d31f6a83aa76cda499",
-  "case": "PostgreSQL inferred enum-array inputs to array_position and array_remove under shadowed search_path",
+  "source_commit": "3ca63737eaa51f8e232f6531993d6ee81ffbf99f",
+  "case": "PostgreSQL inferred enum-array inputs to four polymorphic functions under shadowed search_path",
   "environment": "PostgreSQL Docker integration fixture; local Cargo cache reused",
   "scenario": {
     "test": "value_contract_domain_enum_array_functions_infer_first_array_parameter_under_shadowed_path",
     "functions": [
       "array_position",
-      "array_remove"
+      "array_remove",
+      "array_append",
+      "array_prepend"
     ],
     "assertions": [
       "A same-named shadow enum leads transaction search_path while the target enum and table remain schema-qualified.",
       "The first array parameter is inferred as the target enum array from the typed enum element argument.",
-      "array_position and array_remove results match explicitly typed native array oracles.",
+      "array_position, array_remove, array_append and array_prepend results match explicitly typed native array oracles.",
       "array_send parameter bytes match native arrays, including an array with lower bound zero.",
       "Empty arrays, SQL NULL arrays, NULL elements and a literal NULL enum label are distinct cases.",
-      "A label present only in the shadow enum is rejected with SQLSTATE 22P02 for both functions."
+      "A label present only in the shadow enum is rejected with SQLSTATE 22P02 for all four functions."
     ]
   },
   "results": {
@@ -31,7 +33,7 @@
       "passed": 110,
       "failed": 0,
       "filtered": 29,
-      "duration_seconds": 238.68,
+      "duration_seconds": 235.85,
       "log": "postgres-value-contracts.txt"
     },
     "clippy": {
@@ -60,11 +62,11 @@
     "diff_check": "git diff --check"
   },
   "sha256": {
-    "clippy.txt": "112c4fc18fd67098b878d3b26b103538c8d25f65619c4a5fd9c697ec5c7b323b",
-    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "clippy.txt": "88ba813889b48319ea9f006c638e5c19800d5edc24ecd621477ff28c74431727",
+    "diff-check.txt": "a60783e6c6b5da3bc8899052433daafa3b07501e90161ea8cec9b3d431c5f4dd",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "focused.txt": "12fee9e2932b40f6b81a58fc72155652e55c5b77166707b301a8dc7d61012276",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "postgres-value-contracts.txt": "bab2a4c3d6fed354781d4bf51b89d82945e70eb96bb2bc41fef3fd295aac1096"
+    "postgres-value-contracts.txt": "7de6dee9c328552a9999e0aba999a9ab5a4d2be9bccb998d9c8001c90bbdee8a"
   }
 }

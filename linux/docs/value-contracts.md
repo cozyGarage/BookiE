@@ -186,7 +186,8 @@ oracles ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-
 The same function now preserves both parameter types under a same-named shadow
 enum in `search_path`; native results and wire bytes match, and labels found only
 in the shadow are refused in either slot ([evidence](evidence/postgres-domain-enum-array-replace-shadowed-results-2026-10-05/manifest.json)).
-`array_position($1, enum_value)` and `array_remove($1, enum_value)` now cover
+`array_position($1, enum_value)`, `array_remove($1, enum_value)`,
+`array_append($1, enum_value)` and `array_prepend(enum_value, $1)` now cover
 inference of the array parameter itself, including lower-bound arrays, empty and
 NULL arrays, NULL elements, literal `NULL`, and shadow-only label refusal
 ([evidence](evidence/postgres-domain-enum-array-input-functions-shadowed-results-2026-10-05/manifest.json)).
