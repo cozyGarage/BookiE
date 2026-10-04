@@ -184,3 +184,108 @@ async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_nu
         ]
     );
 }
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
+async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE mood_csv AS ENUM ('', 'NULL', '東京', 'O''Brien', '=1+1', 'ready')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE mood_csv_source (id INTEGER PRIMARY KEY, status mood_csv)")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE mood_csv_target (id INTEGER PRIMARY KEY, status mood_csv)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO mood_csv_source VALUES \
+             (1, ''), (2, 'NULL'), (3, '東京'), (4, 'O''Brien'), (5, '=1+1'), (6, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO mood_csv_target VALUES (99, 'ready')")
+        .await
+        .unwrap();
+
+    let source = connection
+        .query("SELECT id, status FROM mood_csv_source ORDER BY id")
+        .await
+        .unwrap();
+    let marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let export_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        sanitize_formulas: false,
+        null_marker: Some(marker.clone()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &export_options);
+    assert_eq!(
+        csv,
+        format!("id,status\n1,\"\"\n2,NULL\n3,東京\n4,O'Brien\n5,=1+1\n6,{marker}\n")
+    );
+
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker: marker,
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection.fetch_columns(None, "mood_csv_target").await.unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "duckdb",
+            schema: None,
+            table: "mood_csv_target",
+            columns: &columns,
+            mapping: &[Some(0), Some(1)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert_eq!(plan.rows, source.rows);
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query(
+            "SELECT id, typeof(status), status::VARCHAR, status IS NULL \
+             FROM mood_csv_target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let Value::Text(enum_type) = &restored.rows[0][1] else {
+        panic!("expected a native DuckDB ENUM type, got {:?}", restored.rows[0][1]);
+    };
+    assert!(enum_type.starts_with("ENUM"), "{enum_type}");
+    let expected = [
+        (1, Some(""), false),
+        (2, Some("NULL"), false),
+        (3, Some("東京"), false),
+        (4, Some("O'Brien"), false),
+        (5, Some("=1+1"), false),
+        (6, None, true),
+        (99, Some("ready"), false),
+    ];
+    assert_eq!(restored.rows.len(), expected.len());
+    for (row, (id, label, is_null)) in restored.rows.iter().zip(expected) {
+        assert_eq!(row[0], Value::Int(id));
+        assert_eq!(row[1], Value::Text(enum_type.clone()));
+        assert_eq!(row[2], label.map_or(Value::Null, |label| Value::Text(label.into())));
+        assert_eq!(row[3], Value::Bool(is_null));
+    }
+}
