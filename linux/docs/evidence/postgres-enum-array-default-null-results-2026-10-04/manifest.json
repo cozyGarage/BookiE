@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "0b8107ea0",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "default CSV import distinguishes a NULL custom enum array from an empty array",
+  "test": "array_contract::value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape",
+  "contract": [
+    "With the default empty CSV null marker, a blank custom enum-array field imports as SQL NULL because the PostgreSQL empty array representation is `{}`.",
+    "An empty custom enum array remains a non-NULL empty array, and an array containing a SQL NULL element remains distinct.",
+    "Scalar custom-enum blank cells remain refused as ambiguous because the empty enum label and SQL NULL have the same blank CSV representation."
+  ],
+  "validation": {
+    "core": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core",
+      "result": "517 unit tests and 10 query-pipeline tests passed",
+      "log": "core-tests.txt"
+    },
+    "postgres_array_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "18 passed, 0 failed",
+      "log": "postgres-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, spreadsheet-application re-import, installed editing and additional enum/session configurations remain open in B3."
+  ]
+}

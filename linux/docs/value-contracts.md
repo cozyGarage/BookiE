@@ -105,6 +105,8 @@ The app parser and live keyed edit now preserve custom enum-array labels and
 refuse invalid labels without mutation ([grid-edit evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
 Grid input also keeps blank SQL NULL distinct from the empty array literal
 `{}` ([evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
+Default CSV import also maps a blank whole-array field to SQL NULL while
+retaining `{}` as the empty array ([evidence](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json)).
 
 A `timestamptz[]` file-writer contract preserves distinct repeated-hour
 instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and

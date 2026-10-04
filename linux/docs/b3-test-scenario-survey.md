@@ -663,6 +663,9 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   dimensions and wire-byte oracles. A same-named enum in a shadowed
   `search_path` cannot redirect the import away from the table's schema
   ([label evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json), [shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json), [shadowed-path evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
+  Default blank CSV fields now restore SQL NULL arrays, while `{}` remains an
+  empty array and scalar-enum blanks remain safely refused as ambiguous
+  ([evidence](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json)).
   Custom enum-array grid edits also now pass through the app parser and keyed
   update builder, with native type/value checks, invalid-label no-mutation and
   sibling wire-byte assertions; blank input remains SQL NULL while `{}` stores

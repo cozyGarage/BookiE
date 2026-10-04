@@ -5272,6 +5272,16 @@ literal `{}`: blank input stores a typed SQL NULL, while `{}` stores a non-NULL
 empty array. The native PostgreSQL array contract group and app-parser test pass
 ([evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
 
+## PostgreSQL custom enum-array CSV default NULL marker, 2026-10-04
+
+The default blank CSV marker now restores a whole custom enum array as SQL
+NULL. PostgreSQL represents an empty array as `{}`, so it remains distinct;
+arrays containing SQL NULL elements remain distinct as well. Scalar enum blank
+cells still fail closed as ambiguous because an empty enum label is a valid
+scalar value. The full core suite, PostgreSQL array contract group, strict
+Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two
