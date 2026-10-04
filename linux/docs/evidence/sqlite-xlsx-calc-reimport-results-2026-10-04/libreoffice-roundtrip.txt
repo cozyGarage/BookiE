@@ -1,0 +1,6 @@
+forky/sid
+LibreOffice 26.8.0.3 680(Build:3)
+
+
+convert /work/bookiee-generated.xlsx as a Calc document -> /work/roundtrip-3/bookiee-generated.ods using filter : calc8
+convert /work/roundtrip-3/bookiee-generated.ods as a Calc document -> /work/roundtrip-3/bookiee-generated.xlsx using filter : Calc Office Open XML

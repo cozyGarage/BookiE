@@ -1,0 +1,14 @@
+Calc XLSX -> ODS cells (cell type, numeric value, displayed text):
+B2 ('float', '42', '42')
+C2 ('string', None, 'integer')
+B3 ('string', None, '42')
+C3 ('string', None, 'text')
+B4 (None, None, '')
+C4 ('string', None, 'null')
+Calc ODS -> XLSX cells (OOXML type, value):
+B2 ('n', '42')
+C2 ('s', 'integer')
+B3 ('s', '42')
+C3 ('s', 'text')
+B4 ('blank/missing', None)
+C4 ('s', 'null')

@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "a239ca42b52852d845bf26f9b7b7b4c8d8dfcb68",
+  "engine": "SQLite STRICT ANY result exported by BookieE; LibreOffice Calc on Debian testing",
+  "case": "Spreadsheet-application import and re-save of numeric, numeric-looking text and SQL NULL cells",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "BookieE exports an integer 42 as an XLSX numeric cell, text \"42\" as a shared-string cell, and SQL NULL as a blank cell; accompanying runtime-kind labels are integer, text and null.",
+    "Calc opens the workbook and saves it as ODS without converting the numeric-looking text to a number or populating the blank NULL cell.",
+    "Calc reopens that ODS and saves XLSX; OOXML inspection confirms the integer remains numeric, the text remains a string with the same displayed value, and the NULL remains a missing/blank cell.",
+    "The checked workbook cells agree with the result's runtime-kind labels."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=/home/trung/Projects/tablepro/linux/docs/evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/source.xlsx cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds -- --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "Open source.xlsx with LibreOffice Calc and save as calc-roundtrip.ods.",
+        "Reopen calc-roundtrip.ods with LibreOffice Calc and save as calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks over ODS content.xml and XLSX worksheet/shared strings; assertions fail unless both app import/export steps preserve the checked cell kinds and values.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "accff924f8712452498b46b7b2f1c344ba05a76d8101c602e1f01440b5eef6b0",
+    "calc-roundtrip.ods": "43973e6be15ec0e8c4d1c3079a702a4de303779cda763574f361f07fee0dc9ff",
+    "calc-roundtrip.xlsx": "5385ccbf5c2d2dcd4a0e59257986e3becc576762de6d4cc6185db02770f923ac"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "907a92a9865fc9db6a6c6370c5c60dd2a3b6643502cd653f9360fdb96a0d238c",
+    "libreoffice-roundtrip.txt": "3ecb7ba09c00b23e7aacaa84d8682a4b95c52545a36f42279a438c8fa654a6df",
+    "consumer-check.txt": "0263f27c21a1bddc07cb0f2a237263ae6ea410071f8c653b7f082feda1298910",
+    "clippy.txt": "8950be1e8f4499f41b8e38ef15f09a0e2671be53a43aa5dec4d794320908881d",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other spreadsheet data shapes, application/version combinations, broader format equivalence and installed grid editing remain open."
+  ]
+}
