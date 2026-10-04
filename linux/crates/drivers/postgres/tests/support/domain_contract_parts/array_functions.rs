@@ -666,6 +666,174 @@ async fn value_contract_domain_enum_array_replace_keeps_both_parameters_under_sh
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_under_shadowed_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_input")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_input_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_input.state \
+             AS ENUM ('ready', 'paused', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_input_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_shadowed_array_input.state_domain \
+             AS value_contract_shadowed_array_input.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_shadowed_array_input.rows \
+             (id INT PRIMARY KEY, status value_contract_shadowed_array_input.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_shadowed_array_input.rows \
+             VALUES (1, 'ready'), (2, 'NULL'), (3, 'paused'), (4, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let schema = "value_contract_shadowed_array_input";
+    let enum_type = format!("{schema}.state");
+    let array_type = format!("{schema}.state[]");
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(
+            "SET LOCAL search_path TO value_contract_shadowed_array_input_shadow, public",
+        )
+        .await
+        .unwrap();
+
+    for (parameter, native_array) in [
+        (
+            Value::Text(r#"{"ready","NULL","paused"}"#.into()),
+            format!(r#"'{{"ready","NULL","paused"}}'::{array_type}"#),
+        ),
+        (
+            Value::Text(r#"{"ready",NULL,"paused"}"#.into()),
+            format!(r#"'{{"ready",NULL,"paused"}}'::{array_type}"#),
+        ),
+        (
+            Value::Text(r#"[0:3]={"ready","NULL","paused",NULL}"#.into()),
+            format!(r#"'[0:3]={{"ready","NULL","paused",NULL}}'::{array_type}"#),
+        ),
+        (Value::Text("{}".into()), format!("'{{}}'::{array_type}")),
+        (Value::Null, format!("NULL::{array_type}")),
+    ] {
+        let native_position = transaction
+            .query(&format!(
+                "SELECT id, array_position({native_array}, status::{enum_type}), \
+                 encode(array_send({native_array}), 'hex') \
+                 FROM {schema}.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let position = transaction
+            .query_params(
+                &format!(
+                    "SELECT id, array_position($1, status::{enum_type}), \
+                     pg_typeof($1)::text, encode(array_send($1), 'hex') \
+                     FROM {schema}.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected_position = native_position
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(array_type.clone()),
+                    row[2].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(position.rows, expected_position, "array_position {parameter:?}");
+
+        let native_remove = transaction
+            .query(&format!(
+                "SELECT id, array_to_json(array_remove({native_array}, status::{enum_type}))::text, \
+                 encode(array_send(array_remove({native_array}, status::{enum_type})), 'hex') \
+                 FROM {schema}.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let remove = transaction
+            .query_params(
+                &format!(
+                    "SELECT id, array_to_json(array_remove($1, status::{enum_type}))::text, \
+                     pg_typeof($1)::text, \
+                     pg_typeof(array_remove($1, status::{enum_type}))::text, \
+                     encode(array_send(array_remove($1, status::{enum_type})), 'hex') \
+                     FROM {schema}.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected_remove = native_remove
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(array_type.clone()),
+                    Value::Text(array_type.clone()),
+                    row[2].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(remove.rows, expected_remove, "array_remove {parameter:?}");
+    }
+
+    for expression in [
+        "array_position($1, status::value_contract_shadowed_array_input.state)",
+        "array_remove($1, status::value_contract_shadowed_array_input.state)",
+    ] {
+        transaction.execute("SAVEPOINT invalid_array_input").await.unwrap();
+        let invalid = transaction
+            .query_params(
+                &format!(
+                    "SELECT {expression} FROM {schema}.rows WHERE id = 1"
+                ),
+                &[Value::Text(r#"{"shadow-only"}"#.into())],
+            )
+            .await
+            .expect_err("array labels present only in the shadow enum must be rejected");
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+        );
+        transaction.execute("ROLLBACK TO SAVEPOINT invalid_array_input").await.unwrap();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
