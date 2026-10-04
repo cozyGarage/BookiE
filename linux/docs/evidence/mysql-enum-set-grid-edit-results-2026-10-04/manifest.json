@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "34c1380ae",
+  "source_commit": "9eb8c8bf0",
   "engines": {
     "mysql": "MySQL 8.1 in Docker via testcontainers",
     "mariadb": "MariaDB 11 in Docker via testcontainers"
@@ -15,12 +15,12 @@
   ],
   "contract": [
     "Grid parsing validates values against the declared ENUM/SET members, including apostrophe and backslash metadata, and refuses unknown labels or members.",
-    "Bound keyed edits preserve ENUM label bytes and a multi-member SET mask under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, their combination, STRICT_TRANS_TABLES, and STRICT_TRANS_TABLES with NO_BACKSLASH_ESCAPES.",
+    "Bound keyed edits preserve ENUM label bytes and a multi-member SET mask under eight modes: default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES, their combination, STRICT_TRANS_TABLES and STRICT_ALL_TABLES, each strict mode with NO_BACKSLASH_ESCAPES.",
     "Blank input retains shared SQL NULL/required-field behavior, while explicit `''` selects an empty ENUM label or the empty SET value; native ordinals/masks distinguish empty values from NULL.",
     "The native server control demonstrates that permissive mode otherwise coerces an unknown ENUM label to its error value and drops an unknown SET member; the control updates are rolled back.",
     "An untouched sibling row retains its native ordinals, masks and label bytes in every mode.",
     "The literal label `NULL` is accepted as a non-NULL ENUM value on both engines; its ordinal and bytes are checked separately from the SQL NULL row.",
-    "MariaDB 11 reports the declared ENUM/SET members in column metadata; valid apostrophe/backslash values bind and retain their native ordinals, masks and bytes in the same six modes, while invalid labels and members are refused."
+    "MariaDB 11 reports the declared ENUM/SET members in column metadata; valid apostrophe/backslash values bind and retain their native ordinals, masks and bytes in all eight modes, while invalid labels and members are refused."
   ],
   "validation": {
     "parser_test": {
@@ -30,12 +30,12 @@
     },
     "mysql_keyed_edit": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes -- --include-ignored --test-threads=1",
-      "result": "1 passed, 0 failed",
+      "result": "1 passed, 0 failed across eight SQL modes",
       "log": "mysql.txt"
     },
     "mariadb_keyed_edit": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes -- --include-ignored --test-threads=1",
-      "result": "1 passed, 0 failed",
+      "result": "1 passed, 0 failed across eight SQL modes",
       "log": "mariadb.txt"
     },
     "app_library_suite": {
@@ -56,7 +56,25 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "SQL modes beyond the six tested values remain open.",
+    "SQL modes beyond the eight tested values remain open.",
     "This case does not close B3 or qualify the 0.2.0 release."
-  ]
+  ],
+  "sql_modes": [
+    "",
+    "NO_BACKSLASH_ESCAPES",
+    "ANSI_QUOTES",
+    "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+    "STRICT_TRANS_TABLES",
+    "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+    "STRICT_ALL_TABLES",
+    "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES"
+  ],
+  "log_sha256": {
+    "parser.txt": "b347b2b55176cf0ce5f6aca7a242908be9e3b872b48809bf08d550ba9ed1d8c5",
+    "mysql.txt": "240577c1026e17ab700fcdf6c833a08853d5a98cd17a1624f9594304af65f8b3",
+    "mariadb.txt": "a1050c9ad54a07afb7d56e9cd20160135706785e90abcf3b726b9ce1fa679af6",
+    "app-lib.txt": "da6d2a7b1702484686102e7f7567f1fd2134a9142bde3aa764531d9d59df9b47",
+    "clippy.txt": "afafc404973f7e5736c15f86115b99981d6cd943aa0ca8ac08d0bfb4280f3863",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
 }

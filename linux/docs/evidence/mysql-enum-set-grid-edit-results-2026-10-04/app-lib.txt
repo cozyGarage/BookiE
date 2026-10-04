@@ -1,9 +1,4 @@
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.60s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
 running 483 tests
@@ -103,7 +98,7 @@ test services::operation_control::tests::a_supplied_token_is_the_one_the_control
 test services::operation_control::tests::a_zero_timeout_means_no_deadline ... ok
 test services::preferences::tests::a_newer_gsettings_migration_marker_is_not_downgraded ... ok
 test services::preferences::tests::failed_legacy_mirror_rolls_back_the_gsettings_update ... ok
-test services::preferences::tests::gsettings_keyfile_backend_survives_a_process_restart ... 
+test services::preferences::tests::gsettings_keyfile_backend_survives_a_process_restart ...
 running 1 test
 test services::preferences::tests::gsettings_keyfile_child ... ok
 
@@ -503,4 +498,4 @@ test ui::welcome_view::tests::an_empty_arrangement_renders_no_sections ... ok
 test ui::welcome_view::tests::connections_without_a_group_render_as_one_ungrouped_section ... ok
 test ui::welcome_view::tests::each_group_becomes_its_own_section_in_arranged_order ... ok
 
-test result: ok. 460 passed; 0 failed; 23 ignored; 0 measured; 0 filtered out; finished in 0.33s
+test result: ok. 460 passed; 0 failed; 23 ignored; 0 measured; 0 filtered out; finished in 0.30s
