@@ -147,6 +147,12 @@ with text and SQL NULL inputs, special labels, and a same-named shadow enum in
 selection. Other inferred array functions and the broader B3 matrix remain
 open ([evidence](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json)).
 
+October 4 B3 follow-up: `array_positions` now verifies inferred scalar enum
+parameters against native results for repeated values and NULL elements while a
+same-named shadow enum leads `search_path`; text and SQL NULL cases pass. Other
+inferred array contexts and the wider B3 matrix remain open
+([evidence](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json)).
+
 October 4 B3 MongoDB follow-up: stale keyed edits now compare original values of
 edited fields in the atomic update filter. A MongoDB 7 regression preserves a
 concurrent value and distinguishes explicit BSON NULL from a concurrently

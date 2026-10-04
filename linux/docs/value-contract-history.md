@@ -5805,3 +5805,13 @@ comma, quote and backslash labels. It also runs with a same-named shadow enum
 first in `search_path`. Native explicit-array expressions provide the result
 oracle. The focused contract passed; the PostgreSQL selected value suite is
 recorded with the [evidence manifest](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json).
+
+
+## PostgreSQL inferred domain-over-enum `array_positions` parameter, 2026-10-04
+
+`array_positions(ARRAY[status::base_enum, ...], $1)` now infers a scalar enum
+parameter for a domain-over-enum source. The native control and bound query
+check repeated-value positions and PostgreSQL's NULL-element matching; the
+bound parameter and integer-array result types are asserted. A same-named shadow
+enum leads the transaction `search_path` to check schema resolution. See the
+[evidence manifest](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
