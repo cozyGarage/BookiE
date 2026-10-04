@@ -279,6 +279,9 @@ October 4 B3-1 follow-up: text and SQL NULL parameters infer as the custom enum
 in both `COALESCE` argument positions and in `array_append(ARRAY[enum_column], $1)`.
 Native type/value oracles, `22P02` invalid-label refusals and unchanged source
 rows are checked ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
+A `NULLIF(enum_column, $1)` follow-up checks matching, non-matching and SQL NULL
+parameters, native inferred/result enum types, invalid-label SQLSTATE `22P02`
+and unchanged rows ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).
 The same fixture now covers `IS DISTINCT FROM` and `IS NOT DISTINCT FROM` with
 text and SQL NULL parameters, checking server-inferred enum types and exact
 NULL-safe results; see [distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).

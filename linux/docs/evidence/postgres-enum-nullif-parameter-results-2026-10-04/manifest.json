@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "374d52f0c",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Enum inference for NULLIF(enum_column, $1)",
+  "test": "enum_parameter_context_contract::value_contract_enum_parameters_in_coalesce_array_append_and_nullif",
+  "contract": [
+    "A text parameter matching the enum column makes NULLIF return SQL NULL; a non-matching label returns the original enum value.",
+    "A SQL NULL parameter leaves the enum value unchanged under NULLIF semantics.",
+    "pg_typeof($1) and pg_typeof(NULLIF(state, $1)) both report the native custom enum type for text and SQL NULL inputs.",
+    "An invalid text label reaches PostgreSQL enum input validation and returns SQLSTATE 22P02.",
+    "Source rows and native enum values remain unchanged."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration enum_parameter_context_contract::value_contract_enum_parameters_in_coalesce_array_append_and_nullif -- --include-ignored --exact --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "4dadb200cf49dcf40d9d6867f7e89e16e6a915568808c664c800232bc6cd659f",
+    "clippy.txt": "db18cc96eab1969c83c008fac0742e479ddc2729c3aaf2b0ea84d64a4086235a",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other direct expression contexts, domain-over-enum NULLIF inference, additional session/search_path configurations and other custom/native cases remain open."
+  ]
+}

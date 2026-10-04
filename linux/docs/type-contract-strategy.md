@@ -94,6 +94,10 @@ positions of `COALESCE` and in `array_append(ARRAY[enum_column], $1)`. Native
 `pg_typeof`, exact values, NULL behavior, native `22P02` invalid-label refusals
 and unchanged source rows are asserted
 ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
+A follow-up also verifies `NULLIF(enum_column, $1)` infers both text and SQL
+NULL parameters as the native enum, preserves exact results, and returns native
+`22P02` for an invalid label
+([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).
 
 The three-level domain chain also covers directly inferred text and SQL NULL
 parameters for both NULL-safe distinctness operators, with `pg_typeof` checks
