@@ -1079,3 +1079,81 @@ async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type(
         ]]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE SCHEMA value_contract_domain_coalesce").await.unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_domain_coalesce.state AS ENUM ('ready', 'paused')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_coalesce.state_domain \
+             AS value_contract_domain_coalesce.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_coalesce.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_coalesce.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO value_contract_domain_coalesce.rows VALUES (1, 'ready'), (2, 'paused'), (3, NULL)")
+        .await
+        .unwrap();
+
+    for (expression, text_values, null_values) in [
+        (
+            "COALESCE(status, $1)",
+            ["ready", "paused", "paused"],
+            [Some("ready"), Some("paused"), None],
+        ),
+        (
+            "COALESCE($1, status)",
+            ["paused", "paused", "paused"],
+            [Some("ready"), Some("paused"), None],
+        ),
+    ] {
+        for (parameter, expected) in [
+            (
+                Value::Text("paused".into()),
+                text_values.map(|value| Some(value.to_owned())),
+            ),
+            (Value::Null, null_values.map(|value| value.map(str::to_owned))),
+        ] {
+            let result = connection
+                .query_params(
+                    &format!(
+                        "SELECT id, {expression}::text, pg_typeof($1)::text, \
+                         pg_typeof({expression})::text, pg_typeof(status)::text \
+                         FROM value_contract_domain_coalesce.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                result.rows,
+                expected
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, value)| vec![
+                        Value::Int(index as i64 + 1),
+                        value.map_or(Value::Null, Value::Text),
+                        Value::Text("value_contract_domain_coalesce.state".into()),
+                        Value::Text("value_contract_domain_coalesce.state".into()),
+                        Value::Text("value_contract_domain_coalesce.state_domain".into()),
+                    ])
+                    .collect::<Vec<_>>(),
+                "{expression} with parameter {parameter:?}"
+            );
+        }
+    }
+}
