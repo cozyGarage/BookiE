@@ -1,0 +1,96 @@
+{
+  "revision": "235e07b22d46dd5d24764c936e32825f3274d9d4",
+  "dirty": true,
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--workspace",
+    "--features",
+    "tablepro-app/duckdb",
+    "--lib",
+    "--test",
+    "integration",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "compile": {
+    "exit_code": 0,
+    "seconds": 0.414,
+    "fresh_artifacts": 747,
+    "rebuilt_packages": []
+  },
+  "missing_suites": [],
+  "suites": {
+    "crates/app/Cargo.toml": {
+      "tests": 49,
+      "exit_code": 0,
+      "seconds": 107.348,
+      "log": "crates-app.txt"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.27,
+      "log": "crates-core.txt"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 28.793,
+      "log": "crates-drivers-clickhouse.txt"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 2.119,
+      "log": "crates-drivers-duckdb.txt"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 13,
+      "exit_code": 0,
+      "seconds": 9.681,
+      "log": "crates-drivers-mongodb.txt"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 33.578,
+      "log": "crates-drivers-mssql.txt"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 28,
+      "exit_code": 0,
+      "seconds": 312.976,
+      "log": "crates-drivers-mysql.txt"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 96,
+      "exit_code": 0,
+      "seconds": 218.304,
+      "log": "crates-drivers-postgres.txt"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 1.617,
+      "log": "crates-drivers-redis.txt"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "crates-drivers-sqlite.txt"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.txt"
+    }
+  },
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": false,
+  "passed": true
+}

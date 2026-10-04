@@ -1,0 +1,18 @@
+
+running 13 tests
+test census_cost::value_contract_mongodb_census_scan_cost_profile ... ok
+test value_contracts::a_nested_and_max_key_grid_edit_writes_extended_json_back_as_native_bson ... ok
+test value_contracts::nested_bson_special_values_keep_exact_extended_json_types ... ok
+test value_contracts::value_contract_binary_subtypes_survive_native_grid_edits ... ok
+test value_contracts::value_contract_db_pointer_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_generic_binary_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_javascript_code_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_mongodb_missing_fields_remain_distinct_from_bson_null ... ok
+test value_contracts::value_contract_object_id_grid_edit_preserves_native_bson ... ok
+test value_contracts::value_contract_preserves_numbers_and_text_through_json_commands ... ok
+test value_contracts::value_contract_server_generated_bson_column_survives_grid_edit ... ok
+test value_contracts::value_contract_undefined_grid_edit_preserves_native_bson ... ok
+test value_contracts::xlsx_nested_cell_requires_its_own_date_and_binary_markers ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 9.65s
+

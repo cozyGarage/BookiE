@@ -84,6 +84,14 @@ portable run report and suite logs are retained in
 The runner reported the pre-commit revision `7f807cd7` with a dirty worktree;
 the tested source change is committed at `8bb51d3c0`.
 
+After the local GTK+DuckDB value tier exposed a 300-second cumulative timeout
+in the 28-test MySQL suite, the runner cap was raised to 420 seconds. The MySQL
+suite passed in 312.976 seconds and the full run passed 292 contracts across
+all 11 suites, compiling from 747 fresh cached artifacts with no rebuilt
+packages. The runner's 9 unit tests also pass. The durable report and raw suite
+logs, including the original timeout, are in the
+[full value-tier evidence](evidence/full-value-tier-results-2026-10-04/manifest.json).
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

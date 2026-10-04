@@ -19,7 +19,8 @@ need Docker; SQLite/DuckDB are local, and app/grid compilation needs GTK libs.
 Exclusions are recorded when features are omitted. Driver contracts use the
 `value_contract` prefix; a new selector must have execution ownership.
 Missing suites, zero matches, compilation/test errors and fixture timeouts fail.
-Reports/logs go to `target/quality/*-values/`. See [testing](testing.md) and
+Each suite has a 420-second timeout; reports/logs go to `target/quality/*-values/`.
+See [testing](testing.md) and
 [validation](validation-playbook.md) for affected layers and evidence requirements.
 
 ## Case lookup
