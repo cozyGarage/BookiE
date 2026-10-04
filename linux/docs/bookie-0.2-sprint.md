@@ -98,6 +98,13 @@ no missing suites. The report used source `72f937b0`; its `dirty: true` flag is
 from the two pre-existing B4 scratch directories. The portable report, suite
 logs and checksums are in the [run evidence](evidence/full-value-tier-mssql-grid-results-2026-10-04/manifest.json).
 
+October 4 B3 follow-up: SQL Server `datetimeoffset` grid edits now preserve
+local time, fractional scale and offset through text parsing and keyed updates;
+native checks cover mixed offsets, calendar boundaries, stored bytes and an
+untouched sibling. The parser refuses unsupported scale, offset and UTC-range
+inputs. The GTK + DuckDB value tier passed 308 contracts across all 11 suites;
+see the [datetimeoffset evidence](evidence/mssql-datetimeoffset-grid-edit-results-2026-10-04/manifest.json).
+
 October 4 follow-up: with the PostgreSQL domain-over-enum `COALESCE` contract
 added, all 293 selected contracts still pass across the same 11 suites. The
 source revision is `b165a0c7`; the report, suite logs and hashes are retained in

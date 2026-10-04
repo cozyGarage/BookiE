@@ -1,0 +1,39 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/drivers_mssql-581f6fe8191adb8e)
+
+running 32 tests
+test codec::tests::a_null_numeric_column_stays_null ... ok
+test codec::tests::a_numeric_value_within_decimals_range_still_decodes_as_decimal ... ok
+test codec::tests::a_temporal_column_holding_sql_null_stays_null ... ok
+test codec::tests::a_temporal_column_that_converts_keeps_its_value ... ok
+test codec::tests::a_temporal_column_the_driver_cannot_convert_is_not_reported_as_null ... ok
+test codec::tests::column_type_names_are_human_readable ... ok
+test codec::tests::legacy_datetime_uses_exact_text_for_inexact_ticks_and_keeps_null_and_datetime2 ... ok
+test codec::tests::money_columns_refuse_float_decoding_but_preserve_null ... ok
+test codec::tests::value_contract_wide_numeric_text_keeps_sign_scale_and_every_digit ... ok
+test tests::direct_connection_uses_service_identity_as_dial_endpoint ... ok
+test tests::disabled_kerberos_is_rejected_before_connecting ... ok
+test tests::driver_metadata ... ok
+test tests::format_type_lengths_and_precision ... ok
+test tests::kerberos_connect_attempts_do_not_accumulate ... ok
+test tests::local_server_shorthand_dials_localhost ... ok
+test tests::normalize_default_leaves_unbalanced_alone ... ok
+test tests::normalize_default_peels_parens_and_keeps_literal_quotes ... ok
+test tests::qualified_uses_bracket_quoting ... ok
+test tests::quote_ident_brackets_and_escapes ... ok
+test tests::referential_actions_map_to_keywords ... ok
+test tests::retire_wakes_the_fault_sink_and_leaves_the_outcome_unknown ... ok
+test tests::structure_metadata_declarations_match_the_connection_impl ... ok
+test tests::terminal_session_kill_is_disconnected_but_sql_errors_are_preserved ... ok
+test tests::tunnel_connection_uses_service_identity_for_tls_and_spn ... ok
+test tests::undecodable_cell_cannot_be_bound_as_null ... ok
+test tests::verify_ca_with_a_named_authority_does_not_panic_on_conflicting_trust_settings ... ok
+test tests::verify_full_without_a_named_authority_does_not_panic ... ok
+test variant_guard::tests::known_variant_panic_becomes_unsupported ... ok
+test variant_guard::tests::only_the_known_ssvariant_metadata_panic_is_classified ... ok
+test variant_guard::tests::unrelated_panics_are_not_swallowed ... ok
+test zoned::tests::value_contract_datetimeoffset_refuses_invalid_scale_and_offset ... ok
+test zoned::tests::value_contract_datetimeoffset_renders_local_time_scale_and_offset ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

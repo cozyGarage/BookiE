@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-d3f82a3d8397e81b)
+
+running 1 test
+test ui::browse_tab::value_parse::mssql_datetimeoffset_contract::value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 492 filtered out; finished in 5.40s
+

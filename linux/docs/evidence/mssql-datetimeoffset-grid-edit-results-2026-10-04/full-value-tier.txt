@@ -1,0 +1,14 @@
+Value-contract evidence: /home/trung/Projects/tablepro/linux/target/quality/20261004T211734333046Z-values
+crates/app/Cargo.toml: {'tests': 51, 'exit_code': 0, 'seconds': 110.787, 'log': 'crates-app.log'}
+crates/core/Cargo.toml: {'tests': 58, 'exit_code': 0, 'seconds': 3.27, 'log': 'crates-core.log'}
+crates/drivers/clickhouse/Cargo.toml: {'tests': 6, 'exit_code': 0, 'seconds': 28.087, 'log': 'crates-drivers-clickhouse.log'}
+crates/drivers/duckdb/Cargo.toml: {'tests': 30, 'exit_code': 0, 'seconds': 2.118, 'log': 'crates-drivers-duckdb.log'}
+crates/drivers/mongodb/Cargo.toml: {'tests': 15, 'exit_code': 0, 'seconds': 11.384, 'log': 'crates-drivers-mongodb.log'}
+crates/drivers/mssql/Cargo.toml: {'tests': 7, 'exit_code': 0, 'seconds': 51.121, 'log': 'crates-drivers-mssql.log'}
+crates/drivers/mysql/Cargo.toml: {'tests': 28, 'exit_code': 0, 'seconds': 308.457, 'log': 'crates-drivers-mysql.log'}
+crates/drivers/postgres/Cargo.toml: {'tests': 107, 'exit_code': 0, 'seconds': 233.521, 'log': 'crates-drivers-postgres.log'}
+crates/drivers/redis/Cargo.toml: {'tests': 4, 'exit_code': 0, 'seconds': 1.617, 'log': 'crates-drivers-redis.log'}
+crates/drivers/sqlite/Cargo.toml: {'tests': 1, 'exit_code': 0, 'seconds': 0.016, 'log': 'crates-drivers-sqlite.log'}
+crates/mcp/Cargo.toml: {'tests': 1, 'exit_code': 0, 'seconds': 0.003, 'log': 'crates-mcp.log'}
+Compile: 6.57s; 746 fresh artifacts; 1 rebuilt packages
+Report: /home/trung/Projects/tablepro/linux/target/quality/20261004T211734333046Z-values/report.json

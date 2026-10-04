@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "947671de7e7304978abaa2d22343eb7e6363ea61",
+  "engine": "SQL Server Docker via testcontainers_modules::mssql_server::MssqlServer",
+  "case": "Exact datetimeoffset text parsing and native keyed grid edits",
+  "contract": [
+    "SQL Server catalog metadata includes the declared datetimeoffset scale so the app can reject fractional input that would be rounded by the destination column.",
+    "The mssql app parser validates the SQL Server datetimeoffset syntax, scale 0 through 7, the plus/minus 14-hour offset bound, and local and UTC years 1 through 9999; valid input stays Value::Text to preserve its local time and original offset.",
+    "The app grid test edits three primary-keyed rows across positive, negative and -14:00 offsets, including year 0001; SQL Server verifies local text, offset minutes and all 11 native bytes, while a year-9999 sibling remains unchanged.",
+    "A parser unit contract accepts valid scale 0 and scale 3 inputs and refuses excess fractional precision, +14:01, local/UTC year overflow, malformed separators and a missing offset."
+  ],
+  "validation": {
+    "parser_boundaries": {
+      "command": "rtk cargo test -p tablepro-app --lib ui::browse_tab::value_parse::tests::mssql_datetimeoffset_parser_preserves_text_and_refuses_lossy_input -- --exact",
+      "result": "passed",
+      "log": "parser-boundary-unit.txt"
+    },
+    "native_app_grid_contract": {
+      "command": "rtk cargo test -p tablepro-app --lib ui::browse_tab::value_parse::mssql_datetimeoffset_contract::value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings -- --ignored --exact",
+      "result": "1 passed; display, parsing, keyed bound updates, offset minutes, native bytes and sibling row verified",
+      "log": "app-grid-edit.txt"
+    },
+    "native_result_parameter_export_contract": {
+      "command": "rtk cargo test -p tablepro-driver-mssql --test integration value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports -- --ignored --exact",
+      "result": "1 passed; existing native result, bound parameter and export coverage remains green",
+      "log": "mssql-result-parameter-export.txt"
+    },
+    "change_contract_layer": {
+      "command": "python3 scripts/run-change-contract-tests.py --base HEAD",
+      "result": "passed; full app lib suite, parser boundary and SQL Server driver lib suite completed",
+      "log": "change-contracts.txt"
+    },
+    "strict_value_tier": {
+      "command": "bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed; 308 selected contracts across all 11 suites, no missing suites; GTK and DuckDB enabled",
+      "report": "strict-values/report.json",
+      "compile": "6.57 seconds; 746 fresh artifacts; one package rebuilt",
+      "result_note": "The runner report's recorded revision is the pre-change commit and dirty is true because tests ran before the feature commits and the two existing B4 scratch directories remain untracked. The final tested source matches source_commit.",
+      "initial_flake": "The first combined run recorded one failure in the existing MongoDB one-find contract. The test used a timing-sensitive failpoint/currentOp observer. It was changed to assert the server's find command counter, passed under the same GTK+DuckDB app selection, and the complete value tier then passed. The first report and logs remain under first-full-tier/.",
+      "logs": "strict-values/"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-app -p tablepro-driver-mssql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the new Docker-backed app contract is registered once",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "This case does not cover every datetimeoffset scale, session configuration, export format, or installed GTK workflow.",
+    "Other SQL Server native and consumer gaps remain; this case does not close B3 or qualify the 0.2.0 release."
+  ]
+}
