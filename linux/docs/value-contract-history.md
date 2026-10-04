@@ -5525,3 +5525,12 @@ strings. Typed CSV import into a second STRICT `ANY` table preserves every
 result byte and storage class, including empty BLOB and SQL NULL. The focused
 contract, DuckDB-enabled app
 library suite, strict Clippy and formatting pass. See the [evidence manifest](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
+
+## PostgreSQL custom enum with quoted identifiers, 2026-10-04
+
+A PostgreSQL schema, enum type and table with spaces in their identifiers are
+discovered with exact qualified enum metadata. A generated keyed update changes
+only the target row; the native type remains the quoted schema/type name, and a
+structured equality filter selects that row. The sibling row remains unchanged.
+Identifiers containing embedded quotes and other session/search_path
+combinations remain open. See the [evidence manifest](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).

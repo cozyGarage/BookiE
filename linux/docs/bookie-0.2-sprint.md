@@ -109,6 +109,12 @@ Unicode, markup and formula-shaped labels; SQL NULL stays blank and empty-label
 refusal preserves the destination. Other workbook shapes and applications
 remain open ([evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json)).
 
+October 4 B3-1 follow-up: PostgreSQL custom enum metadata, keyed updates and
+structured equality filters now cover schema/type/table names requiring SQL
+identifier quoting, with native type and sibling-row assertions. Other
+identifier and session/search_path combinations remain open
+([evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json)).
+
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3

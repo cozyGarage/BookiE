@@ -167,6 +167,12 @@ empty enum label is refused without replacing the destination workbook. Other
 spreadsheet applications and enum cell shapes remain open; see the
 [scalar-enum Calc evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json).
 
+October 4 B3-1/B3-4 follow-up: PostgreSQL custom enum metadata now covers a
+schema, type and table whose names require identifier quoting. The generated
+keyed edit and structured equality filter preserve the exact native enum type
+and leave the sibling row unchanged; see the
+[quoted-identifier evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
+
 October 4 B3-1 follow-up: one PostgreSQL `timestamptz[]` with both sides of a
 New York fall-back hour, a BC instant, infinities and SQL NULL now passes
 through JSON, CSV, XLSX and replayed SQL. Native `array_to_json` semantics and

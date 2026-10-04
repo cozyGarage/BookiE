@@ -220,6 +220,10 @@ the [accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-
 and [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
 An ordering contract checks non-lexical enum sorting against `pg_enum.enumsortorder`
 and native enum types ([ordering evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
+Schema/type/table identifiers with spaces also pass metadata discovery, a keyed
+edit and structured equality filtering with exact native type and sibling-row
+checks ([quoted-identifier evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json));
+embedded quotes and additional session/search_path combinations remain open.
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
