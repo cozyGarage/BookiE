@@ -5414,6 +5414,15 @@ style. The rollback leaves the destination empty. All 14 array-contract tests,
 strict Clippy and formatting pass. Other interval styles remain untested. See
 the [evidence manifest](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
 
+## DuckDB literal NULL enum label grid edit, 2026-10-04
+
+The DuckDB app grid path now edits a row to the unquoted literal label `NULL`
+through the parser and keyed-update builder. Native `typeof`, text and null
+predicate checks show that row remains an ENUM value while its untouched sibling
+stays SQL NULL. The focused test and DuckDB-enabled app library suite pass, as
+do strict Clippy and formatting. Other DuckDB type, consumer and configuration
+cases plus installed editing remain open. See the [evidence manifest](evidence/duckdb-enum-null-label-results-2026-10-04/manifest.json).
+
 ## PostgreSQL domain-over-bytea array edit with shadowed search_path, 2026-10-04
 
 A PostgreSQL 16 contract adds a same-named `payload` domain to a shadow schema
