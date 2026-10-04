@@ -2994,7 +2994,8 @@ open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/
 
 The app edit path now validates ENUM labels and SET members against MySQL's
 declared `column_type` before binding. A parser-to-keyed-edit contract preserves
-an apostrophe label and a multi-member backslash SET across all four modes, with
+an apostrophe label and a multi-member backslash SET across six modes, including
+`STRICT_TRANS_TABLES` alone and combined with `NO_BACKSLASH_ESCAPES`, with
 native ordinals, masks, bytes and sibling identity. Blank input remains SQL
 NULL; typing `''` explicitly selects an empty ENUM label or an empty SET, and
 the native oracle distinguishes those values from SQL NULL. A separate permissive-mode
@@ -3002,7 +3003,7 @@ control demonstrates why the guard is required: MySQL otherwise turns an
 unknown ENUM label into ordinal zero and silently drops an unknown SET member.
 The control runs inside a transaction and rolls back. The app library suite,
 strict Clippy, focused parser test and MySQL 8 Docker test passed. A matching
-MariaDB 11 app edit now checks all four modes, native label bytes and SET masks,
+MariaDB 11 app edit now checks all six modes, native label bytes and SET masks,
 invalid-value refusal and sibling preservation. It also distinguishes blank SQL
 NULL from explicit `''` empty ENUM and SET values against native ordinals/masks.
 Both engine paths also key-edit the declared literal label `NULL` and verify its
