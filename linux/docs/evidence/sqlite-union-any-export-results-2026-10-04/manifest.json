@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "c43ac038f14470610c0bed178b028b415e0504a6",
+  "engine": "SQLite in-memory STRICT ANY fixture",
+  "case": "CSV and XLSX output for a compound STRICT ANY result",
+  "test": "sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds",
+  "contract": [
+    "A native SQLite UNION ALL result with INTEGER, TEXT and SQL NULL reaches the core result-file exporters with conservative expression metadata.",
+    "CSV emits the exact row text and storage-class diagnostic values.",
+    "The real XLSX workbook stores the integer result as a numeric cell, the text result as a shared-string cell, and SQL NULL as an absent cell.",
+    "This verifies XLSX cell representation for the compound result; it does not claim spreadsheet-application import or CSV storage-class restoration."
+  ],
+  "validation": {
+    "app_sqlite_any_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_any_contract:: -- --test-threads=1",
+      "result": "6 passed, 0 failed",
+      "log": "app-sqlite-any.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "app-sqlite-any.txt": "05d05d076c46e336af63df56b45a82e599f8e2bf5f036111ed3bfd228206ac17",
+    "clippy.txt": "11c00a937796a3c1e404d2955c376d847f57dff10e9555708abbafdd62473533",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Typed CSV round-trip of compound SQLite runtime storage classes remains unproven.",
+    "Other consumers and spreadsheet-application re-import remain open; this case does not close the broader B3 matrix."
+  ]
+}

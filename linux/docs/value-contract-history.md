@@ -4640,6 +4640,17 @@ and five app STRICT-ANY contracts passed, as did Clippy and formatting. Other
 computed-expression shapes and consumers remain open. See the
 [compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json).
 
+## SQLite compound STRICT ANY result CSV/XLSX output (2026-10-04)
+
+An app-level result-file contract materializes a native compound SQLite query
+containing INTEGER, TEXT and SQL NULL. CSV output retains its exact textual
+rows. The real XLSX workbook stores the integer as a numeric cell, the text as
+a shared string, and NULL as an absent cell. Six SQLite app `ANY` contracts
+passed with strict Clippy and formatting. This proves workbook cell output, not
+spreadsheet-application re-import; typed CSV storage-class restoration for
+compound results also remains open. See the
+[compound-result CSV/XLSX evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json).
+
 ## DuckDB enum keyed grid edit, 2026-10-03
 
 A local DuckDB-backed app contract now parses a nonempty enum label through the
