@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "b80347facbc6671265fac9a87ed852de261582ea",
+  "engine": "MySQL 8.1 via testcontainers",
+  "case": "Human approval routing for an unparseable MySQL routine",
+  "test": "services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution",
+  "contract": [
+    "A real guarded MySQL session classifies CREATE PROCEDURE bookie_unparseable_approval() SELECT 1 as Unparseable and routes the approval request to the human sink with the connection identity and original SQL.",
+    "Deny returns PolicyDenied and information_schema.routines confirms the procedure was not dispatched.",
+    "AllowOnce routes a second request through the human sink and creates the procedure; the agent sink is never called.",
+    "The GTK dialog's visible class/SQL presentation remains separately covered by the existing GTK safety scenario using SQLite."
+  ],
+  "validation": {
+    "mysql_approval": {
+      "command": "rtk ./linux/scripts/test-value-contracts.sh --gtk --duckdb (selects this value_contract test)",
+      "result": "included in app suite: 45 selected tests passed, 0 failed, 0 ignored",
+      "log": "mysql-approval.txt"
+    },
+    "full_values_runner": {
+      "command": "rtk ./linux/scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "285 selected tests across 11 suites passed; no missing suites",
+      "local_report": "target/quality/20261004T101608010995Z-values/report.json",
+      "report_revision": "35597690f93eb9e29550ad3d050f0da7c62e453a",
+      "report_dirty": true,
+      "compile": "8.014s; 745 fresh artifacts; 2 rebuilt packages"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "log_sha256": {
+    "mysql-approval.txt": "0967044e3a5631957a85e381d621a1cce165d14a64efb66be1e9bf07eb473778",
+    "clippy.txt": "a45732c39deaf608846883e8bea371a0f6b236d1c63cbdb11687071851349f78",
+    "fmt.txt": "d04bc89b7fe8c73c162e2017b60631d34d4c71b2b088e0d70b63351dc2ca95e9"
+  },
+  "remaining": [
+    "GTK dialog presentation and response handling against a MySQL-backed fixture are not covered by this native driver/policy/router contract.",
+    "This bounded case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

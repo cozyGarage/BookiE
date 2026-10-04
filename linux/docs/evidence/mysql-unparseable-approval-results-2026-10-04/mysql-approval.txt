@@ -1,0 +1,3 @@
+$ rtk ./linux/scripts/test-value-contracts.sh --gtk --duckdb
+285 selected tests across 11 suites passed with no missing suites. The app suite ran 45 tests, including services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution.
+Local report: target/quality/20261004T101608010995Z-values/report.json (report revision 35597690f93eb9e29550ad3d050f0da7c62e453a; dirty because this test and its evidence docs were uncommitted during the run).

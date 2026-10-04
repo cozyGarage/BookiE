@@ -64,6 +64,16 @@ The report records a successful 28.983-second compile (709 fresh artifacts,
 reflects the two pre-existing untracked B4 scratch directories, with tracked
 source at `16a52969125c31e12ee161e56677cc295a046ce7`.
 
+After adding the MySQL-backed unparseable-routine approval contract,
+`./scripts/test-value-contracts.sh --gtk --duckdb` passed 285 selected tests
+across all 11 suites, with no missing suites. The local report is ignored at
+`target/quality/20261004T101608010995Z-values/report.json`; it records a
+successful 8.014-second compile (745 fresh artifacts, 2 rebuilt packages) and
+zero-exit suites. Its `dirty: true` state reflects the test/evidence edits made
+during the run and the two existing B4 scratch directories; the final code is
+at `b80347facbc6671265fac9a87ed852de261582ea`. The new MySQL approval case is
+selected by the runner's `value_contract_` prefix.
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,
