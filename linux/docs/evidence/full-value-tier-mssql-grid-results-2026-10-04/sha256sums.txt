@@ -10,5 +10,4 @@ f7d5287878cf984fdb1752637b1b91bff444aa2ab6fafb8fcabbd7a0aa29548b  docs/evidence/
 ee61be5964185f991622667b9afb2178a2e37bec59eed29ed2db813979feb617  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-redis.txt
 bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-drivers-sqlite.txt
 b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/crates-mcp.txt
-8ed6bd53475cd4d989639ea1c542ac8bfaa09ee4937cad39aa57c5dda49051e5  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/sha256sums.txt
 1ee0c0245b9b4c90951694adb0eeba69567646515c9106861404d36b4baed389  docs/evidence/full-value-tier-mssql-grid-results-2026-10-04/value-tier-report.json
