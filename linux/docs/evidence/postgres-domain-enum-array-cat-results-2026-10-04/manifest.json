@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "d1ea5b7769cef98d6933c58a8d296942edbae935",
+  "engine": "PostgreSQL in Docker via testcontainers",
+  "case": "domain-over-enum array_cat infers text and SQL NULL array parameters",
+  "test": "domain_contract::value_contract_domain_over_enum_array_cat_infers_array_parameter_type",
+  "outcome": "PostgreSQL infers the qualified enum-array type for text and SQL NULL parameters passed to array_cat with a domain-over-enum source, even when a same-named shadow enum is first in search_path.",
+  "contract": [
+    "Creates a domain over a custom enum and a same-named shadow enum with incompatible labels earlier in transaction search_path.",
+    "Uses text array parameters containing SQL NULL elements, empty strings, the literal label NULL, commas, quotes, and backslashes; also covers empty arrays and a SQL NULL array parameter.",
+    "Compares array_cat values against native explicitly typed array expressions and checks pg_typeof for the parameter and result.",
+    "The 105-test PostgreSQL value-contract selection includes the new case and passes without failures."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_array_cat_infers_array_parameter_type -- --include-ignored --test-threads=1",
+      "result": "1 passed",
+      "log": "focused-test.txt"
+    },
+    "postgres_value_suite": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+      "result": "105 passed, 0 failed; 29 other integration tests filtered out",
+      "log": "postgres-value-suite.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --check --all",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "file_size": {
+      "command": "bash scripts/check-file-size.sh",
+      "result": "passed",
+      "log": "file-size.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "limitations": [
+    "This contract proves only the tested array_cat context and values; other inferred array functions and configurations remain open.",
+    "The full 11-suite GTK+DuckDB value tier passed at source revision 117e80c9962beb38521d944c173f08353a5bc717 before this additional PostgreSQL test; this packet records the updated PostgreSQL selection, not a rerun of all suites.",
+    "This case does not qualify the 0.2.0 release."
+  ],
+  "sha256": {
+    "clippy.txt": "192ee1db3e0f314d6ba31f899d2cf1992e5396ca48a2329d4f4ad240d95f924e",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused-test.txt": "411bd603b61d5b9b9744b3698dd6cc55f6afd1a22601628078c0dcceb17303b0",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "postgres-value-suite.txt": "eeeb9793ebb10bb69bf7984411f7cd06afbe745a4b636aebce99951afe8822bb"
+  }
+}
