@@ -275,6 +275,147 @@ async fn value_contract_domain_over_enum_assignment_infers_parameter_type() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_over_enum_nullif_infers_parameter_type() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_nullif")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_nullif_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_domain_nullif.state AS ENUM ('ready', 'paused', 'NULL')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_domain_nullif_shadow.state AS ENUM ('shadow')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_nullif.state_domain \
+             AS value_contract_domain_nullif.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_nullif.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_nullif.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_domain_nullif.rows VALUES \
+             (1, 'ready'), (2, 'paused'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("SET search_path TO value_contract_domain_nullif_shadow, public")
+        .await
+        .unwrap();
+
+    let enum_type = "value_contract_domain_nullif.state";
+    let domain_type = "value_contract_domain_nullif.state_domain";
+    let raw_domain_parameter = connection
+        .query_params(
+            "SELECT NULLIF(status, $1) FROM value_contract_domain_nullif.rows WHERE id = 1",
+            &[Value::Text("ready".into())],
+        )
+        .await
+        .expect_err("raw domain-to-unknown NULLIF must retain PostgreSQL's refusal");
+    assert!(
+        matches!(&raw_domain_parameter, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+        "expected native domain operator SQLSTATE 42883, got {raw_domain_parameter:?}"
+    );
+
+    for (parameter, expected) in [
+        (
+            Value::Text("ready".into()),
+            [Value::Null, Value::Text("paused".into()), Value::Null],
+        ),
+        (
+            Value::Text("NULL".into()),
+            [Value::Text("ready".into()), Value::Text("paused".into()), Value::Null],
+        ),
+        (
+            Value::Null,
+            [Value::Text("ready".into()), Value::Text("paused".into()), Value::Null],
+        ),
+    ] {
+        let result = connection
+            .query_params(
+                "SELECT id, NULLIF(status::value_contract_domain_nullif.state, $1)::text, \
+                        pg_typeof(NULLIF(status::value_contract_domain_nullif.state, $1))::text, \
+                        pg_typeof($1)::text, \
+                        pg_typeof(status)::text \
+                 FROM value_contract_domain_nullif.rows ORDER BY id",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            result.rows,
+            expected
+                .into_iter()
+                .enumerate()
+                .map(|(index, value)| vec![
+                    Value::Int(index as i64 + 1),
+                    value,
+                    Value::Text(enum_type.into()),
+                    Value::Text(enum_type.into()),
+                    Value::Text(domain_type.into()),
+                ])
+                .collect::<Vec<_>>(),
+            "NULLIF parameter {parameter:?}"
+        );
+    }
+
+    let invalid = connection
+        .query_params(
+            "SELECT NULLIF(status::value_contract_domain_nullif.state, $1) \
+             FROM value_contract_domain_nullif.rows WHERE id = 1",
+            &[Value::Text("not-a-label".into())],
+        )
+        .await
+        .expect_err("invalid enum label must reach PostgreSQL validation");
+    assert!(
+        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected native enum SQLSTATE 22P02, got {invalid:?}"
+    );
+
+    let unchanged = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_domain_nullif.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        unchanged.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("ready".into()),
+                Value::Text(domain_type.into())
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("paused".into()),
+                Value::Text(domain_type.into())
+            ],
+            vec![Value::Int(3), Value::Null, Value::Text(domain_type.into())],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_query_comparison_infers_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
