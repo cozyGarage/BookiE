@@ -291,17 +291,20 @@ preservation of a SQL NULL sibling. A combined `pg_typeof($1)`/enum-comparison
 query is explicitly refused with SQLSTATE `42P08`; an explicit cast is the
 passing control. A five-domain follow-up verifies metadata, keyed edit,
 inferred parameters, filter, invalid-label refusal and native sibling values.
-A six/seven/eight/nine-domain follow-up verifies enum-leaf metadata and keyed/draft writes with
-a same-named shadow enum on the session `search_path`; a same-backend transaction
-changes `search_path` twice and repeats the typed writes/filter checks using
-previously fetched metadata. Invalid-label refusal, rollback and exact outer
-type/value with NULL preserved are asserted. Depths
-beyond nine layers and other enum/session combinations remain open; see the
+A follow-up exercises 6-, 7-, 8-, 9-, 10-, 63- and 64-layer domains with a
+same-named shadow enum on the session `search_path`; a same-backend transaction
+changes `search_path` twice and repeats typed writes/filter checks using
+previously fetched metadata. Rollback and exact outer type/value with NULL
+preserved are asserted. Through 63 layers invalid raw text labels reach
+PostgreSQL; at 64 layers SQLx's resolver limit returns an explicit unsupported
+operation. Other domain depths and enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
 plus the [eight-level follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
 and [nine-level follow-up](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
+A [deep-domain boundary contract](evidence/postgres-deep-domain-results-2026-10-04/manifest.json)
+records support through 63 layers and safe refusal at the 64-layer parameter-resolution limit.
 A separate same-backend transaction changes ordinary session `search_path`
 twice, then verifies target enum metadata and keyed writes under the final
 shadowed path; see the [session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
