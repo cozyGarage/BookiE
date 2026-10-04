@@ -94,7 +94,9 @@ A six- through nine-level contract checks recursive enum-leaf metadata under a s
 `search_path` shadowed by a same-named enum, schema-aware keyed and draft writes
 (including SQL NULL), a typed equality filter, invalid-label refusal and exact
 outer-domain type/value while preserving a SQL NULL sibling. All four depths pass
-the same contract. Chains deeper than nine and other enum/session configurations
+the same contract. A same-backend transaction changes `search_path` twice and
+repeats the typed writes/filter with previously fetched metadata; rollback leaves
+the original rows intact. Chains deeper than nine and other enum/session configurations
 remain open; see the [six/seven-domain evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
 [eight-domain follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
 and the [nine-domain follow-up](evidence/postgres-nine-domain-results-2026-10-04/manifest.json),

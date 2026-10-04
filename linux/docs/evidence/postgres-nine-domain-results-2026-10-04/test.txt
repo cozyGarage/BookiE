@@ -1,26 +1,20 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
-     Running unittests src/lib.rs (linux/target/debug/deps/drivers_postgres-a18f340f318501c3)
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 40 filtered out; finished in 0.00s
-
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
      Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
 
-running 1 test
+running 13 tests
+test domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_assignment_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_csv_round_trip_preserves_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_file_formats_preserve_values_and_refuse_empty_xlsx ... ok
+test domain_contract::value_contract_domain_over_enum_filters_preserve_values_and_type ... ok
+test domain_contract::value_contract_domain_over_enum_parameters_preserve_native_type ... ok
+test domain_contract::value_contract_domain_over_enum_projection_preserves_labels_and_null ... ok
+test domain_contract::value_contract_domain_over_enum_query_comparison_infers_parameter_type ... ok
+test domain_contract::value_contract_domain_over_enum_sql_file_replay_preserves_values_and_type ... ok
+test domain_contract::value_contract_five_domain_levels_over_enum_preserve_metadata_and_values ... ok
+test domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values ... ok
 test domain_contract::value_contract_six_through_nine_domain_levels_over_enum_ignore_shadowed_search_path ... ok
+test domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 104 filtered out; finished in 2.65s
-
-     Running tests/smoke_local.rs (linux/target/debug/deps/smoke_local-e1d81ca9e017cc4e)
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
-
-     Running tests/socket_local.rs (linux/target/debug/deps/socket_local-b1c19c8eedd93f97)
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 26.26s
 

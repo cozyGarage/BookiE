@@ -260,8 +260,10 @@ query is explicitly refused with SQLSTATE `42P08`; an explicit cast is the
 passing control. A five-domain follow-up verifies metadata, keyed edit,
 inferred parameters, filter, invalid-label refusal and native sibling values.
 A six/seven/eight/nine-domain follow-up verifies enum-leaf metadata and keyed/draft writes with
-a same-named shadow enum on the session `search_path`, plus typed filtering,
-invalid-label refusal and exact outer type/value with NULL preserved. Depths
+a same-named shadow enum on the session `search_path`; a same-backend transaction
+changes `search_path` twice and repeats the typed writes/filter checks using
+previously fetched metadata. Invalid-label refusal, rollback and exact outer
+type/value with NULL preserved are asserted. Depths
 beyond nine layers and other enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)

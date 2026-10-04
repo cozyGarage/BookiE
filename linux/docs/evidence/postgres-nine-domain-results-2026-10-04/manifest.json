@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "d303a721695c9d75c5f76e7837802600fe9892bf",
+  "source_commit": "a087338d5ca58b915b7ef8f85c23e3345af7f310",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "shadowed-search_path enum-leaf metadata and writes through nine nested domains",
   "test": "domain_contract::value_contract_six_through_nine_domain_levels_over_enum_ignore_shadowed_search_path",
@@ -10,12 +10,13 @@
     "The shared native contract runs domain-over-enum chains at depths six, seven, eight and nine while session search_path resolves a same-named shadow enum.",
     "For each depth, catalog enum-leaf metadata drives a schema-aware keyed update and draft inserts for a label and SQL NULL.",
     "Typed equality filtering returns the updated target-schema row; invalid-label assignment is refused with SQLSTATE 22P02.",
-    "Native pg_typeof/value checks preserve the outer domain and an untouched SQL NULL sibling at all four depths."
+    "On the same transaction backend, search_path changes first to the target then to the shadow schema. Metadata fetched before the changes still drives keyed and draft writes, typed filtering and exact native type/value checks.",
+    "The transaction verifies SQL NULL and rolls back after invalid-label refusal; native rows after rollback match the pre-transaction snapshot at depths six through nine."
   ],
   "validation": {
-    "native_contract": {
-      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres value_contract_six_through_nine_domain_levels_over_enum_ignore_shadowed_search_path -- --ignored --nocapture",
-      "result": "1 passed, 0 failed; contract executes all four depths",
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --ignored --test-threads=1",
+      "result": "13 passed, 0 failed; contract executes all four depths",
       "log": "test.txt"
     },
     "clippy": {
@@ -31,7 +32,7 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "test.txt": "ae00dfe9d96a6c861345fb90ffe3793fc1d74b49418c5f65db16220cccba3dfc",
+    "test.txt": "c0d0fa4c2f15674a4b9ba06dd0e58fec6f7771106cba4b254a0ab5feeb0fbb77",
     "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },

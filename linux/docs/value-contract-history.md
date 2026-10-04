@@ -5032,8 +5032,11 @@ enum/session combinations remain open; see the [evidence manifest](evidence/post
 The same shadowed-`search_path` domain-over-enum contract now also runs at nine
 nested domains. It verifies enum-leaf metadata, schema-aware keyed and draft
 writes (including SQL NULL), typed equality filtering, invalid-label refusal,
-exact outer-domain type/value and an untouched SQL NULL sibling. The focused
-test, strict Clippy and formatting pass. Greater depths and other enum/session
+exact outer-domain type/value and an untouched SQL NULL sibling. On the same
+transaction backend, it changes `search_path` twice, reuses metadata fetched
+before the changes for writes and filtering, and confirms rollback preserves
+the original rows. All 13 PostgreSQL domain-contract tests, strict Clippy and
+formatting pass. Greater depths and other enum/session
 combinations remain open; see the [evidence manifest](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum metadata after session search_path changes, 2026-10-04
