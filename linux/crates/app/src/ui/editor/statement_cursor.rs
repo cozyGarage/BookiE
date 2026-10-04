@@ -353,6 +353,46 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity() {
+        let sql = "\\d //\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside // :literal'; END//\r\n\\d ;\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+        assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("\\d //"));
+        assert!(formatted.contains("\\d ;"));
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        assert_eq!(reformatted.statements().len(), 2);
+        let reformatted_script = script_statements(&formatted, "mysql").unwrap();
+        assert_eq!(reformatted_script.statements.len(), 2);
+        assert!(reformatted_script.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert!(reformatted_script.statements[0].contains("'inside // :literal'"));
+        assert!(reformatted_script.statements[1].starts_with("SELECT"));
+        assert!(reformatted_script.statements[1].contains(":after AS value"));
+        assert_eq!(
+            tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+            ["after"]
+        );
+
+        let facts = tablepro_policy::classify(&reformatted_script.statements[0], "mysql");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+        assert_eq!(
+            tablepro_policy::classify(&reformatted_script.statements[1], "mysql").class,
+            tablepro_policy::StatementClass::Select
+        );
+    }
+
+    #[test]
     fn mysql_repeated_semicolon_delimiter_keeps_body_statements_together() {
         let sql = "DELIMITER ;;\r\nCREATE PROCEDURE p() BEGIN SELECT ':inside' AS first; SELECT 2 AS second; END;;\r\nDELIMITER ;\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;
