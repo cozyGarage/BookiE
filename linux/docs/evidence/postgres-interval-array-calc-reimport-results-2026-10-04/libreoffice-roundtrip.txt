@@ -1,0 +1,7 @@
+Pinned image: debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9
+LibreOffice Calc version: 26.8.0.3 680(Build:3)
+Steps:
+1. Install libreoffice-calc in the pinned Debian container.
+2. Open source.xlsx and save as recheck/source.ods.
+3. Open recheck/source.ods and save as resave/source.xlsx.
+4. Retain these results as calc-roundtrip.ods and calc-roundtrip.xlsx.

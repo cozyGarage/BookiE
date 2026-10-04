@@ -1,0 +1,2 @@
+Command: rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check
+Result: passed.

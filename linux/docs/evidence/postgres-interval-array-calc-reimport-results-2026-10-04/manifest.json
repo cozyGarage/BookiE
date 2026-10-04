@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "b6b7821e110060558790727e039acbff181874be",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL interval[] XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_interval_array_file_exports_preserve_values_under_intervalstyle",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The native PostgreSQL test uses transaction-local postgres_verbose IntervalStyle and verifies mixed-sign months, days, sub-second time, zero intervals and SQL NULL using native array_to_json and array_send checks, SQL replay and rollback.",
+    "BookieE exports the array's exact canonical text in an XLSX shared-string cell without a formula.",
+    "LibreOffice Calc opens the workbook, saves ODS, reopens it and saves XLSX; the shared-string cell text is unchanged across all three files and no formula is created.",
+    "The retained cell is {\"1 year 2 mons 3 days 04:05:06.123456\",\"-10 mons -3 days -04:05:06.654321\",\"00:00:00.000001\",\"00:00:00\",NULL}."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx rtk cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration array_contract::value_contract_interval_array_file_exports_preserve_values_under_intervalstyle -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "In the pinned Debian image, install libreoffice-calc; Calc opens source.xlsx and saves recheck/source.ods.",
+        "Calc reopens recheck/source.ods and saves resave/source.xlsx, retained as calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "command": "rtk proxy python3 linux/docs/evidence/postgres-interval-array-calc-reimport-results-2026-10-04/verify_roundtrip.py",
+      "result": "The exact shared-string text matches across XLSX, ODS and re-saved XLSX; all cells are text and contain no formulas.",
+      "checker": "verify_roundtrip.py",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "d7ee779aebc24d7de3f612cef37e995f1a9ce99ce2890fbbd0ec3a53f25d7f85",
+    "calc-roundtrip.ods": "df4f433777554d56a7c68f0d429707acad2db45cdbd4ce0915db74b66c5fb47a",
+    "calc-roundtrip.xlsx": "f975fa1448908bd5e37d7ba114f54510e70e6d29b2bf65d56c9804e9f54892e0"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "23b2a8f9bfa2fc4d956d36576602c20ce9454ace436c1048bbe5735d571c0ef9",
+    "libreoffice-roundtrip.txt": "c87abe70b68472102ff079f5ef477e462455167a2f6e2a14a1975feceabb4279",
+    "consumer-check.txt": "6cae5dbf65ada2aed906e0eae984f37e9054c6bcd73cd5cbf7c0d280734fb88c",
+    "clippy.txt": "f8e81fa6356e110f849d29ce39835b82e7d9c46544615137a4466aff0a9d8184",
+    "fmt.txt": "2695ddce24d789436f25cf004764d264ef586ab97c539d621f42cccbfa8844d6"
+  },
+  "checker_sha256": "92bf7ccd8cf1d7a2753ff54cc4dcbdff6c5549eeb6b371e2eb82ab454a76475e"
+}

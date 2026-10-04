@@ -1,0 +1,2 @@
+interval[] mixed signs, microseconds, zero intervals and SQL NULL survive Calc XLSX/ODS/XLSX re-save as text; no formulas
+{"1 year 2 mons 3 days 04:05:06.123456","-10 mons -3 days -04:05:06.654321","00:00:00.000001","00:00:00",NULL}
