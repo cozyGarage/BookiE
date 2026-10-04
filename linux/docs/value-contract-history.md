@@ -5673,6 +5673,15 @@ parameter forms pass in ready, paused and SQL NULL source rows. The case extends
 the inferred array-function matrix without changing production binding code;
 other function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum `array_position` parameter inference, 2026-10-04
+
+A PostgreSQL 16 Docker contract covers text and SQL NULL parameters to
+`array_position(ARRAY[status::state], $1)` for a domain-over-enum column. It
+compares returned positions with a separately executed typed native query and
+checks that the parameter is the base enum and the result is `integer`. The SQL
+NULL case confirms PostgreSQL matches a NULL array element; other inferred
+array-function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json).
+
 ## PostgreSQL inferred enum-array parameter in `ANY`, 2026-10-04
 
 A PostgreSQL 16 Docker contract compares a domain-over-enum column cast to its

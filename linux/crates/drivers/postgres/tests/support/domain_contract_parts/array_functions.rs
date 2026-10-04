@@ -177,6 +177,89 @@ async fn value_contract_domain_enum_array_remove_infers_scalar_parameter_type() 
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_position_infers_scalar_parameter_and_matches_null() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_array_position")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_array_position.state \
+             AS ENUM ('ready', 'paused')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_array_position.state_domain \
+             AS value_contract_domain_array_position.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_array_position.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_array_position.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_domain_array_position.rows VALUES \
+             (1, 'ready'), (2, 'paused'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let array = "ARRAY[status::value_contract_domain_array_position.state]";
+    for (parameter, native_value) in [
+        (
+            Value::Text("paused".into()),
+            "'paused'::value_contract_domain_array_position.state",
+        ),
+        (
+            Value::Null,
+            "NULL::value_contract_domain_array_position.state",
+        ),
+    ] {
+        let native = connection
+            .query(&format!(
+                "SELECT id, array_position({array}, {native_value}) \
+                 FROM value_contract_domain_array_position.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, array_position({array}, $1), pg_typeof($1)::text, \
+                     pg_typeof(array_position({array}, $1))::text \
+                     FROM value_contract_domain_array_position.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected = native
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text("value_contract_domain_array_position.state".into()),
+                    Value::Text("integer".into()),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(result.rows, expected, "array_position with {parameter:?}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
