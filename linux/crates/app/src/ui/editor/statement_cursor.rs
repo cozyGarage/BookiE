@@ -365,6 +365,34 @@ mod tests {
     }
 
     #[test]
+    fn mysql_quoted_delimiter_agrees_across_script_consumers() {
+        let sql = "DELIMITER '_finish'\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside _finish; :literal'; END_finish\r\nDELIMITER ';'\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert!(planned.statements[0].ends_with("END"), "{:?}", planned.statements[0]);
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+        assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("DELIMITER '_finish'"), "{formatted}");
+        assert!(formatted.contains("DELIMITER ';'"), "{formatted}");
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        assert_eq!(reformatted.statements().len(), 2);
+        assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
+        assert_eq!(
+            tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+            ["after"]
+        );
+    }
+
+    #[test]
     fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
         let sql = "DELIMITER $$\r\nCREATE PROCEDURE p() BEGIN SELECT 'unfinished :inside\r\nEND$$\r\nDELIMITER ;\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;
