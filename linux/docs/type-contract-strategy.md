@@ -28,10 +28,10 @@ SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
-One PostgreSQL `text[]` result now has XML, HTML and Markdown file-writer
+One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
-Other array families and workbook file-writer semantics remain open.
+Other array families and spreadsheet-application re-import remain open.
 
 The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and
 `BETWEEN` filters on `enum_shadow_b.items` while `search_path` resolves the same

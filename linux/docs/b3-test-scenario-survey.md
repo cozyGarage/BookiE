@@ -108,7 +108,8 @@ XML, HTML and Markdown file writers; the SQL writer is replayed into PostgreSQL
 and checked against native values. PostgreSQL `pg_typeof`, array text,
 `array_to_json` elements and `array_send` bytes provide independent type,
 content and round-trip oracles; hostile markup and Unicode exercise the text
-writers. This is one array family. Other array types, XLSX cell semantics and
+writers; XLSX asserts a text cell and the expected shared-string content. This
+is one array family. Other array types, spreadsheet-application re-import and
 additional enum configurations remain open. See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 

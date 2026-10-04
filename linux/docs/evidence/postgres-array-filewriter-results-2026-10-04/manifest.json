@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "af8a30c2b67fc64a5c36989733297457e9520695",
+  "source_commit": "ca6ebe8446c180f6325d481ee232c8ad0ea7ae30",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "Text array native-value and XML/HTML/Markdown file-writer contract",
   "test": "array_contract::value_contract_text_array_file_exports_preserve_text_and_escape_markup",
@@ -11,7 +11,8 @@
     "PostgreSQL array_to_json supplies an independent element oracle that distinguishes literal NULL from SQL NULL; array_send bytes match after a bound text[] round trip.",
     "The XML, HTML and Markdown result-file writers retain Unicode and escape markup so the text[] payload cannot inject markup into the output.",
     "The SQL result-file writer is replayed into a PostgreSQL table; native text, array_to_json and array_send checks confirm exact restoration.",
-    "This covers one array family across four result-file formats; other array families and workbook cell semantics remain open."
+    "XLSX contains the array text as a shared-string cell, not a formula or numeric cell.",
+    "This covers one array family across five result-file formats; other array families and spreadsheet-application re-import remain open."
   ],
   "validation": {
     "native_contract": {
@@ -32,11 +33,11 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "postgres-array-filewriter.txt": "6351b83c4e661272f8612612a9bd3a03897ead466628c831d6bfd4f7729f9377",
-    "clippy.txt": "438e022dc94fa2149b10f9af3c93a0c675059d8ec58e966f21163ca6ded3ddfb",
+    "postgres-array-filewriter.txt": "10445c6042cdff16e06b06c2763adb09531ecc2430056fb535a5e70502f2b7a1",
+    "clippy.txt": "11a61deda0a6fbd3f6b8132f2c0f30e2e44b66cbd38f5553ab0c2d081c535eb8",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
-    "Other PostgreSQL array families, XLSX cell semantics, broader enum/session configurations, and the remaining B3 engine/type/consumer matrix are unproven."
+    "Other PostgreSQL array families, spreadsheet-application re-import, broader enum/session configurations, and the remaining B3 engine/type/consumer matrix are unproven."
   ]
 }

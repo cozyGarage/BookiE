@@ -4970,7 +4970,9 @@ markup through the XML, HTML and Markdown result-file writers. Native
 the type, element distinctions, content and bound-array round trip. The file
 outputs preserve Unicode and escape the markup payload. The SQL file is replayed
 into a target table and checked against the native text, JSON element and wire
-oracles. This proves one array family through three presentation formats and
-SQL replay; other array families and workbook cell semantics remain open. The
-focused test, strict Clippy and format check passed. See the [evidence
+oracles. XLSX assertions prove the value is a text cell containing the
+distinct literal `NULL`, SQL NULL token, empty text, comma and markup payload.
+This proves one array family through four presentation formats, SQL replay and
+workbook text-cell output; other array families and spreadsheet-application
+re-import remain open. The focused test, strict Clippy and format check passed. See the [evidence
 manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).

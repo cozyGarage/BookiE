@@ -47,9 +47,8 @@ point does not represent all support for that engine.
 The PostgreSQL shadowed-search-path enum/domain write case now covers six and
 seven nested domain levels; see the [native evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
 
-One PostgreSQL `text[]` case now checks the XML, HTML and Markdown result-file
-writers plus replayed SQL output against native array text, JSON elements and
-wire bytes; see the
+One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
+replayed SQL against native array text, JSON elements and wire bytes; see the
 [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
 The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
