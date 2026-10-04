@@ -103,6 +103,8 @@ The target enum remains correct when a same-named type shadows it in the active
 `search_path` ([shadowed-path evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
 The app parser and live keyed edit now preserve custom enum-array labels and
 refuse invalid labels without mutation ([grid-edit evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
+Grid input also keeps blank SQL NULL distinct from the empty array literal
+`{}` ([evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
 
 A `timestamptz[]` file-writer contract preserves distinct repeated-hour
 instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and

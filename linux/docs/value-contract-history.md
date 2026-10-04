@@ -5267,6 +5267,11 @@ wire bytes. All 18 PostgreSQL array-contract tests, the focused app-parser test,
 strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json).
 
+The same grid path also distinguishes blank SQL NULL from the custom enum-array
+literal `{}`: blank input stores a typed SQL NULL, while `{}` stores a non-NULL
+empty array. The native PostgreSQL array contract group and app-parser test pass
+([evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

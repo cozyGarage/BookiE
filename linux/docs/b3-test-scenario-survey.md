@@ -665,4 +665,5 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   ([label evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json), [shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json), [shadowed-path evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
   Custom enum-array grid edits also now pass through the app parser and keyed
   update builder, with native type/value checks, invalid-label no-mutation and
-  sibling wire-byte assertions ([evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
+  sibling wire-byte assertions; blank input remains SQL NULL while `{}` stores
+  an empty array ([edit evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json), [NULL/empty evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).

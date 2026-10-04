@@ -1,0 +1,2 @@
+test array_contract::value_contract_custom_enum_array_grid_edit_preserves_labels_and_siblings ... ok
+test result: ok. 18 passed; 0 failed; 0 ignored; 96 filtered out
