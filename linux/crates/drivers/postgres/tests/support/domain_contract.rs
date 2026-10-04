@@ -236,6 +236,80 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
         .unwrap();
     assert_eq!(imported.rows, native.rows);
 
+    let edited = r#"{"NULL","",東京,NULL}"#;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "value_contract_domain_array_import",
+        &columns,
+        &[(1, Value::Text(edited.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(
+        update
+            .0
+            .contains("$1::text::\"public\".\"value_contract_domain_array_label\"[]")
+    );
+    connection.execute_in_transaction(&[update]).await.unwrap();
+    let grid_native = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM (SELECT ARRAY[\
+                 'NULL'::value_contract_domain_array_label, \
+                 ''::value_contract_domain_array_label, \
+                 '東京'::value_contract_domain_array_label, \
+                 NULL::value_contract_domain_array_label\
+             ] AS labels) AS source",
+        )
+        .await
+        .unwrap();
+    let saved_grid = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM value_contract_domain_array_import",
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved_grid.rows, grid_native.rows);
+
+    let invalid_grid = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "value_contract_domain_array_import",
+        &columns,
+        &[(1, Value::Text("{forbidden}".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let error = connection.execute_in_transaction(&[invalid_grid]).await.unwrap_err();
+    let cause = match &error {
+        tablepro_core::DriverError::Transaction { source, .. }
+        | tablepro_core::DriverError::TransactionRollbackFailed { source, .. } => source.as_ref(),
+        other => other,
+    };
+    assert!(
+        matches!(
+            cause,
+            tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
+        ),
+        "unexpected invalid grid edit error: {error:?}"
+    );
+    assert_eq!(
+        connection
+            .query(
+                "SELECT pg_typeof(labels)::text, array_to_json(labels)::text, \
+                        encode(array_send(labels), 'hex') \
+                 FROM value_contract_domain_array_import",
+            )
+            .await
+            .unwrap()
+            .rows,
+        grid_native.rows
+    );
+
     let invalid_domain = tablepro_core::sql_dialect::build_insert_from_draft(
         "postgres",
         None,

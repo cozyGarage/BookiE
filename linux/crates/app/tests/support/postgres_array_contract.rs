@@ -304,3 +304,51 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
     assert!(sql.contains("$1::text::\"enum_array_schema\".\"label\"[]"));
     assert_eq!(params, vec![Value::Text(literal.into()), Value::Int(2)]);
 }
+
+#[test]
+fn value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain_cast() {
+    let literal = r#"{"NULL","",東京,NULL}"#;
+    let column = ColumnInfo {
+        name: "labels".into(),
+        data_type: "value_contract_domain_array_label[]".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: Some(tablepro_core::QualifiedTypeName {
+            schema: "public".into(),
+            name: "value_contract_domain_array_label".into(),
+        }),
+    };
+    let parsed = parse_input_for_driver(literal, Some(&column), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let columns = vec![
+        ColumnInfo {
+            name: "id".into(),
+            data_type: "integer".into(),
+            nullable: false,
+            primary_key: true,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+        },
+        column,
+    ];
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "items",
+        &columns,
+        &[(1, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(sql.contains("$1::text::\"public\".\"value_contract_domain_array_label\"[]"));
+    assert_eq!(params, vec![Value::Text(literal.into()), Value::Int(1)]);
+}
