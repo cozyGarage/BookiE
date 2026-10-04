@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "6b10e2a2d",
+  "source_commit": "0cbfa6b81",
   "engines": {
     "mysql": "MySQL 8.1 in Docker via testcontainers",
     "mariadb": "MariaDB 11 in Docker via testcontainers"

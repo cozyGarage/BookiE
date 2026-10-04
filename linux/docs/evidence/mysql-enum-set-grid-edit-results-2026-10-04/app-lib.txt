@@ -1,4 +1,9 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.93s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
 running 483 tests
@@ -108,7 +113,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 482 filtered out; fi
 running 1 test
 test services::preferences::tests::gsettings_keyfile_child ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 482 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 482 filtered out; finished in 0.01s
 
 ok
 test services::preferences::tests::gsettings_keyfile_child ... ok
@@ -498,4 +503,4 @@ test ui::welcome_view::tests::an_empty_arrangement_renders_no_sections ... ok
 test ui::welcome_view::tests::connections_without_a_group_render_as_one_ungrouped_section ... ok
 test ui::welcome_view::tests::each_group_becomes_its_own_section_in_arranged_order ... ok
 
-test result: ok. 460 passed; 0 failed; 23 ignored; 0 measured; 0 filtered out; finished in 0.30s
+test result: ok. 460 passed; 0 failed; 23 ignored; 0 measured; 0 filtered out; finished in 0.35s

@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.29s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
 running 1 test
