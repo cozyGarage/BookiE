@@ -1328,6 +1328,18 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
                 if message.contains("resolvable depth")),
             "depth {levels}: {invalid:?}"
         );
+        let null_inference = connection
+            .execute_params(
+                &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
+                &[Value::Null],
+            )
+            .await
+            .expect_err("raw inferred SQL NULL must be refused at the resolver depth limit");
+        assert!(
+            matches!(&null_inference, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "depth {levels}: {null_inference:?}"
+        );
     } else {
         assert!(
             matches!(
@@ -1338,6 +1350,37 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             ),
             "depth {levels}: {invalid:?}"
         );
+
+        let null_update = connection
+            .execute_params(
+                &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
+                &[Value::Null],
+            )
+            .await
+            .unwrap();
+        assert_eq!(null_update.rows_affected, 1);
+        let null_row = connection
+            .query(&format!(
+                "SELECT status IS NULL, pg_typeof(status)::text \
+                 FROM {schema}.rows WHERE id = 3"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            null_row.rows,
+            vec![vec![
+                Value::Bool(true),
+                Value::Text(format!("{schema}.state_domain_{levels}")),
+            ]]
+        );
+        let restore = connection
+            .execute_params(
+                &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
+                &[Value::Text("ready".into())],
+            )
+            .await
+            .unwrap();
+        assert_eq!(restore.rows_affected, 1);
     }
 
     let filtered = FilterSet {
