@@ -229,6 +229,13 @@ rules, nonnumeric text and BLOB inputs yield REAL zero, and an integer-overflow
 case is refused with SQLite's native error. See the
 [SUM evidence](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
 
+October 4 B3-3/B3-4 follow-up: SQLite `total()` over STRICT `ANY` returns REAL
+for every group, including all-NULL input, and returns 0.0 for an empty input
+set. An integer pair above `i64::MAX` remains a REAL result rather than raising
+SUM's integer-overflow error; typed CSV re-import preserves the f64 values and
+native `typeof()` results. See the
+[TOTAL evidence](evidence/sqlite-total-any-results-2026-10-04/manifest.json).
+
 October 4 B3-3/B3-4 follow-up: grouped SQLite `AVG()` over STRICT `ANY` returns
 REAL for every non-NULL group, including integer and numeric-text inputs, and
 SQL NULL for an all-NULL group. Nonnumeric text and BLOB values yield REAL

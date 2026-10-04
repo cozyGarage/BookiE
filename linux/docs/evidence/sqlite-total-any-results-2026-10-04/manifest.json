@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "d7ac41deb2604847f3bc2f091ed56bfff04f11ac",
+  "engine": "SQLite 3.53.4 via system libsqlite3",
+  "case": "TOTAL over mixed STRICT ANY values and typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_total_any_csv_round_trip_preserves_real_results",
+  "contract": [
+    "SQLite total() returns REAL for integer, REAL, numeric-text, nonnumeric-text/BLOB, mixed and all-NULL groups; all-NULL input produces 0.0.",
+    "A no-row aggregate also returns 0.0 with native typeof() equal to real.",
+    "An integer pair above the signed 64-bit sum boundary returns a floating result instead of SUM's integer-overflow refusal.",
+    "The computed result column retains fallback metadata; typed CSV re-import restores every exact f64 result as native REAL, verified by typeof()."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_any_contract:: -- --test-threads=1",
+      "result": "18 passed, 0 failed; includes the new TOTAL contract",
+      "log": "sqlite-any-contract-group.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "sqlite-any-contract-group.txt": "9eb05921fb61f42f0170a8b78b6f390780febd682d5398454b0690ef70f5cd30",
+    "clippy.txt": "c85279bb54879b7fb3c0196b4c193a0707081ef48eba4fd539521120654a3fa7",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other SQLite computed-expression shapes and storage-class/affinity mixtures, additional result consumers, spreadsheet-app re-import beyond the tested Calc case and installed editing remain open."
+  ]
+}
