@@ -725,6 +725,9 @@ fn format_mssql_type(type_name: &str, max_length: i64, precision: i64, scale: i6
             }
         }
         "decimal" | "numeric" => format!("{type_name}({precision},{scale})"),
+        // The app parser needs the declared precision to refuse datetimeoffset
+        // edits that SQL Server would round during implicit text conversion.
+        "datetimeoffset" => format!("{type_name}({scale})"),
         _ => type_name.to_string(),
     }
 }

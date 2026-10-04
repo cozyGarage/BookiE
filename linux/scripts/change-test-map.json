@@ -37,7 +37,8 @@
       "package": "tablepro-app",
       "target": "--lib",
       "tests": [
-        "ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior"
+        "ui::browse_tab::value_parse::tests::sqlite_numeric_grid_edit_keeps_parser_and_affinity_behavior",
+        "ui::browse_tab::value_parse::tests::mssql_datetimeoffset_parser_preserves_text_and_refuses_lossy_input"
       ]
     },
     "crates/drivers/clickhouse/src/lib.rs": {

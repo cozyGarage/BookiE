@@ -181,6 +181,7 @@ fn format_type_lengths_and_precision() {
     assert_eq!(format_mssql_type("nvarchar", 510, 0, 0), "nvarchar(255)");
     assert_eq!(format_mssql_type("nvarchar", -1, 0, 0), "nvarchar(max)");
     assert_eq!(format_mssql_type("decimal", 9, 18, 2), "decimal(18,2)");
+    assert_eq!(format_mssql_type("datetimeoffset", 10, 0, 3), "datetimeoffset(3)");
 }
 
 #[test]

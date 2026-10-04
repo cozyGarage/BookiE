@@ -1,4 +1,4 @@
-use chrono::Timelike;
+use chrono::{Datelike, Timelike};
 use tablepro_core::{ColumnInfo, Value};
 
 /// Replace newlines / carriage returns with spaces. Applied at
@@ -141,6 +141,9 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     {
         return result;
     }
+    if let Some(result) = parse_mssql_datetimeoffset_input(trimmed, col, driver_id) {
+        return result;
+    }
     if let Some(result) = parse_mongodb_integer_input(trimmed, col, driver_id) {
         return result;
     }
@@ -176,6 +179,52 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
         return result;
     }
     parse_input_for_column(text, col)
+}
+
+fn parse_mssql_datetimeoffset_input(
+    text: &str,
+    col: Option<&ColumnInfo>,
+    driver_id: &str,
+) -> Option<Result<Value, String>> {
+    if driver_id != "mssql" {
+        return None;
+    }
+    let column = col?;
+    let data_type = column.data_type.trim().to_ascii_lowercase();
+    let suffix = data_type.strip_prefix("datetimeoffset")?;
+    let scale = if suffix.is_empty() {
+        Some(7)
+    } else {
+        suffix
+            .strip_prefix('(')
+            .and_then(|scale| scale.strip_suffix(')'))
+            .and_then(|scale| scale.parse::<u8>().ok())
+            .filter(|scale| *scale <= 7)
+    };
+    let Some(scale) = scale else {
+        return Some(Err(crate::tr!("Invalid SQL Server datetimeoffset column scale")));
+    };
+    let parsed = chrono::DateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f %:z");
+    Some(parsed.map_or_else(
+        |_| Err(crate::tr!("Invalid SQL Server datetimeoffset")),
+        |value| {
+            let local = text.rsplit_once(' ').map_or(text, |(local, _)| local);
+            let fraction_digits = local.split_once('.').map_or(0, |(_, fraction)| fraction.len());
+            let offset_seconds = value.offset().local_minus_utc().abs();
+            let local_year = value.date_naive().year();
+            let utc_year = value.naive_utc().date().year();
+            if fraction_digits > usize::from(scale)
+                || offset_seconds > 14 * 60 * 60
+                || !(1..=9999).contains(&local_year)
+                || !(1..=9999).contains(&utc_year)
+            {
+                return Err(crate::tr!(
+                    "SQL Server datetimeoffset value exceeds the column precision or offset range"
+                ));
+            }
+            Ok(Value::Text(text.to_owned()))
+        },
+    ))
 }
 
 pub(super) fn parse_input_for_grid_cell(
@@ -808,6 +857,10 @@ mod mysql_temporal_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/mssql_legacy_datetime_contract.rs"]
 mod mssql_legacy_datetime_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mssql_datetimeoffset_contract.rs"]
+mod mssql_datetimeoffset_contract;
 
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_spatial_contract.rs"]

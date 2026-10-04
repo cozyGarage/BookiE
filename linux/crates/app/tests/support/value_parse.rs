@@ -873,6 +873,38 @@ fn classify_disambiguates_overlapping_types() {
 }
 
 #[test]
+fn mssql_datetimeoffset_parser_preserves_text_and_refuses_lossy_input() {
+    let column = col("datetimeoffset(3)", false);
+    let valid = "2024-01-02 03:04:05.123 +05:30";
+    assert_eq!(
+        parse_input_for_driver(valid, Some(&column), "mssql"),
+        Ok(Value::Text(valid.into()))
+    );
+    assert_eq!(
+        parse_input_for_driver(
+            "0001-01-01 00:00:00 -14:00",
+            Some(&col("datetimeoffset(0)", false)),
+            "mssql"
+        ),
+        Ok(Value::Text("0001-01-01 00:00:00 -14:00".into()))
+    );
+    for invalid in [
+        "2024-01-02 03:04:05.1234 +05:30",
+        "2024-01-02 03:04:05.123 +14:01",
+        "0001-01-01 00:00:00 +14:00",
+        "9999-12-31 23:59:59 -14:00",
+        "2024-01-02T03:04:05.123+05:30",
+        "2024-01-02 03:04:05.123",
+    ] {
+        assert!(
+            parse_input_for_driver(invalid, Some(&column), "mssql").is_err(),
+            "must refuse {invalid}"
+        );
+    }
+    assert!(parse_input_for_driver(valid, Some(&column), "postgres").is_err());
+}
+
+#[test]
 fn empty_on_nullable_yields_null() {
     let r = parse_input_for_column("", Some(&col("text", true))).unwrap();
     assert!(matches!(r, Value::Null));

@@ -53,6 +53,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::mssql_datetimeoffset_contract::value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
     ],
     [
