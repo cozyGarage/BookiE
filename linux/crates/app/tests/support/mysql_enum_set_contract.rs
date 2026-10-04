@@ -30,6 +30,10 @@ fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
         parse_input_for_driver("happy", Some(&column("value", "enum('happy','it\\'s ok')")), "mysql"),
         Ok(Value::Text("happy".into()))
     );
+    assert_eq!(
+        parse_input_for_driver("NULL", Some(&column("value", "enum('NULL','known')")), "mysql"),
+        Ok(Value::Text("NULL".into()))
+    );
     let mut nullable_enum = column("value", "enum('happy','')");
     nullable_enum.nullable = true;
     assert_eq!(
@@ -257,6 +261,38 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             );
         }
 
+        let literal_null = parse_input_for_driver("NULL", Some(&columns[mood]), "mysql").unwrap();
+        let literal_null_update = tablepro_core::sql_dialect::build_keyed_update(
+            "mysql",
+            None,
+            "enum_set_grid",
+            &columns,
+            &[(mood, literal_null)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        session
+            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &control)
+            .await
+            .unwrap();
+        let literal_null_state = session
+            .query_params_controlled(
+                "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood)
+                 FROM enum_set_grid WHERE id = 1",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            literal_null_state.rows[0],
+            vec![
+                Value::Text("value".into()),
+                Value::Text("4".into()),
+                Value::Text("4E554C4C".into())
+            ]
+        );
+
         let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
         let perms_value = parse_input_for_driver("write,slash\\path", Some(&columns[perms]), "mysql").unwrap();
         assert_eq!(mood_value, Value::Text("it's ok".into()));
@@ -340,7 +376,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         .query_params_controlled(
             "CREATE TABLE maria_enum_set_grid (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\\\slash', ''),
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', ''),
                 perms SET('read', 'write', 'slash\\\\path')
             )",
             &[],
@@ -451,7 +487,7 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 empty_state.rows[0],
                 vec![
                     Value::Text("value".into()),
-                    Value::Text("4".into()),
+                    Value::Text("5".into()),
                     Value::Text(String::new()),
                     Value::Text("value".into()),
                     Value::Text("0".into()),
@@ -459,6 +495,38 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
                 ]
             );
         }
+        let literal_null = parse_input_for_driver("NULL", Some(&columns[mood]), "mysql").unwrap();
+        let literal_null_update = tablepro_core::sql_dialect::build_keyed_update(
+            "mysql",
+            None,
+            "maria_enum_set_grid",
+            &columns,
+            &[(mood, literal_null)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        session
+            .query_params_controlled(&literal_null_update.0, &literal_null_update.1, &control)
+            .await
+            .unwrap();
+        let literal_null_state = session
+            .query_params_controlled(
+                "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood)
+                 FROM maria_enum_set_grid WHERE id = 1",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            literal_null_state.rows[0],
+            vec![
+                Value::Text("value".into()),
+                Value::Text("4".into()),
+                Value::Text("4E554C4C".into())
+            ]
+        );
+
         let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
         let perms_value = parse_input_for_driver("read,slash\\path", Some(&columns[perms]), "mysql").unwrap();
         let update = tablepro_core::sql_dialect::build_keyed_update(
