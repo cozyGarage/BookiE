@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "8a3f3c3f268093b786d4ea74e8d091ec2f1b87e7",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL domain-over-enum array XLSX re-import through LibreOffice Calc",
+  "test": "domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "base_container": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9",
+    "local_cached_image": "tablepro-lo-calc:26.8.0.3"
+  },
+  "contract": [
+    "The domain-over-enum array includes literal NULL, empty label, Unicode, comma, quote, markup, formula-shaped label and SQL NULL; PostgreSQL native type, JSON, array_send, typed rebinding and SQL replay are asserted by the integration contract.",
+    "The artifact-path override retains the BookieE XLSX emitted by the contract; it contains the array text as a shared-string cell and no formula element.",
+    "LibreOffice Calc opens source.xlsx and saves ODS, then reopens ODS and saves XLSX. The checker confirms the XLSX cells are strings, the ODS cell is a string, and all three 50-code-point values are identical."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "command": "libreoffice --headless --convert-to ods --outdir recheck source.xlsx; libreoffice --headless --convert-to xlsx --outdir recheck recheck/source.ods",
+      "result": "Calc 26.8.0.3 completed both conversions.",
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "command": "python3 verify_roundtrip.py",
+      "result": "The XLSX and ODS cells are strings with byte-for-byte equal extracted text.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "b043cb84f8f1dabe86a09aa9816cc4c0bf8a77095f740db7726dc59ad6ced8af",
+    "recheck/source.ods": "d8f421c62b890b91de89c89c556ce9782d930070856a77ca159de40111feaa49",
+    "recheck/source.xlsx": "7b64fc9ebd59809693cf878ad5c0710b356f704dfe8657ab5173f61378890cd6"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "d61968bd8cf7de57b3f099dae23485c84bded7d270516c4e6b9ae8354bf2d542",
+    "libreoffice-roundtrip.txt": "7064be7edca32d4ecde8de2df5f0c11b7f3e1b520b1f6c9f689860034d4b85ee",
+    "consumer-check.txt": "5917b7763218974303dc227df77f23b7a7b7b934a5fcddf74cec6f1e13d00287",
+    "clippy.txt": "2463f964b0bff47f57419363f284f0e54dc2c600792d5b8354370812f10f2184",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "checker": "verify_roundtrip.py",
+  "checker_sha256": "82915b19138e98b2b7ad883f8426cd5459c1dabe5fc96c4b832ca6cfc31638af",
+  "remaining": [
+    "Other PostgreSQL array families, spreadsheet shapes and applications remain open in B3."
+  ]
+}
