@@ -1,2 +1,2 @@
 rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-mysql --all-targets -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s

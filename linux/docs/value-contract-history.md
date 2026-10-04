@@ -2969,19 +2969,19 @@ literals are checked against returned `Value::TimestampTz`, UTC cast text,
 `sql_mode` is cleared for the baseline. Other temporal precisions and consumer
 paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
-### MySQL/MariaDB ENUM consumers across SQL modes (2026-10-04)
+### MySQL/MariaDB ENUM and SET consumers across SQL modes (2026-10-04)
 
 MySQL and MariaDB replay SQL export files and import typed CSV containing six
-ENUM values under the default mode, `NO_BACKSLASH_ESCAPES`, `ANSI_QUOTES`, and
-both modes together.
-The labels include an apostrophe, a backslash, literal `NULL`, and empty text,
-plus a SQL NULL row. Typed CSV uses an explicit collision-free null marker to
-keep empty text distinct from SQL NULL. Each mode checks server-native ENUM
-ordinals and label bytes, then compares both copied tables with the source.
-JSON preserves all labels and SQL NULL. XLSX explicitly refuses the empty
-label and leaves a pre-existing destination file unchanged.
-Both focused Docker tests, strict Clippy and formatting pass. Other ENUM
-consumers and SQL mode combinations remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
+rows spanning ENUM and SET under the default mode, `NO_BACKSLASH_ESCAPES`,
+`ANSI_QUOTES`, and both modes together. Values include apostrophe and
+backslash labels, multiple selected SET members, literal `NULL`, the empty
+SET, and SQL NULL. Typed CSV uses an explicit collision-free null marker so
+the empty SET stays distinct from SQL NULL. Each mode checks native ENUM
+ordinals, SET masks, label bytes and both copied tables against the source.
+JSON preserves every value. XLSX refuses the empty SET text and leaves a
+pre-existing destination unchanged. Both focused Docker tests, strict Clippy
+and formatting pass. Other enum/set consumers and SQL mode combinations remain
+open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
