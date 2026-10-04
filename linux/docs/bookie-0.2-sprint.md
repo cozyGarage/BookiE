@@ -234,6 +234,11 @@ legal offsets, fractional wall times and SQL NULL survives the pinned Calc
 round trip as text. Native `array_to_json` and `array_send` match after binding.
 See the [timetz-array Calc evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json).
 
+October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
+false and SQL NULL through the pinned Calc round trip as a text cell. Native
+`array_to_json` and `array_send` match after rebinding. See the
+[boolean-array Calc evidence](evidence/postgres-boolean-array-calc-reimport-results-2026-10-05/manifest.json).
+
 October 5 local GTK + DuckDB value tier: all 316 selected tests passed across
 all 11 suites, with no missing suites. PostgreSQL contributed 115 contracts;
 the current MySQL/MariaDB suite contributed 28. Compile reused 746 cached
