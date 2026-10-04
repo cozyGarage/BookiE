@@ -182,6 +182,40 @@ async fn value_contract_text_array_file_exports_preserve_text_and_escape_markup(
         assert!(output.contains("slash"), "{extension}: {output}");
         assert!(output.contains("東京 😀"), "{extension}: {output}");
     }
+
+    connection
+        .execute("CREATE TABLE array_filewriter_target (value text[])")
+        .await
+        .unwrap();
+    let path = directory.path().join("array.sql");
+    tablepro_core::export::write_result_file(
+        &path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "array_filewriter_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    connection
+        .execute(&std::fs::read_to_string(path).unwrap())
+        .await
+        .unwrap();
+    let restored = connection
+        .query(
+            "SELECT value::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows, vec![oracle.rows[0][1..].to_vec()]);
 }
 
 #[tokio::test]
