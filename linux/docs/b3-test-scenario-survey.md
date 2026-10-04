@@ -674,4 +674,5 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   qualified element domain, round-trips native values and bytes, and refuses a
   value rejected by the domain CHECK without inserting its row. The app parser
   and keyed grid edit also retain the domain array cast and roll back invalid
-  values without changing the stored row ([import evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json), [grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
+  values without changing the stored row; structured equality filters match
+  native domain arrays ([import evidence](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json), [grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json), [filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
