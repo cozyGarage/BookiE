@@ -2030,8 +2030,9 @@ above includes this bytea[] contract.
 A separate result/binding contract covers arrays of a domain over `bytea`. It
 checks declared domain-array metadata, a non-UTF-8 element, an empty element, a
 NULL element, SQL NULL versus an empty array, and native JSON/`array_send`
-oracles after qualified text binding. The focused Docker test and the full
-PostgreSQL integration suite passed; see the
+oracles after qualified text binding and keyed edit. A domain CHECK violation
+returns `23514` and leaves both the edited row and its sibling unchanged. The
+focused Docker test and full PostgreSQL integration suite passed; see the
 [source-fingerprinted evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json).
 
 The UUID[] edit exposed a parser bug: `classify_type` matched the `uuid`

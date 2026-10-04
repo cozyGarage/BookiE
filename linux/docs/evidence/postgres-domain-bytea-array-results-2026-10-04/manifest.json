@@ -2,14 +2,15 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "f9a3ada83",
+  "source_commit": "92e3af763",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "array of a domain over bytea",
   "test": "domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes",
   "contract": [
     "A domain-over-bytea array retains its declared qualified array type and decodes non-UTF-8 bytes, an empty byte string and a NULL element distinctly.",
     "SQL NULL and empty arrays remain distinct.",
-    "Qualified text binding reproduces the native array type, JSON and array_send wire bytes for populated, NULL and empty arrays."
+    "Qualified text binding reproduces the native array type, JSON and array_send wire bytes for populated, NULL and empty arrays.",
+    "A keyed edit preserves the qualified domain-array type and wire bytes; an element that violates the domain CHECK returns SQLSTATE 23514 and leaves the edited row and its sibling unchanged."
   ],
   "validation": {
     "focused_test": {

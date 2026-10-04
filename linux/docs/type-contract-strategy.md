@@ -52,8 +52,9 @@ refusal and sibling preservation ([evidence](evidence/postgres-domain-uuid-array
 Text, numeric and timestamptz domain arrays also pass qualified binding and
 native JSON/wire comparisons in a non-UTC session
 ([matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
-Domain arrays over `bytea` now preserve non-UTF-8 bytes, empty elements and
-NULL, with qualified binding checked against native JSON and wire bytes
+Domain arrays over `bytea` preserve non-UTF-8 bytes, empty elements and NULL
+through qualified binding and keyed edits; domain CHECK refusal preserves the
+row and its sibling, with native JSON/wire oracles
 ([evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
