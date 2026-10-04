@@ -125,10 +125,13 @@ October 4 B3-4 follow-up: SQLite compound `UNION ALL` outputs over STRICT
 `ANY` retain fallback metadata through direct, CTE and derived-table queries,
 ordinary/bound/transaction consumers, while native `typeof()` checks preserve
 the INTEGER/TEXT/NULL row kinds. Direct `ANY` projection still recovers declared
-metadata when a UNION occurs only in its filter. An app file-writer contract checks CSV text and the workbook's numeric,
-string and blank cell kinds. Typed CSV storage-class restoration and
-spreadsheet-app re-import remain open. See the
-[compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json).
+metadata when a UNION occurs only in its filter. App file-writer contracts
+check CSV text, XLSX numeric/string/blank cell kinds, and a compound-result CSV
+round trip restoring INTEGER, TEXT, BLOB and NULL through native `typeof()`
+checks. Spreadsheet-app re-import remains open. See the
+[compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json),
+[export evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json)
+and [typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate

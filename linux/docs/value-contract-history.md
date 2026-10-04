@@ -4647,9 +4647,25 @@ containing INTEGER, TEXT and SQL NULL. CSV output retains its exact textual
 rows. The real XLSX workbook stores the integer as a numeric cell, the text as
 a shared string, and NULL as an absent cell. Six SQLite app `ANY` contracts
 passed with strict Clippy and formatting. This proves workbook cell output, not
-spreadsheet-application re-import; typed CSV storage-class restoration for
-compound results also remains open. See the
-[compound-result CSV/XLSX evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json).
+spreadsheet-application re-import. A later typed CSV case closes the native
+SQLite result-to-CSV-to-import gap; see the
+[compound-result CSV/XLSX evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json)
+and [typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
+
+## SQLite compound STRICT ANY typed CSV round trip (2026-10-04)
+
+Reproduction showed that a compound query's fallback `NULL` metadata caused
+INTEGER 42 to return from CSV import as TEXT. SQLite result-file exports now
+tag non-NULL values in fallback-metadata columns; import decodes those tags
+against each destination column's declared type. A native app contract exports
+and re-imports compound output containing INTEGER, TEXT, BLOB, SQL NULL, and
+text that resembles the reserved tag prefix. `typeof()` confirms the typed
+`ANY` result retains each runtime storage class, while INTEGER and TEXT target
+columns keep their declared behavior. Seven SQLite app `ANY` contracts, 514
+core tests plus 10 query-pipeline tests, all 47 SQLite driver tests, strict
+Clippy and formatting passed. Spreadsheet-app re-import and other computed
+expression shapes remain open. See the
+[typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 ## DuckDB enum keyed grid edit, 2026-10-03
 

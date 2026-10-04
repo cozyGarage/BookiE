@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "e24f78533ff019025fa4ede3fac74061717df7d2",
+  "engine": "SQLite in-memory STRICT ANY fixture",
+  "case": "Typed CSV round trip for a compound SQLite result",
+  "test": "sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "The defect reproduced before the fix: a compound result column with fallback NULL metadata exported INTEGER 42 as plain CSV text, and importing into STRICT ANY restored TEXT.",
+    "SQLite CSV file exports tag non-NULL values in fallback-metadata columns with the existing storage-class encoding; unconfigured/default CSV output remains plain text.",
+    "The result-file writer and CSV importer round trip INTEGER, TEXT, BLOB, SQL NULL, and text matching the reserved tag prefix into SQLite INTEGER, ANY, and TEXT destination columns.",
+    "Native typeof() and returned values confirm INTEGER/TEXT/BLOB/NULL storage classes survive in the STRICT ANY result column, and typed destination columns retain normal affinity behavior.",
+    "This proves native SQLite file-writer/import behavior; spreadsheet-application re-import and other computed-expression shapes remain open."
+  ],
+  "validation": {
+    "app_sqlite_any_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_any_contract:: -- --test-threads=1",
+      "result": "7 passed, 0 failed",
+      "log": "app-sqlite-any-csv.txt"
+    },
+    "core": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-core",
+      "result": "514 unit tests and 10 query-pipeline tests passed; 0 failed",
+      "log": "core.txt"
+    },
+    "sqlite_driver": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "47 tests passed; 0 failed",
+      "log": "sqlite-driver.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "app-sqlite-any-csv.txt": "e43458bef274eef17e055fc45f45e962344ab52518fd9cc66a03ab6aa69c8729",
+    "clippy.txt": "dd8af3ff82ff323f9724709f141165e557337e8c552bb214d03f462d94c1b672",
+    "core.txt": "34b5cd5daef6826f0f4fa1cf5b5b68bb74d329c2a417f2e0477f40989aa68b87",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sqlite-driver.txt": "a141e5f5fd26d4408508f1c815fdcc528cc8bce040eee5e7eb5dc4db0e1a1222"
+  },
+  "remaining": [
+    "Spreadsheet-application import, non-SQLite consumers, and additional computed-expression/source combinations remain unproven."
+  ]
+}
