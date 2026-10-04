@@ -209,6 +209,30 @@ async fn value_contract_custom_enum_preserves_maximum_multibyte_label_bytes() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_refuses_labels_over_byte_limit() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let label = "x".repeat(64);
+    let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label)).unwrap();
+    let error = connection
+        .execute(&format!(
+            "CREATE TYPE value_contract_enum_overlength AS ENUM ({literal})"
+        ))
+        .await
+        .expect_err("PostgreSQL must refuse an enum label over the byte limit");
+    assert!(
+        matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42602"),
+        "{error:?}"
+    );
+    let type_absent = connection
+        .query("SELECT to_regtype('value_contract_enum_overlength') IS NULL")
+        .await
+        .unwrap();
+    assert_eq!(type_absent.rows, vec![vec![Value::Bool(true)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
