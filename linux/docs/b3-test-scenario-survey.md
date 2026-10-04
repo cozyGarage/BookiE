@@ -143,6 +143,13 @@ remain open. See the [TIME evidence](evidence/mysql-fractional-time-mode-results
 [DATETIME evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json)
 and [TIMESTAMP evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
+October 4 B3-4 follow-up: the MySQL app parser accepts fractional TIME(6),
+DATETIME(6) and TIMESTAMP(6) edits as typed values, feeds them through the
+keyed-update builder, and verifies native stored values, microseconds and an
+untouched sibling row. The TIMESTAMP edit uses an explicit UTC session and an
+epoch-microsecond oracle. Other format consumers and installed grid interaction
+remain open; see the [native app-edit evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
+
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now
 cover all 17 shared structured-filter operators, including text-pattern
 operators, list complements and both NULL checks. Exact row labels and native

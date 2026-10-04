@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "563649eb6ec563097701e2ea7630cf81ccd68f7c",
+  "case": "MySQL app temporal parser-to-keyed-grid edit with native value and sibling-row oracles",
+  "engine": "testcontainers-modules 0.15.0 default MySQL image tag 8.1",
+  "test": [
+    "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keeps_fractional_input_typed",
+    "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings"
+  ],
+  "contract": [
+    "The app parser maps TIME(6) input to Value::Time and DATETIME(6)/TIMESTAMP(6) input to Value::DateTime.",
+    "The test creates a TIME(6), DATETIME(6), TIMESTAMP(6) table and sets the dedicated MySQL session timezone to +00:00.",
+    "Parser output flows through the shared keyed-update builder and executes on the MySQL connection.",
+    "Native reads assert each edited value, CAST(value AS CHAR), MICROSECOND(value), and TIMESTAMP epoch microseconds.",
+    "A second row retains its original values, verifying keyed identity and sibling preservation."
+  ],
+  "references": [
+    "../../decisions/0007-type-and-value-preservation.md",
+    "../../type-contract-strategy.md"
+  ],
+  "validation": {
+    "focused_docker": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "parser_and_docker_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app mysql_temporal_contract:: -- --include-ignored --test-threads=1",
+      "result": "2 passed, 0 failed",
+      "log": "app-temporal-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "inventory": "rtk proxy python3 linux/scripts/inventory-ignored-tests.py --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "7f36ed7eb16f5520f11ba382af25839fb798d0854e1ae3202e68b0b4a5f7c78c",
+    "app-temporal-suite.txt": "279dfd5a0adf56685b476c517a94bb1697584c55a8ae95ccd60930608299ef2a",
+    "clippy.txt": "8a2933ae25e59188be988ea6218274cb341f13d8bc4b533f57b12ececd4be8b3",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Installed GTK editing and other MySQL format consumers remain open.",
+    "MySQL TIMESTAMP is interpreted in the explicit UTC session; other session-timezone/edit expectations remain open.",
+    "This bounded contract does not close B3 or qualify the 0.2.0 release."
+  ]
+}

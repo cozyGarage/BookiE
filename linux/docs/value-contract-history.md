@@ -4855,3 +4855,14 @@ The focused PostgreSQL 16 case and all 11 enum contracts pass, as do Clippy and
 formatting. See the [operator-matrix evidence](evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
 
 Other schema/session configurations remain open; this case does not close B3.
+
+
+### MySQL app temporal keyed-grid edit (2026-10-04)
+
+The app parser turns edited TIME(6), DATETIME(6) and TIMESTAMP(6) text into
+typed values, and the shared keyed-update builder persists all three through
+the MySQL driver. Native reads assert the updated values, exact fractional
+microseconds and the untouched sibling row. TIMESTAMP uses an explicit UTC
+session and an epoch-microsecond oracle; parser tests also pin MySQL
+TIMESTAMP input as `Value::DateTime`. Installed grid interaction and other
+format consumers remain open. See the [native app-edit evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
