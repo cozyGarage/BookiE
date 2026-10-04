@@ -269,6 +269,14 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
     };
     let parsed = parse_input_for_driver(literal, Some(&column), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
+    assert_eq!(
+        parse_input_for_driver("", Some(&column), "postgres").unwrap(),
+        Value::Null
+    );
+    assert_eq!(
+        parse_input_for_driver("{}", Some(&column), "postgres").unwrap(),
+        Value::Text("{}".into())
+    );
     let columns = vec![
         ColumnInfo {
             name: "id".into(),

@@ -1647,6 +1647,60 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .await
         .unwrap();
     assert_eq!(unchanged.rows, native.rows);
+
+    let null_update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_array_grid"),
+        "items",
+        &columns,
+        &[(labels_index, Value::Null)],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert!(null_update.0.contains("$1::text::\"enum_array_grid\".\"label\"[]"));
+    connection.execute_in_transaction(&[null_update]).await.unwrap();
+    let saved_null = connection
+        .query(
+            "SELECT labels IS NULL, pg_typeof(labels)::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM enum_array_grid.items WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        saved_null.rows,
+        vec![vec![
+            Value::Bool(true),
+            Value::Text("enum_array_grid.label[]".into()),
+            Value::Null,
+            Value::Null,
+        ]]
+    );
+
+    let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_array_grid"),
+        "items",
+        &columns,
+        &[(labels_index, Value::Text("{}".into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[empty_update]).await.unwrap();
+    let saved_empty = connection
+        .query(
+            "SELECT labels IS NULL, pg_typeof(labels)::text, labels::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM enum_array_grid.items WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved_empty.rows[0][0], Value::Bool(false));
+    assert_eq!(saved_empty.rows[0][1], Value::Text("enum_array_grid.label[]".into()));
+    assert_eq!(saved_empty.rows[0][2], Value::Text("{}".into()));
+    assert_eq!(saved_empty.rows[0][3], Value::Null);
+    assert_eq!(saved_empty.rows[0][4], Value::Text("[]".into()));
+    assert_ne!(saved_empty.rows[0][5], Value::Null);
     assert_eq!(
         connection
             .query("SELECT encode(array_send(labels), 'hex') FROM enum_array_grid.items WHERE id = 1")
