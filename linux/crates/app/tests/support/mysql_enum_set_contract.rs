@@ -40,6 +40,7 @@ fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
         parse_input_for_driver("''", Some(&nullable_enum), "mysql"),
         Ok(Value::Text(String::new()))
     );
+    assert!(parse_input_for_driver("", Some(&column("value", "enum('happy','')")), "mysql").is_err());
     assert_eq!(
         parse_input_for_driver("''", Some(&column("value", "set('read','write')")), "mysql"),
         Ok(Value::Text(String::new()))
