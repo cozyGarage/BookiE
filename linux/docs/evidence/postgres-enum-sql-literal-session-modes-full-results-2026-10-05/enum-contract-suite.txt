@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 17 tests
+test enum_contract::value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_backslashes ... ok
+test enum_contract::value_contract_custom_enum_filters_preserve_labels_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_json_and_file_exports_preserve_empty_literal_null_and_sql_null ... ok
+test enum_contract::value_contract_custom_enum_keyed_edit_preserves_label_and_siblings ... ok
+test enum_contract::value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_schema ... ok
+test enum_contract::value_contract_custom_enum_order_uses_declared_catalog_order ... ok
+test enum_contract::value_contract_custom_enum_parameters_infer_native_type_for_query_and_write ... ok
+test enum_contract::value_contract_custom_enum_preserves_maximum_multibyte_label_bytes ... ok
+test enum_contract::value_contract_custom_enum_projection_preserves_labels_and_null ... ok
+test enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter ... ok
+test enum_contract::value_contract_custom_enum_refuses_labels_over_byte_limit ... ok
+test enum_contract::value_contract_custom_enum_sql_file_export_restores_labels_and_native_type ... ok
+test enum_contract::value_contract_custom_enum_sql_file_replay_preserves_backslash_across_string_modes ... ok
+test enum_contract::value_contract_domain_enum_parameters_resolve_shadowed_schema_type ... ok
+test enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values ... ok
+test enum_contract::value_contract_scalar_enum_labels_preserve_exact_text ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 124 filtered out; finished in 34.01s
