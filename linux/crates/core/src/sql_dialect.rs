@@ -83,10 +83,16 @@ fn postgres_text_cast_type(column: &ColumnInfo, value: &Value) -> Option<String>
     if let Some(enum_type) = &column.enum_type
         && matches!(value, Value::Text(_) | Value::Null)
     {
+        let array_suffix = if column.data_type.trim().ends_with("[]") {
+            "[]"
+        } else {
+            ""
+        };
         return Some(format!(
-            "{}.{}",
+            "{}.{}{}",
             quote_ident("postgres", &enum_type.schema),
-            quote_ident("postgres", &enum_type.name)
+            quote_ident("postgres", &enum_type.name),
+            array_suffix
         ));
     }
     if !matches!(value, Value::Text(_)) {

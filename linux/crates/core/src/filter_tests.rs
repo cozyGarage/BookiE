@@ -289,6 +289,30 @@ fn postgres_enum_filters_cast_values_to_the_schema_qualified_type() {
 }
 
 #[test]
+fn postgres_enum_array_filters_cast_the_parameter_to_the_array_type() {
+    let mut column = col("labels", "value_contract_enum_schema.value_contract_status[]");
+    column.enum_type = Some(crate::QualifiedTypeName {
+        schema: "value_contract_enum_schema".into(),
+        name: "value_contract_status".into(),
+    });
+    let columns = [column];
+    let set = FilterSet {
+        rules: vec![rule(
+            "labels",
+            FilterOp::Eq,
+            Some(FilterValue::Single(r#"{"NULL","",NULL}"#.into())),
+        )],
+        ..Default::default()
+    };
+    let (sql, params) = build_filter_where("postgres", &columns, &set).unwrap().unwrap();
+    assert_eq!(
+        sql,
+        r#""labels" = $1::"value_contract_enum_schema"."value_contract_status"[]"#
+    );
+    assert_eq!(params, vec![Value::Text(r#"{"NULL","",NULL}"#.into())]);
+}
+
+#[test]
 fn empty_set_returns_none() {
     let result = build_filter_where("postgres", &[], &FilterSet::default()).unwrap();
     assert!(result.is_none());

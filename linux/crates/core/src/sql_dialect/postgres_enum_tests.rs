@@ -53,3 +53,35 @@ fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
         r#"INSERT INTO "t" ("status") VALUES ($1::text::"odd schema"."status""type")"#
     );
 }
+
+#[test]
+fn postgres_enum_array_writes_cast_text_to_the_qualified_array_type() {
+    let column = ColumnInfo {
+        name: "labels".into(),
+        data_type: "enum_schema.status_type[]".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: Some(QualifiedTypeName {
+            schema: "odd schema".into(),
+            name: "status\"type".into(),
+        }),
+    };
+    let (sql, params) = build_insert_from_draft(
+        "postgres",
+        None,
+        "t",
+        std::slice::from_ref(&column),
+        &[Value::Text("{ready,NULL}".into())],
+    )
+    .unwrap();
+    assert_eq!(
+        sql,
+        r#"INSERT INTO "t" ("labels") VALUES ($1::text::"odd schema"."status""type"[])"#
+    );
+    assert_eq!(params, vec![Value::Text("{ready,NULL}".into())]);
+}

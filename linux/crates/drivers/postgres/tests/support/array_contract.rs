@@ -1182,6 +1182,147 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     assert_eq!(restored.rows, vec![oracle.rows[0][1..].to_vec()]);
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblings() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_enum_array_import")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_array_import.label AS ENUM \
+             ('NULL', '', '東京', 'a,b', 'a\"b', '<tag>&', 'sibling')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_enum_array_import.target \
+             (id integer PRIMARY KEY, labels value_contract_enum_array_import.label[])",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_enum_array_import.target VALUES \
+             (1, ARRAY['sibling'::value_contract_enum_array_import.label])",
+        )
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query(
+            "SELECT encode(array_send(labels), 'hex') \
+             FROM value_contract_enum_array_import.target WHERE id = 1",
+        )
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+
+    let source = connection
+        .query(
+            "SELECT 3 AS id, ARRAY[\
+                'NULL'::value_contract_enum_array_import.label, \
+                ''::value_contract_enum_array_import.label, \
+                '東京'::value_contract_enum_array_import.label, \
+                'a,b'::value_contract_enum_array_import.label, \
+                'a\"b'::value_contract_enum_array_import.label, \
+                '<tag>&'::value_contract_enum_array_import.label, \
+                NULL::value_contract_enum_array_import.label\
+            ] AS labels",
+        )
+        .await
+        .unwrap();
+    let native = connection
+        .query(
+            "SELECT pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM (SELECT ARRAY[\
+                'NULL'::value_contract_enum_array_import.label, \
+                ''::value_contract_enum_array_import.label, \
+                '東京'::value_contract_enum_array_import.label, \
+                'a,b'::value_contract_enum_array_import.label, \
+                'a\"b'::value_contract_enum_array_import.label, \
+                '<tag>&'::value_contract_enum_array_import.label, \
+                NULL::value_contract_enum_array_import.label\
+             ] AS labels) AS source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows[0][0],
+        Value::Text("value_contract_enum_array_import.label[]".into())
+    );
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(Some("value_contract_enum_array_import"), "target")
+        .await
+        .unwrap();
+    assert_eq!(columns[1].data_type, "value_contract_enum_array_import.label[]");
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "value_contract_enum_array_import".into(),
+            name: "label".into(),
+        })
+    );
+    let mapping = [Some(0), Some(1)];
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("value_contract_enum_array_import"),
+            table: "target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert_eq!(
+        plan.statement,
+        "INSERT INTO \"value_contract_enum_array_import\".\"target\" \
+         (\"id\", \"labels\") VALUES ($1, $2::text::\"value_contract_enum_array_import\".\"label\"[])"
+    );
+    connection.execute_params(&plan.statement, &plan.rows[0]).await.unwrap();
+
+    let restored = connection
+        .query(
+            "SELECT id, pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM value_contract_enum_array_import.target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert_eq!(
+        restored.rows[0],
+        vec![
+            Value::Int(1),
+            Value::Text("value_contract_enum_array_import.label[]".into()),
+            Value::Text("{sibling}".into()),
+            Value::Text("[\"sibling\"]".into()),
+            sibling_wire,
+        ]
+    );
+    assert_eq!(
+        restored.rows[1],
+        vec![
+            Value::Int(3),
+            native.rows[0][0].clone(),
+            native.rows[0][1].clone(),
+            native.rows[0][2].clone(),
+            native.rows[0][3].clone(),
+        ]
+    );
+}
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")

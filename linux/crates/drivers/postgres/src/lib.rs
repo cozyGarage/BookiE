@@ -235,7 +235,13 @@ impl Connection for PgConnection {
                      SELECT candidate.oid, candidate.typtype, candidate.typbasetype,
                             candidate.typnamespace, candidate.typname
                      FROM pg_catalog.pg_type candidate
-                     WHERE candidate.oid = ty.oid
+                     WHERE candidate.oid = CASE
+                         WHEN ty.typcategory = 'A' AND EXISTS (
+                             SELECT 1 FROM pg_catalog.pg_type element
+                             WHERE element.oid = ty.typelem AND element.typtype = 'e'
+                         ) THEN ty.typelem
+                         ELSE ty.oid
+                     END
                      UNION ALL
                      SELECT base.oid, base.typtype, base.typbasetype,
                             base.typnamespace, base.typname

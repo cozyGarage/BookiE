@@ -351,16 +351,22 @@ fn filter_placeholder(driver_id: &str, col: &ColumnInfo, index: usize) -> String
     let Some(enum_type) = col.enum_type.as_ref().filter(|_| driver_id == "postgres") else {
         return placeholder;
     };
+    let array_suffix = if col.data_type.trim().ends_with("[]") { "[]" } else { "" };
     format!(
-        "{placeholder}::{}.{}",
+        "{placeholder}::{}.{}{}",
         quote_ident("postgres", &enum_type.schema),
-        quote_ident("postgres", &enum_type.name)
+        quote_ident("postgres", &enum_type.name),
+        array_suffix
     )
 }
 
 fn filter_column(driver_id: &str, col: &ColumnInfo) -> String {
     let column = quote_ident(driver_id, &col.name);
-    let Some(enum_type) = col.enum_type.as_ref().filter(|_| driver_id == "postgres") else {
+    let Some(enum_type) = col
+        .enum_type
+        .as_ref()
+        .filter(|_| driver_id == "postgres" && !col.data_type.trim().ends_with("[]"))
+    else {
         return column;
     };
     format!(
