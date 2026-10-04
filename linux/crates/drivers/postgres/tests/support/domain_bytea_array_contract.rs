@@ -10,10 +10,21 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
     let schema = "domain_bytea_array";
+    let shadow_schema = "domain_bytea_array_shadow";
     connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+    connection
+        .execute(&format!("CREATE SCHEMA {shadow_schema}"))
+        .await
+        .unwrap();
     connection
         .execute(&format!(
             "CREATE DOMAIN {schema}.payload AS bytea CHECK (octet_length(VALUE) <= 4)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE DOMAIN {shadow_schema}.payload AS bytea CHECK (octet_length(VALUE) <= 1)"
         ))
         .await
         .unwrap();
@@ -160,6 +171,44 @@ async fn value_contract_domain_over_bytea_array_preserves_binary_values_and_wire
     assert_eq!(stored.rows[0][2], native.rows[0][2]);
     assert_eq!(stored.rows[0][3], native.rows[0][3]);
     assert_eq!(stored.rows[1][3], sibling_before);
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(&format!("SET search_path TO {shadow_schema}"))
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows[0][0],
+        Value::Text(shadow_schema.into())
+    );
+    transaction.execute("SAVEPOINT shadow_domain_check").await.unwrap();
+    let shadow_rejection = transaction
+        .query(&format!("SELECT decode('00ff275c', 'hex')::{shadow_schema}.payload"))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(
+            &shadow_rejection,
+            tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "23514"
+        ),
+        "{shadow_rejection:?}"
+    );
+    transaction
+        .execute("ROLLBACK TO SAVEPOINT shadow_domain_check")
+        .await
+        .unwrap();
+    assert!(edit.0.contains("::text::\"domain_bytea_array\".\"payload\"[]"));
+    transaction.execute_params(&edit.0, &edit.1).await.unwrap();
+    let shadowed_path_stored = transaction
+        .query(&format!(
+            "SELECT id, pg_typeof(payloads)::text, array_to_json(payloads)::text, \
+                    encode(array_send(payloads), 'hex') \
+             FROM {schema}.rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(shadowed_path_stored.rows, stored.rows);
+    transaction.commit().await.unwrap();
 
     let invalid = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
