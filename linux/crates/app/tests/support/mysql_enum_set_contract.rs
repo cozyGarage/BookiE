@@ -120,8 +120,12 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
         "STRICT_TRANS_TABLES",
         "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+        "STRICT_TRANS_TABLES,ANSI_QUOTES",
+        "STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
         "STRICT_ALL_TABLES",
         "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES",
+        "STRICT_ALL_TABLES,ANSI_QUOTES",
+        "STRICT_ALL_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     ];
     for mode in modes {
         session
@@ -415,8 +419,12 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
         "STRICT_TRANS_TABLES",
         "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+        "STRICT_TRANS_TABLES,ANSI_QUOTES",
+        "STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
         "STRICT_ALL_TABLES",
         "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES",
+        "STRICT_ALL_TABLES,ANSI_QUOTES",
+        "STRICT_ALL_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     ];
     for mode in modes {
         session

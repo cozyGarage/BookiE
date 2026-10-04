@@ -4,15 +4,19 @@ use tablepro_core::{ConnectOptions, Connection, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 
-const MODES: [&str; 8] = [
+const MODES: [&str; 12] = [
     "",
     "NO_BACKSLASH_ESCAPES",
     "ANSI_QUOTES",
     "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     "STRICT_TRANS_TABLES",
     "STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES",
+    "STRICT_TRANS_TABLES,ANSI_QUOTES",
+    "STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     "STRICT_ALL_TABLES",
     "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES",
+    "STRICT_ALL_TABLES,ANSI_QUOTES",
+    "STRICT_ALL_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
 ];
 
 async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connection> {
