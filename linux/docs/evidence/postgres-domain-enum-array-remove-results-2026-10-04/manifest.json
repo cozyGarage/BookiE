@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "5bf30c4733482d5a4fe017610ea1ce7c5cd81750",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum array_remove scalar parameter inference",
+  "test": "domain_contract::value_contract_domain_enum_array_remove_infers_scalar_parameter_type",
+  "outcome": "PostgreSQL infers text and SQL NULL as the base enum for array_remove; the result is the base enum array.",
+  "contract": [
+    "Tests array_remove(ARRAY[status::base_enum], $1) for a domain-over-enum source column.",
+    "Exercises text and SQL NULL parameters over ready, paused and SQL NULL source rows.",
+    "Compares each result array with a separately executed explicitly typed native query.",
+    "Checks pg_typeof($1) and pg_typeof(array_remove(...)) against the base enum and base enum array."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_enum_array_remove_infers_scalar_parameter_type -- --include-ignored --test-threads=1",
+      "result": "1 passed",
+      "log": "focused-test.txt"
+    },
+    "postgres_integration": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "131 passed, 0 failed (303.35 seconds)",
+      "log": "postgres-integration.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --check --package tablepro-driver-postgres",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "file_size": {
+      "command": "bash scripts/check-file-size.sh",
+      "result": "passed",
+      "log": "file-size.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "source_worktree": "The code and documentation were committed at 5bf30c473 before the retained test rerun. The two pre-existing .b4-f4f9-* scratch directories remain untracked outside this packet.",
+  "remaining": [
+    "Other PostgreSQL inferred array function contexts and the broader engine, type, consumer and configuration matrix remain open; this case does not qualify 0.2.0."
+  ],
+  "sha256": {
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused-test.txt": "be739e75f111cad31bee3a7e267586b6db76aa63ad63472e6ab65a1d0588b371",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "postgres-integration.txt": "c1f0ca5311a59c6e43bf368f679bf790d7ae54a75d2c8754320e72990f31d270"
+  }
+}
