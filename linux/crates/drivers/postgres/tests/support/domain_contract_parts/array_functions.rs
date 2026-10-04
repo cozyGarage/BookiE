@@ -502,6 +502,170 @@ async fn value_contract_domain_enum_array_replace_infers_both_scalar_parameters(
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_replace_keeps_both_parameters_under_shadowed_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_replace")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_array_replace_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_replace.state \
+             AS ENUM ('ready', 'paused', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_array_replace_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_shadowed_array_replace.state_domain \
+             AS value_contract_shadowed_array_replace.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_shadowed_array_replace.rows \
+             (id INT PRIMARY KEY, status value_contract_shadowed_array_replace.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_shadowed_array_replace.rows \
+             VALUES (1, 'ready'), (2, 'paused'), (3, 'NULL'), (4, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let schema = "value_contract_shadowed_array_replace";
+    let enum_type = format!("{schema}.state");
+    let result_array = format!("{schema}.state[]");
+    let array = format!("ARRAY[status::{enum_type}, status::{enum_type}]");
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(
+            "SET LOCAL search_path TO value_contract_shadowed_array_replace_shadow, public",
+        )
+        .await
+        .unwrap();
+
+    for (search, replacement, native_search, native_replacement) in [
+        (
+            Value::Text("ready".into()),
+            Value::Text("paused".into()),
+            format!("'ready'::{enum_type}"),
+            format!("'paused'::{enum_type}"),
+        ),
+        (
+            Value::Text("NULL".into()),
+            Value::Text("ready".into()),
+            format!("'NULL'::{enum_type}"),
+            format!("'ready'::{enum_type}"),
+        ),
+        (
+            Value::Null,
+            Value::Text("paused".into()),
+            format!("NULL::{enum_type}"),
+            format!("'paused'::{enum_type}"),
+        ),
+        (
+            Value::Text("paused".into()),
+            Value::Null,
+            format!("'paused'::{enum_type}"),
+            format!("NULL::{enum_type}"),
+        ),
+        (
+            Value::Null,
+            Value::Null,
+            format!("NULL::{enum_type}"),
+            format!("NULL::{enum_type}"),
+        ),
+    ] {
+        let native_expression = format!(
+            "array_replace({array}, {native_search}, {native_replacement})"
+        );
+        let native = transaction
+            .query(&format!(
+                "SELECT id, array_to_json({native_expression})::text, \
+                 encode(array_send({native_expression}), 'hex') \
+                 FROM {schema}.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let result = transaction
+            .query_params(
+                &format!(
+                    "SELECT id, array_to_json(array_replace({array}, $1, $2))::text, \
+                     pg_typeof($1)::text, pg_typeof($2)::text, \
+                     pg_typeof(array_replace({array}, $1, $2))::text, \
+                     encode(array_send(array_replace({array}, $1, $2)), 'hex') \
+                     FROM {schema}.rows ORDER BY id"
+                ),
+                &[search.clone(), replacement.clone()],
+            )
+            .await
+            .unwrap();
+        let expected = native
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(enum_type.clone()),
+                    Value::Text(enum_type.clone()),
+                    Value::Text(result_array.clone()),
+                    row[2].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result.rows, expected,
+            "array_replace with {search:?} to {replacement:?}"
+        );
+    }
+
+    for invalid_position in ["$1", "$2"] {
+        transaction.execute("SAVEPOINT invalid_replace_parameter").await.unwrap();
+        let parameters = if invalid_position == "$1" {
+            [Value::Text("shadow-only".into()), Value::Text("ready".into())]
+        } else {
+            [Value::Text("ready".into()), Value::Text("shadow-only".into())]
+        };
+        let invalid = transaction
+            .query_params(
+                &format!(
+                    "SELECT array_replace({array}, $1, $2) FROM {schema}.rows WHERE id = 1"
+                ),
+                &parameters,
+            )
+            .await
+            .expect_err("a label present only in the shadow enum must be rejected");
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+        );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT invalid_replace_parameter")
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
