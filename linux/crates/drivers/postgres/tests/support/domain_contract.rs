@@ -383,6 +383,122 @@ async fn value_contract_domain_over_enum_array_preserves_labels_and_null() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_csv_import_uses_target_type_under_shadowed_search_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection.execute("CREATE SCHEMA domain_array_shadow_a").await.unwrap();
+    connection.execute("CREATE SCHEMA domain_array_shadow_b").await.unwrap();
+    connection
+        .execute("CREATE TYPE domain_array_shadow_a.status AS ENUM ('shadow')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE domain_array_shadow_b.status AS ENUM ('target', 'sibling')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE DOMAIN domain_array_shadow_a.label AS domain_array_shadow_a.status")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE DOMAIN domain_array_shadow_b.label AS domain_array_shadow_b.status")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE domain_array_shadow_b.target \
+             (id integer PRIMARY KEY, labels domain_array_shadow_b.label[])",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO domain_array_shadow_b.target VALUES \
+             (2, ARRAY['sibling'::domain_array_shadow_b.label])",
+        )
+        .await
+        .unwrap();
+
+    let source = connection
+        .query("SELECT 1 AS id, ARRAY['target'::domain_array_shadow_b.label] AS labels")
+        .await
+        .unwrap();
+    let csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(Some("domain_array_shadow_b"), "target")
+        .await
+        .unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "domain_array_shadow_b".into(),
+            name: "label".into(),
+        })
+    );
+    let mapping = [Some(0), Some(1)];
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("domain_array_shadow_b"),
+            table: "target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert!(
+        plan.statement
+            .contains("$2::text::\"domain_array_shadow_b\".\"label\"[]")
+    );
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO domain_array_shadow_a, public")
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("domain_array_shadow_a".into())]]
+    );
+    transaction
+        .execute_params(&plan.statement, &plan.rows[0])
+        .await
+        .unwrap();
+    let restored = transaction
+        .query(
+            "SELECT id, pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM domain_array_shadow_b.target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let native = transaction
+        .query(
+            "SELECT 1, pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM (SELECT ARRAY['target'::domain_array_shadow_b.label] AS labels) AS source \
+             UNION ALL \
+             SELECT 2, pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM (SELECT ARRAY['sibling'::domain_array_shadow_b.label] AS labels) AS source \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows, native.rows);
+    transaction.commit().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_parameters_preserve_native_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
