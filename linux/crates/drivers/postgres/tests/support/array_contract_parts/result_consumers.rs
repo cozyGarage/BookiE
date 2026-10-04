@@ -393,6 +393,85 @@ async fn value_contract_timestamp_array_file_exports_preserve_boundaries_for_cal
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_time_array_file_exports_preserve_boundaries_for_calc_reimport() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY[\
+        '00:00:00'::time, '12:34:56.123456'::time, \
+        '23:59:59.999999'::time, '24:00:00'::time, NULL]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("time[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+             encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        oracle.rows[0][0],
+        Value::Text("time without time zone[]".into())
+    );
+    assert_eq!(
+        oracle.rows[0][1],
+        Value::Text(
+            r#"["00:00:00","12:34:56.123456","23:59:59.999999","24:00:00",null]"#.into()
+        )
+    );
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::time[])::text, \
+             encode(array_send($1::text::time[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][1]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("time-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut sheet,
+    )
+    .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("time[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
+    assert!(shared_strings.contains(driver_text), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

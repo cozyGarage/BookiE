@@ -215,14 +215,19 @@ October 5 B3-2 consumer follow-up: PostgreSQL `date[]` with a BC date, year
 round trip as exact text, without formulas. Native `array_to_json` and
 `array_send` match after rebinding. See the
 [date-array Calc evidence](evidence/postgres-date-array-calc-reimport-results-2026-10-05/manifest.json).
-Other temporal-array shapes and consumers remain open, including `time[]` and
-`timetz[]` Calc re-import.
+Other temporal-array shapes and consumers remain open, including `timetz[]` Calc re-import.
 
 October 5 B3-2 consumer follow-up: PostgreSQL `timestamp[]` with a BC value,
 year 10000, the maximum finite value, both infinities and SQL NULL survives the
 pinned Calc XLSX/ODS/XLSX round trip as exact text. Native `array_to_json` and
 `array_send` match after binding. See the
 [timestamp-array Calc evidence](evidence/postgres-timestamp-array-calc-reimport-results-2026-10-05/manifest.json).
+
+October 5 B3-2 consumer follow-up: PostgreSQL `time[]` with midnight,
+fractional microseconds, 23:59:59.999999, 24:00 and SQL NULL survives the
+pinned Calc round trip as text. Native `array_to_json` and `array_send` match
+after binding. See the
+[time-array Calc evidence](evidence/postgres-time-array-calc-reimport-results-2026-10-05/manifest.json).
 
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
