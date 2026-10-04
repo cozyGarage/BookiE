@@ -1,6 +1,71 @@
 use super::parse_input_for_grid_cell;
 use tablepro_core::Value;
 
+async fn sqlite_result_csv_round_trip(
+    connection: &dyn tablepro_core::Connection,
+    result: &tablepro_core::QueryResult,
+    target_table: &str,
+    mapping: &[Option<usize>],
+) {
+    use tablepro_core::{
+        export::{CsvOptions, ResultExport, ResultFormat, unique_csv_null_marker, write_result_file},
+        import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
+    };
+
+    let null_marker = unique_csv_null_marker(&result.rows);
+    let options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        preserve_sqlite_result_types: true,
+        ..CsvOptions::default()
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let csv_path = directory.path().join("sqlite-result.csv");
+    write_result_file(
+        &csv_path,
+        result,
+        &ResultExport {
+            format: ResultFormat::Csv,
+            csv: &options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let csv = std::fs::read(&csv_path).unwrap();
+    let sheet = read_csv(
+        &csv,
+        &CsvImportOptions {
+            has_header: true,
+            null_marker: null_marker.clone(),
+            ..CsvImportOptions::default()
+        },
+        None,
+    )
+    .unwrap();
+    let target_columns = connection.fetch_columns(None, target_table).await.unwrap();
+    let plan = build_insert_plan(
+        &ImportTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: target_table,
+            columns: &target_columns,
+            mapping,
+        },
+        &sheet,
+        &CsvImportOptions {
+            has_header: true,
+            null_marker,
+            ..CsvImportOptions::default()
+        },
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+}
+
 #[tokio::test]
 async fn sqlite_strict_any_grid_edit_preserves_each_rows_runtime_storage_class() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
@@ -379,11 +444,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
 
 #[tokio::test]
 async fn sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{
-        ConnectOptions, DatabaseDriver,
-        export::{CsvOptions, ResultExport, ResultFormat, unique_csv_null_marker, write_result_file},
-        import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
-    };
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
@@ -422,58 +483,13 @@ async fn sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes() 
         .unwrap();
     assert_eq!(result.columns[1].data_type, "NULL");
 
-    let null_marker = unique_csv_null_marker(&result.rows);
-    let options = CsvOptions {
-        null_to_empty: false,
-        null_marker: Some(null_marker.clone()),
-        preserve_sqlite_result_types: true,
-        ..CsvOptions::default()
-    };
-    let directory = tempfile::tempdir().unwrap();
-    let csv_path = directory.path().join("sqlite-compound-any.csv");
-    write_result_file(
-        &csv_path,
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
         &result,
-        &ResultExport {
-            format: ResultFormat::Csv,
-            csv: &options,
-            sql: None,
-        },
-        || false,
-        |_| {},
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
     )
-    .unwrap();
-    let csv = std::fs::read(&csv_path).unwrap();
-    let sheet = read_csv(
-        &csv,
-        &CsvImportOptions {
-            has_header: true,
-            null_marker: null_marker.clone(),
-            ..CsvImportOptions::default()
-        },
-        None,
-    )
-    .unwrap();
-    let target_columns = connection.fetch_columns(None, "restored").await.unwrap();
-    let plan = build_insert_plan(
-        &ImportTarget {
-            driver_id: "sqlite",
-            schema: None,
-            table: "restored",
-            columns: &target_columns,
-            mapping: &[None, Some(0), Some(1), Some(2)],
-        },
-        &sheet,
-        &CsvImportOptions {
-            has_header: true,
-            null_marker,
-            ..CsvImportOptions::default()
-        },
-    )
-    .unwrap();
-    for row in &plan.rows {
-        connection.execute_params(&plan.statement, row).await.unwrap();
-    }
+    .await;
 
     let restored = connection
         .query("SELECT typeof(position), position, typeof(result), result, storage_class FROM restored ORDER BY id")
@@ -516,6 +532,84 @@ async fn sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes() 
                 Value::Text("text".into()),
                 Value::Text("bookie:sqlite-any:v1:integer:9".into()),
                 Value::Text("text".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, NULL), (3, NULL), (4, X'00FF'), \
+             (5, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            "SELECT id AS position, \
+                    CASE id WHEN 2 THEN 'branch' WHEN 3 THEN NULL ELSE value END AS result, \
+                    typeof(CASE id WHEN 2 THEN 'branch' WHEN 3 THEN NULL ELSE value END) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("integer".into()),
+            Value::Text("text".into()),
+            Value::Text("null".into()),
+            Value::Text("blob".into()),
+            Value::Text("text".into()),
+        ]
+    );
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("integer".into()), Value::Int(42)],
+            vec![Value::Text("text".into()), Value::Text("branch".into())],
+            vec![Value::Text("null".into()), Value::Null],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![0, 255])],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
             ],
         ]
     );
