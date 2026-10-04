@@ -5072,3 +5072,14 @@ unchanged. A separate unterminated SQL script displays the planner error and
 does not open approval. All 29 GTK safety scenarios pass. The UI case uses a
 SQLite fixture and does not prove approval routing through a MySQL-backed
 connection. See the [evidence manifest](evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json).
+
+## MySQL quoted multi-character delimiter consumer agreement, 2026-10-04
+
+An app-level contract uses quoted `DELIMITER '_finish'` and `DELIMITER ';'`
+directives around a procedure whose terminator is adjacent to `END`. The
+planner, app splitter, formatter and named-parameter extractor agree on one
+routine followed by a parameterized SELECT; delimiter-shaped and placeholder
+text inside the quoted routine string remain part of the body. The MySQL client
+supports quoted delimiter arguments; see the [client command documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
+The focused app test, strict Clippy and formatting pass. See the [evidence
+manifest](evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json).
