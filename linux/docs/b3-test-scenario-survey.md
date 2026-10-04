@@ -660,4 +660,6 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   preserve literal `NULL`, empty text, Unicode, quoted/comma/markup labels,
   SQL NULL arrays and elements, empty arrays, a lower-bound-zero array,
   two-dimensional shape and an existing sibling row against native type, JSON,
-  dimensions and wire-byte oracles ([label evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json), [shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).
+  dimensions and wire-byte oracles. A same-named enum in a shadowed
+  `search_path` cannot redirect the import away from the table's schema
+  ([label evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json), [shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json), [shadowed-path evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).

@@ -5246,6 +5246,16 @@ import, and an existing sibling row retains its wire bytes. All 16 PostgreSQL
 array-contract tests, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json).
 
+## PostgreSQL custom enum-array import under a shadowed search_path, 2026-10-04
+
+A PostgreSQL 16 Docker contract creates same-named enum types in two schemas,
+with the active transaction `search_path` selecting the shadow type. The
+schema-aware CSV importer targets the table's enum array, whose label is not
+accepted by the shadow type. The qualified cast succeeds, native type/value
+checks pass and the sibling row remains unchanged. All 17 PostgreSQL
+array-contract tests, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

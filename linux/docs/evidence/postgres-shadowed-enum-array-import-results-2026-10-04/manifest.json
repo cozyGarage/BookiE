@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "c2e8e4306",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "custom enum[] CSV import resolves the table type under a shadowed search_path",
+  "test": "array_contract::value_contract_custom_enum_array_csv_import_uses_target_type_under_shadowed_search_path",
+  "contract": [
+    "Two schemas define a same-named enum; the search_path points to the shadow type, whose label set excludes the imported target label.",
+    "CSV import metadata and generated cast resolve the target table's schema-qualified enum array type.",
+    "The imported array retains its target native type and label while the existing sibling row remains unchanged."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "17 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, installed array editing and additional enum/session configurations remain open in B3."
+  ]
+}
