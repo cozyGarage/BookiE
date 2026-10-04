@@ -5293,6 +5293,12 @@ wire-byte oracles. A domain CHECK rejects a forbidden label with SQLSTATE
 groups, full core suite, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json).
 
+The same domain-over-enum array now has app-parser and live keyed-grid coverage.
+Native array values and bytes survive valid edits; an invalid enum label trips
+the domain CHECK and transaction rollback preserves the stored row. The full
+domain contract group, focused app-parser test, strict Clippy and formatting
+pass ([grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two

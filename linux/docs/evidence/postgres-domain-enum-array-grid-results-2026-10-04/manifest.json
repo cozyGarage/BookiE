@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "3e80afb4b",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum array app parser and keyed grid edit preserve the element domain",
+  "tests": [
+    "value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain_cast",
+    "domain_contract::value_contract_domain_over_enum_array_preserves_labels_and_null"
+  ],
+  "contract": [
+    "The app parser preserves a domain-over-enum array edit as exact text and the keyed-update builder casts to the qualified element domain array.",
+    "A live edit preserves literal NULL, empty text, Unicode and SQL NULL elements against native type, JSON and array_send byte oracles.",
+    "An invalid enum value violates the element domain CHECK with SQLSTATE 23514; the transaction leaves the prior row unchanged."
+  ],
+  "validation": {
+    "domain_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "14 passed, 0 failed",
+      "log": "domain-tests.txt"
+    },
+    "app_parser_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain_cast -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "app-test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-core -p tablepro-driver-postgres -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Installed grid interaction, other custom array element types and additional enum/session configurations remain open in B3."
+  ]
+}
