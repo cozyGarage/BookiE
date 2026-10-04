@@ -41,6 +41,12 @@ A PostgreSQL `bytea[]` XLSX cell containing binary bytes, empty bytea and SQL
 NULL also survives Calc's ODS/XLSX re-save with its string contents unchanged
 ([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
 
+A PostgreSQL `text[]` workbook preserves its 84-character array text, including
+NULL distinctions, escaped quotes/backslashes, Unicode and hostile markup,
+through LibreOffice Calc's XLSX-to-ODS-to-XLSX re-save. The shared/string cell
+types remain text and no formulas are created
+([evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).

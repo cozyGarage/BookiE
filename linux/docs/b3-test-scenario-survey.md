@@ -166,10 +166,16 @@ and checked against native values. PostgreSQL `pg_typeof`, array text,
 content and round-trip oracles; hostile markup and Unicode exercise the text
 writers; XLSX asserts a text cell and the expected shared-string content. This
 is one array family. Other array types, spreadsheet-application re-import
-beyond the `enum[]`, domain-over-enum `[]`, `bytea[]`, `timestamptz[]`,
+beyond `text[]`, `enum[]`, domain-over-enum `[]`, `bytea[]`, `timestamptz[]`,
 `interval[]`, `numeric[]` and `float8[]` cases, and additional enum configurations remain open.
 See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+
+October 5 B3-1 follow-up: the existing PostgreSQL `text[]` workbook now also
+survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save. Its 84-character shared
+string is identical in all three artifacts, remains a string cell, contains
+hostile markup only as escaped text, and creates no formulas
+([Calc evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json)).
 
 October 4 B3-1 follow-up: a PostgreSQL `bytea[]` containing non-UTF-8 bytes,
 empty bytea and SQL NULL now passes JSON, CSV, XLSX and replayed SQL file

@@ -195,6 +195,13 @@ selected PostgreSQL value contracts pass
 ([evidence](evidence/postgres-domain-enum-array-input-functions-shadowed-results-2026-10-05/manifest.json)).
 Other PostgreSQL contexts and the broader B3 matrix remain open.
 
+October 5 B3 consumer follow-up: PostgreSQL `text[]` XLSX output survives
+LibreOffice Calc XLSX-to-ODS-to-XLSX re-save with all 84 characters unchanged,
+as a text cell and without formulas. The artifact, pinned Debian/Calc run and
+XML verifier are retained in the
+[text-array Calc evidence packet](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json).
+Other PostgreSQL array families, spreadsheet applications and B3 matrices remain open.
+
 October 4 local GTK + DuckDB value tier after the PostgreSQL
 `array_positions` addition passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts; no suites were missing. See the current
