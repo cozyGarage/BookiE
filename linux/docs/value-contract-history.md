@@ -5092,3 +5092,14 @@ fallback. A CSV export/import round trip preserves each runtime class, exact
 BLOB bytes and a text value shaped like the reserved tag; native `typeof()` is
 the oracle. The focused app test, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/sqlite-nullif-any-results-2026-10-04/manifest.json).
+
+## PostgreSQL numeric array file-writer contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit
+integer, high-scale decimal, scale-preserving `1.2300`, NaN, positive/negative
+Infinity and SQL NULL. Native `array_to_json` and `array_send` oracles confirm
+that the driver's quoted numeric elements remain semantically identical and
+bindable. JSON, CSV and XLSX preserve the driver's exact text representation;
+XLSX uses a string cell without a formula. Replayed SQL restores canonical
+PostgreSQL array text, JSON elements and wire bytes. The focused test, strict
+Clippy and formatting pass. See the [evidence manifest](evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json).

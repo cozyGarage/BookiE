@@ -62,6 +62,10 @@ One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
 replayed SQL against native array text, JSON elements and wire bytes; see the
 [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
+A `numeric[]` file-writer contract checks high precision, scale, NaN, infinities
+and SQL NULL through JSON, CSV, XLSX and replayed SQL. Native JSON and wire
+oracles confirm that the driver's quoted element text remains bindable ([evidence](evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json)).
+
 The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
