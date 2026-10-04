@@ -4561,12 +4561,13 @@ through a native client before saving the stale grid values through BookiE. The
 first run matched the `_id` alone, returned one affected row and overwrote the
 newer value. The fixed app materializer includes each edited field's original
 value in the same `update_one` filter; both stale writes now match zero rows.
-The contract verifies a concurrent string edit remains stored and that a
-concurrent removal of an explicitly NULL field stays missing. MongoDB equality
-against a NULL guard is translated to `$type: 10`, preserving the distinction
-between explicit BSON NULL and a missing field. This is per-edited-field
-compare-and-set, not document-version tracking: ABA changes and stale deletes
-remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
+The contract verifies a concurrent string edit remains stored, that a
+concurrent removal of an explicitly NULL field stays missing, and that changing
+explicit NULL to an array containing NULL is preserved. MongoDB matches NULL
+guards with equality, field existence, and a non-array check, preserving the
+distinction between explicit BSON NULL, missing fields, and arrays that contain
+NULL. This is per-edited-field compare-and-set, not document-version tracking:
+ABA changes and stale deletes remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
 
 The shell `run_find` path still runs a full type census and then a filtered
 query. It merges types from returned rows, so a selected row that changes kind

@@ -20,6 +20,13 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         .insert_one(doc! { "_id": null_row_id, "payload": mongodb::bson::Bson::Null, "sibling": "null-row" })
         .await
         .expect("seed explicit BSON NULL row");
+    let null_array_row_id = ObjectId::new();
+    collection
+        .insert_one(
+            doc! { "_id": null_array_row_id, "payload": mongodb::bson::Bson::Null, "sibling": "null-array-row" },
+        )
+        .await
+        .expect("seed explicit BSON NULL row for array-change case");
 
     let connection = MongodbDriver
         .connect(super::opts(&host, port, "appdb"))
@@ -50,6 +57,14 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         .find(|row| row[key_index] == Value::Json(mongodb::bson::Bson::ObjectId(null_row_id).into_canonical_extjson()))
         .expect("find the explicit-NULL row by its complete native key");
     assert_eq!(null_row[payload_index], Value::Json(serde_json::Value::Null));
+    let null_array_row = before
+        .rows
+        .iter()
+        .find(|row| {
+            row[key_index] == Value::Json(mongodb::bson::Bson::ObjectId(null_array_row_id).into_canonical_extjson())
+        })
+        .expect("find the explicit-NULL row for the array-change case by its complete native key");
+    assert_eq!(null_array_row[payload_index], Value::Json(serde_json::Value::Null));
 
     collection
         .update_one(doc! { "_id": row_id }, doc! { "$set": { "payload": "concurrent" } })
@@ -59,6 +74,13 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         .update_one(doc! { "_id": null_row_id }, doc! { "$unset": { "payload": "" } })
         .await
         .expect("remove the explicit-NULL field after the grid read");
+    collection
+        .update_one(
+            doc! { "_id": null_array_row_id },
+            doc! { "$set": { "payload": [mongodb::bson::Bson::Null] } },
+        )
+        .await
+        .expect("change the explicit-NULL field to an array containing NULL after the grid read");
 
     let (statement, params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
         Some("appdb"),
@@ -84,11 +106,27 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
         &[null_row[key_index].clone()],
     )
     .expect("build keyed update from the stale explicit-NULL result");
+    let (null_array_statement, null_array_params) = tablepro_core::sql_dialect::build_mongodb_keyed_update(
+        Some("appdb"),
+        "stale_grid_edits",
+        &before.columns,
+        &[(
+            payload_index,
+            null_array_row[payload_index].clone(),
+            Value::Text("user edit".into()),
+        )],
+        &[null_array_row[key_index].clone()],
+    )
+    .expect("build keyed update from the stale explicit-NULL array result");
     let affected = connection
-        .execute_in_transaction(&[(statement, params), (null_statement, null_params)])
+        .execute_in_transaction(&[
+            (statement, params),
+            (null_statement, null_params),
+            (null_array_statement, null_array_params),
+        ])
         .await
         .expect("attempt guarded stale edits");
-    assert_eq!(affected, [0, 0], "concurrent field changes must report conflicts");
+    assert_eq!(affected, [0, 0, 0], "concurrent field changes must report conflicts");
 
     let persisted = collection
         .find_one(doc! { "_id": row_id })
@@ -105,5 +143,15 @@ async fn value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_c
     assert!(
         !persisted_null.contains_key("payload"),
         "the concurrent field removal must survive"
+    );
+    let persisted_null_array = collection
+        .find_one(doc! { "_id": null_array_row_id })
+        .await
+        .expect("read native persisted explicit-NULL array document")
+        .expect("NULL array row remains present");
+    assert_eq!(
+        persisted_null_array.get_array("payload").unwrap(),
+        &[mongodb::bson::Bson::Null],
+        "the concurrent array value must survive"
     );
 }

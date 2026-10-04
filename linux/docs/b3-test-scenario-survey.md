@@ -15,7 +15,8 @@ an explicit 64-layer refusal ([depth packet](evidence/postgres-inferred-enum-arr
 MongoDB keyed grid edits now compare each edited field with its value from the
 materialized result in the atomic update filter. A failing-first MongoDB 7 case
 reproduces last-write-wins, then verifies conflict counts and preservation for
-a concurrent string change and explicit BSON NULL becoming missing
+a concurrent string change, explicit BSON NULL becoming missing, and explicit
+BSON NULL becoming an array containing NULL
 ([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
 This field-level compare-and-set does not cover stale deletes or ABA changes.
 

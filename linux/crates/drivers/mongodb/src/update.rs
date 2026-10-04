@@ -149,7 +149,7 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
             };
             let value = take_placeholder(right, params, index)?;
             if matches!(value, Bson::Null) {
-                Ok(doc! { field: { "$type": 10 } })
+                Ok(doc! { field: { "$eq": Bson::Null, "$exists": true, "$not": { "$type": "array" } } })
             } else {
                 Ok(doc! { field: value })
             }

@@ -144,7 +144,7 @@ slots for domain-over-enum arrays, including NULL search and replacement values
 October 4 B3 MongoDB follow-up: stale keyed edits now compare original values of
 edited fields in the atomic update filter. A MongoDB 7 regression preserves a
 concurrent value and distinguishes explicit BSON NULL from a concurrently
-removed field. Stale deletes, ABA changes, and the broader B3 matrix remain open
+removed field and an array containing NULL. Stale deletes, ABA changes, and the broader B3 matrix remain open
 ([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
 
 October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
