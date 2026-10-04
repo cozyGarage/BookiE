@@ -6354,6 +6354,7 @@ dependencies = [
  "libsqlite3-sys",
  "rust_decimal",
  "serde_json",
+ "sqlparser",
  "sqlx",
  "tablepro-core",
  "tablepro-policy",

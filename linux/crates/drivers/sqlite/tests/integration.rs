@@ -204,6 +204,84 @@ async fn computed_coalesce_over_strict_any_keeps_fallback_metadata_and_storage_c
 }
 
 #[tokio::test]
+async fn compound_union_over_strict_any_keeps_fallback_metadata_and_storage_classes() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL), (3, 'ready')")
+        .await
+        .unwrap();
+
+    let expected = vec![
+        vec![Value::Int(1), Value::Int(42), Value::Text("integer".into())],
+        vec![Value::Int(2), Value::Text("branch".into()), Value::Text("text".into())],
+        vec![Value::Int(3), Value::Null, Value::Text("null".into())],
+    ];
+    for sql in [
+        "SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+         FROM flexible WHERE id = 1 \
+         UNION ALL SELECT 2, 'branch', typeof('branch') \
+         UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+         ORDER BY position",
+        "WITH combined AS ( \
+             SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+             FROM flexible WHERE id = 1 \
+             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+         ) SELECT position, result, storage_class FROM combined ORDER BY position",
+        "SELECT position, result, storage_class FROM ( \
+             SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+             FROM flexible WHERE id = 1 \
+             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+         ) AS combined ORDER BY position",
+    ] {
+        let result = connection.query(sql).await.unwrap();
+        assert_eq!(result.columns[1].data_type, "NULL", "{sql}");
+        assert_eq!(result.rows, expected, "{sql}");
+    }
+
+    let direct = connection
+        .query("SELECT value FROM flexible WHERE id IN (SELECT 1 UNION ALL SELECT 99)")
+        .await
+        .unwrap();
+    assert_eq!(direct.columns[0].data_type, "ANY");
+    assert_eq!(direct.rows, vec![vec![Value::Int(42)]]);
+
+    let bound = connection
+        .query_params(
+            "SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+             FROM flexible WHERE id = ? \
+             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+             ORDER BY position",
+            &[Value::Int(1)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(bound.columns[1].data_type, "NULL");
+    assert_eq!(bound.rows, expected);
+
+    let mut transaction = connection.begin().await.unwrap();
+    let transactional = transaction
+        .query(
+            "SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+             FROM flexible WHERE id = 1 \
+             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+             ORDER BY position",
+        )
+        .await
+        .unwrap();
+    assert_eq!(transactional.columns[1].data_type, "NULL");
+    assert_eq!(transactional.rows, expected);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
 async fn direct_query_columns_resolve_unambiguous_attached_any_origins() {
     let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
     let mut transaction = connection.begin().await.unwrap();

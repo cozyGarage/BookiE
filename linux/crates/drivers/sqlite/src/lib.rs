@@ -3,6 +3,9 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use sqlparser::ast::{Query, SetExpr, TableFactor, TableWithJoins};
+use sqlparser::dialect::SQLiteDialect;
+use sqlparser::parser::Parser;
 use sqlx::pool::PoolConnection;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteRow};
 use sqlx::{
@@ -466,7 +469,7 @@ impl tablepro_core::Transaction for SqliteTransaction {
             .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
             .await
             .map_err(map_sqlx_error)?;
-        let columns = result_columns(tx, statement.columns()).await;
+        let columns = result_columns(tx, statement.columns(), sql).await;
         drop(statement);
         let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
             .fetch_all(&mut **tx)
@@ -515,7 +518,7 @@ async fn stream_into_result(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
-    let columns = result_columns(connection, statement.columns()).await;
+    let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
     let mut collected: Vec<SqliteRow> = Vec::new();
@@ -535,6 +538,7 @@ async fn stream_into_result(
 async fn result_columns(
     connection: &mut SqlxSqliteConnection,
     source_columns: &[sqlx::sqlite::SqliteColumn],
+    sql: &str,
 ) -> Vec<ColumnInfo> {
     let mut columns: Vec<ColumnInfo> = source_columns
         .iter()
@@ -560,7 +564,7 @@ async fn result_columns(
                 .flatten()
         })
         .collect::<Vec<_>>();
-    if !unknown_origins.is_empty() {
+    if !unknown_origins.is_empty() && !result_origin_is_ambiguous(sql) {
         let mut table_types: HashMap<(String, String), HashMap<String, String>> = HashMap::new();
         let mut attached_schemas = None;
         let mut attached_schema_lookup_failed = false;
@@ -612,6 +616,47 @@ async fn result_columns(
         }
     }
     columns
+}
+
+fn result_origin_is_ambiguous(sql: &str) -> bool {
+    let Ok(statements) = Parser::parse_sql(&SQLiteDialect {}, sql) else {
+        // Preserve SQLx's fallback metadata when the query shape is unknown.
+        return true;
+    };
+    statements.iter().any(|statement| {
+        let sqlparser::ast::Statement::Query(query) = statement else {
+            return false;
+        };
+        query_has_compound_output(query)
+    })
+}
+
+fn query_has_compound_output(query: &Query) -> bool {
+    query
+        .with
+        .as_ref()
+        .is_some_and(|with| with.cte_tables.iter().any(|cte| query_has_compound_output(&cte.query)))
+        || match query.body.as_ref() {
+            SetExpr::SetOperation { .. } => true,
+            SetExpr::Query(query) => query_has_compound_output(query),
+            SetExpr::Select(select) => select.from.iter().any(table_has_compound_output),
+            _ => false,
+        }
+}
+
+fn table_has_compound_output(table: &TableWithJoins) -> bool {
+    table_factor_has_compound_output(&table.relation)
+        || table
+            .joins
+            .iter()
+            .any(|join| table_factor_has_compound_output(&join.relation))
+}
+
+fn table_factor_has_compound_output(table: &TableFactor) -> bool {
+    match table {
+        TableFactor::Derived { subquery, .. } => query_has_compound_output(subquery),
+        _ => false,
+    }
 }
 
 fn rows_into_result(columns: Vec<ColumnInfo>, collected: &[SqliteRow], truncated: bool) -> QueryResult {
@@ -783,7 +828,7 @@ async fn params_into_result(
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
-    let columns = result_columns(connection, statement.columns()).await;
+    let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
