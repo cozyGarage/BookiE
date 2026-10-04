@@ -86,12 +86,13 @@ edit, inferred query/update parameters, a typed filter and invalid-label
 refusal while preserving the outer domain and a SQL NULL sibling. See the
 [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
-A six- and seven-level contract checks recursive enum-leaf metadata under a session
+A six-, seven- and eight-level contract checks recursive enum-leaf metadata under a session
 `search_path` shadowed by a same-named enum, schema-aware keyed and draft writes
 (including SQL NULL), a typed equality filter, invalid-label refusal and exact
-outer-domain type/value while preserving a SQL NULL sibling. Both depths pass
-the same contract. Chains deeper than seven and other enum/session configurations
-remain open; see the [six/seven-domain evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
+outer-domain type/value while preserving a SQL NULL sibling. All three depths pass
+the same contract. Chains deeper than eight and other enum/session configurations
+remain open; see the [six/seven-domain evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
+[eight-domain follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
 and the [six-domain checkpoint](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
 PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte

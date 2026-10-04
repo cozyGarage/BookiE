@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "f80380f8dbcaa1fccf1e209540d92abb1c7c7ffe",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Shadowed-search-path enum writes through six, seven and eight nested domains",
+  "test": "domain_contract::value_contract_six_seven_and_eight_domain_levels_over_enum_ignore_shadowed_search_path",
+  "contract": [
+    "The six-, seven- and eight-domain chains resolve catalog enum-leaf metadata while a same-named enum with a narrower label set shadows the domain schema in search_path.",
+    "All three depths preserve the outer domain through a keyed update, draft insert, SQL NULL draft insert and typed equality filter.",
+    "An invalid enum label is refused with SQLSTATE 22P02; native pg_typeof/status checks verify the outer domain and unchanged neighboring rows, including SQL NULL."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres value_contract_six_seven_and_eight_domain_levels_over_enum_ignore_shadowed_search_path -- --ignored --nocapture",
+      "result": "1 passed, 0 failed; the test exercises six-, seven- and eight-level chains",
+      "log": "postgres-eight-domain.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "postgres-eight-domain.txt": "6d298d215f830827fd77466cdd64cd052856ef3f08d37ac631d66f9058975abe",
+    "clippy.txt": "ded1f2c3e7619d2ffa20d74ac870b213f947c9239b2fada9bc725126d37f9e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Domain chains deeper than eight levels and additional enum/session configurations remain untested."
+  ]
+}

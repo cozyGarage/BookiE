@@ -5017,3 +5017,12 @@ the independent ordering oracle; a shuffled result containing duplicates and
 SQL NULL confirms `ORDER BY label NULLS LAST` follows the native enum order,
 preserves the custom enum result type, and leaves NULL last. The focused test,
 strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-order-results-2026-10-04/manifest.json).
+
+## PostgreSQL eight-domain-layer enum contract, 2026-10-04
+
+The existing shadowed-`search_path` domain-over-enum oracle now also runs at
+eight nested domains. It verifies enum-leaf metadata, schema-aware keyed and
+draft writes (including SQL NULL), typed equality filtering, invalid-label
+refusal, exact outer-domain type/value and an untouched SQL NULL sibling. The
+focused test, strict Clippy and formatting pass. Deeper chains and other
+enum/session combinations remain open; see the [evidence manifest](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).

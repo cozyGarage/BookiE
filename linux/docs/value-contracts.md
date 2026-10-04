@@ -44,8 +44,9 @@ point does not represent all support for that engine.
 | Mutation and infrastructure | [Scoped re-audit](value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](regression-audit-2026-09-29.md), [B3 review](b3-review-2026-10-01.md) |
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
-The PostgreSQL shadowed-search-path enum/domain write case now covers six and
-seven nested domain levels; see the [native evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
+The PostgreSQL shadowed-search-path enum/domain write case now covers six,
+seven and eight nested domain levels; see the [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
+and [eight-level evidence](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
 
 PostgreSQL custom-enum scalar and array labels at 63 bytes are verified for
 ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving
