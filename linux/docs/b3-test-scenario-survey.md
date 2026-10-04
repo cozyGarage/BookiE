@@ -685,3 +685,7 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   JSON, CSV, XML, HTML, Markdown and XLSX file writers now retain the array
   representation; SQL replay restores the native domain-array type and bytes
   ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
+  A live UUID-domain array exposed `Undecodable` despite supported UUID[]
+  elements; the decoder now uses the domain base OID and the regression checks
+  bound/grid writes, a rejected CHECK value and unchanged siblings
+  ([evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).

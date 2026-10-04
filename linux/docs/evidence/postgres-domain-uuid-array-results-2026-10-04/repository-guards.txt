@@ -1,0 +1,7 @@
+rtk proxy python3 linux/scripts/check-function-size.py
+Failed on existing file crates/drivers/sqlite/src/lib.rs: fetch_columns (70 lines) and result_columns (76 lines), while the baseline allows one over-limit function.
+
+rtk proxy bash linux/scripts/check-file-size.sh
+Failed on seven existing oversized files: sqlite_any_contract.rs (1896 lines), core/import/cell.rs (1260), core/sql_dialect.rs (1205), mysql/tests/support/value_contracts.rs (1264), postgres/tests/support/array_contract.rs (2349), postgres/tests/support/domain_contract.rs (2736), postgres/tests/support/enum_contract.rs (1880).
+
+The new PostgreSQL decoder function is below the function-size limit. The added domain_uuid_array_contract.rs test module is below the 1200-line file limit.

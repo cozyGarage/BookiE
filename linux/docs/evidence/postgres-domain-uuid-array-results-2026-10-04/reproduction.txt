@@ -1,0 +1,7 @@
+Before the decoder change, the focused PostgreSQL 16 integration test failed:
+
+assertion failed
+left:  [[Null], [Undecodable("DOMAIN_UUID_ARRAY.TOKEN[]")], [Undecodable("DOMAIN_UUID_ARRAY.TOKEN[]")]]
+right: [[Null], [Text("{}")], [Text("{123e4567-e89b-12d3-a456-426614174000,NULL,00000000-0000-0000-0000-000000000001}")]]
+
+After the decoder change, the same live-server contract passed and verified the values by rebinding to the qualified domain-array type and comparing PostgreSQL array_to_json and array_send results.

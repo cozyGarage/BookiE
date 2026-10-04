@@ -5,7 +5,7 @@
 ### Added
 
 - PostgreSQL enum results and browse filters preserve the literal label `NULL` separately from SQL NULL across scalar and array projections and typed comparisons.
-- PostgreSQL arrays of domains over supported built-in types, including UUID, preserve their values through result decoding, bound writes, and keyed edits.
+- PostgreSQL UUID-domain arrays preserve their values through result decoding, bound writes, and keyed edits.
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
 

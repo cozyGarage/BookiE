@@ -1,0 +1,14 @@
+rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --lib array::tests
+
+running 9 tests
+test array::tests::value_contract_array_null_empty_and_escaped_text_stay_distinct ... ok
+test array::tests::value_contract_malformed_array_dimensions_lengths_types_and_elements_are_refused ... ok
+test array::tests::value_contract_vectors_render_space_separated_elements_and_refuse_other_headers ... ok
+test array::tests::value_contract_enum_array_labels_quote_null_text_and_preserve_sql_null ... ok
+test array::tests::value_contract_domain_array_decodes_elements_by_base_type_oid ... ok
+test array::tests::value_contract_temporal_array_elements_reject_malformed_payloads ... ok
+test array::tests::value_contract_array_header_mutations_and_maximum_depth_are_bounded ... ok
+test array::tests::value_contract_array_wire_limits_are_checked_before_decoding ... ok
+test array::tests::value_contract_expanded_array_text_has_an_explicit_size_bound ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 32 filtered out

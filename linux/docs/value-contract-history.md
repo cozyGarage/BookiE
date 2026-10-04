@@ -5328,6 +5328,19 @@ first in `search_path`. The generated insert still casts to the target table's
 qualified domain-array type, preserves native type, JSON and wire bytes, and
 leaves the sibling row intact ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
 
+## PostgreSQL arrays of UUID domains, 2026-10-04
+
+A PostgreSQL 16 regression first reproduced `Undecodable` for an array of a
+domain over UUID, even though the equivalent UUID array is supported. The
+binary decoder now validates the array header against the declared domain OID
+and decodes elements using the recursively resolved base OID. NULL and empty
+arrays remain distinct; binding and a keyed grid edit preserve native JSON and
+wire bytes. A UUID rejected by the domain CHECK returns SQLSTATE 23514 and
+leaves the edited row and its sibling unchanged. The full PostgreSQL
+integration target, strict Clippy and formatting pass; repository size guards
+retain unrelated existing violations. See the
+[evidence manifest](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json).
+
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two
