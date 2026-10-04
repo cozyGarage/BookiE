@@ -198,7 +198,7 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         .await
         .unwrap();
     connection
-        .execute("CREATE TYPE mood_csv AS ENUM ('', 'NULL', '東京', 'O''Brien', '=1+1', 'ready')")
+        .execute("CREATE TYPE mood_csv AS ENUM ('', 'NULL', '東京', 'O''Brien', '=1+1', '''=1+1', 'ready')")
         .await
         .unwrap();
     connection
@@ -212,7 +212,8 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     connection
         .execute(
             "INSERT INTO mood_csv_source VALUES \
-             (1, ''), (2, 'NULL'), (3, '東京'), (4, 'O''Brien'), (5, '=1+1'), (6, NULL)",
+             (1, ''), (2, 'NULL'), (3, '東京'), (4, 'O''Brien'), \
+             (5, '=1+1'), (6, '''=1+1'), (7, NULL)",
         )
         .await
         .unwrap();
@@ -235,7 +236,7 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &export_options);
     assert_eq!(
         csv,
-        format!("id,status\n1,\"\"\n2,NULL\n3,東京\n4,O'Brien\n5,=1+1\n6,{marker}\n")
+        format!("id,status\n1,\"\"\n2,NULL\n3,東京\n4,O'Brien\n5,=1+1\n6,'=1+1\n7,{marker}\n")
     );
 
     let import_options = tablepro_core::import::CsvImportOptions {
@@ -261,6 +262,42 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }
 
+    let safe_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(import_options.null_marker.clone()),
+        ..Default::default()
+    };
+    let safe_csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &safe_options);
+    assert_eq!(
+        safe_csv,
+        format!(
+            "id,status\n1,\"\"\n2,NULL\n3,東京\n4,O'Brien\n5,\"'=1+1\"\n6,'=1+1\n7,{marker}\n",
+            marker = import_options.null_marker
+        )
+    );
+    let safe_sheet = tablepro_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
+    let safe_plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "duckdb",
+            schema: None,
+            table: "mood_csv_target",
+            columns: &columns,
+            mapping: &[Some(0), Some(1)],
+        },
+        &safe_sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert_eq!(
+        safe_plan.rows[4][1],
+        Value::Text("'=1+1".into()),
+        "spreadsheet-safe CSV adds a leading apostrophe"
+    );
+    assert_eq!(
+        safe_plan.rows[5][1], safe_plan.rows[4][1],
+        "the leading-apostrophe enum label collides after safe export, so this mode is not lossless for restore"
+    );
+
     let restored = connection
         .query(
             "SELECT id, typeof(status), status::VARCHAR, status IS NULL \
@@ -278,7 +315,8 @@ async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
         (3, Some("東京"), false),
         (4, Some("O'Brien"), false),
         (5, Some("=1+1"), false),
-        (6, None, true),
+        (6, Some("'=1+1"), false),
+        (7, None, true),
         (99, Some("ready"), false),
     ];
     assert_eq!(restored.rows.len(), expected.len());
