@@ -666,6 +666,40 @@ async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() 
             Value::Text("text".into()),
         ]
     );
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-coalesce-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(sheet.contains("<c r=\"B2\"><v>42</v></c>"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B3\" t=\"s\">"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B4\"><v>1.5</v></c>"), "{sheet}");
+    for row in [5, 6, 7] {
+        assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
+    }
+    for text in ["fallback", "ready", "\\x00ff", "bookie:sqlite-any:v1:integer:9"] {
+        assert!(shared_strings.contains(&format!("<t>{text}</t>")), "{shared_strings}");
+    }
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
