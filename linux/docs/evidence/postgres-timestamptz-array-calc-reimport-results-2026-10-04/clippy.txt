@@ -1,0 +1,2 @@
+$ rtk cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings
+cargo clippy: No issues found

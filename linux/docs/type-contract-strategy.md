@@ -74,6 +74,9 @@ ODS and then XLSX ([evidence](evidence/postgres-enum-array-calc-reimport-results
 The `bytea[]` XLSX text cell now survives the same Calc re-import with its
 binary, empty and SQL NULL elements intact
 ([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
+A `timestamptz[]` XLSX cell also preserves repeated-hour instants, a BC instant,
+infinities and SQL NULL through Calc's ODS/XLSX re-save
+([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
@@ -94,9 +97,10 @@ One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 Other array families remain open; spreadsheet-application re-import is covered
-for `enum[]` and `bytea[]` XLSX cells, with other shapes unverified (see the
-[enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)
-and [bytea[] evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
+for `enum[]`, `bytea[]` and `timestamptz[]` XLSX cells, with other shapes
+unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
+[bytea[] evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)
+and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
 
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
 has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
