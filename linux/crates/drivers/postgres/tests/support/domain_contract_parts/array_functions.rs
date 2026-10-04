@@ -293,6 +293,17 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
         .await
         .unwrap();
     connection
+        .execute("CREATE SCHEMA value_contract_domain_array_operator_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_array_operator_shadow.state \
+             AS ENUM ('shadow-only')",
+        )
+        .await
+        .unwrap();
+    connection
         .execute(
             "CREATE TYPE value_contract_domain_array_operators.state AS ENUM \
              ('ready', 'paused', 'NULL', '', 'comma,label', 'quote\"label', 'backslash\\label')",
@@ -325,6 +336,11 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
     let schema = "value_contract_domain_array_operators";
     let domain_type = format!("{schema}.state_domain");
     let array_type = format!("{schema}.state[]");
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO value_contract_domain_array_operator_shadow, public")
+        .await
+        .unwrap();
     let cases = [
         (
             Value::Text(r#"{"ready","paused"}"#.into()),
@@ -356,20 +372,20 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
     ] {
         for (parameter, native_array) in cases.iter() {
             let native_expression = expression.replace("$1", native_array);
-            let oracle = connection
+            let oracle = transaction
                 .query(&format!(
                     "SELECT id, {native_expression} FROM \
                      value_contract_domain_array_operators.rows ORDER BY id"
                 ))
                 .await
                 .unwrap();
-            let wire = connection
+            let wire = transaction
                 .query(&format!("SELECT encode(array_send({native_array}), 'hex')"))
                 .await
                 .unwrap()
                 .rows[0][0]
                 .clone();
-            let result = connection
+            let result = transaction
                 .query_params(
                     &format!(
                         "SELECT id, {expression}, pg_typeof($1)::text, \
@@ -401,7 +417,8 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
         "ARRAY[status::value_contract_domain_array_operators.state] <@ $1",
         "$1 @> ARRAY[status::value_contract_domain_array_operators.state]",
     ] {
-        let invalid = connection
+        transaction.execute("SAVEPOINT invalid_enum_parameter").await.unwrap();
+        let invalid = transaction
             .query_params(
                 &format!(
                     "SELECT {expression} FROM \
@@ -415,5 +432,9 @@ async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in
             matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected native invalid-enum SQLSTATE 22P02, got {invalid:?}"
         );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT invalid_enum_parameter")
+            .await
+            .unwrap();
     }
 }
