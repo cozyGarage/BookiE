@@ -57,6 +57,9 @@ mod domain_contract;
 #[path = "support/domain_array_file_export_contract.rs"]
 mod domain_array_file_export_contract;
 
+#[path = "support/domain_depth_boundary_contract.rs"]
+mod domain_depth_boundary_contract;
+
 #[path = "support/enum_file_export_contract.rs"]
 mod enum_file_export_contract;
 
