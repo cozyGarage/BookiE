@@ -1,0 +1,3 @@
+Setting up libreoffice-calc (4:26.8.0.3-2) ...
+convert /work/source.xlsx as a Calc document -> /work/recheck/source.ods using filter : calc8
+convert /work/recheck/source.ods as a Calc document -> /work/recheck/source.xlsx using filter : Calc Office Open XML

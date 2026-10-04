@@ -32,6 +32,10 @@ point does not represent all support for that engine.
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 
+A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
+quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
+([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
+
 A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
 elements and its declared type through decoding, qualified binding and keyed
 edits; invalid values are refused without changing either row

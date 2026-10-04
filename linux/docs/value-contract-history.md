@@ -5414,6 +5414,16 @@ style. The rollback leaves the destination empty. All 14 array-contract tests,
 strict Clippy and formatting pass. Other interval styles remain untested. See
 the [evidence manifest](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
 
+## PostgreSQL enum-array Calc re-import, 2026-10-04
+
+The custom `enum[]` workbook written by BookieE survives LibreOffice Calc
+opening and saving as ODS, then reopening and saving as XLSX. The literal
+`NULL` label, empty label, Unicode, comma, quote, markup and SQL NULL remain in
+the same shared-string cell text. The native PostgreSQL writer test, pinned
+LibreOffice 26.8.0.3 round trip and standard-library OOXML/ODS checker pass.
+Other array shapes and spreadsheet applications remain open. See the
+[evidence manifest](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json).
+
 ## DuckDB literal NULL enum label grid edit, 2026-10-04
 
 The DuckDB app grid path now edits a row to the unquoted literal label `NULL`

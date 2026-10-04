@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "eaba03ce4",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "PostgreSQL custom enum-array XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 (Debian package 4:26.8.0.3-2)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "PostgreSQL's enum[] result contains the literal NULL label, empty label, Unicode, comma, quote, markup and SQL NULL; native type, JSON and array_send checks pass through the existing BookieE file-writer test.",
+    "BookieE writes the array text into XLSX as one shared-string cell without a formula; the cell equals the driver's native enum-array text.",
+    "LibreOffice Calc opens the workbook and saves it as ODS, then reopens and saves XLSX; the cell remains a string with identical 43-code-point text across all three files."
+  ],
+  "validation": {
+    "bookiee_export": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=/home/trung/Projects/tablepro/linux/docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-04/source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_file_exports_preserve_labels -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "application_round_trip": {
+      "steps": [
+        "In the pinned Debian image, apt installs libreoffice-calc; Calc 26.8.0.3 opens source.xlsx and saves recheck/source.ods.",
+        "Calc reopens recheck/source.ods and saves recheck/source.xlsx, which is retained as calc-roundtrip.xlsx."
+      ],
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "command": "rtk proxy python linux/docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-04/verify_roundtrip.py",
+      "result": "All three artifacts contain the same string cell and value.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "bf16dff26bffed2d4a22f3ec2a49652dd1584786a34bafabc6e2faaaba384b6e",
+    "recheck/source.ods": "95ee98e405872f5a47b5397d772d8515c69234baa429b8be77398c248145af03",
+    "calc-roundtrip.xlsx": "d357567c692a9f1b01e6c24d991bf449546f1c901b547fdaee967e7208d0c76d"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "aba6dc0a2c530cde95d08287c221188c5f1711b10c87967f0cf4fe650d34efe5",
+    "libreoffice-roundtrip.txt": "81b08ff409b3bf983f4044513dbd717c3b6741b884003c1da830f903b2a6d046",
+    "consumer-check.txt": "837721418af1485bfda04bab214c65542148fabb4db65833776387eca177ac0f"
+  },
+  "remaining": [
+    "Other PostgreSQL array families/configurations and spreadsheet-application re-import for other cell shapes remain open in B3."
+  ]
+}

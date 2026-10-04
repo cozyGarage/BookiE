@@ -1,0 +1,2 @@
+source/ODS/Calc-re-saved XLSX preserve one string cell (43 code points)
+{"NULL","","東京","a,b","a\"b","<tag>&",NULL}

@@ -59,6 +59,8 @@ row and its sibling, with native JSON/wire oracles
 The keyed edit also succeeds with a stricter same-named domain first in
 `search_path`, proving the generated cast resolves to the target schema
 ([shadowed-path evidence](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json)).
+The custom `enum[]` XLSX text cell also survives a LibreOffice Calc re-save as
+ODS and then XLSX ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
@@ -78,7 +80,9 @@ Other workbook cases, spreadsheet applications and installed editing remain open
 One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
-Other array families and spreadsheet-application re-import remain open.
+Other array families remain open; spreadsheet-application re-import is covered
+for one custom `enum[]` XLSX case, with other shapes unverified (see the
+[Calc evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
 
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
 has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
