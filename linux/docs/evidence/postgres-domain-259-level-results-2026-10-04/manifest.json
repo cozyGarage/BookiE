@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "6ba9e832598342670961a84703c3edb5f612d652",
+  "environment": {
+    "database": "PostgreSQL 16 in the repository Docker integration fixture",
+    "runner": "local workspace; cached Rust build artifacts reused"
+  },
+  "scenario": {
+    "test": "value_contract_domain_over_enum_259_levels_preserve_schema_aware_values",
+    "purpose": "Verify enum-leaf metadata, keyed edit, equality filter, and SQL NULL sibling preservation through a 259-domain chain when a same-named shadow enum leads search_path.",
+    "oracle": "Native PostgreSQL query results and pg_typeof report the target outer-domain type; the concurrent SQL NULL sibling remains unchanged.",
+    "boundary": "The adjacent 258- and 259-layer contracts pass. Raw inferred text/NULL is explicitly unsupported from 64 layers; depths above 259 and other session/search_path combinations remain open."
+  },
+  "results": {
+    "focused_test": {
+      "passed": 1,
+      "failed": 0,
+      "log": "focused.txt"
+    },
+    "postgres_value_contracts": {
+      "passed": 105,
+      "failed": 0,
+      "filtered": 29,
+      "log": "postgres-value-contracts.txt"
+    },
+    "clippy": {
+      "result": "passed",
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "result": "passed",
+      "command": "cargo fmt --all -- --check",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "result": "passed",
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "result": "passed",
+      "command": "git diff --check",
+      "log": "diff-check.txt"
+    }
+  },
+  "sha256": {
+    "clippy.txt": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused.txt": "0d4a7abeba0e834bcb23a425036205e74a67d9d0b622368b41e00eec7c8ae69d",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "postgres-value-contracts.txt": "ea010b216264e2bf31de14ec40151bad20d4b4a37447a199d35b912d74350e74"
+  }
+}
