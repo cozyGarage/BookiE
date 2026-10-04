@@ -641,9 +641,10 @@ parameters infer the custom enum for queries, updates, and transactions when
 the server can resolve the parameter from SQL context. Core file-writer JSON,
 CSV, SQL, XML, HTML, and Markdown output now have native PostgreSQL enum coverage.
 SQL-file replay also preserves an enum label containing literal `\n` and an
-apostrophe with both `standard_conforming_strings=on, backslash_quote=safe_encoding`
-and `standard_conforming_strings=off, backslash_quote=off`
-([evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json)).
+apostrophe across all four `standard_conforming_strings` and `backslash_quote`
+combinations (`on/safe_encoding`, `on/off`, `off/off`, and `off/on`); backslashes
+use explicit `E''` literals ([initial evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json),
+[full setting matrix](evidence/postgres-enum-sql-literal-session-modes-full-results-2026-10-05/manifest.json)).
 The XML case distinguishes literal `NULL`, empty text, and SQL NULL while
 escaping a markup-shaped label. HTML also distinguishes those values and escapes
 a hostile image/event-handler label so it remains text. Markdown output quotes

@@ -213,10 +213,11 @@ checks native typed results, `pg_typeof`, result bytes, literal `NULL` versus
 SQL NULL and invalid-label refusal ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
 
 PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
-when replayed with (`standard_conforming_strings=on`, `backslash_quote=safe_encoding`)
-and (`standard_conforming_strings=off`, `backslash_quote=off`); the writer uses
-an explicit escape string and native type/text checks verify both results
-([evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json)).
+when replayed with all four `standard_conforming_strings` and `backslash_quote`
+combinations (`on/safe_encoding`, `on/off`, `off/off`, `off/on`); the writer uses
+an explicit escape string and native type/text checks verify each result
+([initial evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json),
+[full setting matrix](evidence/postgres-enum-sql-literal-session-modes-full-results-2026-10-05/manifest.json)).
 
 One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
 replayed SQL against native array text, JSON elements and wire bytes; see the

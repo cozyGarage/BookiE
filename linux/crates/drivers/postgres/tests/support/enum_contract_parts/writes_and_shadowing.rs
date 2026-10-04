@@ -175,7 +175,12 @@ async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_s
         "backslashes must use a mode-independent SQL literal: {sql}"
     );
 
-    for (standard_conforming_strings, backslash_quote) in [("on", "safe_encoding"), ("off", "off")] {
+    for (standard_conforming_strings, backslash_quote) in [
+        ("on", "safe_encoding"),
+        ("on", "off"),
+        ("off", "off"),
+        ("off", "on"),
+    ] {
         let mut transaction = connection.begin().await.unwrap();
         transaction
             .execute(&format!(
