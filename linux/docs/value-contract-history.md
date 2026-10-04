@@ -5674,6 +5674,16 @@ domain depths beyond 258 and additional enum/session parameter combinations
 remain open. See the
 [evidence manifest](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum schema-aware operations at 259 layers, 2026-10-04
+
+The adjacent shadowed-search-path PostgreSQL 16 Docker contract now extends
+schema-aware enum metadata, keyed edits and equality filters to 259 nested
+domains. It confirms the target outer-domain type and preserves a SQL NULL
+sibling while a same-named shadow enum leads `search_path`. The 258- and
+259-layer cases pass; raw inferred text/NULL remains explicitly unsupported
+from 64 layers, and greater domain depths and other session combinations remain
+open. See the [evidence manifest](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json).
+
 ## PostgreSQL domain-over-enum COALESCE parameters, 2026-10-04
 
 A PostgreSQL 16 Docker contract tests `COALESCE(status, $1)` and

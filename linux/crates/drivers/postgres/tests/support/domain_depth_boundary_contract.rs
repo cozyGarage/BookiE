@@ -181,11 +181,11 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_domain_over_enum_258_levels_preserve_schema_aware_values() {
+async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values() {
     let (_container, options) = start_pg().await;
     let setup = connect(options.clone()).await;
-    let schema = "value_contract_258_domains";
-    let shadow = "value_contract_258_shadow";
+    let schema = "value_contract_259_domains";
+    let shadow = "value_contract_259_shadow";
     setup.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
     setup
         .execute(&format!("CREATE TYPE {schema}.status AS ENUM ('ready', 'paused')"))
@@ -193,7 +193,7 @@ async fn value_contract_domain_over_enum_258_levels_preserve_schema_aware_values
         .unwrap();
 
     let mut base = "status".to_owned();
-    for level in 1..=258 {
+    for level in 1..=259 {
         let domain = format!("status_domain_{level}");
         setup
             .execute(&format!("CREATE DOMAIN {schema}.{domain} AS {schema}.{base}"))
@@ -274,7 +274,7 @@ async fn value_contract_domain_over_enum_258_levels_preserve_schema_aware_values
         vec![vec![
             Value::Int(1),
             Value::Text("paused".into()),
-            Value::Text(format!("{schema}.status_domain_258")),
+            Value::Text(format!("{schema}.status_domain_259")),
         ]]
     );
     assert_eq!(
@@ -290,12 +290,12 @@ async fn value_contract_domain_over_enum_258_levels_preserve_schema_aware_values
             vec![
                 Value::Int(1),
                 Value::Bool(false),
-                Value::Text(format!("{schema}.status_domain_258")),
+                Value::Text(format!("{schema}.status_domain_259")),
             ],
             vec![
                 Value::Int(2),
                 Value::Bool(true),
-                Value::Text(format!("{schema}.status_domain_258")),
+                Value::Text(format!("{schema}.status_domain_259")),
             ],
         ]
     );

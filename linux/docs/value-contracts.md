@@ -104,11 +104,12 @@ A UUID-domain array now decodes using its base OID and preserves NULL versus emp
 Domain arrays over text, numeric and timestamptz also preserve NULL elements through qualified binding under an Asia/Kathmandu session, checked against native JSON and wire bytes ([base-type matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
-through ten levels, plus 63, 64, 65, 128, 129, 256, 257 and 258 levels. Raw inferred text and SQL
+through ten levels, plus 63, 64, 65, 128, 129, 256, 257, 258 and 259 levels. Raw inferred text and SQL
 NULL parameters work through 63 levels; at 64 or more levels they return
 explicit unsupported results, including after schema-aware work warms the
-same-backend transaction. Schema-aware writes and filters pass through 258
-levels ([258-level evidence](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json),
+same-backend transaction. Schema-aware writes and filters pass through 259
+levels ([259-level evidence](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json),
+[258-level evidence](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json),
 [257-level evidence](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json)); see the [deep-domain
 boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [129/256-level follow-up](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
