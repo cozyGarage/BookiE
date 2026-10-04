@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "42b7e55087ba06e317649c01a4c8d2269950b36a",
+  "engine": "Local MySQL dialect planner/formatter contract; no server required",
+  "case": "Word-character MySQL delimiter adjacent to a routine keyword",
+  "test": "ui::editor::statement_cursor::tests::mysql_word_character_delimiter_stops_at_keyword_boundary",
+  "contract": [
+    "A routine terminated by the word-character delimiter xyz adjacent to END remains one planned statement, and the following SELECT remains a separate statement.",
+    "The delimiter text inside a quoted routine string and its placeholder-shaped text do not terminate the routine or escape parameter extraction.",
+    "Formatting preserves the DELIMITER directive and reparsing preserves statement count and the sole trailing-query parameter."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app mysql_word_character_delimiter_stops_at_keyword_boundary -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "f5edfb676f9bf09dd7a0385ea3cac4feb0b0ab4590fea4cf94f4a1a91799c283",
+    "clippy.txt": "4d50592ce4339956e2f35a599bd630e1111a6114e65b891ee741b72a04ca3c62",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other delimiter forms and human approval behavior for unparseable routines remain open."
+  ]
+}

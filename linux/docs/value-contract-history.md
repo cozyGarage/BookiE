@@ -1000,7 +1000,7 @@ statements and `ContinueNextBatch`; the formatter preserves both separators and
 comments; named-parameter extraction returns only `read`, `name`, `id` and
 `last`; policy classification keeps SELECT/UPDATE/SELECT order and the UPDATE
 WHERE fact. The contract uses the shared lexer and formatter without a live
-SQL Server. Non-default MySQL delimiter forms remain open.
+SQL Server. A word-character delimiter adjacent to the routine END keyword now has a planner/editor/parser regression; other delimiter forms remain open.
 
 ```sh
 rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments -- --test-threads=1
@@ -5035,3 +5035,16 @@ updates an enum column whose qualified target schema differs from the final
 shadow schema. Native type/value checks verify the target row changed and the
 shadow row did not. The transaction rolls back its session changes. The focused
 test, strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
+
+## MySQL word-character delimiter boundary, 2026-10-04
+
+An app-level parser regression uses `DELIMITER xyz` to terminate a stored
+procedure at `ENDxyz`. The word delimiter is recognized at the end of the
+`END` token; the same text inside a quoted body string does not terminate the
+statement. Planner, script extraction, formatter and named-parameter extraction
+agree on the routine followed by a trailing parameterized SELECT. MySQL's
+reference documents delimiter strings and warns that a delimiter can occur
+inside words; this case pins the lexer's word-character delimiter path. See the
+[MySQL client delimiter documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
+The focused app test, strict Clippy and formatting pass. See the [evidence
+manifest](evidence/mysql-word-delimiter-results-2026-10-04/manifest.json).
