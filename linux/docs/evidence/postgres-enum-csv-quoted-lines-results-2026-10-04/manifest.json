@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "509922929",
+  "source_commit": "3a974b268",
   "engine": "PostgreSQL 16 (16-alpine) in Docker via testcontainers",
   "case": "Custom PostgreSQL enum labels through raw CSV export, parse and typed import",
   "test": "enum_contract::value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_backslashes",
@@ -16,12 +16,13 @@
   "contract": [
     "BookieE raw CSV output quotes embedded double quotes and multiline fields, retains backslashes and formula-shaped text, and uses a collision-free explicit SQL NULL marker.",
     "CSV parsing and schema-aware typed import preserve every label and SQL NULL as separate values.",
-    "The restored rows match exact expected text, native pg_typeof(status), and UTF-8 hex bytes for each non-NULL enum label."
+    "The restored rows match exact expected text, native pg_typeof(status), and UTF-8 hex bytes for each non-NULL enum label.",
+    "All 12 supported delimiter and record-ending combinations pass the native round trip."
   ],
   "validation": {
     "focused_test": {
       "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml --package tablepro-driver-postgres --test integration enum_contract::value_contract_custom_enum_csv_round_trip_preserves_quotes_lines_and_backslashes -- --include-ignored --exact --test-threads=1",
-      "result": "1 passed, 0 failed",
+      "result": "1 passed, 0 failed; covers 12 delimiter/record-ending combinations",
       "log": "focused-test.txt"
     },
     "clippy": {
@@ -37,11 +38,25 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "Other PostgreSQL enum session/configuration combinations and other CSV delimiters or application-specific imports remain open in B3."
+    "Other PostgreSQL enum session/configuration combinations and spreadsheet-specific import behavior remain open in B3."
   ],
   "log_sha256": {
-    "focused-test.txt": "f0c6d4ee2d2d1bd5c326bf01ab689ff00dfb1f9daeced0bd1df11172316a72cf",
-    "clippy.txt": "bb5b0109ccc590873883177534e80091980afa24c6e1b411feaa61132ffc962a",
+    "focused-test.txt": "fab433066867312a874a67c4c9ea774ae86f3f4bf14cceb58b14e13037375d7c",
+    "clippy.txt": "e2b368b88374da16e72bb96e0ff68ee7dfb7d49836b63692563151ffa88285ad",
     "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "csv_matrix": {
+    "delimiters": [
+      "comma",
+      "semicolon",
+      "tab",
+      "pipe"
+    ],
+    "record_endings": [
+      "LF",
+      "CRLF",
+      "CR"
+    ],
+    "combinations": 12
   }
 }
