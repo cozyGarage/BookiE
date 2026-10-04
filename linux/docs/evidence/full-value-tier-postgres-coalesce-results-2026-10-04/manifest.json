@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "b165a0c7ca35337e7eac4991cef3dbb3a3c7bab6",
+  "case": "Full local GTK and DuckDB value-contract tier including PostgreSQL domain-over-enum COALESCE contract",
+  "command": "bash scripts/test-value-contracts.sh --gtk --duckdb",
+  "result": "passed; 293 selected contracts across 11 suites; no missing suites",
+  "compile": {
+    "exit_code": 0,
+    "seconds": 2.248,
+    "fresh_artifacts": 746,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0"
+    ]
+  },
+  "suite_seconds": {
+    "app": 103.988,
+    "core": 3.269,
+    "clickhouse": 27.436,
+    "duckdb": 2.118,
+    "mongodb": 9.332,
+    "mssql": 45.629,
+    "mysql": 315.02,
+    "postgres": 212.974,
+    "redis": 1.667,
+    "sqlite": 0.016,
+    "mcp": 0.003
+  },
+  "selected_tests": 293,
+  "missing_suites": [],
+  "worktree": "The runner recorded dirty=true because the two pre-existing .b4-f4f9-* scratch directories were untracked; tracked source matched source_commit.",
+  "report": "report.json",
+  "sha256": {
+    "report.json": "19d7f93a4b3d25e90ce111af8ec5c98c1edee52894aceee2726316004bfd148b",
+    "compile.log": "03a769a68f2f6d0b9e78e08767a2833ace38a8828e1916ffc5a30812910ee8ff",
+    "crates-app.log": "941fd679b0e772fee03a4669d221623961519e5401d6432c0b7c34d0b09df212",
+    "crates-core.log": "f6e57b8bd124f485c33cd416754092b3532bb4d0dce521e6917ba7f5b01a3558",
+    "crates-drivers-clickhouse.log": "b1f04a2c86c1caee1ff4c87b39ef364726bcddaa1c08492aa22d3b7242ce2e49",
+    "crates-drivers-duckdb.log": "c8af069e560885633d1ac64f9895c353576e9bdd26b132f049d174c1ffdbcf41",
+    "crates-drivers-mongodb.log": "4dfbd8213e6c9cd958354965456111838284586e489932c970e8da934d6d5708",
+    "crates-drivers-mssql.log": "2d0eba0b4fe6a7f3594b07daaa29d1c7cc782bbb084ef853ace4da5e544830eb",
+    "crates-drivers-mysql.log": "a36d5e6c2d26792de50a770e6af2a934bbfdb37e90b954ea171a039287fc01b6",
+    "crates-drivers-postgres.log": "5ff42f2c866c3549b83bbf602592f3f5977fa522a61d5031860139f653f8edd0",
+    "crates-drivers-redis.log": "9ee54c9a01f82fffef722302f7d07f3af49ea5065f92ec4f8eca17d9eeb9f5e0",
+    "crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
+    "crates-mcp.log": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062"
+  }
+}

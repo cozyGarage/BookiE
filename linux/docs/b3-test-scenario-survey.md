@@ -773,3 +773,8 @@ directives; the routine body stays one statement, only the following SELECT
 placeholder is extracted, and post-format classification keeps the routine
 unparseable/write. The app selector passes in the strict unit values layer; see
 the [short-delimiter evidence](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
+
+October 4 B3-1 follow-up: PostgreSQL domain-over-enum `COALESCE` now checks
+text and SQL NULL parameters in both argument positions. `pg_typeof` pins the
+server's base-enum expression/parameter result while the source column remains
+the outer domain ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).

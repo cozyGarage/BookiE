@@ -5637,3 +5637,16 @@ checks. Raw inferred text/NULL remains explicitly unsupported from 64 layers;
 domain depths beyond 258 and additional enum/session parameter combinations
 remain open. See the
 [evidence manifest](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
+
+## PostgreSQL domain-over-enum COALESCE parameters, 2026-10-04
+
+A PostgreSQL 16 Docker contract tests `COALESCE(status, $1)` and
+`COALESCE($1, status)` for text and SQL NULL. `pg_typeof` confirms PostgreSQL
+infers the parameter and expression as the base enum while the source column
+remains the outer domain; exact rows verify argument order and NULL behavior.
+The first assertion expected the expression to retain the domain, but the
+server's native common-type resolution selects the base enum. The corrected
+contract pins that behavior without changing production code. The focused case
+and all 16 domain contracts, PostgreSQL Clippy, formatting, file-size and
+ignored-test inventory checks pass. See the
+[evidence manifest](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).

@@ -177,6 +177,11 @@ base enum enables text/NULL inference without resolving to the shadow type.
 It also checks literal `NULL`, invalid-label `22P02`, result types and unchanged
 domain rows ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 
+A domain-over-enum `COALESCE` contract now covers text and SQL NULL in both
+argument positions. PostgreSQL infers the parameter and expression as the base
+enum while the source column remains the outer domain, verified with `pg_typeof`
+and exact rows ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+
 The three-level domain chain also covers directly inferred text and SQL NULL
 parameters for both NULL-safe distinctness operators, with `pg_typeof` checks
 for the leaf enum and outer domain. See the

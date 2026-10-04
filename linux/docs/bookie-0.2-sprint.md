@@ -92,6 +92,11 @@ packages. The runner's 9 unit tests also pass. The durable report and raw suite
 logs, including the original timeout, are in the
 [full value-tier evidence](evidence/full-value-tier-results-2026-10-04/manifest.json).
 
+October 4 follow-up: with the PostgreSQL domain-over-enum `COALESCE` contract
+added, all 293 selected contracts still pass across the same 11 suites. The
+source revision is `b165a0c7`; the report, suite logs and hashes are retained in
+[the follow-up evidence](evidence/full-value-tier-postgres-coalesce-results-2026-10-04/manifest.json).
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,
@@ -140,6 +145,12 @@ domain layers while a same-named shadow enum leads `search_path`. The adjacent
 257/258 Docker contracts pass; raw inferred text/NULL remains explicitly
 unsupported from 64 layers. See the
 [258-layer evidence](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
+
+October 4 B3-1 follow-up: a PostgreSQL 16 contract now covers domain-over-enum
+`COALESCE` with text and SQL NULL in both argument positions. It verifies
+PostgreSQL resolves the parameter/result to the base enum while the source
+column remains the domain; all 16 domain contracts pass. See the
+[COALESCE evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).
 
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL

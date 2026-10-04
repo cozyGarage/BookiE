@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "b165a0c7ca35337e7eac4991cef3dbb3a3c7bab6",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum COALESCE parameter inference in both argument positions",
+  "test": "domain_contract::value_contract_domain_over_enum_coalesce_infers_parameter_type",
+  "outcome": "Exact native PostgreSQL behavior: the text/NULL parameter and COALESCE result use the base enum type, while the source column remains the declared domain type.",
+  "contract": [
+    "COALESCE(status, $1) and COALESCE($1, status) infer text and SQL NULL parameters as the target enum.",
+    "Text and NULL cases preserve the exact expected values for rows containing ready, paused and SQL NULL.",
+    "pg_typeof verifies the parameter and expression use the base enum while pg_typeof(status) remains the outer domain.",
+    "The adjacent domain-over-enum contract group, including this new case, passes."
+  ],
+  "initial_observation": "The first test expectation assumed the COALESCE result would retain the domain. PostgreSQL instead resolves the expression and parameter to the base enum; the corrected test records this native type-resolution behavior and separately asserts the source column remains a domain.",
+  "validation": {
+    "domain_contract_suite": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration domain_contract:: -- --include-ignored --test-threads=1",
+      "result": "16 passed, 0 failed",
+      "log": "domain-tests.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "repository_guards": {
+      "file_size": "passed; file-size.txt",
+      "ignored_test_inventory": "passed; ignored-inventory.txt",
+      "git_diff_check": "passed"
+    }
+  },
+  "remaining": [
+    "Other direct query contexts, enum/session configurations and the wider B3 matrix remain open; this case does not qualify 0.2.0."
+  ],
+  "sha256": {
+    "clippy.txt": "d57a20aa6fc1822000898e9ab61661f998fcc722228bd7a391eb64e024b817c1",
+    "domain-tests.txt": "83e9a82a34d18cf01f9bd1d1a74180c1cd7810f8da11a50c671a4a2987f23976",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7"
+  }
+}
