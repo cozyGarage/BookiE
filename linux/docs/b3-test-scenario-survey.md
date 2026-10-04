@@ -130,6 +130,14 @@ and XML-escapes markup. Other array families/configurations and
 spreadsheet-application re-import remain open. See the [enum-array file-writer
 evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: one PostgreSQL `timestamptz[]` with both sides of a
+New York fall-back hour, a BC instant, infinities and SQL NULL now passes
+through JSON, CSV, XLSX and replayed SQL. Native `array_to_json` semantics and
+`array_send` bytes verify both instants remain distinct after binding and
+re-import; XLSX stores the array as text. Other array families/configurations
+and spreadsheet-application re-import remain open. See the
+[timestamptz-array file-writer evidence](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).
+
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.

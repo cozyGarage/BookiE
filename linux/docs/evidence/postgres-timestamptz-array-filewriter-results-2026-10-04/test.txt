@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
+
+running 13 tests
+test array_contract::value_contract_array_grid_edit_preserves_array_elements ... ok
+test array_contract::value_contract_builtin_array_families_survive_typed_csv_insert ... ok
+test array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist ... ok
+test array_contract::value_contract_custom_enum_array_file_exports_preserve_labels ... ok
+test array_contract::value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null ... ok
+test array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values ... ok
+test array_contract::value_contract_json_array_elements_are_explicitly_unsupported ... ok
+test array_contract::value_contract_json_text_array_is_explicitly_unsupported ... ok
+test array_contract::value_contract_numeric_array_file_exports_preserve_exact_text ... ok
+test array_contract::value_contract_numeric_array_grid_edit_preserves_elements ... ok
+test array_contract::value_contract_text_array_file_exports_preserve_text_and_escape_markup ... ok
+test array_contract::value_contract_timestamptz_array_file_exports_preserve_instants ... ok
+test array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 92 filtered out; finished in 30.97s
+

@@ -5113,3 +5113,13 @@ JSON, CSV and XLSX preserve that text, with XLSX using a string cell and
 escaping markup. Replayed SQL restores native array text, JSON elements and
 wire bytes. The focused test, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
+
+## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports a `timestamptz[]` containing two
+distinct instants in the New York fall-back hour, a BC instant, positive and
+negative infinity and SQL NULL. The server's `array_to_json` and `array_send`
+oracles confirm both instants survive text binding; JSON, CSV and XLSX preserve
+the driver text as a string, and replayed SQL restores native text, JSON values
+and wire bytes. The entire PostgreSQL array contract group passed (13 tests),
+along with strict Clippy and formatting. See the [evidence manifest](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).

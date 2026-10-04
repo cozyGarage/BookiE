@@ -71,6 +71,10 @@ Unicode, comma, quote, markup and SQL NULL through JSON, CSV, XLSX and replayed
 SQL. Native `array_to_json` and `array_send` checks verify bound and restored
 values ([evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json)).
 
+A `timestamptz[]` file-writer contract preserves distinct repeated-hour
+instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and
+replayed SQL, checked against native JSON and wire bytes ([evidence](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json)).
+
 The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
