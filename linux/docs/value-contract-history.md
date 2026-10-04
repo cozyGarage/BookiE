@@ -4995,9 +4995,11 @@ A PostgreSQL 16 Docker fixture creates a custom enum with a 63-byte ASCII label
 and a 21-character UTF-8 label that also occupies 63 bytes. `pg_enum` and
 `octet_length` assert the exact catalog labels and byte lengths; `enum_range`
 then returns both through the native driver with the declared enum type intact.
-The focused case, strict Clippy and formatting pass. This covers the maximum
-accepted label length; overlength refusal and other enum consumer/session cases
-remain open. See the [evidence manifest](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
+The multibyte label also survives `enum[]` projection with an SQL NULL element.
+The decoded array text quotes this label while PostgreSQL's canonical `::text`
+does not; native `array_to_json` and equal `array_send` bytes prove the result
+remains semantically identical and bindable. The focused case, strict Clippy
+and formatting pass. See the [evidence manifest](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
 
 ## PostgreSQL overlength custom-enum label refusal, 2026-10-04
 

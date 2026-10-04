@@ -95,7 +95,7 @@ remain open; see the [six/seven-domain evidence](evidence/postgres-seven-domain-
 and the [six-domain checkpoint](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
 PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
-UTF-8 labels plus refusal of a 64-byte label without partial type creation; see
+UTF-8 scalar and array labels plus refusal of a 64-byte label without partial type creation; see
 the [accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)
 and [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
 
