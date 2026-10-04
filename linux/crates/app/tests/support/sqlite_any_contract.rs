@@ -1149,6 +1149,70 @@ async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classe
         ]
     );
 
+    let directory = tempfile::tempdir().unwrap();
+    let json_path = directory.path().join("sqlite-json-extract-any.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json[0]["result"], i64::MAX);
+    assert_eq!(json[1]["result"], 1.25);
+    assert_eq!(json[2]["result"], "42");
+    assert_eq!(json[3]["result"], 1);
+    assert!(json[4]["result"].is_null());
+    assert_eq!(json[5]["result"], "{\"x\":1}");
+    assert_eq!(json[6]["result"], "[1,2]");
+    assert_eq!(json[7]["result"], "bookie:sqlite-any:v1:integer:9");
+    assert!(json[8]["result"].is_null());
+    assert_eq!(json[4]["json_kind"], "null");
+    assert!(json[8]["json_kind"].is_null());
+
+    let xlsx_path = directory.path().join("sqlite-json-extract-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(sheet.contains("<c r=\"B2\" t=\"s\">"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B3\"><v>1.25</v></c>"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B4\" t=\"s\">"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B5\"><v>1</v></c>"), "{sheet}");
+    for text in [
+        "9223372036854775807",
+        "42",
+        "{\"x\":1}",
+        "[1,2]",
+        "bookie:sqlite-any:v1:integer:9",
+    ] {
+        assert!(shared_strings.contains(&format!("<t>{text}</t>")), "{shared_strings}");
+    }
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
