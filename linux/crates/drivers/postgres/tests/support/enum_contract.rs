@@ -1165,7 +1165,7 @@ async fn value_contract_custom_enum_sql_file_export_restores_labels_and_native_t
 async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_string_modes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
-    let label = r"back\nslash";
+    let label = r"back\nslash'quote";
     let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &Value::Text(label.into())).unwrap();
     connection
         .execute(&format!(
@@ -1219,16 +1219,33 @@ async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_s
     .unwrap();
     let sql = std::fs::read_to_string(&sql_path).unwrap();
     assert!(
-        sql.contains(r#"E'back\\nslash'"#),
+        sql.contains(r#"E'back\\nslash''quote'"#),
         "backslashes must use a mode-independent SQL literal: {sql}"
     );
 
-    for setting in ["on", "off"] {
+    for (standard_conforming_strings, backslash_quote) in [("on", "safe_encoding"), ("off", "off")] {
         let mut transaction = connection.begin().await.unwrap();
         transaction
-            .execute(&format!("SET LOCAL standard_conforming_strings = {setting}"))
+            .execute(&format!(
+                "SET LOCAL standard_conforming_strings = {standard_conforming_strings}"
+            ))
             .await
             .unwrap();
+        transaction
+            .execute(&format!("SET LOCAL backslash_quote = {backslash_quote}"))
+            .await
+            .unwrap();
+        assert_eq!(
+            transaction
+                .query("SELECT current_setting('standard_conforming_strings'), current_setting('backslash_quote')")
+                .await
+                .unwrap()
+                .rows,
+            vec![vec![
+                Value::Text(standard_conforming_strings.into()),
+                Value::Text(backslash_quote.into()),
+            ]]
+        );
         for statement in sql.lines() {
             transaction.execute(statement).await.unwrap();
         }
@@ -1246,7 +1263,7 @@ async fn value_contract_custom_enum_sql_file_replay_preserves_backslash_across_s
                 Value::Text(label.into()),
                 Value::Text("value_contract_enum_string_mode".into()),
             ]],
-            "standard_conforming_strings={setting}"
+            "standard_conforming_strings={standard_conforming_strings}, backslash_quote={backslash_quote}"
         );
         transaction.rollback().await.unwrap();
     }
