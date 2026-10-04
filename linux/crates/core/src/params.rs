@@ -276,6 +276,17 @@ mod tests {
     }
 
     #[test]
+    fn clickhouse_heredocs_hide_placeholders_through_their_close_or_end_of_input() {
+        let closed = extract_named_parameters("SELECT $tag$ :hidden $tag$; SELECT :visible", "clickhouse");
+        assert_eq!(closed.names, ["visible"]);
+        assert_eq!(closed.sql, "SELECT $tag$ :hidden $tag$; SELECT ?");
+
+        let unterminated = extract_named_parameters("SELECT :safe; SELECT $tag$unfinished :tail", "clickhouse");
+        assert_eq!(unterminated.names, ["safe"]);
+        assert_eq!(unterminated.sql, "SELECT ?; SELECT $tag$unfinished :tail");
+    }
+
+    #[test]
     fn adjacent_positional_placeholders_are_not_dollar_quotes() {
         let parsed = extract_named_parameters("SELECT $1$2 FROM t WHERE a = :a", "postgres");
         assert_eq!(parsed.names, vec!["a"]);

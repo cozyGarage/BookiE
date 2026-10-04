@@ -175,6 +175,46 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers() {
+        let sql = "SELECT :safe AS value; SELECT $tag$unfinished :tail";
+        let grammar = SqlGrammar::ClickHouse;
+        let plan = plan_for(sql, grammar);
+
+        assert!(!plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        assert!(script_statements(sql, "clickhouse").is_err());
+
+        let parameters = tablepro_core::extract_named_parameters(sql, "clickhouse");
+        assert_eq!(parameters.names, ["safe"]);
+        assert!(parameters.sql.ends_with("SELECT $tag$unfinished :tail"));
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.ends_with("$tag$unfinished :tail"));
+        assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
+
+        let facts = tablepro_policy::classify(sql, "clickhouse");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+        let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
+        let decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::Agent {
+                token: "test".into(),
+                client: None,
+                model: None,
+            },
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &config,
+            None,
+        );
+        assert!(matches!(
+            decision,
+            tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        ));
+    }
+
+    #[test]
     fn value_contract_mssql_malformed_tail_blocks_the_whole_go_script() {
         let sql = "SELECT :before AS value\r\nGO\r\nSELECT 'unfinished :inside\r\nGO\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MsSql;

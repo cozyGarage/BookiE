@@ -82,19 +82,21 @@ fn block_comment_length(rest: &str, nested: bool) -> usize {
 }
 
 fn dollar_quote_length(rest: &str, driver_id: &str) -> Option<usize> {
-    if driver_id != "postgres" || !rest.starts_with('$') {
+    if !matches!(driver_id, "postgres" | "clickhouse") || !rest.starts_with('$') {
         return None;
     }
     let close = rest[1..].find('$')? + 1;
     let tag = &rest[..close + 1];
-    let mut tag_characters = tag[1..close].chars();
-    if let Some(first) = tag_characters.next()
-        && !(first.is_ascii_alphabetic() || first == '_')
-    {
-        return None;
-    }
-    if tag_characters.any(|c| !c.is_ascii_alphanumeric() && c != '_') {
-        return None;
+    if driver_id == "postgres" {
+        let mut tag_characters = tag[1..close].chars();
+        if let Some(first) = tag_characters.next()
+            && !(first.is_ascii_alphabetic() || first == '_')
+        {
+            return None;
+        }
+        if tag_characters.any(|c| !c.is_ascii_alphanumeric() && c != '_') {
+            return None;
+        }
     }
     let body = &rest[close + 1..];
     match body.find(tag) {
