@@ -378,6 +378,150 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
 }
 
 #[tokio::test]
+async fn sqlite_compound_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{
+        ConnectOptions, DatabaseDriver,
+        export::{CsvOptions, ResultExport, ResultFormat, unique_csv_null_marker, write_result_file},
+        import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
+    };
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO flexible VALUES (1, 42), (2, NULL), (3, X'00FF')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            "SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
+             FROM flexible WHERE id = 1 \
+             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+             UNION ALL SELECT 4, value, typeof(value) FROM flexible WHERE id = 3 \
+             UNION ALL SELECT 5, 'bookie:sqlite-any:v1:integer:9', typeof('bookie:sqlite-any:v1:integer:9') \
+             ORDER BY position",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+
+    let null_marker = unique_csv_null_marker(&result.rows);
+    let options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        preserve_sqlite_result_types: true,
+        ..CsvOptions::default()
+    };
+    let directory = tempfile::tempdir().unwrap();
+    let csv_path = directory.path().join("sqlite-compound-any.csv");
+    write_result_file(
+        &csv_path,
+        &result,
+        &ResultExport {
+            format: ResultFormat::Csv,
+            csv: &options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let csv = std::fs::read(&csv_path).unwrap();
+    let sheet = read_csv(
+        &csv,
+        &CsvImportOptions {
+            has_header: true,
+            null_marker: null_marker.clone(),
+            ..CsvImportOptions::default()
+        },
+        None,
+    )
+    .unwrap();
+    let target_columns = connection.fetch_columns(None, "restored").await.unwrap();
+    let plan = build_insert_plan(
+        &ImportTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "restored",
+            columns: &target_columns,
+            mapping: &[None, Some(0), Some(1), Some(2)],
+        },
+        &sheet,
+        &CsvImportOptions {
+            has_header: true,
+            null_marker,
+            ..CsvImportOptions::default()
+        },
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query("SELECT typeof(position), position, typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+                Value::Int(42),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(2),
+                Value::Text("text".into()),
+                Value::Text("branch".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(3),
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(4),
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into()),
+            ],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(5),
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
     use tablepro_core::{
         ConnectOptions, DatabaseDriver,

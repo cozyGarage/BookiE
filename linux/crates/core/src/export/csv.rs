@@ -76,6 +76,9 @@ pub struct CsvOptions {
     pub line_break_to_space: bool,
     pub header_row: bool,
     pub sanitize_formulas: bool,
+    /// Encode non-NULL cells with SQLite's storage-class tags when result
+    /// metadata is unavailable. Enable only for SQLite result exports.
+    pub preserve_sqlite_result_types: bool,
     pub delimiter: CsvDelimiter,
     pub quote: CsvQuote,
     pub line_break: CsvLineBreak,
@@ -90,6 +93,7 @@ impl Default for CsvOptions {
             line_break_to_space: false,
             header_row: true,
             sanitize_formulas: true,
+            preserve_sqlite_result_types: false,
             delimiter: CsvDelimiter::Comma,
             quote: CsvQuote::IfNeeded,
             line_break: CsvLineBreak::Lf,
@@ -138,7 +142,10 @@ pub(crate) fn csv_row_line(row: &[Value], options: &CsvOptions) -> String {
 fn csv_row_line_for_columns(row: &[Value], columns: &[ColumnInfo], options: &CsvOptions) -> String {
     let any_columns = columns
         .iter()
-        .map(|column| crate::sqlite_any_csv::is_any_type(&column.data_type))
+        .map(|column| {
+            crate::sqlite_any_csv::is_any_type(&column.data_type)
+                || (options.preserve_sqlite_result_types && crate::sqlite_any_csv::is_unknown_type(&column.data_type))
+        })
         .collect::<Vec<_>>();
     csv_row_line_with_any_columns(row, &any_columns, options)
 }
@@ -325,7 +332,11 @@ impl ResultWriter for CsvWriter {
     fn begin(&mut self, output: &mut dyn Write, columns: &[ColumnInfo]) -> Result<(), ExportError> {
         self.any_columns = columns
             .iter()
-            .map(|column| crate::sqlite_any_csv::is_any_type(&column.data_type))
+            .map(|column| {
+                crate::sqlite_any_csv::is_any_type(&column.data_type)
+                    || (self.header.preserve_sqlite_result_types
+                        && crate::sqlite_any_csv::is_unknown_type(&column.data_type))
+            })
             .collect();
         if !self.header.header_row {
             return Ok(());
@@ -427,6 +438,28 @@ mod tests {
         assert!(rendered.contains("bookie:sqlite-any:v1:integer:42"));
         assert!(rendered.contains("bookie:sqlite-any:v1:blob:00ff"));
         assert!(rendered.contains("bookie:sqlite-any:v1:text:bookie:sqlite-any:v1:integer:9"));
+    }
+
+    #[test]
+    fn sqlite_result_type_tags_are_opt_in_for_fallback_metadata() {
+        let columns = [ColumnInfo {
+            data_type: "NULL".into(),
+            ..crate::export::test_support::column("value")
+        }];
+        let rows = [vec![Value::Int(42)]];
+
+        assert_eq!(render_csv(&columns, &rows, &CsvOptions::default()), "value\n42\n");
+        assert_eq!(
+            render_csv(
+                &columns,
+                &rows,
+                &CsvOptions {
+                    preserve_sqlite_result_types: true,
+                    ..CsvOptions::default()
+                }
+            ),
+            "value\nbookie:sqlite-any:v1:integer:42\n"
+        );
     }
 
     #[test]

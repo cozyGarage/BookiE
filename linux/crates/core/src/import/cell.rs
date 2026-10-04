@@ -303,17 +303,26 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
     } else {
         column_kind(&column.data_type)
     };
-    if driver_id == "sqlite" && crate::sqlite_any_csv::is_any_type(&column.data_type) {
+    if driver_id == "sqlite" {
+        let is_any = crate::sqlite_any_csv::is_any_type(&column.data_type);
+        let is_unknown = crate::sqlite_any_csv::is_unknown_type(&column.data_type);
         if text == options.null_marker {
-            return if options.null_marker.is_empty() {
+            return if is_any && options.null_marker.is_empty() {
                 Err(CellError::AmbiguousSqliteAnyNullOrEmpty)
             } else {
                 Ok(Value::Null)
             };
         }
         return match crate::sqlite_any_csv::decode(text) {
-            Ok(Some(value)) => Ok(value),
-            Ok(None) => Ok(Value::Text(text.to_owned())),
+            Ok(Some(value)) if is_any || is_unknown => Ok(value),
+            Ok(Some(Value::Int(value))) => parse_non_null_cell(&value.to_string(), column, kind, driver_id),
+            Ok(Some(Value::Float(value))) => parse_non_null_cell(&value.to_string(), column, kind, driver_id),
+            Ok(Some(Value::Text(value))) => parse_non_null_cell(&value, column, kind, driver_id),
+            Ok(Some(Value::Bytes(value))) if matches!(kind, ColumnKind::Bytes) => Ok(Value::Bytes(value)),
+            Ok(Some(Value::Bytes(_))) => Err(CellError::NotBytes),
+            Ok(Some(_)) => Err(CellError::InvalidSqliteAnyCsvValue),
+            Ok(None) if is_any => Ok(Value::Text(text.to_owned())),
+            Ok(None) => parse_non_null_cell(text, column, kind, driver_id),
             Err(crate::sqlite_any_csv::DecodeError::Malformed) => Err(CellError::InvalidSqliteAnyCsvValue),
         };
     }

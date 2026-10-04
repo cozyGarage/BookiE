@@ -11,6 +11,10 @@ pub(crate) fn is_any_type(data_type: &str) -> bool {
     data_type.trim().eq_ignore_ascii_case("any")
 }
 
+pub(crate) fn is_unknown_type(data_type: &str) -> bool {
+    data_type.trim().is_empty() || data_type.trim().eq_ignore_ascii_case("null")
+}
+
 pub(crate) fn encode(value: &Value) -> Option<String> {
     let (kind, text) = match value {
         Value::Int(value) => ("integer", value.to_string()),

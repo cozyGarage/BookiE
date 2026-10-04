@@ -352,6 +352,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             null_to_empty: false,
             header_row: include_header,
             sanitize_formulas,
+            preserve_sqlite_result_types: driver_id == "sqlite",
             null_marker: Some(null_marker),
             ..Default::default()
         };
