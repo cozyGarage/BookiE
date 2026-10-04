@@ -700,6 +700,30 @@ async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() 
     }
     assert!(!sheet.contains("<f>"), "{sheet}");
 
+    let json_path = directory.path().join("sqlite-coalesce-any.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json[0]["result"], 42);
+    assert_eq!(json[1]["result"], "fallback");
+    assert_eq!(json[2]["result"], 1.5);
+    assert_eq!(json[3]["result"], "ready");
+    assert_eq!(json[4]["result"], "\\x00ff");
+    assert_eq!(json[5]["result"], "bookie:sqlite-any:v1:integer:9");
+    assert_eq!(json[0]["storage_class"], "integer");
+    assert_eq!(json[1]["storage_class"], "text");
+    assert_eq!(json[2]["storage_class"], "real");
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
