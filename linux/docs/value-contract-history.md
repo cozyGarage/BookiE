@@ -4685,9 +4685,21 @@ An app-level native contract exports a computed `CASE` result over STRICT
 destinations, and checks persisted values with `typeof()`. INTEGER, branch
 TEXT, SQL NULL, BLOB bytes, and text matching the reserved type-tag prefix all
 survive; the CASE result keeps conservative fallback metadata. Eight SQLite app
-`ANY` contracts passed with strict Clippy and formatting. COALESCE and other
-computed-expression consumer paths remain open. See the
+`ANY` contracts passed with strict Clippy and formatting. Other computed-
+expression consumer paths remain open. See the
 [CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json).
+
+## SQLite computed COALESCE STRICT ANY CSV round trip (2026-10-04)
+
+An app-level result-file contract exports `coalesce(value, 'fallback')` over
+STRICT `ANY`, imports the CSV into a typed destination and checks persisted
+values with native `typeof()`. INTEGER, REAL, fallback TEXT for SQL NULL,
+stored TEXT, BLOB bytes and tag-prefix-shaped text survive. The expression
+retains fallback metadata. Nine SQLite app `ANY` contracts passed with strict
+Clippy and formatting. Other computed-expression shapes, spreadsheet-app
+re-import and installed editing remain open. See the
+[COALESCE CSV evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json)
+and [COALESCE metadata evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
 
 ## DuckDB enum keyed grid edit, 2026-10-03
 

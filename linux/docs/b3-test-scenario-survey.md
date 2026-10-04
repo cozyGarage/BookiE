@@ -117,10 +117,12 @@ with [empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-1
 October 4 B3-4 follow-up: mixed `CASE` and `COALESCE` expressions over STRICT
 `ANY` keep fallback metadata while native `typeof()` proves per-row storage
 classes. A `CASE` result also round-trips INTEGER, TEXT, BLOB and NULL through
-the app CSV writer/importer with native storage-class checks; other expression
+the app CSV writer/importer with native storage-class checks. COALESCE also
+round-trips INTEGER, REAL, fallback TEXT, BLOB and stored TEXT. Other expression
 consumers remain open. See the [CASE metadata evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json),
-[CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
-and [COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
+[CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),
+[COALESCE metadata evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json)
+and [COALESCE CSV evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
 colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 
