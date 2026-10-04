@@ -1142,6 +1142,98 @@ async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 7), (1, 9), (2, 1.25), (2, 2.5), \
+             (3, '12'), (3, '3'), (4, '1.5'), \
+             (5, 'alpha'), (5, X'00FF'), (6, NULL), (6, NULL), \
+             (7, 1), (7, 2.5), \
+             (8, 9223372036854775807), (8, 1)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, AVG(value) AS result, \
+                    typeof(AVG(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+
+    let expected = [
+        (1, Value::Float(8.0), "real"),
+        (2, Value::Float(1.875), "real"),
+        (3, Value::Float(7.5), "real"),
+        (4, Value::Float(1.5), "real"),
+        (5, Value::Float(0.0), "real"),
+        (6, Value::Null, "null"),
+        (7, Value::Float(1.75), "real"),
+        (8, Value::Float((i64::MAX as f64 + 1.0) / 2.0), "real"),
+    ];
+    let expected_result_rows = expected
+        .iter()
+        .map(|(group_id, value, storage_class)| {
+            vec![
+                Value::Int(*group_id),
+                value.clone(),
+                Value::Text((*storage_class).into()),
+            ]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(result.rows, expected_result_rows);
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    let expected_restored_rows = expected
+        .iter()
+        .map(|(_, value, storage_class)| {
+            vec![
+                Value::Text((*storage_class).into()),
+                value.clone(),
+                Value::Text((*storage_class).into()),
+            ]
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(restored.rows, expected_restored_rows);
+}
+
+#[tokio::test]
 async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
