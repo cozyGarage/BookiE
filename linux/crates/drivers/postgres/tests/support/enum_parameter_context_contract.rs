@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-use tablepro_core::Value;
+use tablepro_core::{DriverError, Value};
 
 use crate::{connect, start_pg};
 
@@ -86,6 +86,20 @@ async fn value_contract_enum_parameters_infer_in_coalesce_and_array_append() {
                 Value::Text(expected_array.into()),
                 Value::Text(format!("{enum_type}[]")),
             ]]
+        );
+    }
+
+    for sql in [
+        "SELECT COALESCE($1, state) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
+        "SELECT array_append(ARRAY[state], $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
+    ] {
+        let error = connection
+            .query_params(sql, &[Value::Text("not-a-label".into())])
+            .await
+            .expect_err("invalid enum text must reach PostgreSQL's enum input validation");
+        assert!(
+            matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected native invalid-enum SQLSTATE 22P02, got {error:?}"
         );
     }
 
