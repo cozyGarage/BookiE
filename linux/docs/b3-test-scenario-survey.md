@@ -545,11 +545,13 @@ field. The clean strict layer passed 187 tests across all 11 suites on
 `19c5b6a`; other nested unsigned shapes remain open. See the
 [value evidence](value-contract-history.md#duckdb-nested-ubigint-struct-refusal-2026-10-02).
 
-The ClickHouse nested consumer contract now includes a numeric-key
-`Map(UInt8, Nullable(UInt128))`, checking exact server oracles, JSON/CSV
-preservation and safe refusal across type-less write consumers. The matrix has
-fifteen nested shapes, including both numeric-key Map/Array nesting orders with
-wide UInt128 values and NULL; other nested combinations remain open.
+The ClickHouse nested consumer contract now covers 16 shapes, including
+`Array(Tuple(String, Map(UInt8, Nullable(UInt128))))` with a value above
+`u64::MAX` and a NULL map value. Native type/JSON oracles, JSON/CSV
+preservation, type-less SQL/bind refusal and unchanged MergeTree storage are
+asserted ([follow-up evidence](evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json)).
+Both numeric-key Map/Array nesting orders are covered; other nested
+combinations and XLSX remain open.
 
 DuckDB now has separate native-oracle refusal contracts for `UBIGINT[]` and a
 `STRUCT` containing wide `UBIGINT` fields and NULL. The new STRUCT contract is

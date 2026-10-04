@@ -4095,6 +4095,18 @@ rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::v
 rtk cargo test --locked -p tablepro-driver-clickhouse --test integration value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --ignored --test-threads=1
 ```
 
+### ClickHouse tuple containing a numeric-key nullable UInt128 map, 2026-10-04
+
+The native-backed nested consumer contract now also checks
+`Array(Tuple(String, Map(UInt8, Nullable(UInt128))))` with a value above
+`u64::MAX` and a NULL map value. The ClickHouse `toTypeName` and `toJSONString`
+oracles match the driver result; JSON/CSV output and CSV parsing preserve the
+same value. Type-less SQL literal and parameter consumers refuse it, and a
+keyed MergeTree grid edit is rejected with the stored id, value, type and JSON
+unchanged. The focused Docker contract, strict ClickHouse Clippy and formatting
+passed. Other nested/type and XLSX combinations remain open; see the
+[evidence manifest](evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json).
+
 ## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
 
 The first 50 documents declare a field as string; the next fetched page contains

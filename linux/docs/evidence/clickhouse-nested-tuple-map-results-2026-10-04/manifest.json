@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "1d53405c141ed84efd2e3065d3d1112d1698af81",
+  "engine": "ClickHouse 24.8 in Docker via testcontainers",
+  "case": "Array of tuples containing a numeric-key map of nullable UInt128",
+  "test": "nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers",
+  "contract": [
+    "The new Array(Tuple(String, Map(UInt8, Nullable(UInt128)))) shape contains a value above u64::MAX and a separate NULL map value.",
+    "ClickHouse toTypeName and toJSONString are independent native type/value oracles for the decoded result.",
+    "JSON and CSV export plus CSV parsing preserve the native JSON value.",
+    "Type-less SQL literal, parameter binding and keyed MergeTree grid edit are refused; the stored id, value, native type and JSON remain unchanged."
+  ],
+  "validation": {
+    "focused_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed; nested matrix contains 16 shapes",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-clickhouse --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed before the source commit",
+      "log": null
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "dec86f111779abd84f1a49f52a0d165f3767faf68c37f22d41bd8204b2a7968a",
+    "clippy.txt": "2bc683fb4e4f4f21ee9ee39e2b8ecce2efe20d3b1be57bda5316aa519ab3d30a"
+  },
+  "source_fingerprints_sha256": {
+    "linux/crates/drivers/clickhouse/tests/support/nested_values.rs": "ceedf6257d720fce08ced7414ab697227f03bb4dca30594977dcd1587ed894b3"
+  },
+  "remaining": [
+    "Other nested/type combinations, additional consumer formats such as XLSX, and installed grid editing remain open."
+  ]
+}
