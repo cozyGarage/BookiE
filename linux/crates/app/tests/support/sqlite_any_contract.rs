@@ -401,7 +401,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
         .query(
             "SELECT 1 AS position, value AS result, typeof(value) AS storage_class \
              FROM flexible WHERE id = 1 \
-             UNION ALL SELECT 2, 'branch', typeof('branch') \
+             UNION ALL SELECT 2, '42', typeof('42') \
              UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
              ORDER BY position",
         )
@@ -410,7 +410,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     assert_eq!(result.columns[1].data_type, "NULL");
     assert_eq!(
         render_csv(&result.columns, &result.rows, &CsvOptions::default()),
-        "position,result,storage_class\n1,42,integer\n2,branch,text\n3,,null\n"
+        "position,result,storage_class\n1,42,integer\n2,42,text\n3,,null\n"
     );
 
     let directory = tempfile::tempdir().unwrap();
@@ -427,6 +427,9 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
         |_| {},
     )
     .unwrap();
+    if let Some(path) = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT") {
+        std::fs::copy(&workbook_path, path).unwrap();
+    }
     let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
     let mut sheet = String::new();
     std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
@@ -439,7 +442,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     assert!(sheet.contains("<c r=\"B2\"><v>42</v></c>"), "{sheet}");
     assert!(sheet.contains("<c r=\"B3\" t=\"s\">"), "{sheet}");
     assert!(!sheet.contains("r=\"B4\""), "{sheet}");
-    assert!(shared_strings.contains("<t>branch</t>"), "{shared_strings}");
+    assert!(shared_strings.contains("<t>42</t>"), "{shared_strings}");
 }
 
 #[tokio::test]
