@@ -100,6 +100,12 @@ engine/type/consumer/configuration case; preserve existing fallbacks/refusals.
 | B3-P5 delivery/SQL | One malformed-tail, zero-row, cap, multi-result or partial-stream case; identity/order/completeness and handle state |
 | B3-P6 mutation | One relevant survivor/timeout group; independent assertions and scoped rerun; unavailable output stays unproven |
 
+October 4 B3-5 follow-up: a SQL Server script with a valid `GO` batch before an
+unterminated quoted tail now fails whole-script planning, keeps tail placeholders
+out of extraction, remains malformed after formatting and is denied to agents
+by fail-closed policy. Other dialects and installed SQL editor interaction
+remain open; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
+
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL
 with native ENUM type and an untouched destination row. Spreadsheet-safe mode

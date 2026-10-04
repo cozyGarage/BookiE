@@ -175,6 +175,45 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_mssql_malformed_tail_blocks_the_whole_go_script() {
+        let sql = "SELECT :before AS value\r\nGO\r\nSELECT 'unfinished :inside\r\nGO\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MsSql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(!plan.diagnostics().is_empty());
+        assert!(script_statements(sql, "mssql").is_err());
+        let parameters = tablepro_core::extract_named_parameters(sql, "mssql");
+        assert_eq!(parameters.names, ["before"]);
+        assert!(parameters.sql.contains("SELECT 'unfinished :inside"));
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("SELECT 'unfinished :inside"));
+        assert!(formatted.contains("GO"));
+        assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
+
+        let facts = tablepro_policy::classify(sql, "mssql");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+        let config = tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
+        let decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::Agent {
+                token: "test".into(),
+                client: None,
+                model: None,
+            },
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &config,
+            None,
+        );
+        assert!(matches!(
+            decision,
+            tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        ));
+    }
+
+    #[test]
     fn mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments() {
         let sql = "SELECT :read AS value\r\nGO -- :go_comment ;\r\nUPDATE dbo.items SET name = :name WHERE id = :id\r\nGO -- :next_comment ;\r\nSELECT :last AS value";
         let grammar = SqlGrammar::MsSql;

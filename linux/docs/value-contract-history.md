@@ -5573,3 +5573,13 @@ as identical 390-character text without formulas. The focused contract, strict
 Clippy, formatting and OOXML/ODS checker pass. Other array families and
 spreadsheet applications remain open. See the
 [evidence manifest](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json).
+
+## SQL Server GO script with malformed quoted tail, 2026-10-04
+
+A SQL Server script with one valid `GO` batch followed by an unterminated
+quoted tail is rejected as a whole. The planner reports a diagnostic, execution
+planning returns an error, named-parameter extraction keeps only the earlier
+safe parameter, and formatting preserves the malformed tail and batch
+delimiters. Policy classifies the script as unparseable/write and denies it to
+an agent. The focused app regression and strict unit-only GTK+DuckDB values
+runner pass; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
