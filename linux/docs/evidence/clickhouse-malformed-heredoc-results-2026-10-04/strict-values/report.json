@@ -44,19 +44,19 @@
       "tests": 49,
       "exit_code": 0,
       "seconds": 104.988,
-      "log": "crates-app.log"
+      "log": "crates-app.txt"
     },
     "crates/core/Cargo.toml": {
       "tests": 58,
       "exit_code": 0,
       "seconds": 3.27,
-      "log": "crates-core.log"
+      "log": "crates-core.txt"
     },
     "crates/mcp/Cargo.toml": {
       "tests": 1,
       "exit_code": 0,
       "seconds": 0.003,
-      "log": "crates-mcp.log"
+      "log": "crates-mcp.txt"
     }
   },
   "gtk": true,

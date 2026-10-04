@@ -20,12 +20,12 @@
     "focused_core_test": {
       "command": "cargo test --locked -p tablepro-core --lib clickhouse_heredocs_hide_placeholders_through_their_close_or_end_of_input -- --test-threads=1",
       "result": "1 passed, 0 failed",
-      "log": "core-test.log"
+      "log": "core-test.txt"
     },
     "focused_app_test": {
       "command": "cargo test --locked -p tablepro-app --features duckdb --lib value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers -- --test-threads=1",
       "result": "1 passed, 0 failed",
-      "log": "app-test.log"
+      "log": "app-test.txt"
     },
     "strict_unit_values": {
       "command": "bash scripts/test-value-contracts.sh --gtk --duckdb --unit-only",
@@ -41,16 +41,16 @@
     "clippy": {
       "command": "cargo clippy --locked -p tablepro-app --features duckdb --all-targets -- -D warnings",
       "result": "passed",
-      "log": "clippy.log"
+      "log": "clippy.txt"
     },
     "format": {
       "command": "cargo fmt --all -- --check",
       "result": "passed",
-      "log": "fmt.log"
+      "log": "fmt.txt"
     },
     "repository_guards": {
-      "file_size": "passed; file-size.log",
-      "ignored_test_inventory": "passed; ignored-inventory.log",
+      "file_size": "passed; file-size.txt",
+      "ignored_test_inventory": "passed; ignored-inventory.txt",
       "git_diff_check": "passed"
     }
   },
@@ -59,12 +59,16 @@
     "Other dialect executable-identity and malformed-tail cases remain open, along with installed GTK acceptance."
   ],
   "sha256": {
-    "app-test.log": "021567e8d08065f6dee84a6847df960b2a0de3792a4ca93a94cc513040eb0b4e",
-    "core-test.log": "5a41c1d26c2e1af758916b535d39536e9729f48208e934589a8ac4be8b54a74f",
-    "clippy.log": "8d8a92ec3fd0e3a8c4b2b854ad57b4196c38a3b4e49cee823ab2f443df2697f9",
-    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "file-size.log": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
-    "ignored-inventory.log": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "strict-values/report.json": "d6cbf7077f0688ec71ec26a98acc8d86bb9fb691f304ca18840b3a05e3b11654"
+    "app-test.txt": "021567e8d08065f6dee84a6847df960b2a0de3792a4ca93a94cc513040eb0b4e",
+    "core-test.txt": "5a41c1d26c2e1af758916b535d39536e9729f48208e934589a8ac4be8b54a74f",
+    "clippy.txt": "8d8a92ec3fd0e3a8c4b2b854ad57b4196c38a3b4e49cee823ab2f443df2697f9",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "strict-values/compile.txt": "c3f00d5b739a0e650027978b192fee3ebd00587767051a85bd2a877eec6656d8",
+    "strict-values/crates-app.txt": "b6fac57257e6fed42ea2e3d4e3592a4d614aa0cee46469bca2d3fdd42f3245e8",
+    "strict-values/crates-core.txt": "572d519b7465241dd3dab91576da6e3396910b954c2faa1551d63ad942d9cce8",
+    "strict-values/crates-mcp.txt": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062",
+    "strict-values/report.json": "9339a990b27084ec4c646365dd39d5c16b5c31262ae66a4034bf56ba3cf9aecd"
   }
 }
