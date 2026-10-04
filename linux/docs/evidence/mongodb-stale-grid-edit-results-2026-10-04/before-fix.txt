@@ -1,0 +1,25 @@
+
+running 1 test
+test value_contracts::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change ... FAILED
+
+failures:
+
+---- value_contracts::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change stdout ----
+
+thread 'value_contracts::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change' (825780) panicked at crates/drivers/mongodb/tests/support/value_contracts.rs:923:5:
+assertion `left == right` failed: a concurrent field change must report a conflict
+  left: [1]
+ right: [0]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    value_contracts::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 1.26s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.53s
+     Running tests/integration.rs (target/debug/deps/integration-fc39c0a96012db67)
+error: test failed, to rerun pass `-p tablepro-driver-mongodb --test integration`

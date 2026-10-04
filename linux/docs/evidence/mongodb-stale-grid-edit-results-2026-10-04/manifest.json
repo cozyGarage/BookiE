@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "7d5f9fa4a0175d0ff7f9aa21a682b376125604e1",
+  "engine": "MongoDB 7 in Docker via testcontainers",
+  "case": "stale MongoDB grid updates preserve concurrent field changes",
+  "test": "stale_grid_edit_contract::value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change",
+  "outcome": "MongoDB grid edits now compare the materialized original values of edited fields in the atomic update filter. Concurrent same-field changes produce zero matched rows and are preserved.",
+  "contract": [
+    "Reads two documents through the BookiE MongoDB driver, then concurrently changes one payload and removes another document's explicitly NULL payload through a native client.",
+    "Builds and executes the same value-keyed update shape used by the app materializer; both stale updates return zero affected rows.",
+    "Checks the newer string value and sibling field remain stored, and the concurrent field removal remains missing.",
+    "Maps an equality guard bound to BSON NULL to MongoDB $type: 10 so an absent field cannot match as NULL.",
+    "A failing-first run on the prior implementation matched one row and overwrote its newer value."
+  ],
+  "validation": {
+    "before_fix": {
+      "source_commit": "635ceb88a",
+      "result": "failed as expected: matched_count was 1 instead of 0; the old filter only used _id",
+      "log": "before-fix.txt"
+    },
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-mongodb --test integration value_contract_stale_grid_edit_does_not_overwrite_concurrent_document_change -- --include-ignored --test-threads=1",
+      "result": "1 passed",
+      "log": "focused-test.txt"
+    },
+    "mongodb_integration": {
+      "command": "cargo test --locked -p tablepro-driver-mongodb --test integration -- --include-ignored --test-threads=1",
+      "result": "30 passed, 0 failed",
+      "log": "mongodb-integration.txt"
+    },
+    "app_library": {
+      "command": "cargo test --locked -p tablepro-app --lib",
+      "result": "467 passed, 24 ignored",
+      "log": "app-tests.txt"
+    },
+    "core_library": {
+      "command": "cargo test --locked -p tablepro-core --lib",
+      "result": "523 passed, 0 failed",
+      "log": "core-tests.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-core -p tablepro-app -p tablepro-driver-mongodb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --check --all",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "file_size": {
+      "command": "bash scripts/check-file-size.sh",
+      "result": "passed; the sql_dialect.rs baseline was reduced from 1205 to 1172",
+      "log": "file-size.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "limitations": [
+    "The field-value guard does not detect an ABA change that restores the original value.",
+    "Stale row deletes still match only the primary key and remain open.",
+    "This case does not establish snapshot isolation or qualify the 0.2.0 release."
+  ],
+  "source_worktree": "Implementation and docs were committed at 7d5f9fa4a before the retained test run. The two pre-existing .b4-f4f9-* scratch directories remain untracked outside this packet.",
+  "sha256": {
+    "app-tests.txt": "34ca2e759a866e496840f338ec94eacb49d3330081437f4c36fcbeb052bbca11",
+    "before-fix.txt": "0825d1e0f617a57b5d2886bce81173959d27002d6ba3985e6f12584c9aa7c134",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "core-tests.txt": "97f16c1588466b28019992a976c028ca31f797bb58ae55d958ef085d5125ef77",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "focused-test.txt": "78c3c7606811cfb43005b11b040a1a997d41d99c3715d2b4ef6a06e2e05cd457",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "mongodb-integration.txt": "3a60a0b1f351c9ee764ccd73a019614b62e49e698cfe4d31bd772d6b64435269"
+  }
+}

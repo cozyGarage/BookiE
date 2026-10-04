@@ -1,0 +1,1 @@
+cargo test: 30 passed (1 suite, 35.82s)
