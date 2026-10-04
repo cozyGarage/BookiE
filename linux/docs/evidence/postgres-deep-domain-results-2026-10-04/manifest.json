@@ -2,15 +2,16 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "02129a12df433cceb59d8794962cbdb42322210d",
+  "source_commit": "8c6cae59e14a70ea55c93390ae9b65b9f6bc18fa",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "shadowed-search_path enum metadata and consumer behavior through 64 nested domains",
   "test": "domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path",
   "contract": [
     "The native contract checks domain-over-enum chains at depths 6, 7, 8, 9, 10, 63 and 64 while search_path resolves a same-named shadow enum.",
     "At every tested depth, recursive catalog metadata resolves the target enum leaf; schema-aware keyed updates, label and SQL NULL draft inserts, typed equality filters, and exact outer-domain/native value checks succeed.",
-    "At depths through 63, an invalid raw text label is refused by PostgreSQL with SQLSTATE 22P02. At depth 64, SQLx cannot resolve the parameter type OIDs within its 64-step resolver limit; BookieE maps that failure to an explicit Unsupported result instead of an internal error.",
-    "The 64-level unsupported parameter operation does not mutate the row. Same-backend search_path changes and rollback checks preserve exact native values and types at every tested depth."
+    "At depths through 63, raw inferred SQL NULL updates succeed with the outer domain type preserved, and an invalid raw text label is refused by PostgreSQL with SQLSTATE 22P02.",
+    "At depth 64, SQLx cannot resolve inferred text or SQL NULL parameter type OIDs within its 64-step resolver limit; BookieE maps both failures to an explicit Unsupported result instead of an internal error, and neither operation mutates the row.",
+    "Same-backend search_path changes and rollback checks preserve exact native values and types at every tested depth."
   ],
   "validation": {
     "native_contract_group": {
@@ -31,11 +32,11 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "test.txt": "55948c94c12870846f65e6136d3e244934001c168c180e7f27bd411cafa39e36",
-    "clippy.txt": "3842a685bf2d03f2848703c6161816e02b00e8aa43c8c78599b6b6ef6f0bd7a9",
+    "test.txt": "4af09568833f69bc6584f485d947b02c35e366e0c80d4d5f1109bae6b0fbe75f",
+    "clippy.txt": "d57a20aa6fc1822000898e9ab61661f998fcc722228bd7a391eb64e024b817c1",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
-    "Other domain-chain depths, raw inferred text/NULL parameters at 64 nested domains, deeper-than-64 domains, and other enum/session configurations remain open."
+    "Other domain-chain depths, additional parameter value types at 64 nested domains, deeper-than-64 domains, and other enum/session configurations remain open."
   ]
 }

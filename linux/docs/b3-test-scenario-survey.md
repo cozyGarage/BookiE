@@ -295,9 +295,11 @@ A follow-up exercises 6-, 7-, 8-, 9-, 10-, 63- and 64-layer domains with a
 same-named shadow enum on the session `search_path`; a same-backend transaction
 changes `search_path` twice and repeats typed writes/filter checks using
 previously fetched metadata. Rollback and exact outer type/value with NULL
-preserved are asserted. Through 63 layers invalid raw text labels reach
-PostgreSQL; at 64 layers SQLx's resolver limit returns an explicit unsupported
-operation. Other domain depths and enum/session combinations remain open; see the
+preserved are asserted. Raw inferred SQL NULL updates preserve the outer
+domain type through 63 layers; invalid text labels reach PostgreSQL and are
+refused. At 64 layers SQLx's resolver limit returns an explicit unsupported
+operation for both text and SQL NULL. Other domain depths and enum/session
+combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)

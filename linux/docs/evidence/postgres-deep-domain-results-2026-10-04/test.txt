@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
      Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
 
 running 13 tests
@@ -16,5 +16,5 @@ test domain_contract::value_contract_five_domain_levels_over_enum_preserve_metad
 test domain_contract::value_contract_four_domain_levels_over_enum_preserve_metadata_and_keyed_values ... ok
 test domain_contract::value_contract_three_level_domain_over_enum_infers_parameters_and_decodes ... ok
 
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 93 filtered out; finished in 33.26s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 93 filtered out; finished in 26.74s
 

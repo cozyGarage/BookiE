@@ -5044,11 +5044,12 @@ combinations remain open; see the [evidence manifest](evidence/postgres-nine-dom
 The shadowed-`search_path` domain-over-enum contract now runs at depths 6, 7,
 8, 9, 10, 63 and 64. Enum-leaf metadata, schema-aware writes, typed filters,
 safe invalid-label outcomes and same-backend session changes/rollback pass at
-every depth. SQLx's 64-step OID resolver cannot infer a raw text parameter at 64
-nested domains; BookieE now reports this as an explicit unsupported operation
-instead of an internal error. The failed parameter operation leaves the row
-unchanged. All 13 PostgreSQL domain-contract tests, strict Clippy and formatting
-pass. Other domain depths and session configurations remain open; see the
+every depth. Raw inferred SQL NULL updates preserve the outer domain type
+through 63 layers. SQLx's 64-step OID resolver cannot infer raw text or SQL NULL
+parameters at 64 nested domains; BookieE reports both as explicit unsupported
+operations instead of internal errors, and neither operation changes the row.
+All 13 PostgreSQL domain-contract tests, strict Clippy and formatting pass.
+Other domain depths and session configurations remain open; see the
 [deep-domain evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum metadata after session search_path changes, 2026-10-04

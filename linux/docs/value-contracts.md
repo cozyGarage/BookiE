@@ -46,9 +46,10 @@ point does not represent all support for that engine.
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
 The PostgreSQL shadowed-search-path enum/domain write case now covers six
-through ten levels, plus 63 and 64 levels. The 64-level raw inferred text
-parameter path returns an explicit unsupported result at SQLx's type-resolver
-limit while schema-aware writes and filters still pass; see the [deep-domain
+through ten levels, plus 63 and 64 levels. Raw inferred text and SQL NULL
+parameters work through 63 levels; at 64 levels they return explicit
+unsupported results at SQLx's type-resolver limit while schema-aware writes and
+filters pass; see the [deep-domain
 boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json),
 [eight-level evidence](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
