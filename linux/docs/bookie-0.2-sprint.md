@@ -153,10 +153,11 @@ unchanged rows delete and stale string, untouched sibling, missing-field, and
 BSON NULL-to-array changes survive. ABA changes and the broader B3 matrix remain open
 ([evidence](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json)).
 
-October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
-contracts across all 11 suites, including 101 PostgreSQL contracts with the
-new array-operator and depth-boundary cases. The exact-revision report and raw
-logs are in the [value-tier packet](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
+October 4 follow-up: the GTK + DuckDB local value tier now passes 302 selected
+contracts across all 11 suites, including 104 PostgreSQL and 15 MongoDB
+contracts. The exact-revision report and raw logs are in the [latest value-tier
+packet](evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/manifest.json);
+the earlier 297-contract enum-array packet is retained separately.
 
 ## B3 work packets
 

@@ -1,0 +1,13 @@
+c962a800b937f67b7cac9b6ac7d7a7b08266134be28ae8755aa5fe3074c10942  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/compile.txt
+19487013baf62490f7f5f014b669eb6a4dc14d09393a02178f9ecfaa9fdc75ce  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-app.txt
+fd17d3666b3718cfdbadcd20f30a9fac7778d4c04d0c90e4a1b5ae48a5c68536  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-core.txt
+91efea0d39793ac786b6bfe90a5ecdc84d9b6f2830f8374a316466e2c95c8c68  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-clickhouse.txt
+385fe2897fbb8290554d4b3cc71496669595a29d3d4dfd1e922104add3eb1696  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-duckdb.txt
+8907234d1b2b8fa56984cf8978d21ad1decd36711cfbf5b874e9e6d9d4a220bb  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-mongodb.txt
+8a851f2d509c1e7d01d750d90dcc32bed3a674235dd85ee494fb2662fda336c4  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-mssql.txt
+5df69ae475a9ac219c24b7857558e130f5497d398046c97fe8c9620b22c76e74  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-mysql.txt
+f8d3736414de8de3b2f7e62f4cd350a1527c452c20c810184667d020fcbddb81  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-postgres.txt
+7234d912bc0b1d71e425cd2eda028a52ca4651fa212b73f10df9260c75e502b1  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-redis.txt
+bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-drivers-sqlite.txt
+b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/crates-mcp.txt
+796136a4a5628e45b95aede3971a1c550833fa623722b5bda12cce4d9508032c  docs/evidence/full-value-tier-mongodb-stale-delete-results-2026-10-04/value-tier-report.json

@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "117e80c9962beb38521d944c173f08353a5bc717",
+  "branch": "linux",
+  "command": "bash scripts/test-value-contracts.sh --gtk --duckdb",
+  "report": "value-tier-report.json",
+  "report_dirty": true,
+  "dirty_note": "The report marks the checkout dirty because the pre-existing sibling .b4-f4f9-target and .b4-f4f9-tmp scratch directories are visible to Git. Tracked files were at the source commit; those scratch directories were left untouched.",
+  "gtk": true,
+  "duckdb": true,
+  "unit_only": false,
+  "missing_suites": [],
+  "selected_contracts": 302,
+  "suite_count": 11,
+  "passed": true,
+  "suite_results": {
+    "app": 49,
+    "core": 58,
+    "clickhouse": 6,
+    "duckdb": 30,
+    "mongodb": 15,
+    "mssql": 6,
+    "mysql": 28,
+    "postgres": 104,
+    "redis": 4,
+    "sqlite": 1,
+    "mcp": 1
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 20.16,
+    "fresh_artifacts": 709,
+    "rebuilt_packages": 17
+  },
+  "logs": "one text file per reported suite plus compile.txt",
+  "checksums": "sha256sums.txt",
+  "scope_limit": "This selected value tier is not full workspace, installed-package, B4 acceptance or B7 release qualification."
+}
