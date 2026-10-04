@@ -126,6 +126,13 @@ planner diagnostics, whole-script refusal, safe-prefix parameters, formatter
 retention and fail-closed policy; see the
 [ClickHouse malformed-heredoc evidence](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: PostgreSQL schema-aware enum-domain metadata, keyed
+writes, filters and SQL NULL sibling preservation now pass through 258 nested
+domain layers while a same-named shadow enum leads `search_path`. The adjacent
+257/258 Docker contracts pass; raw inferred text/NULL remains explicitly
+unsupported from 64 layers. See the
+[258-layer evidence](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
+
 October 4 B3-4 follow-up: DuckDB enum CSV coverage now proves raw mode restores
 empty text, literal `NULL`, Unicode, quotes, formula-shaped labels and SQL NULL
 with native ENUM type and an untouched destination row. Spreadsheet-safe mode

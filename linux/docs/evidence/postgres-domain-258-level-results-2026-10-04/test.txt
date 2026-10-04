@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 2 tests
+test domain_depth_boundary_contract::value_contract_domain_over_enum_257_levels_preserve_schema_aware_values ... ok
+test domain_depth_boundary_contract::value_contract_domain_over_enum_258_levels_preserve_schema_aware_values ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 4.47s
+

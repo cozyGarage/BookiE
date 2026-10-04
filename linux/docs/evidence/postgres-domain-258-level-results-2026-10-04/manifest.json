@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "806900298379707b8620562078f20c324b8f941a",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "schema-aware enum-leaf resolution and writes at 258 nested domains under a shadowed search_path",
+  "test": "domain_depth_boundary_contract::value_contract_domain_over_enum_258_levels_preserve_schema_aware_values",
+  "contract": [
+    "Catalog metadata identifies the target enum leaf through 258 domain layers while another schema's same-named enum is first in search_path.",
+    "A schema-aware keyed edit and equality filter preserve the outer 258th domain and target value.",
+    "A SQL NULL sibling retains its value and outer-domain type after the write.",
+    "The adjacent 257- and 258-layer shadowed-search_path contracts pass together."
+  ],
+  "validation": {
+    "focused_tests": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration domain_depth_boundary_contract:: -- --include-ignored --test-threads=1",
+      "result": "2 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "repository_guards": {
+      "file_size": "passed; file-size.txt",
+      "ignored_test_inventory": "passed; ignored-inventory.txt",
+      "git_diff_check": "passed"
+    }
+  },
+  "remaining": [
+    "Domain depths beyond 258 remain open.",
+    "Raw inferred enum text and SQL NULL remain explicitly unsupported from 64 layers.",
+    "Additional inferred parameter value types and enum/session combinations need separate contracts."
+  ],
+  "sha256": {
+    "test.txt": "60fec7bb77978b22d1f942f37a162f02755cbed28f39344ea13d1e94f0dc05ea",
+    "clippy.txt": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "file-size.txt": "210f4354c536faf2c35b25c342a4031a3a09251dee8fd968c1bc49c369b94aa1",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7"
+  }
+}

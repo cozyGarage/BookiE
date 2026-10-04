@@ -5624,3 +5624,16 @@ The initial contract failed because the generic scanner only recognized
 PostgreSQL dollar quotes. The focused core and app selectors, strict unit-only
 GTK+DuckDB values tier, Clippy, formatting and repository guards pass. See the
 [evidence manifest](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).
+
+## PostgreSQL domain-over-enum schema-aware operations at 258 layers, 2026-10-04
+
+A PostgreSQL 16 Docker contract extends the deep domain-over-enum schema-aware
+boundary from 257 to 258 layers. With a same-named shadow enum first in
+`search_path`, catalog metadata still identifies the target enum leaf, a keyed
+edit and equality filter preserve the target outer-domain type, and a SQL NULL
+sibling remains unchanged. The adjacent 257- and 258-layer contracts pass,
+along with PostgreSQL Clippy, formatting, file-size and ignored-test inventory
+checks. Raw inferred text/NULL remains explicitly unsupported from 64 layers;
+domain depths beyond 258 and additional enum/session parameter combinations
+remain open. See the
+[evidence manifest](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
