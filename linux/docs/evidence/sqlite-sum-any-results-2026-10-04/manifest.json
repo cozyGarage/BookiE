@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "d876bad7a52b961a72f91acee1437272876b1044",
+  "engine": "SQLite STRICT ANY (in-memory native SQLite driver)",
+  "case": "grouped SUM() result storage classes through typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "Grouped SUM(value) over STRICT ANY returns INTEGER for integer inputs and numeric integer text, REAL for real inputs, numeric real text, and mixed integer/real inputs, and SQL NULL when every input is NULL.",
+    "Nonnumeric text and BLOB inputs follow SQLite SUM coercion and produce REAL 0.0; source typeof() and explicit expected values pin this behavior.",
+    "Typed CSV export/import restores each computed result carrier into STRICT ANY, verified by native typeof() and exact values.",
+    "Summing 9223372036854775807 and 1 returns SQLite's integer overflow error instead of silently promoting the integer result."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_ -- --test-threads=1",
+      "result": "14 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "efa84932326729017b7749d751516a9c1bf81eddf70ad8d2ecfcf47618452e51",
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression shapes, additional consumer formats, spreadsheet-app re-import and installed editing remain open."
+  ]
+}

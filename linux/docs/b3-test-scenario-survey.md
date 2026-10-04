@@ -204,6 +204,13 @@ storage classes and keeps JSON null distinct from a missing path in the
 companion kind column. Spreadsheet-app re-import remains open. See the
 [JSON extraction evidence](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
 
+October 4 B3-3/B3-4 follow-up: grouped SQLite `SUM()` over STRICT `ANY`
+preserves computed INTEGER, REAL and SQL NULL result classes through typed CSV
+re-import. Numeric text contributes to integer/real sums by SQLite's native
+rules, nonnumeric text and BLOB inputs yield REAL zero, and an integer-overflow
+case is refused with SQLite's native error. See the
+[SUM evidence](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
+
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and

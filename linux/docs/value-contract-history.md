@@ -5128,6 +5128,17 @@ cells for numeric results and shared strings for text, with no formulas.
 Spreadsheet-app re-import remains open. See the
 [evidence manifest](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
 
+## SQLite SUM over computed STRICT ANY result round trip, 2026-10-04
+
+Grouped `SUM(value)` over STRICT `ANY` returns INTEGER, REAL and SQL NULL
+according to SQLite's input storage classes and coercion rules. Numeric text
+contributes numerically; nonnumeric text and BLOB inputs produce REAL zero.
+Typed CSV export/import preserves each result carrier, verified by native
+`typeof()`. Adding `9223372036854775807` and `1` returns SQLite's integer
+overflow error instead of a rounded value. All 14 selected SQLite app
+contracts, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
+
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit
