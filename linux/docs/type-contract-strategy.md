@@ -51,6 +51,11 @@ The keyed-edit regression now changes ordinary session `search_path` twice
 inside one transaction on the same backend, then verifies target-schema enum
 metadata and write safety under the final shadowed path; see the
 [session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
+
+A quoted-identifier enum case verifies catalog metadata, keyed edit, draft
+insert and typed filtering when both schema and type names contain spaces and
+embedded quotes. PostgreSQL catalog values confirm the exact stored enum type
+and values; see [quoted enum identifier evidence](evidence/postgres-quoted-enum-identifiers-results-2026-10-04/manifest.json).
 The same contract changes `search_path` with `SET LOCAL` and verifies that an
 uncast `status = $1` query still infers the target table's enum type.
 When `pg_typeof($1)` leaves an enum comparison parameter ambiguous, native

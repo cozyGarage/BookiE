@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "9c16c4c242aa3b8d29391622cb3f93c197fc0df7",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Quoted mixed-case schema and enum identifiers through metadata, edit, draft insert and typed filter consumers",
+  "test": "quoted_enum_identifier_contract::value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writes",
+  "contract": [
+    "Catalog metadata resolves a schema and enum type whose quoted names contain spaces and embedded double quotes.",
+    "Schema-aware keyed edit and draft insert generate correctly quoted type casts and preserve an empty enum label, Unicode label, literal NULL label and SQL NULL distinctly.",
+    "A typed equality filter returns only the native enum literal-NULL row.",
+    "PostgreSQL catalog joins verify the exact stored schema/type/value, row identity and untouched sibling values after writes."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writes -- --include-ignored --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "fb18e767b8e5d4684adda016c5cce04152a38db20e517e39cd4cd5b09ed418f5",
+    "clippy.txt": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other enum consumer/session configurations and the broader B3 engine/type matrix remain open."
+  ]
+}

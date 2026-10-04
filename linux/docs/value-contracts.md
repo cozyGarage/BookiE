@@ -59,6 +59,9 @@ A PostgreSQL 16 transaction also changes ordinary session `search_path` twice
 on one backend, then verifies target-schema enum metadata and keyed-write safety
 under the final shadowed path ([session evidence](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json)).
 
+Quoted schema/type identifiers containing spaces and embedded quotes now have
+metadata, keyed-edit, draft-insert and filter coverage ([evidence](evidence/postgres-quoted-enum-identifiers-results-2026-10-04/manifest.json)).
+
 PostgreSQL custom-enum scalar and array labels at 63 bytes are verified for
 ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving
 a type behind ([accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json), [refusal evidence](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json)).
