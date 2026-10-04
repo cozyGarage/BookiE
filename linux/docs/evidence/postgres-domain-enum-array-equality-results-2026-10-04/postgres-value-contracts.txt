@@ -1,4 +1,4 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
      Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
 
 running 107 tests
@@ -110,4 +110,4 @@ test wide_numeric_contract::value_contract_numeric_domain_preserves_wide_value_a
 test wide_numeric_contract::value_contract_numeric_special_grid_edits_match_server_text ... ok
 test wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value ... ok
 
-test result: ok. 107 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 236.25s
+test result: ok. 107 passed; 0 failed; 0 ignored; 0 measured; 29 filtered out; finished in 233.82s

@@ -2,14 +2,23 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "18efd849dd058cb06735f494405b18aab0d511f9",
-  "case": "PostgreSQL domain-over-enum array equality with inferred domain-array parameters",
+  "source_commit": "cb63f5303e18f48db17236e4df03f2aae33c34c8",
+  "case": "PostgreSQL domain-over-enum array parameters across all six comparison operators",
   "environment": "PostgreSQL 16 local Docker integration fixture; cached build reused",
   "scenario": {
     "test": "value_contract_domain_over_enum_array_equality_infers_parameter_and_bounds",
+    "operators": [
+      "=",
+      "<>",
+      "<",
+      "<=",
+      ">",
+      ">="
+    ],
     "assertions": [
-      "Native equality results cover duplicate matching rows and NULL propagation.",
-      "An array with lower bound 0 compares unequal to the otherwise identical default-bound array and equal to the corresponding [0:1] parameter.",
+      "Native PostgreSQL comparison results match for all six operators.",
+      "Duplicate values compare equal.",
+      "An array with lower bound 0 compares differently from the default-bound array with identical elements.",
       "Empty arrays, SQL NULL arrays, and arrays containing NULL are distinct cases.",
       "pg_typeof($1) is the schema-qualified domain-over-enum array type.",
       "encode(array_send($1), hex) matches PostgreSQL native typed-array wire bytes."
@@ -53,11 +62,11 @@
     "diff_check": "git diff --check"
   },
   "sha256": {
-    "clippy.txt": "d7ce00f1aa81b846f8ffa4834de3afcb087447f181a069acbcd5750c2232b75f",
-    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "clippy.txt": "1f1fe690dc2cedb4a1890650cb6a4170cd308a6942a65267f2d7155a409066fd",
+    "diff-check.txt": "e40b21b83eec86b9151852fef28a4d53b0a512e745c496acd049c9b41c229a59",
     "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
-    "focused.txt": "24f66e240580da51de0dc845a3fd04d31825b7556e22f8397b3bd22e6eb82555",
+    "focused.txt": "ece55909909c2f17349542325b4189cda1125d492a672112a33994a43070ed2e",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "postgres-value-contracts.txt": "d6d519912afd2c87c4a4b4a61048e52fc9a2736a5054925144aae061a6bfaa53"
+    "postgres-value-contracts.txt": "724210358883dbb56634e36dfeae3afbc78007ce247a7fa703909826ed8e781f"
   }
 }
