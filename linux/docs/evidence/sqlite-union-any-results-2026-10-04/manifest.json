@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "81cea021c0a5544c0b18cc9079eb04880fd8821e",
+  "engine": "SQLite in-memory STRICT ANY fixture",
+  "case": "Compound SELECT output provenance over STRICT ANY",
+  "test": "compound_union_over_strict_any_keeps_fallback_metadata_and_storage_classes",
+  "contract": [
+    "A UNION ALL result over a STRICT ANY column and other branches retains SQLx fallback metadata rather than inheriting ANY from the first branch.",
+    "The same conservative metadata applies when the compound result is selected through a CTE or derived table.",
+    "Native typeof() reports integer, text and null for the three compound-result rows while the returned Value cells preserve those kinds.",
+    "Ordinary, bound-query and transaction paths retain the fallback metadata and exact values.",
+    "A direct ANY column remains declared ANY when an unrelated UNION appears only in its filter subquery."
+  ],
+  "validation": {
+    "focused": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --test integration compound_union_over_strict_any_keeps_fallback_metadata_and_storage_classes -- --exact",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "sqlite_package_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite",
+      "result": "47 passed, 0 failed, 0 ignored; 13 unit, 7 CSV import, 27 integration",
+      "log": "sqlite-suite.txt"
+    },
+    "app_sqlite_any_contracts": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_any_contract:: -- --test-threads=1",
+      "result": "5 passed, 0 failed",
+      "log": "app-sqlite-any.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-sqlite --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "f93fbfefa3233b85a63f4c34e4332dbb83fdedb0517e9d002a0ec0f33317c03e",
+    "sqlite-suite.txt": "38b55c36fd58a7973c0b073264741d65acc1b9804741d35268caea9a31ded72b",
+    "app-sqlite-any.txt": "963eb3bc7ac9bac21a05e1b793b3199d8dacfefeb3b2e87d4967c0f28bb2eed6",
+    "clippy.txt": "0dac9b1dfc40ee509e03d3c57664be8ba7419b08e0b186e871b98cee05710e55",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other SQLite computed-expression shapes, storage-class/affinity mixtures, non-SQLite consumers and installed editing remain open.",
+    "This bounded regression does not close the broader B3 type, engine, consumer or configuration matrix."
+  ]
+}

@@ -121,6 +121,14 @@ and [COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest
 Unambiguous attached-schema query origins also recover declared `ANY` metadata;
 colliding flattened names retain fallback metadata. See [attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json)
 
+October 4 B3-4 follow-up: SQLite compound `UNION ALL` outputs over STRICT
+`ANY` retain fallback metadata through direct, CTE and derived-table queries,
+ordinary/bound/transaction consumers, while native `typeof()` checks preserve
+the INTEGER/TEXT/NULL row kinds. Direct `ANY` projection still recovers declared
+metadata when a UNION occurs only in its filter. Other computed-expression
+shapes and consumers remain open; see the
+[compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json).
+
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and

@@ -4626,6 +4626,20 @@ passed. The failing-first log, full app test logs, local layer reports, and
 source fingerprints are in the
 [STRICT ANY evidence packet](evidence/sqlite-strict-any-results-2026-10-03/manifest.json).
 
+## SQLite compound SELECT provenance over STRICT ANY (2026-10-04)
+
+A new native regression found that SQLite origin metadata on a `UNION ALL`
+result can point at the first branch's STRICT `ANY` column even when later
+branches return text and SQL NULL. The driver now keeps SQLx's fallback
+metadata for compound results, including a CTE or derived-table wrapper, and
+for query syntax it cannot classify. `typeof()` independently confirms the
+integer, text and NULL storage classes; ordinary, bound and transaction paths
+return the same cells. A direct table-column query still reports `ANY` when an
+unrelated UNION exists only in its filter. The focused test, all 47 driver tests
+and five app STRICT-ANY contracts passed, as did Clippy and formatting. Other
+computed-expression shapes and consumers remain open. See the
+[compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json).
+
 ## DuckDB enum keyed grid edit, 2026-10-03
 
 A local DuckDB-backed app contract now parses a nonempty enum label through the

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/integration.rs (linux/target/debug/deps/integration-9b45a5e02a68aa62)
+
+running 1 test
+test compound_union_over_strict_any_keeps_fallback_metadata_and_storage_classes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 26 filtered out; finished in 0.00s
+
