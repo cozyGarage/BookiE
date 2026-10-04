@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "f9a3ada83",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "array of a domain over bytea",
+  "test": "domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes",
+  "contract": [
+    "A domain-over-bytea array retains its declared qualified array type and decodes non-UTF-8 bytes, an empty byte string and a NULL element distinctly.",
+    "SQL NULL and empty arrays remain distinct.",
+    "Qualified text binding reproduces the native array type, JSON and array_send wire bytes for populated, NULL and empty arrays."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "integration_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "120 passed, 0 failed"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL domain-array base types, consumers and session configurations remain open in B3."
+  ]
+}

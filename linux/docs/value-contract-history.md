@@ -2027,6 +2027,13 @@ preserves the array literal as exact text, the builder emits the fixed
 app-parser and Docker integration tests passed. The strict shared-value report
 above includes this bytea[] contract.
 
+A separate result/binding contract covers arrays of a domain over `bytea`. It
+checks declared domain-array metadata, a non-UTF-8 element, an empty element, a
+NULL element, SQL NULL versus an empty array, and native JSON/`array_send`
+oracles after qualified text binding. The focused Docker test and the full
+PostgreSQL integration suite passed; see the
+[source-fingerprinted evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json).
+
 The UUID[] edit exposed a parser bug: `classify_type` matched the `uuid`
 substring before accounting for PostgreSQL array metadata, so it tried to parse
 the entire `{...}` literal as one UUID. PostgreSQL `[]` metadata now stays text

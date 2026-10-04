@@ -32,6 +32,10 @@ point does not represent all support for that engine.
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 
+A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
+elements plus the declared domain-array type through decoding and qualified
+binding ([evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json)).
+
 One compound SQLite STRICT `ANY` workbook now preserves numeric `42`, text
 `42` and blank SQL NULL through a LibreOffice Calc import, ODS save and XLSX
 re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manifest.json)).
