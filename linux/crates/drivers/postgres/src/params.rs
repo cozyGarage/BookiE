@@ -48,18 +48,32 @@ pub(super) async fn describe_query_parameters(
         .parameters()
         .and_then(|types| types.left())
         .unwrap_or_default();
-    let enum_types = parameters.iter().map(enum_type_info).collect();
+    let enum_types = parameters.iter().map(enum_type_info).collect::<Result<Vec<_>, _>>()?;
     Ok(PgParameterDescription {
         enum_types,
         columns: statement_columns(statement.columns()),
     })
 }
 
-fn enum_type_info(type_info: &PgTypeInfo) -> Option<PgTypeInfo> {
-    match type_info.kind() {
-        PgTypeKind::Enum(_) => Some(type_info.clone()),
-        PgTypeKind::Domain(base) => enum_type_info(base),
-        _ => None,
+fn enum_type_info(type_info: &PgTypeInfo) -> Result<Option<PgTypeInfo>, DriverError> {
+    let mut current = type_info.clone();
+    let mut domain_depth = 0;
+    loop {
+        match current.kind() {
+            PgTypeKind::Enum(_) => {
+                if domain_depth >= 64 {
+                    return Err(DriverError::Unsupported(
+                        "PostgreSQL enum domain hierarchy exceeds the driver's resolvable depth".into(),
+                    ));
+                }
+                return Ok(Some(current));
+            }
+            PgTypeKind::Domain(base) => {
+                domain_depth += 1;
+                current = base.clone();
+            }
+            _ => return Ok(None),
+        }
     }
 }
 

@@ -1540,6 +1540,21 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         ]]
     );
 
+    if levels >= 64 {
+        let valid_raw = transaction
+            .execute_params(
+                &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
+                &[Value::Text("ready".into())],
+            )
+            .await
+            .expect_err(&format!("raw inferred enum text must be refused at depth {levels}"));
+        assert!(
+            matches!(&valid_raw, tablepro_core::DriverError::Unsupported(message)
+                if message.contains("resolvable depth")),
+            "depth {levels}: {valid_raw:?}"
+        );
+    }
+
     let invalid = transaction
         .execute_params(
             &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
@@ -1549,7 +1564,7 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
         .expect_err(&format!(
             "{levels}-level target domain rejects invalid labels under shadowed search_path"
         ));
-    if levels > 64 {
+    if levels >= 64 {
         assert!(
             matches!(&invalid, tablepro_core::DriverError::Unsupported(message)
                 if message.contains("resolvable depth")),
