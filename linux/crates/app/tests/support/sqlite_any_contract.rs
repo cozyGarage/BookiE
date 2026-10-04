@@ -1043,3 +1043,181 @@ async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, document ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            r#"INSERT INTO flexible VALUES
+                 (1, '{"v":9223372036854775807}'),
+                 (2, '{"v":1.25}'),
+                 (3, '{"v":"42"}'),
+                 (4, '{"v":true}'),
+                 (5, '{"v":null}'),
+                 (6, '{"v":{"x":1}}'),
+                 (7, '{"v":[1,2]}'),
+                 (8, '{"v":"bookie:sqlite-any:v1:integer:9"}'),
+                 (9, '{}')"#,
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, \
+                 storage_class TEXT, json_kind TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, json_extract(document, '$.v') AS result, \
+                    typeof(json_extract(document, '$.v')) AS storage_class, \
+                    json_type(document, '$.v') AS json_kind \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Int(i64::MAX),
+                Value::Text("integer".into()),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Float(1.25),
+                Value::Text("real".into()),
+                Value::Text("real".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("42".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(4),
+                Value::Int(1),
+                Value::Text("integer".into()),
+                Value::Text("true".into()),
+            ],
+            vec![
+                Value::Int(5),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Int(6),
+                Value::Text("{\"x\":1}".into()),
+                Value::Text("text".into()),
+                Value::Text("object".into()),
+            ],
+            vec![
+                Value::Int(7),
+                Value::Text("[1,2]".into()),
+                Value::Text("text".into()),
+                Value::Text("array".into()),
+            ],
+            vec![
+                Value::Int(8),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+            ],
+            vec![Value::Int(9), Value::Null, Value::Text("null".into()), Value::Null,],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2), Some(3)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class, json_kind FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(i64::MAX),
+                Value::Text("integer".into()),
+                Value::Text("integer".into()),
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.25),
+                Value::Text("real".into()),
+                Value::Text("real".into()),
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("42".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(1),
+                Value::Text("integer".into()),
+                Value::Text("true".into()),
+            ],
+            vec![
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Text("null".into()),
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("{\"x\":1}".into()),
+                Value::Text("text".into()),
+                Value::Text("object".into()),
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("[1,2]".into()),
+                Value::Text("text".into()),
+                Value::Text("array".into()),
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Text("null".into()),
+                Value::Null,
+                Value::Text("null".into()),
+                Value::Null,
+            ],
+        ]
+    );
+}
