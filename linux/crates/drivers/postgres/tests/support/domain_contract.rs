@@ -1388,6 +1388,123 @@ async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, level
             ],
         ]
     );
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(&format!("SET search_path TO {schema}, {shadow_schema}"))
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text(schema.clone())]]
+    );
+    transaction
+        .execute(&format!("SET search_path TO {shadow_schema}"))
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text(shadow_schema.clone())]]
+    );
+
+    let (session_update, session_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(&schema),
+        "rows",
+        &columns,
+        &[(1, Value::Text("paused".into()))],
+        &[Value::Int(3)],
+    )
+    .unwrap();
+    transaction
+        .execute_params(&session_update, &session_params)
+        .await
+        .unwrap();
+    let (session_insert, session_insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+        "postgres",
+        Some(&schema),
+        "rows",
+        &columns,
+        &[Value::Int(6), Value::Text("paused".into())],
+    )
+    .unwrap();
+    transaction
+        .execute_params(&session_insert, &session_insert_params)
+        .await
+        .unwrap();
+    let (session_null_insert, session_null_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+        "postgres",
+        Some(&schema),
+        "rows",
+        &columns,
+        &[Value::Int(7), Value::Null],
+    )
+    .unwrap();
+    transaction
+        .execute_params(&session_null_insert, &session_null_params)
+        .await
+        .unwrap();
+
+    let session_rows = transaction
+        .query_params(
+            &format!(
+                "SELECT id, status::text, pg_typeof(status)::text \
+                 FROM {schema}.rows WHERE {where_sql} ORDER BY id"
+            ),
+            &params,
+        )
+        .await
+        .unwrap();
+    let typed_paused = Value::Text(format!("{schema}.state_domain_{levels}"));
+    assert_eq!(
+        session_rows.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("paused".into()), typed_paused.clone()],
+            vec![Value::Int(3), Value::Text("paused".into()), typed_paused.clone()],
+            vec![Value::Int(4), Value::Text("paused".into()), typed_paused.clone()],
+            vec![Value::Int(6), Value::Text("paused".into()), typed_paused],
+        ]
+    );
+    let session_null = transaction
+        .query(&format!(
+            "SELECT id, status IS NULL, pg_typeof(status)::text \
+             FROM {schema}.rows WHERE id = 7"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        session_null.rows,
+        vec![vec![
+            Value::Int(7),
+            Value::Bool(true),
+            Value::Text(format!("{schema}.state_domain_{levels}")),
+        ]]
+    );
+
+    let invalid = transaction
+        .execute_params(
+            &format!("UPDATE {schema}.rows SET status = $1 WHERE id = 3"),
+            &[Value::Text("not a label".into())],
+        )
+        .await
+        .expect_err(&format!(
+            "{levels}-level target domain rejects invalid labels under shadowed search_path"
+        ));
+    assert!(matches!(
+        invalid,
+        tablepro_core::DriverError::Query {
+            sqlstate: Some(code), ..
+        } if code == "22P02"
+    ));
+    transaction.rollback().await.unwrap();
+
+    let after_rollback = connection
+        .query(&format!(
+            "SELECT id, status::text, pg_typeof(status)::text FROM {schema}.rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(after_rollback.rows, stored.rows);
 }
 
 #[tokio::test]
