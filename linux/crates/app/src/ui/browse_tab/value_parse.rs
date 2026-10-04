@@ -43,9 +43,88 @@ pub(super) fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Re
     }
 }
 
+fn parse_mysql_enum_set_input(text: &str, col: Option<&ColumnInfo>) -> Option<Result<Value, String>> {
+    let column = col?;
+    let data_type = column.data_type.trim();
+    let lower = data_type.to_ascii_lowercase();
+    let is_enum = lower.starts_with("enum");
+    let is_set = lower.starts_with("set");
+    if !is_enum && !is_set {
+        return None;
+    }
+    let Some(labels) = parse_mysql_enum_set_labels(data_type) else {
+        return Some(Err(crate::tr!("Could not safely read ENUM or SET members")));
+    };
+    let valid = if is_enum {
+        labels.iter().any(|label| label == text)
+    } else {
+        text.split(',').all(|member| labels.iter().any(|label| label == member))
+    };
+    if valid {
+        Some(Ok(Value::Text(text.to_owned())))
+    } else {
+        Some(Err(crate::tr!("Value is not a declared ENUM or SET member")))
+    }
+}
+
+fn parse_mysql_enum_set_labels(data_type: &str) -> Option<Vec<String>> {
+    let open = data_type.find('(')?;
+    let kind = data_type[..open].trim();
+    if !kind.eq_ignore_ascii_case("enum") && !kind.eq_ignore_ascii_case("set") {
+        return None;
+    }
+    let mut chars = data_type[open + 1..].strip_suffix(')')?.chars().peekable();
+    let mut labels = Vec::new();
+    loop {
+        while chars.peek().is_some_and(|ch| ch.is_whitespace()) {
+            chars.next();
+        }
+        if chars.next()? != '\'' {
+            return None;
+        }
+        let mut label = String::new();
+        loop {
+            match chars.next()? {
+                '\\' => {
+                    let escaped = chars.next()?;
+                    label.push(match escaped {
+                        '0' => '\0',
+                        'b' => '\u{0008}',
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        'Z' => '\u{001a}',
+                        other => other,
+                    });
+                }
+                '\'' if chars.peek() == Some(&'\'') => {
+                    chars.next();
+                    label.push('\'');
+                }
+                '\'' => break,
+                ch => label.push(ch),
+            }
+        }
+        labels.push(label);
+        while chars.peek().is_some_and(|ch| ch.is_whitespace()) {
+            chars.next();
+        }
+        match chars.next() {
+            None => return Some(labels),
+            Some(',') => {}
+            Some(_) => return None,
+        }
+    }
+}
+
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
     if text.is_empty() {
         return parse_input_for_column(text, col);
+    }
+    if driver_id == "mysql"
+        && let Some(result) = parse_mysql_enum_set_input(text, col)
+    {
+        return result;
     }
     let trimmed = text.trim();
     if driver_id == "mysql"
@@ -708,6 +787,10 @@ mod duckdb_enum_contract;
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
+
+#[cfg(test)]
+#[path = "../../../tests/support/mysql_enum_set_contract.rs"]
+mod mysql_enum_set_contract;
 
 #[cfg(test)]
 #[path = "../../../tests/support/mysql_temporal_contract.rs"]

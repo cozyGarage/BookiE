@@ -1,0 +1,215 @@
+use super::parse_input_for_driver;
+use tablepro_core::{ColumnInfo, Value};
+
+#[test]
+fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
+    let column = |name: &str, data_type: &str| ColumnInfo {
+        name: name.into(),
+        data_type: data_type.into(),
+        nullable: false,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+    };
+    for (data_type, input) in [
+        ("enum('happy','it''s ok','back\\\\slash')", "it's ok"),
+        ("set('read','write','slash\\\\path')", "write,slash\\path"),
+    ] {
+        assert_eq!(
+            parse_input_for_driver(input, Some(&column("value", data_type)), "mysql"),
+            Ok(Value::Text(input.into()))
+        );
+    }
+    assert!(parse_input_for_driver("unknown", Some(&column("value", "enum('known')")), "mysql").is_err());
+    assert!(parse_input_for_driver("read,unknown", Some(&column("value", "set('read','write')")), "mysql").is_err());
+    assert_eq!(
+        parse_input_for_driver("happy", Some(&column("value", "enum('happy','it\\'s ok')")), "mysql"),
+        Ok(Value::Text("happy".into()))
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::mysql::Mysql;
+
+    let container = Mysql::default()
+        .with_env_var("MYSQL_ROOT_PASSWORD", "tablepro_test")
+        .with_cmd(["--default-authentication-plugin=mysql_native_password"])
+        .start()
+        .await
+        .unwrap();
+    let connection = drivers_mysql::MysqlDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(3306).await.unwrap(),
+            database: "test".into(),
+            username: "root".into(),
+            password: secrecy::SecretString::new("tablepro_test".to_string().into()),
+            tls: TlsConfig::disabled(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let mut session = connection.open_session().await.unwrap();
+    session
+        .query_params_controlled(
+            "CREATE TABLE enum_set_grid (
+                id INT PRIMARY KEY,
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', '<tag>&'),
+                perms SET('read', 'write', 'slash\\\\path', 'NULL', '<member>')
+            )",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    session
+        .query_params_controlled(
+            "INSERT INTO enum_set_grid VALUES
+                (1, 'happy', 'read'), (2, '<tag>&', '<member>')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "enum_set_grid").await.unwrap();
+    let mood = columns.iter().position(|column| column.name == "mood").unwrap();
+    let perms = columns.iter().position(|column| column.name == "perms").unwrap();
+    let siblings = session
+        .query_params_controlled(
+            "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
+             FROM enum_set_grid WHERE id = 2",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap()
+        .rows;
+    let modes = [
+        "",
+        "NO_BACKSLASH_ESCAPES",
+        "ANSI_QUOTES",
+        "ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+    ];
+    for mode in modes {
+        session
+            .query_params_controlled(&format!("SET SESSION sql_mode = '{mode}'"), &[], &control)
+            .await
+            .unwrap();
+        let active = session
+            .query_params_controlled("SELECT @@SESSION.sql_mode", &[], &control)
+            .await
+            .unwrap();
+        let Value::Text(active) = &active.rows[0][0] else {
+            panic!("unexpected sql_mode: {:?}", active.rows[0][0]);
+        };
+        assert_eq!(
+            active.split(',').any(|value| value == "NO_BACKSLASH_ESCAPES"),
+            mode.contains("NO_BACKSLASH_ESCAPES")
+        );
+        assert_eq!(
+            active.split(',').any(|value| value == "ANSI_QUOTES"),
+            mode.contains("ANSI_QUOTES")
+        );
+
+        assert!(
+            parse_input_for_driver("unknown", Some(&columns[mood]), "mysql").is_err(),
+            "unknown ENUM labels must be rejected in mode {mode:?}"
+        );
+        assert!(
+            parse_input_for_driver("read,unknown", Some(&columns[perms]), "mysql").is_err(),
+            "unknown SET members must be rejected in mode {mode:?}"
+        );
+
+        if mode.is_empty() {
+            session
+                .query_params_controlled("START TRANSACTION", &[], &control)
+                .await
+                .unwrap();
+            for (column, invalid) in [("mood", "unknown"), ("perms", "read,unknown")] {
+                session
+                    .query_params_controlled(
+                        &format!("UPDATE enum_set_grid SET {column} = ? WHERE id = 1"),
+                        &[Value::Text(invalid.into())],
+                        &control,
+                    )
+                    .await
+                    .unwrap();
+                let coerced = session
+                    .query_params_controlled(
+                        &format!("SELECT CAST({column} + 0 AS CHAR), HEX({column}) FROM enum_set_grid WHERE id = 1"),
+                        &[],
+                        &control,
+                    )
+                    .await
+                    .unwrap();
+                if column == "mood" {
+                    assert_eq!(
+                        coerced.rows[0],
+                        vec![Value::Text("0".into()), Value::Text(String::new())]
+                    );
+                } else {
+                    assert_eq!(
+                        coerced.rows[0],
+                        vec![Value::Text("1".into()), Value::Text("72656164".into())]
+                    );
+                }
+            }
+            session
+                .query_params_controlled("ROLLBACK", &[], &control)
+                .await
+                .unwrap();
+        }
+
+        let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
+        let perms_value = parse_input_for_driver("write,slash\\path", Some(&columns[perms]), "mysql").unwrap();
+        assert_eq!(mood_value, Value::Text("it's ok".into()));
+        assert_eq!(perms_value, Value::Text("write,slash\\path".into()));
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "mysql",
+            None,
+            "enum_set_grid",
+            &columns,
+            &[(mood, mood_value), (perms, perms_value)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        session
+            .query_params_controlled(&update.0, &update.1, &control)
+            .await
+            .unwrap();
+
+        let rows = session
+            .query_params_controlled(
+                "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), CAST(perms + 0 AS CHAR), HEX(perms)
+                 FROM enum_set_grid ORDER BY id",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows;
+        assert_eq!(
+            rows[0],
+            vec![
+                Value::Int(1),
+                Value::Text("2".into()),
+                Value::Text("69742773206F6B".into()),
+                Value::Text("6".into()),
+                Value::Text("77726974652C736C6173685C70617468".into()),
+            ],
+            "mode {mode:?}"
+        );
+        assert_eq!(rows[1], siblings[0], "sibling changed in mode {mode:?}");
+    }
+    session.close().await.unwrap();
+}
