@@ -109,6 +109,11 @@ combination; restored UTF-8 bytes and native enum type are checked independently
 Separate PostgreSQL expression contexts now infer text and SQL NULL enum
 parameters in `COALESCE` and `array_append` ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)). A `NULLIF(enum_column, $1)` follow-up checks inferred type, NULL/match behavior and invalid-label refusal ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)). A domain-over-enum case records the raw `42883` refusal and passing qualified base-enum cast control under a shadowed `search_path` ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 
+PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
+when replayed under both `standard_conforming_strings=on`
+and `off`; the writer uses an explicit escape string and native type/text checks
+verify both results ([evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json)).
+
 One PostgreSQL `text[]` case now checks XML, HTML, Markdown and XLSX output plus
 replayed SQL against native array text, JSON elements and wire bytes; see the
 [array file-writer evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).

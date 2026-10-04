@@ -1,0 +1,2 @@
+    Checking tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.56s

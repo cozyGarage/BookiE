@@ -5456,3 +5456,14 @@ header for each one. Restored rows match exact text, UTF-8 bytes, native enum
 type and SQL NULL. The focused test, strict Clippy and formatting pass. Other
 session configurations and spreadsheet-specific import behavior remain open. See the
 [evidence manifest](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json).
+
+## PostgreSQL enum SQL replay across string-literal modes, 2026-10-04
+
+A PostgreSQL 16 native contract exports an enum label containing literal `\n`,
+then replays the same generated SQL in
+transactions with `standard_conforming_strings` on and off. The label remains
+exact text with the same native enum type in both modes. PostgreSQL text with
+backslashes now uses explicit `E''` syntax and doubles each backslash; ordinary
+values retain regular quoted-literal output. The native focused tests, core and
+app suites, strict Clippy and formatting pass. Other session settings and SQL
+literal edge cases remain open. See the [evidence manifest](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json).
