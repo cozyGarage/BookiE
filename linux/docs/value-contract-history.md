@@ -2992,6 +2992,17 @@ pre-existing destination unchanged. Both focused Docker tests, strict Clippy
 and formatting pass. Other enum/set consumers and SQL mode combinations remain
 open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
+The app edit path now validates ENUM labels and SET members against MySQL's
+declared `column_type` before binding. A parser-to-keyed-edit contract preserves
+an apostrophe label and a multi-member backslash SET across all four modes, with
+native ordinals, masks, bytes and sibling identity. A separate permissive-mode
+control demonstrates why the guard is required: MySQL otherwise turns an
+unknown ENUM label into ordinal zero and silently drops an unknown SET member.
+The control runs inside a transaction and rolls back. The app library suite,
+strict Clippy, focused parser test and MySQL 8 Docker test passed. MariaDB app
+edits and selecting an empty ENUM label remain open; see the
+[grid evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
+
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
 The existing MySQL and MariaDB SQL export round trip also runs with

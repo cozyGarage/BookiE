@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "6281152a9",
+  "engine": "MySQL 8.1 in Docker via testcontainers",
+  "case": "MySQL ENUM and SET parser/keyed edit across SQL modes",
+  "tests": [
+    "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_and_set_parser_preserves_labels",
+    "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
+  ],
+  "contract": [
+    "Grid parsing validates values against the declared ENUM/SET members, including apostrophe and backslash metadata, and refuses unknown labels or members.",
+    "Bound keyed edits preserve ENUM label bytes and a multi-member SET mask under default, NO_BACKSLASH_ESCAPES, ANSI_QUOTES and combined SQL modes.",
+    "The native server control demonstrates that permissive mode otherwise coerces an unknown ENUM label to its error value and drops an unknown SET member; the control updates are rolled back.",
+    "An untouched sibling row retains its native ordinals, masks and label bytes in every mode."
+  ],
+  "validation": {
+    "parser_test": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_enum_and_set_parser_preserves_labels -- --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "parser.txt"
+    },
+    "mysql_keyed_edit": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "mysql.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib -- --test-threads=1",
+      "result": "460 passed, 0 failed, 22 ignored",
+      "log": "app-lib.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "remaining": [
+    "MariaDB app-grid edits and additional SQL modes remain untested.",
+    "Blank input retains shared SQL NULL/required-field behavior, so selecting an empty ENUM label in the grid remains open.",
+    "This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}
