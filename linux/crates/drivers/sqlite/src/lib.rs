@@ -555,6 +555,16 @@ async fn result_columns(
             enum_type: None,
         })
         .collect();
+    resolve_result_column_types(connection, source_columns, &mut columns, sql).await;
+    columns
+}
+
+async fn resolve_result_column_types(
+    connection: &mut SqlxSqliteConnection,
+    source_columns: &[sqlx::sqlite::SqliteColumn],
+    columns: &mut [ColumnInfo],
+    sql: &str,
+) {
     let unknown_origins = source_columns
         .iter()
         .enumerate()
@@ -615,7 +625,6 @@ async fn result_columns(
             }
         }
     }
-    columns
 }
 
 fn result_origin_is_ambiguous(sql: &str) -> bool {

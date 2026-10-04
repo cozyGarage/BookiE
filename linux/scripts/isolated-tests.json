@@ -13,6 +13,11 @@
     [
       "tablepro-app",
       "--lib",
+      "services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mongodb_integer_width::value_contract_mongodb_int32_grid_edit_preserves_integer_width"
     ],
     [
@@ -39,6 +44,16 @@
       "tablepro-app",
       "--lib",
       "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes"
     ],
     [
       "tablepro-app",

@@ -1,0 +1,616 @@
+#[tokio::test]
+async fn sqlite_case_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, NULL), (3, NULL), (4, X'00FF'), \
+             (5, 'bookie:sqlite-any:v1:integer:9'), (6, '')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            "SELECT id AS position, \
+                    CASE id WHEN 2 THEN 'branch' WHEN 3 THEN NULL ELSE value END AS result, \
+                    typeof(CASE id WHEN 2 THEN 'branch' WHEN 3 THEN NULL ELSE value END) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("integer".into()),
+            Value::Text("text".into()),
+            Value::Text("null".into()),
+            Value::Text("blob".into()),
+            Value::Text("text".into()),
+            Value::Text("text".into()),
+        ]
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-case-any.xlsx");
+    std::fs::write(&workbook_path, b"existing workbook").unwrap();
+    let error = tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap_err();
+    assert!(
+        matches!(
+            error,
+            tablepro_core::export::ExportError::WorkbookEmptyText { row: 6, column: 2 }
+        ),
+        "{error:?}"
+    );
+    assert_eq!(std::fs::read(&workbook_path).unwrap(), b"existing workbook");
+    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("integer".into()), Value::Int(42)],
+            vec![Value::Text("text".into()), Value::Text("branch".into())],
+            vec![Value::Text("null".into()), Value::Null],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![0, 255])],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+            ],
+            vec![Value::Text("text".into()), Value::Text(String::new())],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_coalesce_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, NULL), (3, 1.5), (4, 'ready'), (5, X'00FF'), \
+             (6, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+    let result = connection
+        .query(
+            "SELECT id AS position, coalesce(value, 'fallback') AS result, \
+                    typeof(coalesce(value, 'fallback')) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("integer".into()),
+            Value::Text("text".into()),
+            Value::Text("real".into()),
+            Value::Text("text".into()),
+            Value::Text("blob".into()),
+            Value::Text("text".into()),
+        ]
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-coalesce-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    assert!(sheet.contains("<c r=\"B2\"><v>42</v></c>"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B3\" t=\"s\">"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B4\"><v>1.5</v></c>"), "{sheet}");
+    for row in [5, 6, 7] {
+        assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
+    }
+    for text in ["fallback", "ready", "\\x00ff", "bookie:sqlite-any:v1:integer:9"] {
+        assert!(shared_strings.contains(&format!("<t>{text}</t>")), "{shared_strings}");
+    }
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
+    let json_path = directory.path().join("sqlite-coalesce-any.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json[0]["result"], 42);
+    assert_eq!(json[1]["result"], "fallback");
+    assert_eq!(json[2]["result"], 1.5);
+    assert_eq!(json[3]["result"], "ready");
+    assert_eq!(json[4]["result"], "\\x00ff");
+    assert_eq!(json[5]["result"], "bookie:sqlite-any:v1:integer:9");
+    assert_eq!(json[0]["storage_class"], "integer");
+    assert_eq!(json[1]["storage_class"], "text");
+    assert_eq!(json[2]["storage_class"], "real");
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("integer".into()), Value::Int(42)],
+            vec![Value::Text("text".into()), Value::Text("fallback".into())],
+            vec![Value::Text("real".into()), Value::Float(1.5)],
+            vec![Value::Text("text".into()), Value::Text("ready".into())],
+            vec![Value::Text("blob".into()), Value::Bytes(vec![0, 255])],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_strict_any_csv_import_refuses_ambiguous_blank_and_bad_tags() {
+    use tablepro_core::{
+        ConnectOptions, DatabaseDriver,
+        import::{CsvImportOptions, ImportTarget, PlanError, build_insert_plan, read_csv},
+    };
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "flexible").await.unwrap();
+
+    let import = |bytes: &[u8], null_marker: String| {
+        let options = CsvImportOptions {
+            has_header: true,
+            null_marker,
+            ..CsvImportOptions::default()
+        };
+        let sheet = read_csv(bytes, &options, None).unwrap();
+        build_insert_plan(
+            &ImportTarget {
+                driver_id: "sqlite",
+                schema: None,
+                table: "flexible",
+                columns: &columns,
+                mapping: &[None, Some(0)],
+            },
+            &sheet,
+            &options,
+        )
+    };
+
+    let blank = import(b"value\n\"\"\n", String::new()).unwrap_err();
+    assert!(matches!(
+        blank,
+        PlanError::Rows { first, total: 1 }
+            if first[0].reason == tablepro_core::import::CellError::AmbiguousSqliteAnyNullOrEmpty
+    ));
+
+    let malformed = import(b"value\nbookie:sqlite-any:v1:blob:0xz1\n", "\\N".into()).unwrap_err();
+    assert!(matches!(
+        malformed,
+        PlanError::Rows { first, total: 1 }
+            if first[0].reason == tablepro_core::import::CellError::InvalidSqliteAnyCsvValue
+    ));
+
+    let untagged_text = import(b"value\n42\n", "\\N".into()).unwrap();
+    assert_eq!(untagged_text.rows, vec![vec![Value::Text("42".into())]]);
+    assert_eq!(
+        connection.query("SELECT COUNT(*) FROM flexible").await.unwrap().rows,
+        vec![vec![Value::Int(0)]]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_nullif_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.5), (3, 'keep'), (4, 'drop'), \
+             (5, X'00FF'), (6, NULL), (7, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, NULLIF(value, 'drop') AS result, \
+                    typeof(NULLIF(value, 'drop')) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("integer".into()),
+            Value::Text("real".into()),
+            Value::Text("text".into()),
+            Value::Text("null".into()),
+            Value::Text("blob".into()),
+            Value::Text("null".into()),
+            Value::Text("text".into()),
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(42),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.5),
+                Value::Text("real".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("keep".into()),
+                Value::Text("text".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_max_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 2), (1, 9), (2, 1.25), (2, 1.5), \
+             (3, 'alpha'), (3, 'zebra'), (4, X'0001'), (4, X'00FF'), \
+             (5, NULL), (5, NULL), (6, 'alpha'), (6, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, MAX(value) AS result, \
+                    typeof(MAX(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(9), Value::Text("integer".into())],
+            vec![Value::Int(2), Value::Float(1.5), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Text("zebra".into()), Value::Text("text".into())],
+            vec![Value::Int(4), Value::Bytes(vec![0, 255]), Value::Text("blob".into())],
+            vec![Value::Int(5), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Int(6),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(9),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.5),
+                Value::Text("real".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("zebra".into()),
+                Value::Text("text".into())
+            ],
+            vec![
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 255]),
+                Value::Text("blob".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+async fn sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 2), (1, 9), (2, 1.25), (2, 2.5), \
+             (3, 'zebra'), (3, 'alpha'), (4, X'00FF'), (4, X'0001'), \
+             (5, NULL), (5, NULL), (6, 9), (6, '1'), \
+             (7, 'zebra'), (7, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id AS position, MIN(value) AS result, \
+                    typeof(MIN(value)) AS storage_class \
+             FROM flexible GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(2), Value::Text("integer".into())],
+            vec![Value::Int(2), Value::Float(1.25), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Text("alpha".into()), Value::Text("text".into())],
+            vec![Value::Int(4), Value::Bytes(vec![0, 1]), Value::Text("blob".into())],
+            vec![Value::Int(5), Value::Null, Value::Text("null".into())],
+            vec![Value::Int(6), Value::Int(9), Value::Text("integer".into())],
+            vec![
+                Value::Int(7),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(2),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("real".into()),
+                Value::Float(1.25),
+                Value::Text("real".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("alpha".into()),
+                Value::Text("text".into())
+            ],
+            vec![
+                Value::Text("blob".into()),
+                Value::Bytes(vec![0, 1]),
+                Value::Text("blob".into())
+            ],
+            vec![Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+            vec![
+                Value::Text("integer".into()),
+                Value::Int(9),
+                Value::Text("integer".into())
+            ],
+            vec![
+                Value::Text("text".into()),
+                Value::Text("bookie:sqlite-any:v1:integer:9".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+}

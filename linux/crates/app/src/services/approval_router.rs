@@ -220,10 +220,12 @@ mod tests {
     }
 
     async fn mysql_routine_count(connection: &dyn Connection) -> u64 {
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
         let result = connection
-            .query(
+            .query_controlled(
                 "SELECT COUNT(*) FROM information_schema.routines \
                  WHERE routine_schema = DATABASE() AND routine_name = 'bookie_unparseable_approval'",
+                &control,
             )
             .await
             .expect("query MySQL routine catalog");

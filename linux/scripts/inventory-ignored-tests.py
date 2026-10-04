@@ -41,6 +41,13 @@ def docker_activation(path, name, packages):
         # Included through #[path] from a cfg(test) app module, rather than a
         # Cargo integration-test crate. Keep its activation command on --lib.
         selector = f"--lib {name}"
+    elif relative.parts[-2].endswith("_parts"):
+        module = relative.parts[-2][:-6]
+        tests_dir = path.parents[2]
+        integration = tests_dir / "integration.rs"
+        if not integration.is_file() or f"mod {module};" not in integration.read_text():
+            raise RuntimeError(f"included Docker test source has no integration module: {relative}")
+        selector = "--test integration"
     elif relative.parts[-2] == "tests":
         selector = f"--test {path.stem}"
     elif "src" in relative.parts:
