@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "03e737938",
+  "case": "PostgreSQL timetz[] XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport",
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "The timetz[] fixture contains fractional wall times at the maximum positive and negative offsets, ordinary half-hour offsets, and SQL NULL; native type, array_to_json and array_send provide independent oracles.",
+    "BookiE array text rebinds through a typed cast and preserves array_to_json and array_send bytes.",
+    "The XLSX cell is a shared string and preserves the complete 107-character array text, including offset seconds, without a formula.",
+    "LibreOffice Calc opens XLSX and saves ODS, then reopens ODS and saves XLSX; exact cell text and string cell kinds remain unchanged."
+  ],
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "LibreOffice 26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "validation": {
+    "native_export_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-packet-path>/source.xlsx cargo test -p tablepro-driver-postgres --test integration array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "Install libreoffice-calc in the pinned Debian container.",
+        "Open source.xlsx in Calc and save calc-roundtrip.ods.",
+        "Open calc-roundtrip.ods in Calc and save calc-roundtrip.xlsx."
+      ],
+      "version_log": "calc-version.txt",
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 text in XLSX and ODS, requires shared/string cell kinds and rejects formulas.",
+      "result": "All 107 characters preserved; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "c2366d0e292578fd2d6049e01fa618bcf024ce4ae9b5c9e05537e30a386771af",
+    "calc-roundtrip.ods": "5ea689bd95194d5e667e5db398ad098db63eba498cd460db682717b40f3a6f76",
+    "calc-roundtrip.xlsx": "7e11d9afcccb5027cfaa5affd16adecc64c7ab7906555f687e403d3735e9bffb"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "04b8fe6e62a0f11d5434db40b72ffdaec934efdc69c180364959a27745dd1847",
+    "calc-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
+    "libreoffice-roundtrip.txt": "727452b13c67af14fe76c2b542c25a4062871bcf6bae5f7d07a7a87360e0a9ac",
+    "consumer-check.txt": "1738e750001cada0752a8df8f7c5657347651cee614275b2d4ae39cfe4b1a2f0",
+    "clippy.txt": "90d9722e064bd8f8bec995b08884a9aefe543c821ed1c220fb4d3a765631d482",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "checker_sha256": "01f4c83e79aea8023e5081525e8d9104b7228e9d02024f89fc261da5c8183a47"
+}
