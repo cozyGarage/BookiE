@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "79de39dbf7b265b6db3ffec7ffaabb83c64ccf01",
+  "engine": "SQLite STRICT ANY (in-memory native SQLite driver)",
+  "case": "arithmetic expression storage classes through typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "The computed expressions value + 1, value / 2 and value / 0 retain independent fallback result metadata while native typeof() reports each runtime class.",
+    "Integer, REAL, numeric text, nonnumeric text, BLOB and SQL NULL inputs exercise SQLite arithmetic coercion; nonnumeric text and BLOB behave as zero for these expressions.",
+    "Adding 1 to 9223372036854775807 promotes the result to REAL, while integer division by 2 truncates and remains INTEGER; division by zero and NULL inputs produce SQL NULL.",
+    "Typed CSV export/import restores all computed values and runtime classes into STRICT ANY, verified with native typeof() on every destination cell."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_ -- --test-threads=1",
+      "result": "16 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "d0150a90bac9d2feb602436bb6698e5e92d035193ab4d2898cc3cbc63f24c03b",
+    "clippy.txt": "4740d584f4a4b2382dec2ee1080cb592f037d742f30e2804775e11b0a7948a9d",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression shapes, additional consumer formats, spreadsheet-app re-import and installed editing remain open."
+  ]
+}

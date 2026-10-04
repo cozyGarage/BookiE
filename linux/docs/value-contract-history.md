@@ -5163,6 +5163,17 @@ classes, checked with native `typeof()`. All 15 selected SQLite app contracts,
 strict Clippy and formatting pass. See the
 [evidence manifest](evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
 
+## SQLite arithmetic over computed STRICT ANY result round trip, 2026-10-04
+
+The `value + 1`, `value / 2` and `value / 0` expressions over STRICT `ANY`
+cover INTEGER, REAL, numeric TEXT, nonnumeric TEXT, BLOB and SQL NULL inputs.
+SQLite coerces numeric text, treats nonnumeric text and BLOB as zero, promotes
+integer overflow to REAL, truncates integer division, and returns SQL NULL for
+division by zero. Typed CSV export/import restores each computed value and
+runtime class, checked with native `typeof()`. All 16 selected SQLite app
+contracts, strict Clippy and formatting pass. See the
+[evidence manifest](evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json).
+
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit

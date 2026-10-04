@@ -218,6 +218,14 @@ zero; a near-`i64::MAX` pair averages as REAL without integer overflow. Typed
 CSV re-import preserves each result, verified by native `typeof()`. See the
 [AVG evidence](evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
 
+October 4 B3-3/B3-4 follow-up: SQLite arithmetic over STRICT `ANY` preserves
+dynamic INTEGER/REAL/NULL classes through `value + 1`, `value / 2` and
+`value / 0`. Numeric text is coerced; nonnumeric text and BLOB inputs act as
+zero; integer overflow promotes to REAL and integer division truncates. Division
+by zero returns SQL NULL. Typed CSV re-import preserves each computed value and
+class under native `typeof()` checks. See the
+[arithmetic evidence](evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json).
+
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and
