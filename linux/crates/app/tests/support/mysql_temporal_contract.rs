@@ -214,6 +214,35 @@ async fn value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values
     assert_eq!(json[0]["local_at"], "2024-01-02 03:04:05.123456");
     assert_eq!(json[0]["instant"], "2024-01-02T03:04:05.123456+00:00");
 
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("mysql-temporal.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &export,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    for value in [
+        "12:34:56.123456",
+        "2024-01-02 03:04:05.123456",
+        "2024-01-02T03:04:05.123456+00:00",
+    ] {
+        assert!(shared_strings.contains(&format!("<t>{value}</t>")), "{shared_strings}");
+    }
+
     session
         .query_params_controlled(
             "CREATE TABLE temporal_grid_imported LIKE temporal_grid_edit",

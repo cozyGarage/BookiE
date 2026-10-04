@@ -6183,6 +6183,7 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "whoami 1.6.1",
+ "zip 8.6.0",
 ]
 
 [[package]]
