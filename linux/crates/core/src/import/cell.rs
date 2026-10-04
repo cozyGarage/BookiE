@@ -326,8 +326,12 @@ fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver
             Err(crate::sqlite_any_csv::DecodeError::Malformed) => Err(CellError::InvalidSqliteAnyCsvValue),
         };
     }
-    if driver_id == "postgres" && column.enum_type.is_some() && options.null_marker.is_empty() && text.is_empty() {
-        return Err(CellError::AmbiguousEnumNullOrEmpty);
+    if driver_id == "postgres" && column.enum_type.is_some() && text.is_empty() && options.null_marker.is_empty() {
+        return if column.data_type.trim().ends_with("[]") {
+            Ok(Value::Null)
+        } else {
+            Err(CellError::AmbiguousEnumNullOrEmpty)
+        };
     }
     if driver_id == "duckdb" && column.data_type.trim().eq_ignore_ascii_case("interval") && text.is_empty() {
         return if options.null_marker.is_empty() {

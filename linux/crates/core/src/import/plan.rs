@@ -301,6 +301,22 @@ mod tests {
     }
 
     #[test]
+    fn postgres_enum_array_import_distinguishes_blank_null_from_empty_array() {
+        let mut labels = column("labels", "enum_array_schema.label[]");
+        labels.enum_type = Some(crate::query::QualifiedTypeName {
+            schema: "enum_array_schema".into(),
+            name: "label".into(),
+        });
+        let columns = vec![labels];
+        let mapping = vec![Some(0)];
+        let sheet = sheet(&[&[""], &["{}"]], &["labels"]);
+        let plan = build_insert_plan(&target(&columns, &mapping), &sheet, &CsvImportOptions::default())
+            .expect("blank is an unambiguous NULL array; an empty array is `{}`");
+        assert_eq!(plan.rows, vec![vec![Value::Null], vec![Value::Text("{}".into())]]);
+        assert!(plan.statement.contains("$1::text::\"enum_array_schema\".\"label\"[]"));
+    }
+
+    #[test]
     fn value_contract_postgres_temporal_csv_rows_share_text_cast_parameters() {
         let columns = vec![
             column("date_value", "date"),

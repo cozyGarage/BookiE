@@ -1402,15 +1402,9 @@ async fn value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape()
     assert_eq!(native.rows[3][2], Value::Text("[0:3]".into()));
     assert_eq!(native.rows[4][2], Value::Text("[1:2][1:2]".into()));
 
-    let csv_options = tablepro_core::export::CsvOptions {
-        null_marker: Some("\\N".into()),
-        ..Default::default()
-    };
+    let csv_options = tablepro_core::export::CsvOptions::default();
     let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
-    let import_options = tablepro_core::import::CsvImportOptions {
-        null_marker: "\\N".into(),
-        ..Default::default()
-    };
+    let import_options = tablepro_core::import::CsvImportOptions::default();
     let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let columns = connection
         .fetch_columns(Some("value_contract_enum_array_shape"), "target")
