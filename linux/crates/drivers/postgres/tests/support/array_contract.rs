@@ -1117,7 +1117,9 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
-    let xlsx_path = directory.path().join("enum-array.xlsx");
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("enum-array.xlsx"));
     tablepro_core::export::write_result_file(
         &xlsx_path,
         &result,
