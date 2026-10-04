@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "d6ecb4651",
+  "case": "PostgreSQL timestamp[] XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport",
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "The timestamp[] contains a BC timestamp at microsecond precision, year 10000, the maximum finite timestamp, positive and negative infinity, and SQL NULL; native type, array_to_json and array_send are independent oracles.",
+    "BookiE array text rebinds through a typed cast and preserves array_to_json and array_send bytes.",
+    "The XLSX cell is a shared string and preserves the complete 115-character array text without a formula.",
+    "LibreOffice Calc opens XLSX and saves ODS, then reopens ODS and saves XLSX; exact cell text and string cell kinds remain unchanged."
+  ],
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "LibreOffice 26.8.0.3 680(Build:3)",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "validation": {
+    "native_export_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-packet-path>/source.xlsx cargo test -p tablepro-driver-postgres --test integration array_contract::value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "postgres_value_contracts": {
+      "command": "cargo test -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+      "passed": 113,
+      "failed": 0,
+      "filtered": 29,
+      "duration_seconds": 251.72,
+      "log": "postgres-value-contracts.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "Install libreoffice-calc in the pinned Debian container.",
+        "Open source.xlsx in Calc and save calc-roundtrip.ods.",
+        "Open calc-roundtrip.ods in Calc and save calc-roundtrip.xlsx."
+      ],
+      "version_log": "calc-version.txt",
+      "log": "libreoffice-roundtrip.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 text in XLSX and ODS, requires shared/string cell kinds and rejects formulas.",
+      "result": "All 115 characters preserved; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "d12065504d2a949b45ffcafeafde4e70f09193758ddf20d2c17760fd8e80a13e",
+    "calc-roundtrip.ods": "8e616cb5009fa05ddfac3f467d4190562c65f88d4b2009c5bb090f9516f003f8",
+    "calc-roundtrip.xlsx": "e2342a512ef337faac1d79c1d1dbf435e25fcc3c2a171d712ebcb2bbe4d609ab"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "f170f343cef10b609ee4a7ebb4e359497372562ac0ca40f4bf1b403e2092c1ce",
+    "postgres-value-contracts.txt": "1b4227ae94dcc59829f7faa9807fb757828f37cf928601f611a6ec367972d49c",
+    "calc-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
+    "libreoffice-roundtrip.txt": "727452b13c67af14fe76c2b542c25a4062871bcf6bae5f7d07a7a87360e0a9ac",
+    "consumer-check.txt": "6f861a686486a609dcfb9827486cf283ddca6055bd2febd69fb37f4ed6f343fe",
+    "clippy.txt": "cf3f6a9c04b089b800f4c52b2ce477d40c698f3e22204815a6d31361c671bc41",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "checker_sha256": "bd09a3b5d0d3478fbe61869c8b8b9fb328c892c49db63447420d1a291743d22e"
+}
