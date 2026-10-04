@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "f4ad62e86",
+  "source_commit": "6b10e2a2d",
   "engines": {
     "mysql": "MySQL 8.1 in Docker via testcontainers",
     "mariadb": "MariaDB 11 in Docker via testcontainers"
@@ -55,7 +55,7 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "remaining": [
-    "MariaDB blank/empty edit postconditions and SQL modes beyond the four tested values remain open.",
+    "SQL modes beyond the four tested values remain open.",
     "This case does not close B3 or qualify the 0.2.0 release."
   ]
 }
