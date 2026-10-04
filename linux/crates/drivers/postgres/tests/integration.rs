@@ -24,6 +24,9 @@ mod vector_contract;
 #[path = "support/array_contract.rs"]
 mod array_contract;
 
+#[path = "support/binary_array_file_export_contract.rs"]
+mod binary_array_file_export_contract;
+
 #[path = "support/time_contract.rs"]
 mod time_contract;
 
