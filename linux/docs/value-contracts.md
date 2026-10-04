@@ -138,6 +138,9 @@ overlap (`&&`) with the parameter on either side. Native literal-array query
 results, `pg_typeof`, source-domain type and `array_send` bytes agree across
 NULL, empty and adversarial enum labels; invalid labels preserve SQLSTATE
 `22P02` ([integration evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json)).
+The same four operator forms also pass with a same-named shadow enum first in
+`search_path`, while qualified target type and wire-byte oracles remain exact
+([shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
 
 A PostgreSQL 16 transaction also changes ordinary session `search_path` twice
 on one backend, then verifies target-schema enum metadata and keyed-write safety

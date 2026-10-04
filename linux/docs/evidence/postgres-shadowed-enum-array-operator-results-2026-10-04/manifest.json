@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-04",
+  "source_commit": "f89b0304fbb37a818e5d5dc84f222458dcdf1ee9",
+  "branch": "linux",
+  "focused_contract": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs::value_contract_domain_over_enum_array_operators_infer_parameter_type_in_both_positions",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+  "result": {
+    "passed": 129,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0,
+    "seconds": 280.64
+  },
+  "configuration": "A same-named shadow enum with a different label is first in search_path; the source domain and base enum references are schema-qualified in the query.",
+  "coverage": [
+    "containment and overlap operators with the enum-array parameter in either operand position",
+    "qualified target pg_typeof and source-domain type assertions",
+    "operator-result comparison against independently cast native arrays",
+    "array_send wire-byte equality",
+    "NULL, empty and adversarial enum-label values",
+    "invalid target label returns SQLSTATE 22P02 for both containment operand positions",
+    "savepoints recover the transaction after each expected native error"
+  ],
+  "additional_checks": {
+    "cargo fmt --all -- --check": "passed",
+    "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings": "passed",
+    "python3 scripts/inventory-ignored-tests.py --check": "passed; 437 declarations",
+    "bash scripts/check-file-size.sh": "passed",
+    "git diff --check": "passed"
+  },
+  "log": "postgres-integration.txt",
+  "checksums": "sha256sums.txt",
+  "scope_limit": "This proves the listed enum-array operators and operand positions under one shadowed search_path configuration. Other PostgreSQL session configurations and the remaining B3 matrix, B4 acceptance and B7 qualification remain open."
+}

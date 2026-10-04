@@ -5687,3 +5687,13 @@ For each valid input, an independently cast native array provides operator
 results and `array_send` bytes; `pg_typeof($1)` and the source domain type are
 also asserted. The complete Docker-backed PostgreSQL integration suite passes
 129 tests. See the [evidence manifest](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
+
+## PostgreSQL inferred enum-array operators under shadowed `search_path`, 2026-10-04
+
+The containment/overlap operator matrix now places a same-named enum with a
+different label in the first `search_path` schema and queries a qualified
+domain-over-enum source from another schema. All four operand orientations
+still infer the target enum-array type and match native literal-array results
+and `array_send` bytes. Invalid target labels return SQLSTATE `22P02` in both
+containment positions; savepoints isolate the expected server errors. The full
+PostgreSQL integration suite passes 129 tests. See the [evidence manifest](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).

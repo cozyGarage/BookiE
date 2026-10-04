@@ -114,6 +114,12 @@ inventory now lists 437 declarations. Evidence and run logs are in the
 [array-operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 B3 remains open for other array contexts and the broader matrix.
 
+October 4 B3 configuration follow-up: containment and overlap enum-array
+parameters retain the qualified target enum OID and bytes when a same-named
+shadow enum precedes it in `search_path`. The complete PostgreSQL suite passes
+129 tests ([evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
+This closes only the tested array-operator/search-path combination.
+
 ## B3 work packets
 
 Use [ADR 0007](decisions/0007-type-and-value-preservation.md) for the standard,

@@ -7,6 +7,8 @@ containment and overlap operators, including either operand position for
 containment and overlap. Native array type, operator results and wire bytes are
 checked; other inferred array contexts remain open. See the [ANY packet](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
 and [operator packet](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
+The operator matrix also runs with a same-named shadow enum first in
+`search_path` ([configuration packet](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source

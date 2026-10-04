@@ -14,10 +14,12 @@ source/SHA attribution; this summary does not certify the current tree.
 PostgreSQL inferred enum-array binding now has direct evidence for the
 domain-over-enum `ANY($1)` predicate, including native type and wire-byte
 oracles. Follow-up contracts cover containment and overlap operators with the
-parameter on either side, checked against native typed arrays. Other inferred
-array operator/function contexts remain candidates; these cases do not close
-the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json)
-and [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
+parameter on either side, including a same-named shadow enum earlier in
+`search_path`; the bound OID and bytes continue to match the qualified target
+type. Other inferred array operator/function contexts remain candidates; these
+cases do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
+[operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
+and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
 
 | Owner / engine | Retain established contracts | Remaining scope to select one case from |
 | --- | --- | --- |
