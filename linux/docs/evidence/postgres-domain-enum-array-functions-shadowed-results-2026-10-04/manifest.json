@@ -33,6 +33,18 @@
       "duration_seconds": 244.95,
       "log": "postgres-value-contracts.txt"
     },
+    "gtk_duckdb_value_tier": {
+      "passed": 309,
+      "failed": 0,
+      "suites": 11,
+      "missing_suites": 0,
+      "gtk": true,
+      "duckdb": true,
+      "tested_revision": "6fbba820f444f9395a256e468a9ccb16b234064e",
+      "report_dirty": true,
+      "report": "full-value-tier-report.json",
+      "suite_logs_prefix": "full-value-tier-"
+    },
     "clippy": {
       "result": "passed",
       "log": "clippy.txt"
@@ -53,17 +65,32 @@
   "commands": {
     "focused_test": "cargo test -p tablepro-driver-postgres --test integration append_prepend_keep_target_under_shadowed_path -- --ignored --nocapture",
     "postgres_value_contracts": "cargo test -p tablepro-driver-postgres --test integration value_contract -- --include-ignored --test-threads=1",
+    "gtk_duckdb_value_tier": "bash scripts/test-value-contracts.sh --gtk --duckdb",
     "clippy": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
     "format": "cargo fmt --all -- --check",
     "ignored_test_inventory": "python3 scripts/inventory-ignored-tests.py --check",
     "diff_check": "git diff --check"
   },
   "sha256": {
-    "focused.txt": "5748f1bbcac029278422215707c9aae9a77cc37c1fd347be7a16a38203a4452d",
-    "postgres-value-contracts.txt": "ac9a967141c703489c5c2c582069ec9c8dba49b56f2073d8a7b91995d6bc3e3c",
     "clippy.txt": "70f5fe1b8d3691021573abd70f20bad5cf851ded2b9248187470324793777052",
-    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "375bd9fb112d6539e7e2014098880a37b82037e31852f60593d22adcbd56445c",
+    "fmt.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "focused.txt": "5748f1bbcac029278422215707c9aae9a77cc37c1fd347be7a16a38203a4452d",
+    "full-value-tier-app.log": "99c6987af99b114101f6cc8e8a168f9d41070a632d4f424f6dc79c5ff51676ec",
+    "full-value-tier-clickhouse.log": "a24f54096a47e829c8d3f22a8fa1741e8dcddade4eb44d2564523f8466804727",
+    "full-value-tier-compile.log": "558c90b5b0c9f3dcc1f8e14adf6f194487b96cbc7560be74ecf76bca5ff185f1",
+    "full-value-tier-core.log": "7885642bc2453c4830c168210f074fc6c58976dffdde1e58280003a6202e8bd8",
+    "full-value-tier-duckdb.log": "a662c7230da2beab479b565cb6b122a3f8aeff9894742e7686ccf3f9a9e204e9",
+    "full-value-tier-mcp.log": "b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8",
+    "full-value-tier-mongodb.log": "7b330eafc784993f91f2e5366ab203204346cd2eca09fbc1df2d55f726d3d1bd",
+    "full-value-tier-mssql.log": "6fcffb776cc2b3ae778b857a9df1f0d5cb3085b952c3ab59a6ef64ecaf27b119",
+    "full-value-tier-mysql.log": "f09b30f4f76d9e5b713cc9908c45b1bbc92ca69abc46bdc75cecb4c4945e59e1",
+    "full-value-tier-postgres.log": "38254c3146381e1e713dd232aede1fdc921b4f425b302518298aa05679e93b1c",
+    "full-value-tier-redis.log": "b8e75c6ac4ae04074990563a9b03249039bf1bbceee31faf79b7bfec16c311bc",
+    "full-value-tier-report.json": "e1760f7750ad3b651e8829d258d582f8a588b8bdf333eac90dd922f829b20129",
+    "full-value-tier-sqlite.log": "bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539",
+    "full-value-tier.txt": "875bfba4acce9f5676fe94ba360d3021f6ccb34b82e25a1974223d82c4b75bbc",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    "postgres-value-contracts.txt": "ac9a967141c703489c5c2c582069ec9c8dba49b56f2073d8a7b91995d6bc3e3c"
   }
 }
