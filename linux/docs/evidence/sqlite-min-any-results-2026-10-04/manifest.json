@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "5ab436b9d52eba79b9d1a6147a9cba25e1e7791b",
+  "engine": "SQLite via the native SQLite driver",
+  "case": "Grouped MIN over mixed STRICT ANY storage classes and typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "SQLite MIN returns the native minimum storage value for INTEGER, REAL, TEXT and BLOB groups; an all-NULL group remains SQL NULL.",
+    "A mixed INTEGER/TEXT group follows SQLite's native storage-class ordering and selects the INTEGER value.",
+    "A marker-shaped string remains TEXT and is not confused with the CSV type marker.",
+    "Computed results are exported and imported through the app's typed CSV path; restored typeof() and exact values match the source results.",
+    "The computed result column retains fallback metadata rather than claiming the declared STRICT ANY storage class."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes -- --test-threads=1",
+      "result": "1 passed, 0 failed; the selected app test ran against native SQLite",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "d582fc22665d7034b967a765c0874d6346879434184148b3eb90ef2a7d03b854",
+    "clippy.txt": "6f23d00fdcd853e4c6442a625b9ae5b7a7cb6b0f4c1d22ffe6ef4c6342868f00",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression families, storage-class/affinity mixtures, spreadsheet-app re-import beyond the Calc case and installed editing remain open."
+  ]
+}
