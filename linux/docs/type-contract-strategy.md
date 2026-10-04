@@ -30,8 +30,9 @@ delimiters and three record endings; auto-detection identifies each format,
 and native UTF-8 byte/type assertions verify import ([evidence](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json)).
 
 PostgreSQL enum SQL-file output also replays a backslash-bearing label with
-`standard_conforming_strings` both on and off; backslashes use explicit `E''`
-literals ([evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json)).
+(`standard_conforming_strings=on`, `backslash_quote=safe_encoding`) and
+(`standard_conforming_strings=off`, `backslash_quote=off`); backslashes use
+explicit `E''` literals ([evidence](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json)).
 
 PostgreSQL custom enum-array CSV import now has native round trips for NULL
 arrays versus empty arrays and NULL elements, lower-bound-zero and

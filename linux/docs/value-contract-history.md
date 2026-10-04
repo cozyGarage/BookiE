@@ -5459,10 +5459,11 @@ session configurations and spreadsheet-specific import behavior remain open. See
 
 ## PostgreSQL enum SQL replay across string-literal modes, 2026-10-04
 
-A PostgreSQL 16 native contract exports an enum label containing literal `\n`,
-then replays the same generated SQL in
-transactions with `standard_conforming_strings` on and off. The label remains
-exact text with the same native enum type in both modes. PostgreSQL text with
+A PostgreSQL 16 native contract exports an enum label containing literal `\n`
+and an apostrophe, then replays the same generated SQL in transactions with
+`standard_conforming_strings=on, backslash_quote=safe_encoding` and
+`standard_conforming_strings=off, backslash_quote=off`. The label remains exact
+text with the same native enum type in both configurations. PostgreSQL text with
 backslashes now uses explicit `E''` syntax and doubles each backslash; ordinary
 values retain regular quoted-literal output. The native focused tests, core and
 app suites, strict Clippy and formatting pass. Other session settings and SQL
