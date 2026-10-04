@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "ad43f033f77bbbfbe876a52372aa58e9aa056f63",
+  "engine": "SQLite 3.53.4 via system libsqlite3",
+  "case": "Ordered GROUP_CONCAT over mixed STRICT ANY values and typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_group_concat_any_csv_round_trip_preserves_text_and_null",
+  "contract": [
+    "Ordered INTEGER, REAL and TEXT inputs are concatenated using SQLite's native text conversion and the requested separator; an intervening SQL NULL is skipped.",
+    "An empty TEXT input remains an empty field between separators, while an all-NULL group returns SQL NULL.",
+    "A marker-shaped TEXT value remains literal text in the aggregate and is not confused with the CSV storage-class marker.",
+    "The computed result uses fallback result metadata; typed CSV export/import restores exact aggregate text and native TEXT/NULL storage classes.",
+    "Native typeof() assertions confirm the stored source classes and restored result classes."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_any_contract:: -- --test-threads=1",
+      "result": "17 passed, 0 failed; includes the new GROUP_CONCAT and MIN scenarios",
+      "log": "sqlite-any-contract-group.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "sqlite-any-contract-group.txt": "9d54501c1780eee61ecd0b3e102ffebe1ebde21a9d41ad2a643ce103dc03e482",
+    "clippy.txt": "98b25fc570acbbd251ccd6462d78687faf79a9e8fd5c311abb63dc1058864479",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression shapes and storage-class/affinity mixtures, other format combinations, spreadsheet-app re-import beyond the tested Calc case and installed editing remain open."
+  ]
+}

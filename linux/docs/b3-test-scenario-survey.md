@@ -205,6 +205,12 @@ ordering in a mixed group. Typed CSV re-import restores exact values and native
 `typeof()` classes, including marker-shaped text and BLOB bytes; see the
 [MIN evidence](evidence/sqlite-min-any-results-2026-10-04/manifest.json).
 
+October 4 B3-3/B3-4 follow-up: ordered SQLite `group_concat()` over STRICT
+`ANY` checks native numeric-to-text conversion, NULL skipping, empty-text
+separators, all-NULL output and marker-shaped text. Typed CSV re-import restores
+the exact text and SQL NULL under native `typeof()` checks; see the
+[GROUP_CONCAT evidence](evidence/sqlite-group-concat-any-results-2026-10-04/manifest.json).
+
 October 4 B3-3/B3-4 follow-up: SQLite `json_extract()` over STRICT `ANY`
 produces dynamic INTEGER, REAL, TEXT and SQL NULL results from one expression.
 The contract distinguishes JSON integer, real, string, boolean, null, object,
