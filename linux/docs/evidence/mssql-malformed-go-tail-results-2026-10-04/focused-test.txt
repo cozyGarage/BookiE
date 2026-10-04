@@ -1,0 +1,7 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-e131c5477c22af2c)
+
+running 1 test
+test ui::editor::statement_cursor::tests::value_contract_mssql_malformed_tail_blocks_the_whole_go_script ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 493 filtered out; finished in 0.00s
