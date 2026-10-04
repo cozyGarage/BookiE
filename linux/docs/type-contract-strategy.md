@@ -98,6 +98,11 @@ A follow-up also verifies `NULLIF(enum_column, $1)` infers both text and SQL
 NULL parameters as the native enum, preserves exact results, and returns native
 `22P02` for an invalid label
 ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).
+A shadow-schema domain-over-enum follow-up confirms raw `NULLIF(status, $1)`
+retains PostgreSQL's `42883` refusal; casting the column to its qualified
+base enum enables text/NULL inference without resolving to the shadow type.
+It also checks literal `NULL`, invalid-label `22P02`, result types and unchanged
+domain rows ([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 
 The three-level domain chain also covers directly inferred text and SQL NULL
 parameters for both NULL-safe distinctness operators, with `pg_typeof` checks

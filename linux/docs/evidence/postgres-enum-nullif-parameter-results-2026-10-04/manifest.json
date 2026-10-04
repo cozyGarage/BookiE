@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "374d52f0c",
+  "source_commit": "374d52f0c48d1c774fe4e854f51ef9a9dc547b99",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "Enum inference for NULLIF(enum_column, $1)",
   "test": "enum_parameter_context_contract::value_contract_enum_parameters_in_coalesce_array_append_and_nullif",
@@ -37,6 +37,6 @@
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
-    "Other direct expression contexts, domain-over-enum NULLIF inference, additional session/search_path configurations and other custom/native cases remain open."
+    "Other direct expression contexts, additional session/search_path configurations and other custom/native cases remain open; the raw domain-over-enum NULLIF refusal and qualified base-enum control are recorded separately."
   ]
 }

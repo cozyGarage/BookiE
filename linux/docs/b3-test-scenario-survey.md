@@ -282,6 +282,10 @@ rows are checked ([evidence](evidence/postgres-enum-expression-parameter-results
 A `NULLIF(enum_column, $1)` follow-up checks matching, non-matching and SQL NULL
 parameters, native inferred/result enum types, invalid-label SQLSTATE `22P02`
 and unchanged rows ([evidence](evidence/postgres-enum-nullif-parameter-results-2026-10-04/manifest.json)).
+For a domain-over-enum column under a shadowed `search_path`, raw `NULLIF` is
+explicitly refused with `42883`; a qualified base-enum cast is the passing
+control for text/NULL inference and native `22P02` invalid-label handling
+([evidence](evidence/postgres-domain-nullif-parameter-results-2026-10-04/manifest.json)).
 The same fixture now covers `IS DISTINCT FROM` and `IS NOT DISTINCT FROM` with
 text and SQL NULL parameters, checking server-inferred enum types and exact
 NULL-safe results; see [distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
