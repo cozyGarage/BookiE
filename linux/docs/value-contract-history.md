@@ -1084,6 +1084,26 @@ The final codec predicate mutation run caught both polarity changes (2/2),
 including treating every nullable temporal payload as inexact; evidence is at
 `target/quality/20260929-mssql-legacy-datetime-mutants-precise/mutants.out/outcomes.json`.
 
+#### October 4 exact text fallback follow-up
+
+The earlier refusal was safe but left supported round-trip coverage incomplete.
+Inexact 1/300-second ticks now decode to canonical SQL Server style-126 text;
+ticks exactly representable in nanoseconds remain typed `DateTime` values.
+The focused export contract restores sample values with identical `varbinary(8)`
+bytes. A generated native sweep checks all 300 distinct ticks against independent
+style-126 text, binds all typed/text values back to a `datetime` column, and
+compares each stored 8-byte value. Null and `datetime2` behavior remain covered.
+
+```sh
+rtk cargo test -p tablepro-driver-mssql --test integration inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_trip -- --ignored --exact
+rtk cargo test -p tablepro-driver-mssql --test integration value_contract_all_legacy_datetime_ticks_round_trip_through_parameters -- --ignored --exact
+rtk cargo test -p tablepro-driver-mssql --test integration value_contract_legacy_datetime_fallback_matches_session_batch_and_native_text -- --ignored --exact
+```
+
+All three focused Docker tests passed locally, including parity through the
+session batch API. Portable command logs and source fingerprints
+are in [the evidence packet](evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
+
 ## SQL Server money float-decoding refusal
 
 A Docker regression first reproduced SQL Server `money` as

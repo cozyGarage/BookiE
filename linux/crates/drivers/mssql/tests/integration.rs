@@ -867,7 +867,7 @@ async fn value_contract_preserves_scalar_boundaries_through_parameters_and_expor
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_round_trip() {
+async fn inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_trip() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
     conn.execute(
@@ -897,21 +897,36 @@ async fn inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_roun
         )
         .await
         .unwrap();
-    assert_eq!(legacy_oracle.rows[0][1], Value::Undecodable("datetime".into()));
+    assert_eq!(legacy_oracle.rows[0][1], Value::Text("2024-01-02T03:04:05.997".into()));
     assert_eq!(legacy_oracle.rows[0][2], Value::Text("2024-01-02T03:04:05.997".into()));
-    assert_eq!(legacy_oracle.rows[1][1], Value::Undecodable("datetime".into()));
+    assert_eq!(legacy_oracle.rows[1][1], Value::Text("1753-01-01T00:00:00.003".into()));
     assert_eq!(legacy_oracle.rows[1][2], Value::Text("1753-01-01T00:00:00.003".into()));
 
-    let source_columns = conn.fetch_columns(None, "temporal_source").await.unwrap();
+    conn.execute("CREATE TABLE temporal_legacy_exported (id int, legacy datetime)")
+        .await
+        .unwrap();
+    let legacy_columns = conn.fetch_columns(None, "temporal_legacy_exported").await.unwrap();
     for row in &rows {
-        let error =
-            tablepro_core::sql_literal::build_insert_literal("mssql", None, "temporal_source", &source_columns, row)
-                .expect_err("an inexact legacy datetime must refuse SQL export");
-        assert!(
-            matches!(error, tablepro_core::sql_dialect::BuildSqlError::UnrepresentableValue { ref column } if column == "legacy"),
-            "refusal must identify the inexact column, got {error:?}"
-        );
+        let statement = tablepro_core::sql_literal::build_insert_literal(
+            "mssql",
+            None,
+            "temporal_legacy_exported",
+            &legacy_columns,
+            &row[..2],
+        )
+        .expect("legacy datetime text fallback should be exportable");
+        conn.execute(&statement)
+            .await
+            .unwrap_or_else(|error| panic!("{statement}: {error}"));
     }
+    let literal_matches = conn
+        .query(
+            "SELECT COUNT(*) FROM temporal_source s JOIN temporal_legacy_exported c \
+         ON s.id = c.id AND CONVERT(varbinary(8), s.legacy) = CONVERT(varbinary(8), c.legacy)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(literal_matches.rows, vec![vec![Value::Int(2)]]);
 
     let precise = conn
         .query(
@@ -961,6 +976,85 @@ async fn inexact_legacy_datetime_refuses_sql_export_but_supported_temporals_roun
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_all_legacy_datetime_ticks_round_trip_through_parameters() {
+    let (_container, options) = start_mssql().await;
+    let conn = connect(options).await;
+    conn.execute(
+        "CREATE TABLE legacy_ticks (value datetime); \
+         CREATE TABLE legacy_ticks_bound (value datetime)",
+    )
+    .await
+    .unwrap();
+    let seed = conn
+        .query(
+            ";WITH millis AS (SELECT 0 AS n UNION ALL SELECT n + 1 FROM millis WHERE n < 998) \
+         INSERT INTO legacy_ticks SELECT DISTINCT CONVERT(datetime, DATEADD(millisecond, n, \
+         CONVERT(datetime2(3), '2024-01-02T03:04:05.000'))) FROM millis OPTION (MAXRECURSION 0)",
+        )
+        .await;
+    assert!(seed.is_ok(), "generate all 300 server datetime ticks: {seed:?}");
+
+    let source = conn
+        .query(
+            "SELECT value, CONVERT(varchar(23), value, 126) AS native_text \
+         FROM legacy_ticks ORDER BY value",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        source.rows.len(),
+        300,
+        "the millisecond sweep must cover each 1/300-second tick"
+    );
+    let mut parameters = Vec::with_capacity(source.rows.len());
+    let mut typed_count = 0;
+    let mut text_count = 0;
+    for row in &source.rows {
+        match &row[0] {
+            Value::Text(_) => {
+                text_count += 1;
+                assert_eq!(row[0], row[1], "fallback must equal native style-126 text");
+            }
+            Value::DateTime(stamp) => {
+                typed_count += 1;
+                let expected = chrono::NaiveDateTime::parse_from_str(
+                    match &row[1] {
+                        Value::Text(text) => text,
+                        other => panic!("native text: {other:?}"),
+                    },
+                    "%Y-%m-%dT%H:%M:%S%.f",
+                )
+                .unwrap();
+                assert_eq!(stamp, &expected, "exact datetime tick must retain its typed value");
+            }
+            other => panic!("unexpected legacy datetime carrier: {other:?}"),
+        }
+        parameters.push(row[0].clone());
+    }
+    assert_eq!(parameters.len(), 300);
+    assert_eq!(typed_count, 100, "one third of legacy ticks are exact nanoseconds");
+    assert_eq!(text_count, 200, "two thirds require the exact text fallback");
+    let placeholders = (1..=parameters.len())
+        .map(|i| format!("(@P{i})"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!("INSERT INTO legacy_ticks_bound VALUES {placeholders}");
+    conn.execute_params(&sql, &parameters).await.unwrap();
+
+    let comparisons = conn
+        .query(
+            "SELECT COUNT(*), SUM(CASE WHEN CONVERT(varbinary(8), s.value) = \
+         CONVERT(varbinary(8), b.value) THEN 1 ELSE 0 END) \
+         FROM legacy_ticks s CROSS JOIN legacy_ticks_bound b \
+         WHERE CONVERT(varchar(23), s.value, 126) = CONVERT(varchar(23), b.value, 126)",
+        )
+        .await
+        .unwrap();
+    assert_eq!(comparisons.rows, vec![vec![Value::Int(300), Value::Int(300)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_smalldatetime_rounding_matches_server_text() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
@@ -996,7 +1090,7 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() {
+async fn value_contract_legacy_datetime_fallback_matches_session_batch_and_native_text() {
     let (_container, options) = start_mssql().await;
     let conn = connect(options).await;
     let sql = "SELECT value, CONVERT(varchar(23), value, 126) AS server_text \
@@ -1031,10 +1125,10 @@ async fn value_contract_legacy_datetime_refuses_ticks_chrono_cannot_represent() 
                 .and_hms_opt(3, 4, 5)
                 .unwrap(),
         ),
-        Value::Undecodable("datetime".into()),
-        Value::Undecodable("datetime".into()),
-        Value::Undecodable("datetime".into()),
-        Value::Undecodable("datetime".into()),
+        Value::Text("2024-01-02T03:04:05.003".into()),
+        Value::Text("2024-01-02T03:04:05.003".into()),
+        Value::Text("2024-01-02T03:04:05.007".into()),
+        Value::Text("2024-01-02T03:04:05.007".into()),
     ];
     assert_eq!(result.rows.len(), expected_server_text.len());
     for ((row, expected_value), expected_text) in result.rows.iter().zip(expected_values).zip(expected_server_text) {

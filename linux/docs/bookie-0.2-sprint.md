@@ -206,6 +206,12 @@ out of extraction, remains malformed after formatting and is denied to agents
 by fail-closed policy. Other dialects and installed SQL editor interaction
 remain open; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
 
+October 4 B3-2 follow-up: SQL Server legacy `datetime` now decodes every
+1/300-second tick exactly, using typed nanosecond values where representable
+and canonical style-126 text for the others. Native SQL Server tests compare
+all 300 ticks with server text and verify parameter and SQL-literal restore by
+the stored 8-byte value; see the [evidence manifest](evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
+
 October 4 B3-5 follow-up: a Docker-backed GTK scenario now checks MySQL
 unparseable-routine approval text, deny-before-dispatch, and Allow Once against
 the native routine catalog. It exposed the pooled MySQL query path missing the

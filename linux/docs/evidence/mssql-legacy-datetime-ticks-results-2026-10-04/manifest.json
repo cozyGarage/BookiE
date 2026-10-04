@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "12856cb51c80b0d9f747fe8798992605cc0edc08",
+  "source_diff_sha256": "a57f2974b9420c4fe90e2d90266b33ef325a0e10bd578da7adf7aa46b9736420",
+  "engine": "SQL Server Docker via testcontainers_modules::mssql_server::MssqlServer",
+  "case": "Exact result, SQL-literal and parameter round trips for legacy SQL Server datetime ticks",
+  "contract": [
+    "Every-third 1/300-second ticks remain typed DateTime values; other ticks use canonical style-126 text, preserving the value beyond chrono nanosecond precision.",
+    "A sweep over all 300 distinct ticks checks the decoded carrier against independent SQL Server CONVERT(varchar(23), value, 126) output and asserts 100 typed plus 200 text values.",
+    "All 300 typed/text values are bound into a legacy datetime column; SQL Server compares each stored varbinary(8) value with its source value.",
+    "Representative inexact values restore through generated SQL INSERT literals with identical varbinary(8) values. SQL NULL and datetime2 remain covered by codec unit tests and existing native temporal checks."
+  ],
+  "validation": {
+    "all_tick_parameter_round_trip": {
+      "command": "rtk cargo test -p tablepro-driver-mssql --test integration value_contract_all_legacy_datetime_ticks_round_trip_through_parameters -- --ignored --exact",
+      "result": "1 passed; all 300 stored values match their source varbinary(8) bytes",
+      "log": "all-ticks-roundtrip.txt",
+      "log_sha256": "f24bec2b664bcbc2ea17efd664c0c60ed5927fc1222b3b61eb1f1aad750f0c4b"
+    },
+    "sql_literal_round_trip": {
+      "command": "rtk cargo test -p tablepro-driver-mssql --test integration inexact_legacy_datetime_uses_exact_text_and_supported_temporals_round_trip -- --ignored --exact",
+      "result": "1 passed; representative text values and supported temporal projection restore",
+      "log": "sql-literal-roundtrip.txt",
+      "log_sha256": "e7b21649be25cd400e528b90b47cdca1cdbdfa7a77207d5ad498b6c3999feb86"
+    },
+    "session_batch_boundary_contract": {
+      "command": "rtk cargo test -p tablepro-driver-mssql --test integration value_contract_legacy_datetime_fallback_matches_session_batch_and_native_text -- --ignored --exact",
+      "result": "1 passed; session batch matches pool query, and decoded values match native style-126 text",
+      "log": "session-native-text.txt",
+      "log_sha256": "b66dfa347e41eccfbddd0fa7f765adba38aeb785e6f93c8bab72da8a7734b98f"
+    },
+    "codec_unit_suite": {
+      "command": "rtk cargo test -p tablepro-driver-mssql --lib",
+      "result": "32 passed",
+      "log": "codec-suite.txt",
+      "log_sha256": "6fd86433f63ebe294dd98dfc64407bfe3cd9098370da9c96dffeaed0b7dd1716"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy -p tablepro-driver-mssql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt",
+      "log_sha256": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt",
+      "log_sha256": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7"
+    },
+    "diff_check": {
+      "command": "rtk proxy git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "remaining": [
+    "Grid editing and non-SQL consumer behavior for the mixed typed/text legacy datetime carrier remain open.",
+    "SQL Server money/smallmoney and sql_variant remain explicitly unsupported. This case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

@@ -28,8 +28,12 @@ pub(crate) fn col_to_info(c: &Column) -> ColumnInfo {
 const MAX_DECIMAL_MANTISSA: u128 = 0x0000_0000_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF;
 
 fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
-    if is_inexact_legacy_datetime_payload(cd) {
-        return undecodable("datetime");
+    if is_inexact_legacy_datetime_payload(cd)
+        && let ColumnData::DateTime(Some(value)) = cd
+    {
+        return legacy_datetime_text(*value)
+            .map(Value::Text)
+            .unwrap_or_else(|| undecodable("datetime"));
     }
     match cd {
         ColumnData::Bit(v) => (*v).map(Value::Bool).unwrap_or(Value::Null),
@@ -78,6 +82,24 @@ fn column_data_to_value(cd: &ColumnData<'static>) -> Value {
 /// payload variant instead of refusing based on column metadata.
 fn is_inexact_legacy_datetime_payload(cd: &ColumnData<'static>) -> bool {
     matches!(cd, ColumnData::DateTime(Some(value)) if value.seconds_fragments() % 3 != 0)
+}
+
+fn legacy_datetime_text(value: tiberius::time::DateTime) -> Option<String> {
+    let date =
+        NaiveDate::from_ymd_opt(1900, 1, 1)?.checked_add_signed(chrono::Duration::days(i64::from(value.days())))?;
+    // SQL Server style 126 rounds 1/300-second ticks to the nearest millisecond.
+    let milliseconds = (u64::from(value.seconds_fragments()) * 10 + 1) / 3;
+    let seconds = u32::try_from(milliseconds / 1_000).ok()?;
+    let nanos = u32::try_from(milliseconds % 1_000).ok()? * 1_000_000;
+    let time = NaiveTime::from_num_seconds_from_midnight_opt(seconds, nanos)?;
+    let timestamp = date.and_time(time);
+    let base = timestamp.format("%Y-%m-%dT%H:%M:%S");
+    let fraction = milliseconds % 1_000;
+    Some(if fraction == 0 {
+        base.to_string()
+    } else {
+        format!("{base}.{fraction:03}")
+    })
 }
 
 pub(crate) fn column_data_to_value_for_type(cd: &ColumnData<'static>, column_type: ColumnType) -> Value {
@@ -260,14 +282,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_datetime_refuses_inexact_ticks_but_keeps_null_and_datetime2() {
+    fn legacy_datetime_uses_exact_text_for_inexact_ticks_and_keeps_null_and_datetime2() {
         let date = chrono::NaiveDate::from_ymd_opt(2024, 1, 2).unwrap();
         let days_since_1900 = (date - chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap()).num_days() as i32;
         let legacy = tiberius::time::DateTime::new(days_since_1900, 2);
         for column_type in [ColumnType::Datetime, ColumnType::Datetimen] {
             assert_eq!(
                 column_data_to_value_for_type(&ColumnData::DateTime(Some(legacy)), column_type),
-                Value::Undecodable("datetime".into())
+                Value::Text("2024-01-02T00:00:00.007".into())
             );
             assert_eq!(
                 column_data_to_value_for_type(
