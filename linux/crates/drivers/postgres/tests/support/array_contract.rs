@@ -1323,6 +1323,132 @@ async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblin
     );
 }
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_enum_array_shape")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_enum_array_shape.label AS ENUM ('NULL', '', '東京', 'sibling')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_enum_array_shape.target \
+             (id integer PRIMARY KEY, labels value_contract_enum_array_shape.label[])",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_enum_array_shape.target VALUES \
+             (99, ARRAY['sibling'::value_contract_enum_array_shape.label])",
+        )
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query(
+            "SELECT encode(array_send(labels), 'hex') \
+             FROM value_contract_enum_array_shape.target WHERE id = 99",
+        )
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+
+    let source = connection
+        .query(
+            "SELECT 1 AS id, NULL::value_contract_enum_array_shape.label[] AS labels \
+             UNION ALL SELECT 2, ARRAY[]::value_contract_enum_array_shape.label[] \
+             UNION ALL SELECT 3, ARRAY[NULL::value_contract_enum_array_shape.label] \
+             UNION ALL SELECT 4, '[0:3]={\"NULL\",NULL,\"\",東京}'::value_contract_enum_array_shape.label[] \
+             UNION ALL SELECT 5, ARRAY[\
+                 ['NULL'::value_contract_enum_array_shape.label, NULL::value_contract_enum_array_shape.label], \
+                 [''::value_contract_enum_array_shape.label, '東京'::value_contract_enum_array_shape.label]\
+             ]::value_contract_enum_array_shape.label[] \
+             ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let native = connection
+        .query(
+            "SELECT id, pg_typeof(labels)::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM (\
+                 SELECT 1 AS id, NULL::value_contract_enum_array_shape.label[] AS labels \
+                 UNION ALL SELECT 2, ARRAY[]::value_contract_enum_array_shape.label[] \
+                 UNION ALL SELECT 3, ARRAY[NULL::value_contract_enum_array_shape.label] \
+                 UNION ALL SELECT 4, '[0:3]={\"NULL\",NULL,\"\",東京}'::value_contract_enum_array_shape.label[] \
+                 UNION ALL SELECT 5, ARRAY[\
+                     ['NULL'::value_contract_enum_array_shape.label, NULL::value_contract_enum_array_shape.label], \
+                     [''::value_contract_enum_array_shape.label, '東京'::value_contract_enum_array_shape.label]\
+                 ]::value_contract_enum_array_shape.label[]\
+             ) AS source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(source.rows.len(), 5);
+    assert_eq!(native.rows.len(), 5);
+    assert_eq!(native.rows[0][2], Value::Null);
+    assert_eq!(native.rows[1][2], Value::Null);
+    assert_eq!(native.rows[0][3], Value::Null);
+    assert_eq!(native.rows[1][3], Value::Text("[]".into()));
+    assert_ne!(native.rows[0][4], native.rows[1][4]);
+    assert_eq!(native.rows[2][3], Value::Text("[null]".into()));
+    assert_eq!(native.rows[3][2], Value::Text("[0:3]".into()));
+    assert_eq!(native.rows[4][2], Value::Text("[1:2][1:2]".into()));
+
+    let csv_options = tablepro_core::export::CsvOptions {
+        null_marker: Some("\\N".into()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker: "\\N".into(),
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(Some("value_contract_enum_array_shape"), "target")
+        .await
+        .unwrap();
+    let mapping = [Some(0), Some(1)];
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("value_contract_enum_array_shape"),
+            table: "target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert_eq!(plan.rows.len(), 5);
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query(
+            "SELECT id, pg_typeof(labels)::text, array_dims(labels), \
+                    array_to_json(labels)::text, encode(array_send(labels), 'hex') \
+             FROM value_contract_enum_array_shape.target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 6);
+    assert_eq!(&restored.rows[..5], native.rows.as_slice());
+    assert_eq!(restored.rows[5][0], Value::Int(99));
+    assert_eq!(restored.rows[5][3], Value::Text("[\"sibling\"]".into()));
+    assert_eq!(restored.rows[5][4], sibling_wire);
+}
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")
