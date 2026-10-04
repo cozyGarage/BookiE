@@ -201,9 +201,9 @@ preservation of a SQL NULL sibling. A combined `pg_typeof($1)`/enum-comparison
 query is explicitly refused with SQLSTATE `42P08`; an explicit cast is the
 passing control. A five-domain follow-up verifies metadata, keyed edit,
 inferred parameters, filter, invalid-label refusal and native sibling values.
-A six-domain follow-up verifies enum-leaf metadata, keyed and draft writes,
-typed filter, invalid-label refusal and exact outer type/value with NULL
-preserved. Depths
+A six-domain follow-up verifies enum-leaf metadata and keyed/draft writes with
+a same-named shadow enum on the session `search_path`, plus typed filtering,
+invalid-label refusal and exact outer type/value with NULL preserved. Depths
 beyond six layers and other enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)

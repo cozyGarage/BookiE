@@ -4575,11 +4575,12 @@ remain untested. See the [five-domain-layer evidence](evidence/postgres-five-lev
 ## PostgreSQL six-domain-layer enum contract (2026-10-04)
 
 A PostgreSQL 16 native case extends the enum chain to six nested domains.
-Catalog metadata resolves to the qualified enum leaf. Schema-aware keyed and
-draft inserts preserve the six-layer outer domain for both an enum label and
-SQL NULL; a typed equality filter selects the expected rows. An invalid label
-is refused with SQLSTATE `22P02`; native value/type checks confirm the row is
-unchanged and its SQL NULL sibling remains intact. The
+Catalog metadata resolves to the qualified enum leaf while the session
+`search_path` resolves a same-named shadow enum with a narrower label set.
+Schema-aware keyed and draft writes preserve the six-layer outer domain for an
+enum label and SQL NULL; a typed equality filter selects the expected rows.
+An invalid label is refused with SQLSTATE `22P02`; native value/type checks
+confirm the row is unchanged and its SQL NULL sibling remains intact. The
 focused case and all 13 PostgreSQL domain contracts passed, along with Clippy,
 formatting and ignored-test inventory checks. Chains deeper than six layers and
 other enum/session combinations remain untested. See the

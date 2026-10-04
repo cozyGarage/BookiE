@@ -2,21 +2,22 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "514b0453b632d2caba79581ee2331ba1d65bd8c4",
+  "source_commit": "a0057ee9682dcc1982b3cf08b2aa6e6b92a32b51",
   "case": "Six nested PostgreSQL domains over a custom enum",
   "engine": "PostgreSQL 16 (Docker)",
-  "test": "domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values",
+  "test": "domain_contract::value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_search_path",
   "contract": [
     "Catalog metadata resolves the six-domain column to the schema-qualified enum leaf.",
-    "A schema-aware keyed edit preserves the six-layer outer domain type.",
-    "Draft inserts preserve an enum label and SQL NULL as the six-layer outer domain type.",
+    "The session search_path resolves a same-named shadow enum with fewer labels than the target enum.",
+    "Schema-aware keyed edits and draft inserts preserve the six-layer outer domain type under the shadowed search_path.",
+    "Draft inserts preserve both an enum label and SQL NULL as the six-layer outer domain type.",
     "A typed equality filter selects the edited row with the exact outer pg_typeof value.",
     "An invalid enum label is rejected with SQLSTATE 22P02 and does not mutate the stored row.",
     "Independent native value/type queries confirm the exact values, outer domain type, and unchanged SQL NULL sibling."
   ],
   "validation": {
     "focused": {
-      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values -- --include-ignored --exact --test-threads=1",
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration domain_contract::value_contract_six_domain_levels_over_enum_writes_ignore_shadowed_search_path -- --include-ignored --exact --test-threads=1",
       "result": "1 passed, 0 failed",
       "log": "focused.txt"
     },
@@ -39,9 +40,9 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "focused.txt": "08283d57c52359bcb22f0881681b56e739ec16a3f87b6b6232a42f311048d6d7",
-    "domain-tests.txt": "4fedf6268b802e848980239ed018609c2b028fd8a9e5f834b94c60c392ea0f3d",
-    "clippy.txt": "88df934953f494a4c4861871c404f0544c51da634d1776574f188255bebf630c",
+    "focused.txt": "11c7041123834bcbdc775299d4518bcaadfe0365a9371bbc4a0a09cff3375473",
+    "domain-tests.txt": "cae65dc5e45c5738ed75d1daf4c70c8f8cc5c0007f403645cb78b254bec5de6c",
+    "clippy.txt": "25684e9665a15a09a4d13b453333ea2b6f1f73e96f782e4f62d810f4d912a26f",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
