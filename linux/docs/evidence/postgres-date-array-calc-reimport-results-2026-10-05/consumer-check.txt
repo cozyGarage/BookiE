@@ -1,0 +1,1 @@
+date[] boundary text (59 characters), string cell kinds and no-formula checks passed through Calc ODS/XLSX re-save
