@@ -344,6 +344,23 @@ async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boun
     let mut transaction = connection.begin().await.unwrap();
     transaction.execute("SET LOCAL search_path TO public").await.unwrap();
 
+    transaction.execute("SAVEPOINT native_domain_equality").await.unwrap();
+    let native_equality = transaction
+        .query(&format!(
+            "SELECT status_63 = ANY('{{\"ready\"}}'::{schema}.state_domain_63[]) \
+             FROM {schema}.rows WHERE id = 1"
+        ))
+        .await
+        .expect_err("PostgreSQL cannot resolve equality for this deep domain chain");
+    assert!(
+        matches!(&native_equality, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42883"),
+        "expected native missing-operator SQLSTATE 42883, got {native_equality:?}"
+    );
+    transaction
+        .execute("ROLLBACK TO SAVEPOINT native_domain_equality")
+        .await
+        .unwrap();
+
     for depth in [62, 63] {
         let status_column = format!("status_{depth}");
         let type_name = format!("{schema}.state_domain_{depth}");
