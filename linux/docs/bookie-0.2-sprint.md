@@ -137,6 +137,10 @@ October 4 B3 follow-up: `array_position` now has the same inferred text/SQL NULL
 coverage, including PostgreSQL's NULL-element match behavior and native position
 results ([evidence](evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json)).
 
+October 4 B3 follow-up: `array_replace` verifies both inferred scalar parameter
+slots for domain-over-enum arrays, including NULL search and replacement values
+([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
+
 October 4 follow-up: the GTK + DuckDB local value tier now passes 297 selected
 contracts across all 11 suites, including 101 PostgreSQL contracts with the
 new array-operator and depth-boundary cases. The exact-revision report and raw

@@ -260,6 +260,110 @@ async fn value_contract_domain_enum_array_position_infers_scalar_parameter_and_m
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_replace_infers_both_scalar_parameters() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_domain_array_replace")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_array_replace.state \
+             AS ENUM ('ready', 'paused')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE DOMAIN value_contract_domain_array_replace.state_domain \
+             AS value_contract_domain_array_replace.state",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_domain_array_replace.rows \
+             (id INT PRIMARY KEY, status value_contract_domain_array_replace.state_domain)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_domain_array_replace.rows VALUES \
+             (1, 'ready'), (2, 'paused'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let array = "ARRAY[status::value_contract_domain_array_replace.state]";
+    for (search, replacement, native_search, native_replacement) in [
+        (
+            Value::Text("ready".into()),
+            Value::Text("paused".into()),
+            "'ready'",
+            "'paused'",
+        ),
+        (
+            Value::Null,
+            Value::Text("ready".into()),
+            "NULL",
+            "'ready'",
+        ),
+        (
+            Value::Text("paused".into()),
+            Value::Null,
+            "'paused'",
+            "NULL",
+        ),
+        (Value::Null, Value::Null, "NULL", "NULL"),
+    ] {
+        let native = connection
+            .query(&format!(
+                "SELECT id, array_to_json(array_replace({array}, \
+                 {native_search}::value_contract_domain_array_replace.state, \
+                 {native_replacement}::value_contract_domain_array_replace.state))::text \
+                 FROM value_contract_domain_array_replace.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let result = connection
+            .query_params(
+                &format!(
+                    "SELECT id, array_to_json(array_replace({array}, $1, $2))::text, \
+                     pg_typeof($1)::text, pg_typeof($2)::text, \
+                     pg_typeof(array_replace({array}, $1, $2))::text \
+                     FROM value_contract_domain_array_replace.rows ORDER BY id"
+                ),
+                &[search.clone(), replacement.clone()],
+            )
+            .await
+            .unwrap();
+        let enum_type = Value::Text("value_contract_domain_array_replace.state".into());
+        let array_type = Value::Text("value_contract_domain_array_replace.state[]".into());
+        let expected = native
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    enum_type.clone(),
+                    enum_type.clone(),
+                    array_type.clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            result.rows,
+            expected,
+            "array_replace with {search:?} to {replacement:?}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

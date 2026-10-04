@@ -5682,6 +5682,16 @@ checks that the parameter is the base enum and the result is `integer`. The SQL
 NULL case confirms PostgreSQL matches a NULL array element; other inferred
 array-function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json).
 
+## PostgreSQL domain-over-enum `array_replace` parameter inference, 2026-10-04
+
+A PostgreSQL 16 Docker contract covers both inferred parameters in
+`array_replace(ARRAY[status::state], $1, $2)` for a domain-over-enum source. It
+checks text replacement, NULL search, NULL replacement, and both parameters
+NULL. Each result array is compared with a separately typed native query, and
+`pg_typeof` verifies both parameters are the base enum and the result is the
+base enum array. Other inferred function and operator contexts remain open. See
+the [evidence manifest](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json).
+
 ## PostgreSQL inferred enum-array parameter in `ANY`, 2026-10-04
 
 A PostgreSQL 16 Docker contract compares a domain-over-enum column cast to its

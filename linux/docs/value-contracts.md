@@ -179,6 +179,9 @@ parameter and result enum types checked independently
 The corresponding `array_position` case checks native position results and
 confirms that a SQL NULL parameter matches a NULL array element
 ([evidence](evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json)).
+`array_replace` exercises two inferred parameters together for text, SQL NULL,
+and their search/replacement combinations, with native result and enum-type
+oracles ([evidence](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json)).
 
 PostgreSQL custom-enum SQL export now preserves a label containing literal `\n`
 when replayed with (`standard_conforming_strings=on`, `backslash_quote=safe_encoding`)
