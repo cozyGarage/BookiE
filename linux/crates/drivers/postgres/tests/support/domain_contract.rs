@@ -1208,10 +1208,11 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_six_and_seven_domain_levels_over_enum_ignore_shadowed_search_path() {
+async fn value_contract_six_seven_and_eight_domain_levels_over_enum_ignore_shadowed_search_path() {
     let (_container, opts) = start_pg().await;
     assert_domain_level_contract(opts.clone(), 6).await;
-    assert_domain_level_contract(opts, 7).await;
+    assert_domain_level_contract(opts.clone(), 7).await;
+    assert_domain_level_contract(opts, 8).await;
 }
 
 async fn assert_domain_level_contract(opts: tablepro_core::ConnectOptions, levels: usize) {
