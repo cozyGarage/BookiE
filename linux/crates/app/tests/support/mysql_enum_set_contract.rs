@@ -30,6 +30,20 @@ fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
         parse_input_for_driver("happy", Some(&column("value", "enum('happy','it\\'s ok')")), "mysql"),
         Ok(Value::Text("happy".into()))
     );
+    let mut nullable_enum = column("value", "enum('happy','')");
+    nullable_enum.nullable = true;
+    assert_eq!(
+        parse_input_for_driver("", Some(&nullable_enum), "mysql"),
+        Ok(Value::Null)
+    );
+    assert_eq!(
+        parse_input_for_driver("''", Some(&nullable_enum), "mysql"),
+        Ok(Value::Text(String::new()))
+    );
+    assert_eq!(
+        parse_input_for_driver("''", Some(&column("value", "set('read','write')")), "mysql"),
+        Ok(Value::Text(String::new()))
+    );
 }
 
 #[tokio::test]
@@ -64,7 +78,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
         .query_params_controlled(
             "CREATE TABLE enum_set_grid (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', '<tag>&'),
+                mood ENUM('happy', 'it''s ok', 'back\\\\slash', 'NULL', '', '<tag>&'),
                 perms SET('read', 'write', 'slash\\\\path', 'NULL', '<member>')
             )",
             &[],
@@ -75,7 +89,7 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
     session
         .query_params_controlled(
             "INSERT INTO enum_set_grid VALUES
-                (1, 'happy', 'read'), (2, '<tag>&', '<member>')",
+                (1, 'happy', 'read'), (2, '<tag>&', '<member>'), (3, NULL, NULL)",
             &[],
             &control,
         )
@@ -170,6 +184,78 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
                 .unwrap();
         }
 
+        if mode.is_empty() {
+            let blank_mood = parse_input_for_driver("", Some(&columns[mood]), "mysql").unwrap();
+            let blank_perms = parse_input_for_driver("", Some(&columns[perms]), "mysql").unwrap();
+            assert_eq!(blank_mood, Value::Null);
+            assert_eq!(blank_perms, Value::Null);
+            let blank_update = tablepro_core::sql_dialect::build_keyed_update(
+                "mysql",
+                None,
+                "enum_set_grid",
+                &columns,
+                &[(mood, blank_mood), (perms, blank_perms)],
+                &[Value::Int(1)],
+            )
+            .unwrap();
+            session
+                .query_params_controlled(&blank_update.0, &blank_update.1, &control)
+                .await
+                .unwrap();
+            let blank_state = session
+                .query_params_controlled(
+                    "SELECT IF(mood IS NULL, 'null', 'value'), IF(perms IS NULL, 'null', 'value')
+                     FROM enum_set_grid WHERE id = 1",
+                    &[],
+                    &control,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                blank_state.rows[0],
+                vec![Value::Text("null".into()), Value::Text("null".into())]
+            );
+
+            let empty_mood = parse_input_for_driver("''", Some(&columns[mood]), "mysql").unwrap();
+            let empty_perms = parse_input_for_driver("''", Some(&columns[perms]), "mysql").unwrap();
+            assert_eq!(empty_mood, Value::Text(String::new()));
+            assert_eq!(empty_perms, Value::Text(String::new()));
+            let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+                "mysql",
+                None,
+                "enum_set_grid",
+                &columns,
+                &[(mood, empty_mood), (perms, empty_perms)],
+                &[Value::Int(1)],
+            )
+            .unwrap();
+            session
+                .query_params_controlled(&empty_update.0, &empty_update.1, &control)
+                .await
+                .unwrap();
+            let empty_state = session
+                .query_params_controlled(
+                    "SELECT IF(mood IS NULL, 'null', 'value'), CAST(mood + 0 AS CHAR), HEX(mood),
+                            IF(perms IS NULL, 'null', 'value'), CAST(perms + 0 AS CHAR), HEX(perms)
+                     FROM enum_set_grid WHERE id = 1",
+                    &[],
+                    &control,
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                empty_state.rows[0],
+                vec![
+                    Value::Text("value".into()),
+                    Value::Text("5".into()),
+                    Value::Text(String::new()),
+                    Value::Text("value".into()),
+                    Value::Text("0".into()),
+                    Value::Text(String::new()),
+                ]
+            );
+        }
+
         let mood_value = parse_input_for_driver("it's ok", Some(&columns[mood]), "mysql").unwrap();
         let perms_value = parse_input_for_driver("write,slash\\path", Some(&columns[perms]), "mysql").unwrap();
         assert_eq!(mood_value, Value::Text("it's ok".into()));
@@ -210,6 +296,11 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             "mode {mode:?}"
         );
         assert_eq!(rows[1], siblings[0], "sibling changed in mode {mode:?}");
+        assert_eq!(
+            rows[2],
+            vec![Value::Int(3), Value::Null, Value::Null, Value::Null, Value::Null],
+            "SQL NULL row changed in mode {mode:?}"
+        );
     }
     session.close().await.unwrap();
 }

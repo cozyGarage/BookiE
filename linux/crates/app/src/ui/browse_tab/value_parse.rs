@@ -57,6 +57,8 @@ fn parse_mysql_enum_set_input(text: &str, col: Option<&ColumnInfo>) -> Option<Re
     };
     let valid = if is_enum {
         labels.iter().any(|label| label == text)
+    } else if text.is_empty() {
+        true
     } else {
         text.split(',').all(|member| labels.iter().any(|label| label == member))
     };
@@ -118,6 +120,12 @@ fn parse_mysql_enum_set_labels(data_type: &str) -> Option<Vec<String>> {
 }
 
 pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Result<Value, String> {
+    if driver_id == "mysql"
+        && text == "''"
+        && let Some(result) = parse_mysql_enum_set_input("", col)
+    {
+        return result;
+    }
     if text.is_empty() {
         return parse_input_for_column(text, col);
     }
