@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "ac497c9b2651a765fe083459208a84ee23de601b",
+  "engine": "SQLite STRICT ANY (in-memory native SQLite driver)",
+  "case": "grouped AVG() result storage classes through typed CSV re-import",
+  "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_avg_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "Grouped AVG(value) over STRICT ANY returns REAL for every non-NULL group, including integer, real, numeric text and mixed integer/real inputs; an all-NULL group returns SQL NULL.",
+    "Nonnumeric text and BLOB inputs follow SQLite AVG coercion and yield REAL 0.0; native typeof() verifies the result class.",
+    "A group containing 9223372036854775807 and 1 produces a REAL average without SUM's integer-overflow error.",
+    "Typed CSV export/import restores every computed result and REAL/NULL storage class into STRICT ANY, verified by native typeof() and exact values."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app sqlite_ -- --test-threads=1",
+      "result": "15 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "45283a9ffc50db35e3b234f5c43b0e1526e3cfc70eb5a5e7792352791a798c70",
+    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other computed-expression shapes, additional consumer formats, spreadsheet-app re-import and installed editing remain open."
+  ]
+}

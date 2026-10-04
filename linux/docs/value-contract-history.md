@@ -5152,6 +5152,17 @@ overflow error instead of a rounded value. All 14 selected SQLite app
 contracts, strict Clippy and formatting pass. See the
 [evidence manifest](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
 
+## SQLite AVG over computed STRICT ANY result round trip, 2026-10-04
+
+Grouped `AVG(value)` over STRICT `ANY` returns REAL for every non-NULL group,
+including integer and numeric-text inputs; an all-NULL group returns SQL NULL.
+Nonnumeric text and BLOB inputs yield REAL zero. A pair containing
+`9223372036854775807` and `1` averages as REAL instead of raising SUM's integer
+overflow. Typed CSV export/import preserves the computed values and runtime
+classes, checked with native `typeof()`. All 15 selected SQLite app contracts,
+strict Clippy and formatting pass. See the
+[evidence manifest](evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
+
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
 A PostgreSQL 16 Docker contract exports a `numeric[]` containing a 40-digit

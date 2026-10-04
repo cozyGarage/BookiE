@@ -211,6 +211,13 @@ rules, nonnumeric text and BLOB inputs yield REAL zero, and an integer-overflow
 case is refused with SQLite's native error. See the
 [SUM evidence](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
 
+October 4 B3-3/B3-4 follow-up: grouped SQLite `AVG()` over STRICT `ANY` returns
+REAL for every non-NULL group, including integer and numeric-text inputs, and
+SQL NULL for an all-NULL group. Nonnumeric text and BLOB values yield REAL
+zero; a near-`i64::MAX` pair averages as REAL without integer overflow. Typed
+CSV re-import preserves each result, verified by native `typeof()`. See the
+[AVG evidence](evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
+
 October 4 B3-2 follow-up: MySQL `TIME(3)`, `DATETIME(3)` and `TIMESTAMP(3)`
 round fractional input when `TIME_TRUNCATE_FRACTIONAL` is absent and truncate
 when enabled; MariaDB truncates when `TIME_ROUND_FRACTIONAL` is absent and
