@@ -42,7 +42,7 @@ class ValueRunnerTests(unittest.TestCase):
 
     def test_a_timed_out_suite_is_reported_as_failure(self):
         listed = runner.subprocess.CompletedProcess([], 0, "value_contract_case: test\n", "")
-        expired = runner.subprocess.TimeoutExpired("fixture", 300)
+        expired = runner.subprocess.TimeoutExpired("fixture", runner.SUITE_TIMEOUT_SECONDS)
         with tempfile.TemporaryDirectory() as root, patch.object(runner.subprocess, "run", side_effect=[listed, expired]):
             result = runner.run_suite("crates/core/Cargo.toml", "/tmp/fixture", Path(root))
             self.assertEqual(result["tests"], 1)

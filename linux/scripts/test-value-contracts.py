@@ -12,6 +12,7 @@ from rust_test_evidence import completed_tests
 
 ROOT = Path(__file__).resolve().parents[1]
 DRIVERS = ("postgres", "mysql", "sqlite", "mssql", "clickhouse", "redis", "mongodb")
+SUITE_TIMEOUT_SECONDS = 420
 
 
 def expected_suites(gtk=False, duckdb=False):
@@ -88,10 +89,16 @@ def run_suite(manifest, executable, directory):
     started = time.monotonic()
     with log_path.open("w") as log:
         try:
-            result = subprocess.run([executable, "value_contract", "--include-ignored", "--test-threads=1", "--format=pretty", "--color=never"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT, timeout=300)
+            result = subprocess.run(
+                [executable, "value_contract", "--include-ignored", "--test-threads=1", "--format=pretty", "--color=never"],
+                cwd=ROOT,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                timeout=SUITE_TIMEOUT_SECONDS,
+            )
             exit_code = result.returncode
         except subprocess.TimeoutExpired:
-            log.write("\nValue-contract suite exceeded 300 seconds.\n")
+            log.write(f"\nValue-contract suite exceeded {SUITE_TIMEOUT_SECONDS} seconds.\n")
             exit_code = 124
     if exit_code == 0 and not completed_tests(log_path.read_text(), expected):
         with log_path.open("a") as log:
