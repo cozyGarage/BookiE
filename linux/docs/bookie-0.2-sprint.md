@@ -90,6 +90,12 @@ engine/type/consumer/configuration case; preserve existing fallbacks/refusals.
 | B3-P5 delivery/SQL | One malformed-tail, zero-row, cap, multi-result or partial-stream case; identity/order/completeness and handle state |
 | B3-P6 mutation | One relevant survivor/timeout group; independent assertions and scoped rerun; unavailable output stays unproven |
 
+October 4 B3-4 follow-up: DuckDB enum raw CSV export/import now has native
+round-trip coverage for empty text, literal `NULL`, Unicode, quotes,
+formula-shaped text, SQL NULL and an untouched destination row. Formula-safe
+CSV behavior and broader DuckDB consumer parity remain open; see the [evidence
+manifest](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
+
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
 stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3

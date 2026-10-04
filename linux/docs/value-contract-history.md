@@ -5443,6 +5443,16 @@ stays SQL NULL. The focused test and DuckDB-enabled app library suite pass, as
 do strict Clippy and formatting. Other DuckDB type, consumer and configuration
 cases plus installed editing remain open. See the [evidence manifest](evidence/duckdb-enum-null-label-results-2026-10-04/manifest.json).
 
+## DuckDB enum raw CSV round trip, 2026-10-04
+
+A local DuckDB contract exports and re-imports enum labels through CSV using an
+explicit collision-free null marker and raw-text mode. Empty text, literal
+`NULL`, Unicode, a quoted label, a formula-shaped label and SQL NULL retain
+their values and native `ENUM` type. The test also proves an unrelated existing
+destination row remains unchanged. The focused contract, all-feature app
+library suite, strict Clippy and formatting pass. Formula-sanitized CSV and
+installed GTK editing remain open; see the [evidence manifest](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
+
 ## PostgreSQL domain-over-bytea array edit with shadowed search_path, 2026-10-04
 
 A PostgreSQL 16 contract adds a same-named `payload` domain to a shadow schema
