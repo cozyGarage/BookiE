@@ -146,10 +146,11 @@ and [TIMESTAMP evidence](evidence/mysql-fractional-timestamp-mode-results-2026-1
 October 4 B3-4 follow-up: the MySQL app parser accepts fractional TIME(6),
 DATETIME(6) and TIMESTAMP(6) edits as typed values, feeds them through the
 keyed-update builder, and verifies native stored values, microseconds and an
-untouched sibling row. A real MySQL result also round-trips through CSV and JSON
-export, then CSV import and native writes; MySQL TIMESTAMP CSV import restores
-the UTC instant instead of treating the RFC3339 value as a naive datetime. Other
-format consumers and installed grid interaction remain open; see the
+untouched sibling row. A real MySQL result also exports to CSV, JSON and XLSX
+with exact fractional temporal text, then round-trips through CSV import and
+native writes. MySQL TIMESTAMP CSV import restores the UTC instant instead of
+treating the RFC3339 value as a naive datetime. Other format consumers and
+installed grid interaction remain open; see the
 [native app-edit evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
 
 October 3 B3-1 follow-up: ordinary PostgreSQL enums and domains over enums now

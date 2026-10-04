@@ -1,14 +1,6 @@
-    Checking tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
-    Checking tablepro-policy v0.1.0 (/home/trung/Projects/tablepro/linux/crates/policy)
-    Checking tablepro-driver-sqlite v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/sqlite)
-    Checking tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
-    Checking tablepro-driver-clickhouse v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/clickhouse)
-    Checking tablepro-driver-mssql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mssql)
-    Checking tablepro-driver-redis v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/redis)
-    Checking tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
-    Checking tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
-    Checking tablepro-storage v0.1.0 (/home/trung/Projects/tablepro/linux/crates/storage)
-    Checking tablepro-mcp v0.1.0 (/home/trung/Projects/tablepro/linux/crates/mcp)
-    Checking tablepro-transport v0.1.0 (/home/trung/Projects/tablepro/linux/crates/transport)
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
     Checking tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.69s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.28s

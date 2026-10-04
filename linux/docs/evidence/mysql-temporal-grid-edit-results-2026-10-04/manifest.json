@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "d59d5a3978c48e8881622754c323d2212c7a2e0c",
-  "case": "MySQL app temporal grid edit and CSV/JSON export/import instant round trip",
+  "source_commit": "120e8b7fea1a667c3f2c01d4f14908bf21f3cc82",
+  "case": "MySQL app temporal grid edit and CSV/JSON/XLSX export plus CSV import instant round trip",
   "engine": "testcontainers-modules 0.15.0 default MySQL image tag 8.1",
   "test": [
     "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keeps_fractional_input_typed",
@@ -15,7 +15,8 @@
     "The app keyed-update builder persists all three temporal values; native reads verify exact values, cast text, microseconds, UTC TIMESTAMP epoch, and an unchanged sibling row.",
     "A native MySQL query result exports exact fractional TIME/DATETIME text and UTC RFC3339 TIMESTAMP text through CSV and JSON.",
     "The CSV import plan restores timestamp(6) RFC3339 text as Value::TimestampTz for MySQL and the resulting bound inserts read back equal to the exported native rows.",
-    "Driver-aware MySQL timestamp parsing leaves generic and PostgreSQL timestamp-without-time-zone parsing as Value::DateTime."
+    "Driver-aware MySQL timestamp parsing leaves generic and PostgreSQL timestamp-without-time-zone parsing as Value::DateTime.",
+    "The real XLSX result workbook contains the fractional TIME/DATETIME and UTC RFC3339 TIMESTAMP strings as text cells."
   ],
   "references": [
     "../../decisions/0007-type-and-value-preservation.md",
@@ -56,15 +57,15 @@
     }
   },
   "log_sha256": {
-    "focused.txt": "9f310cd0cc0a95be1bc5dd4325108224b33e294d253c5309695ce2e86938078d",
-    "app-temporal-suite.txt": "79d98000484f4a27cd16d155c032ed277d90be5ab827bc21ce392a6d670a7722",
+    "focused.txt": "62326f6df2083ead2145c930ed8e28aef02d3b021fa508bc8e52b22537bccedc",
+    "app-temporal-suite.txt": "e2f0ff4c74a417a6735b0ba1ee51ae01598fe9d013967fe56ddc774d121e530e",
     "core-import.txt": "3067b77db85a9c0fe7384fa444b29931a858c1b2371db6bd3496db2dad059d58",
-    "clippy.txt": "0f91001b556852d82ae9cc0fe2a05f1b1a441977f55379dec1a1e7ff308452fe",
+    "clippy.txt": "35548c20a09e086281bbfa727c8dc418c499e2ef5f5a083c75942907dd99a69a",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "core-import-suite.txt": "fcdf1b0db0897a28c7600a33e0567d99158d59e55b17862439a37ab01e85a146"
   },
   "remaining": [
-    "Installed GTK temporal editing and XLSX or other format consumers remain open.",
+    "Installed GTK temporal editing and other format consumers remain open.",
     "MySQL TIMESTAMP import uses the driver UTC pool contract; other session-timezone, engines, and temporal consumer combinations remain open.",
     "This bounded contract does not close B3 or qualify the 0.2.0 release."
   ]
