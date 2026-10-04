@@ -1876,38 +1876,41 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
 async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
-    connection.execute("CREATE SCHEMA \"Enum Shelf\"").await.unwrap();
+    connection.execute("CREATE SCHEMA \"Enum \"\"Shelf\"").await.unwrap();
     connection
-        .execute("CREATE TYPE \"Enum Shelf\".\"State Kind\" AS ENUM ('ready', 'paused')")
+        .execute("CREATE TYPE \"Enum \"\"Shelf\".\"State \"\"Kind\" AS ENUM ('ready', 'paused')")
         .await
         .unwrap();
     connection
         .execute(
-            "CREATE TABLE \"Enum Shelf\".\"Row Box\" \
-             (id INT PRIMARY KEY, status \"Enum Shelf\".\"State Kind\", sibling TEXT NOT NULL)",
+            "CREATE TABLE \"Enum \"\"Shelf\".\"Row \"\"Box\" \
+             (id INT PRIMARY KEY, status \"Enum \"\"Shelf\".\"State \"\"Kind\", sibling TEXT NOT NULL)",
         )
         .await
         .unwrap();
     connection
         .execute(
-            "INSERT INTO \"Enum Shelf\".\"Row Box\" \
+            "INSERT INTO \"Enum \"\"Shelf\".\"Row \"\"Box\" \
              VALUES (1, 'ready', 'target'), (2, 'ready', 'sibling')",
         )
         .await
         .unwrap();
 
-    let columns = connection.fetch_columns(Some("Enum Shelf"), "Row Box").await.unwrap();
+    let columns = connection
+        .fetch_columns(Some("Enum \"Shelf"), "Row \"Box")
+        .await
+        .unwrap();
     assert_eq!(
         columns[1].enum_type,
         Some(tablepro_core::QualifiedTypeName {
-            schema: "Enum Shelf".into(),
-            name: "State Kind".into(),
+            schema: "Enum \"Shelf".into(),
+            name: "State \"Kind".into(),
         })
     );
     let update = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
-        Some("Enum Shelf"),
-        "Row Box",
+        Some("Enum \"Shelf"),
+        "Row \"Box",
         &columns,
         &[(1, Value::Text("paused".into()))],
         &[Value::Int(1)],
@@ -1918,7 +1921,7 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
     let rows = connection
         .query(
             "SELECT id, status::text, pg_typeof(status)::text, sibling \
-             FROM \"Enum Shelf\".\"Row Box\" ORDER BY id",
+             FROM \"Enum \"\"Shelf\".\"Row \"\"Box\" ORDER BY id",
         )
         .await
         .unwrap();
@@ -1928,13 +1931,13 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
             vec![
                 Value::Int(1),
                 Value::Text("paused".into()),
-                Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+                Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
                 Value::Text("target".into()),
             ],
             vec![
                 Value::Int(2),
                 Value::Text("ready".into()),
-                Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+                Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
                 Value::Text("sibling".into()),
             ],
         ]
@@ -1955,7 +1958,7 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
         .query_params(
             &format!(
                 "SELECT id, status::text, pg_typeof(status)::text \
-                 FROM \"Enum Shelf\".\"Row Box\" WHERE {where_sql}"
+                 FROM \"Enum \"\"Shelf\".\"Row \"\"Box\" WHERE {where_sql}"
             ),
             &params,
         )
@@ -1966,7 +1969,7 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
         vec![vec![
             Value::Int(1),
             Value::Text("paused".into()),
-            Value::Text("\"Enum Shelf\".\"State Kind\"".into()),
+            Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
         ]]
     );
 }
