@@ -1208,7 +1208,7 @@ async fn value_contract_five_domain_levels_over_enum_preserve_metadata_and_value
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_values() {
+async fn value_contract_six_domain_levels_over_enum_preserve_metadata_keyed_and_draft_values() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     connection
@@ -1266,6 +1266,28 @@ async fn value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_
     .unwrap();
     connection.execute_params(&update_sql, &update_params).await.unwrap();
 
+    let (insert_sql, insert_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+        "postgres",
+        Some("value_contract_six_domains"),
+        "rows",
+        &columns,
+        &[Value::Int(4), Value::Text("paused".into())],
+    )
+    .unwrap();
+    connection.execute_params(&insert_sql, &insert_params).await.unwrap();
+    let (insert_null_sql, insert_null_params) = tablepro_core::sql_dialect::build_insert_from_draft(
+        "postgres",
+        Some("value_contract_six_domains"),
+        "rows",
+        &columns,
+        &[Value::Int(5), Value::Null],
+    )
+    .unwrap();
+    connection
+        .execute_params(&insert_null_sql, &insert_null_params)
+        .await
+        .unwrap();
+
     let invalid = connection
         .execute_params(
             "UPDATE value_contract_six_domains.rows SET status = $1 WHERE id = 3",
@@ -1303,11 +1325,18 @@ async fn value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_
         .unwrap();
     assert_eq!(
         result.rows,
-        vec![vec![
-            Value::Int(1),
-            Value::Text("paused".into()),
-            Value::Text("value_contract_six_domains.state_domain_6".into()),
-        ]]
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_six_domains.state_domain_6".into()),
+            ],
+            vec![
+                Value::Int(4),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_six_domains.state_domain_6".into()),
+            ],
+        ]
     );
 
     let stored = connection
@@ -1324,6 +1353,16 @@ async fn value_contract_six_domain_levels_over_enum_preserve_metadata_and_keyed_
             vec![Value::Int(1), Value::Text("paused".into()), outer_domain.clone()],
             vec![Value::Int(2), Value::Null, outer_domain.clone()],
             vec![Value::Int(3), Value::Text("ready".into()), outer_domain],
+            vec![
+                Value::Int(4),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_six_domains.state_domain_6".into()),
+            ],
+            vec![
+                Value::Int(5),
+                Value::Null,
+                Value::Text("value_contract_six_domains.state_domain_6".into()),
+            ],
         ]
     );
 }
