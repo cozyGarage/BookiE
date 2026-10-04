@@ -55,6 +55,8 @@ The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE consumer evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
+The computed COALESCE workbook output now checks numeric and shared-string cell
+kinds, including BLOB text encoding ([XLSX evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json)).
 
 ## Evidence updates
 

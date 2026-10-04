@@ -27,6 +27,8 @@ source/SHA attribution; this summary does not certify the current tree.
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json).
+The COALESCE XLSX output now checks numeric versus string cells and BLOB text
+encoding against its computed runtime kinds; see the [workbook evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).
 
 One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire

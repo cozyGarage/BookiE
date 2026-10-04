@@ -4700,6 +4700,10 @@ Clippy and formatting. Other computed-expression shapes, spreadsheet-app
 re-import and installed editing remain open. See the
 [COALESCE CSV evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json)
 and [COALESCE metadata evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
+The same contract now inspects XLSX XML: INTEGER and REAL are numeric cells;
+fallback/stored/tag-prefix text and BLOB's `\x00ff` representation are string
+cells, with no formula cells. Spreadsheet-application re-import remains open.
+See the [XLSX evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).
 
 ## DuckDB enum keyed grid edit, 2026-10-03
 
