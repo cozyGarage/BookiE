@@ -403,6 +403,8 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
              FROM flexible WHERE id = 1 \
              UNION ALL SELECT 2, '42', typeof('42') \
              UNION ALL SELECT 3, value, typeof(value) FROM flexible WHERE id = 2 \
+             UNION ALL SELECT 4, '=1+1', typeof('=1+1') \
+             UNION ALL SELECT 5, '''=1+1', typeof('''=1+1') \
              ORDER BY position",
         )
         .await
@@ -410,7 +412,7 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     assert_eq!(result.columns[1].data_type, "NULL");
     assert_eq!(
         render_csv(&result.columns, &result.rows, &CsvOptions::default()),
-        "position,result,storage_class\n1,42,integer\n2,42,text\n3,,null\n"
+        "position,result,storage_class\n1,42,integer\n2,42,text\n3,,null\n4,\"'=1+1\",text\n5,'=1+1,text\n"
     );
 
     let directory = tempfile::tempdir().unwrap();
@@ -442,7 +444,15 @@ async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     assert!(sheet.contains("<c r=\"B2\"><v>42</v></c>"), "{sheet}");
     assert!(sheet.contains("<c r=\"B3\" t=\"s\">"), "{sheet}");
     assert!(!sheet.contains("r=\"B4\""), "{sheet}");
+    assert!(sheet.contains("<c r=\"B5\" t=\"s\">"), "{sheet}");
+    assert!(sheet.contains("<c r=\"B6\" t=\"s\">"), "{sheet}");
+    assert!(
+        !sheet.contains("<f>"),
+        "formula-shaped source text must not become an XLSX formula: {sheet}"
+    );
     assert!(shared_strings.contains("<t>42</t>"), "{shared_strings}");
+    assert!(shared_strings.contains("<t>=1+1</t>"), "{shared_strings}");
+    assert!(shared_strings.contains("<t>'=1+1</t>"), "{shared_strings}");
 }
 
 #[tokio::test]
