@@ -67,6 +67,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "CAST([map(toUInt8(1), CAST(toUInt128('18446744073709551616') AS Nullable(UInt128)), toUInt8(255), CAST(NULL AS Nullable(UInt128)))] AS Array(Map(UInt8, Nullable(UInt128))))",
             "Array(Map(UInt8, Nullable(UInt128)))",
         ),
+        (
+            "CAST([tuple('wide', map(toUInt8(1), CAST(toUInt128('18446744073709551616') AS Nullable(UInt128)), toUInt8(255), CAST(NULL AS Nullable(UInt128))))] AS Array(Tuple(String, Map(UInt8, Nullable(UInt128)))))",
+            "Array(Tuple(String, Map(UInt8, Nullable(UInt128))))",
+        ),
     ];
 
     for (index, (expression, expected_type)) in cases.into_iter().enumerate() {
