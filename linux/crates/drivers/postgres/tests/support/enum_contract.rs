@@ -1541,6 +1541,31 @@ async fn value_contract_custom_enum_keyed_edit_resolves_shadowed_type_name_by_sc
             Value::Text("enum_shadow_b.status_kind".into()),
         ]]
     );
+
+    let session_update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("enum_shadow_b"),
+        "items",
+        &columns,
+        &[(1, Value::Text("ready".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    transaction
+        .execute_params(&session_update.0, &session_update.1)
+        .await
+        .unwrap();
+    assert_eq!(
+        transaction
+            .query("SELECT status::text, pg_typeof(status)::text FROM enum_shadow_b.items WHERE id = 1")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![
+            Value::Text("ready".into()),
+            Value::Text("enum_shadow_b.status_kind".into()),
+        ]]
+    );
     transaction.rollback().await.unwrap();
 
     let ambiguous_native = connection
