@@ -314,7 +314,9 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
 
     let directory = tempfile::tempdir().unwrap();
     let csv_options = tablepro_core::export::CsvOptions::default();
-    let xlsx_path = directory.path().join("enum.xlsx");
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("enum.xlsx"));
     tablepro_core::export::write_result_file(
         &xlsx_path,
         &valid_rows,
@@ -327,9 +329,27 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
         |_| {},
     )
     .unwrap();
-    let workbook = std::fs::read(&xlsx_path).unwrap();
-    assert_eq!(&workbook[..2], b"PK");
-    assert!(workbook.len() > 1_000, "{}", workbook.len());
+    let mut workbook = zip::ZipArchive::new(std::fs::File::open(&xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut workbook.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    for cell in ["B2", "B3", "B4", "B5"] {
+        assert!(sheet.contains(&format!("<c r=\"{cell}\" t=\"s\">")), "{sheet}");
+    }
+    assert!(
+        !sheet.contains("r=\"B6\""),
+        "SQL NULL should remain a blank cell: {sheet}"
+    );
+    assert!(shared_strings.contains("<t>NULL</t>"), "{shared_strings}");
+    assert!(shared_strings.contains("<t>東京</t>"), "{shared_strings}");
+    assert!(shared_strings.contains("&lt;tag&gt;&amp;amp;"), "{shared_strings}");
+    assert!(shared_strings.contains("<t>=1+1</t>"), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "enum labels must not become formulas: {sheet}");
 
     let refusal_path = directory.path().join("preserve.xlsx");
     std::fs::write(&refusal_path, b"existing workbook").unwrap();
@@ -353,7 +373,6 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
         "{error:?}"
     );
     assert_eq!(std::fs::read(&refusal_path).unwrap(), b"existing workbook");
-    assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
 }
 
 #[tokio::test]
