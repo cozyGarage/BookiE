@@ -14,13 +14,14 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
         return None;
     };
     let element_oid = element.oid()?.0;
+    let value_oid = base_oid(element)?;
     let enum_element = is_enum_element(element);
     match raw.format() {
         PgValueFormat::Binary => {
             let bytes = raw.as_bytes().ok()?;
             let text = match info.oid()?.0 {
                 INT2VECTOR_OID | OIDVECTOR_OID => decode_vector(bytes, element_oid),
-                _ => decode_binary(bytes, element_oid, enum_element),
+                _ => decode_binary_with_oid(bytes, element_oid, value_oid, enum_element),
             }?;
             Some(Value::Text(text))
         }
@@ -33,6 +34,13 @@ fn is_enum_element(info: &PgTypeInfo) -> bool {
         PgTypeKind::Enum(_) => true,
         PgTypeKind::Domain(base) => is_enum_element(base),
         _ => false,
+    }
+}
+
+fn base_oid(info: &PgTypeInfo) -> Option<u32> {
+    match info.kind() {
+        PgTypeKind::Domain(base) => base_oid(base),
+        _ => info.oid().map(|oid| oid.0),
     }
 }
 
@@ -95,12 +103,20 @@ fn read_dimensions(reader: &mut Reader<'_>, count: usize) -> Option<(Vec<Dimensi
     (total <= reader.remaining.len() / 4).then_some((dimensions, total))
 }
 
+#[cfg(test)]
 fn decode_binary(bytes: &[u8], expected_oid: u32, enum_element: bool) -> Option<String> {
+    decode_binary_with_oid(bytes, expected_oid, expected_oid, enum_element)
+}
+
+fn decode_binary_with_oid(bytes: &[u8], expected_oid: u32, value_oid: u32, enum_element: bool) -> Option<String> {
     let mut reader = Reader { remaining: bytes };
     let count = reader.integer()?;
     let flags = reader.integer()?;
     let oid = reader.integer()? as u32;
-    if !(0..=6).contains(&count) || !matches!(flags, 0 | 1) || oid != expected_oid || (!enum_element && !supported(oid))
+    if !(0..=6).contains(&count)
+        || !matches!(flags, 0 | 1)
+        || oid != expected_oid
+        || (!enum_element && !supported(value_oid))
     {
         return None;
     }
@@ -115,7 +131,14 @@ fn decode_binary(bytes: &[u8], expected_oid: u32, enum_element: bool) -> Option<
     if total == 0 {
         output.push_str("{}");
     } else {
-        append_dimension(&mut reader, &dimensions, oid, enum_element, flags == 1, &mut output)?;
+        append_dimension(
+            &mut reader,
+            &dimensions,
+            value_oid,
+            enum_element,
+            flags == 1,
+            &mut output,
+        )?;
     }
     reader.remaining.is_empty().then_some(output)
 }
@@ -393,6 +416,18 @@ mod tests {
             Some(r#"{"NULL","","a,b","a\"b","東京",NULL}"#)
         );
         assert_eq!(element_text(9001, true, &[0xff]), None);
+    }
+
+    #[test]
+    fn value_contract_domain_array_decodes_elements_by_base_type_oid() {
+        let uuid = uuid::Uuid::parse_str("123e4567-e89b-12d3-a456-426614174000").unwrap();
+        let bytes = wire(9002, &[(2, 1)], &[Some(uuid.as_bytes()), None]);
+
+        assert_eq!(
+            decode_binary_with_oid(&bytes, 9002, 2950, false).as_deref(),
+            Some(r#"{"123e4567-e89b-12d3-a456-426614174000",NULL}"#)
+        );
+        assert_eq!(decode_binary_with_oid(&bytes, 9003, 2950, false), None);
     }
 
     #[test]
