@@ -38,6 +38,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::mysql_temporal_contract::value_contract_mysql_temporal_parser_keyed_edit_preserves_native_values_and_siblings"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mysql_spatial_contract::value_contract_mysql_spatial_grid_refusal_preserves_native_bytes"
     ],
     [

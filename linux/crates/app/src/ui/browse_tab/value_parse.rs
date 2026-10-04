@@ -710,6 +710,10 @@ mod duckdb_enum_contract;
 mod mysql_integer_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/mysql_temporal_contract.rs"]
+mod mysql_temporal_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mysql_spatial_contract.rs"]
 mod mysql_spatial_contract;
 
