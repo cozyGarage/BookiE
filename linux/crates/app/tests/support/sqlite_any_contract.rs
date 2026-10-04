@@ -2039,6 +2039,75 @@ async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
         ]
     );
 
+    let consumer_result = connection
+        .query(
+            "SELECT id AS position, CAST(value AS BLOB) AS result, \
+                    typeof(CAST(value AS BLOB)) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let json_path = directory.path().join("sqlite-cast-blob-any.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &consumer_result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    let expected_json = [
+        "\\x3432",
+        "\\x312e35",
+        "\\x3432",
+        "\\x",
+        "\\x00ff",
+        "\\x6e6f74206e756d65726963",
+    ];
+    for (row, value) in json.as_array().unwrap().iter().zip(expected_json) {
+        assert_eq!(row["result"], value);
+        assert_eq!(row["storage_class"], "blob");
+    }
+    assert!(json[6]["result"].is_null());
+    assert_eq!(json[6]["storage_class"], "null");
+
+    let xlsx_path = directory.path().join("sqlite-cast-blob-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &consumer_result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    for row in 2..=7 {
+        assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
+    }
+    for value in ["\\x3432", "\\x312e35", "\\x", "\\x00ff", "\\x6e6f74206e756d65726963"] {
+        assert!(shared_strings.contains(&format!("<t>{value}</t>")), "{shared_strings}");
+    }
+    assert!(!sheet.contains("<c r=\"B8\""), "{sheet}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
