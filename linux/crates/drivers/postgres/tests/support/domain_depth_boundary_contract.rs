@@ -300,3 +300,115 @@ async fn value_contract_domain_over_enum_258_levels_preserve_schema_aware_values
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary() {
+    let (_container, options) = start_pg().await;
+    let setup = connect(options.clone()).await;
+    let schema = "value_contract_enum_array_depth";
+    setup.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+    setup
+        .execute(&format!("CREATE TYPE {schema}.state AS ENUM ('ready', 'paused')"))
+        .await
+        .unwrap();
+
+    let mut base = "state".to_owned();
+    for level in 1..=64 {
+        let domain = format!("state_domain_{level}");
+        setup
+            .execute(&format!("CREATE DOMAIN {schema}.{domain} AS {schema}.{base}"))
+            .await
+            .unwrap();
+        base = domain;
+    }
+    setup
+        .execute(&format!(
+            "CREATE TABLE {schema}.rows (\
+             id integer PRIMARY KEY, status_62 {schema}.state_domain_62, \
+             status_63 {schema}.state_domain_63, status_64 {schema}.state_domain_64)"
+        ))
+        .await
+        .unwrap();
+    setup
+        .execute(&format!(
+            "INSERT INTO {schema}.rows VALUES \
+             (1, 'ready', 'ready', 'paused'), (2, 'paused', 'paused', 'ready'), \
+             (3, NULL, NULL, NULL)"
+        ))
+        .await
+        .unwrap();
+    drop(setup);
+
+    let connection = connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("SET LOCAL search_path TO public").await.unwrap();
+
+    for depth in [62, 63] {
+        let status_column = format!("status_{depth}");
+        let type_name = format!("{schema}.state_domain_{depth}");
+        let array_type = format!("{type_name}[]");
+        for (parameter, native_text) in [
+            (Value::Text(r#"{"ready","paused"}"#.into()), r#"'{"ready","paused"}'"#),
+            (Value::Text(r#"{"ready",NULL}"#.into()), r#"'{"ready",NULL}'"#),
+            (Value::Text("{}".into()), "'{}'"),
+            (Value::Null, "NULL"),
+        ] {
+            let native_array = format!("{native_text}::{array_type}");
+            let oracle = transaction
+                .query(&format!(
+                    "SELECT id, ARRAY[{status_column}] <@ {native_array} \
+                     FROM {schema}.rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            let wire = transaction
+                .query(&format!("SELECT encode(array_send({native_array}), 'hex')"))
+                .await
+                .unwrap()
+                .rows[0][0]
+                .clone();
+            let result = transaction
+                .query_params(
+                    &format!(
+                        "SELECT id, ARRAY[{status_column}] <@ $1, pg_typeof($1)::text, \
+                         pg_typeof({status_column})::text, encode(array_send($1), 'hex') \
+                         FROM {schema}.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = oracle
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text(array_type.clone()),
+                        Value::Text(type_name.clone()),
+                        wire.clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(result.rows, expected, "depth {depth} with {parameter:?}");
+        }
+    }
+
+    for parameter in [Value::Text(r#"{"ready"}"#.into()), Value::Null] {
+        let error = transaction
+            .query_params(
+                &format!("SELECT ARRAY[status_64] <@ $1 FROM {schema}.rows WHERE id = 1"),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .expect_err("inferred enum-array parameters at depth 64 must be explicitly refused");
+        assert!(
+            matches!(&error, tablepro_core::DriverError::Unsupported(message) if message.contains("resolvable depth")),
+            "expected the enum-domain depth refusal at depth 64, got {error:?}"
+        );
+    }
+
+    transaction.rollback().await.unwrap();
+}
