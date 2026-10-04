@@ -272,6 +272,54 @@ async fn value_contract_custom_enum_refuses_labels_over_byte_limit() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_order_uses_declared_catalog_order() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE TYPE value_contract_enum_order AS ENUM ('zulu', 'alpha', 'middle')")
+        .await
+        .unwrap();
+    let catalog = connection
+        .query(
+            "SELECT enumlabel::text FROM pg_enum \
+             WHERE enumtypid = 'value_contract_enum_order'::regtype \
+             ORDER BY enumsortorder",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        catalog.rows,
+        ["zulu", "alpha", "middle"].map(|label| vec![Value::Text(label.into())])
+    );
+
+    let result = connection
+        .query(
+            "SELECT label, pg_typeof(label)::text FROM (VALUES \
+             ('middle'::value_contract_enum_order), \
+             ('zulu'::value_contract_enum_order), \
+             (NULL::value_contract_enum_order), \
+             ('alpha'::value_contract_enum_order), \
+             ('zulu'::value_contract_enum_order)) AS rows(label) \
+             ORDER BY label NULLS LAST",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_enum_order");
+    assert_eq!(
+        result.rows,
+        ["zulu", "zulu", "alpha", "middle"]
+            .map(|label| vec![
+                Value::Text(label.into()),
+                Value::Text("value_contract_enum_order".into())
+            ])
+            .into_iter()
+            .chain([vec![Value::Null, Value::Text("value_contract_enum_order".into()),]])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_filters_preserve_labels_and_sql_null() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
