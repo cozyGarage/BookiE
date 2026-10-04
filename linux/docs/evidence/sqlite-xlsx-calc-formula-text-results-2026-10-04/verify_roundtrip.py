@@ -71,6 +71,24 @@ for filename in ("source.xlsx", "calc-roundtrip.xlsx"):
     assert not formulas, (filename, formulas)
     print(f"{filename}: expected values preserved; B4 blank; no formula cells")
 
+table_expected = {
+    "B2": "42",
+    "B4": "42",
+    "B5": "=1+1",
+    "B6": "'=1+1",
+    "C2": "integer",
+    "C3": "null",
+    "C4": "text",
+    "C5": "text",
+    "C6": "text",
+}
+for filename in ("table-source.xlsx", "table-calc-roundtrip.xlsx"):
+    values, formulas, cells = xlsx_values(ROOT / filename)
+    assert all(values.get(key) == value for key, value in table_expected.items()), (filename, values)
+    assert "B3" not in cells, (filename, cells)
+    assert not formulas, (filename, formulas)
+    print(f"{filename}: declared ANY column values preserved; B3 blank; no formula cells")
+
 ods = ods_values(ROOT / "calc-roundtrip.ods")
 for cell, value in (("B3", "42"), ("B5", "=1+1"), ("B6", "'=1+1")):
     value_type, numeric_value, text, has_formula = ods[cell]
@@ -81,3 +99,14 @@ for row, kind in ((2, "integer"), (3, "text"), (4, "null"), (5, "text"), (6, "te
     assert ods[f"C{row}"][2] == kind, ods[f"C{row}"]
 assert not any(cell[3] for cell in ods.values()), ods
 print("calc-roundtrip.ods: numeric/text/blank kinds and formula-shaped strings preserved; no formulas")
+
+table_ods = ods_values(ROOT / "table-calc-roundtrip.ods")
+for cell, value in (("B4", "42"), ("B5", "=1+1"), ("B6", "'=1+1")):
+    value_type, numeric_value, text, has_formula = table_ods[cell]
+    assert value_type == "string" and text == value and not has_formula, (cell, table_ods[cell])
+assert table_ods["B2"][0] == "float" and table_ods["B2"][1] == "42", table_ods["B2"]
+assert table_ods["B3"][0] is None and table_ods["B3"][2] == "", table_ods["B3"]
+for row, kind in ((2, "integer"), (3, "null"), (4, "text"), (5, "text"), (6, "text")):
+    assert table_ods[f"C{row}"][2] == kind, table_ods[f"C{row}"]
+assert not any(cell[3] for cell in table_ods.values()), table_ods
+print("table-calc-roundtrip.ods: declared ANY values and formula-shaped text preserved; no formulas")

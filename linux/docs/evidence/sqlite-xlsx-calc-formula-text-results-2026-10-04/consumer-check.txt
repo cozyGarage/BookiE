@@ -1,3 +1,6 @@
 source.xlsx: expected values preserved; B4 blank; no formula cells
 calc-roundtrip.xlsx: expected values preserved; B4 blank; no formula cells
+table-source.xlsx: declared ANY column values preserved; B3 blank; no formula cells
+table-calc-roundtrip.xlsx: declared ANY column values preserved; B3 blank; no formula cells
 calc-roundtrip.ods: numeric/text/blank kinds and formula-shaped strings preserved; no formulas
+table-calc-roundtrip.ods: declared ANY values and formula-shaped text preserved; no formulas

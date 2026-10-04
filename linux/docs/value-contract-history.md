@@ -5471,11 +5471,13 @@ literal edge cases remain open. See the [evidence manifest](evidence/postgres-en
 
 ## SQLite STRICT ANY formula-shaped text through Calc, 2026-10-04
 
-The compound SQLite STRICT `ANY` result workbook now includes text `=1+1` and
-`'=1+1` alongside integer `42`, text `42` and SQL NULL. The BookiE XLSX writer
-stores both formula-shaped values as shared strings without formula elements.
-LibreOffice Calc 26.8.0.3 preserves their text kind through ODS save and XLSX
-re-save; the numeric, text and blank cells retain their prior kinds. The focused
-app regression, strict Clippy, formatting and standard-library OOXML/ODS checker
-pass. Other spreadsheet applications and workbook shapes remain unverified.
+The compound-result workbook and a direct table projection over SQLite STRICT
+`ANY` both contain text `=1+1` and `'=1+1` alongside integer `42`, text `42` and
+SQL NULL. The direct projection also retains the declared `ANY` result metadata.
+The BookiE XLSX writer stores both formula-shaped values as shared strings
+without formula elements. LibreOffice Calc 26.8.0.3 preserves their text kind
+through ODS save and XLSX re-save; the numeric, text and blank cells retain their
+prior kinds. The focused app regression, strict Clippy, formatting and
+standard-library OOXML/ODS checker pass. Other spreadsheet applications and
+workbook shapes remain unverified.
 See the [evidence manifest](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json).

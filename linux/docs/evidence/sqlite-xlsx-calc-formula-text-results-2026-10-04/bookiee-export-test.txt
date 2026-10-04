@@ -1,4 +1,9 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.34s
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.61s
      Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-e969bf700cc7c62e)
 
 running 1 test

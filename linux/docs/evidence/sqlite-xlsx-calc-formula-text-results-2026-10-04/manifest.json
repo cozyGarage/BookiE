@@ -2,9 +2,9 @@
   "schema_version": 1,
   "date": "2026-10-04",
   "branch": "linux",
-  "source_commit": "ea45cedb2",
-  "engine": "SQLite STRICT ANY compound result exported by BookieE; LibreOffice Calc on Debian testing",
-  "case": "Formula-shaped text stays text through BookieE XLSX output and LibreOffice Calc ODS/XLSX re-save",
+  "source_commit": "6860632ea9fd0d6f81b35275b3554d0d3f759825",
+  "engine": "SQLite STRICT ANY compound result and direct table projection exported by BookieE; LibreOffice Calc on Debian testing",
+  "case": "Formula-shaped text stays text through BookieE XLSX output and Calc ODS/XLSX re-save for compound and direct table results",
   "test": "ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds",
   "application": {
     "name": "LibreOffice Calc",
@@ -12,23 +12,26 @@
     "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
   },
   "contract": [
-    "The compound result contains integer 42, text 42, SQL NULL, formula-shaped text =1+1, and formula-shaped text '=1+1; native typeof() labels identify the runtime kind for every row.",
-    "BookieE emits integer 42 as a numeric XLSX cell, text values as shared strings, and SQL NULL as a blank cell. The XLSX contains no formula elements.",
-    "LibreOffice Calc opens the workbook and saves ODS, then reopens ODS and saves XLSX. The formula-shaped text values remain strings in both formats, and Calc creates no formulas.",
-    "The integer, numeric-looking text and blank NULL keep their respective kinds through the same Calc round trip."
+    "A compound result and a direct projection from a STRICT ANY table each include integer 42, text 42, SQL NULL, formula-shaped text =1+1, and formula-shaped text '=1+1; native typeof() labels identify each runtime kind.",
+    "The direct projection reports the declared ANY column type. BookieE emits integer 42 as a numeric XLSX cell, text values as shared strings, and SQL NULL as a blank cell; neither workbook contains formula elements.",
+    "LibreOffice Calc opens both workbooks and saves ODS, then reopens those ODS workbooks and saves XLSX. Formula-shaped text remains string data, with no formulas created.",
+    "Integer, numeric-looking text and blank NULL retain their respective kinds through both Calc round trips."
   ],
   "validation": {
     "bookiee_export": {
-      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-app --lib ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds -- --exact --test-threads=1",
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx BOOKIEE_XLSX_TABLE_REIMPORT_ARTIFACT=<evidence-dir>/table-source.xlsx cargo test --manifest-path linux/Cargo.toml --package tablepro-app --lib ui::browse_tab::value_parse::sqlite_any_contract::sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds -- --exact --test-threads=1",
       "result": "1 passed, 0 failed",
       "log": "bookiee-export-test.txt"
     },
     "application_round_trip": {
       "steps": [
-        "Open source.xlsx with LibreOffice Calc and save as calc-roundtrip.ods.",
-        "Reopen calc-roundtrip.ods with LibreOffice Calc and save as calc-roundtrip.xlsx."
+        "Open source.xlsx and table-source.xlsx with LibreOffice Calc; save each as calc-roundtrip.ods and table-calc-roundtrip.ods.",
+        "Reopen both ODS files with LibreOffice Calc and save as calc-roundtrip.xlsx and table-calc-roundtrip.xlsx."
       ],
-      "log": "libreoffice-roundtrip.txt"
+      "logs": [
+        "libreoffice-roundtrip.txt",
+        "table-libreoffice-roundtrip.txt"
+      ]
     },
     "consumer_assertions": {
       "method": "Python standard-library ZIP/XML checks over ODS content.xml and XLSX worksheet/shared strings; assert exact values and cell kinds, blank NULL, and no formula elements.",
@@ -48,19 +51,23 @@
     "diff_check": "rtk proxy git diff --check passed"
   },
   "artifact_sha256": {
-    "source.xlsx": "5c58d3207ab14bd61aca48d98e3459d697d8d443c2cd65ed157cb731eef80fc9",
+    "source.xlsx": "7ea1a896e6fb08ac6391a60012fa3f585895fe74e7cb51fd56ac70f4637fa822",
     "calc-roundtrip.ods": "9b339da49176e9ca12ccca11a14f9b45e26a5272f09682d40dd2cae3104a2129",
-    "calc-roundtrip.xlsx": "33ea1d1348f654c8a8eb84c43cf9d777fb8d1d4a77b96666ec10dbfb6c78f166"
+    "calc-roundtrip.xlsx": "33ea1d1348f654c8a8eb84c43cf9d777fb8d1d4a77b96666ec10dbfb6c78f166",
+    "table-source.xlsx": "13a9eabdb65e6d36f47af6f1c11613cca0e82dc96595a29bdfef3318cba4f409",
+    "table-calc-roundtrip.ods": "3d5ac948d65d734b6f916d4107ec9be5889eb7124dd85ac582c4f3b57c6b3f77",
+    "table-calc-roundtrip.xlsx": "bd9a5155d7b06f2f6cdda1c6d597ae9ccbab643dd4b5bdf7af336f5fd90768e5"
   },
   "log_sha256": {
-    "bookiee-export-test.txt": "1c243a1403f362a11163debd990ca46e6043b7a0210f4c63ba0f465fd600b643",
+    "bookiee-export-test.txt": "2f510673407c639e5e06ff154b3c88ff77dd52ad397cdbee59db149bcc234ee8",
     "libreoffice-roundtrip.txt": "1fcbfb70f772f2566b85f8a0675360a9f2c195a3b443316bec03cadb7bb013d2",
-    "consumer-check.txt": "46b612bf6ece456bc6323f7633be1ccefd19738c1c551c2e7947b368bee15116",
-    "clippy.txt": "32d47f791eadf1ea833d9f8c84fbfea5cab1f438e113e93be05bd5b908e1c2ac",
+    "table-libreoffice-roundtrip.txt": "5796c42b0750e82ac5e3b2dea54716b53a81e9fd2b6d68958a536ae2eed20443",
+    "consumer-check.txt": "cb7d4d6f4fe073504cbcc733221c2ebbabdfd036fb670eb8a393eaf05f67dc8f",
+    "clippy.txt": "ce188a9fcbda62092659663228be09d6297535e7f327c0cefb019b0fa4f2a470",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
     "Other spreadsheet applications and versions, workbook shapes, broader format combinations and installed GTK grid editing remain open in B3/B7."
   ],
-  "checker_sha256": "315c56915653a08d3da04fe801c7a58c2b270cd19616e0f0d4549cfa94c778f8"
+  "checker_sha256": "8c26068ea6fa8f0b2cc9fa28a29009e44bcf8a7888629caa524fa1c774ee3799"
 }

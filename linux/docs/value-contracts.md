@@ -48,9 +48,10 @@ One compound SQLite STRICT `ANY` workbook now preserves numeric `42`, text
 `42` and blank SQL NULL through a LibreOffice Calc import, ODS save and XLSX
 re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manifest.json)).
 
-The same Calc round trip also keeps `=1+1` and `'=1+1` as text cells without
-creating formulas; other spreadsheet applications and workbook shapes remain
-unverified ([formula-text evidence](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json)).
+The compound-result and direct table-projection XLSX workbooks both keep `=1+1`
+and `'=1+1` as text through the Calc ODS/XLSX round trip, without creating
+formulas; other spreadsheet applications and workbook shapes remain unverified
+([formula-text evidence](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json)).
 
 | Scope | Evidence entry points |
 | --- | --- |
