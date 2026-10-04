@@ -76,6 +76,10 @@ A `timestamptz[]` file-writer contract preserves distinct repeated-hour
 instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and
 replayed SQL, checked against native JSON and wire bytes ([evidence](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json)).
 
+An `interval[]` file-writer case runs under `postgres_verbose` `IntervalStyle`
+on one transaction backend and verifies text binding, all four writers and
+replayed SQL against PostgreSQL JSON/wire oracles ([evidence](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json)).
+
 The SQLite STRICT `ANY` computed `CASE` and `COALESCE` paths now have app CSV
 export/import coverage with native storage-class assertions; see the [CASE
 consumer evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "branch": "linux",
+  "source_commit": "8f4d298a5dea0340a673e2fe1251155580bd66f9",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "interval[] text consumers under postgres_verbose IntervalStyle",
+  "test": "array_contract::value_contract_interval_array_file_exports_preserve_values_under_intervalstyle",
+  "contract": [
+    "A mixed-sign interval[] contains months, days, microseconds, zero interval and SQL NULL under transaction-local IntervalStyle postgres_verbose.",
+    "pg_typeof, array_to_json, canonical array text and array_send provide native type, semantic and wire-byte oracles.",
+    "Binding the driver's text as interval[] reproduces native JSON and wire bytes on the same transaction backend.",
+    "JSON, CSV and XLSX preserve the exact driver text; XLSX uses a string cell without a formula.",
+    "Replayed SQL restores native array text, JSON values and wire bytes under the same IntervalStyle; transaction rollback leaves the destination empty."
+  ],
+  "validation": {
+    "native_contract_group": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --ignored --test-threads=1",
+      "result": "14 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "618b6bc7f2b6501492703102794a7fec543f4a03960bb2a0e7f3710246ef5e95",
+    "clippy.txt": "f4403412cb20dc7d8a0a94c08c9c8853e4bac9b3e8489158834f30512311ed97",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL array families and IntervalStyle configurations, spreadsheet-application re-import and other native type/consumer/session combinations remain open."
+  ]
+}

@@ -138,6 +138,13 @@ re-import; XLSX stores the array as text. Other array families/configurations
 and spreadsheet-application re-import remain open. See the
 [timestamptz-array file-writer evidence](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).
 
+October 4 B3-1 follow-up: a PostgreSQL `interval[]` with mixed-sign months,
+days and sub-second time now passes through JSON, CSV, XLSX and replayed SQL
+under one transaction's `postgres_verbose` `IntervalStyle`. Native
+`array_to_json` and `array_send` checks verify binding and replay; rollback
+leaves the destination empty. Other interval styles and spreadsheet-application
+re-import remain open. See the [interval-array file-writer evidence](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
+
 October 3 B3-4 follow-up: table-based and direct nonempty query-result SQLite
 STRICT `ANY` CSV paths now have exact tagged INTEGER/REAL/TEXT/BLOB restoration
 with an explicit NULL marker and native storage-class/value assertions.

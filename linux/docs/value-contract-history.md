@@ -5135,3 +5135,14 @@ oracles confirm both instants survive text binding; JSON, CSV and XLSX preserve
 the driver text as a string, and replayed SQL restores native text, JSON values
 and wire bytes. The entire PostgreSQL array contract group passed (13 tests),
 along with strict Clippy and formatting. See the [evidence manifest](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).
+
+## PostgreSQL interval-array file-writer contract under postgres_verbose, 2026-10-04
+
+A PostgreSQL 16 Docker contract exports an `interval[]` with mixed-sign months,
+days, fractional time and SQL NULL under transaction-local `IntervalStyle =
+'postgres_verbose'`. Binding the driver's array text reproduces native
+`array_to_json` and `array_send` results. JSON, CSV and XLSX preserve the text;
+replayed SQL restores native text, JSON elements and wire bytes under the same
+style. The rollback leaves the destination empty. All 14 array-contract tests,
+strict Clippy and formatting pass. Other interval styles remain untested. See
+the [evidence manifest](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
