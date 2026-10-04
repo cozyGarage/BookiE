@@ -32,7 +32,10 @@ use uuid::Uuid;
 
 use tablepro_core::{
     ColumnInfo, Value,
-    sql_dialect::{build_insert_from_draft, build_keyed_delete, build_keyed_update, build_mongodb_keyed_update},
+    sql_dialect::{
+        build_insert_from_draft, build_keyed_delete, build_keyed_update, build_mongodb_keyed_delete,
+        build_mongodb_keyed_update,
+    },
 };
 
 #[path = "change_tracker_row_identity.rs"]
@@ -557,14 +560,24 @@ impl TabChangeTracker {
                 row_key: row_key.clone(),
             });
         }
-        let mut delete_keys: Vec<&RowKey> = self.deletes.keys().collect();
-        delete_keys.sort();
-        for row_key in delete_keys {
+        let mut delete_entries: Vec<(&RowKey, &Vec<Value>)> = self.deletes.iter().collect();
+        delete_entries.sort_by(|left, right| left.0.cmp(right.0));
+        for (row_key, original_values) in delete_entries {
             let RowKey::Persisted(pk_keyvalues) = row_key else {
                 continue;
             };
             let pk_values = readable_pk_values(pk_keyvalues)?;
-            out.push(build_keyed_delete(driver_id, schema, table, columns, &pk_values)?);
+            if driver_id == "mongodb" {
+                out.push(build_mongodb_keyed_delete(
+                    schema,
+                    table,
+                    columns,
+                    original_values,
+                    &pk_values,
+                )?);
+            } else {
+                out.push(build_keyed_delete(driver_id, schema, table, columns, &pk_values)?);
+            }
             sources.push(StatementSource::Delete {
                 row_key: row_key.clone(),
             });
@@ -869,6 +882,35 @@ mod tests {
             .materialize("mongodb", Some("appdb"), "records", &columns)
             .unwrap();
         assert_eq!(statements[0].1[2], Value::Null);
+    }
+
+    #[test]
+    fn mongodb_materialize_guards_deletes_with_the_complete_original_row() {
+        let mut t = TabChangeTracker::new();
+        let columns = vec![pk_col("_id"), data_col("nullable"), data_col("missing")];
+        t.track_delete(
+            rk(&[Value::Text("id-1".into())]),
+            vec![
+                Value::Text("id-1".into()),
+                Value::Null,
+                Value::Undecodable("missing BSON field".into()),
+            ],
+        );
+
+        let (statements, _) = t.materialize("mongodb", Some("appdb"), "records", &columns).unwrap();
+
+        assert_eq!(
+            statements[0].0,
+            "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ?"
+        );
+        assert_eq!(
+            statements[0].1,
+            vec![
+                Value::Text("id-1".into()),
+                Value::Null,
+                Value::Undecodable("missing BSON field".into())
+            ]
+        );
     }
 
     #[test]

@@ -9,7 +9,7 @@ mod postgres_enum_tests;
 #[path = "sql_dialect/updates.rs"]
 mod updates;
 
-pub use updates::{build_keyed_update, build_mongodb_keyed_update};
+pub use updates::{build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update};
 
 pub const MAX_IDENT_BYTES: usize = 256;
 

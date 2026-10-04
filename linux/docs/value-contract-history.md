@@ -4551,8 +4551,9 @@ has already passed is therefore outside the metadata guarantee. MongoDB grid
 updates now compare the displayed original value for each edited field in the
 same atomic update filter, so a same-field concurrent change reports a conflict
 instead of being overwritten. This value guard does not detect an ABA change
-that returns the field to its original value; stale deletes still use the row
-key alone and remain open.
+that returns the field to its original value. Stale keyed deletes now guard all
+non-key values present in the materialized row; they still do not detect ABA or
+changes to fields introduced after the result's column set was materialized.
 
 ## MongoDB stale grid edits use atomic original-value guards — 2026-10-04
 
@@ -4567,7 +4568,22 @@ explicit NULL to an array containing NULL is preserved. MongoDB matches NULL
 guards with equality, field existence, and a non-array check, preserving the
 distinction between explicit BSON NULL, missing fields, and arrays that contain
 NULL. This is per-edited-field compare-and-set, not document-version tracking:
-ABA changes and stale deletes remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
+ABA changes remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
+
+## MongoDB keyed deletes compare the materialized row — 2026-10-04
+
+A failing-first MongoDB 7 contract showed that the app generated a parameterized
+keyed DELETE while the MongoDB driver rejected bound DELETE statements. The
+driver now accepts a single-collection DELETE with a bound equality/AND filter
+and executes `delete_one`. The app materializer adds every materialized
+non-primary-key value to that filter; BSON NULL guards require an existing
+non-array NULL field, and the missing-field marker becomes `$exists: false`.
+The native contract proves an unchanged row is deleted, while a concurrent
+string change, explicit NULL becoming missing, and explicit NULL becoming an
+array containing NULL all return zero deleted rows and preserve the new values.
+This guards the visible row snapshot rather than providing document-version or
+snapshot isolation: ABA changes and fields added outside the materialized
+column set remain open. See the [evidence manifest](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json).
 
 The shell `run_find` path still runs a full type census and then a filtered
 query. It merges types from returned rows, so a selected row that changes kind

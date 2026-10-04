@@ -98,9 +98,52 @@ pub fn build_mongodb_keyed_update(
     Ok((sql, params))
 }
 
+pub fn build_mongodb_keyed_delete(
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    original_values: &[Value],
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let driver_id = "mongodb";
+    if original_values.len() != columns.len() {
+        return Err(BuildSqlError::LengthMismatch {
+            expected: columns.len(),
+            got: original_values.len(),
+        });
+    }
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    let mut params = Vec::with_capacity(pk_values.len() + columns.len() - pk_indexes.len());
+    let mut where_clauses = vec![keyed_where_clause(
+        driver_id,
+        columns,
+        &pk_indexes,
+        pk_values,
+        &mut params,
+    )];
+    for (column_index, (column, original_value)) in columns.iter().zip(original_values).enumerate() {
+        if pk_indexes.contains(&column_index) {
+            continue;
+        }
+        if matches!(original_value, Value::Undecodable(kind) if kind != "missing BSON field") {
+            return Err(BuildSqlError::UnrepresentableValue {
+                column: column.name.clone(),
+            });
+        }
+        let placeholder = placeholder_for(driver_id, params.len());
+        where_clauses.push(format!("{} = {placeholder}", quote_ident(driver_id, &column.name)));
+        params.push(original_value.clone());
+    }
+    let qualified = qualified_table(driver_id, schema, table);
+    Ok((
+        format!("DELETE FROM {qualified} WHERE {}", where_clauses.join(" AND ")),
+        params,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{build_keyed_update, build_mongodb_keyed_update};
+    use super::{build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update};
     use crate::{ColumnInfo, Value};
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
@@ -157,6 +200,51 @@ mod tests {
         assert_eq!(
             params,
             vec![Value::Text("edited".into()), Value::Text("id-1".into()), Value::Null]
+        );
+    }
+
+    #[test]
+    fn mongodb_delete_guards_every_non_key_value_including_null_and_missing() {
+        let columns = [column("_id", true), column("nullable", false), column("missing", false)];
+        let (sql, params) = build_mongodb_keyed_delete(
+            Some("appdb"),
+            "records",
+            &columns,
+            &[
+                Value::Json(serde_json::Value::String("id-1".into())),
+                Value::Null,
+                Value::Undecodable("missing BSON field".into()),
+            ],
+            &[Value::Json(serde_json::Value::String("id-1".into()))],
+        )
+        .unwrap();
+        assert_eq!(
+            sql,
+            "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ?"
+        );
+        assert_eq!(
+            params,
+            vec![
+                Value::Json(serde_json::Value::String("id-1".into())),
+                Value::Null,
+                Value::Undecodable("missing BSON field".into())
+            ]
+        );
+    }
+
+    #[test]
+    fn mongodb_delete_refuses_other_undecodable_snapshot_values() {
+        let columns = [column("_id", true), column("payload", false)];
+        let error = build_mongodb_keyed_delete(
+            None,
+            "records",
+            &columns,
+            &[Value::Int(1), Value::Undecodable("NUMERIC".into())],
+            &[Value::Int(1)],
+        )
+        .unwrap_err();
+        assert!(
+            matches!(error, crate::sql_dialect::BuildSqlError::UnrepresentableValue { column } if column == "payload")
         );
     }
 

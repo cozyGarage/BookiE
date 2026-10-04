@@ -18,7 +18,13 @@ reproduces last-write-wins, then verifies conflict counts and preservation for
 a concurrent string change, explicit BSON NULL becoming missing, and explicit
 BSON NULL becoming an array containing NULL
 ([evidence](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json)).
-This field-level compare-and-set does not cover stale deletes or ABA changes.
+MongoDB keyed row deletes now compare every materialized non-key field in the
+same `delete_one` filter. The MongoDB 7 case confirms unchanged rows delete,
+while a concurrent string change, explicit NULL becoming missing, and explicit
+NULL becoming an array containing NULL all conflict and survive
+([evidence](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json)).
+Neither write nor delete guards detect ABA changes; the broader B3 matrix stays
+open.
 
 External sources below were first reviewed 2026-09-26 against BookiE `2eb9414c2`.
 The September 29 B3-P1 reconciliation used source

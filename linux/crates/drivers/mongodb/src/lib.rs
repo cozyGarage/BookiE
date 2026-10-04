@@ -20,7 +20,7 @@ use shell::{
     AggregateQuery, FindQuery, parse_aggregate_shell, parse_delete_many, parse_drop_table_sql, parse_find_shell,
     parse_insert_one,
 };
-use update::parse_keyed_update;
+use update::{parse_keyed_delete, parse_keyed_update};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
@@ -294,9 +294,6 @@ impl Connection for MongodbConnection {
     }
 
     async fn execute_params(&self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
-        if params.is_empty() {
-            return self.execute(sql).await;
-        }
         if let Some(update) = parse_keyed_update(sql, params, &self.database_name)? {
             let result = self
                 .db()
@@ -307,6 +304,20 @@ impl Connection for MongodbConnection {
             return Ok(ExecResult {
                 rows_affected: result.matched_count,
             });
+        }
+        if let Some(delete) = parse_keyed_delete(sql, params, &self.database_name)? {
+            let result = self
+                .db()
+                .collection::<Document>(&delete.collection)
+                .delete_one(delete.filter)
+                .await
+                .map_err(map_mongo_error)?;
+            return Ok(ExecResult {
+                rows_affected: result.deleted_count,
+            });
+        }
+        if params.is_empty() {
+            return self.execute(sql).await;
         }
         Err(DriverError::Unsupported(
             "MongoDB execute_params does not support bound parameters".into(),

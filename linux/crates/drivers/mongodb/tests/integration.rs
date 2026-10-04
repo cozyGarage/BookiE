@@ -891,3 +891,6 @@ mod value_contracts;
 
 #[path = "support/stale_grid_edit_contract.rs"]
 mod stale_grid_edit_contract;
+
+#[path = "support/stale_grid_delete_contract.rs"]
+mod stale_grid_delete_contract;

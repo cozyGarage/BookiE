@@ -1,6 +1,6 @@
 use mongodb::bson::{Bson, Document, doc};
 use sqlparser::ast::{
-    AssignmentTarget, BinaryOperator, Expr, ObjectNamePart, Statement, TableFactor, Value as SqlValue,
+    AssignmentTarget, BinaryOperator, Expr, FromTable, ObjectNamePart, Statement, TableFactor, Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -12,6 +12,11 @@ pub(super) struct KeyedUpdate {
     pub(super) collection: String,
     pub(super) filter: Document,
     pub(super) set: Document,
+}
+
+pub(super) struct KeyedDelete {
+    pub(super) collection: String,
+    pub(super) filter: Document,
 }
 
 pub(super) fn parse_keyed_update(
@@ -37,7 +42,7 @@ pub(super) fn parse_keyed_update(
     if from.is_some() || !table.joins.is_empty() {
         return Ok(None);
     }
-    let Some(collection) = collection_named_by_update(&table.relation, database) else {
+    let Some(collection) = collection_named(&table.relation, database) else {
         return Ok(None);
     };
     if assignments.is_empty() {
@@ -69,7 +74,48 @@ pub(super) fn parse_keyed_update(
     }))
 }
 
-fn collection_named_by_update(relation: &TableFactor, database: &str) -> Option<String> {
+pub(super) fn parse_keyed_delete(
+    sql: &str,
+    params: &[Value],
+    database: &str,
+) -> Result<Option<KeyedDelete>, DriverError> {
+    let statements = Parser::parse_sql(&GenericDialect {}, sql)
+        .map_err(|error| DriverError::Unsupported(format!("invalid parameterized MongoDB delete: {error}")))?;
+    let [Statement::Delete(delete)] = statements.as_slice() else {
+        return Ok(None);
+    };
+    if !delete.tables.is_empty()
+        || delete.using.is_some()
+        || delete.returning.is_some()
+        || !delete.order_by.is_empty()
+        || delete.limit.is_some()
+    {
+        return Ok(None);
+    }
+    let Some(selection) = &delete.selection else {
+        return Ok(None);
+    };
+    let tables = match &delete.from {
+        FromTable::WithFromKeyword(tables) | FromTable::WithoutKeyword(tables) => tables,
+    };
+    let [table] = tables.as_slice() else {
+        return Ok(None);
+    };
+    if !table.joins.is_empty() {
+        return Ok(None);
+    }
+    let Some(collection) = collection_named(&table.relation, database) else {
+        return Ok(None);
+    };
+    let mut parameter_index = 0;
+    let filter = selector_from_expr(selection, params, &mut parameter_index)?;
+    if parameter_index != params.len() || filter.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(KeyedDelete { collection, filter }))
+}
+
+fn collection_named(relation: &TableFactor, database: &str) -> Option<String> {
     let TableFactor::Table {
         name,
         alias: None,
@@ -99,23 +145,27 @@ fn single_identifier(name: &sqlparser::ast::ObjectName) -> Option<String> {
 }
 
 fn take_placeholder(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Bson, DriverError> {
+    value_to_bson(&take_placeholder_value(expr, params, index)?)
+}
+
+fn take_placeholder_value(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Value, DriverError> {
     let Expr::Value(value) = expr else {
         return Err(DriverError::Unsupported(
-            "MongoDB grid updates require bound values".into(),
+            "MongoDB grid writes require bound values".into(),
         ));
     };
     if !matches!(value.value, SqlValue::Placeholder(_)) {
         return Err(DriverError::Unsupported(
-            "MongoDB grid updates require bound values".into(),
+            "MongoDB grid writes require bound values".into(),
         ));
     }
     let Some(value) = params.get(*index) else {
         return Err(DriverError::Unsupported(
-            "MongoDB grid update has too few bound values".into(),
+            "MongoDB grid write has too few bound values".into(),
         ));
     };
     *index += 1;
-    value_to_bson(value)
+    Ok(value.clone())
 }
 
 fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Result<Document, DriverError> {
@@ -131,7 +181,7 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
             for (key, value) in right {
                 if selector.insert(key, value).is_some() {
                     return Err(DriverError::Unsupported(
-                        "MongoDB grid update repeats a key condition".into(),
+                        "MongoDB grid write repeats a key condition".into(),
                     ));
                 }
             }
@@ -144,12 +194,16 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
         } => {
             let Some(field) = identifier_from_expr(left) else {
                 return Err(DriverError::Unsupported(
-                    "MongoDB grid update has an unsupported key predicate".into(),
+                    "MongoDB grid write has an unsupported key predicate".into(),
                 ));
             };
-            let value = take_placeholder(right, params, index)?;
+            let raw_value = take_placeholder_value(right, params, index)?;
+            if matches!(&raw_value, Value::Undecodable(kind) if kind == "missing BSON field") {
+                return Ok(doc! { field: { "$exists": false } });
+            }
+            let value = value_to_bson(&raw_value)?;
             if matches!(value, Bson::Null) {
-                Ok(doc! { field: { "$eq": Bson::Null, "$exists": true, "$not": { "$type": "array" } } })
+                Ok(explicit_null_selector(field))
             } else {
                 Ok(doc! { field: value })
             }
@@ -157,15 +211,19 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
         Expr::IsNull(inner) => {
             let Some(field) = identifier_from_expr(inner) else {
                 return Err(DriverError::Unsupported(
-                    "MongoDB grid update has an unsupported NULL key predicate".into(),
+                    "MongoDB grid write has an unsupported NULL key predicate".into(),
                 ));
             };
-            Ok(doc! { field: Bson::Null })
+            Ok(explicit_null_selector(field))
         }
         _ => Err(DriverError::Unsupported(
-            "MongoDB grid update has an unsupported key predicate".into(),
+            "MongoDB grid write has an unsupported key predicate".into(),
         )),
     }
+}
+
+fn explicit_null_selector(field: String) -> Document {
+    doc! { field: { "$eq": Bson::Null, "$exists": true, "$not": { "$type": "array" } } }
 }
 
 fn identifier_from_expr(expr: &Expr) -> Option<String> {
