@@ -400,5 +400,36 @@ mod tests {
             decision,
             tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
         ));
+
+        let mut human_policy =
+            tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local);
+        assert!(human_policy.human_approve_unparseable);
+        let human_decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::human_gui(),
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &human_policy,
+            None,
+        );
+        assert!(matches!(
+            human_decision,
+            tablepro_policy::Decision::RequireApproval { ref rule, .. }
+                if rule == "fail_closed_unparseable"
+        ));
+
+        human_policy.human_approve_unparseable = false;
+        let configured_human_decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::human_gui(),
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &human_policy,
+            None,
+        );
+        assert!(matches!(
+            configured_human_decision,
+            tablepro_policy::Decision::Allow { ref rule } if rule == "unparseable_human_allow"
+        ));
     }
 }
