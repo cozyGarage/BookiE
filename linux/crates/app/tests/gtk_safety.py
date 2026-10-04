@@ -700,6 +700,23 @@ def dismissed_approval_denies(database, _base):
     assert_database_count_stable(database, 0)
 
 
+def malformed_sql_is_blocked_before_approval(database, _base):
+    run_sql("SELECT 'unterminated")
+    wait_for_node_containing("unterminated quote or comment")
+    wait_for_node(name="Approve once", present=False)
+    assert_database_count_stable(database, 0)
+
+
+def unparseable_routine_requests_human_approval(database, _base):
+    run_sql("CREATE PROCEDURE p() SELECT 1")
+    wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON)
+    wait_for_node_containing("Class: Unparseable")
+    wait_for_node_containing("CREATE PROCEDURE p() SELECT 1")
+    invoke(wait_for_node(name="Deny", role=pyatspi.ROLE_PUSH_BUTTON))
+    wait_for_node(name="Approve once", present=False)
+    assert_database_count_stable(database, 0)
+
+
 def approve_once_prompts_again(database, _base):
     run_sql("INSERT INTO safety_items(id) VALUES (1)")
     invoke(wait_for_node(name="Approve once", role=pyatspi.ROLE_PUSH_BUTTON))
@@ -1266,6 +1283,8 @@ def main():
         committed_editor_ddl_refreshes_sidebar,
         new_connection_form_keeps_title_and_help_text_visible,
         sql_character_warnings_leave_query_unchanged,
+        malformed_sql_is_blocked_before_approval,
+        unparseable_routine_requests_human_approval,
         dismissed_approval_denies,
         approve_once_prompts_again,
         audit_failure_denies,
