@@ -39,8 +39,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
         .execute(
             r#"CREATE TABLE enum_mode_source (
                 id INT PRIMARY KEY,
-                mood ENUM('happy', 'it''s ok', 'back\\slash', 'NULL', ''),
-                perms SET('read', 'write', 'slash\\path', 'NULL')
+                mood ENUM('happy', 'it''s ok', 'back\\slash', 'NULL', '', '<tag>&'),
+                perms SET('read', 'write', 'slash\\path', 'NULL', '<member>')
             )"#,
         )
         .await
@@ -60,6 +60,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
         (4, Some("NULL"), Some("")),
         (5, Some(""), Some("slash\\path")),
         (6, None, None),
+        (7, Some("<tag>&"), Some("<member>")),
     ] {
         setup
             .execute_params(
@@ -129,6 +130,13 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
                     Value::Text("736C6173685C70617468".into()),
                 ],
                 vec![Value::Int(6), Value::Null, Value::Null, Value::Null, Value::Null],
+                vec![
+                    Value::Int(7),
+                    Value::Text("6".into()),
+                    Value::Text("3C7461673E26".into()),
+                    Value::Text("16".into()),
+                    Value::Text("3C6D656D6265723E".into()),
+                ],
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
         );
@@ -142,10 +150,41 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
                 {"id": 3, "mood": "back\\slash", "perms": "NULL"},
                 {"id": 4, "mood": "NULL", "perms": ""},
                 {"id": 5, "mood": "", "perms": "slash\\path"},
-                {"id": 6, "mood": null, "perms": null}
+                {"id": 6, "mood": null, "perms": null},
+                {"id": 7, "mood": "<tag>&", "perms": "<member>"}
             ]),
             "JSON export under sql_mode {mode:?}"
         );
+        let csv_options = tablepro_core::export::CsvOptions::default();
+        for (extension, format) in [
+            ("xml", tablepro_core::export::ResultFormat::Xml),
+            ("html", tablepro_core::export::ResultFormat::Html),
+            ("md", tablepro_core::export::ResultFormat::Markdown),
+        ] {
+            let path = std::env::temp_dir().join(format!(
+                "tablepro-enum-set-{}-{:?}-{suffix}.{extension}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            tablepro_core::export::write_result_file(
+                &path,
+                &source,
+                &tablepro_core::export::ResultExport {
+                    format,
+                    csv: &csv_options,
+                    sql: None,
+                },
+                || false,
+                |_| {},
+            )
+            .unwrap();
+            let output = std::fs::read_to_string(&path).unwrap();
+            assert!(output.contains("&lt;tag&gt;&amp;"), "{extension}: {output}");
+            assert!(output.contains("&lt;member&gt;"), "{extension}: {output}");
+            assert!(!output.contains("<tag>&"), "{extension}: {output}");
+            assert!(!output.contains("<member>"), "{extension}: {output}");
+            std::fs::remove_file(path).unwrap();
+        }
         let xlsx_path = std::env::temp_dir().join(format!(
             "tablepro-enum-xlsx-{}-{:?}-{suffix}.xlsx",
             std::process::id(),
@@ -247,7 +286,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
             )
             .await
             .unwrap();
-        assert_eq!(matching.rows, vec![vec![Value::Int(6)]], "sql_mode {mode:?}");
+        assert_eq!(matching.rows, vec![vec![Value::Int(7)]], "sql_mode {mode:?}");
         connection.close().await.unwrap();
     }
 }
