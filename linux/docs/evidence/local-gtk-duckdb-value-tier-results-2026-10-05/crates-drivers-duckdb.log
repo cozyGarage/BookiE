@@ -1,0 +1,34 @@
+
+running 30 tests
+test bigint_array::value_contract_nested_ubigint_array_refuses_lossy_consumers ... ok
+test bigint_map::value_contract_nested_ubigint_map_refuses_lossy_consumers ... ok
+test bigint_struct::value_contract_nested_ubigint_struct_refuses_lossy_consumers ... ok
+test extended_timestamptz::value_contract_extended_timestamptz_matches_duckdb_text_and_epoch ... ok
+test fixed_uhugeint_array::value_contract_nested_uhugeint_fixed_array_refuses_lossy_consumers ... ok
+test interval_csv_import::value_contract_extended_calendar_csv_round_trips_exactly ... ok
+test interval_csv_import::value_contract_interval_csv_import_preserves_native_components ... ok
+test submicro_parameter_expression::value_contract_submicro_text_parameters_keep_precision_after_explicit_casts ... ok
+test uhugeint_union::value_contract_nested_uhugeint_union_refuses_lossy_consumers ... ok
+test value_contract_bound_temporals_are_typed_in_expressions ... ok
+test value_contract_bound_temporals_insert_and_read_back_exactly ... ok
+test value_contract_bound_timestamptz_keeps_its_instant_in_any_session_zone ... ok
+test value_contract_decimal_parameters_and_results_stay_exact_numbers ... ok
+test value_contract_enum_labels_and_unsupported_collections_are_explicit ... ok
+test value_contract_interval_all_component_signs_round_trip_as_exact_text ... ok
+test value_contract_interval_component_extremes_round_trip_as_exact_text ... ok
+test value_contract_interval_components_round_trip_as_exact_text ... ok
+test value_contract_interval_grid_edit_persists_native_components ... ok
+test value_contract_list_array_and_struct_refusals_keep_native_oracles ... ok
+test value_contract_native_temporal_nulls_and_json_preserve_precision ... ok
+test value_contract_native_temporals_round_trip_parameters_and_sql ... ok
+test value_contract_nested_uhugeint_refuses_lossy_consumers ... ok
+test value_contract_nested_uhugeint_struct_shapes_refuse_lossy_consumers ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contract_scalar_hugeints_preserve_exact_text_across_consumers ... ok
+test value_contract_submicro_temporals_bind_as_exact_text ... ok
+test value_contract_temporal_filter_parameters_keep_duckdb_column_precision_end_to_end ... ok
+test value_contract_time_ns_filter_uses_exact_text_fallback ... ok
+test value_contract_timestamptz_filter_preserves_offset_origin_instant ... ok
+test value_contract_wide_map_refuses_lossy_consumers_with_native_oracle ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 2.08s

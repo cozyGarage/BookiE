@@ -94,17 +94,17 @@
   "logs_sha256": {
     "report.json": "cea3adf519eb08466273f0e41c96f725f7b1de8f8c0a56df75c1e255520677f6",
     "compile.log": "d3a9220f786a25e9491d0ff669e28efebe0ccf33dd5fb6b5d476d8d036b53e6a",
-    "crates-app.log": "7b8b5dc6aac49ba0e37fbb9ace97031f73947616df52aebd7d48f6ae5573594d",
-    "crates-core.log": "2dca3cde70adf7f8dfc2bc03d7eb97044e1c7862417890d03fad34a7041afafd",
-    "crates-drivers-clickhouse.log": "25d30d3636c2b4df6ebc99e5c649eeda1a3a44092f08acd53d522e7c113045a0",
-    "crates-drivers-duckdb.log": "a1b261e898a984afc6c228c87ed907e756992ec75454744b2dbd5096754eb301",
-    "crates-drivers-mongodb.log": "6d28c04eb2dae218e03bb36cf9e3ffe983adb5eb4452909716e6be484e6b4a25",
-    "crates-drivers-mssql.log": "50347cd294dbb8eefa833ea720fb808f624af76df6d488835fb42fb67e14b86b",
-    "crates-drivers-mysql.log": "2fdf2dfadb3c2a28ba598d7c628e28c24fb40d23989cf4b0e6e9d63cd49a17f3",
-    "crates-drivers-postgres.log": "14de567a1240221abf8d3d2634badaa04ea3eaa04d0b3344d15bd0522676cd63",
-    "crates-drivers-redis.log": "b9d1516463bb84d49021f9200b729ee1677720a36343a6d92a78d0bd9b342958",
-    "crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
-    "crates-mcp.log": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062",
+    "crates-app.log": "4cb9c06671e659a48536e3e35bf62d56e76cdc8526046978b67fa755171509ea",
+    "crates-core.log": "0b3a1415e92ae8f4c67d486e49304c64c7d0736f2b248786dd471a91e3fd455a",
+    "crates-drivers-clickhouse.log": "58b6a8d9eaefdbb010201a41a628e4c1cb1285eadcaeb28b6440ebf95321e1df",
+    "crates-drivers-duckdb.log": "385fe2897fbb8290554d4b3cc71496669595a29d3d4dfd1e922104add3eb1696",
+    "crates-drivers-mongodb.log": "270c2fbaee3978286957c14887497ec13c4d6ff6bea6c462cf63ee487fdfbf59",
+    "crates-drivers-mssql.log": "b652d14b0daf271b2b85b0b439814777baaf291d67bbccdaf44f47ccf4aabc6f",
+    "crates-drivers-mysql.log": "4db883cffd11ce4f6fa7ac34c01a933acd665a132c89b6870ca4c1bcffd3bd37",
+    "crates-drivers-postgres.log": "c7e3a90049279a0eb37e550ae4bff7a1541611d36b0d48159d5ee217a92abb48",
+    "crates-drivers-redis.log": "7234d912bc0b1d71e425cd2eda028a52ca4651fa212b73f10df9260c75e502b1",
+    "crates-drivers-sqlite.log": "bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539",
+    "crates-mcp.log": "b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8",
     "runner-output.txt": "6128341c5c36b44c925b74461e30bf2e6fd0714b59b773501294078cd3e17846"
   }
 }
