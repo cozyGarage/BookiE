@@ -67,6 +67,11 @@ extraction and formatting preserve the routine as one statement and the query
 after the delimiter as the second; the body-only placeholder remains excluded
 ([case evidence](evidence/mysql-delimiter-comment-boundary-results-2026-10-05/manifest.json)).
 
+October 5 B3-5 follow-up: a MySQL `DELIMITER :` case now confirms the delimiter
+does not leak into named-parameter extraction. Formatting and replanning retain
+the procedure/query boundary, string contents and following `:after` parameter
+([case evidence](evidence/mysql-colon-delimiter-parameter-results-2026-10-05/manifest.json)).
+
 October 5 B3-5 policy follow-up: MySQL executable comments (`/*!...*/`) and
 MariaDB executable comments (`/*M!...*/`) now classify as unparseable/write so
 the policy layer cannot treat embedded SQL as a read. Tests also keep ordinary

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "5c77e33443fb0ea97480d0bb89539d9f8efbab3d",
+  "case": "MySQL script delimiter colliding with named-parameter syntax",
+  "test": "ui::editor::statement_cursor::tests::mysql_colon_delimiter_does_not_leak_into_named_parameters",
+  "contract": [
+    "A colon delimiter keeps the MySQL procedure body and following SELECT as exactly two planned statements.",
+    "A colon inside the procedure's string literal remains text, while only the following statement's :after placeholder is extracted.",
+    "Formatting retains the delimiter directive; replanning and parameter extraction after formatting preserve statement boundaries and placeholder identity."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app mysql_colon_delimiter_does_not_leak_into_named_parameters -- --nocapture",
+      "result": "1 passed, 501 filtered out (3 suites)",
+      "log": "focused.txt"
+    },
+    "app_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app",
+      "result": "472 passed, 32 ignored, 996 filtered out (6 suites)",
+      "log": "app-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other MySQL delimiter punctuation and dialect-specific script boundaries remain open; this focused case does not close B3-5."
+  ],
+  "log_sha256": {
+    "focused.txt": "ab4ebde6f973dc835524e089c0f7c83352b344f932e11a5c192f3520ee956ac1",
+    "app-suite.txt": "59a980ae28ec6359814fa7276cba80f09ab20e74b76f36d60c5622ea014e6207",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}
