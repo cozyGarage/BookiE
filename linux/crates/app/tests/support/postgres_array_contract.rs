@@ -323,6 +323,39 @@ async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values
         .unwrap();
     assert_eq!(after.rows[0][1..], native.rows[0][..]);
     assert_eq!(after.rows[1], sibling_before);
+
+    let invalid = parse_input_for_driver("{0.1,not-a-float}", Some(&columns[value_index]), "postgres")
+        .expect("malformed float4[] remains text for server validation");
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "float4_array_grid",
+        &columns,
+        &[(value_index, invalid)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let error = connection
+        .execute_in_transaction_controlled(&[update], &control)
+        .await
+        .expect_err("invalid float4[] element must be rejected by PostgreSQL");
+    assert!(
+        matches!(
+            &error,
+            tablepro_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
+        ),
+        "invalid float4[] should retain PostgreSQL's invalid-text SQLSTATE: {error:?}"
+    );
+    let unchanged = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM float4_array_grid ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(unchanged.rows, after.rows, "refused edit changed target or sibling");
 }
 
 #[tokio::test]

@@ -2,18 +2,19 @@
   "schema_version": 1,
   "date": "2026-10-05",
   "branch": "linux",
-  "baseline_commit": "12baa60bb8c6444bd625b30348a774876bfce93d",
+  "baseline_commit": "ff8b29b4f7be1268c895ebcd8d97a63e1e165126",
   "scope": "PostgreSQL float4[] app parser and keyed-grid edit behavior",
   "source": {
     "path": "crates/app/tests/support/postgres_array_contract.rs",
-    "sha256": "17a862985f6a69993ef505163e937f9013a0cd255fe6db43fbd1b3f844df6a8f"
+    "sha256": "ec420593097c341f908f1aeadb16c18bdac7a20acdf0497c1af664fb8f0d3bde"
   },
   "selector": "value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling",
   "engine": "PostgreSQL 16 Docker integration fixture",
   "contract": [
     "The app parser sends float4[] input through as array text before the schema-qualified keyed update.",
     "The edited array covers 0.1, an adjacent float4 above 1.0, negative zero, the minimum subnormal, NaN, positive and negative Infinity, and SQL NULL.",
-    "The target matches an independently typed PostgreSQL float4[] result for type, array_to_json and array_send; the sibling row remains byte-for-byte unchanged."
+    "The target matches an independently typed PostgreSQL float4[] result for type, array_to_json and array_send; the sibling row remains byte-for-byte unchanged.",
+    "A malformed element is rejected with SQLSTATE 22P02; a follow-up query confirms the edited row and sibling remain unchanged and the connection is usable."
   ],
   "validation": {
     "focused_test": {
@@ -48,8 +49,8 @@
     }
   },
   "log_sha256": {
-    "focused-test.txt": "9b72e0b2c0cb67207e54048ca748ce81e43c542f2f3954e4b04b08f3ad3f1835",
-    "app-suite.txt": "3acddb7c97636c0930b69e562e68f0ca28c103fb003979e60310ae90ba03c178",
+    "focused-test.txt": "d7103ea2861af406db0ec05c7d231554e55fff679b39f38485cb06befb683fe9",
+    "app-suite.txt": "c4e4df3961a77db961e6f7b16c4f87e8f359fd1e95ac180d5b596a80943dcbcb",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
