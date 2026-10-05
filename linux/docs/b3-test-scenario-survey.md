@@ -21,6 +21,15 @@ case includes fractional seconds, BC/year-10000 values, infinities and SQL NULL
 [file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 Other temporal-array and consumer/session combinations remain open.
 
+### October 5 PostgreSQL timetz[] TimeZone follow-up
+
+Explicit `timetz[]` offsets, including PostgreSQL's ±15:59 boundaries, remain
+unchanged when a transaction switches from `America/New_York` to UTC. Typed
+rebinding and JSON/CSV/XLSX/SQL consumers retain native JSON/wire values, and
+SQL replay preserves a sibling row
+([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+Other temporal/session combinations remain open.
+
 ### October 5 PostgreSQL numeric[] Gnumeric follow-up
 
 The `numeric[]` XLSX cell now survives Gnumeric's XLSX/ODS/XLSX re-save with

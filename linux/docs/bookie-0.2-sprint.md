@@ -35,6 +35,11 @@ now covers canonical CSV output and SQL replay after switching from `SQL, DMY`
 to `ISO, MDY`. Native array JSON/wire bytes match, and a sibling row is retained
 ([evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 follow-up: PostgreSQL `timetz[]` now preserves explicit offsets
+through an `America/New_York` → UTC session switch, typed rebinding and JSON,
+CSV, XLSX and SQL consumers. Native wire checks and sibling preservation pass
+([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
+
 October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
 inside the nested type fallback. The driver now explicitly refuses nested
 LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;

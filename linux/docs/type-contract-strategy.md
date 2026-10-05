@@ -15,6 +15,9 @@ The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to
 canonical CSV output and SQL replay after switching from `SQL, DMY` to
 `ISO, MDY`; native JSON/wire oracles and sibling preservation pass
 ([evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
+The `timetz[]` case also preserves explicit offsets through an `America/New_York`
+to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
+([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
 Other temporal-array session/consumer combinations remain open.
 
 PostgreSQL inferred enum-array binding now has direct evidence for the

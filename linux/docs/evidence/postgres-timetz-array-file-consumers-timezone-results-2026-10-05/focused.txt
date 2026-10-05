@@ -1,0 +1,6 @@
+
+running 1 test
+test array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 177 filtered out; finished in 1.97s
+

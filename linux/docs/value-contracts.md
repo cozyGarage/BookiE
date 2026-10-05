@@ -137,6 +137,10 @@ A PostgreSQL `timetz[]` workbook preserves fractional wall times, the largest
 positive and negative offsets, and SQL NULL through Calc's XLSX/ODS/XLSX round
 trip. The native parameter rebind matches both `array_to_json` and `array_send`
 ([evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json)).
+The same native offsets also survive typed rebinding, JSON/CSV/XLSX output and
+SQL replay after a session changes from `America/New_York` to UTC; SQL NULL and
+a sibling array remain intact
+([session/consumer evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).
 
 A PostgreSQL `boolean[]` workbook preserves true, false and SQL NULL through
 Calc's XLSX/ODS/XLSX round trip as a text cell. The native parameter rebind
