@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-05",
   "branch": "b3/postgres-enum-add-after",
-  "source_commit": "6d6633061b06b6b77c353a8e7f53139d481586ef",
+  "source_commit": "c042909f99f9cbce115ced66d314b7a5cecf776e",
   "engine": "PostgreSQL 16, Docker fixture",
   "case": "a warmed enum_range session observes both BEFORE and AFTER label insertions",
   "test": "array_contract::value_contract_enum_range_observes_added_label_order_in_same_session",
@@ -14,12 +14,12 @@
   "validation": {
     "focused_test": {
       "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_observes_added_label_order_in_same_session -- --ignored --nocapture",
-      "result": "1 passed, 178 filtered out",
+      "result": "1 passed, 179 filtered out",
       "log": "focused-test.txt"
     },
     "postgres_driver_suite": {
       "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
-      "result": "45 passed, 180 ignored (5 suites)",
+      "result": "45 passed, 181 ignored (5 suites)",
       "log": "driver-suite.txt"
     },
     "clippy": {
@@ -34,7 +34,7 @@
     },
     "ignored_inventory": {
       "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
-      "result": "passed; 500 declarations, Driver tier 367",
+      "result": "passed; 501 declarations, Driver tier 368",
       "log": "ignored-inventory.txt"
     },
     "diff_check": {
@@ -53,8 +53,8 @@
     "The repository-wide file-size gate still reports seven unrelated existing files over its limits."
   ],
   "log_sha256": {
-    "focused-test.txt": "e9f6413635bd4d200d39e8ffb5ca1bf62d229fa33dde1a974ff0f578e95cdb54",
-    "driver-suite.txt": "8fa6bc002ae99d81a6add2fcf559f7e7737b58e41b9dbea7d28177d8319a0f80",
+    "focused-test.txt": "32440e7317ac400befe25f103cceb4e4516097862e03447b4ccbd3393000ba1e",
+    "driver-suite.txt": "53277b6bde4e349b5953cedead0cfea493076ee7d6a7842abc7a0fb2ea1cb034",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
