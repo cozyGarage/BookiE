@@ -432,6 +432,11 @@ the companion kind column; XLSX uses numeric cells for numeric results and
 shared strings for extracted text without formulas. Native `typeof()` and
 `json_type()` remain the independent SQLite oracles ([evidence](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json)).
 
+SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
+ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
+Native `typeof()` and `hex()` check source and restored values
+([evidence](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json)).
+
 ## Evidence updates
 
 Add or update one named case in the ledger with the ADR 0007 outcome, native

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "dac43fed35bc533a0e0f0b8f9200226f848b8a52",
+  "engine": "SQLite, in-memory STRICT ANY tables",
+  "case": "substr computed result storage classes through typed CSV re-import",
+  "test": "sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes",
+  "contract": [
+    "substr(value, 1, 4) over STRICT ANY covers INTEGER- and REAL-derived text, ordinary TEXT, empty TEXT, a valid-UTF-8 BLOB, a binary BLOB and SQL NULL.",
+    "The computed result retains fallback metadata and typed CSV restores each runtime storage class into a separate STRICT ANY table.",
+    "Native typeof() checks each source and restored class, while hex() independently checks the exact result bytes, including valid-UTF-8 BLOB bytes, empty TEXT and SQL NULL."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --all-features --lib sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --all-features --lib",
+      "result": "478 passed, 32 ignored, 1014 filtered out (3 suites)",
+      "log": "app-lib-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-app --all-features --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other SQLite computed-expression and consumer combinations, spreadsheet-app re-import, and installed editing remain open; this case does not close B3."
+  ],
+  "log_sha256": {
+    "focused.txt": "a0c4af6fbac6b6ea69b698007780bf3e03e0bed87a53a855e9593bcc1564b531",
+    "app-lib-suite.txt": "0d51b348d9fd2f1a555eaa328d22cb81dd36a85b45f225b96ef957f1e13d4f0a"
+  }
+}

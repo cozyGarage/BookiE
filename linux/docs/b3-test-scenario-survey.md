@@ -337,6 +337,11 @@ for a shadow-only label. Other B3 enum functions and session/search-path
 combinations remain open
 ([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
 
+October 5 B3-4 SQLite follow-up: `substr()` over STRICT `ANY` now preserves
+TEXT, empty TEXT, UTF-8 and binary BLOB, and SQL NULL result classes through
+typed CSV re-import. Native `typeof()` and `hex()` check source and restored
+values ([evidence](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
