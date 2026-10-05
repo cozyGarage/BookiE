@@ -257,6 +257,12 @@ extended-year values, infinities, end-of-day time, offset boundaries and SQL
 NULL preserved as exact text. XML checks confirm string cell types and no
 formulas ([evidence](evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: PostgreSQL `enum[]` file export now includes a
+formula-shaped `=1+1` label alongside empty, quoted, escaped, Unicode and SQL
+NULL values. Native SQL replay passes all four string-mode combinations, and
+Gnumeric preserves the full array as a text cell without formulas
+([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
 false and SQL NULL through the pinned Calc round trip as a text cell. Native
 `array_to_json` and `array_send` match after rebinding. See the

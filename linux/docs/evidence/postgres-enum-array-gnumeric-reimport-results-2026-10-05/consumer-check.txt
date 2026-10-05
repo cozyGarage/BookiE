@@ -1,0 +1,6 @@
+Command: rtk proxy python3 docs/evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/verify_roundtrip.py
+Result: Gnumeric preserved enum[] text, including formula-shaped label and escaped values, as text without formulas.
+
+The checker examines cell A2 in the source XLSX, Gnumeric ODS and Gnumeric
+XLSX. It pins the full escaped array literal, requires text cell kinds, and
+rejects formulas.

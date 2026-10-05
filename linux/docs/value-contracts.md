@@ -37,6 +37,10 @@ A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
 quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
 
+The custom `enum[]` XLSX cell also survives Gnumeric's ODS/XLSX re-save with
+the formula-shaped `=1+1` label, escaped values and SQL NULL preserved as text
+([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 A scalar custom-enum XLSX workbook also survives Gnumeric's XLSX/ODS/XLSX
 re-save: literal `NULL`, Unicode, markup and the `=1+1` label remain string
 cells, SQL NULL stays blank, and no formula is created

@@ -195,6 +195,10 @@ The keyed edit also succeeds with a stricter same-named domain first in
 ([shadowed-path evidence](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json)).
 The custom `enum[]` XLSX text cell also survives a LibreOffice Calc re-save as
 ODS and then XLSX ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
+It now also survives Gnumeric's re-save with a formula-shaped label, Unicode,
+quotes, backslashes, markup, empty text and SQL NULL preserved as escaped array
+text, with no formula created
+([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 The `bytea[]` XLSX text cell now survives the same Calc re-import with its
 binary, empty and SQL NULL elements intact
 ([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).

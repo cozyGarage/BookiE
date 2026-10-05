@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "b2d945a0ffcf088106ccd91837b473c2a99ff7b0",
+  "case": "PostgreSQL custom enum[] XLSX re-import through Gnumeric",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "f95d8585bc0c2cebadfa1c55e49e010bdb3a4307552b49acd5e14f88c2cc81a7"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric 1.12.57-1.1+b4",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The native enum[] includes literal NULL, empty text, Unicode, comma, quote, markup, formula-shaped =1+1, backslash and SQL NULL labels.",
+    "The native oracle checks enum[] type, array JSON and array_send bytes; rebinding reproduces both JSON and wire bytes.",
+    "The XLSX writer stores the complete array as a text cell without a formula. SQL-file replay preserves it under all four standard_conforming_strings/backslash_quote combinations and leaves the sibling array intact.",
+    "Gnumeric preserves the exact array literal as a text cell through XLSX/ODS/XLSX re-save, including the formula-shaped label."
+  ],
+  "expected_array_literal": "{\"NULL\",\"\",\"\u6771\u4eac\",\"a,b\",\"a\\\"b\",\"<tag>&\",\"=1+1\",\"slash\\\\path\",NULL}",
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_file_exports_preserve_labels -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "Install Gnumeric in the pinned Debian container.",
+        "Convert source.xlsx to gnumeric-roundtrip.ods, then the ODS to gnumeric-roundtrip.xlsx."
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 array text, requires string cell types and rejects formulas in source and both re-saved workbooks.",
+      "result": "Full enum[] text, including =1+1 and SQL NULL distinction, preserved.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "89f16d4b338fea7e74c3b8bbe1fc7cf84cd480c4a45fc4ffef6660c0d4f84d59",
+    "gnumeric-roundtrip.ods": "80c2a9294ab053a8c8c0fc8d406b0bebd81cfc887855b0ac2cfa968f9e640b7a",
+    "gnumeric-roundtrip.xlsx": "dd43a4d66c50bdea59a5297269edc074b5f626e118e23541d8028d7735361405"
+  },
+  "remaining": [
+    "Other spreadsheet applications, enum array shapes and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "bookiee-export-test.txt": "96e8264a993b1c448322c07d0735d8e4c44be5f89d186ed1c57a1c925212d8a0",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "ed94ccd134f1cd91f75ed6f008a5d8d9d7bc24a23cc5b0dc277a1fafa4c9b20c",
+    "consumer-check.txt": "72dddca2a0cdb55195b329a8414770f6f3518e3b8e7576cd69ac60e7610a7eae",
+    "verify_roundtrip.py": "159774a1973a3e0bb8851766718bd4edd202173ad337a8dd73d34bf2111df5ee",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "31cbc7f6640f67db087c6e5aa939e60853dca2e6f513aa512be87c2347b865e9"
+  }
+}

@@ -99,14 +99,15 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     connection
         .execute(
             "CREATE TYPE value_contract_file_enum AS ENUM \
-             ('NULL', '', '東京', 'a,b', 'a\"b', '<tag>&', 'slash\\path', 'sibling')",
+             ('NULL', '', '東京', 'a,b', 'a\"b', '<tag>&', '=1+1', 'slash\\path', 'sibling')",
         )
         .await
         .unwrap();
     let expression = "ARRAY['NULL'::value_contract_file_enum, \
         ''::value_contract_file_enum, '東京'::value_contract_file_enum, \
         'a,b'::value_contract_file_enum, 'a\"b'::value_contract_file_enum, \
-        '<tag>&'::value_contract_file_enum, 'slash\\path'::value_contract_file_enum, NULL]";
+        '<tag>&'::value_contract_file_enum, '=1+1'::value_contract_file_enum, \
+        'slash\\path'::value_contract_file_enum, NULL]";
     let result = connection
         .query(&format!("SELECT {expression} AS value"))
         .await
@@ -130,7 +131,7 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     };
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
-        serde_json::json!(["NULL", "", "東京", "a,b", "a\"b", "<tag>&", "slash\\path", null])
+        serde_json::json!(["NULL", "", "東京", "a,b", "a\"b", "<tag>&", "=1+1", "slash\\path", null])
     );
     let rebound = connection
         .query_params(
