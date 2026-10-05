@@ -372,6 +372,78 @@ async fn value_contract_enum_range_uses_qualified_type_under_shadowed_search_pat
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_extreme_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_extreme_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_extreme_target.label AS ENUM \
+             ('first', 'NULL', '', '東京', 'last')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_extreme_shadow.label AS ENUM \
+             ('shadow-only', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("SET search_path = value_contract_enum_extreme_shadow, value_contract_enum_extreme_target, public")
+        .await
+        .unwrap();
+
+    let expression = "SELECT enum_first(NULL::value_contract_enum_extreme_target.label) AS first_label, \
+                             enum_last(NULL::value_contract_enum_extreme_target.label) AS last_label";
+    let result = connection.query(expression).await.unwrap();
+    let type_name = "value_contract_enum_extreme_target.label";
+    assert_eq!(result.columns[0].data_type, type_name);
+    assert_eq!(result.columns[1].data_type, type_name);
+    assert_eq!(
+        result.rows[0],
+        vec![Value::Text("first".into()), Value::Text("last".into())]
+    );
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof(first_label)::text, pg_typeof(last_label)::text, \
+                    encode(enum_send(first_label), 'hex'), encode(enum_send(last_label), 'hex') \
+             FROM ({expression}) AS enumerated"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(type_name.into()));
+    assert_eq!(native.rows[0][1], Value::Text(type_name.into()));
+
+    let rebound = connection
+        .query_params(
+            "SELECT encode(enum_send($1::text::value_contract_enum_extreme_target.label), 'hex'), \
+                    encode(enum_send($2::text::value_contract_enum_extreme_target.label), 'hex')",
+            &[result.rows[0][0].clone(), result.rows[0][1].clone()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][2]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][3]);
+
+    let invalid = connection
+        .query_params(
+            "SELECT enum_first($1::text::value_contract_enum_extreme_target.label)",
+            &[Value::Text("shadow-only".into())],
+        )
+        .await
+        .expect_err("a shadow-only label must not be accepted as the target enum");
+    assert!(
+        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
