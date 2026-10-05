@@ -287,6 +287,13 @@ extraction keeps only the safe prefix, formatting retains the malformed text,
 and agent policy denies the unparseable/write statement
 ([evidence](evidence/postgres-malformed-dollar-quote-consumers-results-2026-10-05/manifest.json)).
 
+October 5 B3-5 policy follow-up: MySQL `/*!...*/` and MariaDB `/*M!...*/`
+executable comments fail closed as unparseable/write in policy classification;
+ordinary block comments and comment-shaped string contents remain reads. The
+test records conservative policy handling only; executable-comment planning
+and end-to-end database execution remain open
+([evidence](evidence/mysql-executable-comment-policy-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as

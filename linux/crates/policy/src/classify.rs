@@ -6,7 +6,7 @@ use sqlparser::ast::{
 };
 use sqlparser::dialect::{Dialect, GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect, SQLiteDialect};
 use sqlparser::parser::Parser;
-use sqlparser::tokenizer::{Token, Tokenizer};
+use sqlparser::tokenizer::{Token, Tokenizer, Whitespace};
 
 /// Coarse statement class used by policy rules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -74,6 +74,10 @@ pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
         return StatementFacts::unparseable("empty SQL");
     }
 
+    if driver_id == "mysql" && sql_contains_mysql_executable_comment(trimmed, dialect.as_ref()) {
+        return StatementFacts::unparseable("MySQL executable comments are not safely classified");
+    }
+
     let statements = match Parser::parse_sql(dialect.as_ref(), trimmed) {
         Ok(s) => s,
         Err(e) => return StatementFacts::unparseable(e.to_string()),
@@ -138,6 +142,17 @@ pub fn classify(sql: &str, driver_id: &str) -> StatementFacts {
         is_multi_statement: is_multi,
         parse_error: None,
     }
+}
+
+fn sql_contains_mysql_executable_comment(sql: &str, dialect: &dyn Dialect) -> bool {
+    let Ok(tokens) = Tokenizer::new(dialect, sql).tokenize() else {
+        return false;
+    };
+
+    tokens.iter().any(|token| {
+        matches!(token, Token::Whitespace(Whitespace::MultiLineComment(comment))
+            if comment.starts_with('!') || comment.starts_with("M!"))
+    })
 }
 
 /// Detect administrative calls anywhere in a successfully parsed statement.
@@ -1013,6 +1028,27 @@ mod tests {
         let f = classify("DELETE FROM t WHERE id = 1", "mysql");
         assert_eq!(f.class, StatementClass::Delete);
         assert!(f.has_where);
+    }
+
+    #[test]
+    fn mysql_executable_comment_cannot_hide_a_file_write_from_policy() {
+        for sql in [
+            "SELECT 'payload' /*! INTO OUTFILE '/tmp/bookiee-policy.csv' */",
+            "SELECT 1 /*M!100100 INTO OUTFILE '/tmp/bookiee-policy.csv' */",
+        ] {
+            let facts = classify(sql, "mysql");
+            assert_eq!(facts.class, StatementClass::Unparseable, "SQL: {sql}, facts: {facts:?}");
+            assert!(facts.writes, "SQL: {sql}, facts: {facts:?}");
+        }
+
+        for sql in [
+            "SELECT '/*! INTO OUTFILE ''/tmp/file'' */'",
+            "SELECT 1 /* INTO OUTFILE '/tmp/file' */",
+        ] {
+            let facts = classify(sql, "mysql");
+            assert_eq!(facts.class, StatementClass::Select, "SQL: {sql}, facts: {facts:?}");
+            assert!(!facts.writes, "SQL: {sql}, facts: {facts:?}");
+        }
     }
 
     #[test]

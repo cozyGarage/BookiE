@@ -47,6 +47,15 @@ extraction and formatting preserve the routine as one statement and the query
 after the delimiter as the second; the body-only placeholder remains excluded
 ([case evidence](evidence/mysql-delimiter-comment-boundary-results-2026-10-05/manifest.json)).
 
+October 5 B3-5 policy follow-up: MySQL executable comments (`/*!...*/`) and
+MariaDB executable comments (`/*M!...*/`) now classify as unparseable/write so
+the policy layer cannot treat embedded SQL as a read. Tests also keep ordinary
+block comments and comment-shaped string content classified as reads. This is
+a conservative policy refusal, not support for planning executable comments
+([MySQL syntax](https://dev.mysql.com/doc/refman/8.4/en/comments.html),
+[MariaDB syntax](https://mariadb.com/docs/server/reference/sql-statements/comment-syntax),
+[evidence](evidence/mysql-executable-comment-policy-results-2026-10-05/manifest.json)).
+
 October 5 B3-2 follow-up: SQL Server `smalldatetime` now checks the 29.998/29.999
 rounding boundary at December 31 midnight rollover. The server rounds the value
 to `2025-01-01T00:00:00`; BookiE's datetime result and native style-126 text
