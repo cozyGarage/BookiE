@@ -468,6 +468,120 @@ async fn value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_min_max_keep_target_type_and_order_under_shadowed_search_path() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_aggregate_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_aggregate_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_aggregate_target.state AS ENUM \
+             ('early', 'NULL', '', '東京', 'late')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_aggregate_shadow.state AS ENUM \
+             ('shadow-only', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_enum_aggregate_target.events \
+             (group_id integer, label value_contract_enum_aggregate_target.state)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_enum_aggregate_target.events VALUES \
+             (1, 'late'), (1, ''), (1, NULL), (1, 'NULL'), (1, 'early'), \
+             (2, '東京'), (2, 'NULL'), (3, NULL), (3, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "SET search_path = value_contract_enum_aggregate_shadow, \
+             value_contract_enum_aggregate_target, public",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT group_id, min(label) AS min_label, max(label) AS max_label \
+             FROM value_contract_enum_aggregate_target.events \
+             GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    let target_type = "value_contract_enum_aggregate_target.state";
+    assert_eq!(result.columns[1].data_type, target_type);
+    assert_eq!(result.columns[2].data_type, target_type);
+    let native = connection
+        .query(
+            "SELECT group_id, pg_typeof(min(label))::text, pg_typeof(max(label))::text, \
+                    min(label)::text, max(label)::text, \
+                    encode(enum_send(min(label)), 'hex'), encode(enum_send(max(label)), 'hex') \
+             FROM value_contract_enum_aggregate_target.events \
+             GROUP BY group_id ORDER BY group_id",
+        )
+        .await
+        .unwrap();
+    let expected = [
+        (1, Some("early"), Some("late")),
+        (2, Some("NULL"), Some("東京")),
+        (3, None, None),
+    ];
+    for (index, (group_id, min_label, max_label)) in expected.into_iter().enumerate() {
+        assert_eq!(result.rows[index][0], Value::Int(group_id));
+        assert_eq!(native.rows[index][0], result.rows[index][0]);
+        assert_eq!(native.rows[index][1], Value::Text(target_type.into()));
+        assert_eq!(native.rows[index][2], Value::Text(target_type.into()));
+        for (result_column, native_text_column, native_wire_column, label) in
+            [(1, 3, 5, min_label), (2, 4, 6, max_label)]
+        {
+            match label {
+                Some(label) => {
+                    assert_eq!(result.rows[index][result_column], Value::Text(label.into()));
+                    assert_eq!(native.rows[index][native_text_column], Value::Text(label.into()));
+                    let rebound = connection
+                        .query_params(
+                            &format!(
+                                "SELECT encode(enum_send($1::text::{target_type}), 'hex')"
+                            ),
+                            std::slice::from_ref(&result.rows[index][result_column]),
+                        )
+                        .await
+                        .unwrap();
+                    assert_eq!(rebound.rows[0][0], native.rows[index][native_wire_column]);
+                }
+                None => {
+                    assert_eq!(result.rows[index][result_column], Value::Null);
+                    assert_eq!(native.rows[index][native_text_column], Value::Null);
+                    assert_eq!(native.rows[index][native_wire_column], Value::Null);
+                }
+            }
+        }
+    }
+
+    let empty = connection
+        .query(
+            "SELECT min(label), max(label) \
+             FROM value_contract_enum_aggregate_target.events WHERE false",
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.columns[0].data_type, target_type);
+    assert_eq!(empty.columns[1].data_type, target_type);
+    assert_eq!(empty.rows[0], [Value::Null, Value::Null]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
