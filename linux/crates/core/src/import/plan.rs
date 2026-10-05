@@ -4,8 +4,8 @@ use crate::import::cell::{CsvRowError, row_to_values_for_driver};
 use crate::import::csv_import::{CsvImportOptions, CsvSheet};
 use crate::query::{ColumnInfo, Value};
 use crate::sql_dialect::{
-    BuildSqlError, IdentError, build_insert_from_draft, postgres_array_cast_type, postgres_numeric_cast_type,
-    postgres_temporal_cast_type, validate_ident,
+    BuildSqlError, IdentError, build_insert_from_draft, placeholder_for, postgres_array_cast_type,
+    postgres_numeric_cast_type, postgres_temporal_cast_type, quote_ident, validate_ident,
 };
 
 /// Rows committed per transaction. Small enough that a failure loses
@@ -77,8 +77,39 @@ pub fn build_insert_plan(
         return Err(PlanError::NoRows);
     }
     let (columns, mapping) = insert_columns(target)?;
-    let statement = insert_statement(target, &columns)?;
-    let rows = bind_rows(sheet, &columns, &mapping, options, target.driver_id)?;
+    let mut rows = bind_rows(sheet, &columns, &mapping, options, target.driver_id)?;
+    let mysql_empty_enum_columns = if target.driver_id.eq_ignore_ascii_case("mysql") {
+        columns
+            .iter()
+            .enumerate()
+            .filter(|(index, column)| {
+                mysql_enum_type(&column.data_type)
+                    && rows
+                        .iter()
+                        .any(|row| matches!(row.get(*index), Some(Value::Text(text)) if text.is_empty()))
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+    let statement = insert_statement(target, &columns, &mysql_empty_enum_columns)?;
+    if !mysql_empty_enum_columns.is_empty() {
+        for row in &mut rows {
+            let values = std::mem::take(row);
+            let mut params = Vec::with_capacity(values.len() + mysql_empty_enum_columns.len());
+            for (index, value) in values.into_iter().enumerate() {
+                if mysql_empty_enum_columns.contains(&index) {
+                    let is_empty = matches!(&value, Value::Text(text) if text.is_empty());
+                    params.push(Value::Int(i64::from(is_empty)));
+                    params.push(if is_empty { Value::Null } else { value });
+                } else {
+                    params.push(value);
+                }
+            }
+            *row = params;
+        }
+    }
     Ok(InsertPlan {
         statement,
         columns,
@@ -112,7 +143,47 @@ fn insert_columns(target: &ImportTarget<'_>) -> Result<(Vec<ColumnInfo>, Vec<Opt
 /// One shape for every row. The statement is built from placeholder
 /// values that are never NULL, so no column is dropped from it for one
 /// row and kept for the next.
-fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result<String, PlanError> {
+fn insert_statement(
+    target: &ImportTarget<'_>,
+    columns: &[ColumnInfo],
+    mysql_empty_enum_columns: &[usize],
+) -> Result<String, PlanError> {
+    if !mysql_empty_enum_columns.is_empty() {
+        let mut parameter_index = 0;
+        let values = columns
+            .iter()
+            .enumerate()
+            .map(|(column_index, _)| {
+                if mysql_empty_enum_columns.contains(&column_index) {
+                    let empty = placeholder_for(target.driver_id, parameter_index);
+                    let value = placeholder_for(target.driver_id, parameter_index + 1);
+                    parameter_index += 2;
+                    format!("CASE WHEN {empty} = 1 THEN SPACE(0) ELSE {value} END")
+                } else {
+                    let value = placeholder_for(target.driver_id, parameter_index);
+                    parameter_index += 1;
+                    value
+                }
+            })
+            .collect::<Vec<_>>();
+        let identifiers = columns
+            .iter()
+            .map(|column| quote_ident(target.driver_id, &column.name))
+            .collect::<Vec<_>>();
+        let table = match target.schema {
+            Some(schema) => format!(
+                "{}.{}",
+                quote_ident(target.driver_id, schema),
+                quote_ident(target.driver_id, target.table)
+            ),
+            None => quote_ident(target.driver_id, target.table),
+        };
+        return Ok(format!(
+            "INSERT INTO {table} ({}) VALUES ({})",
+            identifiers.join(", "),
+            values.join(", ")
+        ));
+    }
     let shape_columns: Vec<ColumnInfo> = columns.to_vec();
     // PostgreSQL temporal CSV values use text parameters with an explicit
     // server cast. This supports exact sentinels such as +/-infinity while
@@ -140,6 +211,13 @@ fn insert_statement(target: &ImportTarget<'_>, columns: &[ColumnInfo]) -> Result
     )
     .map_err(|error: BuildSqlError| PlanError::Sql(error.to_string()))?;
     Ok(statement)
+}
+
+fn mysql_enum_type(data_type: &str) -> bool {
+    data_type
+        .trim()
+        .get(..5)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("enum("))
 }
 
 fn bind_rows(
@@ -243,6 +321,39 @@ mod tests {
         assert_eq!(plan.row_count(), 2);
         assert_eq!(plan.rows.len(), 2);
         assert_eq!(plan.rows[0], vec![Value::Int(1), Value::Text("ada".to_owned())]);
+    }
+
+    #[test]
+    fn mysql_enum_empty_csv_cells_are_reconstructed_without_binding_empty_text() {
+        let columns = vec![column("id", "INT"), column("state", "enum('', 'ready', 'NULL')")];
+        let mapping = vec![Some(0), Some(1)];
+        let sheet = sheet(&[&["1", ""], &["2", "ready"], &["3", "\\N"]], &["id", "state"]);
+        let options = CsvImportOptions {
+            null_marker: "\\N".into(),
+            ..CsvImportOptions::default()
+        };
+        let target = ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "enum_rows",
+            columns: &columns,
+            mapping: &mapping,
+        };
+
+        let plan = build_insert_plan(&target, &sheet, &options).expect("plan");
+
+        assert_eq!(
+            plan.statement,
+            "INSERT INTO `enum_rows` (`id`, `state`) VALUES (?, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END)"
+        );
+        assert_eq!(
+            plan.rows,
+            vec![
+                vec![Value::Int(1), Value::Int(1), Value::Null],
+                vec![Value::Int(2), Value::Int(0), Value::Text("ready".into())],
+                vec![Value::Int(3), Value::Int(0), Value::Null],
+            ]
+        );
     }
 
     #[test]

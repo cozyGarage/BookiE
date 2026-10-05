@@ -393,6 +393,11 @@ enum first in `search_path`; a target-only label, empty label, literal `NULL`,
 and SQL NULL restore to the qualified destination type without changing its
 sibling or writing to the shadow table ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: MariaDB 11's `EMPTY_STRING_IS_NULL` turns a bound
+empty CSV value into SQL NULL. The importer now uses a `SPACE(0)` expression
+for empty MySQL/MariaDB ENUM labels; a native round trip distinguishes the
+empty label from SQL NULL and preserves the sibling ([evidence](evidence/mariadb-empty-enum-empty-string-is-null-results-2026-10-05/manifest.json)).
+
 October 4 local integration gate: all 315 tests passed at
 `d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,
 policy/session, PostgreSQL socket and SSH suites. B3/B4 and release acceptance

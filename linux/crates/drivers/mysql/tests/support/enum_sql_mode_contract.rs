@@ -322,3 +322,144 @@ async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
     let (_container, options) = start_mariadb().await;
     assert_enum_and_set_export_modes(options).await;
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_string_is_null() {
+    let (_container, options) = start_mariadb().await;
+    let setup = connect(options.clone()).await;
+    setup
+        .execute("CREATE TABLE enum_empty_mode_source (id INT PRIMARY KEY, state ENUM('', 'ready', 'NULL'))")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE TABLE enum_empty_mode_target LIKE enum_empty_mode_source")
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "INSERT INTO enum_empty_mode_source VALUES \
+             (1, ''), (2, 'NULL'), (3, NULL)",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute("INSERT INTO enum_empty_mode_target VALUES (99, 'ready')")
+        .await
+        .unwrap();
+    setup
+        .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL'")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
+
+    let connection = connect(options).await;
+    let active_mode = connection.query("SELECT @@SESSION.sql_mode").await.unwrap();
+    let Value::Text(active_mode) = &active_mode.rows[0][0] else {
+        panic!("unexpected sql_mode: {:?}", active_mode.rows)
+    };
+    assert!(
+        active_mode.split(',').any(|mode| mode.trim() == "EMPTY_STRING_IS_NULL"),
+        "EMPTY_STRING_IS_NULL must be active; got {active_mode}"
+    );
+    assert_eq!(
+        connection
+            .query("SELECT HEX(SPACE(0)), SPACE(0) IS NULL")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text(String::new()), Value::Int(0)]],
+        "a server expression can represent empty text without the SQL mode turning it into NULL"
+    );
+    let source = connection
+        .query("SELECT id, state FROM enum_empty_mode_source ORDER BY id")
+        .await
+        .unwrap();
+    let source_native = connection
+        .query(
+            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL \
+             FROM enum_empty_mode_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        source_native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("1".into()),
+                Value::Text(String::new()),
+                Value::Int(0)
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("3".into()),
+                Value::Text("4E554C4C".into()),
+                Value::Int(0)
+            ],
+            vec![Value::Int(3), Value::Null, Value::Null, Value::Int(1)],
+        ]
+    );
+
+    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker,
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection.fetch_columns(None, "enum_empty_mode_target").await.unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "enum_empty_mode_target",
+            columns: &columns,
+            mapping: &[Some(0), Some(1)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query(
+            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL \
+             FROM enum_empty_mode_target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("1".into()),
+                Value::Text(String::new()),
+                Value::Int(0)
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("3".into()),
+                Value::Text("4E554C4C".into()),
+                Value::Int(0)
+            ],
+            vec![Value::Int(3), Value::Null, Value::Null, Value::Int(1)],
+            vec![
+                Value::Int(99),
+                Value::Text("2".into()),
+                Value::Text("7265616479".into()),
+                Value::Int(0)
+            ],
+        ]
+    );
+    connection.close().await.unwrap();
+}
