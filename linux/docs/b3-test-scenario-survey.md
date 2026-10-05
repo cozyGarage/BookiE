@@ -99,6 +99,11 @@ The same session now keeps enum-array result metadata current after
 first in `search_path`. Both populated and zero-row results report the moved
 qualified type; native type, JSON values and rebound array wire bytes agree
 ([evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+The same rename and schema move are also covered with separate reader and
+writer sessions. A warmed table projection retains labels and SQL NULL while
+reporting the moved type by OID under a same-named shadow path; catalog order,
+`pg_typeof`, `enum_send` and typed rebinding agree
+([cross-session evidence](evidence/postgres-enum-cross-session-type-move-results-2026-10-05/manifest.json)).
 Other catalog mutations and the broader B3 matrix remain open.
 
 ### October 5 PostgreSQL enum aggregate follow-up
