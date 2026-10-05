@@ -349,6 +349,11 @@ October 5 B3-4 follow-up: the same scalar-enum XLSX also survives Gnumeric's
 XLSX/ODS/XLSX re-save. Literal `NULL`, Unicode, markup and `=1+1` stay string
 cells, SQL NULL stays blank, and no formula is created ([Gnumeric evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: a PostgreSQL domain-over-enum array XLSX also
+survives Gnumeric's XLSX/ODS/XLSX re-save with the escaped array text and
+formula-shaped label unchanged, as a string cell without formulas
+([Gnumeric evidence](evidence/postgres-domain-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 4 B3-1/B3-4 follow-up: PostgreSQL custom enum metadata now covers a
 schema, type and table whose names contain spaces and embedded double quotes.
 The generated keyed edit and structured equality filter preserve the exact

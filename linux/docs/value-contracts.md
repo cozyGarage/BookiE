@@ -180,6 +180,8 @@ It also resolves the target schema when `search_path` contains a same-named shad
 The app parser and keyed grid edit use the same qualified domain-array cast; invalid values roll back without changing the row ([grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 Structured equality filters use the qualified domain-array type and match native array values ([filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
 JSON, CSV, XML, HTML, Markdown and XLSX exports preserve domain-over-enum array text, and SQL replay restores the native type, JSON values and array wire bytes ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)). Its XLSX string cell also survives LibreOffice Calc ODS/XLSX re-import with exact text ([evidence](evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same workbook's formula-shaped enum label and escaped array text also survive Gnumeric's XLSX/ODS/XLSX re-save unchanged
+([Gnumeric evidence](evidence/postgres-domain-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 A UUID-domain array now decodes using its base OID and preserves NULL versus empty arrays, bound round trips, keyed edits, domain CHECK refusal and sibling rows ([UUID-domain array evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
 Domain arrays over text, numeric and timestamptz also preserve NULL elements through qualified binding under an Asia/Kathmandu session, checked against native JSON and wire bytes ([base-type matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
 

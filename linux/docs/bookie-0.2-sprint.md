@@ -247,6 +247,10 @@ October 5 B3-4 follow-up: the PostgreSQL scalar-enum XLSX with a `=1+1` label
 also survives Gnumeric's XLSX/ODS/XLSX re-save as text; SQL NULL stays blank
 and no formula appears ([evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: a domain-over-enum array XLSX also survives
+Gnumeric XLSX/ODS/XLSX re-save with the full escaped array text and formula-
+shaped label intact ([evidence](evidence/postgres-domain-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
 false and SQL NULL through the pinned Calc round trip as a text cell. Native
 `array_to_json` and `array_send` match after rebinding. See the

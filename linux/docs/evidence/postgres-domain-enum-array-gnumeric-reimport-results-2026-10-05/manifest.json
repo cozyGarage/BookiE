@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "948a3b23fb0fdcc86cff699a57e6578dff7fad9f",
+  "case": "PostgreSQL domain-over-enum array XLSX re-import through Gnumeric",
+  "test": "domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_array_file_export_contract.rs",
+    "sha256": "aceb28ac974baae7f853a6abe09ab84558721860732f83b585e58bf053451b56"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The native domain-over-enum array contains literal NULL, an empty label, Unicode, comma and quote labels, markup, =1+1, and SQL NULL; native type, array_to_json and array_send oracles pass before export and after SQL replay.",
+    "BookiE writes the array as a string cell without a formula.",
+    "Gnumeric ssconvert opens source.xlsx, saves gnumeric-roundtrip.ods, then saves gnumeric-roundtrip.xlsx; the exact array text is unchanged, remains a string cell, and no formula is created.",
+    "The checker pins the full escaped array literal, including the formula-shaped label and the distinction between literal NULL and SQL NULL."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration domain_array_file_export_contract::value_contract_domain_enum_array_file_exports_preserve_values_and_native_type -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "Install Gnumeric in the pinned Debian container.",
+        "Run ssconvert source.xlsx to gnumeric-roundtrip.ods.",
+        "Run ssconvert gnumeric-roundtrip.ods to gnumeric-roundtrip.xlsx."
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 text in source and re-saved ODS/XLSX, requires string cell types and rejects formulas.",
+      "result": "Full domain-over-enum array text preserved, including the escaped formula-shaped label.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "70d9c05bc287a80baf83b5836cb04d6099f2926cacbf17d77a8138a6ed21ae3c",
+    "gnumeric-roundtrip.ods": "073f154070930e22851968e38fab1b15608d6cdc01cc3371eb946b105d97541b",
+    "gnumeric-roundtrip.xlsx": "f3822a2d6bf7b4caa4ee244cc2234afc6fda5df85ac494ce812839836bee545a"
+  },
+  "remaining": [
+    "Other spreadsheet applications, array shapes and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "bookiee-export-test.txt": "165f9da0beb46b4384fc25e78cfac92d5eff4f360ef73023efbe3bf75b5a6ffa",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "4a81d1d52534330b9e5db1ccfee0f827e58968c83077613ea4c272a393f7d1ed",
+    "consumer-check.txt": "b1f7e3da329c053720a48373fc34ef00fd1403eb99050f0246643739edb3daf0",
+    "verify_roundtrip.py": "ac0bf7903f830073bbb0e95991ecf98bac88aa63e8775ce8ea8b8d8543e2df08",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

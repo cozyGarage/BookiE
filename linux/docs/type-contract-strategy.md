@@ -178,6 +178,9 @@ values ([evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04
 The same array now has JSON, CSV, XML, HTML, Markdown and XLSX file-writer
 coverage plus typed SQL replay checked against native type, JSON and wire
 oracles ([file-writer evidence](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json)).
+Its XLSX string cell also survives Gnumeric's XLSX/ODS/XLSX re-save with the
+full escaped array text and formula-shaped enum label unchanged
+([Gnumeric evidence](evidence/postgres-domain-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 A UUID-domain array now decodes by its base OID, with a typed keyed edit, CHECK
 refusal and sibling preservation ([evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
 Text, numeric and timestamptz domain arrays also pass qualified binding and
