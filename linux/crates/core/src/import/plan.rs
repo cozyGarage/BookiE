@@ -78,12 +78,12 @@ pub fn build_insert_plan(
     }
     let (columns, mapping) = insert_columns(target)?;
     let mut rows = bind_rows(sheet, &columns, &mapping, options, target.driver_id)?;
-    let mysql_empty_enum_columns = if target.driver_id.eq_ignore_ascii_case("mysql") {
+    let mysql_empty_string_columns = if target.driver_id.eq_ignore_ascii_case("mysql") {
         columns
             .iter()
             .enumerate()
             .filter(|(index, column)| {
-                mysql_enum_type(&column.data_type)
+                mysql_empty_string_type(&column.data_type)
                     && rows
                         .iter()
                         .any(|row| matches!(row.get(*index), Some(Value::Text(text)) if text.is_empty()))
@@ -93,13 +93,13 @@ pub fn build_insert_plan(
     } else {
         Vec::new()
     };
-    let statement = insert_statement(target, &columns, &mysql_empty_enum_columns)?;
-    if !mysql_empty_enum_columns.is_empty() {
+    let statement = insert_statement(target, &columns, &mysql_empty_string_columns)?;
+    if !mysql_empty_string_columns.is_empty() {
         for row in &mut rows {
             let values = std::mem::take(row);
-            let mut params = Vec::with_capacity(values.len() + mysql_empty_enum_columns.len());
+            let mut params = Vec::with_capacity(values.len() + mysql_empty_string_columns.len());
             for (index, value) in values.into_iter().enumerate() {
-                if mysql_empty_enum_columns.contains(&index) {
+                if mysql_empty_string_columns.contains(&index) {
                     let is_empty = matches!(&value, Value::Text(text) if text.is_empty());
                     params.push(Value::Int(i64::from(is_empty)));
                     params.push(if is_empty { Value::Null } else { value });
@@ -146,15 +146,15 @@ fn insert_columns(target: &ImportTarget<'_>) -> Result<(Vec<ColumnInfo>, Vec<Opt
 fn insert_statement(
     target: &ImportTarget<'_>,
     columns: &[ColumnInfo],
-    mysql_empty_enum_columns: &[usize],
+    mysql_empty_string_columns: &[usize],
 ) -> Result<String, PlanError> {
-    if !mysql_empty_enum_columns.is_empty() {
+    if !mysql_empty_string_columns.is_empty() {
         let mut parameter_index = 0;
         let values = columns
             .iter()
             .enumerate()
             .map(|(column_index, _)| {
-                if mysql_empty_enum_columns.contains(&column_index) {
+                if mysql_empty_string_columns.contains(&column_index) {
                     let empty = placeholder_for(target.driver_id, parameter_index);
                     let value = placeholder_for(target.driver_id, parameter_index + 1);
                     parameter_index += 2;
@@ -213,11 +213,13 @@ fn insert_statement(
     Ok(statement)
 }
 
-fn mysql_enum_type(data_type: &str) -> bool {
-    data_type
-        .trim()
-        .get(..5)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("enum("))
+fn mysql_empty_string_type(data_type: &str) -> bool {
+    ["enum(", "set("].iter().any(|prefix| {
+        data_type
+            .trim()
+            .get(..prefix.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+    })
 }
 
 fn bind_rows(
@@ -324,10 +326,17 @@ mod tests {
     }
 
     #[test]
-    fn mysql_enum_empty_csv_cells_are_reconstructed_without_binding_empty_text() {
-        let columns = vec![column("id", "INT"), column("state", "enum('', 'ready', 'NULL')")];
-        let mapping = vec![Some(0), Some(1)];
-        let sheet = sheet(&[&["1", ""], &["2", "ready"], &["3", "\\N"]], &["id", "state"]);
+    fn mysql_enum_set_empty_csv_cells_are_reconstructed_without_binding_empty_text() {
+        let columns = vec![
+            column("id", "INT"),
+            column("state", "enum('', 'ready', 'NULL')"),
+            column("permissions", "set('read', 'write')"),
+        ];
+        let mapping = vec![Some(0), Some(1), Some(2)];
+        let sheet = sheet(
+            &[&["1", "", ""], &["2", "ready", "read"], &["3", "\\N", "\\N"]],
+            &["id", "state", "permissions"],
+        );
         let options = CsvImportOptions {
             null_marker: "\\N".into(),
             ..CsvImportOptions::default()
@@ -344,14 +353,20 @@ mod tests {
 
         assert_eq!(
             plan.statement,
-            "INSERT INTO `enum_rows` (`id`, `state`) VALUES (?, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END)"
+            "INSERT INTO `enum_rows` (`id`, `state`, `permissions`) VALUES (?, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END)"
         );
         assert_eq!(
             plan.rows,
             vec![
-                vec![Value::Int(1), Value::Int(1), Value::Null],
-                vec![Value::Int(2), Value::Int(0), Value::Text("ready".into())],
-                vec![Value::Int(3), Value::Int(0), Value::Null],
+                vec![Value::Int(1), Value::Int(1), Value::Null, Value::Int(1), Value::Null],
+                vec![
+                    Value::Int(2),
+                    Value::Int(0),
+                    Value::Text("ready".into()),
+                    Value::Int(0),
+                    Value::Text("read".into()),
+                ],
+                vec![Value::Int(3), Value::Int(0), Value::Null, Value::Int(0), Value::Null],
             ]
         );
     }

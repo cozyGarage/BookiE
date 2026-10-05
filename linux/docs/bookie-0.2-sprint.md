@@ -395,8 +395,8 @@ sibling or writing to the shadow table ([evidence](evidence/postgres-enum-csv-sh
 
 October 5 B3-1 follow-up: MariaDB 11's `EMPTY_STRING_IS_NULL` turns a bound
 empty CSV value into SQL NULL. The importer now uses a `SPACE(0)` expression
-for empty MySQL/MariaDB ENUM labels; a native round trip distinguishes the
-empty label from SQL NULL and preserves the sibling ([evidence](evidence/mariadb-empty-enum-empty-string-is-null-results-2026-10-05/manifest.json)).
+for empty MySQL/MariaDB ENUM labels and zero-member SET values; a native round
+trip distinguishes both from SQL NULL and preserves the sibling ([evidence](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
 
 October 4 local integration gate: all 315 tests passed at
 `d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,

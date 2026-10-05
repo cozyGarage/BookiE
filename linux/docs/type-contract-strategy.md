@@ -61,10 +61,10 @@ as `42883`; the test keeps that native limitation distinct from containment
 binding coverage.
 
 MariaDB 11's `EMPTY_STRING_IS_NULL` mode converts empty-string parameters to
-SQL NULL. MySQL/MariaDB CSV plans now reconstruct empty ENUM labels with
-`SPACE(0)` and keep them distinct from marker-bound SQL NULL; the native mode
-contract checks ENUM ordinal, exact label bytes, and a sibling row
-([evidence](evidence/mariadb-empty-enum-empty-string-is-null-results-2026-10-05/manifest.json)).
+SQL NULL. MySQL/MariaDB CSV plans now reconstruct empty ENUM labels and empty
+SET values with `SPACE(0)`, keeping them distinct from marker-bound SQL NULL;
+the native mode contract checks ordinals, exact bytes, and a sibling row
+([evidence](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
 
 | Owner / engine | Retain established contracts | Remaining scope to select one case from |
 | --- | --- | --- |

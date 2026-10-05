@@ -325,11 +325,14 @@ async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_string_is_null() {
+async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null() {
     let (_container, options) = start_mariadb().await;
     let setup = connect(options.clone()).await;
     setup
-        .execute("CREATE TABLE enum_empty_mode_source (id INT PRIMARY KEY, state ENUM('', 'ready', 'NULL'))")
+        .execute(
+            "CREATE TABLE enum_empty_mode_source (id INT PRIMARY KEY, \
+             state ENUM('', 'ready', 'NULL'), permissions SET('read', 'write'))",
+        )
         .await
         .unwrap();
     setup
@@ -339,12 +342,12 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
     setup
         .execute(
             "INSERT INTO enum_empty_mode_source VALUES \
-             (1, ''), (2, 'NULL'), (3, NULL)",
+             (1, '', ''), (2, 'NULL', 'read'), (3, NULL, NULL)",
         )
         .await
         .unwrap();
     setup
-        .execute("INSERT INTO enum_empty_mode_target VALUES (99, 'ready')")
+        .execute("INSERT INTO enum_empty_mode_target VALUES (99, 'ready', 'write')")
         .await
         .unwrap();
     setup
@@ -372,12 +375,13 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
         "a server expression can represent empty text without the SQL mode turning it into NULL"
     );
     let source = connection
-        .query("SELECT id, state FROM enum_empty_mode_source ORDER BY id")
+        .query("SELECT id, state, permissions FROM enum_empty_mode_source ORDER BY id")
         .await
         .unwrap();
     let source_native = connection
         .query(
-            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL \
+            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL, \
+             CAST(permissions + 0 AS CHAR), HEX(permissions), permissions IS NULL \
              FROM enum_empty_mode_source ORDER BY id",
         )
         .await
@@ -389,15 +393,29 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
                 Value::Int(1),
                 Value::Text("1".into()),
                 Value::Text(String::new()),
-                Value::Int(0)
+                Value::Int(0),
+                Value::Text("0".into()),
+                Value::Text(String::new()),
+                Value::Int(0),
             ],
             vec![
                 Value::Int(2),
                 Value::Text("3".into()),
                 Value::Text("4E554C4C".into()),
-                Value::Int(0)
+                Value::Int(0),
+                Value::Text("1".into()),
+                Value::Text("72656164".into()),
+                Value::Int(0),
             ],
-            vec![Value::Int(3), Value::Null, Value::Null, Value::Int(1)],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Null,
+                Value::Int(1),
+                Value::Null,
+                Value::Null,
+                Value::Int(1),
+            ],
         ]
     );
 
@@ -420,7 +438,7 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
             schema: None,
             table: "enum_empty_mode_target",
             columns: &columns,
-            mapping: &[Some(0), Some(1)],
+            mapping: &[Some(0), Some(1), Some(2)],
         },
         &sheet,
         &import_options,
@@ -432,7 +450,8 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
 
     let restored = connection
         .query(
-            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL \
+            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL, \
+             CAST(permissions + 0 AS CHAR), HEX(permissions), permissions IS NULL \
              FROM enum_empty_mode_target ORDER BY id",
         )
         .await
@@ -444,20 +463,37 @@ async fn value_contract_mariadb_empty_enum_label_csv_restore_survives_empty_stri
                 Value::Int(1),
                 Value::Text("1".into()),
                 Value::Text(String::new()),
-                Value::Int(0)
+                Value::Int(0),
+                Value::Text("0".into()),
+                Value::Text(String::new()),
+                Value::Int(0),
             ],
             vec![
                 Value::Int(2),
                 Value::Text("3".into()),
                 Value::Text("4E554C4C".into()),
-                Value::Int(0)
+                Value::Int(0),
+                Value::Text("1".into()),
+                Value::Text("72656164".into()),
+                Value::Int(0),
             ],
-            vec![Value::Int(3), Value::Null, Value::Null, Value::Int(1)],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Null,
+                Value::Int(1),
+                Value::Null,
+                Value::Null,
+                Value::Int(1),
+            ],
             vec![
                 Value::Int(99),
                 Value::Text("2".into()),
                 Value::Text("7265616479".into()),
-                Value::Int(0)
+                Value::Int(0),
+                Value::Text("2".into()),
+                Value::Text("7772697465".into()),
+                Value::Int(0),
             ],
         ]
     );
