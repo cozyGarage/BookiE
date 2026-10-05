@@ -200,6 +200,9 @@ native array text and JSON show the two fall-back offsets, while BookiE's
 decoded array text remains canonical UTC. Rebinding and SQL-file restore after
 switching the transaction to `Asia/Kathmandu` preserve the original
 `array_send` bytes ([session evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
+The workbook from that same `America/New_York` transaction also survives Calc's
+XLSX/ODS/XLSX re-save as the identical canonical UTC string
+([Calc evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
 A PostgreSQL `interval[]` XLSX cell preserves mixed signs, microseconds, zero
 intervals and SQL NULL through the same Calc re-save
 ([evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).

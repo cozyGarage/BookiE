@@ -1,0 +1,4 @@
+Pinned image: debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9
+Installed package: libreoffice-calc 4:26.8.0.3-2
+convert /work/source.xlsx as a Calc document -> /work/recheck/source.ods using filter : calc8
+convert /work/recheck/source.ods as a Calc document -> /work/resave/source.xlsx using filter : Calc Office Open XML
