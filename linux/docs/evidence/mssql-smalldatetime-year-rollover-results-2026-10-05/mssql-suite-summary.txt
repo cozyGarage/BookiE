@@ -1,2 +1,0 @@
-Command: rtk cargo test --locked -p tablepro-driver-mssql --test integration -- --ignored
-Result: 34 passed, 1 filtered out (1 suite, 118.32s)

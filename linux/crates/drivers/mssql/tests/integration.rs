@@ -1104,6 +1104,53 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
             Value::Text("2025-01-01T00:00:00".into()),
         ]]
     );
+
+    let csv = tablepro_core::export::render_csv(
+        &result.columns,
+        &result.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let mapping = (0..result.columns.len()).map(Some).collect::<Vec<_>>();
+    let imported =
+        tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &result.columns, &options, 2).unwrap();
+    assert_eq!(imported, result.rows[0]);
+
+    conn.execute(
+        "CREATE TABLE smalldatetime_year_end_csv_copy \
+         (below smalldatetime, above smalldatetime, year_end_below smalldatetime, year_end_above smalldatetime)",
+    )
+    .await
+    .unwrap();
+    conn.execute_params(
+        "INSERT INTO smalldatetime_year_end_csv_copy VALUES (@P1, @P2, @P3, @P4)",
+        &[
+            imported[0].clone(),
+            imported[2].clone(),
+            imported[4].clone(),
+            imported[6].clone(),
+        ],
+    )
+    .await
+    .unwrap();
+    let restored = conn
+        .query(
+            "SELECT CONVERT(varchar(19), below, 126), CONVERT(varchar(19), above, 126), \
+             CONVERT(varchar(19), year_end_below, 126), CONVERT(varchar(19), year_end_above, 126) \
+             FROM smalldatetime_year_end_csv_copy",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![vec![
+            Value::Text("2024-01-02T03:04:00".into()),
+            Value::Text("2024-01-02T03:05:00".into()),
+            Value::Text("2024-12-31T23:59:00".into()),
+            Value::Text("2025-01-01T00:00:00".into()),
+        ]]
+    );
 }
 
 #[tokio::test]

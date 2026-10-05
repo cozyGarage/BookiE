@@ -6,23 +6,24 @@
   "scope": "SQL Server smalldatetime minute and year-end rounding boundary",
   "source": {
     "path": "crates/drivers/mssql/tests/integration.rs",
-    "sha256": "a2d7848270bd629014cb5092f83bebc8728338908b90bf2a8acf790aad716f5e"
+    "sha256": "ae9fabfe146048bb907324cbd7e6e51dfe6b319ec9cbd62f90659436393f0949"
   },
   "contract": [
     "The SQL Server 29.998-second input rounds down to the current minute, including at 2024-12-31 23:59.",
     "The 29.999-second input rounds up across midnight/year end to 2025-01-01T00:00:00.",
-    "BookiE datetime results and SQL Server style-126 text agree for the within-minute and year-end values."
+    "BookiE datetime results and SQL Server style-126 text agree for the within-minute and year-end values.",
+    "CSV export parses back into typed smalldatetime values; binding the below-threshold and rollover values into a fresh table reproduces the native style-126 text."
   ],
   "validation": {
     "focused_test": {
       "command": "rtk cargo test --locked -p tablepro-driver-mssql --test integration value_contract_smalldatetime_rounding_matches_server_text -- --ignored --nocapture",
-      "result": "1 passed",
+      "result": "1 passed; covers native result/text, CSV typed parse, parameter insert and native re-read",
       "log": "focused-test.txt"
     },
     "mssql_integration_suite": {
       "command": "rtk cargo test --locked -p tablepro-driver-mssql --test integration -- --ignored",
-      "result": "34 passed, 1 filtered out (1 suite, 118.32s)",
-      "summary_log": "mssql-suite-summary.txt"
+      "result": "34 passed, 1 filtered out (1 suite, 109.24s)",
+      "log": "mssql-integration.txt"
     },
     "clippy": {
       "command": "rtk cargo clippy --locked -p tablepro-driver-mssql --all-targets -- -D warnings",
@@ -40,11 +41,11 @@
     }
   },
   "log_sha256": {
-    "focused-test.txt": "e3b2732bec143388ab427bfc2abfc573ceb30331ed701ce0b9aacef6d0d64fde",
+    "focused-test.txt": "c81339e659b9f7509d785e39f0475489c0e6c89931d669ef54635853d79fd2e9",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
-    "mssql-suite-summary.txt": "3d546daf7034be9c5d707af1d6391844d4b952f7ddc5cd16c9c78242181363a7"
+    "mssql-integration.txt": "9acdf1fbf16d6b722de180e7f5e8a36082ad877d3614ae794f3455e40bad9d0c"
   },
   "remaining": [
     "Other SQL Server native rounding boundaries, non-SQL consumers and temporal grid combinations remain open; this case does not close B3 or qualify 0.2.0."

@@ -49,8 +49,9 @@ after the delimiter as the second; the body-only placeholder remains excluded
 
 October 5 B3-2 follow-up: SQL Server `smalldatetime` now checks the 29.998/29.999
 rounding boundary at December 31 midnight rollover. The server rounds the value
-to `2025-01-01T00:00:00`, and BookiE's datetime result and native style-126 text
-agree; the full SQL Server integration suite passed
+to `2025-01-01T00:00:00`; BookiE's datetime result and native style-126 text
+agree, and CSV parse/bind/re-read preserves all four boundary values. The full
+SQL Server integration suite passed
 ([case evidence](evidence/mssql-smalldatetime-year-rollover-results-2026-10-05/manifest.json)).
 
 Read [the documentation entry point](README.md) and the relevant ADR, then the
