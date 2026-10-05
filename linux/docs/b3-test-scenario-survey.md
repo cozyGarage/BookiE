@@ -82,6 +82,10 @@ An existing PostgreSQL session now verifies `enum_range` after
 position, the result stays bound to the target enum under a same-named leading
 shadow type, and typed rebinding matches native array bytes
 ([evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
+The warmed session now also observes `ADD VALUE ... AFTER`; the label is
+inserted between existing values, and result type, JSON order and rebound wire
+bytes match PostgreSQL
+([paired position evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json)).
 The same session also observes `ALTER TYPE ... RENAME VALUE` after warming the
 range query; catalog order, target type metadata and rebound array bytes match
 the native result
@@ -90,6 +94,9 @@ Separate reader and writer sessions now cover both migrations after the reader
 has warmed `enum_range`; the target array type, updated order and labels match
 catalog, JSON and native wire oracles under the shadowed path
 ([cross-session evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
+The writer now also inserts a label `AFTER` an existing value; the warmed
+reader sees that position and matches native metadata, JSON and wire oracles
+([follow-up evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json)).
 Other catalog changes and enum session combinations remain open.
 
 ### October 5 PostgreSQL enum type rename/schema move

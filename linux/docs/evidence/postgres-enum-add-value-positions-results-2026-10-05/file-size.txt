@@ -1,0 +1,8 @@
+error: crates/drivers/mssql/tests/integration.rs has 1351 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+error: crates/drivers/postgres/src/lib.rs has 1234 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+error: crates/drivers/postgres/tests/support/array_contract_parts/result_consumers.rs has 2374 lines (hard limit 1800). Split before merging.
+error: crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs has 1461 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+error: crates/drivers/postgres/tests/support/domain_contract_parts/basic_domains.rs has 1330 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+error: crates/drivers/postgres/tests/support/enum_contract_parts/scalar_consumers.rs has 1369 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+error: crates/policy/src/classify.rs has 1222 lines (soft limit 1200). Split the file, or add it to file-size-baselines.txt with that exact line count.
+file-size: 7 error(s)

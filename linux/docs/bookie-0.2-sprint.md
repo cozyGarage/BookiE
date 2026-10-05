@@ -210,6 +210,12 @@ The same-session `enum_range` contract now also observes a newly inserted label
 after `ALTER TYPE ADD VALUE BEFORE`, with catalog-order, qualified-type and
 wire-byte checks under a same-named leading shadow type
 ([migration evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
+The warmed query also observes an `ADD VALUE AFTER` insertion between existing
+labels, with result type, JSON order and rebound wire bytes checked against
+PostgreSQL ([paired-position evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json)).
+The separate writer session now also inserts `AFTER` an existing value while a
+reader's `enum_range` is warm; the reader sees the correct catalog order and
+native wire values ([cross-session evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json)).
 It also observes `ALTER TYPE RENAME VALUE` after warming the range query, with
 the renamed label and unchanged declaration order verified in the same session
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).

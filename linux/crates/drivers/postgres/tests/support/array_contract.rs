@@ -99,6 +99,10 @@ include!("array_contract_parts/result_consumers.rs");
 
 include!("array_contract_parts/enum_consumers.rs");
 
+include!("array_contract_parts/enum_catalog_changes.rs");
+
+include!("array_contract_parts/enum_array_file_consumers.rs");
+
 pub async fn assert_array_grid_edit(connection: &dyn Connection) {
     connection
         .execute("CREATE TABLE array_grid_edit (id integer PRIMARY KEY, value integer[])")
