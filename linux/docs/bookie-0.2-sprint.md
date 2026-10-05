@@ -41,6 +41,12 @@ cell exactly without formulas. Other array shapes and spreadsheet applications
 remain open
 ([case evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-5 follow-up: a MySQL `DELIMITER //` routine now includes `//` in
+block and line comments as well as a string literal. Planning, named-parameter
+extraction and formatting preserve the routine as one statement and the query
+after the delimiter as the second; the body-only placeholder remains excluded
+([case evidence](evidence/mysql-delimiter-comment-boundary-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

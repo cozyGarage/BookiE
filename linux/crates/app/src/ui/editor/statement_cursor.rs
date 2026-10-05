@@ -444,6 +444,38 @@ mod tests {
     }
 
     #[test]
+    fn mysql_slash_delimiter_inside_comments_does_not_end_routine() {
+        let sql = "DELIMITER //\r\nCREATE PROCEDURE p() BEGIN SELECT 1 /* // :block */; -- // :line\r\nSELECT '// :literal'; END//\r\nDELIMITER ;\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].contains("/* // :block */"));
+        assert!(planned.statements[0].contains("-- // :line"));
+        assert!(planned.statements[0].contains("'// :literal'"));
+        assert!(planned.statements[0].ends_with("END"));
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+        assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        let reformatted = script_statements(&formatted, "mysql").unwrap();
+        assert_eq!(reformatted.statements.len(), 2);
+        assert!(reformatted.statements[0].contains("/* // :block */"));
+        assert!(reformatted.statements[0].contains("-- // :line"));
+        assert!(reformatted.statements[1].contains("SELECT"));
+        assert!(reformatted.statements[1].contains(":after AS value"));
+        assert_eq!(
+            tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+            ["after"]
+        );
+    }
+
+    #[test]
     fn value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity() {
         let sql = "\\d //\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside // :literal'; END//\r\n\\d ;\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;
