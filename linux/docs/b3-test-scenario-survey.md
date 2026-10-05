@@ -370,6 +370,13 @@ PostgreSQL oracles, and overflowing `smallint[]` input is refused without
 changing the target or sibling
 ([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 app-consumer follow-up: PostgreSQL `text[]` now passes a
+lower-bound-zero grid edit with SQL NULL, literal `NULL`, empty text, comma,
+quote, backslash, Unicode, markup and formula-shaped text kept distinct. Native
+type, array JSON and wire bytes match; malformed array syntax is refused with
+the target and sibling unchanged
+([evidence](evidence/postgres-text-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-2/B3-4 follow-up: PostgreSQL `date[]`, `timestamp[]`, `time[]` and
 `timetz[]` XLSX cells also survive Gnumeric XLSX/ODS/XLSX re-save with exact
 boundary text, string cell types and no formulas

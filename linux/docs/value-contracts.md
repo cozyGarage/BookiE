@@ -43,6 +43,11 @@ signed endpoints, array lower bounds and SQL NULL, including `9007199254740993`
 in `bigint[]`; overflowing smallint input is refused with both rows unchanged
 ([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
 
+The PostgreSQL `text[]` app grid path preserves SQL NULL, literal `NULL`, empty
+text, delimiters, quotes, backslashes, Unicode, markup and formula-shaped text
+through native JSON and wire checks; malformed input is rejected without row
+changes ([evidence](evidence/postgres-text-array-grid-edit-results-2026-10-05/manifest.json)).
+
 A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
 quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).

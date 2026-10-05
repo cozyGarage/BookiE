@@ -1,0 +1,9 @@
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.02s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-d3f82a3d8397e81b)
+
+running 1 test
+test ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 496 filtered out; finished in 2.21s
+

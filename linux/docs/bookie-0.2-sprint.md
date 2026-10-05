@@ -270,6 +270,12 @@ JSON and wire-byte oracles match. A smallint overflow is refused with the target
 and sibling unchanged
 ([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 app follow-up: `text[]` grid edits preserve SQL NULL, literal
+`NULL`, empty text, commas, quotes, backslashes, Unicode, markup and `=1+1`
+with lower bound zero. PostgreSQL JSON and wire oracles match, and malformed
+array syntax is refused without changing either row
+([evidence](evidence/postgres-text-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-1/B3-4 follow-up: PostgreSQL `enum[]` file export now includes a
 formula-shaped `=1+1` label alongside empty, quoted, escaped, Unicode and SQL
 NULL values. Native SQL replay passes all four string-mode combinations, and

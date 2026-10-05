@@ -385,6 +385,141 @@ async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_sib
     assert_eq!(saved.rows[0], smallint_target_after_edit.unwrap());
     assert_eq!(saved.rows[1], smallint_sibling_after_edit.unwrap());
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::postgres::Postgres;
+
+    let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
+    let connection = drivers_postgres::PgDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(5432).await.unwrap(),
+            database: "postgres".into(),
+            username: "postgres".into(),
+            password: secrecy::SecretString::new("postgres".to_string().into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let literal = r#"[0:8]={NULL,"NULL","","a,b","a\"b","a\\b","東京","<tag>&","=1+1"}"#;
+    connection
+        .execute_controlled(
+            "CREATE TABLE text_array_grid_contract (id integer PRIMARY KEY, value text[])",
+            &control,
+        )
+        .await
+        .unwrap();
+    connection
+        .execute_controlled(
+            "INSERT INTO text_array_grid_contract VALUES \
+             (1, ARRAY['before']::text[]), (2, ARRAY['sibling',NULL]::text[])",
+            &control,
+        )
+        .await
+        .unwrap();
+    let columns = connection
+        .fetch_columns_controlled(None, "text_array_grid_contract", &control)
+        .await
+        .unwrap();
+    let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+    let before = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM text_array_grid_contract ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    let sibling_before = before.rows[1].clone();
+
+    let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
+    assert_eq!(parsed, Value::Text(literal.into()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "text_array_grid_contract",
+        &columns,
+        &[(value_index, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update.0.contains("$1::text::pg_catalog.text[]"));
+    assert_eq!(update.1[0], Value::Text(literal.into()));
+    assert_eq!(
+        connection
+            .execute_in_transaction_controlled(&[update], &control)
+            .await
+            .unwrap(),
+        vec![1]
+    );
+
+    let after = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM text_array_grid_contract ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    let native = connection
+        .query_controlled(
+            &format!(
+                "SELECT pg_typeof('{literal}'::text[])::text, ('{literal}'::text[])::text, \
+                 array_to_json('{literal}'::text[])::text, encode(array_send('{literal}'::text[]), 'hex')"
+            ),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(after.rows[0][1..], native.rows[0][..]);
+    assert_eq!(after.rows[1], sibling_before);
+    let tablepro_core::Value::Text(json_text) = &after.rows[0][3] else {
+        panic!("text[] JSON oracle was not text: {:?}", after.rows[0][3]);
+    };
+    let json: serde_json::Value = serde_json::from_str(json_text).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!([null, "NULL", "", "a,b", "a\"b", "a\\b", "東京", "<tag>&", "=1+1"])
+    );
+
+    let invalid = parse_input_for_driver("{\"unterminated}", Some(&columns[value_index]), "postgres").unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "text_array_grid_contract",
+        &columns,
+        &[(value_index, invalid)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let error = connection
+        .execute_in_transaction_controlled(&[update], &control)
+        .await
+        .expect_err("malformed text[] input must be rejected by PostgreSQL");
+    assert!(
+        matches!(
+            &error,
+            tablepro_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02")
+        ),
+        "malformed text[] should retain PostgreSQL's input SQLSTATE: {error:?}"
+    );
+    let saved = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM text_array_grid_contract ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.rows, after.rows);
+}
 use tablepro_core::{ColumnInfo, Value};
 
 #[test]
