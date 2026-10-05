@@ -61,7 +61,7 @@ rtk python3 scripts/run-test-layer.py sandbox
 That layer runs `scripts/test-sandbox.sh`, which invokes the Redis cancellation
 target explicitly after the sandbox crate tests. On October 1, the sandbox layer
 passed in 65.12 seconds, including that cancellation test:
-[`20261001T005701182279Z-layers/report.json`](../target/quality/20261001T005701182279Z-layers/report.json).
+`20261001T005701182279Z-layers/report.json` (historical artifact `../target/quality/20261001T005701182279Z-layers/report.json` is unavailable in this checkout).
 MongoDB's cancellation and same-client recovery cases can be run individually:
 
 ```sh
@@ -82,7 +82,7 @@ socket and SSH suites: zero failures and zero ignored tests among executed
 tests. This includes each remote driver's established-loss and refusal
 distinction, its mid-stream or page-loss case where applicable, and its
 documented recovery path. The report was recorded against a clean tracked tree:
-[`20261001T025640026732Z-layers/report.json`](../target/quality/20261001T025640026732Z-layers/report.json).
+`20261001T025640026732Z-layers/report.json` (historical artifact `../target/quality/20261001T025640026732Z-layers/report.json` is unavailable in this checkout).
 
 On October 1, the complete `drivers` layer passed in 949.8 seconds against the
 working tree based on `ed07e553e9f7e5a6f48bcd3b2d822092987e5308`. It executed
@@ -90,7 +90,7 @@ working tree based on `ed07e553e9f7e5a6f48bcd3b2d822092987e5308`. It executed
 zero ignored tests among executed tests. The new PostgreSQL session-loss case
 ran in the full layer and proved the lost session handle stays retired while a
 separate shared-pool query succeeds. The report is
-[`20261001T042714823272Z-layers/report.json`](../target/quality/20261001T042714823272Z-layers/report.json).
+`20261001T042714823272Z-layers/report.json` (historical artifact `../target/quality/20261001T042714823272Z-layers/report.json` is unavailable in this checkout).
 The `quick` layer and test harness also passed after the ignored-test inventory
 was regenerated.
 
@@ -100,4 +100,4 @@ tests across the six drivers, MCP, socket and SSH suites, with zero failures and
 zero ignored tests among executed tests. This includes the MySQL loss-during-
 query and loss-before-next-statement cases, plus the PostgreSQL and SQL Server
 session-retirement tests. The report is
-[`20261001T051127401608Z-layers/report.json`](../target/quality/20261001T051127401608Z-layers/report.json).
+`20261001T051127401608Z-layers/report.json` (historical artifact `../target/quality/20261001T051127401608Z-layers/report.json` is unavailable in this checkout).

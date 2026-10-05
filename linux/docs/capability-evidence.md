@@ -2,9 +2,10 @@
 
 Historical capability audit: 2026-09-07. Current scope and acceptance are in the [active sprint](bookie-0.2-sprint.md); the [consistency review](architecture-consistency-review-2026-10-03.md) records evidence availability.
 
-`PLAN.md` lists ten capabilities as "Already useful on Linux". This file records
-what actually proves each one, so the list is a claim backed by evidence rather
-than an assertion. Status terms match [ROADMAP.md](../ROADMAP.md).
+This historical audit evaluates ten capabilities previously listed as "Already
+useful on Linux" in `PLAN.md`. Its evidence and verdicts apply to the September
+7, 2026 audit snapshot, not current coverage. Status terms follow
+[ROADMAP.md](../ROADMAP.md); current work belongs to the active sprint and boards.
 
 The September [bug and consistency audit](bug-consistency-2026-09.md) is also historical; historical numeric counts below describe the earlier audit, not current totals.
 

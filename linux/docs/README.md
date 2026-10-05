@@ -29,24 +29,26 @@ on historical statements such as “next”, “current” or “pending”.
 | Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
 | Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
 | Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
-| Capability backlog / short status | [PLAN](../../PLAN.md) / [ROADMAP](../ROADMAP.md) | Summarize and link; do not duplicate ADRs or progress logs |
+| Active milestone / short status | [Sprint](bookie-0.2-sprint.md) / [ROADMAP](../ROADMAP.md) | Sprint owns acceptance; roadmap links to current boards |
 
-## Current audit
+## Audit checkpoints
 
-[The October 3 release audit](release-audit-2026-10-03.md) checks the merged
-source against decisions, records fresh local gates and gives small remaining
-tasks. Historical inventories retain their original source/date.
+[The October 3 release audit](release-audit-2026-10-03.md) is the latest broad
+source/documentation audit, pinned to its recorded baseline; it does not audit
+the current `linux` head. The October 6 B3 follow-up is recorded on the
+[type/consumer board](type-contract-strategy.md) with its
+[UUID evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)
+and [local value-tier packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-06/manifest.json).
+The earlier documentation consolidation record is in its
+[evidence manifest](evidence/document-consolidation-2026-10-03/manifest.json).
+Historical inventories retain their original source/date.
 
 ## History and review lookup
 
-- [B4 history](b4-history.md), [connection history](connections-history.md) and
-  [test adoption history](testing-history.md): dated packets and obsolete gaps.
-- [Sprint history](bookie-0.2-history.md): original approved scope, dated
-  continuation packets, implementation counts, migration and commit records.
-- [Type-contract history](type-contract-history.md): detailed driver matrices
-  and dated consumer reconciliation.
-- [Value-contract history](value-contract-history.md): case selectors, native
-  oracles, before/after results and report links.
+Use the [changelog engineering history index](../CHANGELOG.md#engineering-history-index)
+to locate dated implementation and validation records. The long-form records
+remain source-pinned archives; use current boards and evidence manifests for
+active decisions and case proof.
 - [Architecture/evidence review](architecture-consistency-review-2026-10-03.md):
   source risks and unavailable raw proof; its manifest is a dated snapshot.
 - [Upstream main](upstream-main-review-2026-10-03.md) and
@@ -56,7 +58,8 @@ tasks. Historical inventories retain their original source/date.
 ## Keep context bounded
 
 Record a rule once in an ADR, a task once on its board, and a runtime result once
-in its case evidence. Link those from the sprint. Archive completed narratives;
-preserve their anchors and attribution when moving them. A history file may be
-long because it is consulted selectively; it must not become required startup
-reading. Do not copy old test counts into a current acceptance claim.
+in its case evidence. Link those from the sprint and changelog. Do not copy old
+test counts into a current acceptance claim.
+Link each checked-in evidence manifest from its owning case index or audit. Keep
+ignored `target/quality` paths as plain text; when the output is unavailable,
+mark it unavailable instead of leaving a dead link.

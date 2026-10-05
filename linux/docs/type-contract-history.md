@@ -186,18 +186,18 @@ local TCP port, proving connect-time refusal is distinct from established loss.
 PostgreSQL and MySQL exercise this through SQLx pool setup, not only the pure
 error mapper. After these cases were added, the complete `drivers` layer passed
 207 driver, MCP, socket and SSH tests in 864.5 seconds with no failures. Evidence:
-[`20260930T021134930354Z-layers/report.json`](../target/quality/20260930T021134930354Z-layers/report.json).
+`20260930T021134930354Z-layers/report.json` (historical artifact `../target/quality/20260930T021134930354Z-layers/report.json` is unavailable in this checkout).
 
-The complete layer was rerun at source SHA `8ed0f66ed54b1411feaac5d7a8e49abc6999fb18` on September 30. It ran 219 tests with zero failures or ignored tests in the executed suites, taking 939.7 seconds. All six remote-driver disconnect and stream/page-loss cases passed, including PostgreSQL/MySQL pool recovery and SQL Server/MongoDB/Redis/ClickHouse restart paths. Evidence: [`20260930T110146955489Z-layers/report.json`](../target/quality/20260930T110146955489Z-layers/report.json).
+The complete layer was rerun at source SHA `8ed0f66ed54b1411feaac5d7a8e49abc6999fb18` on September 30. It ran 219 tests with zero failures or ignored tests in the executed suites, taking 939.7 seconds. All six remote-driver disconnect and stream/page-loss cases passed, including PostgreSQL/MySQL pool recovery and SQL Server/MongoDB/Redis/ClickHouse restart paths. Evidence: `20260930T110146955489Z-layers/report.json` (historical artifact `../target/quality/20260930T110146955489Z-layers/report.json` is unavailable in this checkout).
 
 At `f88159dcb23dd74a960c638a6af42b608a1b4345`, the full `drivers` layer
 passed again: 220 tests, zero failures, in 984 seconds. The executed log
 contains established disconnect, whole-query failure after mid-stream loss,
 pool or reconnect recovery, and six unused-port `ConnectionRefused` checks.
-[`20260930T232244336622Z-layers/report.json`](../target/quality/20260930T232244336622Z-layers/report.json)
+`20260930T232244336622Z-layers/report.json` (historical artifact `../target/quality/20260930T232244336622Z-layers/report.json` is unavailable in this checkout)
 is the clean-tree report.
 
-After splitting the nested MongoDB test into its own support module, the strict combined value-contract layer passed with GTK and DuckDB enabled at base SHA `736a73f8434a57fd33dbe9d6212956e29351b168`: 144 selected tests across 11 suites, no missing suites, and zero failures in 201.7 seconds. Its report records 746 fresh build artifacts and one rebuilt package. The quick layer then passed in 92.0 seconds, including the file-size and function-size guards. Evidence: [`20260930T114622059959Z-layers/report.json`](../target/quality/20260930T114622059959Z-layers/report.json) and [`20260930T114425279874Z-layers/report.json`](../target/quality/20260930T114425279874Z-layers/report.json).
+After splitting the nested MongoDB test into its own support module, the strict combined value-contract layer passed with GTK and DuckDB enabled at base SHA `736a73f8434a57fd33dbe9d6212956e29351b168`: 144 selected tests across 11 suites, no missing suites, and zero failures in 201.7 seconds. Its report records 746 fresh build artifacts and one rebuilt package. The quick layer then passed in 92.0 seconds, including the file-size and function-size guards. Evidence: `20260930T114622059959Z-layers/report.json` (historical artifact `../target/quality/20260930T114622059959Z-layers/report.json` is unavailable in this checkout) and `20260930T114425279874Z-layers/report.json` (historical artifact `../target/quality/20260930T114425279874Z-layers/report.json` is unavailable in this checkout).
 
 Redis and ClickHouse mapper mutations are retained at
 `target/quality/20260930-redis-disconnect-mutants-final/` and
@@ -271,13 +271,13 @@ The Docker-backed app case passed with the strict GTK/DuckDB value selector:
 26 app tests and 163 tests across all 11 configured suites passed at working
 tree source `7fd33187c1f9bfa024a09be85e203bb82e8f24c4`. The quick layer also
 passed on that tree. Reports:
-[`20260930T215342621227Z-values/report.json`](../target/quality/20260930T215342621227Z-values/report.json)
+`20260930T215342621227Z-values/report.json` (historical artifact `../target/quality/20260930T215342621227Z-values/report.json` is unavailable in this checkout)
 and
-[`20260930T215742792833Z-layers/report.json`](../target/quality/20260930T215742792833Z-layers/report.json).
+`20260930T215742792833Z-layers/report.json` (historical artifact `../target/quality/20260930T215742792833Z-layers/report.json` is unavailable in this checkout).
 Scoped mutation testing of `columns_for_browse_page` caught three of six
 generated changes; the other three were unviable, with no misses or timeouts.
 The in-place report is
-[`outcomes.json`](../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json).
+`outcomes.json` (historical artifact `../target/quality/20261001-mongodb-page-schema-mutants-inplace/mutants.out/outcomes.json` is unavailable in this checkout).
 
 ClickHouse nested refusal coverage now also includes an array of tuples carrying
 `Decimal(38, 9)` and `DateTime64(9, 'UTC')`, checked against native type and JSON

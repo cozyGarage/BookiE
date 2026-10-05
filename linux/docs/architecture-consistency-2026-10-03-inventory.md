@@ -29,7 +29,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/b3-test-scenario-survey.md](b3-test-scenario-survey.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/b4-task-board.md](b4-task-board.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/baseline-review-2026-09-17.md](baseline-review-2026-09-17.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
-| [linux/docs/bookie-0.1.1-plan.md](bookie-0.1.1-plan.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
+| `linux/docs/bookie-0.1.1-plan.md` (retired after this inventory) | dated plan | Superseded by the active 0.2 sprint; see the [changelog history index](../CHANGELOG.md#engineering-history-index) |
 | [linux/docs/bookie-0.2-sprint.md](bookie-0.2-sprint.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/bug-consistency-2026-09.md](bug-consistency-2026-09.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/capability-evidence.md](capability-evidence.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |

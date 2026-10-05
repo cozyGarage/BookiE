@@ -1,6 +1,6 @@
 # Bug and consistency stabilization
 
-Reviewed starting commit: `89979e51a3d70b52c2a4082d0fa44ac72528c8ea` on `linux`. Implementation and verification: 2026-09-08–09. This is a code baseline review, not package release approval. [PLAN.md](../../PLAN.md) owns the active scope; new features and visual redesign are deferred.
+Reviewed starting commit: `89979e51a3d70b52c2a4082d0fa44ac72528c8ea` on `linux`. Implementation and verification: 2026-09-08–09. This is a code baseline review, not package release approval. The active sprint owns current scope; this audit's feature deferrals applied to its 2026-09 review baseline.
 
 ## Baseline choice
 

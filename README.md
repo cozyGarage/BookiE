@@ -1,4 +1,10 @@
-# TablePro
+# TablePro repository
+
+This repository contains the Linux BookiE application, derived from TablePro.
+This root page describes the repository and its development workflow. For
+BookiE features, supported systems, installation and user-facing guidance, use
+the canonical [Linux application guide](linux/README.md). The two pages have
+different audiences and should not duplicate product or build instructions.
 
 Current delivery scope and evidence: [active sprint](linux/docs/bookie-0.2-sprint.md). The [October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
@@ -10,7 +16,7 @@ Every shipped feature is free to use. TablePro has no account, license, subscrip
 
 The Linux client is under active development. It includes database browsing, SQL editing, structure editing, inline row changes, query history, SSH tunnels, policy checks, audit records, MCP access, and a headless MCP process.
 
-PostgreSQL is the furthest along: server-confirmed cancellation, certificate hostname and authority verification, verified TLS through an SSH tunnel, read-only denial, rollback, blocking-lock reporting, and reconnect run as deterministic container checks. MySQL, ClickHouse, Redis, and MongoDB also have driver TLS fixture evidence; those fixtures do not establish full transport or packaging readiness. Packaging is not release-verified. [`linux/ROADMAP.md`](linux/ROADMAP.md) states, per area, whether behavior is implemented, integrated, or release-verified.
+PostgreSQL is the furthest along: server-confirmed cancellation, certificate hostname and authority verification, verified TLS through an SSH tunnel, read-only denial, rollback, blocking-lock reporting, and reconnect run as deterministic container checks. MySQL, ClickHouse, Redis, and MongoDB also have driver TLS fixture evidence; those fixtures do not establish full transport or packaging readiness. Packaging is not release-verified. [`linux/ROADMAP.md`](linux/ROADMAP.md) links to current milestone status and the detailed acceptance boards.
 
 Database support is provided by static Rust crates compiled into the app:
 

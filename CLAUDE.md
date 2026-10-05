@@ -16,7 +16,7 @@ The root [LICENSE](LICENSE) applies to the repository. User-facing changes are r
 
 ## Document authority
 
-Start with [the documentation entry point](linux/docs/README.md), the compact active sprint and the owning task. Accepted ADRs constrain architecture; the sprint owns sequencing/acceptance, PLAN is the capability backlog and ROADMAP summarizes status. Load a relevant historical heading only when its source evidence is needed. Dated reviews do not override current decisions or establish new passes.
+Start with [the documentation entry point](linux/docs/README.md), the compact active sprint and the owning task. Accepted ADRs constrain architecture; the sprint owns sequencing/acceptance, PLAN is a stable pointer to the sprint, and ROADMAP summarizes milestone status. The changelog indexes dated implementation and validation records; load a relevant historical heading only when its source evidence is needed. Dated reviews do not override current decisions or establish new passes.
 
 For type/value changes, [ADR 0007](linux/docs/decisions/0007-type-and-value-preservation.md) is the shared standard across drivers, grid, binding, import/export and MCP. Record exact typed support, exact text fallback, explicit refusal or untested per native type/consumer/configuration; assert native stored kind/value, not display equality alone. Remaining work is in the compact B3 board; detailed results are reached through the value evidence index.
 

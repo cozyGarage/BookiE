@@ -1,4 +1,7 @@
-# BookiE
+# BookiE for Linux
+
+This is the canonical product, installation and build guide for the Linux
+application. The repository overview is at [the root README](../README.md).
 
 Current delivery scope and evidence: [active sprint](docs/bookie-0.2-sprint.md). The [October 3 consistency review](docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 

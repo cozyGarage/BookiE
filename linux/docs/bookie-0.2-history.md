@@ -239,9 +239,9 @@ column. All 489 core tests, the live MySQL contract and all 36 scoped metadata
 mutants passed. The full GTK+DuckDB value layer evidence above predates this
 small follow-up. The strict 168-test, 11-suite GTK+DuckDB values layer has now
 passed on the updated source; see
-[the retained report](../target/quality/20261001T011112385634Z-values/report.json).
+the retained report (historical artifact `../target/quality/20261001T011112385634Z-values/report.json` is unavailable in this checkout).
 The quick layer also passed with Redis cancellation executed explicitly; see
-[its report](../target/quality/20261001T011619474080Z-layers/report.json).
+its report (historical artifact `../target/quality/20261001T011619474080Z-layers/report.json` is unavailable in this checkout).
 Hosted checks for the new source revision are reported separately.
 
 The MySQL session-mode audit added a live `PAD_CHAR_TO_FULL_LENGTH` contract:
@@ -250,7 +250,7 @@ typed import, bound writes, and SQL-literal writes. Native length and byte
 checks verify every path. The focused Docker test and integration Clippy check
 passed. The strict GTK+DuckDB values layer then passed 169 selected tests over
 all 11 suites, including eight MySQL scenarios; report:
-[`20261001T013200347651Z-values/report.json`](../target/quality/20261001T013200347651Z-values/report.json).
+`20261001T013200347651Z-values/report.json` (historical artifact `../target/quality/20261001T013200347651Z-values/report.json` is unavailable in this checkout).
 Other SQL-mode and DDL-session combinations remain open, so B3 is still open.
 
 ClickHouse named-timezone coverage now includes Kathmandu's `+05:45` offset and
@@ -265,7 +265,7 @@ markers, while the independent server text/wire oracles remain exact and
 parameter/SQL-literal consumers refuse the values. The focused Docker test
 passed. The strict GTK+DuckDB values layer then passed 169 selected tests
 across all 11 suites with no missing suites; report:
-[`20261001T015111955335Z-values/report.json`](../target/quality/20261001T015111955335Z-values/report.json).
+`20261001T015111955335Z-values/report.json` (historical artifact `../target/quality/20261001T015111955335Z-values/report.json` is unavailable in this checkout).
 
 ### PostgreSQL temporal CSV sentinel imports — October 1
 
@@ -285,7 +285,7 @@ import plan and SQL insert casts (55 caught, 8 unviable, no survivors or
 timeouts); exact reports and commands are in the [value ledger](value-contract-history.md#postgresql-era-and-mutation-checkpoint).
 The strict GTK+DuckDB values layer passed 169 tests across all 11 suites, with
 no missing suites:
-[`20261001T023544965607Z-values/report.json`](../target/quality/20261001T023544965607Z-values/report.json).
+`20261001T023544965607Z-values/report.json` (historical artifact `../target/quality/20261001T023544965607Z-values/report.json` is unavailable in this checkout).
 B3 remains open.
 
 ### PostgreSQL float8[] CSV INSERT — October 1
@@ -1918,12 +1918,12 @@ The focused test passed. Mutation testing of `time_param` and
 `timestamp_param` caught 8 of 10 generated changes; two were unviable, with no
 misses or timeouts. The strict GTK+DuckDB value runner passed 164 tests across
 11 suites, including 22 DuckDB tests:
-[`20260930T223807112958Z-values/report.json`](../target/quality/20260930T223807112958Z-values/report.json).
+`20260930T223807112958Z-values/report.json` (historical artifact `../target/quality/20260930T223807112958Z-values/report.json` is unavailable in this checkout).
 Mutation evidence:
-[`outcomes.json`](../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json).
+`outcomes.json` (historical artifact `../target/quality/20261001-duckdb-temporal-bind-mutants/mutants.out/outcomes.json` is unavailable in this checkout).
 The quick layer passed after the function was moved to a support module to keep
 the integration source below the file-size threshold:
-[`20260930T224147348085Z-layers/report.json`](../target/quality/20260930T224147348085Z-layers/report.json).
+`20260930T224147348085Z-layers/report.json` (historical artifact `../target/quality/20260930T224147348085Z-layers/report.json` is unavailable in this checkout).
 
 ```sh
 rtk cargo test -p tablepro-driver-duckdb --test integration submicro_parameter_expression::value_contract_submicro_text_parameters_keep_precision_after_explicit_casts -- --exact --test-threads=1
@@ -2015,7 +2015,7 @@ connection recovery for MongoDB, across all six server drivers. The same run
 also passed the real-MongoDB MCP browse round trip and BSON Extended JSON
 re-import with a native BSON oracle. Evidence is
 `target/quality/20260930T122803925695Z-layers/report.json` and
-[`drivers-1.log`](../target/quality/20260930T122803925695Z-layers/drivers-1.log);
+`drivers-1.log` (historical artifact `../target/quality/20260930T122803925695Z-layers/drivers-1.log` is unavailable in this checkout);
 the older base run remains at `target/quality/20260930T110146955489Z-layers/report.json`.
 The per-driver contracts are recorded in the [PostgreSQL](value-contract-history.md#postgresql-server-termination-and-pool-recovery-2026-09-29),
 [MySQL](value-contract-history.md#mysql-mid-stream-disconnect-completeness-2026-09-30),
@@ -2067,7 +2067,7 @@ On pushed SHA `69e160c477dab8310bc57bc69116ba310bc7f2df`, the complete Docker-
 backed `drivers` layer passed 220 tests with no failures or ignored executed
 tests in 918.9 seconds. This includes all six remote-driver disconnect and
 mid-stream completeness contracts. Evidence:
-[`20260930T190433266840Z-layers/report.json`](../target/quality/20260930T190433266840Z-layers/report.json).
+`20260930T190433266840Z-layers/report.json` (historical artifact `../target/quality/20260930T190433266840Z-layers/report.json` is unavailable in this checkout).
 
 Hosted CI on that SHA failed quick Clippy before later jobs could run: the new
 ClickHouse precision contract had an unused import and an `unreachable!()`;
@@ -2075,7 +2075,7 @@ Clippy also caught a duplicate glob import in the extracted core filter test
 module. All three were removed. The quick layer then passed on that corrected
 working tree in 113.8 seconds, including formatting, Clippy, unit tests and
 sandbox tests:
-[`20260930T192142875147Z-layers/report.json`](../target/quality/20260930T192142875147Z-layers/report.json).
+`20260930T192142875147Z-layers/report.json` (historical artifact `../target/quality/20260930T192142875147Z-layers/report.json` is unavailable in this checkout).
 Hosted CI must be checked again on the correction commit; the earlier hosted
 failure is not treated as green.
 
@@ -2090,14 +2090,14 @@ focused DuckDB crate passed 41 tests. This extends the shared filter unit and
 mutation evidence to the native consumer path; the broader B3 matrix and hosted
 gates remain open.
 The quick layer then passed with formatting, Clippy, unit and sandbox gates:
-[`20260930T195640249113Z-layers/report.json`](../target/quality/20260930T195640249113Z-layers/report.json).
+`20260930T195640249113Z-layers/report.json` (historical artifact `../target/quality/20260930T195640249113Z-layers/report.json` is unavailable in this checkout).
 
 The first strict value-runner pass omitted this integration case because test
 selection uses the `value_contract` name prefix. The case now follows that
 contract, and the strict DuckDB selection now includes all 20 temporal filter
 contracts. The corrected runner passed all 159 tests across 11 suites, with no
 missing suites:
-[`20260930T195202641431Z-values/report.json`](../target/quality/20260930T195202641431Z-values/report.json).
+`20260930T195202641431Z-values/report.json` (historical artifact `../target/quality/20260930T195202641431Z-values/report.json` is unavailable in this checkout).
 
 ### DuckDB nested unsigned wide values — September 30
 
@@ -2109,9 +2109,9 @@ Other nested collection combinations remain open.
 The complete DuckDB crate then passed 42 tests, and the strict GTK+DuckDB
 runner passed 160 tests across 11 suites, including all 21 selected DuckDB
 contracts:
-[`20260930T200423574515Z-values/report.json`](../target/quality/20260930T200423574515Z-values/report.json).
+`20260930T200423574515Z-values/report.json` (historical artifact `../target/quality/20260930T200423574515Z-values/report.json` is unavailable in this checkout).
 The quick layer also passed formatting, Clippy, unit and sandbox gates:
-[`20260930T200925216322Z-layers/report.json`](../target/quality/20260930T200925216322Z-layers/report.json).
+`20260930T200925216322Z-layers/report.json` (historical artifact `../target/quality/20260930T200925216322Z-layers/report.json` is unavailable in this checkout).
 
 ### MySQL spatial grid refusal — September 30
 
@@ -2124,7 +2124,7 @@ unchanged after the refusal path. The focused parser and Docker cases passed.
 Scoped mutation testing caught two changes to the spatial guard; one was
 unviable, with no survivors or timeouts. The strict GTK+DuckDB layer passed 162
 tests across 11 suites:
-[`20260930T203202118084Z-values/report.json`](../target/quality/20260930T203202118084Z-values/report.json).
+`20260930T203202118084Z-values/report.json` (historical artifact `../target/quality/20260930T203202118084Z-values/report.json` is unavailable in this checkout).
 
 ### MongoDB in-flight cancellation classification — September 30
 
@@ -2148,8 +2148,8 @@ This also prevents pooled connections from silently invalidating `SET SESSION`
 test assumptions. The focused Docker app contract passed.
 The strict value layer passed all 162 selected tests across 11 suites, and the
 quick layer passed formatting, Clippy, unit and sandbox gates:
-[`20260930T210700047035Z-values/report.json`](../target/quality/20260930T210700047035Z-values/report.json),
-[`20260930T211125388087Z-layers/report.json`](../target/quality/20260930T211125388087Z-layers/report.json).
+`20260930T210700047035Z-values/report.json` (historical artifact `../target/quality/20260930T210700047035Z-values/report.json` is unavailable in this checkout),
+`20260930T211125388087Z-layers/report.json` (historical artifact `../target/quality/20260930T211125388087Z-layers/report.json` is unavailable in this checkout).
 
 ### ClickHouse nested decimal and temporal values — September 30
 
@@ -2183,9 +2183,9 @@ the stored MergeTree row remains unchanged. JSON and CSV output are parsed back
 through the corresponding consumers and compared with the native JSON oracle.
 The focused Docker test passed, and the strict GTK/DuckDB selector passed 164
 tests across 11 suites:
-[`20260930T224745418261Z-values/report.json`](../target/quality/20260930T224745418261Z-values/report.json).
+`20260930T224745418261Z-values/report.json` (historical artifact `../target/quality/20260930T224745418261Z-values/report.json` is unavailable in this checkout).
 The quick layer also passed:
-[`20260930T225139833836Z-layers/report.json`](../target/quality/20260930T225139833836Z-layers/report.json).
+`20260930T225139833836Z-layers/report.json` (historical artifact `../target/quality/20260930T225139833836Z-layers/report.json` is unavailable in this checkout).
 
 ```sh
 rtk cargo test -p tablepro-driver-clickhouse --test integration nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers -- --include-ignored --exact --test-threads=1
@@ -2225,8 +2225,8 @@ that every mapped function exists in its package before execution, and the
 harness has a regression for stale map entries. The 63-test harness and the
 same change-contract selection used by CI passed; its full core suite ran 493
 tests and all four exact regressions ran once. Evidence:
-[`20261001T032907972866Z-layers/report.json`](../target/quality/20261001T032907972866Z-layers/report.json),
-[`20261001T032917087566Z-change-contracts/report.json`](../target/quality/20261001T032917087566Z-change-contracts/report.json).
+`20261001T032907972866Z-layers/report.json` (historical artifact `../target/quality/20261001T032907972866Z-layers/report.json` is unavailable in this checkout),
+`20261001T032917087566Z-change-contracts/report.json` (historical artifact `../target/quality/20261001T032917087566Z-change-contracts/report.json` is unavailable in this checkout).
 The new selector guard is included in `scripts/run-change-contract-tests.py`.
 
 ### B3 DuckDB interval CSV delivery — 2026-10-01
@@ -2254,8 +2254,8 @@ requires those values to stay exact strings. Both focused core tests passed;
 the scoped `write_cell` mutation run caught all 15 generated mutants,
 with no misses, timeouts or unviable cases. The strict GTK+DuckDB layer passed
 177 tests over all 11 suites with no missing suite, and quick passed. Reports:
-[`20261001T055114378394Z-values/report.json`](../target/quality/20261001T055114378394Z-values/report.json),
-[`20261001T055614415328Z-layers/report.json`](../target/quality/20261001T055614415328Z-layers/report.json).
+`20261001T055114378394Z-values/report.json` (historical artifact `../target/quality/20261001T055114378394Z-values/report.json` is unavailable in this checkout),
+`20261001T055614415328Z-layers/report.json` (historical artifact `../target/quality/20261001T055614415328Z-layers/report.json` is unavailable in this checkout).
 B3 remains open for the other matrix targets; evidence and commands are in the
 [value ledger](value-contract-history.md#clickhouse-int128uint128-xlsx-preservation-2026-10-01).
 
