@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "73449fcf52c51aa513ba2ae7d1fad59e4e10ecad",
+  "scope": "PostgreSQL domain-over-enum inferred array parameter in ALL quantifiers",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs",
+    "sha256": "3bfdd3cc2e727701f775f1136134bc6424e98c4bac25dd368caf312b1579b438"
+  },
+  "selector": "value_contract_domain_over_enum_any_all_infer_array_parameter_type",
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_any_all_infer_array_parameter_type -- --ignored --nocapture",
+      "result": "1 passed against PostgreSQL 16 via local Testcontainers",
+      "log": "native-postgres.txt"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "assertions": [
+    "= ALL($1) infers the qualified base enum array type beside the existing = ANY($1) case.",
+    "ALL results match a native typed query across ordinary, NULL-containing, quoted/escaped, empty, multidimensional, lower-bound, and SQL NULL arrays.",
+    "The bound parameter's pg_typeof and array_send bytes match PostgreSQL's native typed array oracle."
+  ],
+  "remaining": [
+    "Other inferred PostgreSQL array function/operator contexts and the wider B3 matrix remain open."
+  ]
+}

@@ -484,6 +484,11 @@ for quotes/escapes, empty text, NULL, bounds, nesting, ragged input and malforme
 tails. The native domain-over-enum `ANY($1)` contract passes with wire-byte
 comparison ([evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the same PostgreSQL domain-over-enum matrix now
+checks inferred `= ALL($1)` parameters alongside `= ANY($1)`, including NULL,
+empty and lower-bound/multidimensional arrays against typed results and native
+array wire bytes ([evidence](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: domain-over-enum `COALESCE` parameters now also match
 explicit native target-enum casts in both argument positions under a shadowed
 `search_path`, including empty text, literal `NULL`, SQL NULL and invalid

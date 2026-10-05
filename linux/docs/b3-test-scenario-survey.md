@@ -241,6 +241,12 @@ The native domain-over-enum `ANY($1)` contract also passed against the server's
 type and `array_send` wire-byte oracles
 ([evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the domain-over-enum inferred array parameter matrix
+now also exercises `= ALL($1)` beside `= ANY($1)` for quoted/escaped labels,
+SQL NULL arrays, empty arrays and explicit multidimensional bounds. Each result
+is compared with a typed PostgreSQL query, inferred array type and `array_send`
+wire bytes ([evidence](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: the existing PostgreSQL `text[]` workbook now also
 survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save. Its 84-character shared
 string is identical in all three artifacts, remains a string cell, contains

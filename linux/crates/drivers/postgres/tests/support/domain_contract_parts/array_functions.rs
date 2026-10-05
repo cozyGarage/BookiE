@@ -945,7 +945,7 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
+async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     connection
@@ -1101,6 +1101,38 @@ async fn value_contract_domain_over_enum_any_infers_array_parameter_type() {
                 ])
                 .collect::<Vec<_>>(),
             "ANY with parameter {parameter:?}"
+        );
+
+        let native_all = connection
+            .query(&format!(
+                "SELECT id, status::value_contract_domain_any_array.state = ALL({native_array}) \
+                 FROM value_contract_domain_any_array.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let all = connection
+            .query_params(
+                "SELECT id, status::value_contract_domain_any_array.state = ALL($1), \
+                 pg_typeof($1)::text, pg_typeof(status)::text, encode(array_send($1), 'hex') \
+                 FROM value_contract_domain_any_array.rows ORDER BY id",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            all.rows,
+            native_all
+                .rows
+                .iter()
+                .map(|row| vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(enum_array_type.into()),
+                    Value::Text(domain_type.into()),
+                    native_wire.clone(),
+                ])
+                .collect::<Vec<_>>(),
+            "ALL with parameter {parameter:?}"
         );
     }
 
