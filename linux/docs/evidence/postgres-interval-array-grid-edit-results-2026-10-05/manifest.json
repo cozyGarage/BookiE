@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "ff79936c5ff1b4e16db9db02b0b6c4b0ec5744c8",
+  "scope": "PostgreSQL interval[] app grid parser and keyed update behavior",
+  "source": {
+    "path": "crates/app/tests/support/postgres_array_contract.rs",
+    "sha256": "48758c867239b02c8b71213b6d265d74a72649c1cbfba7b02deefa21db046021"
+  },
+  "selector": "value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The app grid parser passes mixed-sign month/day/time interval values with microseconds, zero intervals and SQL NULL as array text to the keyed update builder.",
+    "The target result matches an independently typed PostgreSQL interval[] expression for pg_typeof, array_to_json and array_send bytes.",
+    "A sibling row retains its original array_send bytes after the keyed update."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings -- --ignored --nocapture --test-threads=1",
+      "result": "1 passed, 497 filtered out across 3 suites",
+      "log": "focused-test.txt"
+    },
+    "app_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --lib",
+      "result": "466 passed, 31 ignored, 988 filtered out across 3 suites",
+      "log": "app-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "4c073ae98a22c3d6fed04458d5780f821f662f8526262b4ad7b72abc7be82449",
+    "app-suite.txt": "154b162a96f904dfb88f7464f2188f0fa4dfba8836585e449f200a3dc947e1ce",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, sessions, consumers and spreadsheet applications remain open; this case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

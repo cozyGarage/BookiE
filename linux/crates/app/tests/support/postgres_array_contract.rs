@@ -9,6 +9,7 @@ fn value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser
         ("numeric[]", "{1.2300,NULL}"),
         ("boolean[]", "{true,NULL}"),
         ("timestamp with time zone[]", "{2026-09-30 12:34:56+00,NULL}"),
+        ("interval[]", r#"{"1 year 2 mons 3 days 04:05:06.123456",NULL}"#),
     ] {
         let column = ColumnInfo {
             name: "value".into(),
@@ -74,6 +75,12 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
             "timetz",
             r#"{"00:00:00+15:59:59","23:59:59.999999-15:59:59","12:34:56.123456+05:30",NULL}"#,
             "ARRAY['12:00:00+00'::timetz]",
+        ),
+        (
+            "interval_array_grid",
+            "interval",
+            r#"{"1 year 2 mons 3 days 04:05:06.123456","-1 year +2 mons -3 days -04:05:06.654321","0 seconds","00:00:00",NULL}"#,
+            "ARRAY['2 months'::interval, NULL]::interval[]",
         ),
     ];
     let mut date_row_after_edit = None;

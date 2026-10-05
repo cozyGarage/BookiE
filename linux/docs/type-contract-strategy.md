@@ -300,6 +300,10 @@ A `text[]` grid edit also preserves SQL NULL separately from literal `NULL` and
 empty text, plus escaped punctuation, Unicode and formula-shaped text; a
 malformed array is refused without mutation
 ([evidence](evidence/postgres-text-array-grid-edit-results-2026-10-05/manifest.json)).
+The app parser and keyed-update path also round-trip `interval[]` mixed-sign
+month/day/time values, microseconds, zero intervals and SQL NULL against
+PostgreSQL type, JSON and wire-byte oracles while preserving sibling bytes
+([evidence](evidence/postgres-interval-array-grid-edit-results-2026-10-05/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)

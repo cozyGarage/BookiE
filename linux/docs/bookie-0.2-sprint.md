@@ -77,6 +77,12 @@ through 300 domain layers, retaining schema-aware writes/filters and explicit
 raw-parameter refusal
 ([case evidence](evidence/postgres-domain-300-level-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 app-consumer follow-up: PostgreSQL `interval[]` now passes
+through the app grid parser and keyed-update path with mixed-sign month/day/time
+values, microseconds, zero intervals and SQL NULL. Native type, JSON and
+wire-byte oracles match, and the sibling row stays unchanged
+([case evidence](evidence/postgres-interval-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 MySQL/MariaDB follow-up: under `utf8mb4_unicode_ci`, case- and
 accent-insensitive inputs resolve to canonical declared ENUM labels. Driver
 metadata retains the column collation, and a parameterized copy preserves the
