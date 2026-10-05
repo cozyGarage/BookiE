@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style -- --ignored --nocapture
+1 passed, 0 failed (PostgreSQL 16 Docker fixture)

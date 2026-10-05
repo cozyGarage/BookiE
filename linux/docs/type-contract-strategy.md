@@ -193,6 +193,11 @@ native-byte, CSV, SQL-literal and keyed-grid contracts. The workbook stores
 positive/negative offsets and calendar-boundary values as exact text cells with
 no formulas ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
 
+PostgreSQL `date[]` result text stays canonical ISO when fetched under
+`DateStyle = SQL, DMY`; CSV export, parameter rebinding and SQL replay under
+`ISO, MDY` preserve the source array's native wire bytes
+([evidence](evidence/postgres-date-array-sql-dmy-results-2026-10-05/manifest.json)).
+
 The selected-row TSV clipboard path is also exercised in LibreOffice Calc 26.8.0.3:
 literal `NULL`, empty text, SQL NULL's collision-free marker, marker-shaped labels,
 formula-shaped text and quoted tab/newline text retain the asserted cell contents

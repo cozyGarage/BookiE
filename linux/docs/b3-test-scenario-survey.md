@@ -349,6 +349,12 @@ and the sheet contains no formulas. Existing native byte and keyed-edit checks
 remain in the same Docker-backed contract
 ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 PostgreSQL follow-up: a `date[]` result fetched under
+`DateStyle = SQL, DMY` remains canonical ISO array text. CSV export and SQL
+replay under `ISO, MDY`, plus parameter rebinding, preserve the original
+`array_send` bytes across the session setting change
+([evidence](evidence/postgres-date-array-sql-dmy-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
