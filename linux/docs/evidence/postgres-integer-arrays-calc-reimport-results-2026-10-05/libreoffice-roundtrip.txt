@@ -1,0 +1,1 @@
+LibreOffice Calc in the pinned Debian container opened source.xlsx and saved calc-roundtrip.ods; Calc reopened calc-roundtrip.ods and saved calc-roundtrip.xlsx. The application version and image digest are recorded in manifest.json.

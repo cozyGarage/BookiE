@@ -1,0 +1,2 @@
+cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings
+Finished dev profile; passed with -D warnings.
