@@ -6241,6 +6241,7 @@ dependencies = [
  "tablepro-core",
  "tempfile",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
