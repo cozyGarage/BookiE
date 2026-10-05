@@ -175,6 +175,54 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer() {
+        let sql = "SELECT :safe AS value; SELECT $tag$unfinished :tail; SELECT :after AS value";
+        let grammar = SqlGrammar::PostgreSql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(!plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        assert!(script_statements(sql, "postgres").is_err());
+        assert_eq!(
+            statement_at_cursor(sql, "postgres", sql.find(":safe").unwrap()),
+            Some("SELECT :safe AS value".into())
+        );
+        assert_eq!(statement_at_cursor(sql, "postgres", sql.find("$tag$").unwrap()), None);
+
+        let parameters = tablepro_core::extract_named_parameters(sql, "postgres");
+        assert_eq!(parameters.names, ["safe"]);
+        assert!(
+            parameters
+                .sql
+                .ends_with("SELECT $tag$unfinished :tail; SELECT :after AS value")
+        );
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.ends_with("$tag$unfinished :tail; SELECT :after AS value"));
+        assert!(!plan_for(&formatted, grammar).diagnostics().is_empty());
+
+        let facts = tablepro_policy::classify(sql, "postgres");
+        assert_eq!(facts.class, tablepro_policy::StatementClass::Unparseable);
+        assert!(facts.writes);
+        let decision = tablepro_policy::evaluate(
+            &tablepro_policy::Principal::Agent {
+                token: "test".into(),
+                client: None,
+                model: None,
+            },
+            tablepro_core::Environment::Local,
+            &facts,
+            false,
+            &tablepro_policy::PolicyConfig::default().for_environment(tablepro_core::Environment::Local),
+            None,
+        );
+        assert!(matches!(
+            decision,
+            tablepro_policy::Decision::Deny { ref rule, .. } if rule == "fail_closed_unparseable"
+        ));
+    }
+
+    #[test]
     fn value_contract_sqlite_malformed_tail_blocks_all_script_consumers() {
         let sql = "SELECT :safe AS value; SELECT 'unfinished :tail; SELECT :after AS value";
         let grammar = SqlGrammar::Sqlite;

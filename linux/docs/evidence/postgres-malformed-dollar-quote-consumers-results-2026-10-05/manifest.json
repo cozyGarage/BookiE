@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "ed31b842938f08ff3b1a38806d5b0628a94965e2",
+  "scope": "PostgreSQL malformed dollar-quote tail across application script consumers",
+  "source": {
+    "path": "crates/app/src/ui/editor/statement_cursor.rs",
+    "sha256": "d4dfb3da1d837deb0de8c2e3162279a89cba1b4a01a3919ca77649287278c694"
+  },
+  "selector": "ui::editor::statement_cursor::tests::value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer",
+  "contract": [
+    "An unterminated PostgreSQL dollar-quoted tail makes whole-script planning fail while a valid prefix remains selectable and the malformed tail is not selectable.",
+    "Named-parameter extraction retains only the safe-prefix parameter and leaves the malformed tail intact; formatting also preserves the malformed text and remains diagnosed.",
+    "Policy classifies the script as unparseable/write and denies agent execution under the fail_closed_unparseable rule."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer -- --nocapture",
+      "result": "1 passed, 499 filtered out across 3 suites",
+      "log": "focused-test.txt"
+    },
+    "app_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --lib",
+      "result": "467 passed, 32 ignored, 992 filtered out across 3 suites",
+      "log": "app-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "3f7d7ea4158adab14e8629030a27eeaf4af355ce03e96c749d64f46bf3e2e11b",
+    "app-suite.txt": "841170addb1f16889954d89de4d3930acaad9310e74d88e1533ca61667dea19e",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other executable identity and malformed-tail cases across supported dialects, installed SQL editor interaction and the broader B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}

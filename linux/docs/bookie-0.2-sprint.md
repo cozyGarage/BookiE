@@ -527,6 +527,12 @@ safe-prefix named parameter is extracted, formatting retains the malformed
 text, and agent policy denies the unparseable/write statement. See the
 [SQLite malformed-tail evidence](evidence/sqlite-malformed-tail-results-2026-10-05/manifest.json).
 
+October 5 B3-5 follow-up: PostgreSQL now checks an unterminated dollar-quoted
+tail across planning, cursor selection, parameter extraction, formatting and
+agent policy. The valid prefix remains selectable; the whole script and
+malformed tail are refused
+([evidence](evidence/postgres-malformed-dollar-quote-consumers-results-2026-10-05/manifest.json)).
+
 October 4 B3-5 follow-up: ClickHouse's shared parameter scanner now recognizes
 the same `$tag$...$tag$` heredoc rule as the script lexer, so placeholders
 inside closed or unterminated bodies are not extracted. An app contract checks
