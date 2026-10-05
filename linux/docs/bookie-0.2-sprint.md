@@ -489,6 +489,11 @@ checks inferred `= ALL($1)` parameters alongside `= ANY($1)`, including NULL,
 empty and lower-bound/multidimensional arrays against typed results and native
 array wire bytes ([evidence](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json)).
 
+October 5 B3-2/B3-4 follow-up: embedded DuckDB keyed edits for `TIME_NS` and
+`TIMESTAMP_NS` now preserve all nine fractional digits, native column types and
+the sibling row. Direct native nanosecond parameter binding remains open; this
+app path uses the exact-text cast ([evidence](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: domain-over-enum `COALESCE` parameters now also match
 explicit native target-enum casts in both argument positions under a shadowed
 `search_path`, including empty text, literal `NULL`, SQL NULL and invalid

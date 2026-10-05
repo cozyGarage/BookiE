@@ -137,6 +137,7 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | GTK clipboard delivery | [GDK publication/readback and CSV parser recovery for enum CSV](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array parameter codec | [Parser grammar cases and native parameter/wire contract](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array quantifier | [Inferred `ALL($1)` compared with a typed PostgreSQL oracle](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json) |
+| DuckDB nanosecond keyed edit | [Native `TIME_NS`/`TIMESTAMP_NS` values and sibling preservation](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json) |
 | XLSX/XML/other formats | [Workbook precision](value-contract-history.md#xlsx-float-precision-and-excel-safe-cell-types-2026-10-02), [temporal workbook](value-contract-history.md#xlsx-temporal-consumer-checkpoint-2026-09-27), [XML text](value-contract-history.md#xml-text-consumer-checkpoint-2026-09-27) |
 | Mutation and infrastructure | [Scoped re-audit](value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](regression-audit-2026-09-29.md), [B3 review](b3-review-2026-10-01.md) |
 | Local integration gate | [Six-driver, MCP, session, socket and SSH run (315 passed)](evidence/local-integration-tier-results-2026-10-04/manifest.json) |

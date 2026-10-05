@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "eaacfcecb54fe8cb4ae5844e5badf3284e2afae2",
+  "scope": "DuckDB TIME_NS and TIMESTAMP_NS app keyed grid edits",
+  "source": {
+    "path": "crates/app/tests/support/duckdb_temporal_edit_contract.rs",
+    "sha256": "9d16f32fc0361a2652df141d0b338285572123908e01112781a23c6268ea9bb4"
+  },
+  "selector": "value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_sibling",
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-app --lib --features duckdb value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_sibling -- --nocapture",
+      "result": "passed against embedded DuckDB",
+      "log": "app-test.txt"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-duckdb --test integration value_contract_submicro -- --nocapture",
+      "result": "2 passed; sub-microsecond values bind as exact text and survive explicit TIME_NS/TIMESTAMP_NS casts",
+      "log": "driver-parameters.txt"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-app --lib --features duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "assertions": [
+    "The app parser and keyed-update builder edit TIME_NS and TIMESTAMP_NS values with nine fractional digits.",
+    "After the write, typeof, exact VARCHAR text, and equality with nanosecond literals confirm native stored values.",
+    "An adjacent sibling row retains its original nanosecond values.",
+    "The driver's sub-microsecond temporal parameters report VARCHAR and retain all digits through explicit nanosecond casts."
+  ],
+  "transport_boundary": "This verifies the exact-text cast path used by the app. Direct native nanosecond prepared-statement binding remains open because the current Rust DuckDB binder converts temporal units to microseconds."
+}

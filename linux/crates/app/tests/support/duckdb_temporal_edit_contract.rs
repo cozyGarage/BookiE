@@ -251,6 +251,118 @@ async fn value_contract_duckdb_microsecond_grid_types_refuse_submicro_edits() {
     );
 }
 
+#[cfg(feature = "duckdb")]
+#[tokio::test]
+async fn value_contract_duckdb_nanosecond_grid_edits_preserve_native_values_and_sibling() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE nanosecond_grid (
+                id INTEGER PRIMARY KEY,
+                clock TIME_NS,
+                moment TIMESTAMP_NS
+            )",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO nanosecond_grid VALUES
+             (1, TIME_NS '12:34:56.111111111', TIMESTAMP_NS '1969-12-31 23:59:59.111111111'),
+             (2, TIME_NS '08:00:00.222222222', TIMESTAMP_NS '2026-09-27 08:00:00.222222222')",
+        )
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "nanosecond_grid").await.unwrap();
+    let clock_index = columns.iter().position(|column| column.name == "clock").unwrap();
+    let moment_index = columns.iter().position(|column| column.name == "moment").unwrap();
+    assert_eq!(columns[clock_index].data_type.to_ascii_uppercase(), "TIME_NS");
+    assert_eq!(columns[moment_index].data_type.to_ascii_uppercase(), "TIMESTAMP_NS");
+    let before = connection
+        .query("SELECT id, clock::VARCHAR, moment::VARCHAR FROM nanosecond_grid ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        before.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("12:34:56.111111111".into()),
+                Value::Text("1969-12-31 23:59:59.111111111".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("08:00:00.222222222".into()),
+                Value::Text("2026-09-27 08:00:00.222222222".into()),
+            ],
+        ]
+    );
+
+    let edits = [
+        (
+            clock_index,
+            parse_input_for_driver("12:34:56.123456789", Some(&columns[clock_index]), "duckdb").unwrap(),
+        ),
+        (
+            moment_index,
+            parse_input_for_driver("1969-12-31 23:59:59.123456789", Some(&columns[moment_index]), "duckdb").unwrap(),
+        ),
+    ];
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "duckdb",
+        None,
+        "nanosecond_grid",
+        &columns,
+        &edits,
+        &[before.rows[0][0].clone()],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+
+    let saved = connection
+        .query(
+            "SELECT id, typeof(clock), clock::VARCHAR,
+                    clock = TIME_NS '12:34:56.123456789',
+                    typeof(moment), moment::VARCHAR,
+                    moment = TIMESTAMP_NS '1969-12-31 23:59:59.123456789'
+             FROM nanosecond_grid ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        saved.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("TIME_NS".into()),
+                Value::Text("12:34:56.123456789".into()),
+                Value::Bool(true),
+                Value::Text("TIMESTAMP_NS".into()),
+                Value::Text("1969-12-31 23:59:59.123456789".into()),
+                Value::Bool(true),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("TIME_NS".into()),
+                Value::Text("08:00:00.222222222".into()),
+                Value::Bool(false),
+                Value::Text("TIMESTAMP_NS".into()),
+                Value::Text("2026-09-27 08:00:00.222222222".into()),
+                Value::Bool(false),
+            ],
+        ]
+    );
+}
+
 #[test]
 fn value_contract_duckdb_time_and_timestamp_parsers_refuse_submicro_edits() {
     for (data_type, input) in [

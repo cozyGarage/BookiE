@@ -955,3 +955,10 @@ recovery for literal `NULL`, empty text, SQL NULL, marker-shaped labels and
 formula-shaped text. The formula-safe export prefix is preserved by import, so
 lossless formula-text restore is still open; paste through external spreadsheet
 applications is also unverified ([GTK clipboard evidence](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json)).
+
+October 5 B3-2/B3-4 follow-up: DuckDB `TIME_NS` and `TIMESTAMP_NS` app edits now
+run through the grid parser and keyed-update builder into a real embedded
+database. Exact type/text and nanosecond values survive, and the adjacent row
+is unchanged ([evidence](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json)).
+Direct native nanosecond parameter binding remains open; the current driver
+uses its exact-text cast path.
