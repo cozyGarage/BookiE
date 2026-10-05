@@ -691,12 +691,17 @@ async fn value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed
     let setup = connect(opts.clone()).await;
     setup.execute("CREATE SCHEMA enum_csv_shadow_a").await.unwrap();
     setup.execute("CREATE SCHEMA enum_csv_shadow_b").await.unwrap();
+    setup.execute("CREATE SCHEMA enum_csv_shadow_c").await.unwrap();
     setup
         .execute("CREATE TYPE enum_csv_shadow_a.state AS ENUM ('ready', 'shadow-only', 'NULL', '')")
         .await
         .unwrap();
     setup
         .execute("CREATE TYPE enum_csv_shadow_b.state AS ENUM ('ready', 'target-only', 'NULL', '')")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE TYPE enum_csv_shadow_c.state AS ENUM ('ready', 'decoy-only')")
         .await
         .unwrap();
     setup
@@ -731,7 +736,7 @@ async fn value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed
     setup.execute("ALTER ROLE postgres SET search_path TO enum_csv_shadow_a, public").await.unwrap();
     drop(setup);
 
-    let connection = connect(opts).await;
+    let connection = connect(opts.clone()).await;
     assert_eq!(
         connection.query("SELECT current_schema()::text").await.unwrap().rows,
         vec![vec![Value::Text("enum_csv_shadow_a".into())]]
@@ -786,6 +791,21 @@ async fn value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed
         .iter()
         .map(|row| (plan.statement.clone(), row.clone()))
         .collect::<Vec<_>>();
+
+    let setup = connect(opts.clone()).await;
+    setup
+        .execute("ALTER ROLE postgres SET search_path TO enum_csv_shadow_c, enum_csv_shadow_a, public")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
+    connection.close().await.unwrap();
+
+    let connection = connect(opts).await;
+    assert_eq!(
+        connection.query("SELECT current_schema()::text").await.unwrap().rows,
+        vec![vec![Value::Text("enum_csv_shadow_c".into())]],
+        "execution must use the changed search_path with a different same-named enum first"
+    );
     connection.execute_in_transaction(&statements).await.unwrap();
 
     let target = connection
