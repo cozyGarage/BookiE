@@ -831,6 +831,86 @@ async fn assert_collated_enum_round_trip(options: ConnectOptions) {
         .await
         .unwrap();
     assert_eq!(copied.rows, native.rows);
+
+    connection
+        .execute(
+            "CREATE TABLE latin1_collation_source (
+                id INT PRIMARY KEY,
+                mood ENUM('Café', 'Tea') CHARACTER SET latin1 COLLATE latin1_swedish_ci,
+                permissions SET('Café', 'Tea') CHARACTER SET latin1 COLLATE latin1_swedish_ci
+            )",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE latin1_collation_copy LIKE latin1_collation_source")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO latin1_collation_source VALUES (1, 'CAFÉ', 'tea,Café'), (2, 'tEa', 'Tea')")
+        .await
+        .unwrap();
+    let latin1_columns = connection.fetch_columns(None, "latin1_collation_source").await.unwrap();
+    for column in latin1_columns
+        .iter()
+        .filter(|column| column.name == "mood" || column.name == "permissions")
+    {
+        assert_eq!(column.collation.as_deref(), Some("latin1_swedish_ci"));
+    }
+    let native = connection
+        .query(
+            "SELECT id, mood, permissions, CAST(mood + 0 AS CHAR), \
+             CAST(permissions + 0 AS CHAR), HEX(mood), HEX(permissions), \
+             COLLATION(mood), COLLATION(permissions) \
+             FROM latin1_collation_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.columns[1].data_type, "ENUM");
+    assert_eq!(native.columns[2].data_type, "SET");
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("Café".into()),
+                Value::Text("Café,Tea".into()),
+                Value::Text("1".into()),
+                Value::Text("3".into()),
+                Value::Text("436166E9".into()),
+                Value::Text("436166E92C546561".into()),
+                Value::Text("latin1_swedish_ci".into()),
+                Value::Text("latin1_swedish_ci".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("Tea".into()),
+                Value::Text("Tea".into()),
+                Value::Text("2".into()),
+                Value::Text("2".into()),
+                Value::Text("546561".into()),
+                Value::Text("546561".into()),
+                Value::Text("latin1_swedish_ci".into()),
+                Value::Text("latin1_swedish_ci".into()),
+            ],
+        ]
+    );
+    for row in &native.rows {
+        connection
+            .execute_params("INSERT INTO latin1_collation_copy VALUES (?, ?, ?)", &row[..3])
+            .await
+            .unwrap();
+    }
+    let copied = connection
+        .query(
+            "SELECT id, mood, permissions, CAST(mood + 0 AS CHAR), \
+             CAST(permissions + 0 AS CHAR), HEX(mood), HEX(permissions), \
+             COLLATION(mood), COLLATION(permissions) \
+             FROM latin1_collation_copy ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(copied.rows, native.rows);
 }
 
 #[tokio::test]

@@ -50,6 +50,10 @@ The same collation now preserves SET labels as text in declared-member order
 and retains the native bitmask; SET values using the actual `binary` character
 set remain bytes through parameterized copies
 ([SET evidence](evidence/mysql-binary-set-collation-results-2026-10-05/manifest.json)).
+The `latin1_swedish_ci` case also resolves case-variant ENUM/SET inputs to
+canonical UTF-8 text while server HEX checks retain the expected Latin-1 bytes;
+both columns preserve collation metadata and parameterized copies
+([Latin-1 evidence](evidence/mysql-latin1-enum-set-collation-results-2026-10-05/manifest.json)).
 Other collations and enum configurations remain open.
 
 ### October 5 PostgreSQL float4[] Calc follow-up
