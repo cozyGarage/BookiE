@@ -1357,7 +1357,7 @@ async fn value_contract_float4_array_file_exports_preserve_values_for_calc_reimp
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_timestamp_array_rebind_preserves_values_across_dmy_datestyle() {
+async fn value_contract_timestamp_array_file_consumers_preserve_values_across_dmy_datestyle() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
     let mut transaction = connection.begin().await.unwrap();
@@ -1376,7 +1376,8 @@ async fn value_contract_timestamp_array_rebind_preserves_values_across_dmy_dates
     let native = transaction
         .query(&format!(
             "SELECT current_setting('DateStyle'), pg_typeof({expression})::text, \
-                    {expression}::text, encode(array_send({expression}), 'hex')"
+                    {expression}::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
         ))
         .await
         .unwrap();
@@ -1395,12 +1396,91 @@ async fn value_contract_timestamp_array_rebind_preserves_values_across_dmy_dates
     transaction.execute("SET LOCAL DateStyle = 'ISO, MDY'").await.unwrap();
     let rebound = transaction
         .query_params(
-            "SELECT encode(array_send($1::text::timestamp[]), 'hex')",
+            "SELECT array_to_json($1::text::timestamp[])::text, \
+                    encode(array_send($1::text::timestamp[]), 'hex')",
             std::slice::from_ref(&result.rows[0][0]),
         )
         .await
         .unwrap();
     assert_eq!(rebound.rows[0][0], native.rows[0][3]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][4]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_path = directory.path().join("timestamp-array-dmy.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    transaction
+        .execute("CREATE TABLE timestamp_array_dmy_target (value timestamp[])")
+        .await
+        .unwrap();
+    transaction
+        .execute(
+            "INSERT INTO timestamp_array_dmy_target \
+             VALUES (ARRAY['1999-01-01 00:00:00'::timestamp])",
+        )
+        .await
+        .unwrap();
+    let sibling = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM timestamp_array_dmy_target",
+        )
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("timestamp-array-dmy.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "timestamp_array_dmy_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    transaction
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM timestamp_array_dmy_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert!(restored.rows.contains(&sibling.rows[0]));
+    assert!(
+        restored.rows.contains(&vec![
+            native.rows[0][1].clone(),
+            native.rows[0][3].clone(),
+            native.rows[0][4].clone(),
+        ]),
+        "restored {:?}, expected native type, JSON and wire values",
+        restored.rows
+    );
     transaction.rollback().await.unwrap();
 }
 
