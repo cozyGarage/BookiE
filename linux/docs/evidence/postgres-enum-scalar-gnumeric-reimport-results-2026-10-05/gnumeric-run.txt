@@ -1,0 +1,4 @@
+Pinned image: debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9
+Installed package: gnumeric (ssconvert 1.12.57)
+Round trip: ssconvert /work/source.xlsx /work/gnumeric-roundtrip.ods (exit 0)
+Round trip: ssconvert /work/gnumeric-roundtrip.ods /work/gnumeric-roundtrip.xlsx (exit 0)

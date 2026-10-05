@@ -130,8 +130,11 @@ other computed-expression shapes remain open.
 
 PostgreSQL scalar custom-enum XLSX values now survive LibreOffice Calc ODS/XLSX
 re-save with formula-shaped labels retained as text and SQL NULL left blank
-([evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json));
-other spreadsheet applications and cell shapes remain open.
+([Calc evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json)).
+Gnumeric also re-saves the scalar-enum workbook with `=1+1` retained as a
+string, SQL NULL blank, and no formula
+([Gnumeric evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
+Other spreadsheet applications and enum cell shapes remain open.
 
 The PostgreSQL enum CSV importer now also has a round trip for double quotes,
 an embedded line break, backslashes and formula-shaped text across four

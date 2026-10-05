@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "4b30035e551b062a5e99ce00036bdfd723eaf279",
+  "case": "PostgreSQL scalar enum XLSX re-import through Gnumeric",
+  "test": "enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/enum_file_export_contract.rs",
+    "sha256": "9d022f364383e4db1380ff6f430c65f634ef1aa4234de6d00973f528bc87dca7"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "The native fixture contains literal NULL, Unicode, markup, the formula-shaped enum label =1+1, and SQL NULL; empty enum text is refused before export and an existing destination stays unchanged.",
+    "BookiE writes the formula-shaped label as an XLSX string cell without a formula and SQL NULL as a blank cell.",
+    "Gnumeric ssconvert opens source.xlsx, saves gnumeric-roundtrip.ods, then saves gnumeric-roundtrip.xlsx; both retain the exact labels as strings, keep SQL NULL blank, and create no formula.",
+    "The checker verifies B2 through B6 in source XLSX, re-saved ODS and XLSX, including literal NULL, Unicode, markup, =1+1 and SQL NULL."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "Install Gnumeric in the pinned Debian container.",
+        "Run ssconvert source.xlsx to gnumeric-roundtrip.ods.",
+        "Run ssconvert gnumeric-roundtrip.ods to gnumeric-roundtrip.xlsx."
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact B2:B6 values, string cell types, blank NULL and absence of formulas in source and re-saved workbooks.",
+      "result": "All labels, including =1+1, remain text and SQL NULL remains blank.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "1d3cf71bfa6a7592d16a58819efe20e2056eec8500bc44170d2727641d0b4dfe",
+    "gnumeric-roundtrip.ods": "82e9bb470148c122dff120e9831aa44690efa00a698e2e9e257cbf0ffc95b02b",
+    "gnumeric-roundtrip.xlsx": "4409163b9ae61fa3203d70ddd988707746d85a22627c4bb733e46533c7f35bde"
+  },
+  "remaining": [
+    "Other spreadsheet applications, enum cell shapes and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "bookiee-export-test.txt": "7f5fb37fdd8e7f8062e8f6d02e43ee0d5c29377bae390bddf7834defc865e7b5",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "4a81d1d52534330b9e5db1ccfee0f827e58968c83077613ea4c272a393f7d1ed",
+    "consumer-check.txt": "2afd3e9844a5328ac6e7f0150aa266da8e7d1750ed024f535c69d6cfceea6c15",
+    "verify_roundtrip.py": "29425e0287340887c555398c4dc90cc31a59409d86a514cb02a51abac02854b4",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

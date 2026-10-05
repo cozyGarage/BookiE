@@ -345,6 +345,10 @@ empty enum label is refused without replacing the destination workbook. Other
 spreadsheet applications and enum cell shapes remain open; see the
 [scalar-enum Calc evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json).
 
+October 5 B3-4 follow-up: the same scalar-enum XLSX also survives Gnumeric's
+XLSX/ODS/XLSX re-save. Literal `NULL`, Unicode, markup and `=1+1` stay string
+cells, SQL NULL stays blank, and no formula is created ([Gnumeric evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 4 B3-1/B3-4 follow-up: PostgreSQL custom enum metadata now covers a
 schema, type and table whose names contain spaces and embedded double quotes.
 The generated keyed edit and structured equality filter preserve the exact

@@ -243,6 +243,10 @@ The XLSX from that New York session also survives Calc and Gnumeric ODS/XLSX
 re-saves with the canonical UTC text, string cell kinds and no formulas
 ([spreadsheet evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
 
+October 5 B3-4 follow-up: the PostgreSQL scalar-enum XLSX with a `=1+1` label
+also survives Gnumeric's XLSX/ODS/XLSX re-save as text; SQL NULL stays blank
+and no formula appears ([evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
 false and SQL NULL through the pinned Calc round trip as a text cell. Native
 `array_to_json` and `array_send` match after rebinding. See the
