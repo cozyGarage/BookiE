@@ -1,0 +1,5 @@
+Command: rtk proxy python3 docs/evidence/postgres-enum-array-formula-calc-reimport-results-2026-10-05/verify_roundtrip.py
+Result: Calc preserved enum[] text, including formula-shaped and escaped labels, in XLSX/ODS/XLSX with no formulas.
+
+The checker examines A2 in each workbook, requires text cell types, pins the
+complete escaped array literal, and rejects formulas in XLSX and ODS XML.

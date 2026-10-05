@@ -262,6 +262,9 @@ formula-shaped `=1+1` label alongside empty, quoted, escaped, Unicode and SQL
 NULL values. Native SQL replay passes all four string-mode combinations, and
 Gnumeric preserves the full array as a text cell without formulas
 ([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+The same workbook also survives the pinned LibreOffice Calc XLSX/ODS/XLSX
+round trip with exact text and no formulas
+([Calc evidence](evidence/postgres-enum-array-formula-calc-reimport-results-2026-10-05/manifest.json)).
 
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
 false and SQL NULL through the pinned Calc round trip as a text cell. Native

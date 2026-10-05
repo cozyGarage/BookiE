@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "03b5798b660cc3519b047a59b30326cc67f08db1",
+  "case": "PostgreSQL custom enum[] formula-shaped label re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "f95d8585bc0c2cebadfa1c55e49e010bdb3a4307552b49acd5e14f88c2cc81a7"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3 680(Build:3)",
+    "container_image": "tablepro-lo-calc:26.8.0.3@sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c"
+  },
+  "contract": [
+    "The native enum[] includes literal NULL, empty text, Unicode, comma, quote, markup, formula-shaped =1+1, backslash and SQL NULL labels.",
+    "Native type, array_to_json and array_send oracles pass; rebinding reproduces JSON and wire bytes.",
+    "The XLSX writer stores the full array as a shared-string cell without a formula. SQL-file replay preserves it under four standard_conforming_strings/backslash_quote combinations and leaves a sibling array intact.",
+    "Calc preserves exact enum[] array text through XLSX/ODS/XLSX re-save; each cell remains text and no formula is created."
+  ],
+  "expected_array_literal": "{\"NULL\",\"\",\"\u6771\u4eac\",\"a,b\",\"a\\\"b\",\"<tag>&\",\"=1+1\",\"slash\\\\path\",NULL}",
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_file_exports_preserve_labels -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "Open source.xlsx and save as ODS with LibreOffice Calc 26.8.0.3.",
+        "Reopen the ODS and save as XLSX."
+      ],
+      "log": "libreoffice-roundtrip.txt",
+      "version_log": "libreoffice-version.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 text, requires XLSX shared/inline string and ODS string types, and rejects formulas.",
+      "result": "Full array text, including =1+1 and SQL NULL distinction, preserved.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "e2771c276443b2ce3129f2286e19903ef30fc5d49017b59377622616fc3c936e",
+    "recheck/source.ods": "9c30a62212d2f412a5ac0c801c2c1a44108ef23dec1dc91c53be57b1f4ea1d14",
+    "calc-roundtrip.xlsx": "2af3af1fd1a5f4963ab872bba3ce38932d10bac0559ee718243b08fcf496382a"
+  },
+  "remaining": [
+    "Other spreadsheet applications, enum array shapes and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "bookiee-export-test.txt": "5c34017b3e63a092b04926376c3c1638d0292ed5ddc6c0aa39a6f28658d9b716",
+    "libreoffice-version.txt": "8d65d53d9fc8f6caaeaa16013977052dc4bda05564f797a246690fe81f3d00c7",
+    "libreoffice-roundtrip.txt": "a7f5f8f7254017433093b5016c958c1b25f2338655c84d9ed16fe65b32711599",
+    "consumer-check.txt": "de99a688fecad117463a7b8916b8d2244f6edeb2ff7d4d73b7ac6f1f67290d79",
+    "verify_roundtrip.py": "1ef5a4a5f10845ed250f9614209fb8644c48297f7e9220896a8b8144b52e772f",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "31cbc7f6640f67db087c6e5aa939e60853dca2e6f513aa512be87c2347b865e9"
+  }
+}

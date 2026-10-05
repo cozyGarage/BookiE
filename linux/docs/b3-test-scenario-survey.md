@@ -363,6 +363,9 @@ October 5 B3-1/B3-4 follow-up: PostgreSQL custom `enum[]` file export now
 includes `=1+1` among the labels and proves it stays part of an escaped text
 cell through native SQL replay under four string-mode combinations and Gnumeric
 XLSX/ODS/XLSX re-save ([Gnumeric evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+The same source workbook also survives the pinned LibreOffice Calc XLSX/ODS/XLSX
+re-save unchanged, with string cell types and no formulas
+([Calc evidence](evidence/postgres-enum-array-formula-calc-reimport-results-2026-10-05/manifest.json)).
 
 October 4 B3-1/B3-4 follow-up: PostgreSQL custom enum metadata now covers a
 schema, type and table whose names contain spaces and embedded double quotes.

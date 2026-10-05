@@ -199,6 +199,9 @@ It now also survives Gnumeric's re-save with a formula-shaped label, Unicode,
 quotes, backslashes, markup, empty text and SQL NULL preserved as escaped array
 text, with no formula created
 ([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+The formula-shaped enum label also survives the pinned LibreOffice Calc
+XLSX/ODS/XLSX round trip as the same escaped text without a formula
+([Calc evidence](evidence/postgres-enum-array-formula-calc-reimport-results-2026-10-05/manifest.json)).
 The `bytea[]` XLSX text cell now survives the same Calc re-import with its
 binary, empty and SQL NULL elements intact
 ([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).
