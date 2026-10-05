@@ -155,7 +155,6 @@ async fn value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across
             active.split(',').any(|value| value == "STRICT_ALL_TABLES"),
             mode.contains("STRICT_ALL_TABLES")
         );
-
         assert!(
             parse_input_for_driver("unknown", Some(&columns[mood]), "mysql").is_err(),
             "unknown ENUM labels must be rejected in mode {mode:?}"
@@ -425,6 +424,8 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
         "STRICT_ALL_TABLES,NO_BACKSLASH_ESCAPES",
         "STRICT_ALL_TABLES,ANSI_QUOTES",
         "STRICT_ALL_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+        "EMPTY_STRING_IS_NULL",
+        "EMPTY_STRING_IS_NULL,STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
     ];
     for mode in modes {
         session
@@ -454,9 +455,13 @@ async fn value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_m
             active.split(',').any(|value| value == "STRICT_ALL_TABLES"),
             mode.contains("STRICT_ALL_TABLES")
         );
+        assert_eq!(
+            active.split(',').any(|value| value.trim() == "EMPTY_STRING_IS_NULL"),
+            mode.contains("EMPTY_STRING_IS_NULL")
+        );
         assert!(parse_input_for_driver("unknown", Some(&columns[mood]), "mysql").is_err());
         assert!(parse_input_for_driver("read,unknown", Some(&columns[perms]), "mysql").is_err());
-        if mode.is_empty() {
+        if mode.is_empty() || mode.contains("EMPTY_STRING_IS_NULL") {
             let blank_mood = parse_input_for_driver("", Some(&columns[mood]), "mysql").unwrap();
             let blank_perms = parse_input_for_driver("", Some(&columns[perms]), "mysql").unwrap();
             assert_eq!(blank_mood, Value::Null);

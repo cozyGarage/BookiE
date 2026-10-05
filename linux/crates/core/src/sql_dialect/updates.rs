@@ -23,6 +23,14 @@ pub fn build_keyed_update(
     let set_clauses: Vec<String> = edits
         .iter()
         .map(|(col_idx, new_value)| {
+            let mysql_empty_enum_or_set =
+                driver_id == "mysql" && matches!(new_value, Value::Text(value) if value.is_empty()) && {
+                    let data_type = columns[*col_idx].data_type.trim().to_ascii_lowercase();
+                    data_type.starts_with("enum(") || data_type.starts_with("set(")
+                };
+            if mysql_empty_enum_or_set {
+                return format!("{} = SPACE(0)", quote_ident(driver_id, &columns[*col_idx].name));
+            }
             let placeholder = placeholder_for(driver_id, params.len());
             let value_sql = if driver_id == "postgres" {
                 postgres_text_cast_type(&columns[*col_idx], new_value)
@@ -262,5 +270,33 @@ mod tests {
         .unwrap();
         assert_eq!(sql, "UPDATE \"records\" SET \"payload\" = $1 WHERE \"id\" = $2");
         assert_eq!(params, vec![Value::Text("edited".into()), Value::Int(7)]);
+    }
+
+    #[test]
+    fn mysql_empty_enum_and_set_keyed_values_use_a_server_empty_string_expression() {
+        let mut mood = column("mood", false);
+        mood.data_type = "ENUM('', 'ready')".into();
+        let mut permissions = column("permissions", false);
+        permissions.data_type = "set('read', 'write')".into();
+        let columns = [column("id", true), mood, permissions, column("note", false)];
+        let (sql, params) = build_keyed_update(
+            "mysql",
+            None,
+            "records",
+            &columns,
+            &[
+                (1, Value::Text(String::new())),
+                (2, Value::Text(String::new())),
+                (3, Value::Text(String::new())),
+            ],
+            &[Value::Int(7)],
+        )
+        .unwrap();
+
+        assert_eq!(
+            sql,
+            "UPDATE `records` SET `mood` = SPACE(0), `permissions` = SPACE(0), `note` = ? WHERE `id` = ?"
+        );
+        assert_eq!(params, vec![Value::Text(String::new()), Value::Int(7)]);
     }
 }
