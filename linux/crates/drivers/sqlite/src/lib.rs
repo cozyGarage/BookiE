@@ -713,6 +713,10 @@ fn extract_value(row: &SqliteRow, idx: usize) -> Value {
         Ok(_) => {}
     }
     let type_name = row.columns()[idx].type_info().name().to_ascii_uppercase();
+    let runtime_type = row
+        .try_get_raw(idx)
+        .map(|value| value.type_info().name().to_ascii_uppercase())
+        .unwrap_or_default();
     match type_name.as_str() {
         "INTEGER" => row
             .try_get::<i64, _>(idx)
@@ -722,10 +726,24 @@ fn extract_value(row: &SqliteRow, idx: usize) -> Value {
             .try_get::<f64, _>(idx)
             .map(Value::Float)
             .unwrap_or_else(|_| decode_fallback(row, idx)),
-        "BLOB" => row
-            .try_get::<Vec<u8>, _>(idx)
-            .map(Value::Bytes)
-            .unwrap_or_else(|_| decode_fallback(row, idx)),
+        "BLOB" => match runtime_type.as_str() {
+            "TEXT" => row
+                .try_get::<String, _>(idx)
+                .map(Value::Text)
+                .unwrap_or_else(|_| decode_fallback(row, idx)),
+            "INTEGER" => row
+                .try_get::<i64, _>(idx)
+                .map(Value::Int)
+                .unwrap_or_else(|_| decode_fallback(row, idx)),
+            "REAL" => row
+                .try_get::<f64, _>(idx)
+                .map(Value::Float)
+                .unwrap_or_else(|_| decode_fallback(row, idx)),
+            _ => row
+                .try_get::<Vec<u8>, _>(idx)
+                .map(Value::Bytes)
+                .unwrap_or_else(|_| decode_fallback(row, idx)),
+        },
         "BOOLEAN" => row
             .try_get::<bool, _>(idx)
             .map(Value::Bool)

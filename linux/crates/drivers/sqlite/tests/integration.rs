@@ -326,14 +326,84 @@ async fn declared_types_preserve_nulls_and_binary_affinity_mismatches() {
         .await
         .unwrap();
     connection.execute("INSERT INTO typed DEFAULT VALUES").await.unwrap();
-    assert_eq!(
-        connection.query("SELECT * FROM typed").await.unwrap().rows,
-        vec![vec![Value::Null; 7]]
-    );
     connection.execute("UPDATE typed SET r = X'00ff41'").await.unwrap();
+    connection
+        .execute(
+            "INSERT INTO typed VALUES \
+             ('not-an-integer', X'00ff41', X'0102', 'not-a-date', \
+              'not-a-time', 'not-a-datetime', 'text-in-blob')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO typed (payload) VALUES (42), (2.5)")
+        .await
+        .unwrap();
+    let result = connection.query("SELECT * FROM typed ORDER BY rowid").await.unwrap();
     assert_eq!(
-        connection.query("SELECT r FROM typed").await.unwrap().rows,
-        vec![vec![Value::Bytes(vec![0, 255, 65])]]
+        result.rows,
+        vec![
+            vec![
+                Value::Null,
+                Value::Bytes(vec![0, 255, 65]),
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+            ],
+            vec![
+                Value::Text("not-an-integer".into()),
+                Value::Bytes(vec![0, 255, 65]),
+                Value::Bytes(vec![1, 2]),
+                Value::Text("not-a-date".into()),
+                Value::Text("not-a-time".into()),
+                Value::Text("not-a-datetime".into()),
+                Value::Text("text-in-blob".into()),
+            ],
+            vec![
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Int(42)
+            ],
+            vec![
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Null,
+                Value::Float(2.5),
+            ],
+        ]
+    );
+    let runtime_classes = connection
+        .query(
+            "SELECT typeof(i), typeof(r), typeof(b), typeof(d), typeof(t), \
+             typeof(dt), typeof(payload) FROM typed ORDER BY rowid",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        runtime_classes.rows,
+        vec![
+            ["null", "blob", "null", "null", "null", "null", "null"]
+                .map(|kind| Value::Text(kind.into()))
+                .to_vec(),
+            ["text", "blob", "blob", "text", "text", "text", "text"]
+                .map(|kind| Value::Text(kind.into()))
+                .to_vec(),
+            ["null", "null", "null", "null", "null", "null", "integer"]
+                .map(|kind| Value::Text(kind.into()))
+                .to_vec(),
+            ["null", "null", "null", "null", "null", "null", "real"]
+                .map(|kind| Value::Text(kind.into()))
+                .to_vec(),
+        ]
     );
 }
 
