@@ -47,6 +47,12 @@ extraction and formatting preserve the routine as one statement and the query
 after the delimiter as the second; the body-only placeholder remains excluded
 ([case evidence](evidence/mysql-delimiter-comment-boundary-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 follow-up: SQL Server `smalldatetime` now checks the 29.998/29.999
+rounding boundary at December 31 midnight rollover. The server rounds the value
+to `2025-01-01T00:00:00`, and BookiE's datetime result and native style-126 text
+agree; the full SQL Server integration suite passed
+([case evidence](evidence/mssql-smalldatetime-year-rollover-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

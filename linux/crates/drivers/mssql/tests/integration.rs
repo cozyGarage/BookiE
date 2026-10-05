@@ -1063,7 +1063,11 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
             "SELECT CAST('2024-01-02T03:04:29.998' AS smalldatetime) AS below, \
              CONVERT(varchar(19), CAST('2024-01-02T03:04:29.998' AS smalldatetime), 126) AS below_text, \
              CAST('2024-01-02T03:04:29.999' AS smalldatetime) AS above, \
-             CONVERT(varchar(19), CAST('2024-01-02T03:04:29.999' AS smalldatetime), 126) AS above_text",
+             CONVERT(varchar(19), CAST('2024-01-02T03:04:29.999' AS smalldatetime), 126) AS above_text, \
+             CAST('2024-12-31T23:59:29.998' AS smalldatetime) AS year_end_below, \
+             CONVERT(varchar(19), CAST('2024-12-31T23:59:29.998' AS smalldatetime), 126) AS year_end_below_text, \
+             CAST('2024-12-31T23:59:29.999' AS smalldatetime) AS year_end_above, \
+             CONVERT(varchar(19), CAST('2024-12-31T23:59:29.999' AS smalldatetime), 126) AS year_end_above_text",
         )
         .await
         .unwrap();
@@ -1084,6 +1088,20 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
                     .unwrap()
             ),
             Value::Text("2024-01-02T03:05:00".into()),
+            Value::DateTime(
+                NaiveDate::from_ymd_opt(2024, 12, 31)
+                    .unwrap()
+                    .and_hms_opt(23, 59, 0)
+                    .unwrap()
+            ),
+            Value::Text("2024-12-31T23:59:00".into()),
+            Value::DateTime(
+                NaiveDate::from_ymd_opt(2025, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap()
+            ),
+            Value::Text("2025-01-01T00:00:00".into()),
         ]]
     );
 }
