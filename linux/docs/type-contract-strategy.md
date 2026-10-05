@@ -321,13 +321,14 @@ coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 Other array families remain open; spreadsheet-application re-import is covered
 for `text[]`, `uuid[]`, `date[]`, `timestamp[]`, `time[]`, `timetz[]`, `boolean[]`, `int8[]`, `smallint[]`, `integer[]`, `enum[]`, domain-over-enum `[]`, `bytea[]`,
-`timestamptz[]`, `interval[]`, `numeric[]` and `float8[]` XLSX cells ([text[] Calc evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json), [uuid[] Calc evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json), [numeric[] Calc evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json), [float8[] Calc evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json)), with other shapes unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
+`timestamptz[]`, `interval[]`, `numeric[]`, `float8[]` and `float4[]` XLSX cells ([text[] Calc evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json), [uuid[] Calc evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json), [numeric[] Calc evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json), [float8[] Calc evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json), [float4[] Calc evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)), with other shapes unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
 [bytea[] evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)
 and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json),
 [interval[] evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
-The `float4[]` Calc round trip is also covered: native `float4send` checks
-adjacent, negative-zero and minimum-subnormal elements, rebinding matches the
-native array bytes, and Calc preserves the full XLSX/ODS/XLSX shared-string cell
+The `float4[]` file-writer matrix now includes CSV text export, SQL-file replay
+and Calc XLSX/ODS/XLSX re-import: native `float4send` checks adjacent,
+negative-zero and minimum-subnormal elements; typed rebinding and SQL replay
+match the native array bytes; Calc preserves the full shared-string cell
 ([evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
 
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now

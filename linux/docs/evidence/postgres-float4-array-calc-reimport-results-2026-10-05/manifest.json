@@ -3,16 +3,17 @@
   "date": "2026-10-05",
   "branch": "linux",
   "baseline_commit": "e2c03f71a1fe8594e53084d5482295580c72e97f",
-  "scope": "PostgreSQL float4[] exact values and Calc XLSX re-import",
+  "scope": "PostgreSQL float4[] CSV/SQL exports and Calc XLSX re-import",
   "source": {
     "path": "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers.rs",
-    "sha256": "85f51ed3c66c22d7409888addf3ac30f0951e90b16cdae4b2e8529955c84dd1b"
+    "sha256": "633cd0f9bb1c51fb511d4ec1d8f6a6047603ee72870be606148ba03ae23943b4"
   },
   "selector": "value_contract_float4_array_file_exports_preserve_values_for_calc_reimport",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "contract": [
     "The float4[] contains 0.1, the adjacent value above 1.0, negative zero, the minimum subnormal, NaN, positive and negative Infinity, and SQL NULL.",
-    "Native float4send checks exact bits for 0.1, the adjacent value, negative zero and minimum subnormal; typed rebinding preserves array_send bytes.",
+    "Native float4send checks exact bits for 0.1, the adjacent value, negative zero and minimum subnormal; typed rebinding and SQL-file replay preserve array_send bytes.",
+    "CSV export preserves the complete PostgreSQL array text cell.",
     "The XLSX shared-string cell survives LibreOffice Calc ODS save and XLSX re-save as identical 108-character text with no formulas."
   ],
   "application": {
@@ -46,7 +47,8 @@
       "result": "341 tests passed across 11 suites; no missing suites; GTK and DuckDB enabled; PostgreSQL selected 133 tests",
       "revision": "e2c03f71a1fe8594e53084d5482295580c72e97f",
       "dirty": true,
-      "local_report": "target/quality/20261005T121257896160Z-values/report.json"
+      "local_report": "target/quality/20261005T121257896160Z-values/report.json",
+      "note": "Historical strict tier run preceded the added CSV and SQL-file replay assertions; use focused_value_contract for those current assertions."
     },
     "clippy": {
       "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
@@ -66,22 +68,33 @@
       "command": "rtk git diff --check",
       "result": "passed",
       "log": "diff-check.txt"
+    },
+    "focused_value_contract": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration value_contract_float4_array_file_exports_preserve_values_for_calc_reimport -- --ignored --nocapture",
+      "result": "1 passed; verifies CSV export text, SQL-file replay native type and array bytes, and XLSX generation",
+      "log": "bookiee-export-test.txt"
+    },
+    "postgres_integration_suite": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored",
+      "result": "161 passed, 1 filtered out (1 suite, 210.56s)",
+      "summary_log": "postgres-integration.txt"
     }
   },
   "artifact_sha256": {
-    "source.xlsx": "5bca962ba51a613424f5b6908a1b0e3a6511da5b264b51e6396feb9193a4d71a",
-    "recheck/source.ods": "c68bd202ed5fef0e8ce94c9f07f81f55f79568e2074dac225bbf21979b1e05a6",
-    "recheck/source.xlsx": "6a567f744c504550d8d049b281d67bd1742a98e325c6edd0c094e3f3b0f3d3de"
+    "source.xlsx": "305c683dc4610bad51e533e7b29ebb0ce138f6f0165e9f1380bed311620799f7",
+    "recheck/source.ods": "df0f6944caeab7089f613c58680660ec2649c8412dec54de69e51fb84255a3db",
+    "recheck/source.xlsx": "817df288f75e4976f41f25c6d6ad07535d36fdba635f6b4932d2b40b33ee3546"
   },
   "checker_sha256": "6b4521bf5238b8595fa9a9277b668390fb8041a1937776af67dcae45bf6bb3fb",
   "log_sha256": {
-    "bookiee-export-test.txt": "0c99293262c2192017b05398b7e61bfb5668b93d88ffa841e68ca83b9532ff29",
+    "bookiee-export-test.txt": "29a22f32c481dc69ef171072b708b72cbc5f55c0030586aa91424d2ed34c7e33",
     "libreoffice-roundtrip.txt": "7064be7edca32d4ecde8de2df5f0c11b7f3e1b520b1f6c9f689860034d4b85ee",
     "consumer-check.txt": "50a582faa2914990b90868a4455bd409492482a74c76a7e0823ecec7cda364bd",
     "libreoffice-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
-    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    "diff-check.txt": "2700165975f68815c97d605c56eca8e90d497ade1264b6282401d13fee99ac27",
+    "postgres-integration.txt": "b00c5f27bbbeae4cc9e81d30091a3a9b2dcff71b3ff1acabd4e814a0016fd42a"
   },
   "remaining": [
     "Other PostgreSQL array families, spreadsheet shapes and applications remain open; this case does not close B3 or qualify the 0.2.0 release."

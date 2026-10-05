@@ -24,11 +24,13 @@ Other enum session configurations and the wider B3 matrix remain open.
 
 ### October 5 PostgreSQL float4[] Calc follow-up
 
-The PostgreSQL `float4[]` XLSX cell now has a Calc ODS/XLSX re-import case.
-Native `float4send` checks the adjacent value, negative zero and minimum
-subnormal, and typed rebinding preserves `array_send` bytes. Calc preserves the
-entire 108-character array text cell without formulas; other array shapes remain
-open ([evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
+The PostgreSQL `float4[]` file-writer case now checks CSV text export and SQL
+file replay as well as XLSX/ODS/XLSX re-import through Calc. Native
+`float4send` checks the adjacent value, negative zero and minimum subnormal;
+typed rebinding and SQL replay preserve `array_send` bytes. Calc preserves the
+entire 108-character array text cell without formulas; other array shapes and
+file-writer combinations remain open
+([evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
 
 ### October 4 follow-up
 

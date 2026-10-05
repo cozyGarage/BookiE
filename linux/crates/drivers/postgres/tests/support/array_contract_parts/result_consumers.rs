@@ -1101,6 +1101,61 @@ async fn value_contract_float4_array_file_exports_preserve_values_for_calc_reimp
     assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
 
     let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("float4[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    let csv_path = directory.path().join("float4-array.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    connection
+        .execute("CREATE TABLE float4_array_filewriter_target (value real[])")
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("float4-array.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "float4_array_filewriter_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    connection
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = connection
+        .query(
+            "SELECT pg_typeof(value)::text, encode(array_send(value), 'hex') \
+             FROM float4_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows, vec![vec![oracle.rows[0][0].clone(), oracle.rows[0][2].clone()]]);
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("float4-array.xlsx"));
