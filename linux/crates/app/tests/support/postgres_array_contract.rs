@@ -217,6 +217,174 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
     assert_eq!(saved.rows[0], date_row_after_edit.unwrap());
     assert_eq!(saved.rows[1], date_sibling_after_edit.unwrap());
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::postgres::Postgres;
+
+    let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
+    let connection = drivers_postgres::PgDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(5432).await.unwrap(),
+            database: "postgres".into(),
+            username: "postgres".into(),
+            password: secrecy::SecretString::new("postgres".to_string().into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    let mut smallint_target_after_edit = None;
+    let mut smallint_sibling_after_edit = None;
+    for (table, data_type, literal, sibling) in [
+        ("smallint_array_grid", "int2", "[-1:1]={-32768,32767,NULL}", "ARRAY[42]"),
+        (
+            "integer_array_grid",
+            "int4",
+            "[2:4]={-2147483648,2147483647,NULL}",
+            "ARRAY[42]",
+        ),
+        (
+            "bigint_array_grid",
+            "int8",
+            "[0:3]={-9223372036854775808,9007199254740993,9223372036854775807,NULL}",
+            "ARRAY[42]",
+        ),
+    ] {
+        connection
+            .execute_controlled(
+                &format!("CREATE TABLE {table} (id integer PRIMARY KEY, value pg_catalog.{data_type}[])"),
+                &control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_controlled(
+                &format!(
+                    "INSERT INTO {table} VALUES \
+                     (1, ARRAY[0]::pg_catalog.{data_type}[]), (2, {sibling}::pg_catalog.{data_type}[])"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let columns = connection
+            .fetch_columns_controlled(None, table, &control)
+            .await
+            .unwrap();
+        let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+        let before = connection
+            .query_controlled(
+                &format!(
+                    "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                     encode(array_send(value), 'hex') FROM {table} ORDER BY id"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let sibling_before = before.rows[1].clone();
+
+        let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres").unwrap();
+        assert_eq!(parsed, Value::Text(literal.into()), "{data_type}[] input text");
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            table,
+            &columns,
+            &[(value_index, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert!(
+            update.0.contains("::text::pg_catalog."),
+            "{}[] cast: {}",
+            data_type,
+            update.0
+        );
+        assert_eq!(update.1[0], Value::Text(literal.into()));
+        assert_eq!(
+            connection
+                .execute_in_transaction_controlled(&[update], &control)
+                .await
+                .unwrap(),
+            vec![1]
+        );
+
+        let after = connection
+            .query_controlled(
+                &format!(
+                    "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                     encode(array_send(value), 'hex') FROM {table} ORDER BY id"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let native = connection
+            .query_controlled(
+                &format!(
+                    "SELECT pg_typeof('{literal}'::pg_catalog.{data_type}[])::text, \
+                     ('{literal}'::pg_catalog.{data_type}[])::text, \
+                     array_to_json('{literal}'::pg_catalog.{data_type}[])::text, \
+                     encode(array_send('{literal}'::pg_catalog.{data_type}[]), 'hex')"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(after.rows[0][1..], native.rows[0][..], "{data_type}[] native oracle");
+        assert_eq!(after.rows[1], sibling_before, "{data_type}[] sibling changed");
+        if table == "smallint_array_grid" {
+            smallint_target_after_edit = Some(after.rows[0].clone());
+            smallint_sibling_after_edit = Some(after.rows[1].clone());
+        }
+    }
+
+    let columns = connection
+        .fetch_columns_controlled(None, "smallint_array_grid", &control)
+        .await
+        .unwrap();
+    let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+    let invalid = parse_input_for_driver("{32768}", Some(&columns[value_index]), "postgres").unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "smallint_array_grid",
+        &columns,
+        &[(value_index, invalid)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let error = connection
+        .execute_in_transaction_controlled(&[update], &control)
+        .await
+        .expect_err("smallint[] overflow must be refused by PostgreSQL");
+    assert!(
+        matches!(
+            &error,
+            tablepro_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22003")
+        ),
+        "smallint[] overflow should retain PostgreSQL's numeric-range SQLSTATE: {error:?}"
+    );
+    let saved = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM smallint_array_grid ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.rows[0], smallint_target_after_edit.unwrap());
+    assert_eq!(saved.rows[1], smallint_sibling_after_edit.unwrap());
+}
 use tablepro_core::{ColumnInfo, Value};
 
 #[test]

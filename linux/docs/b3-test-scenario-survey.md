@@ -362,6 +362,14 @@ match a native cast oracle; invalid `date[]` is refused with target and sibling
 rows unchanged
 ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 app-consumer follow-up: PostgreSQL `smallint[]`, `integer[]` and
+`bigint[]` now round-trip through the app parser and keyed update with signed
+endpoints, lower bounds `-1`, `2` and `0`, and SQL NULL. The `bigint[]` case
+preserves `9007199254740993`; native type, array text, JSON and wire bytes match
+PostgreSQL oracles, and overflowing `smallint[]` input is refused without
+changing the target or sibling
+([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-2/B3-4 follow-up: PostgreSQL `date[]`, `timestamp[]`, `time[]` and
 `timetz[]` XLSX cells also survive Gnumeric XLSX/ODS/XLSX re-save with exact
 boundary text, string cell types and no formulas

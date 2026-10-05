@@ -227,6 +227,10 @@ The app parser and keyed-update path also round-trip `date[]`, `time[]`,
 `timestamp[]` and `timetz[]` boundary values against PostgreSQL type, JSON and
 wire-byte oracles, preserving sibling rows and refusing malformed date-array
 input ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
+The same app grid path now covers `smallint[]`, `integer[]` and `bigint[]`
+signed endpoints, non-default lower bounds and the precision-risk integer
+9007199254740993, with native type/JSON/wire oracles and overflow refusal
+([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)

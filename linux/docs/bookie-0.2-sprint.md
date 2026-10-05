@@ -263,6 +263,13 @@ JSON and wire-byte oracles, including era, infinity, end-of-day and offset
 boundaries. A malformed date array is refused without changing the target or
 sibling ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 app follow-up: `smallint[]`, `integer[]` and `bigint[]` now pass
+through the app parser and keyed update with signed bounds, non-default lower
+bounds and SQL NULL. `bigint[]` retains `9007199254740993`; PostgreSQL type,
+JSON and wire-byte oracles match. A smallint overflow is refused with the target
+and sibling unchanged
+([evidence](evidence/postgres-integer-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-1/B3-4 follow-up: PostgreSQL `enum[]` file export now includes a
 formula-shaped `=1+1` label alongside empty, quoted, escaped, Unicode and SQL
 NULL values. Native SQL replay passes all four string-mode combinations, and
