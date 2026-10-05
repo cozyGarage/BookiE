@@ -25,6 +25,11 @@ cell without a formula. The existing Calc contract remains separate; the wider
 array/consumer matrix stays open
 ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL `uuid[]` now has JSON, CSV, XLSX and SQL
+file-writer assertions in one native contract. SQL replay restores the native
+type/value/JSON/wire bytes and leaves a pre-existing sibling row unchanged
+([evidence](evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).
+
 October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
 inside the nested type fallback. The driver now explicitly refuses nested
 LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;

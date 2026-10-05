@@ -27,6 +27,14 @@ native-array checks remain in the export test; Calc coverage is separately
 recorded ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 Other array shapes and spreadsheet/consumer combinations remain open.
 
+### October 5 PostgreSQL UUID array file-writer follow-up
+
+The native `uuid[]` contract now checks JSON and CSV text exports plus XLSX
+string-cell output, then replays the SQL file and compares PostgreSQL's native
+type, text, JSON and wire bytes. A pre-existing sibling array remains unchanged
+([evidence](evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).
+Other array types and file-writer/session combinations remain open.
+
 ### October 5 PostgreSQL bounded enum_range follow-up
 
 Two-argument `enum_range(start, end)` now covers inclusive endpoints, either

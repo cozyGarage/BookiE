@@ -110,6 +110,10 @@ A PostgreSQL `uuid[]` workbook preserves two UUIDs and SQL NULL through the same
 Calc round trip as exact text. Native `array_send` bytes match after binding the
 driver's quoted array text, and the re-saved cells remain strings without
 formulas ([evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json)).
+The same native contract now checks JSON/CSV text exports and SQL-file replay;
+re-import restores the native UUID[] type, JSON and wire bytes without changing
+a pre-existing sibling row
+([file-writer evidence](evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).
 
 A PostgreSQL `date[]` workbook preserves a BC date, year 10000, both date
 infinities and SQL NULL through Calc's XLSX/ODS/XLSX round trip. The native

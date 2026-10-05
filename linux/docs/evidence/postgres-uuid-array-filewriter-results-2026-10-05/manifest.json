@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "3a91a597a5edbd6bd659a21d0839d9c2e4300e05",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "UUID array file writers preserve values through JSON, CSV, XLSX and SQL replay",
+  "test": "array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport",
+  "contract": [
+    "The UUID[] result retains its native type, array text, JSON values and array_send bytes after typed rebinding.",
+    "JSON and CSV exports preserve the exact array text; XLSX stores it as a string cell without formulas.",
+    "SQL-file replay restores the native UUID[] type, array text, JSON value and wire bytes in PostgreSQL.",
+    "The SQL replay leaves a pre-existing sibling UUID array row unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --offline --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 179 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "696c215aa2078595bd29dbe3bf5daa6664fa583505914f333bc085bde3474c37"
+  },
+  "log_sha256": {
+    "focused.txt": "c5d4be15826a6ba55e8ebf46b0178db6598b48e7f6236fa3fda1d721b69e5664",
+    "driver-suite.txt": "bd0840b6d080d50920b42e47bd2aa2deabc693838699ab4d915b2a60ef21db38",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other array types, file-writer configurations, session combinations and the wider B3 matrix remain open."
+  ]
+}
