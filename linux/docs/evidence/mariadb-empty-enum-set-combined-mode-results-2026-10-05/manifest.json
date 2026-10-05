@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "9cc656f0df9d5b7ba68654b5ec1aa7523ead0bbc",
+  "case": "MariaDB empty ENUM and zero-member SET CSV restore under combined EMPTY_STRING_IS_NULL, strict, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES modes",
+  "test": "enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null",
+  "engine": "MariaDB 11 Docker integration fixture",
+  "contract": [
+    "The existing standalone EMPTY_STRING_IS_NULL CSV restore remains covered.",
+    "A second restore runs with EMPTY_STRING_IS_NULL, STRICT_TRANS_TABLES, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES active together.",
+    "Empty ENUM and zero-member SET retain native ordinal zero and empty bytes, distinct from marker-bound SQL NULL.",
+    "The pre-existing sibling row remains identical to the standalone-mode result."
+  ],
+  "validation": {
+    "focused_mariadb_combined_mode": {
+      "command": "cargo test --locked -p tablepro-driver-mysql --test integration value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 61,
+      "log": "focused-mariadb-combined.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check HEAD",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  }
+}

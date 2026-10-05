@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-04; each new case links to its source-fingerprinted
+and acceptance. Updated 2026-10-05; each new case links to its source-fingerprinted
 evidence packet, and this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
@@ -64,7 +64,11 @@ MariaDB 11's `EMPTY_STRING_IS_NULL` mode converts empty-string parameters to
 SQL NULL. MySQL/MariaDB CSV plans now reconstruct empty ENUM labels and empty
 SET values with `SPACE(0)`, keeping them distinct from marker-bound SQL NULL;
 the native mode contract checks ordinals, exact bytes, and a sibling row
-([evidence](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
+([standalone mode](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
+The same round trip also passes with `STRICT_TRANS_TABLES`, `ANSI_QUOTES`, and
+`NO_BACKSLASH_ESCAPES` enabled alongside that mode, including native verification
+that the pre-existing sibling is unchanged
+([combined-mode evidence](evidence/mariadb-empty-enum-set-combined-mode-results-2026-10-05/manifest.json)).
 
 | Owner / engine | Retain established contracts | Remaining scope to select one case from |
 | --- | --- | --- |
