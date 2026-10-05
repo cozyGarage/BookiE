@@ -97,7 +97,9 @@ boundaries and shadowed enum resolution are checked
 ([evidence](evidence/postgres-enum-random-arrays-results-2026-10-05/manifest.json)).
 An ordered `array_agg` result also checks custom enum-array result metadata,
 ordered labels, literal `NULL` versus SQL NULL, empty/Unicode/quoted labels,
-JSON semantics and native wire-byte equality after rebinding
+JSON semantics and native wire-byte equality after rebinding. No input rows
+return SQL NULL with enum[] metadata, separate from an array with a SQL NULL
+element
 ([evidence](evidence/postgres-enum-array-agg-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),

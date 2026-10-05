@@ -77,7 +77,9 @@ assertions. Their empty/NULL inputs and sample-size boundary are also checked.
 October 5 B3-1 follow-up: an ordered PostgreSQL `array_agg` of custom enum
 values now has a result-consumer contract. It checks enum[] metadata, label
 order, empty/Unicode/quoted values, literal `NULL` versus SQL NULL, JSON
-semantics and native `array_send` bytes after rebinding
+semantics and native `array_send` bytes after rebinding; no input rows yield
+SQL NULL with enum[] metadata, distinct from an array containing a SQL NULL
+element
 ([evidence](evidence/postgres-enum-array-agg-results-2026-10-05/manifest.json)).
 
 The merged working tree passed local quick CI and the strict GTK+DuckDB values

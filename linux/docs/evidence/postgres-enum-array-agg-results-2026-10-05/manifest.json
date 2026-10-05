@@ -2,10 +2,10 @@
   "schema_version": 1,
   "date": "2026-10-05",
   "branch": "linux",
-  "source_commit": "f30bc6fa6afd9fe6555bb09a0704388e79278360",
+  "source_commit": "c70ea9c5a7d27709b91613e7d66c1baa28998602",
   "source": {
     "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
-    "sha256": "37b2513c71057cda265cc45396c21ce7299768cd59e9e9b1f6b755661048a2a2"
+    "sha256": "c1842acc6eab661563d3d1f7f26b77b79b837bd162fe4d884a50c415978f2f00"
   },
   "engine": "PostgreSQL via local testcontainers/Docker",
   "case": "Ordered custom enum array_agg result and typed rebind",
@@ -13,7 +13,8 @@
   "contract": [
     "array_agg(label ORDER BY ordinal) returns the custom enum[] metadata and a textual array value with deterministic label order.",
     "The result distinguishes the literal NULL label from SQL NULL and preserves empty text, Unicode, comma and apostrophe labels.",
-    "Native array_to_json output matches the expected ordered JSON values; rebinding the returned text as the target enum[] preserves that JSON and the native array_send bytes."
+    "Native array_to_json output matches the expected ordered JSON values; rebinding the returned text as the target enum[] preserves that JSON and the native array_send bytes.",
+    "An aggregate with no input rows returns SQL NULL while retaining enum[] metadata, distinct from an aggregate containing one SQL NULL element."
   ],
   "validation": {
     "focused_test": {
@@ -43,8 +44,8 @@
     }
   },
   "log_sha256": {
-    "focused-test.txt": "9f41e43926380fd22da6318170015566fbe55b23c5977c937533ae65d9f5824d",
-    "clippy.txt": "778e35422619f1717a82f21564b9d63808db6eb2f77ed12448617d888d73a1b5",
+    "focused-test.txt": "46c2db2ad70585a96fe9cc40a20a09601efbff46222ac120570189c86a3b0672",
+    "clippy.txt": "fa9c83e817f9db42344f14faf695fc9176a1bba44284d753308e85861df58785",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "ignored-inventory.txt": "36b084f4c3cb457337afb8a22c9b2c19c942b13cb56a0e7557701fd245d2dcfc",
     "diff-check.txt": "83079924b46ef266548bb992c708cd3e9f03dd322f27a29b0f38302e4cbc641c"
