@@ -106,6 +106,10 @@ selective `FILTER`; duplicate enum labels collapse in declared enum order,
 filtered-out labels stay absent, and duplicate SQL NULL inputs produce one NULL
 element, with native JSON/type/wire checks after rebinding
 ([evidence](evidence/postgres-enum-array-agg-distinct-filter-results-2026-10-05/manifest.json)).
+The same aggregate also has a same-named enum in a leading shadow schema; native
+type OID and wire checks confirm the qualified table's enum array survives
+rebinding, and a shadow-only label is refused
+([shadow-path evidence](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

@@ -27,6 +27,12 @@ wire bytes after rebinding. This extends one aggregate case; the remaining B3
 array/type/consumer matrix stays open
 ([case evidence](evidence/postgres-enum-array-agg-distinct-filter-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: a companion PostgreSQL aggregate case puts a same-named
+enum in a shadow schema first in `search_path`. Aggregation from the qualified
+target table keeps its declared type and wire identity after rebinding, and a
+shadow-only label is refused
+([case evidence](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

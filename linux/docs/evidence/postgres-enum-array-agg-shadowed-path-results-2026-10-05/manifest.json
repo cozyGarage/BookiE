@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "fafbb84ae86e5ec6a13b7100b373b1ac57f303b6",
+  "scope": "PostgreSQL custom enum array_agg with a same-named shadow type",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "fd51d1b8cc8fc295c37da1a5013afb9f31171edc175be1e8f57cee5d21589c93"
+  },
+  "selector": "value_contract_custom_enum_array_agg_keeps_target_type_under_shadowed_search_path",
+  "contract": [
+    "A qualified table column keeps its target-schema enum[] type when a same-named enum in another schema leads search_path.",
+    "The aggregate preserves declared enum ordering, the literal NULL label, empty text, Unicode and SQL NULL.",
+    "The native enum-array type OID, JSON values and wire bytes match after schema-qualified text-carrier rebinding.",
+    "A shadow-only enum label is rejected when rebound to the qualified target enum array."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_agg_keeps_target_type_under_shadowed_search_path -- --ignored --nocapture",
+      "result": "1 passed, 0 failed against Docker PostgreSQL",
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed"
+    }
+  },
+  "remaining": [
+    "Other PostgreSQL array/aggregate session combinations and the broader B3 type/consumer matrix remain open; this case does not qualify the 0.2.0 release."
+  ]
+}

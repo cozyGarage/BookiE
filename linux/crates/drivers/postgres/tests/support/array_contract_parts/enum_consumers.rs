@@ -239,6 +239,114 @@ async fn value_contract_custom_enum_array_agg_distinct_filter_preserves_native_o
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_agg_keeps_target_type_under_shadowed_search_path() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_agg_target")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_agg_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_agg_target.status AS ENUM \
+             ('NULL', '', 'shared', 'target-only', '東京')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_agg_shadow.status AS ENUM \
+             ('shadow-only', 'shared', 'target-only')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_agg_target.rows \
+             (ordinal INT PRIMARY KEY, label value_contract_agg_target.status)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_agg_target.rows VALUES \
+             (1, 'target-only'), (2, 'NULL'), (3, 'shared'), \
+             (4, ''), (5, NULL), (6, '東京')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "SET search_path TO value_contract_agg_shadow, \
+             value_contract_agg_target, public",
+        )
+        .await
+        .unwrap();
+
+    let aggregate = "array_agg(DISTINCT label ORDER BY label)";
+    let result = connection
+        .query(&format!(
+            "SELECT {aggregate} AS value \
+             FROM value_contract_agg_target.rows"
+        ))
+        .await
+        .unwrap();
+    let Value::Text(_) = &result.rows[0][0] else {
+        panic!("custom enum aggregate must remain textual: {:?}", result.rows[0][0]);
+    };
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text, \
+                    pg_typeof(value)::oid = \
+                        'value_contract_agg_target.status[]'::regtype::oid, \
+                    array_to_json(value)::text, encode(array_send(value), 'hex') \
+             FROM (SELECT {aggregate} AS value \
+                   FROM value_contract_agg_target.rows) AS aggregate_result"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows[0][0],
+        Value::Text("value_contract_agg_target.status[]".into())
+    );
+    assert_eq!(native.rows[0][1], Value::Bool(true));
+    assert_eq!(
+        native.rows[0][2],
+        Value::Text(r#"["NULL","","shared","target-only","東京",null]"#.into())
+    );
+
+    let rebound = connection
+        .query_params(
+            "SELECT pg_typeof($1::text::value_contract_agg_target.status[])::text, \
+                    pg_typeof($1::text::value_contract_agg_target.status[])::oid = \
+                        'value_contract_agg_target.status[]'::regtype::oid, \
+                    array_to_json($1::text::value_contract_agg_target.status[])::text, \
+                    encode(array_send($1::text::value_contract_agg_target.status[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0], native.rows[0]);
+
+    let shadow_only_label = Value::Text("{shadow-only}".into());
+    assert!(
+        connection
+            .query_params(
+                "SELECT $1::text::value_contract_agg_target.status[]",
+                std::slice::from_ref(&shadow_only_label),
+            )
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

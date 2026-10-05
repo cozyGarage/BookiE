@@ -12,6 +12,16 @@ This prevents the crash; nested enum-list editing, rendering and binding remain
 unsupported, and the broader B3 matrix remains open
 ([evidence](evidence/duckdb-enum-list-result-refusal-results-2026-10-05/manifest.json)).
 
+### October 5 PostgreSQL enum aggregate shadow-path follow-up
+
+A PostgreSQL `array_agg(DISTINCT ... ORDER BY ...)` result from a qualified
+table now has a same-named enum shadow in the leading `search_path`. The native
+oracle confirms the aggregate stays the table's target-schema enum array; JSON
+and wire bytes agree after schema-qualified rebinding, and a label declared
+only by the shadow type is refused
+([evidence](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json)).
+Other enum session configurations and the wider B3 matrix remain open.
+
 ### October 4 follow-up
 
 PostgreSQL inferred enum-array binding is covered for domain-over-enum `ANY`,
