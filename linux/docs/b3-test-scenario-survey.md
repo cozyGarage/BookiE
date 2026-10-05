@@ -33,6 +33,10 @@ A domain-over-enum CASE follow-up checks both parameter branches with a
 same-named shadow enum leading `search_path`; native type/value checks preserve
 the target enum and outer domain and distinguish empty text, literal `NULL`,
 and SQL NULL ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+The same shadowed-path fixture compares both domain-over-enum `COALESCE`
+parameter positions against explicit native target-enum casts, including
+literal `NULL`, empty text, SQL NULL and invalid shadow-only labels
+([evidence](evidence/postgres-domain-coalesce-shadowed-results-2026-10-05/manifest.json)).
 
 MongoDB keyed grid edits now compare each edited field with its value from the
 materialized result in the atomic update filter. A failing-first MongoDB 7 case

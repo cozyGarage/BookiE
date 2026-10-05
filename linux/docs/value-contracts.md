@@ -146,6 +146,10 @@ PostgreSQL domain-over-enum CASE parameter inference now has a native contract
 for both result branches under a shadowed `search_path`, including empty and
 literal `NULL` labels distinct from SQL NULL
 ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+The domain-over-enum `COALESCE` parameter contract now compares both argument
+positions against native casts under that shadowed path, with empty, literal
+`NULL`, SQL NULL and invalid shadow-only labels
+([evidence](evidence/postgres-domain-coalesce-shadowed-results-2026-10-05/manifest.json)).
 
 MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under
 `EMPTY_STRING_IS_NULL`, separately from SQL NULL, with native text-byte

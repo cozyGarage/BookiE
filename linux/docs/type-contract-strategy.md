@@ -285,6 +285,10 @@ same-named shadow enum leads `search_path`; the target base enum parameter and
 CASE result types, outer domain type, empty/literal-NULL/SQL-NULL values and
 invalid-label refusal are all checked against native expressions
 ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+Both domain-over-enum `COALESCE` parameter positions now have the same shadowed
+path checks against explicit native casts, including empty text, literal
+`NULL`, SQL NULL and invalid shadow-only labels
+([evidence](evidence/postgres-domain-coalesce-shadowed-results-2026-10-05/manifest.json)).
 The same text/NULL inference now covers `array_append` and `array_prepend`: the
 input constructor retains `state_domain[]`, while the polymorphic function result
 uses `state[]` ([array-function evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).

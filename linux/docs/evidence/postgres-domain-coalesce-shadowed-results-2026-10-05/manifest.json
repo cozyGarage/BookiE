@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "dc8a136cf3ca48df13ea249f7fca3856098eee0c",
+  "working_tree_dirty": true,
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "domain-over-enum COALESCE parameters preserve target enum inference under shadowed search_path",
+  "test": "domain_contract::value_contract_domain_over_enum_coalesce_infers_parameter_type",
+  "source_files": [
+    {
+      "path": "crates/drivers/postgres/tests/support/domain_contract_parts/basic_domains.rs",
+      "sha256": "44c2288005e8e9e84144914bb49921cd78f4ce338a58b7cd7d2118d55343d925"
+    }
+  ],
+  "contract": [
+    "COALESCE(status, $1) and COALESCE($1, status) are each checked while a same-named shadow enum leads transaction search_path.",
+    "Native explicitly cast target-enum queries provide value and expression-type oracles for inferred parameter queries; the outer source column remains the domain type.",
+    "Literal NULL, empty text and SQL NULL inputs are compared for all rows, including the NULL source row.",
+    "A label that exists only in the shadow enum is refused with SQLSTATE 22P02 in both argument positions, and source rows remain unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_coalesce_infers_parameter_type -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 147,
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other inferred enum contexts, session/search_path combinations and the wider B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}

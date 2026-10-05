@@ -1224,11 +1224,65 @@ async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
             })
             .collect::<Vec<_>>();
         assert_eq!(inferred.rows, expected, "domain CASE with {parameter:?}");
+
+        for (native_expression, inferred_expression) in [
+            (
+                format!(
+                    "COALESCE(status, {native_parameter}::value_contract_domain_coalesce.state)"
+                ),
+                "COALESCE(status, $1)",
+            ),
+            (
+                format!(
+                    "COALESCE({native_parameter}::value_contract_domain_coalesce.state, status)"
+                ),
+                "COALESCE($1, status)",
+            ),
+        ] {
+            let native = transaction
+                .query(&format!(
+                    "SELECT id, {native_expression}::text, \
+                     pg_typeof({native_expression})::text, pg_typeof(status)::text \
+                     FROM value_contract_domain_coalesce.rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            let inferred = transaction
+                .query_params(
+                    &format!(
+                        "SELECT id, {inferred_expression}::text, pg_typeof($1)::text, \
+                         pg_typeof({inferred_expression})::text, pg_typeof(status)::text \
+                         FROM value_contract_domain_coalesce.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = native
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text("value_contract_domain_coalesce.state".into()),
+                        row[2].clone(),
+                        row[3].clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(
+                inferred.rows, expected,
+                "domain {inferred_expression} with {parameter:?}"
+            );
+        }
     }
 
     for expression in [
         "CASE WHEN id = 1 THEN $1 ELSE status END",
         "CASE WHEN id = 1 THEN status ELSE $1 END",
+        "COALESCE(status, $1)",
+        "COALESCE($1, status)",
     ] {
         transaction.execute("SAVEPOINT invalid_domain_case").await.unwrap();
         let invalid = transaction
@@ -1239,7 +1293,7 @@ async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
                 &[Value::Text("shadow-only".into())],
             )
             .await
-            .expect_err("CASE parameter must resolve against the target enum, not its shadow");
+            .expect_err("parameter must resolve against the target enum, not its shadow");
         assert!(
             matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
             "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
