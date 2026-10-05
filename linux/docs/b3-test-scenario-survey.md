@@ -39,6 +39,15 @@ native-array checks remain in the export test; Calc coverage is separately
 recorded ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 Other array shapes and spreadsheet/consumer combinations remain open.
 
+### October 5 PostgreSQL float8[] Gnumeric follow-up
+
+The `float8[]` XLSX string cell survives Gnumeric's XLSX/ODS/XLSX re-save with
+an adjacent double, negative zero, minimum subnormal, NaN, infinities and SQL
+NULL unchanged, without formulas. PostgreSQL bit/wire checks and Calc coverage
+are separately recorded
+([Gnumeric evidence](evidence/postgres-float8-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+Other array shapes and spreadsheet/consumer combinations remain open.
+
 ### October 5 PostgreSQL UUID array file-writer follow-up
 
 The native `uuid[]` contract now checks JSON and CSV text exports plus XLSX

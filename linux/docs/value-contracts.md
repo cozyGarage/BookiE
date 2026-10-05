@@ -177,6 +177,10 @@ SQL NULL unchanged as a string cell without formulas
 A PostgreSQL `float8[]` XLSX cell preserves an adjacent double, negative zero,
 the minimum subnormal, NaN, infinities and SQL NULL as exact text through the
 same Calc round trip ([evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same `float8[]` workbook also survives Gnumeric's XLSX/ODS/XLSX re-save
+with the adjacent double, negative zero, minimum subnormal, NaN, infinities and
+SQL NULL unchanged as text and without formulas
+([Gnumeric evidence](evidence/postgres-float8-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
 A PostgreSQL array of a domain over `bytea` preserves binary, empty and NULL
 elements and its declared type through decoding, qualified binding and keyed

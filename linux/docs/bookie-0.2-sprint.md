@@ -25,6 +25,13 @@ cell without a formula. The existing Calc contract remains separate; the wider
 array/consumer matrix stays open
 ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: a PostgreSQL `float8[]` XLSX result survives
+Gnumeric's XLSX/ODS/XLSX re-save with the adjacent double, negative zero,
+minimum subnormal, NaN, infinities and SQL NULL unchanged as text and without
+formulas. Native bit and wire-byte checks remain in the export test; the wider
+array/consumer matrix stays open
+([Gnumeric evidence](evidence/postgres-float8-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: PostgreSQL `uuid[]` now has JSON, CSV, XLSX and SQL
 file-writer assertions in one native contract. SQL replay restores the native
 type/value/JSON/wire bytes and leaves a pre-existing sibling row unchanged

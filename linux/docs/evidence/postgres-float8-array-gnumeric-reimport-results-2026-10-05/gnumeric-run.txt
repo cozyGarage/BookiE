@@ -1,0 +1,1 @@
+Cached Gnumeric image; ssconvert completed XLSX-to-ODS and ODS-to-XLSX conversions successfully.
