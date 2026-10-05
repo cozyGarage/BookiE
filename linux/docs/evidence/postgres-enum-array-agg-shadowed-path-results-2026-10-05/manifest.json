@@ -21,6 +21,13 @@
       "result": "1 passed, 0 failed against Docker PostgreSQL",
       "log": "focused-test.txt"
     },
+    "strict_value_matrix": {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "340 tests passed across 11 suites; no missing suites; GTK and DuckDB enabled; PostgreSQL selected 132 tests",
+      "revision": "364793f605d384785ac2a7ad22e3bc88a821ff9a",
+      "dirty": true,
+      "local_report": "target/quality/20261005T114943192762Z-values/report.json"
+    },
     "clippy": {
       "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
       "result": "passed",
