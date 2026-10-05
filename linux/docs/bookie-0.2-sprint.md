@@ -107,6 +107,11 @@ does not leak into named-parameter extraction. Formatting and replanning retain
 the procedure/query boundary, string contents and following `:after` parameter
 ([case evidence](evidence/mysql-colon-delimiter-parameter-results-2026-10-05/manifest.json)).
 
+October 5 B3-5 follow-up: a MySQL `#!` delimiter now preserves a `#` line
+comment inside the procedure and keeps the following query distinct through
+planning, formatting and parameter extraction. Other punctuation tokens remain
+open ([evidence](evidence/mysql-hash-prefixed-delimiter-results-2026-10-05/manifest.json)).
+
 October 5 B3-5 policy follow-up: MySQL executable comments (`/*!...*/`) and
 MariaDB executable comments (`/*M!...*/`) now classify as unparseable/write so
 the policy layer cannot treat embedded SQL as a read. Tests also keep ordinary
