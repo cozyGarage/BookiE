@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "c20356c2f4a5bccd7acbdd0d40e735654fd6d640",
+  "working_tree_dirty": true,
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "ordinary custom-enum parameter inference under a same-named shadow search_path",
+  "test": "value_contract_enum_parameters_resolve_target_under_shadowed_search_path",
+  "source_files": [
+    {
+      "path": "crates/drivers/postgres/tests/support/enum_parameter_context_contract.rs",
+      "sha256": "8c3912b2696813cf9a7b083b0a8ff70f274d791bfcdf3da58c988b91cadc3d56"
+    }
+  ],
+  "contract": [
+    "A target enum and a same-named shadow enum have different labels; the shadow leads transaction-local search_path while queries address the target table by schema.",
+    "COALESCE, GREATEST and LEAST each infer a text/NULL parameter in both argument positions; results and pg_typeof values are compared with explicit casts to the target enum.",
+    "Inputs include a regular label, the literal NULL label, the empty label and SQL NULL across rows containing those values and a NULL row.",
+    "A shadow-only label is rejected with SQLSTATE 22P02 for every expression position, and target rows retain their values and native enum type."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_parameters_resolve_target_under_shadowed_search_path -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 148,
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other PostgreSQL enum contexts/configurations and the wider engine/type/consumer B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}
