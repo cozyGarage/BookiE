@@ -173,6 +173,7 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | PostgreSQL enum-array quantifier | [Inferred `ALL($1)` compared with a typed PostgreSQL oracle](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array quantifier under `search_path` shadow | [Qualified target type and shadow-only label refusal](evidence/postgres-enum-array-quantifier-shadowed-path-results-2026-10-05/manifest.json) |
 | PostgreSQL enum-array `generate_subscripts` | [Untyped type-resolution boundary and native subscript/type/wire comparisons](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json) |
+| PostgreSQL enum-array shape functions | [Native shape functions, empty/NULL boundaries and wire-byte comparisons](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json) |
 | DuckDB nanosecond keyed edit | [Native `TIME_NS`/`TIMESTAMP_NS` values and sibling preservation](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json) |
 | XLSX/XML/other formats | [Workbook precision](value-contract-history.md#xlsx-float-precision-and-excel-safe-cell-types-2026-10-02), [temporal workbook](value-contract-history.md#xlsx-temporal-consumer-checkpoint-2026-09-27), [XML text](value-contract-history.md#xml-text-consumer-checkpoint-2026-09-27) |
 | Mutation and infrastructure | [Scoped re-audit](value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](regression-audit-2026-09-29.md), [B3 review](b3-review-2026-10-01.md) |

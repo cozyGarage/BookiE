@@ -64,12 +64,20 @@ qualified cast under the same-named shadow path matches native subscripts for
 both dimensions, reverse ordering, non-default lower bounds, empty arrays and
 SQL NULL, with array type and wire-byte checks
 ([evidence](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json)).
+The enum-array shape family is also checked with a same-named shadow type:
+`array_dims`, `array_ndims`, `array_length`, `array_lower`, `array_upper`, and
+`cardinality` match typed native literals and `array_send` bytes for multidimensional
+non-default bounds, empty labels/arrays, and SQL NULL. Untyped shape calls return
+`42804`; empty-array length is NULL while cardinality is zero
+([evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json)).
 Quoted enum schema/type identifiers containing embedded quotes also retain the
 target type under a same-named shadowed `search_path`; keyed writes and filters
 match native qualified/unqualified type names, preserve both target and shadow
 rows, and reject a shadow-only label ([identifier evidence](evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json)).
-Other inferred array operator/function contexts remain candidates; these cases
-do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
+Remaining named PostgreSQL enum-array candidates include `array_to_string`,
+`array_fill`, multi-array `unnest`, and the random-result `array_sample` and
+`array_shuffle` functions. These cases do not close the PostgreSQL or B3 matrix.
+See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
 and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
 

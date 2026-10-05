@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "15aaa9cffa2b9185e487748432564f441083df60",
+  "scope": "PostgreSQL 16 enum-array shape-function type resolution and value contract under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/array_shape.rs",
+    "sha256": "c48f60324bcda6a1e3df7c1657834b894532324164e878a569587494ed739688"
+  },
+  "selector": "domain_contract::value_contract_enum_array_shape_functions_preserve_bounds_under_shadowed_path",
+  "functions": [
+    "array_dims",
+    "array_ndims",
+    "array_length",
+    "array_lower",
+    "array_upper",
+    "cardinality"
+  ],
+  "assertions": [
+    "Untyped calls over an unknown enum array return PostgreSQL SQLSTATE 42804; qualified target-array casts work while a same-named shadow enum leads search_path.",
+    "Native literals and bound parameters agree on dimensions, lengths, lower/upper bounds, cardinality, pg_typeof and array_send bytes.",
+    "Cases cover multidimensional non-default bounds, an empty enum label, literal NULL, SQL NULL elements, empty arrays and SQL NULL arrays.",
+    "For empty arrays, array_length returns NULL and cardinality returns zero; SQL NULL arrays remain NULL."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_array_shape_functions_preserve_bounds_under_shadowed_path -- --ignored --nocapture",
+      "result": "passed, 1 test",
+      "log": "focused-test.txt"
+    },
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 331 selected tests across all 11 suites, no missing suites; PostgreSQL selected 125 tests",
+      "report": "report.json",
+      "postgres_log": "crates-drivers-postgres.log"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the driver test is registered",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "worktree_note": "The strict runner report records baseline 15aaa9c with dirty=true because this test and its docs were added in the worktree. The test source is pinned by SHA-256 above.",
+  "remaining": [
+    "The PostgreSQL enum-array matrix still has named function candidates; see the current B3 board.",
+    "This contract does not close the broader engine/type/consumer/configuration matrix."
+  ],
+  "reference": "PostgreSQL 16 array-function semantics: https://www.postgresql.org/docs/16/functions-array.html"
+}

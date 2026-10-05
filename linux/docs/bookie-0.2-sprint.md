@@ -55,6 +55,13 @@ empty/NULL arrays, and native type/wire bytes. Other inferred array
 function/operator contexts and the broader B3 matrix remain open
 ([case evidence](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json)).
 
+October 5 B3 follow-up: PostgreSQL enum-array shape functions now cover
+dimensions, bounds, lengths and cardinality under the same shadowed path,
+including the empty-array distinction between NULL length and zero cardinality.
+The remaining named enum-array candidates are `array_to_string`, `array_fill`,
+multi-array `unnest`, and random-result `array_sample`/`array_shuffle`
+([case evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json)).
+
 The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These
 reports capture the dirty merge worktree with `origin/linux` at `6346a431c`

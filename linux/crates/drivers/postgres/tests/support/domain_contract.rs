@@ -12,6 +12,8 @@ include!("domain_contract_parts/array_positions.rs");
 
 include!("domain_contract_parts/array_subscripts.rs");
 
+include!("domain_contract_parts/array_shape.rs");
+
 include!("domain_contract_parts/array_equality.rs");
 
 include!("domain_contract_parts/deep_domains.rs");
