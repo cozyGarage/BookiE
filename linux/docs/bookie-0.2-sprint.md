@@ -403,6 +403,12 @@ with `EMPTY_STRING_IS_NULL`, `STRICT_TRANS_TABLES`, `ANSI_QUOTES` and
 `NO_BACKSLASH_ESCAPES` active together; the native ordinal/byte/NULL checks and
 untouched sibling match the standalone-mode case ([evidence](evidence/mariadb-empty-enum-set-combined-mode-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
+schema-qualified destination cast across a role `search_path` change between
+planning and execution on a fresh connection. A distinct same-named enum leads
+the new path; native target type/value checks confirm restoration and the
+shadow table remains empty ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
+
 October 4 local integration gate: all 315 tests passed at
 `d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,
 policy/session, PostgreSQL socket and SSH suites. B3/B4 and release acceptance

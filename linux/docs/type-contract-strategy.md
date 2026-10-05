@@ -115,6 +115,11 @@ another schema shadows it through `search_path` ([evidence](evidence/postgres-sh
 Scalar-enum CSV restore has the same configuration check with a target-only
 label, empty text, literal `NULL`, SQL NULL and an unchanged sibling row
 ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
+The import plan also remains bound to its destination enum when a fresh
+execution connection changes the role's `search_path` to put a different
+same-named decoy enum first between planning and execution; native target type,
+values and untouched shadow/sibling rows are checked
+([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
 Custom enum-array grid edits now have app-parser and native keyed-write
 coverage, including invalid-label refusal and sibling preservation ([evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
 The grid parser and live write path distinguish blank SQL NULL from the empty

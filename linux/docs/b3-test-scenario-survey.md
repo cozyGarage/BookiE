@@ -128,6 +128,10 @@ A PostgreSQL scalar-enum CSV import case now also runs with a same-named shadow
 enum first in `search_path`; it restores a target-only label, an empty label,
 literal `NULL`, and SQL NULL with the qualified target type while preserving a
 sibling row ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
+The import plan also survives a role `search_path` change before execution on a
+fresh connection, with another same-named decoy enum first; native target type,
+all four value/null states, the sibling, and the untouched shadow table are
+asserted ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
 MariaDB 11's `EMPTY_STRING_IS_NULL` mode also has a native enum/set CSV restore
 contract: an empty ENUM label and zero-member SET stay distinct from SQL NULL
 by rebuilding empty text with a server expression; native ordinal/byte checks

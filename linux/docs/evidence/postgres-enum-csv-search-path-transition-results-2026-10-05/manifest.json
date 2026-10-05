@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "108498c73fad7fa99af1f68c86e4f1c9382dc831",
+  "case": "PostgreSQL scalar-enum CSV import remains schema-qualified when the role search_path changes between planning and execution",
+  "test": "enum_contract::value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed_search_path",
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "CSV metadata and the insert plan are built while enum_csv_shadow_a is first in search_path and shadows the destination type name in enum_csv_shadow_b.",
+    "Before execution, the role search_path changes and a fresh connection uses enum_csv_shadow_c first, whose same-named enum has a distinct decoy-only label.",
+    "The schema-qualified insert cast restores target-only, literal NULL, empty text, and SQL NULL to enum_csv_shadow_b.state.",
+    "The target sibling is unchanged and the identically named shadow table in enum_csv_shadow_a remains empty."
+  ],
+  "validation": {
+    "focused_postgres": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_csv_import_uses_target_schema_under_shadowed_search_path -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 147,
+      "log": "focused-postgres.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check HEAD",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  }
+}
