@@ -1087,7 +1087,18 @@ async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
     let connection = connect(opts).await;
     connection.execute("CREATE SCHEMA value_contract_domain_coalesce").await.unwrap();
     connection
-        .execute("CREATE TYPE value_contract_domain_coalesce.state AS ENUM ('ready', 'paused')")
+        .execute(
+            "CREATE TYPE value_contract_domain_coalesce.state \
+             AS ENUM ('ready', 'paused', 'NULL', '')",
+        )
+        .await
+        .unwrap();
+    connection.execute("CREATE SCHEMA value_contract_domain_coalesce_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_coalesce_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
+        )
         .await
         .unwrap();
     connection
@@ -1156,4 +1167,110 @@ async fn value_contract_domain_over_enum_coalesce_infers_parameter_type() {
             );
         }
     }
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO value_contract_domain_coalesce_shadow, public")
+        .await
+        .unwrap();
+    for (parameter, native_parameter) in [
+        (Value::Text("NULL".into()), "'NULL'"),
+        (Value::Text(String::new()), "''"),
+        (Value::Null, "NULL"),
+    ] {
+        let native = transaction
+            .query(&format!(
+                "SELECT id, \
+                 CASE WHEN id = 1 THEN {native_parameter}::value_contract_domain_coalesce.state \
+                      ELSE status END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN {native_parameter}::value_contract_domain_coalesce.state \
+                                ELSE status END)::text, \
+                 CASE WHEN id = 1 THEN status \
+                      ELSE {native_parameter}::value_contract_domain_coalesce.state END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN status \
+                                ELSE {native_parameter}::value_contract_domain_coalesce.state END)::text, \
+                 pg_typeof(status)::text \
+                 FROM value_contract_domain_coalesce.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let inferred = transaction
+            .query_params(
+                "SELECT id, \
+                 CASE WHEN id = 1 THEN $1 ELSE status END::text, \
+                 pg_typeof($1)::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN $1 ELSE status END)::text, \
+                 CASE WHEN id = 1 THEN status ELSE $1 END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN status ELSE $1 END)::text, \
+                 pg_typeof(status)::text \
+                 FROM value_contract_domain_coalesce.rows ORDER BY id",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected = native
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text("value_contract_domain_coalesce.state".into()),
+                    row[2].clone(),
+                    row[3].clone(),
+                    row[4].clone(),
+                    row[5].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inferred.rows, expected, "domain CASE with {parameter:?}");
+    }
+
+    for expression in [
+        "CASE WHEN id = 1 THEN $1 ELSE status END",
+        "CASE WHEN id = 1 THEN status ELSE $1 END",
+    ] {
+        transaction.execute("SAVEPOINT invalid_domain_case").await.unwrap();
+        let invalid = transaction
+            .query_params(
+                &format!(
+                    "SELECT {expression} FROM value_contract_domain_coalesce.rows ORDER BY id"
+                ),
+                &[Value::Text("shadow-only".into())],
+            )
+            .await
+            .expect_err("CASE parameter must resolve against the target enum, not its shadow");
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+        );
+        transaction.execute("ROLLBACK TO SAVEPOINT invalid_domain_case").await.unwrap();
+    }
+    let unchanged = transaction
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text \
+             FROM value_contract_domain_coalesce.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        unchanged.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("ready".into()),
+                Value::Text("value_contract_domain_coalesce.state_domain".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("paused".into()),
+                Value::Text("value_contract_domain_coalesce.state_domain".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text("value_contract_domain_coalesce.state_domain".into()),
+            ],
+        ]
+    );
 }

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "306a87ed33b041f019574204477fe25bd99d97cc",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/domain_contract_parts/basic_domains.rs",
+  "source_file_sha256": "d5e2c97c157290719137d1558e1eab9513d9a5c3d04e03be3422eaae548eedfa",
+  "case": "PostgreSQL CASE enum parameter inference with a domain over the target enum and a shadowed search_path",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The CASE parameter occupies both result branches while the opposite branch is a column of a domain over the target enum.",
+    "A same-named decoy enum leads transaction search_path; parameter inference still selects the target base enum.",
+    "The literal NULL enum label, empty enum label and SQL NULL are compared to schema-qualified native expressions.",
+    "pg_typeof checks parameter and CASE result types while the source column retains its outer domain type.",
+    "Invalid shadow-only labels retain SQLSTATE 22P02 and source rows remain unchanged."
+  ],
+  "validation": {
+    "focused_test": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_coalesce_infers_parameter_type -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "focused-test.txt"},
+    "postgres_integration": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored", "passed": 147, "failed": 0, "filtered": 1, "seconds": 170.79, "log": "postgres-integration.txt"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

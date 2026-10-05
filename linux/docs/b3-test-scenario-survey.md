@@ -29,6 +29,10 @@ the empty label and SQL NULL and asserting invalid-label refusal
 value and type comparisons for valid enum values and SQL NULL; invalid labels
 retain SQLSTATE `22P02`
 ([evidence](evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json)).
+A domain-over-enum CASE follow-up checks both parameter branches with a
+same-named shadow enum leading `search_path`; native type/value checks preserve
+the target enum and outer domain and distinguish empty text, literal `NULL`,
+and SQL NULL ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
 
 MongoDB keyed grid edits now compare each edited field with its value from the
 materialized result in the atomic update filter. A failing-first MongoDB 7 case

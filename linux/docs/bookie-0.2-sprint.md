@@ -446,6 +446,12 @@ both `GREATEST` and `LEAST` argument positions against native typed results.
 The contracts retain PostgreSQL's NULL handling and `22P02` invalid-label
 behavior ([evidence](evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: domain-over-enum CASE parameters now have native
+coverage in both result branches with a same-named shadow enum first in
+`search_path`. Literal `NULL`, empty text, SQL NULL, `pg_typeof`, invalid-label
+refusal and unchanged outer-domain rows are checked
+([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: PostgreSQL custom-enum CSV import also handles schema,
 table and type identifiers with spaces and embedded quotes while a same-named
 shadow schema leads `search_path`. The generated cast selects the target enum;

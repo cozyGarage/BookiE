@@ -1,0 +1,2 @@
+Command: cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings
+Result: passed; no issues found.

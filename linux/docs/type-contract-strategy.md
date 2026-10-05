@@ -276,6 +276,11 @@ A domain-over-enum `COALESCE` contract now covers text and SQL NULL in both
 argument positions. PostgreSQL infers the parameter and expression as the base
 enum while the source column remains the outer domain, verified with `pg_typeof`
 and exact rows ([evidence](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json)).
+The same domain-over-enum path now covers both CASE result branches while a
+same-named shadow enum leads `search_path`; the target base enum parameter and
+CASE result types, outer domain type, empty/literal-NULL/SQL-NULL values and
+invalid-label refusal are all checked against native expressions
+([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
 The same text/NULL inference now covers `array_append` and `array_prepend`: the
 input constructor retains `state_domain[]`, while the polymorphic function result
 uses `state[]` ([array-function evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).

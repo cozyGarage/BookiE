@@ -1,0 +1,10 @@
+PostgreSQL 16 native integration contract for CASE inference with a domain over
+a custom enum.
+
+The CASE parameter is placed in both result branches while the table's
+state_domain column supplies the other branch. A same-named decoy enum leads
+the transaction search_path. Literal NULL, the empty enum label, and SQL NULL
+are compared with schema-qualified native enum expressions. pg_typeof checks
+the parameter, CASE expressions, and unchanged outer-domain column. Invalid
+shadow-only labels must be rejected with 22P02, and all source rows are checked
+unchanged after the refusals.

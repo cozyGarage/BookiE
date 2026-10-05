@@ -142,6 +142,11 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | Script planning and approval | [MySQL delimiter consumer agreement](value-contract-history.md#mysql-delimiter-consumer-agreement-2026-09-28), [word-character delimiter boundary](evidence/mysql-word-delimiter-results-2026-10-04/manifest.json), [quoted delimiter consumer agreement](evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json), [short `\d` delimiter consumer](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json), [malformed-routine fail-closed contract](value-contract-history.md#mysql-malformed-routine-delimiter-fails-closed-2026-09-30), [human policy decision](evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json), [GTK approval route](evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json), [MySQL-backed GTK approval and dispatch](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json) |
 | Transport/partial delivery | [Disconnection contracts](disconnection-contracts.md); coordinate type/result delivery with B4 ownership |
 
+PostgreSQL domain-over-enum CASE parameter inference now has a native contract
+for both result branches under a shadowed `search_path`, including empty and
+literal `NULL` labels distinct from SQL NULL
+([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
+
 PostgreSQL domain-over-enum arrays now also have a bound text-parameter contract
 for literal `NULL`, empty text, Unicode, comma-containing labels and SQL NULL,
 verified against native `array_send` bytes ([parameter evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)); a separate 2×2 parameter case preserves lower bounds 0 and 3 ([bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json)).
