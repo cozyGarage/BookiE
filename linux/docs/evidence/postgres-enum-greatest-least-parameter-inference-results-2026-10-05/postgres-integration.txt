@@ -1,0 +1,2 @@
+Command: cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored
+Result: 147 passed, 0 failed, 1 filtered; PostgreSQL 16 Docker fixture; 170.61 seconds.

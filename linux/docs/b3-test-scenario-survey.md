@@ -25,6 +25,10 @@ The scalar enum parameter matrix now also checks `CASE` result type inference
 with `$1` in both result branches, distinguishing the literal `NULL` label,
 the empty label and SQL NULL and asserting invalid-label refusal
 ([evidence](evidence/postgres-enum-case-parameter-inference-results-2026-10-05/manifest.json)).
+`GREATEST` and `LEAST` now cover `$1` in both argument positions, with native
+value and type comparisons for valid enum values and SQL NULL; invalid labels
+retain SQLSTATE `22P02`
+([evidence](evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json)).
 
 MongoDB keyed grid edits now compare each edited field with its value from the
 materialized result in the atomic update filter. A failing-first MongoDB 7 case

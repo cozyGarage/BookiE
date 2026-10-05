@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "6294b086291ab5612367e5c59ae2f760712eeab3",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/enum_parameter_context_contract.rs",
+  "source_file_sha256": "37e882eb5307e3da6e3c803434636de106551ffc938cd194d9b504e30be3e46a",
+  "case": "PostgreSQL custom enum inference for GREATEST and LEAST arguments",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The inferred custom enum parameter occupies both argument positions of GREATEST and LEAST.",
+    "The literal NULL enum label, empty label, and SQL NULL remain distinct.",
+    "Parameter and expression types match the explicitly typed native enum expressions.",
+    "PostgreSQL's GREATEST/LEAST NULL semantics are compared with native results.",
+    "Invalid labels in each argument position retain SQLSTATE 22P02, and source rows stay unchanged."
+  ],
+  "validation": {
+    "focused_test": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_parameters_in_coalesce_array_append_and_nullif -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "focused-test.txt"},
+    "postgres_integration": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored", "passed": 147, "failed": 0, "filtered": 1, "seconds": 170.61, "log": "postgres-integration.txt"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

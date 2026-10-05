@@ -1,0 +1,7 @@
+PostgreSQL 16 native integration contract for enum ordering expressions.
+
+GREATEST and LEAST each bind the enum parameter in both argument positions.
+The literal enum label NULL, the empty label and SQL NULL are compared with
+explicitly typed native expressions. This checks PostgreSQL's NULL handling,
+the parameter and expression pg_typeof values, and native SQLSTATE 22P02 for
+invalid labels in each argument position. Source rows are verified unchanged.

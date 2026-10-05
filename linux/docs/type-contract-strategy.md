@@ -259,6 +259,9 @@ literal `NULL` label, empty enum label and SQL NULL are compared with explicitly
 typed native expressions; `pg_typeof` verifies parameter and result types, and
 invalid labels retain native `22P02` behavior
 ([evidence](evidence/postgres-enum-case-parameter-inference-results-2026-10-05/manifest.json)).
+`GREATEST` and `LEAST` now cover the parameter in both argument positions,
+including their NULL handling, against explicitly typed enum expressions and
+`pg_typeof` results ([evidence](evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json)).
 A follow-up also verifies `NULLIF(enum_column, $1)` infers both text and SQL
 NULL parameters as the native enum, preserves exact results, and returns native
 `22P02` for an invalid label

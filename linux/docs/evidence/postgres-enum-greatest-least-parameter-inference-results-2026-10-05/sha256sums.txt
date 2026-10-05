@@ -1,0 +1,8 @@
+3cb28c775f52545ee52978dfdd4b40e983a8d359eef1eb78e636ca338414ca0b  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/contract.txt
+acc1b06e08903791a9d219a7032adf858da4c4577020c3bdf935d4ecd03fbaac  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/focused-test.txt
+93ea266fd8017e4ea80afce99cfd041228ef23bf78c48a3a3612baae854a6e8c  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/postgres-integration.txt
+4183798ad4733fa73b597d8781c274e205183b63c2514de1d04bec8b6bc633d1  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/clippy.txt
+4213077d49081e95718b2fad873a41e865bd74e1163975ac9a58a49573d28eec  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/fmt.txt
+d390914ba0cc6e60835c4db4ecef788e811e56155882cad522e6009b86d74628  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/ignored-inventory.txt
+a2d29eac0db94ede2cf05f391ae78688db856983dd81f9a23b184b21482dea27  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/diff-check.txt
+9f7118daa389f7a4748ab32db4517495e03280fe9062e083ed0a58c1e3ed27f6  docs/evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json

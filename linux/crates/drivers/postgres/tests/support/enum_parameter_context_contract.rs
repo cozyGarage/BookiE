@@ -132,6 +132,58 @@ async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
             })
             .collect::<Vec<_>>();
         assert_eq!(inferred.rows, expected, "CASE enum parameter {parameter:?}");
+
+        for (native_expression, inferred_expression) in [
+            (
+                format!("GREATEST({native_parameter}::{enum_type}, state)"),
+                "GREATEST($1, state)",
+            ),
+            (
+                format!("GREATEST(state, {native_parameter}::{enum_type})"),
+                "GREATEST(state, $1)",
+            ),
+            (
+                format!("LEAST({native_parameter}::{enum_type}, state)"),
+                "LEAST($1, state)",
+            ),
+            (
+                format!("LEAST(state, {native_parameter}::{enum_type})"),
+                "LEAST(state, $1)",
+            ),
+        ] {
+            let native = connection
+                .query(&format!(
+                    "SELECT id, {native_expression}::text, \
+                     pg_typeof({native_expression})::text \
+                     FROM value_contract_enum_parameter_context.rows ORDER BY id"
+                ))
+                .await
+                .unwrap();
+            let inferred = connection
+                .query_params(
+                    &format!(
+                        "SELECT id, {inferred_expression}::text, pg_typeof($1)::text, \
+                         pg_typeof({inferred_expression})::text \
+                         FROM value_contract_enum_parameter_context.rows ORDER BY id"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            let expected = native
+                .rows
+                .into_iter()
+                .map(|row| {
+                    vec![
+                        row[0].clone(),
+                        row[1].clone(),
+                        Value::Text(enum_type.into()),
+                        row[2].clone(),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(inferred.rows, expected, "{inferred_expression} with {parameter:?}");
+        }
     }
 
     for (parameter, expected_ready) in [
@@ -174,6 +226,10 @@ async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
         "SELECT array_append(ARRAY[state], $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
         "SELECT CASE WHEN id = 1 THEN $1 ELSE state END FROM value_contract_enum_parameter_context.rows",
         "SELECT CASE WHEN id = 1 THEN state ELSE $1 END FROM value_contract_enum_parameter_context.rows",
+        "SELECT GREATEST($1, state) FROM value_contract_enum_parameter_context.rows",
+        "SELECT GREATEST(state, $1) FROM value_contract_enum_parameter_context.rows",
+        "SELECT LEAST($1, state) FROM value_contract_enum_parameter_context.rows",
+        "SELECT LEAST(state, $1) FROM value_contract_enum_parameter_context.rows",
     ] {
         let error = connection
             .query_params(sql, &[Value::Text("not-a-label".into())])
