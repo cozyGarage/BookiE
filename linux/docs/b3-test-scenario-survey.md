@@ -355,6 +355,12 @@ replay under `ISO, MDY`, plus parameter rebinding, preserve the original
 `array_send` bytes across the session setting change
 ([evidence](evidence/postgres-date-array-sql-dmy-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 PostgreSQL follow-up: `interval[]` values exported while
+`IntervalStyle = postgres_verbose` survive parameter rebinding, CSV, and SQL
+replay after changing to `iso_8601`. Native `array_send` bytes match for the
+mixed-sign fields, subsecond values, zero interval, and SQL NULL
+([evidence](evidence/postgres-interval-array-style-transition-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as

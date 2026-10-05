@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "ed0600276aa8b7dca7a06463aa29935e81d26571",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "interval[] parameter, CSV and SQL replay across IntervalStyle configurations",
+  "test": "array_contract::value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_change",
+  "contract": [
+    "The source interval[] is read with IntervalStyle postgres_verbose and contains mixed-sign year/month/day/time fields, microseconds, a zero interval and SQL NULL.",
+    "The source type and array_send bytes are captured from PostgreSQL before changing the transaction to IntervalStyle iso_8601.",
+    "Rebinding the driver result, rebinding its CSV field, and replaying the SQL export after the style change all preserve the source array_send bytes.",
+    "The temporary target table is rolled back after verification."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_change -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 172 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 492 declarations, Driver tier 359",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other temporal-array types, style combinations, spreadsheet applications, and installed editing remain open; this case does not close B3."
+  ],
+  "log_sha256": {
+    "focused.txt": "3f83efc6d505999c4d9e346e62c5b6993c1606d2a50a0428ed04e5a606ac51b9",
+    "driver-suite.txt": "d4bc341fe676bd819293da5cdca3486c90ade0c8251d41b115a110ebffa666df",
+    "ignored-inventory.txt": "80b371a85e0d0d7e1f70a13cad3ac00f1f605bd925cb2c059c7080a07fde31cd"
+  }
+}

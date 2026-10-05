@@ -198,6 +198,11 @@ PostgreSQL `date[]` result text stays canonical ISO when fetched under
 `ISO, MDY` preserve the source array's native wire bytes
 ([evidence](evidence/postgres-date-array-sql-dmy-results-2026-10-05/manifest.json)).
 
+PostgreSQL `interval[]` values also survive rebinding, CSV and SQL replay when
+the transaction changes from `postgres_verbose` to `iso_8601` `IntervalStyle`;
+native `array_send` bytes cover mixed-sign calendar/time components, zero and
+SQL NULL ([evidence](evidence/postgres-interval-array-style-transition-results-2026-10-05/manifest.json)).
+
 The selected-row TSV clipboard path is also exercised in LibreOffice Calc 26.8.0.3:
 literal `NULL`, empty text, SQL NULL's collision-free marker, marker-shaped labels,
 formula-shaped text and quoted tab/newline text retain the asserted cell contents
