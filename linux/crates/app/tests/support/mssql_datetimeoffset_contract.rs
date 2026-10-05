@@ -57,6 +57,40 @@ async fn value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offs
         assert!(matches!(row[3], Value::Bytes(ref bytes) if bytes.len() == 11));
     }
 
+    let workbook_result = connection
+        .query_controlled("SELECT value FROM datetimeoffset_grid ORDER BY id", &control)
+        .await
+        .unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("datetimeoffset.xlsx");
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &workbook_result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet).unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    for (index, (stamp, _)) in expected.iter().enumerate() {
+        assert!(sheet.contains(&format!("<c r=\"A{}\" t=\"s\">", index + 2)), "{sheet}");
+        assert!(shared_strings.contains(&format!("<t>{stamp}</t>")), "{shared_strings}");
+    }
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
     let mut updates = Vec::new();
     for row in &before.rows[..3] {
         let displayed = crate::ui::grid::value_to_display_text(&row[value_index]);
