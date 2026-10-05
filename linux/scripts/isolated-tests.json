@@ -18,6 +18,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings"
     ],
     [

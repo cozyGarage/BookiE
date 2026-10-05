@@ -227,6 +227,106 @@ async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_a
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl, Value};
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::postgres::Postgres;
+
+    const ARRAY: &str = "{0.10000000149011612,1.0000001192092896,-0,1.401298464324817e-45,NaN,Infinity,-Infinity,NULL}";
+    const ORACLE: &str = "ARRAY[0.10000000149011612::float4, 1.0000001192092896::float4, \
+        '-0'::float4, '1.401298464324817e-45'::float4, 'NaN'::float4, \
+        'Infinity'::float4, '-Infinity'::float4, NULL]::float4[]";
+
+    let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
+    let connection = drivers_postgres::PgDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(5432).await.unwrap(),
+            database: "postgres".into(),
+            username: "postgres".into(),
+            password: secrecy::SecretString::new("postgres".to_string().into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    connection
+        .execute_controlled(
+            "CREATE TABLE float4_array_grid (id integer PRIMARY KEY, value float4[])",
+            &control,
+        )
+        .await
+        .unwrap();
+    connection
+        .execute_controlled(
+            "INSERT INTO float4_array_grid VALUES (1, ARRAY[0]::float4[]), (2, ARRAY[77]::float4[])",
+            &control,
+        )
+        .await
+        .unwrap();
+
+    let columns = connection
+        .fetch_columns_controlled(None, "float4_array_grid", &control)
+        .await
+        .unwrap();
+    let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+    let before = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM float4_array_grid ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    let sibling_before = before.rows[1].clone();
+
+    let parsed = parse_input_for_driver(ARRAY, Some(&columns[value_index]), "postgres")
+        .expect("float4[] array text should pass through app grid parsing");
+    assert_eq!(parsed, Value::Text(ARRAY.into()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "float4_array_grid",
+        &columns,
+        &[(value_index, parsed)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update.0.contains("::text::pg_catalog.float4[]"), "{}", update.0);
+    assert_eq!(update.1[0], Value::Text(ARRAY.into()));
+    assert_eq!(
+        connection
+            .execute_in_transaction_controlled(&[update], &control)
+            .await
+            .unwrap(),
+        vec![1]
+    );
+
+    let after = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM float4_array_grid ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    let native = connection
+        .query_controlled(
+            &format!(
+                "SELECT pg_typeof({ORACLE})::text, array_to_json({ORACLE})::text, \
+                 encode(array_send({ORACLE}), 'hex')"
+            ),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(after.rows[0][1..], native.rows[0][..]);
+    assert_eq!(after.rows[1], sibling_before);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings() {
     use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
     use testcontainers::ImageExt;
