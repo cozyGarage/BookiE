@@ -582,6 +582,109 @@ async fn value_contract_enum_min_max_keep_target_type_and_order_under_shadowed_s
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_range_observes_added_label_order_in_same_session() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_alter_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_alter_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_alter_target.state AS ENUM ('queued', 'complete')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_alter_shadow.state AS ENUM ('shadow-only', 'complete')",
+        )
+        .await
+        .unwrap();
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    session
+        .query_params_controlled(
+            "SET search_path = value_contract_enum_alter_shadow, \
+             value_contract_enum_alter_target, public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let before = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_alter_target.state) AS value",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(before.columns[0].data_type, "value_contract_enum_alter_target.state[]");
+    assert_eq!(before.rows[0][0], Value::Text(r#"{"queued","complete"}"#.into()));
+
+    session
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_alter_target.state \
+             ADD VALUE 'working' BEFORE 'complete'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert!(session.is_usable());
+
+    let catalog = session
+        .query_params_controlled(
+            "SELECT enumlabel::text FROM pg_enum \
+             WHERE enumtypid = 'value_contract_enum_alter_target.state'::regtype \
+             ORDER BY enumsortorder",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        catalog.rows,
+        ["queued", "working", "complete"].map(|label| vec![Value::Text(label.into())])
+    );
+
+    let result = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_alter_target.state) AS value",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let target_array = "value_contract_enum_alter_target.state[]";
+    assert_eq!(result.columns[0].data_type, target_array);
+    assert_eq!(result.rows[0][0], Value::Text(r#"{"queued","working","complete"}"#.into()));
+
+    let native = session
+        .query_params_controlled(
+            "SELECT pg_typeof(enum_range(NULL::value_contract_enum_alter_target.state))::text, \
+                    array_to_json(enum_range(NULL::value_contract_enum_alter_target.state))::text, \
+                    encode(array_send(enum_range(NULL::value_contract_enum_alter_target.state)), 'hex')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(target_array.into()));
+    assert_eq!(native.rows[0][1], Value::Text(r#"["queued","working","complete"]"#.into()));
+    let rebound = session
+        .query_params_controlled(
+            &format!("SELECT encode(array_send($1::text::{target_array}), 'hex')"),
+            std::slice::from_ref(&result.rows[0][0]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
