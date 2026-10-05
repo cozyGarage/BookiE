@@ -88,9 +88,14 @@ array under a same-named shadow path. The native oracle checks storage order,
 multidimensional flattening, shorter/NULL/empty-array NULL padding, ordinality,
 per-column types and shadow-only label refusal. Untyped calls return SQLSTATE
 `42725` ([evidence](evidence/postgres-enum-multi-array-unnest-results-2026-10-05/manifest.json)).
-Remaining named PostgreSQL enum-array candidates are random-result
-`array_sample` and `array_shuffle`; these cases do not close the PostgreSQL or
-B3 matrix.
+The named random-result enum-array functions `array_sample` and
+`array_shuffle` are now covered with multiset and result-shape oracles rather
+than fixed random output. Repeated samples enforce count-bounded subset
+membership; shuffles preserve the full multiset; multidimensional operations
+select or reorder whole first-dimension slices. Empty/NULL inputs, sample-size
+boundaries and shadowed enum resolution are checked
+([evidence](evidence/postgres-enum-random-arrays-results-2026-10-05/manifest.json)).
+These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
 and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).

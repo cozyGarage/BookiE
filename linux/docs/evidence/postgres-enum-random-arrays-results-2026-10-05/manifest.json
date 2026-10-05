@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "571a1e35f90d52b92d0b1181814e0e0e6c25a3df",
+  "scope": "PostgreSQL enum-array array_sample and array_shuffle type resolution, randomized multiset invariants and result shape under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/random_enum_arrays.rs",
+    "sha256": "50905d8ff296334e90c89cfdbde92bd11d343928ccf0d87c783c85b8a40f8b63"
+  },
+  "selector": "domain_contract::value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_shadowed_path",
+  "assertions": [
+    "Untyped array_sample($1, n) and array_shuffle($1) calls return PostgreSQL SQLSTATE 42804; qualified enum[] casts remain bound to the target enum with a same-named shadow enum first in search_path.",
+    "Twenty-four repeated 1D samples at each size 0, 1, 3, and 6 preserve sample cardinality and never select any label or NULL more times than it occurs in the input; the test makes no fixed-order assertion.",
+    "Thirty-two repeated 1D shuffles preserve the full multiset, including duplicate labels and SQL NULL, with result type and shape checked against native calls.",
+    "Repeated 2D samples and shuffles return whole first-dimension slices with the expected dimensions and JSON values, without assuming which valid random ordering occurs.",
+    "Empty arrays remain empty; SQL NULL arrays return SQL NULL with the target enum-array type; requesting 7 items from a 6-item first dimension returns SQLSTATE 22023.",
+    "A shadow-only enum label is rejected with PostgreSQL SQLSTATE 22P02."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_shadowed_path -- --ignored --nocapture",
+      "result": "passed, 1 test",
+      "log": "focused-test.txt"
+    },
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 335 selected tests across all 11 suites, no missing suites; PostgreSQL selected 129 tests",
+      "report": "report.json",
+      "postgres_log": "crates-drivers-postgres.log"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the driver test is registered",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "worktree_note": "The strict runner report records baseline 571a1e3 with dirty=true because this test and its docs were added in the worktree. The test source is pinned by SHA-256 above.",
+  "remaining": [
+    "These cases do not close the broader PostgreSQL array or B3 matrix."
+  ],
+  "reference": "PostgreSQL 16 array-function semantics: https://www.postgresql.org/docs/16/functions-array.html"
+}
