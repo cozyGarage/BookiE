@@ -234,6 +234,13 @@ beyond `text[]`, `uuid[]`, `enum[]`, domain-over-enum `[]`, `bytea[]`, `timestam
 See the [array file-writer
 evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
+October 5 B3-1 follow-up: PostgreSQL enum-array parameter text now has direct
+codec cases for quoted and escaped labels, empty text, SQL NULL, custom lower
+bounds, nested arrays, ragged shapes, inconsistent bounds and malformed tails.
+The native domain-over-enum `ANY($1)` contract also passed against the server's
+type and `array_send` wire-byte oracles
+([evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: the existing PostgreSQL `text[]` workbook now also
 survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save. Its 84-character shared
 string is identical in all three artifacts, remains a string cell, contains

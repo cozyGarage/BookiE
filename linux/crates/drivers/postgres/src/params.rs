@@ -490,4 +490,44 @@ mod tests {
             Err(DriverError::Unsupported(message)) if message.contains("at most six dimensions")
         ));
     }
+
+    #[test]
+    fn inferred_enum_array_text_preserves_quotes_escapes_nulls_and_bounds() {
+        let parsed = parse_enum_array_text(r#"[0:5]={"NULL",NULL,"","a,b","a\"b","a\\b"}"#).unwrap();
+        assert_eq!(parsed.dimensions, vec![(6, 0)]);
+        assert_eq!(
+            parsed.elements,
+            vec![
+                Some("NULL".into()),
+                None,
+                Some(String::new()),
+                Some("a,b".into()),
+                Some("a\"b".into()),
+                Some("a\\b".into()),
+            ]
+        );
+
+        let parsed = parse_enum_array_text(r#"[-1:0][3:4]={{ready,NULL},{"",東京}}"#).unwrap();
+        assert_eq!(parsed.dimensions, vec![(2, -1), (2, 3)]);
+        assert_eq!(
+            parsed.elements,
+            vec![Some("ready".into()), None, Some(String::new()), Some("東京".into()),]
+        );
+    }
+
+    #[test]
+    fn inferred_enum_array_text_refuses_malformed_shapes_and_trailing_data() {
+        for text in [
+            "{{ready},{paused,ready}}",
+            "[0:2]={ready,paused}",
+            "{} trailing",
+            r#"{"unterminated\}"#,
+            "{ready,paused]",
+        ] {
+            assert!(
+                matches!(parse_enum_array_text(text), Err(DriverError::Unsupported(_))),
+                "malformed array text should be refused: {text:?}"
+            );
+        }
+    }
 }

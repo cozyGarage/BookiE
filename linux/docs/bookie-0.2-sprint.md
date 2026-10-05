@@ -479,6 +479,11 @@ text, SQL NULL and marker-shaped values. Formula-like text keeps its safety
 prefix after parsing; external spreadsheet paste and lossless restore remain
 open ([evidence](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: enum-array parameter text now has direct parser cases
+for quotes/escapes, empty text, NULL, bounds, nesting, ragged input and malformed
+tails. The native domain-over-enum `ANY($1)` contract passes with wire-byte
+comparison ([evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: domain-over-enum `COALESCE` parameters now also match
 explicit native target-enum casts in both argument positions under a shadowed
 `search_path`, including empty text, literal `NULL`, SQL NULL and invalid

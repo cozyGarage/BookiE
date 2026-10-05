@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "b49688deca6e0bcfeb8676970b8bbb5da42a2b65",
+  "scope": "PostgreSQL inferred enum-array parameter text codec grammar",
+  "source": {
+    "path": "crates/drivers/postgres/src/params.rs",
+    "sha256": "e2911e2dec4d4d3ada3e3779630cd11599fd29755a96ce8788ee013432c96e35"
+  },
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --lib inferred_enum_array_text -- --nocapture",
+      "result": "3 passed",
+      "log": "unit-tests.txt"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_any_infers_array_parameter_type -- --ignored --nocapture",
+      "result": "1 passed against PostgreSQL 16 via local Testcontainers",
+      "log": "native-postgres.txt"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --lib -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    }
+  ],
+  "coverage": [
+    "Quoted NULL text versus unquoted SQL NULL, empty labels, commas, embedded quotes and backslashes.",
+    "Explicit non-default lower bounds and two-dimensional arrays.",
+    "Refusal of ragged shapes, mismatched explicit bounds, unterminated quoting, mismatched delimiters and trailing data.",
+    "Existing native ANY($1) contract compares inferred parameter type and array_send bytes with PostgreSQL's typed array oracle."
+  ],
+  "remaining": [
+    "Other PostgreSQL inferred array function/operator contexts and the wider B3 matrix remain open."
+  ]
+}
