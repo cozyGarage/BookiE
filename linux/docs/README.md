@@ -45,7 +45,7 @@ Historical inventories retain their original source/date.
 
 ## History and review lookup
 
-Use the [changelog engineering history index](../CHANGELOG.md#engineering-history-index)
+Use the [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
 to locate dated implementation and validation records. The long-form records
 remain source-pinned archives; use current boards and evidence manifests for
 active decisions and case proof.
