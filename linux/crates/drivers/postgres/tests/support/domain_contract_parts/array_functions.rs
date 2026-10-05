@@ -740,6 +740,10 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
         (Value::Text("{}".into()), format!("'{{}}'::{array_type}")),
         (Value::Null, format!("NULL::{array_type}")),
     ] {
+        let trim_count = match &parameter {
+            Value::Text(text) if text == "{}" => 0,
+            _ => 1,
+        };
         let native_position = transaction
             .query(&format!(
                 "SELECT id, array_position({native_array}, status::{enum_type}), \
@@ -808,6 +812,61 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
             })
             .collect::<Vec<_>>();
         assert_eq!(remove.rows, expected_remove, "array_remove {parameter:?}");
+
+        let native_trim = transaction
+            .query(&format!(
+                "SELECT id, array_to_json(trim_array({native_array}, {trim_count}))::text, \
+                 pg_typeof(trim_array({native_array}, {trim_count}))::text, \
+                 encode(array_send(trim_array({native_array}, {trim_count})), 'hex'), \
+                 encode(array_send({native_array}), 'hex') \
+                 FROM {schema}.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        transaction.execute("SAVEPOINT untyped_trim_array").await.unwrap();
+        let trim_untyped = transaction
+            .query_params(
+                &format!(
+                    "SELECT trim_array($1, {trim_count}) FROM {schema}.rows LIMIT 1"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .expect_err("trim_array alone cannot resolve its polymorphic input");
+        assert!(
+            matches!(&trim_untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42804"),
+            "expected unresolved polymorphic-type SQLSTATE 42804, got {trim_untyped:?}"
+        );
+        transaction.execute("ROLLBACK TO SAVEPOINT untyped_trim_array").await.unwrap();
+        let trim = transaction
+            .query_params(
+                &format!(
+                    "SELECT id, array_to_json(trim_array($1::{array_type}, {trim_count}))::text, \
+                     pg_typeof($1::{array_type})::text, \
+                     pg_typeof(trim_array($1::{array_type}, {trim_count}))::text, \
+                     encode(array_send(trim_array($1::{array_type}, {trim_count})), 'hex'), \
+                     encode(array_send($1::{array_type}), 'hex') \
+                     FROM {schema}.rows ORDER BY id"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected_trim = native_trim
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(array_type.clone()),
+                    row[2].clone(),
+                    row[3].clone(),
+                    row[4].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(trim.rows, expected_trim, "cast trim_array with {parameter:?}");
 
         for (expression, native_expression) in [
             (

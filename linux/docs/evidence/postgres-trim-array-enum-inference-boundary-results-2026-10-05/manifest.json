@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "4fce5bd1c305748d0e17a9373735e1313ee66a2c",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs",
+  "source_file_sha256": "9fc7fd6618729798d1cef95c00af422ef61a1861a71e2ae2bc02eb1f73b36623",
+  "case": "PostgreSQL 16 trim_array enum-array inference boundary under a shadowed search_path",
+  "behavior": {
+    "untyped_parameter": "trim_array($1, n) returns SQLSTATE 42804 because PostgreSQL cannot resolve the polymorphic anyarray input without a typed argument.",
+    "typed_path": "A schema-qualified enum-array cast preserves native type and values through trim_array.",
+    "inputs": ["ordinary labels", "literal NULL enum label", "NULL element", "non-default lower bound", "empty array", "SQL NULL array"],
+    "oracles": ["pg_typeof", "array_to_json", "array_send wire bytes", "same-named shadow enum first in search_path"]
+  },
+  "validation": {
+    "focused_test": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_enum_array_functions_infer_first_array_parameter_under_shadowed_path -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "focused-test.txt"},
+    "postgres_integration": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored", "passed": 147, "failed": 0, "filtered": 1, "seconds": 173.87, "log": "postgres-integration.txt"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

@@ -429,6 +429,12 @@ planning and execution on a fresh connection. A distinct same-named enum leads
 the new path; native target type/value checks confirm restoration and the
 shadow table remains empty ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL 16's `trim_array($1, n)` cannot infer an
+unknown polymorphic array input and returns `42804`. A new boundary contract
+pins that server refusal and verifies that a schema-qualified array cast
+preserves NULL, empty, NULL-element and lower-bound values under a shadowed
+`search_path` ([evidence](evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: PostgreSQL custom-enum CSV import also handles schema,
 table and type identifiers with spaces and embedded quotes while a same-named
 shadow schema leads `search_path`. The generated cast selects the target enum;

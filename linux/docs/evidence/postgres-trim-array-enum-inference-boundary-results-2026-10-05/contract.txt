@@ -1,0 +1,11 @@
+PostgreSQL 16 native integration contract.
+
+Untyped trim_array($1, n) is expected to fail with SQLSTATE 42804 because the
+function's polymorphic anyarray input has no typed argument from which to
+resolve its element type. The contract runs this assertion for ordinary,
+NULL-element, lower-bound, empty, and SQL NULL array parameters.
+
+An explicit schema-qualified cast to the target enum array then runs the same
+trim operation and compares array type, JSON result, and array_send bytes with
+the equivalent native typed literal. A same-named shadow enum is first in the
+transaction search_path, so the cast must select the target schema.

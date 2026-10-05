@@ -16,6 +16,11 @@ The operator matrix also runs with a same-named shadow enum first in
 `search_path` ([configuration packet](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json)).
 The inferred array-element domain chain also covers 62/63 supported layers and
 an explicit 64-layer refusal ([depth packet](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json)).
+PostgreSQL 16 `trim_array($1, n)` is now recorded as an inference boundary:
+without a typed array argument the server returns `42804`; a schema-qualified
+array cast round-trips NULL, empty, NULL-element and lower-bound values with
+native `pg_typeof` and wire-byte checks under a same-named shadow enum
+([evidence](evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json)).
 
 MongoDB keyed grid edits now compare each edited field with its value from the
 materialized result in the atomic update filter. A failing-first MongoDB 7 case

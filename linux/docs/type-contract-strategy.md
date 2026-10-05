@@ -48,6 +48,11 @@ The `array_append` and `array_prepend` function contexts now also preserve the
 target enum type under a same-named shadow enum, verified with typed native
 results, `pg_typeof`, result wire bytes, text labels including literal `NULL`,
 SQL NULL and native invalid-label SQLSTATE ([evidence](evidence/postgres-domain-enum-array-functions-shadowed-results-2026-10-04/manifest.json)).
+The PostgreSQL 16 `trim_array` boundary is now explicit: a standalone
+`trim_array($1, n)` cannot infer an unknown polymorphic array parameter
+(`42804`), while a schema-qualified array cast preserves NULL, empty, NULL
+element and lower-bound inputs against native result and wire oracles under a
+shadowed `search_path` ([evidence](evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json)).
 Other inferred array operator/function contexts remain candidates; these cases
 do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

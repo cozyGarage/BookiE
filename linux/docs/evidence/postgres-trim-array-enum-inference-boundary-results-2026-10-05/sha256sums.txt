@@ -1,0 +1,8 @@
+5984e3c4218da018bbc26e396782fe6986f36b400cff861d826a8c4058c70952  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/contract.txt
+d37a728ef474125a0421929e2d4b2d95e74324de848bfea30960f7472aad179b  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/focused-test.txt
+6e30bb004db3598cbd237d835688b1d63b4c94dccd9cb0709b8509efe0bf1150  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/postgres-integration.txt
+4183798ad4733fa73b597d8781c274e205183b63c2514de1d04bec8b6bc633d1  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/clippy.txt
+4213077d49081e95718b2fad873a41e865bd74e1163975ac9a58a49573d28eec  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/fmt.txt
+d390914ba0cc6e60835c4db4ecef788e811e56155882cad522e6009b86d74628  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/ignored-inventory.txt
+a2d29eac0db94ede2cf05f391ae78688db856983dd81f9a23b184b21482dea27  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/diff-check.txt
+c5b908c8da8b3550fdd583d2ed2c7b43ae849c5d45f75d3fb38cd1b004784a9a  docs/evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json
