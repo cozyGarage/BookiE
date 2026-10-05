@@ -134,6 +134,10 @@ Scalar enum `min`/`max` aggregates now preserve declared enum order, qualified
 metadata and wire identity under the same shadow-path collision, including
 all-NULL and no-row aggregate results
 ([evidence](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
+The existing session's `enum_range` result also follows an
+`ALTER TYPE ADD VALUE BEFORE` migration, preserving the updated label order and qualified type
+after native catalog and wire-byte checks
+([evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

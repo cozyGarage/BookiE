@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "3975d7aca3ac081aee4108a0d21ceea6db2ad664",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "enum_range observes a newly inserted enum label and order in an existing session",
+  "test": "array_contract::value_contract_enum_range_observes_added_label_order_in_same_session",
+  "contract": [
+    "The session first resolves enum_range for a target enum while a different enum with the same name is first in search_path.",
+    "After ALTER TYPE ADD VALUE inserts 'working' BEFORE 'complete', the same dedicated session sees the catalog order queued/working/complete and enum_range returns the new order.",
+    "The driver result retains target-schema enum[] metadata; native pg_typeof, array_to_json and array_send agree after typed rebinding."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_observes_added_label_order_in_same_session -- --ignored --nocapture",
+      "result": "1 passed, 175 filtered out",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 177 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 497 declarations, Driver tier 364",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other enum catalog mutations, schema/search_path combinations and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "focused.txt": "53a5d104e78faf23979188d380ffed8eaf9c83c0ee313eca03324014ff1a08a3",
+    "driver-suite.txt": "caf9c35b05e31fcd17aa62618f1f66b35966244ecd021a2f4af83593993916cc",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}
