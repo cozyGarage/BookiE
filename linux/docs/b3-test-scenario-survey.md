@@ -124,6 +124,10 @@ The PostgreSQL enum CSV case now distinguishes raw-text restore from
 spreadsheet-safe output. Formula protection can make two distinct enum labels
 collide after import; the export dialog directs users to turn it off for
 lossless re-import. Further enum consumer and session combinations remain open.
+A PostgreSQL scalar-enum CSV import case now also runs with a same-named shadow
+enum first in `search_path`; it restores a target-only label, an empty label,
+literal `NULL`, and SQL NULL with the qualified target type while preserving a
+sibling row ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
 A PostgreSQL 16 boundary test now preserves both a 63-byte ASCII label and a
 21-character three-byte UTF-8 label through scalar and enum-array projections,
 against `pg_enum`, JSON-element and wire oracles; an overlength 64-byte label is

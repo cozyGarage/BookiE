@@ -102,6 +102,9 @@ two-dimensional shapes, literal `NULL` and empty labels, Unicode, and sibling
 row preservation ([shape evidence](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json)).
 The CSV import also selects the table's enum when an identically named type in
 another schema shadows it through `search_path` ([evidence](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json)).
+Scalar-enum CSV restore has the same configuration check with a target-only
+label, empty text, literal `NULL`, SQL NULL and an unchanged sibling row
+([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
 Custom enum-array grid edits now have app-parser and native keyed-write
 coverage, including invalid-label refusal and sibling preservation ([evidence](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json)).
 The grid parser and live write path distinguish blank SQL NULL from the empty

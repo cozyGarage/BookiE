@@ -388,6 +388,11 @@ default shadowed `search_path` cannot accept the target-only label; qualified
 keyed edit and filter paths select the target type and preserve the shadow row
 ([evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json)).
 
+October 5 B3-1 follow-up: scalar-enum CSV restore now has a same-named shadow
+enum first in `search_path`; a target-only label, empty label, literal `NULL`,
+and SQL NULL restore to the qualified destination type without changing its
+sibling or writing to the shadow table ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
+
 October 4 local integration gate: all 315 tests passed at
 `d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,
 policy/session, PostgreSQL socket and SSH suites. B3/B4 and release acceptance
