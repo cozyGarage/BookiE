@@ -15,6 +15,14 @@ async fn value_contract_query_preserves_uuid_kinds_in_mixed_multirow_projection(
         .unwrap();
 
     assert_eq!(
+        result
+            .columns
+            .iter()
+            .map(|column| column.data_type.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Utf8", "UUID", "UUID", "Utf8"]
+    );
+    assert_eq!(
         result.rows,
         vec![
             vec![
@@ -31,4 +39,18 @@ async fn value_contract_query_preserves_uuid_kinds_in_mixed_multirow_projection(
             ],
         ]
     );
+}
+
+#[tokio::test]
+async fn value_contract_zero_row_projection_preserves_uuid_metadata() {
+    let connection = super::native_connection().await;
+    let result = connection
+        .query("SELECT NULL::UUID AS missing WHERE false")
+        .await
+        .unwrap();
+
+    assert!(result.rows.is_empty());
+    assert_eq!(result.columns.len(), 1);
+    assert_eq!(result.columns[0].name, "missing");
+    assert_eq!(result.columns[0].data_type, "UUID");
 }

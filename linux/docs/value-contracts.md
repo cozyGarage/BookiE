@@ -55,7 +55,8 @@ The shared scalar contract checks native UUID parameters and SQL-literal
 round trips on PostgreSQL, SQL Server, ClickHouse and DuckDB. UUID-shaped text
 and typed SQL NULL are controls; DuckDB uses its logical result type to preserve
 `Value::Uuid`. A mixed DuckDB projection checks the UUID type map across columns
-and rows ([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
+and rows, including UUID result metadata in populated and zero-row results
+([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
 [mixed projection evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
 
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
