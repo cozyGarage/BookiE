@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/shared-scalar-uuid-contract",
+  "source_commit": "fe46ae88eda435d7a016b779e772c6bb74109b5b",
+  "source_tree_dirty": true,
+  "dirty_tree_note": "At run time, the worktree contained the DuckDB mixed UUID regression and its evidence packet plus updates to the B3 board/value index. The regression is named with the value_contract prefix and is included in the DuckDB suite.",
+  "case": "Local GTK + DuckDB value-contract tier across all 11 suites",
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "result": {
+    "passed": 363,
+    "failed": 0,
+    "suites": 11,
+    "missing_suites": [],
+    "gtk": true,
+    "duckdb": true
+  },
+  "suite_results": {
+    "crates/app/Cargo.toml": {
+      "tests": 59,
+      "exit_code": 0,
+      "seconds": 112.037,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.27,
+      "log": "crates-core.log"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 30.945,
+      "log": "crates-drivers-clickhouse.log"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 31,
+      "exit_code": 0,
+      "seconds": 2.168,
+      "log": "crates-drivers-duckdb.log"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 15,
+      "exit_code": 0,
+      "seconds": 10.333,
+      "log": "crates-drivers-mongodb.log"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 7,
+      "exit_code": 0,
+      "seconds": 49.925,
+      "log": "crates-drivers-mssql.log"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 320.353,
+      "log": "crates-drivers-mysql.log"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 151,
+      "exit_code": 0,
+      "seconds": 326.39,
+      "log": "crates-drivers-postgres.log"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 2.82,
+      "log": "crates-drivers-redis.log"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.032,
+      "log": "crates-drivers-sqlite.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 1.723,
+    "fresh_artifacts": 746,
+    "rebuilt_packages": [
+      "tablepro-driver-duckdb"
+    ]
+  },
+  "report": "report.json",
+  "logs_sha256": {
+    "compile.log": "860e0259157f03b68c9c15972e68b26dac7ba8b08dd9f9aceb03f821f60d9f8d",
+    "report.json": "8f40db8a196ac5e417a2b8c8f82b09204e1371d9bbc619dec4b314bcfa558d52",
+    "crates-app.log": "727b634fd38af510e61f424f8d86f3e5466705b4bbae4170a24cae97f1e75dba",
+    "crates-core.log": "8d89471189f8eb05ca3159ec55d9bfa6d1be25dfbb2b5bdac96a63c6e1874a5b",
+    "crates-drivers-clickhouse.log": "e13dbb889b1be680dfb14d6e1fecea69f592e1cd7777266fc2864fe0eca51186",
+    "crates-drivers-duckdb.log": "1cf71c02532c9cd3c93777564b6e681478473754af5724958ab57426a36c914b",
+    "crates-drivers-mongodb.log": "5d779adddd48afc05a413ccc97e44eedbc1588ac23ebfb96fa07e931aed70136",
+    "crates-drivers-mssql.log": "2760eccfa7db45c220078920cd3b089f052bcb554c128300f62adccd50b09a34",
+    "crates-drivers-mysql.log": "a1cab50f6c9d3c332f8cb8ba8973db04145f400fae7bb3f1483c9264cbf0ab98",
+    "crates-drivers-postgres.log": "77afd85e8c751ccb3aaba2f19f0eda16c1026d08e75c520e24cc02acfd50778e",
+    "crates-drivers-redis.log": "c2050e50f1f9a08d8595472466d00d5b5a24b359d60f6d67aab459e106a0250d",
+    "crates-drivers-sqlite.log": "e3a3e9c7feb59c7c9149d56c28051214ff086e2f1a430fa8d8d074cb6a78c99a",
+    "crates-mcp.log": "b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8"
+  }
+}

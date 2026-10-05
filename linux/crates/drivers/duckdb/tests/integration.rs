@@ -19,6 +19,8 @@ mod interval_csv_import;
 mod submicro_parameter_expression;
 #[path = "support/uhugeint_union.rs"]
 mod uhugeint_union;
+#[path = "support/uuid_mixed_projection.rs"]
+mod uuid_mixed_projection;
 #[path = "../../../core/tests/support/value_contract.rs"]
 mod value_contract;
 
