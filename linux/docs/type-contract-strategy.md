@@ -157,6 +157,11 @@ oracles under the shadowed path
 Result metadata now also follows same-session enum type renames and schema
 moves by catalog OID, including a zero-row projection under a shadowed
 `search_path` ([migration evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+Separate reader/writer coverage now verifies the same type rename and schema
+move after a warmed table projection; the populated/SQL NULL rows, zero-row
+metadata, catalog order, `enum_send` and typed rebinding all match PostgreSQL
+under a same-named shadow path
+([cross-session evidence](evidence/postgres-enum-cross-session-type-move-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

@@ -24,6 +24,12 @@ The shadowed-path contract checks updated order, qualified metadata and native
 catalog/JSON/wire values; the wider B3 matrix stays open
 ([evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: a warmed PostgreSQL reader now sees an enum type
+rename and schema move performed by a separate writer session. Target metadata,
+populated and zero-row projections, SQL NULL, catalog order and native wire
+checks remain correct under a same-named shadow path; B3 stays open
+([evidence](evidence/postgres-enum-cross-session-type-move-results-2026-10-05/manifest.json)).
+
 October 5 B3-1/B3-4 follow-up: a PostgreSQL `numeric[]` XLSX result now survives
 Gnumeric's XLSX/ODS/XLSX re-save with its 40-digit integer, high-scale decimal,
 scale-preserving decimal, NaN, infinities and SQL NULL unchanged as a string
