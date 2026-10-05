@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "babd43b660d3b0b46c81054100681f0c8ee18a17",
+  "engine": "SQLite, file-backed integration database",
+  "case": "Declared BLOB column decoding follows each row's runtime storage class",
+  "test": "declared_types_preserve_nulls_and_binary_affinity_mismatches",
+  "contract": [
+    "A declared BLOB column containing TEXT is returned as Value::Text, while BLOB storage remains Value::Bytes.",
+    "A declared REAL column containing BLOB remains exact bytes, and a declared BOOLEAN column containing BLOB remains bytes.",
+    "TEXT values in INTEGER, DATE, TIME, and DATETIME affinity columns remain text rather than becoming NULL or an unrelated typed value.",
+    "Native SQLite typeof() results independently verify the stored runtime classes, including SQL NULL."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-sqlite --test integration declared_types_preserve_nulls_and_binary_affinity_mismatches -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "sqlite_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-sqlite",
+      "result": "47 passed, 0 failed",
+      "log": "sqlite-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-driver-sqlite --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "This case adds a BLOB-affinity storage-class regression only; broader SQLite affinity combinations and B3 acceptance remain open."
+  ],
+  "log_sha256": {
+    "focused.txt": "3a08c20582851158eb73239bd9ac907c09d01cbeaf7dfa66035e62735421e294",
+    "sqlite-suite.txt": "3abf259797fb8ef2aa065d83ad38e2c681bac1b719979f039853e4594ef708f0"
+  }
+}

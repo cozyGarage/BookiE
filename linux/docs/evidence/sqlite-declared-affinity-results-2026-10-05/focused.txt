@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-driver-sqlite --test integration declared_types_preserve_nulls_and_binary_affinity_mismatches -- --nocapture
+1 passed, 0 failed

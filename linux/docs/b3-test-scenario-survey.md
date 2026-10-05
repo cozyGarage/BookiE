@@ -317,6 +317,13 @@ test records conservative policy handling only; executable-comment planning
 and end-to-end database execution remain open
 ([evidence](evidence/mysql-executable-comment-policy-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: SQLite values in declared `BLOB` columns now decode
+from each row's runtime storage class, so TEXT and numeric affinity mismatches
+do not become byte arrays. The integration case checks NULLs, text and binary
+values across declared INTEGER, REAL, BOOLEAN, DATE, TIME, DATETIME and BLOB
+columns against native `typeof()` results
+([evidence](evidence/sqlite-declared-affinity-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
