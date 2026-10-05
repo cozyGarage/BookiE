@@ -1,0 +1,1 @@
+Before the planner fix, the focused native contract failed under MariaDB 11 with sql_mode containing EMPTY_STRING_IS_NULL. The imported empty ENUM label appeared as SQL NULL: observed id 1 had ordinal NULL, HEX NULL, and state IS NULL = 1; expected ordinal 1, empty HEX, and state IS NULL = 0. Literal "NULL", explicit SQL NULL, and the pre-existing sibling remained distinct.
