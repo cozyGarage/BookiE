@@ -315,6 +315,103 @@ async fn value_contract_date_array_file_exports_preserve_boundaries_for_calc_rei
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("SET LOCAL DateStyle = 'SQL, DMY'").await.unwrap();
+    let expression = "ARRAY['2024-12-31'::date, '2001-02-03'::date, \
+                      '0002-12-31 BC'::date, 'infinity'::date, NULL]";
+    let result = transaction
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("date[]", &result);
+
+    let native = transaction
+        .query(&format!(
+            "SELECT current_setting('DateStyle'), pg_typeof({expression})::text, \
+                    {expression}::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("SQL, DMY".into()));
+    assert_eq!(native.rows[0][1], Value::Text("date[]".into()));
+    assert_ne!(result.rows[0][0], native.rows[0][2]);
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("date[] result must remain exact array text: {:?}", result.rows[0][0]);
+    };
+    assert_eq!(
+        driver_text,
+        r#"{"2024-12-31","2001-02-03","0002-12-31 BC","infinity",NULL}"#
+    );
+    transaction.execute("SET LOCAL DateStyle = 'ISO, MDY'").await.unwrap();
+
+    let rebound = transaction
+        .query_params(
+            "SELECT array_to_json($1::text::date[])::text, \
+                    encode(array_send($1::text::date[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][3]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][4]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let csv_path = directory.path().join("date-array-sql-dmy.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    transaction
+        .execute("CREATE TABLE date_array_sql_dmy_target (value date[])")
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("date-array-sql-dmy.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "date_array_sql_dmy_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    transaction
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = transaction
+        .query("SELECT encode(array_send(value), 'hex') FROM date_array_sql_dmy_target")
+        .await
+        .unwrap();
+    assert_eq!(restored.rows[0][0], native.rows[0][4]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
