@@ -289,6 +289,89 @@ async fn value_contract_custom_enum_array_accepts_maximum_utf8_label_length() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_range_uses_qualified_type_under_shadowed_search_path() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_range_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_range_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_range_target.ordered_label AS ENUM \
+             ('first', 'NULL', '', '東京', 'last')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_range_shadow.ordered_label AS ENUM \
+             ('shadow-only', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("SET search_path = value_contract_enum_range_shadow, value_contract_enum_range_target, public")
+        .await
+        .unwrap();
+
+    let expression = "enum_range(NULL::value_contract_enum_range_target.ordered_label)";
+    let result = connection
+        .query(&format!(
+            "SELECT {expression} AS value, pg_typeof({expression})::text AS array_type"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_enum_range_target.ordered_label[]");
+    let target_type = Value::Text("value_contract_enum_range_target.ordered_label[]".into());
+    assert_eq!(result.rows[0][1], target_type);
+    let Value::Text(encoded) = &result.rows[0][0] else {
+        panic!("enum_range result must remain typed array text: {:?}", result.rows[0][0]);
+    };
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex'), array_dims(value) \
+             FROM (SELECT {expression} AS value) AS native"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], target_type);
+    let Value::Text(json_text) = &native.rows[0][1] else {
+        panic!("enum_range JSON oracle returned {:?}", native.rows[0][1]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(json_text).unwrap(),
+        serde_json::json!(["first", "NULL", "", "東京", "last"])
+    );
+    assert_eq!(native.rows[0][3], Value::Text("[1:5]".into()));
+
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::value_contract_enum_range_target.ordered_label[])::text, \
+                    encode(array_send($1::text::value_contract_enum_range_target.ordered_label[]), 'hex')",
+            std::slice::from_ref(&Value::Text(encoded.clone())),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][1]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][2]);
+
+    let shadow_label = Value::Text("{shadow-only}".into());
+    let error = connection
+        .query_params(
+            "SELECT $1::text::value_contract_enum_range_target.ordered_label[]",
+            std::slice::from_ref(&shadow_label),
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&error, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected target enum invalid-label SQLSTATE 22P02, got {error:?}"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
