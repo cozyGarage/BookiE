@@ -82,6 +82,10 @@ An existing PostgreSQL session now verifies `enum_range` after
 position, the result stays bound to the target enum under a same-named leading
 shadow type, and typed rebinding matches native array bytes
 ([evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
+The warmed session now also observes `ADD VALUE ... AFTER`; the label is
+inserted between existing values, and result type, JSON order and rebound wire
+bytes match PostgreSQL
+([paired position evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json)).
 The same session also observes `ALTER TYPE ... RENAME VALUE` after warming the
 range query; catalog order, target type metadata and rebound array bytes match
 the native result
