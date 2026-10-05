@@ -286,6 +286,12 @@ wall times, both maximum legal offsets and SQL NULL through the same Calc
 re-save. Native type, `array_to_json` and `array_send` match after rebinding
 ([Calc evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 session follow-up: `timestamptz[]` file export now runs under
+`America/New_York`, where the native oracle renders distinct fall-back offsets;
+BookiE's result remains canonical UTC. Typed binding and SQL-file replay after
+switching to `Asia/Kathmandu` preserve native `array_send` bytes
+([evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` with true, false and
 SQL NULL survives the Calc re-save as exact text; native type, `array_to_json`
 and `array_send` match after rebinding

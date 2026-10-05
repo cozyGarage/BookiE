@@ -310,6 +310,10 @@ retaining `{}` as the empty array ([evidence](evidence/postgres-enum-array-defau
 A `timestamptz[]` file-writer contract preserves distinct repeated-hour
 instants, a BC instant, infinities and SQL NULL through JSON, CSV, XLSX and
 replayed SQL, checked against native JSON and wire bytes ([evidence](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json)).
+Under a New York session, a follow-up confirms PostgreSQL's native output uses
+the two fall-back offsets while BookiE's decoded value remains canonical UTC;
+binding and SQL replay in a later Kathmandu session preserve the original wire
+bytes ([session evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
 
 An `interval[]` file-writer case runs under `postgres_verbose` `IntervalStyle`
 on one transaction backend and verifies text binding, all four writers and

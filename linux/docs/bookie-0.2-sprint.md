@@ -234,6 +234,12 @@ legal offsets, fractional wall times and SQL NULL survives the pinned Calc
 round trip as text. Native `array_to_json` and `array_send` match after binding.
 See the [timetz-array Calc evidence](evidence/postgres-timetz-array-calc-reimport-results-2026-10-05/manifest.json).
 
+October 5 B3-2 session follow-up: `timestamptz[]` file export now runs under
+`America/New_York`, where PostgreSQL's native output renders distinct
+fall-back offsets while BookiE's decoded value remains canonical UTC. Typed
+binding and SQL-file replay after switching to `Asia/Kathmandu` preserve native
+`array_send` bytes ([evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` preserves true,
 false and SQL NULL through the pinned Calc round trip as a text cell. Native
 `array_to_json` and `array_send` match after rebinding. See the

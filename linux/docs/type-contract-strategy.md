@@ -195,6 +195,11 @@ binary, empty and SQL NULL elements intact
 A `timestamptz[]` XLSX cell also preserves repeated-hour instants, a BC instant,
 infinities and SQL NULL through Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
+A separate file-writer contract runs under `America/New_York`: PostgreSQL's
+native array text and JSON show the two fall-back offsets, while BookiE's
+decoded array text remains canonical UTC. Rebinding and SQL-file restore after
+switching the transaction to `Asia/Kathmandu` preserve the original
+`array_send` bytes ([session evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
 A PostgreSQL `interval[]` XLSX cell preserves mixed signs, microseconds, zero
 intervals and SQL NULL through the same Calc re-save
 ([evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
