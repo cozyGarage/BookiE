@@ -58,9 +58,12 @@ function/operator contexts and the broader B3 matrix remain open
 October 5 B3 follow-up: PostgreSQL enum-array shape functions now cover
 dimensions, bounds, lengths and cardinality under the same shadowed path,
 including the empty-array distinction between NULL length and zero cardinality.
-The remaining named enum-array candidates are `array_to_string`, `array_fill`,
+`array_to_string` now distinguishes empty labels, literal `NULL`, SQL NULL
+elements, empty arrays and SQL NULL arrays, including calls under a shadowed
+enum path. The remaining named enum-array candidates are `array_fill`,
 multi-array `unnest`, and random-result `array_sample`/`array_shuffle`
-([case evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json)).
+([shape evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json),
+[array_to_string evidence](evidence/postgres-enum-array-to-string-results-2026-10-05/manifest.json)).
 
 The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These

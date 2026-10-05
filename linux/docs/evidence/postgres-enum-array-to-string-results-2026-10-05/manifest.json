@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "c14ef860bd118d8d469abc1d06c84f7116204897",
+  "scope": "PostgreSQL enum-array array_to_string inference, value and type behavior under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/array_to_string.rs",
+    "sha256": "93fe107831bcd574764c2848795abae82d9168617b32c89220156cc0f5cc708d"
+  },
+  "selector": "domain_contract::value_contract_enum_array_to_string_preserves_labels_and_nulls_under_shadowed_path",
+  "assertions": [
+    "Untyped array_to_string($1, separator) returns PostgreSQL SQLSTATE 42804; the qualified target enum-array cast remains correct while a same-named shadow enum leads search_path.",
+    "Native enum-array literals and bound text parameters agree on array_to_string output, pg_typeof, and array_send bytes.",
+    "Cases distinguish an empty enum label, the literal enum label NULL, SQL NULL elements with and without a replacement marker, empty arrays, SQL NULL arrays, non-default lower bounds, and multidimensional arrays.",
+    "A label that exists only in the shadow enum is rejected with PostgreSQL SQLSTATE 22P02."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_array_to_string_preserves_labels_and_nulls_under_shadowed_path -- --ignored --nocapture",
+      "result": "passed, 1 test",
+      "log": "focused-test.txt"
+    },
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 332 selected tests across all 11 suites, no missing suites; PostgreSQL selected 126 tests",
+      "report": "report.json",
+      "postgres_log": "crates-drivers-postgres.log"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the driver test is registered",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "worktree_note": "The strict runner report records baseline c14ef86 with dirty=true because this test and its docs were added in the worktree. The test source is pinned by SHA-256 above.",
+  "remaining": [
+    "Named enum-array candidates still include array_fill, multi-array unnest, array_sample, and array_shuffle.",
+    "This contract does not close the broader PostgreSQL array or B3 matrix."
+  ]
+}

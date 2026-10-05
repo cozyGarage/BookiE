@@ -74,9 +74,14 @@ Quoted enum schema/type identifiers containing embedded quotes also retain the
 target type under a same-named shadowed `search_path`; keyed writes and filters
 match native qualified/unqualified type names, preserve both target and shadow
 rows, and reject a shadow-only label ([identifier evidence](evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json)).
-Remaining named PostgreSQL enum-array candidates include `array_to_string`,
-`array_fill`, multi-array `unnest`, and the random-result `array_sample` and
-`array_shuffle` functions. These cases do not close the PostgreSQL or B3 matrix.
+`array_to_string` now has explicit output contracts for empty labels, literal
+`NULL`, SQL NULL elements with and without a replacement marker, empty arrays,
+SQL NULL arrays, lower bounds, multidimensional arrays, and shadowed enum names.
+Untyped calls return SQLSTATE `42804`; qualified casts match native string,
+type, and wire-byte oracles ([evidence](evidence/postgres-enum-array-to-string-results-2026-10-05/manifest.json)).
+Remaining named PostgreSQL enum-array candidates include `array_fill`,
+multi-array `unnest`, and the random-result `array_sample` and `array_shuffle`
+functions. These cases do not close the PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
 and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
