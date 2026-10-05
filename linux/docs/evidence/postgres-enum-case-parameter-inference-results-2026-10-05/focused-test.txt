@@ -1,0 +1,2 @@
+Command: cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_parameters_in_coalesce_array_append_and_nullif -- --ignored --nocapture
+Result: 1 passed, 0 failed, 147 filtered; PostgreSQL 16 Docker fixture.

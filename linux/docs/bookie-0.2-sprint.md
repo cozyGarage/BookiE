@@ -435,6 +435,12 @@ pins that server refusal and verifies that a schema-qualified array cast
 preserves NULL, empty, NULL-element and lower-bound values under a shadowed
 `search_path` ([evidence](evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the scalar enum parameter matrix now verifies
+PostgreSQL's CASE-result inference in both branch positions. It preserves the
+literal `NULL` and empty labels separately from SQL NULL, checks native
+parameter/result types, and confirms invalid labels fail with `22P02`
+([evidence](evidence/postgres-enum-case-parameter-inference-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: PostgreSQL custom-enum CSV import also handles schema,
 table and type identifiers with spaces and embedded quotes while a same-named
 shadow schema leads `search_path`. The generated cast selects the target enum;

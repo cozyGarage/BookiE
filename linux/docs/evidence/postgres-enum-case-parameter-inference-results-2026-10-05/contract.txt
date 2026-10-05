@@ -1,0 +1,8 @@
+PostgreSQL 16 native integration contract for CASE result type resolution.
+
+The bound enum parameter occupies both the THEN and ELSE result branches.
+Inputs distinguish the literal enum label NULL, the empty enum label, and SQL
+NULL. Each branch result and the bound parameter are checked with pg_typeof;
+text values and NULL state are compared with explicitly typed native SQL.
+Invalid labels in both branch positions retain PostgreSQL SQLSTATE 22P02, and
+the source rows are checked unchanged afterward.

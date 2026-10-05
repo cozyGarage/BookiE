@@ -254,6 +254,11 @@ positions of `COALESCE` and in `array_append(ARRAY[enum_column], $1)`. Native
 `pg_typeof`, exact values, NULL behavior, native `22P02` invalid-label refusals
 and unchanged source rows are asserted
 ([evidence](evidence/postgres-enum-expression-parameter-results-2026-10-04/manifest.json)).
+A CASE result context now covers `$1` in both `THEN`/`ELSE` positions. The
+literal `NULL` label, empty enum label and SQL NULL are compared with explicitly
+typed native expressions; `pg_typeof` verifies parameter and result types, and
+invalid labels retain native `22P02` behavior
+([evidence](evidence/postgres-enum-case-parameter-inference-results-2026-10-05/manifest.json)).
 A follow-up also verifies `NULLIF(enum_column, $1)` infers both text and SQL
 NULL parameters as the native enum, preserves exact results, and returns native
 `22P02` for an invalid label

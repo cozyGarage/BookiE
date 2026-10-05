@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "d70af9482384fc14c6e2a33ea41b03589f883ab3",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/enum_parameter_context_contract.rs",
+  "source_file_sha256": "fcf1b8dc23c1505c35c7162bf89e739e8c70e268aaf12d075170a68030c58e31",
+  "case": "PostgreSQL custom enum parameter inference in both CASE result branches",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "An inferred enum parameter in either CASE result branch matches an explicitly typed native enum expression.",
+    "The literal NULL enum label, the empty enum label, and SQL NULL remain distinct.",
+    "pg_typeof confirms the bound parameter and both CASE result types are the schema enum.",
+    "Invalid enum labels in either branch retain native SQLSTATE 22P02 and do not change the source rows."
+  ],
+  "validation": {
+    "focused_test": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_parameters_in_coalesce_array_append_and_nullif -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "focused-test.txt"},
+    "postgres_integration": {"command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored", "passed": 147, "failed": 0, "filtered": 1, "seconds": 172.40, "log": "postgres-integration.txt"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

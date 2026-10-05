@@ -1,0 +1,8 @@
+034f45e40f781a096e00fa5d6421e3bdbf588b0fc60517b67f9f260c53ee4d3b  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/contract.txt
+acc1b06e08903791a9d219a7032adf858da4c4577020c3bdf935d4ecd03fbaac  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/focused-test.txt
+cbf0840d405a8a3c0d3f39be980eab511f6b9eeb374f853b1bc7c1833c53e6fe  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/postgres-integration.txt
+4183798ad4733fa73b597d8781c274e205183b63c2514de1d04bec8b6bc633d1  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/clippy.txt
+4213077d49081e95718b2fad873a41e865bd74e1163975ac9a58a49573d28eec  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/fmt.txt
+d390914ba0cc6e60835c4db4ecef788e811e56155882cad522e6009b86d74628  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/ignored-inventory.txt
+a2d29eac0db94ede2cf05f391ae78688db856983dd81f9a23b184b21482dea27  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/diff-check.txt
+f3343265e0f10d7649eea0ff9d0d026abee967246ca823809f90296f64d38803  docs/evidence/postgres-enum-case-parameter-inference-results-2026-10-05/manifest.json

@@ -89,6 +89,51 @@ async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
         );
     }
 
+    for (parameter, native_parameter) in [
+        (Value::Text("NULL".into()), "'NULL'"),
+        (Value::Text(String::new()), "''"),
+        (Value::Null, "NULL"),
+    ] {
+        let native = connection
+            .query(&format!(
+                "SELECT id, \
+                 CASE WHEN id = 1 THEN {native_parameter}::{enum_type} ELSE state END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN {native_parameter}::{enum_type} ELSE state END)::text, \
+                 CASE WHEN id = 1 THEN state ELSE {native_parameter}::{enum_type} END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN state ELSE {native_parameter}::{enum_type} END)::text \
+                 FROM value_contract_enum_parameter_context.rows ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        let inferred = connection
+            .query_params(
+                "SELECT id, \
+                 CASE WHEN id = 1 THEN $1 ELSE state END::text, pg_typeof($1)::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN $1 ELSE state END)::text, \
+                 CASE WHEN id = 1 THEN state ELSE $1 END::text, \
+                 pg_typeof(CASE WHEN id = 1 THEN state ELSE $1 END)::text \
+                 FROM value_contract_enum_parameter_context.rows ORDER BY id",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        let expected = native
+            .rows
+            .into_iter()
+            .map(|row| {
+                vec![
+                    row[0].clone(),
+                    row[1].clone(),
+                    Value::Text(enum_type.into()),
+                    row[2].clone(),
+                    row[3].clone(),
+                    row[4].clone(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(inferred.rows, expected, "CASE enum parameter {parameter:?}");
+    }
+
     for (parameter, expected_ready) in [
         (Value::Text("ready".into()), Value::Null),
         (Value::Text("paused".into()), Value::Text("ready".into())),
@@ -127,6 +172,8 @@ async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
         "SELECT COALESCE($1, state) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
         "SELECT NULLIF(state, $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
         "SELECT array_append(ARRAY[state], $1) FROM value_contract_enum_parameter_context.rows WHERE id = 1",
+        "SELECT CASE WHEN id = 1 THEN $1 ELSE state END FROM value_contract_enum_parameter_context.rows",
+        "SELECT CASE WHEN id = 1 THEN state ELSE $1 END FROM value_contract_enum_parameter_context.rows",
     ] {
         let error = connection
             .query_params(sql, &[Value::Text("not-a-label".into())])
