@@ -777,6 +777,119 @@ async fn value_contract_enum_range_observes_renamed_label_in_same_session() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_range_refreshes_labels_changed_by_another_session() {
+    let (_container, options) = crate::start_pg().await;
+    let setup = crate::connect(options.clone()).await;
+    setup
+        .execute("CREATE SCHEMA value_contract_enum_cross_session_target")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE SCHEMA value_contract_enum_cross_session_shadow")
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_cross_session_target.state AS ENUM ('queued', 'complete')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_cross_session_shadow.state AS ENUM ('shadow-only', 'complete')",
+        )
+        .await
+        .unwrap();
+
+    let reader = crate::connect(options.clone()).await;
+    let writer = crate::connect(options).await;
+    let mut reader = reader.open_session().await.unwrap();
+    let mut writer = writer.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    reader
+        .query_params_controlled(
+            "SET search_path = value_contract_enum_cross_session_shadow, value_contract_enum_cross_session_target, public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let query =
+        "SELECT enum_range(NULL::value_contract_enum_cross_session_target.state) AS value";
+    let initial = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    let target_array = "value_contract_enum_cross_session_target.state[]";
+    assert_eq!(initial.columns[0].data_type, target_array);
+    assert_eq!(initial.rows[0][0], Value::Text(r#"{"queued","complete"}"#.into()));
+
+    writer
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_cross_session_target.state ADD VALUE 'working' BEFORE 'complete'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let added = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(added.columns[0].data_type, target_array);
+    assert_eq!(
+        added.rows[0][0],
+        Value::Text(r#"{"queued","working","complete"}"#.into())
+    );
+
+    writer
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_cross_session_target.state RENAME VALUE 'working' TO 'in_progress'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let renamed = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(renamed.columns[0].data_type, target_array);
+    assert_eq!(
+        renamed.rows[0][0],
+        Value::Text(r#"{"queued","in_progress","complete"}"#.into())
+    );
+
+    let native = reader
+        .query_params_controlled(
+            concat!(
+                "SELECT pg_typeof(enum_range(NULL::value_contract_enum_cross_session_target.state))::text, ",
+                "array_to_json(enum_range(NULL::value_contract_enum_cross_session_target.state))::text, ",
+                "encode(array_send(enum_range(NULL::value_contract_enum_cross_session_target.state)), 'hex'), ",
+                "(SELECT string_agg(enumlabel::text, ',' ORDER BY enumsortorder) FROM pg_enum ",
+                "WHERE enumtypid = 'value_contract_enum_cross_session_target.state'::regtype)"
+            ),
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(target_array.into()));
+    assert_eq!(native.rows[0][1], Value::Text(r#"["queued","in_progress","complete"]"#.into()));
+    assert_eq!(native.rows[0][3], Value::Text("queued,in_progress,complete".into()));
+    let rebound = reader
+        .query_params_controlled(
+            &format!("SELECT encode(array_send($1::text::{target_array}), 'hex')"),
+            std::slice::from_ref(&renamed.rows[0][0]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_type_rename_and_schema_move_refresh_session_metadata() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
