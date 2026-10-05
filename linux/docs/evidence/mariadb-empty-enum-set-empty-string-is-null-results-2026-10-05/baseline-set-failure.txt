@@ -1,0 +1,25 @@
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.76s
+     Running tests/integration.rs (target/debug/deps/integration-245109a29f7e15d5)
+
+running 1 test
+test enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null ... FAILED
+
+failures:
+
+---- enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null stdout ----
+
+thread 'enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null' (1852674) panicked at crates/drivers/mysql/tests/support/enum_sql_mode_contract.rs:459:5:
+assertion `left == right` failed
+  left: [[Int(1), Text("1"), Text(""), Int(0), Null, Null, Int(1)], [Int(2), Text("3"), Text("4E554C4C"), Int(0), Text("1"), Text("72656164"), Int(0)], [Int(3), Null, Null, Int(1), Null, Null, Int(1)], [Int(99), Text("2"), Text("7265616479"), Int(0), Text("2"), Text("7772697465"), Int(0)]]
+ right: [[Int(1), Text("1"), Text(""), Int(0), Text("0"), Text(""), Int(0)], [Int(2), Text("3"), Text("4E554C4C"), Int(0), Text("1"), Text("72656164"), Int(0)], [Int(3), Null, Null, Int(1), Null, Null, Int(1)], [Int(99), Text("2"), Text("7265616479"), Int(0), Text("2"), Text("7772697465"), Int(0)]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 61 filtered out; finished in 5.74s
+
+error: test failed, to rerun pass `-p tablepro-driver-mysql --test integration`

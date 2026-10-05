@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "6d353eb8a",
+  "case": "MariaDB EMPTY_STRING_IS_NULL preserves empty ENUM and zero-member SET values separately from SQL NULL during CSV restore",
+  "test": "enum_sql_mode_contract::value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null",
+  "engine": "MariaDB 11 Docker integration fixture",
+  "contract": [
+    "The source contains an empty ENUM label, a zero-member SET, the literal ENUM label NULL, ordinary enum/set values, and SQL NULL.",
+    "Under EMPTY_STRING_IS_NULL, CSV planning avoids empty-string parameters for MySQL ENUM and SET columns. A per-row flag distinguishes empty values from null-marker-bound SQL NULL; SPACE(0) reconstructs empty values server-side.",
+    "Native enum/set ordinal, HEX, and IS NULL results exactly match the source after restore; the pre-existing sibling remains unchanged.",
+    "A failing-first run with the old ENUM-only planner restored the zero-member SET as SQL NULL; the baseline failure is retained."
+  ],
+  "validation": {
+    "baseline_failure": {
+      "result": "Reproduced loss: zero-member SET restored as SQL NULL when only ENUM columns used the server-side empty-text expression",
+      "log": "baseline-set-failure.txt"
+    },
+    "focused_mariadb": {
+      "command": "cargo test -p tablepro-driver-mysql --test integration value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_string_is_null -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused-mariadb.txt"
+    },
+    "enum_set_modes": {
+      "command": "cargo test -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive -- --include-ignored --test-threads=1",
+      "passed": 2,
+      "failed": 0,
+      "filtered": 60,
+      "duration_seconds": 19.16,
+      "log": "enum-set-modes.txt"
+    },
+    "core_tests": {
+      "command": "cargo test -p tablepro-core",
+      "unit_tests_passed": 526,
+      "integration_tests_passed": 10,
+      "failed": 0,
+      "log": "core-tests.txt"
+    },
+    "planner_test": {
+      "command": "cargo test -p tablepro-core mysql_enum_set_empty_csv_cells_are_reconstructed_without_binding_empty_text",
+      "result": "1 passed, 0 failed",
+      "log": "planner-test.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-core -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "baseline-set-failure.txt": "e3c44d06068fca997a4e517e7927b4346aafa1af876bfce0a385da9153011f55",
+    "clippy.txt": "98d20d3424b8adf3a1438bc58f5919f2ea35a970dbe6e6318562888c4c7eceb2",
+    "core-tests.txt": "9fc450dc3d91bc986a954d546f5c8cc418208ed2deeb6a1bc4e243cd21f7661b",
+    "diff-check.txt": "42f8a0e4ffb8c838249b69708dad11c81cb7cad32dcd2907eda9512d7c12eaef",
+    "enum-set-modes.txt": "389ffa8dfc1a60fd0db89bfdbffae5ba3a16a80090ecc681de4a19c29e211f26",
+    "fmt.txt": "38c3babff835b0a8b4ca67d59820b95df17d3294e13267b654a39920a19bd877",
+    "focused-mariadb.txt": "19ed9367f8a54603eb2f36ae6d25db3f3e2d30ccf6e0e48251b60875d3a87a2d",
+    "ignored-inventory.txt": "cae50e6e20a7ebaa78659b382f84c7cff0f152e47a4cea309a4702f0a9a8604e",
+    "planner-test.txt": "c858110e8eaf88afbfb08b6ad0c02b6fa9b6fe6fa8421540dc6662d328d01f92"
+  }
+}

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running tests/integration.rs (target/debug/deps/integration-245109a29f7e15d5)
+
+running 2 tests
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes ... ok
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mysql_sql_modes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 19.16s
