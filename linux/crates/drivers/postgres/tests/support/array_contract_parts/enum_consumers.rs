@@ -151,6 +151,20 @@ async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
         expected_json
     );
     assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+
+    let no_rows_aggregate = format!(
+        "(SELECT array_agg(label ORDER BY ordinal) FILTER (WHERE false) \
+         FROM ({source}) AS input(ordinal, label))"
+    );
+    let no_rows = connection
+        .query(&format!(
+            "SELECT {no_rows_aggregate} AS value, pg_typeof({no_rows_aggregate})::text AS array_type"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(no_rows.columns[0].data_type, "value_contract_array_agg_enum[]");
+    assert_eq!(no_rows.rows[0][0], Value::Null);
+    assert_eq!(no_rows.rows[0][1], Value::Text("value_contract_array_agg_enum[]".into()));
 }
 
 #[tokio::test]
