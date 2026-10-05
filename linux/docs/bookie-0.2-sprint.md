@@ -27,6 +27,13 @@ wire bytes after rebinding. This extends one aggregate case; the remaining B3
 array/type/consumer matrix stays open
 ([case evidence](evidence/postgres-enum-array-agg-distinct-filter-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL enum parameters now have a native-oracle
+contract in both branches of `UNION ALL` and both row positions of `VALUES`.
+Ordinary, empty, literal `NULL`, and SQL NULL labels retain the inferred enum
+type and `enum_send` bytes; invalid labels fail with SQLSTATE `22P02`. This
+extends selected parameter contexts without closing the enum or B3 matrix
+([case evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: a companion PostgreSQL aggregate case puts a same-named
 enum in a shadow schema first in `search_path`. Aggregation from the qualified
 target table keeps its declared type and wire identity after rebinding, and a

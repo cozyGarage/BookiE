@@ -33,6 +33,11 @@ point does not represent all support for that engine.
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 
+PostgreSQL custom-enum parameters in either `UNION ALL` branch and either
+`VALUES` row preserve the native enum type and wire text; ordinary, empty,
+literal `NULL`, SQL NULL and invalid-label boundaries are checked
+([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
+
 PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits
 preserve boundary values, native type and wire bytes through the parser and
 keyed-update builder; invalid date-array input is refused without changing

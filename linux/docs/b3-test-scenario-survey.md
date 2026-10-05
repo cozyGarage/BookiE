@@ -1,5 +1,14 @@
 # B3 external test-scenario survey
 
+### October 5 PostgreSQL enum set-operation inference follow-up
+
+Parameterized labels in both branches of `UNION ALL` and both row positions of
+`VALUES` now match native schema-qualified enum literals for ordinary, empty,
+literal `NULL`, and SQL NULL labels. Result type and `enum_send` bytes are
+checked; invalid labels preserve PostgreSQL SQLSTATE `22P02`. The broader enum,
+session-configuration and B3 matrices remain open
+([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
+
 ### October 5 DuckDB nested enum result follow-up
 
 A LIST<ENUM> result previously reached DuckDB's unimplemented nested

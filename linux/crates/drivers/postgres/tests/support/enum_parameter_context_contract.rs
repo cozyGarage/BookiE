@@ -442,3 +442,109 @@ async fn value_contract_enum_parameters_resolve_target_under_shadowed_search_pat
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_enum_parameters_in_union_and_values_keep_native_type() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let enum_type = "value_contract_enum_set_operation.state";
+    connection
+        .execute("CREATE SCHEMA value_contract_enum_set_operation")
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {enum_type} AS ENUM ('ready', 'paused', 'NULL', '')"
+        ))
+        .await
+        .unwrap();
+
+    let contexts = [
+        (
+            "SELECT 1 AS ordinal, {parameter} AS label \
+             UNION ALL SELECT 2, 'ready'::{enum_type} ORDER BY ordinal",
+            "SELECT 1 AS ordinal, $1 AS label \
+             UNION ALL SELECT 2, 'ready'::{enum_type} ORDER BY ordinal",
+        ),
+        (
+            "SELECT 1 AS ordinal, 'ready'::{enum_type} AS label \
+             UNION ALL SELECT 2, {parameter} ORDER BY ordinal",
+            "SELECT 1 AS ordinal, 'ready'::{enum_type} AS label \
+             UNION ALL SELECT 2, $1 ORDER BY ordinal",
+        ),
+        (
+            "SELECT ordinal, label FROM (VALUES (1, {parameter}), \
+             (2, 'ready'::{enum_type})) AS candidates(ordinal, label) ORDER BY ordinal",
+            "SELECT ordinal, label FROM (VALUES (1, $1), \
+             (2, 'ready'::{enum_type})) AS candidates(ordinal, label) ORDER BY ordinal",
+        ),
+        (
+            "SELECT ordinal, label FROM (VALUES (1, 'ready'::{enum_type}), \
+             (2, {parameter})) AS candidates(ordinal, label) ORDER BY ordinal",
+            "SELECT ordinal, label FROM (VALUES (1, 'ready'::{enum_type}), \
+             (2, $1)) AS candidates(ordinal, label) ORDER BY ordinal",
+        ),
+    ];
+
+    for parameter in [
+        Value::Text("paused".into()),
+        Value::Text("NULL".into()),
+        Value::Text(String::new()),
+        Value::Null,
+    ] {
+        let native_parameter = match &parameter {
+            Value::Text(value) => format!("'{}'", value.replace('\'', "''")),
+            Value::Null => "NULL".into(),
+            other => panic!("unexpected enum parameter: {other:?}"),
+        };
+
+        for (native_template, inferred_template) in contexts {
+            let native_sql = native_template
+                .replace("{parameter}", &format!("{native_parameter}::{enum_type}"))
+                .replace("{enum_type}", enum_type);
+            let inferred_sql = inferred_template.replace("{enum_type}", enum_type);
+            let native = connection
+                .query(&format!(
+                    "SELECT ordinal, label::text, pg_typeof(label)::text, \
+                 encode(enum_send(label), 'hex') FROM ({native_sql}) AS result"
+                ))
+                .await
+                .unwrap();
+            let inferred = connection
+                .query_params(
+                    &format!(
+                        "SELECT ordinal, label::text, pg_typeof(label)::text, \
+                 encode(enum_send(label), 'hex') FROM ({inferred_sql}) AS result"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                inferred.rows, native.rows,
+                "SQL: {inferred_sql}, parameter: {parameter:?}"
+            );
+            assert!(
+                inferred
+                    .rows
+                    .iter()
+                    .all(|row| row.get(2) == Some(&Value::Text(enum_type.into()))),
+                "inferred enum type changed: {:?}",
+                inferred.rows
+            );
+        }
+    }
+
+    for (_, inferred_template) in contexts {
+        let inferred_sql = inferred_template.replace("{enum_type}", enum_type);
+        let invalid = connection
+            .query_params(&inferred_sql, &[Value::Text("not-a-label".into())])
+            .await
+            .expect_err("invalid inferred enum labels must be rejected by PostgreSQL");
+        assert!(
+            matches!(&invalid, DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected native invalid-enum SQLSTATE 22P02 for {inferred_sql}, got {invalid:?}"
+        );
+    }
+}
