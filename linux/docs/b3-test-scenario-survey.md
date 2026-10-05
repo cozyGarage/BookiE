@@ -1,5 +1,17 @@
 # B3 external test-scenario survey
 
+### October 5 DuckDB nested enum result follow-up
+
+A LIST<ENUM> result previously reached DuckDB's unimplemented nested
+`data_type()` path and panicked while decoding. The driver now returns the
+existing explicit `Undecodable("LIST")` marker for nested result kinds before
+the fallback asks DuckDB to infer their nested type. A regression case checks
+native `typeof` and JSON for empty text, Unicode, literal `NULL` and SQL NULL,
+then verifies type-less literal rendering and rebinding refuse the value.
+This prevents the crash; nested enum-list editing, rendering and binding remain
+unsupported, and the broader B3 matrix remains open
+([evidence](evidence/duckdb-enum-list-result-refusal-results-2026-10-05/manifest.json)).
+
 ### October 4 follow-up
 
 PostgreSQL inferred enum-array binding is covered for domain-over-enum `ANY`,

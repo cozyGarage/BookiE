@@ -492,6 +492,11 @@ fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
             .as_str()
             .map(|s| Value::Text(s.into()))
             .unwrap_or_else(|_| Value::Undecodable("ENUM".into())),
+        ValueRef::List(..) => Value::Undecodable("LIST".into()),
+        ValueRef::Struct(..) => Value::Undecodable("STRUCT".into()),
+        ValueRef::Array(..) => Value::Undecodable("ARRAY".into()),
+        ValueRef::Map(..) => Value::Undecodable("MAP".into()),
+        ValueRef::Union(..) => Value::Undecodable("UNION".into()),
         other => Value::Undecodable(format!("{:?}", other.data_type())),
     }
 }

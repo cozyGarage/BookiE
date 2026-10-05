@@ -187,6 +187,62 @@ async fn value_contract_duckdb_enum_literal_null_edit_stays_distinct_from_sql_nu
 
 #[cfg(feature = "duckdb")]
 #[tokio::test]
+async fn value_contract_duckdb_enum_list_result_matches_native_json() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_duckdb::DuckdbDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE mood_list AS ENUM ('NULL', '', '東京', 'ready')")
+        .await
+        .unwrap();
+
+    let expression = "['NULL'::mood_list, NULL::mood_list, ''::mood_list, '東京'::mood_list]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    let native = connection
+        .query(&format!(
+            "SELECT typeof(value), to_json(value) FROM (SELECT {expression} AS value) AS source"
+        ))
+        .await
+        .unwrap();
+    assert!(
+        matches!(&result.rows[0][0], Value::Undecodable(kind) if kind == "LIST"),
+        "nested enum lists must be explicitly un-decodable: {:?}",
+        result.rows[0][0]
+    );
+    assert!(tablepro_core::sql_literal::render_sql_literal("duckdb", &result.rows[0][0]).is_err());
+    assert!(
+        connection
+            .query_params("SELECT ?", std::slice::from_ref(&result.rows[0][0]))
+            .await
+            .is_err()
+    );
+    let Value::Text(native_type) = &native.rows[0][0] else {
+        panic!("native LIST<ENUM> type oracle returned {:?}", native.rows[0][0]);
+    };
+    assert!(
+        native_type.starts_with("ENUM(") && native_type.ends_with("[]"),
+        "{native_type}"
+    );
+    let Value::Text(json_text) = &native.rows[0][1] else {
+        panic!("native LIST<ENUM> JSON oracle returned {:?}", native.rows[0][1]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(json_text).unwrap(),
+        serde_json::json!(["NULL", null, "", "東京"])
+    );
+}
+
+#[cfg(feature = "duckdb")]
+#[tokio::test]
 async fn value_contract_duckdb_enum_csv_roundtrip_preserves_labels_and_null() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 

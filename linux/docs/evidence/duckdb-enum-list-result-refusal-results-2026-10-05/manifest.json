@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "1eb21ff60dcd2684df3850d9d4fd48f829d433ce",
+  "scope": "DuckDB nested result decoding and LIST<ENUM> refusal",
+  "source": {
+    "path": "crates/drivers/duckdb/src/lib.rs",
+    "sha256": "18b6031626d02272e65ed1ff5bf660ae8daa9c1a58e7a4de999bf1cf453aacbd"
+  },
+  "regression_test": {
+    "path": "crates/app/tests/support/duckdb_enum_contract.rs",
+    "sha256": "eb0a70951826b860bfe100f49a76bb0a6ef2c50b2aa4c3a0137edf2708c2cfd8",
+    "selector": "value_contract_duckdb_enum_list_result_matches_native_json"
+  },
+  "observed_before_fix": "LIST<ENUM> decoding called DuckDB ValueRef::data_type on a dictionary child and panicked with not implemented: Dictionary(UInt8, Utf8).",
+  "contract": [
+    "Nested LIST, STRUCT, ARRAY, MAP and UNION results map to the existing Undecodable marker without calling nested data_type().",
+    "A LIST<ENUM> result is explicitly Undecodable(LIST); SQL literal rendering and parameter rebinding refuse it.",
+    "Native typeof and to_json preserve the ENUM list labels, Unicode, empty label, literal NULL label and SQL NULL element."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-app --features duckdb --lib value_contract_duckdb_enum_list_result_matches_native_json -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "duckdb_driver_suite": {
+      "command": "rtk cargo test --locked -p tablepro-driver-duckdb",
+      "result": "52 passed across 3 suites",
+      "log": "driver-tests.txt"
+    },
+    "strict_value_matrix": {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "338 tests passed across 11 suites; no missing suites; GTK and DuckDB enabled",
+      "local_report": "target/quality/20261005T110534843509Z-values/report.json"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-duckdb -p tablepro-app --features duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Nested DuckDB values, including LIST<ENUM>, remain unsupported by type-less app consumers; this change prevents a decoder panic and does not close B3 or qualify the 0.2.0 release."
+  ]
+}

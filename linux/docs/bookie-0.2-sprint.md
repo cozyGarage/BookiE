@@ -12,6 +12,14 @@ Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
 files and fixtures; a lane pass does not close a milestone.
 
+October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
+inside the nested type fallback. The driver now explicitly refuses nested
+LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;
+the new LIST<ENUM> scenario compares native type/JSON and verifies type-less
+literal and parameter paths refuse safely. Nested values are still unsupported,
+so B3 stays open
+([case evidence](evidence/duckdb-enum-list-result-refusal-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,
