@@ -140,6 +140,16 @@ resolve case variants to canonical values. Text results are UTF-8, while native
 HEX checks retain Latin-1 storage bytes; metadata and parameterized copies are
 checked ([case evidence](evidence/mysql-latin1-enum-set-collation-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL enum function/result contracts now cover
+unbounded and bounded `enum_range`, `enum_first`/`enum_last`, and scalar
+`min`/`max` under same-named leading shadow types. The aggregate case checks
+declaration order, all-NULL and no-row results; each case checks qualified type
+metadata and native wire identity
+([unbounded range](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json),
+[bounded range](evidence/postgres-enum-range-bounds-shadowed-results-2026-10-05/manifest.json),
+[first/last](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json),
+[min/max](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

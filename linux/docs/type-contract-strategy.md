@@ -130,6 +130,10 @@ checks ([evidence](evidence/postgres-enum-range-bounds-shadowed-results-2026-10-
 shadow-path collision, with qualified metadata, native `enum_send` byte checks,
 typed rebinding and SQLSTATE `22P02` for shadow-only labels
 ([evidence](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json)).
+Scalar enum `min`/`max` aggregates now preserve declared enum order, qualified
+metadata and wire identity under the same shadow-path collision, including
+all-NULL and no-row aggregate results
+([evidence](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
