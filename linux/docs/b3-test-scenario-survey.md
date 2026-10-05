@@ -330,6 +330,13 @@ check its runtime class and exact bytes. This closes a decoder edge case only;
 the wider SQLite expression and consumer matrix remains open
 ([evidence](evidence/sqlite-utf8-blob-result-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 PostgreSQL enum follow-up: `enum_range(NULL::qualified_enum)`
+now checks result metadata and enum order under a same-named leading shadow
+type, with JSON and wire-byte oracles, array rebinding, and SQLSTATE `22P02`
+for a shadow-only label. Other B3 enum functions and session/search-path
+combinations remain open
+([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as

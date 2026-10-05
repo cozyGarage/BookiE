@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-driver-postgres
+45 passed, 170 ignored (5 suites)

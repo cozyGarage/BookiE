@@ -117,6 +117,11 @@ The same aggregate also has a same-named enum in a leading shadow schema; native
 type OID and wire checks confirm the qualified table's enum array survives
 rebinding, and a shadow-only label is refused
 ([shadow-path evidence](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json)).
+`enum_range(NULL::qualified_enum)` now has a separate result contract under a
+same-named leading shadow type: metadata stays qualified to the target schema,
+enum order and empty/Unicode labels match native JSON and wire-byte oracles,
+and rebinding refuses a shadow-only label
+([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

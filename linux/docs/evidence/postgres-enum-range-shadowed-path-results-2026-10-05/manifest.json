@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "fbe34b2d6499234e55991c07813ddc22d893250a",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "enum_range result and rebind with a same-named shadow enum in search_path",
+  "test": "array_contract::value_contract_enum_range_uses_qualified_type_under_shadowed_search_path",
+  "contract": [
+    "A custom enum and a different enum with the same type name exist in target and shadow schemas, with the shadow schema first in search_path.",
+    "enum_range(NULL::qualified_target_enum) preserves target schema metadata, declaration order, empty and Unicode labels, one-dimensional lower bounds, and SQL NULL-free enum array semantics.",
+    "Native pg_typeof, array_to_json, array_send and array_dims provide independent type, value, wire-byte and shape oracles.",
+    "Rebinding the returned enum array through its typed text cast reproduces native JSON and array_send bytes; a shadow-only label is rejected with SQLSTATE 22P02."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_uses_qualified_type_under_shadowed_search_path -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 170 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 490 declarations, Driver tier 357",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL enum functions, value consumers, and search_path/session combinations remain open; this case does not close B3."
+  ],
+  "log_sha256": {
+    "focused.txt": "6bf2696b8782638f8ab702a403d034134c032cf62b62659de08e5a2fcaf4b86c",
+    "driver-suite.txt": "36c1172d2bc2149c82cabf4c698492fae52550482f4bfff9c5c47a36a8c1e4d4",
+    "ignored-inventory.txt": "76b21973f5f84bc603c97c4bea692f959200c470bd4484ef802281d86399867e"
+  }
+}
