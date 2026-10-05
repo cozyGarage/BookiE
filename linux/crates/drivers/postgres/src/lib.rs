@@ -1,9 +1,10 @@
 use std::time::Duration;
+use std::{collections::HashMap, iter};
 
 use async_trait::async_trait;
 use secrecy::ExposeSecret;
 use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow, PgTypeInfo, PgTypeKind};
 use sqlx::{
     Column, Connection as SqlxConnection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef,
 };
@@ -848,11 +849,12 @@ async fn query_connection(
         .map_or(&[][..], |description| description.inferred_text_types.as_slice());
     let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, inferred_text_types)?;
     let mut stream = query.fetch(&mut **connection);
-    let mut result = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+    let (mut result, mut type_infos) = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
     drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
         if let Some(description) = description {
             result.columns = description.columns;
+            type_infos = description.column_type_infos;
         } else {
             let parameter_types = pg_parameter_type_infos(params);
             let statement = connection
@@ -860,8 +862,10 @@ async fn query_connection(
                 .await
                 .map_err(map_sqlx_error)?;
             result.columns = statement_columns(statement.columns());
+            type_infos = statement_type_infos(statement.columns());
         }
     }
+    refresh_enum_type_names(connection, &mut result.columns, &type_infos).await?;
     Ok(result)
 }
 
@@ -885,15 +889,19 @@ async fn execute_connection(
 }
 
 async fn stream_into_result(pool: &Pool<Postgres>, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
-    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(pool);
-    let mut result = collect_query_rows(&mut stream, limit).await?;
+    let mut connection = pool.acquire().await.map_err(map_sqlx_error)?;
+    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
+    let (mut result, mut type_infos) = collect_query_rows(&mut stream, limit).await?;
+    drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
-        let statement = pool
+        let statement = connection
             .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
             .await
             .map_err(map_sqlx_error)?;
         result.columns = statement_columns(statement.columns());
+        type_infos = statement_type_infos(statement.columns());
     }
+    refresh_enum_type_names(&mut connection, &mut result.columns, &type_infos).await?;
     Ok(result)
 }
 
@@ -915,11 +923,65 @@ fn statement_columns(columns: &[sqlx::postgres::PgColumn]) -> Vec<ColumnInfo> {
         .collect()
 }
 
-async fn collect_query_rows<'a, S>(stream: &mut S, limit: usize) -> Result<QueryResult, DriverError>
+fn statement_type_infos(columns: &[sqlx::postgres::PgColumn]) -> Vec<PgTypeInfo> {
+    columns.iter().map(|column| column.type_info().clone()).collect()
+}
+
+fn has_enum_leaf(type_info: &PgTypeInfo) -> bool {
+    match type_info.kind() {
+        PgTypeKind::Enum(_) => true,
+        PgTypeKind::Array(element) | PgTypeKind::Domain(element) => has_enum_leaf(element),
+        _ => false,
+    }
+}
+
+async fn refresh_enum_type_names(
+    connection: &mut PoolConnection<Postgres>,
+    columns: &mut [ColumnInfo],
+    type_infos: &[PgTypeInfo],
+) -> Result<(), DriverError> {
+    let type_oids: Vec<i64> = type_infos
+        .iter()
+        .filter(|type_info| has_enum_leaf(type_info))
+        .filter_map(|type_info| type_info.oid().map(|oid| i64::from(oid.0)))
+        .collect();
+    if type_oids.is_empty() {
+        return Ok(());
+    }
+
+    let rows = sqlx::query(
+        "SELECT type.oid::bigint, pg_catalog.format_type(type.oid, NULL) \
+         FROM pg_catalog.pg_type AS type \
+         WHERE type.oid IN (SELECT unnest($1::bigint[])::oid)",
+    )
+    .bind(&type_oids)
+    .fetch_all(&mut **connection)
+    .await
+    .map_err(map_sqlx_error)?;
+    let mut names = HashMap::with_capacity(rows.len());
+    for row in rows {
+        let oid: i64 = row.try_get(0).map_err(map_sqlx_error)?;
+        let name: String = row.try_get(1).map_err(map_sqlx_error)?;
+        names.insert(oid, name);
+    }
+
+    for (column, type_info) in iter::zip(columns, type_infos) {
+        if has_enum_leaf(type_info)
+            && let Some(oid) = type_info.oid().map(|oid| i64::from(oid.0))
+            && let Some(name) = names.get(&oid)
+        {
+            column.data_type.clone_from(name);
+        }
+    }
+    Ok(())
+}
+
+async fn collect_query_rows<'a, S>(stream: &mut S, limit: usize) -> Result<(QueryResult, Vec<PgTypeInfo>), DriverError>
 where
     S: futures::Stream<Item = Result<PgRow, sqlx::Error>> + Unpin + 'a,
 {
     let mut columns = Vec::new();
+    let mut type_infos = Vec::new();
     let mut type_names = Vec::new();
     let mut rows = Vec::new();
     let mut truncated = false;
@@ -930,6 +992,7 @@ where
             break;
         }
         if rows.is_empty() {
+            type_infos = statement_type_infos(row.columns());
             type_names = row
                 .columns()
                 .iter()
@@ -962,11 +1025,14 @@ where
                 .collect::<Result<Vec<_>, _>>()?,
         );
     }
-    Ok(QueryResult {
-        columns,
-        rows,
-        truncated,
-    })
+    Ok((
+        QueryResult {
+            columns,
+            rows,
+            truncated,
+        },
+        type_infos,
+    ))
 }
 
 fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, DriverError> {

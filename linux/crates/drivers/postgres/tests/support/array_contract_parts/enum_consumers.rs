@@ -777,6 +777,133 @@ async fn value_contract_enum_range_observes_renamed_label_in_same_session() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_type_rename_and_schema_move_refresh_session_metadata() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_move_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_move_shadow").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_move_destination").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_move_target.state AS ENUM ('queued', 'complete')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_move_shadow.state AS ENUM ('shadow-state', 'complete')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_move_shadow.phase AS ENUM ('shadow-phase', 'complete')",
+        )
+        .await
+        .unwrap();
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    session
+        .query_params_controlled(
+            "SET search_path = value_contract_enum_move_shadow, \
+             value_contract_enum_move_target, public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+
+    let initial = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_move_target.state) AS value",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let initial_type = "value_contract_enum_move_target.state[]";
+    assert_eq!(initial.columns[0].data_type, initial_type);
+    assert_eq!(initial.rows[0][0], Value::Text(r#"{"queued","complete"}"#.into()));
+
+    session
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_move_target.state RENAME TO phase",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let renamed = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_move_target.phase) AS value",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let renamed_type = "value_contract_enum_move_target.phase[]";
+    assert_eq!(renamed.columns[0].data_type, renamed_type);
+    assert_eq!(renamed.rows[0][0], initial.rows[0][0]);
+
+    session
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_move_target.phase \
+             SET SCHEMA value_contract_enum_move_destination",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let moved = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_move_destination.phase) AS value",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let moved_type = "value_contract_enum_move_destination.phase[]";
+    assert_eq!(moved.columns[0].data_type, moved_type);
+    assert_eq!(moved.rows[0][0], initial.rows[0][0]);
+
+    let empty = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_move_destination.phase) AS value \
+             WHERE false",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.columns[0].data_type, moved_type);
+    assert!(empty.rows.is_empty());
+
+    let native = session
+        .query_params_controlled(
+            "SELECT pg_typeof(enum_range(NULL::value_contract_enum_move_destination.phase))::text, \
+                    array_to_json(enum_range(NULL::value_contract_enum_move_destination.phase))::text, \
+                    encode(array_send(enum_range(NULL::value_contract_enum_move_destination.phase)), 'hex')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(moved_type.into()));
+    assert_eq!(native.rows[0][1], Value::Text(r#"["queued","complete"]"#.into()));
+    let rebound = session
+        .query_params_controlled(
+            &format!("SELECT encode(array_send($1::text::{moved_type}), 'hex')"),
+            std::slice::from_ref(&moved.rows[0][0]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

@@ -4,11 +4,12 @@ use sqlx::{Encode, Executor, Postgres, SqlSafeStr, Statement, Type};
 use tablepro_core::{ColumnInfo, DriverError, Value};
 
 use crate::array::MAX_ARRAY_TEXT_BYTES;
-use crate::{map_sqlx_error, statement_columns};
+use crate::{map_sqlx_error, statement_columns, statement_type_infos};
 
 pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
     pub(super) columns: Vec<ColumnInfo>,
+    pub(super) column_type_infos: Vec<PgTypeInfo>,
 }
 
 pub(super) async fn describe_query_parameters(
@@ -56,6 +57,7 @@ pub(super) async fn describe_query_parameters(
     Ok(PgParameterDescription {
         inferred_text_types,
         columns: statement_columns(statement.columns()),
+        column_type_infos: statement_type_infos(statement.columns()),
     })
 }
 
