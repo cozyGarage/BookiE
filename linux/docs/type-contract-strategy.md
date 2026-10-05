@@ -66,9 +66,10 @@ as `42883`; the test keeps that native limitation distinct from containment
 binding coverage.
 
 MariaDB 11's `EMPTY_STRING_IS_NULL` mode converts empty-string parameters to
-SQL NULL. MySQL/MariaDB CSV plans now reconstruct empty ENUM labels and empty
-SET values with `SPACE(0)`, keeping them distinct from marker-bound SQL NULL;
-the native mode contract checks ordinals, exact bytes, and a sibling row
+SQL NULL. MySQL/MariaDB CSV plans now reconstruct empty ENUM labels, empty SET
+values, and empty CHAR/VARCHAR/TEXT destinations with `SPACE(0)`, keeping them
+distinct from marker-bound SQL NULL; native mode contracts check ordinals,
+masks, text bytes, NULL state, and a sibling row
 ([standalone mode](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
 The same round trip also passes with `STRICT_TRANS_TABLES`, `ANSI_QUOTES`, and
 `NO_BACKSLASH_ESCAPES` enabled alongside that mode, including native verification
@@ -87,6 +88,9 @@ core builder test also pins that expression for ordinary text columns. Native
 SQL-file and typed CSV restore contracts compare ordinals, masks, exact bytes,
 NULL state, and sibling rows separately under the standalone and combined MariaDB modes
 ([evidence](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json)).
+The typed CSV contract also verifies empty VARCHAR through import and SQL-file
+replay under both MariaDB mode combinations, against native bytes and NULL state
+([evidence](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json)).
 
 | Owner / engine | Retain established contracts | Remaining scope to select one case from |
 | --- | --- | --- |

@@ -63,7 +63,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
             r#"CREATE TABLE enum_mode_source (
                 id INT PRIMARY KEY,
                 mood ENUM('happy', 'it''s ok', 'back\\slash', 'NULL', '', '<tag>&'),
-                perms SET('read', 'write', 'slash\\path', 'NULL', '<member>')
+                perms SET('read', 'write', 'slash\\path', 'NULL', '<member>'),
+                note VARCHAR(30) NULL
             )"#,
         )
         .await
@@ -76,22 +77,23 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         .execute("CREATE TABLE enum_csv_copy LIKE enum_mode_source")
         .await
         .unwrap();
-    for (id, label, permissions) in [
-        (1, Some("happy"), Some("read")),
-        (2, Some("it's ok"), Some("write,slash\\path")),
-        (3, Some("back\\slash"), Some("NULL")),
-        (4, Some("NULL"), Some("")),
-        (5, Some(""), Some("slash\\path")),
-        (6, None, None),
-        (7, Some("<tag>&"), Some("<member>")),
+    for (id, label, permissions, note) in [
+        (1, Some("happy"), Some("read"), Some("plain")),
+        (2, Some("it's ok"), Some("write,slash\\path"), Some("second")),
+        (3, Some("back\\slash"), Some("NULL"), None),
+        (4, Some("NULL"), Some(""), Some("four")),
+        (5, Some(""), Some("slash\\path"), Some("five")),
+        (6, None, None, Some("six")),
+        (7, Some("<tag>&"), Some("<member>"), Some("")),
     ] {
         setup
             .execute_params(
-                "INSERT INTO enum_mode_source VALUES (?, ?, ?)",
+                "INSERT INTO enum_mode_source VALUES (?, ?, ?, ?)",
                 &[
                     Value::Int(id),
                     label.map_or(Value::Null, |value| Value::Text(value.into())),
                     permissions.map_or(Value::Null, |value| Value::Text(value.into())),
+                    note.map_or(Value::Null, |value| Value::Text(value.into())),
                 ],
             )
             .await
@@ -104,13 +106,14 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         connection.execute("DELETE FROM enum_mode_copy").await.unwrap();
         connection.execute("DELETE FROM enum_csv_copy").await.unwrap();
         let source = connection
-            .query("SELECT id, mood, perms FROM enum_mode_source ORDER BY id")
+            .query("SELECT id, mood, perms, note FROM enum_mode_source ORDER BY id")
             .await
             .unwrap();
         let native = connection
             .query(
                 "SELECT id, CAST(mood + 0 AS CHAR), HEX(mood), \
-                 CAST(perms + 0 AS CHAR), HEX(perms) FROM enum_mode_source ORDER BY id",
+                 CAST(perms + 0 AS CHAR), HEX(perms), HEX(note), note IS NULL \
+                 FROM enum_mode_source ORDER BY id",
             )
             .await
             .unwrap();
@@ -123,6 +126,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     Value::Text("6861707079".into()),
                     Value::Text("1".into()),
                     Value::Text("72656164".into()),
+                    Value::Text("706C61696E".into()),
+                    Value::Int(0),
                 ],
                 vec![
                     Value::Int(2),
@@ -130,6 +135,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     Value::Text("69742773206F6B".into()),
                     Value::Text("6".into()),
                     Value::Text("77726974652C736C6173685C70617468".into()),
+                    Value::Text("7365636F6E64".into()),
+                    Value::Int(0),
                 ],
                 vec![
                     Value::Int(3),
@@ -137,6 +144,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     Value::Text("6261636B5C736C617368".into()),
                     Value::Text("8".into()),
                     Value::Text("4E554C4C".into()),
+                    Value::Null,
+                    Value::Int(1),
                 ],
                 vec![
                     Value::Int(4),
@@ -144,6 +153,8 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     Value::Text("4E554C4C".into()),
                     Value::Text("0".into()),
                     Value::Text(String::new()),
+                    Value::Text("666F7572".into()),
+                    Value::Int(0),
                 ],
                 vec![
                     Value::Int(5),
@@ -151,14 +162,26 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     Value::Text(String::new()),
                     Value::Text("4".into()),
                     Value::Text("736C6173685C70617468".into()),
+                    Value::Text("66697665".into()),
+                    Value::Int(0),
                 ],
-                vec![Value::Int(6), Value::Null, Value::Null, Value::Null, Value::Null],
+                vec![
+                    Value::Int(6),
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    Value::Null,
+                    Value::Text("736978".into()),
+                    Value::Int(0),
+                ],
                 vec![
                     Value::Int(7),
                     Value::Text("6".into()),
                     Value::Text("3C7461673E26".into()),
                     Value::Text("16".into()),
                     Value::Text("3C6D656D6265723E".into()),
+                    Value::Text(String::new()),
+                    Value::Int(0),
                 ],
             ],
             "native ENUM ordinals and labels in sql_mode {mode:?}"
@@ -168,13 +191,13 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         assert_eq!(
             json,
             serde_json::json!([
-                {"id": 1, "mood": "happy", "perms": "read"},
-                {"id": 2, "mood": "it's ok", "perms": "write,slash\\path"},
-                {"id": 3, "mood": "back\\slash", "perms": "NULL"},
-                {"id": 4, "mood": "NULL", "perms": ""},
-                {"id": 5, "mood": "", "perms": "slash\\path"},
-                {"id": 6, "mood": null, "perms": null},
-                {"id": 7, "mood": "<tag>&", "perms": "<member>"}
+                {"id": 1, "mood": "happy", "perms": "read", "note": "plain"},
+                {"id": 2, "mood": "it's ok", "perms": "write,slash\\path", "note": "second"},
+                {"id": 3, "mood": "back\\slash", "perms": "NULL", "note": null},
+                {"id": 4, "mood": "NULL", "perms": "", "note": "four"},
+                {"id": 5, "mood": "", "perms": "slash\\path", "note": "five"},
+                {"id": 6, "mood": null, "perms": null, "note": "six"},
+                {"id": 7, "mood": "<tag>&", "perms": "<member>", "note": ""}
             ]),
             "JSON export under sql_mode {mode:?}"
         );
@@ -250,7 +273,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
         };
         let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
         let columns = connection.fetch_columns(None, "enum_csv_copy").await.unwrap();
-        let mapping = [Some(0), Some(1), Some(2)];
+        let mapping = [Some(0), Some(1), Some(2), Some(3)];
         let plan = tablepro_core::import::build_insert_plan(
             &tablepro_core::import::ImportTarget {
                 driver_id: "mysql",
@@ -303,7 +326,9 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: 
                     "SELECT COUNT(*) FROM enum_mode_source s \
                      JOIN {copy_table} c ON s.id = c.id \
                        AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood) \
-                       AND s.perms + 0 <=> c.perms + 0 AND HEX(s.perms) <=> HEX(c.perms)"
+                       AND s.perms + 0 <=> c.perms + 0 AND HEX(s.perms) <=> HEX(c.perms) \
+                       AND (s.note IS NULL) <=> (c.note IS NULL) \
+                       AND HEX(s.note) <=> HEX(c.note)"
                 ))
                 .await
                 .unwrap();

@@ -147,6 +147,11 @@ for both result branches under a shadowed `search_path`, including empty and
 literal `NULL` labels distinct from SQL NULL
 ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
 
+MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under
+`EMPTY_STRING_IS_NULL`, separately from SQL NULL, with native text-byte
+comparison on both CSV and SQL replay
+([evidence](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json)).
+
 PostgreSQL domain-over-enum arrays now also have a bound text-parameter contract
 for literal `NULL`, empty text, Unicode, comma-containing labels and SQL NULL,
 verified against native `array_send` bytes ([parameter evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json)); a separate 2×2 parameter case preserves lower bounds 0 and 3 ([bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json)).

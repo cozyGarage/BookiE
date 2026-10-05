@@ -1,0 +1,11 @@
+892e09e69edcea5ab41c220d8c73fb191f96f6e4fc73430367de749c5bc2d01b  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/baseline-failure.txt
+fe3dacb38061d4532ab72524089d2145b0e45f0cc51e4f62b897c400d320252f  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/clippy.txt
+8d36da607ffe893ffa16831c2fa2fe7b8f9c2082a4d38487df91b117ae75722e  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/core-plan-test.txt
+6e687eb2076b8cc5bfbe5b2aa12b41e1331205efa1ef4b1237e9eb996579d4b6  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/core-tests.txt
+a2d29eac0db94ede2cf05f391ae78688db856983dd81f9a23b184b21482dea27  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/diff-check.txt
+4213077d49081e95718b2fad873a41e865bd74e1163975ac9a58a49573d28eec  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/fmt.txt
+d390914ba0cc6e60835c4db4ecef788e811e56155882cad522e6009b86d74628  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/ignored-inventory.txt
+97ea848ec5ddc3f905919ebd775302c182afd5f9a55166c81e00bc19a9e87a3a  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/mariadb-contract.txt
+33a4b0269cba78f64608551599c586af6a8e0444011b5d62d9f3f7feffffb7ff  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json
+a104aadc30e6e8a1c75ebdd95986f27ab223013f6d8ffd72917749d3a6446c00  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/mysql-contract.txt
+cf41835f760518c528200b1923e7713703d97a984acf6b1fc1ea8b63b3edd37b  docs/evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/type-classifier-test.txt

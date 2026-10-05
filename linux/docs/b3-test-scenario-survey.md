@@ -157,6 +157,11 @@ MariaDB 11's `EMPTY_STRING_IS_NULL` mode also has a native enum/set CSV restore
 contract: an empty ENUM label and zero-member SET stay distinct from SQL NULL
 by rebuilding empty text with a server expression; native ordinal/byte checks
 verify the stored values ([evidence](evidence/mariadb-empty-enum-set-empty-string-is-null-results-2026-10-05/manifest.json)).
+The same mode exposed an ordinary-text CSV gap: empty VARCHAR became SQL NULL
+while the SQL-file copy passed. The importer now emits `SPACE(0)` for empty
+CHAR/VARCHAR/TEXT destinations, and native CSV/SQL round trips compare text
+bytes and NULL state across the MySQL and MariaDB mode matrices
+([evidence](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json)).
 The same import now also passes with `STRICT_TRANS_TABLES`, `ANSI_QUOTES`, and
 `NO_BACKSLASH_ESCAPES` combined with `EMPTY_STRING_IS_NULL`; native ENUM/SET
 ordinals, bytes, SQL NULL state, and the pre-existing sibling match the

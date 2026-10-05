@@ -1,0 +1,2 @@
+Command: cargo test --locked -p tablepro-core
+Result: 539 passed across 3 suites, 0 failed.

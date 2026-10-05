@@ -1,0 +1,2 @@
+Command: cargo test --locked -p tablepro-core mysql_empty_string_reconstruction_is_limited_to_text_destinations
+Result: 1 passed, 0 failed, 538 filtered; accepts ENUM/SET and CHAR/VARCHAR/TEXT families, excludes JSON, VARBINARY, and INT.

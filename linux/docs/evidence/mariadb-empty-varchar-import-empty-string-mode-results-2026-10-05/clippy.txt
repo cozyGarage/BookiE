@@ -1,0 +1,2 @@
+Command: cargo clippy --locked -p tablepro-core -p tablepro-driver-mysql --all-targets -- -D warnings
+Result: passed; no issues found.

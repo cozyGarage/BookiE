@@ -1,0 +1,2 @@
+Command: cargo test --locked -p tablepro-core mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text
+Result: 1 passed, 0 failed, 537 filtered.

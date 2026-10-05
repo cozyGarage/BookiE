@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "base_commit": "7664ae7c7b14002c81eb5673a46fa54d0aac2742",
+  "working_tree_dirty": true,
+  "change_under_test": "MySQL CSV planning preserves explicit empty CHAR/VARCHAR/TEXT values with SPACE(0) under MariaDB EMPTY_STRING_IS_NULL.",
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "passed": 321,
+  "failed": 0,
+  "suites": 11,
+  "missing_suites": [],
+  "report": "report.json",
+  "logs": ["crates-app.log", "crates-core.log", "crates-drivers-clickhouse.log", "crates-drivers-duckdb.log", "crates-drivers-mongodb.log", "crates-drivers-mssql.log", "crates-drivers-mysql.log", "crates-drivers-postgres.log", "crates-drivers-redis.log", "crates-drivers-sqlite.log", "crates-mcp.log"],
+  "compile_log": "compile.log"
+}

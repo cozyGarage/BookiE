@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "7664ae7c7b14002c81eb5673a46fa54d0aac2742",
+  "working_tree_dirty": true,
+  "case": "MySQL/MariaDB typed CSV and SQL-file round trips preserve empty VARCHAR under MariaDB EMPTY_STRING_IS_NULL",
+  "engine": "MariaDB 11 and MySQL Docker integration fixtures",
+  "source_files": [
+    {"path": "crates/core/src/import/plan.rs", "sha256": "d6b18c5ad97eddaaae5a26081d0643220640e2783aa044d6f00fa922b89ec015"},
+    {"path": "crates/drivers/mysql/tests/support/enum_sql_mode_contract.rs", "sha256": "9b5a81570c5514b0cbfc04be0394522d11fbfe593036e5f75f0108a2e07c9a4c"}
+  ],
+  "behavior_before_fix": {
+    "result": "The MariaDB SQL-file copy matched all 7 source rows, but typed CSV restore matched only 6 of 7 under EMPTY_STRING_IS_NULL; the empty VARCHAR was converted to SQL NULL.",
+    "evidence": "baseline-failure.txt",
+    "test_delta": "The VARCHAR column, empty value and native byte/NULL checks were added before the baseline run; the core import planner was unchanged."
+  },
+  "fix": "MySQL CSV planning now recognizes empty values for ENUM/SET and CHAR/VARCHAR/TEXT destination types and expands them as CASE WHEN marker = 1 THEN SPACE(0) ELSE value END. Explicit marker-bound SQL NULL remains NULL. The MySQL SQL-file literal writer already emits SPACE(0) for empty text values.",
+  "contract": [
+    "The native source includes ordinary empty VARCHAR, nonempty text, and SQL NULL alongside enum/set boundary values.",
+    "Typed CSV restore and replayed SQL files are compared independently against native ENUM ordinals and bytes, SET masks and bytes, VARCHAR bytes, NULL state, and an untouched sibling.",
+    "MariaDB runs EMPTY_STRING_IS_NULL alone and combined with STRICT_TRANS_TABLES, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES, in addition to the established mode matrix.",
+    "MySQL continues to pass the established twelve-mode consumer matrix.",
+    "Core planner tests pin emitted SQL and restrict the empty-string workaround to enum/set and text-family destinations."
+  ],
+  "validation": {
+    "mariadb_contract": {"command": "cargo test --locked -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive_mariadb_sql_modes -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "mariadb-contract.txt"},
+    "mysql_contract": {"command": "cargo test --locked -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive_mysql_sql_modes -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "mysql-contract.txt"},
+    "core_plan_test": {"command": "cargo test --locked -p tablepro-core mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text", "passed": 1, "failed": 0, "log": "core-plan-test.txt"},
+    "core_classifier_test": {"command": "cargo test --locked -p tablepro-core mysql_empty_string_reconstruction_is_limited_to_text_destinations", "passed": 1, "failed": 0, "log": "type-classifier-test.txt"},
+    "core_tests": {"command": "cargo test --locked -p tablepro-core", "passed": 539, "failed": 0, "suites": 3, "log": "core-tests.txt"},
+    "full_value_tier": {"command": "./scripts/test-value-contracts.sh --gtk --duckdb", "passed": 321, "failed": 0, "suites": 11, "missing_suites": [], "evidence": "../local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/manifest.json"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-core -p tablepro-driver-mysql --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

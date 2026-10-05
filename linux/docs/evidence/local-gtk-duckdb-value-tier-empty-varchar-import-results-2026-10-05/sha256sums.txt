@@ -1,0 +1,14 @@
+388ef46fd4eb8643fbfe4f85f7f804935f2d0dea2b4effe423dba327f3ad20a8  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/compile.log
+aceb4e77495ca11195c631b199f30d9534de70a425bd50bbe6947f982a31981b  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-app.log
+14c4c9eeec3e3b28257e9016e29d6a4000f3124500e961060282c8b3c56aa68b  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-core.log
+d752bf341be98d740e653072d626c307a2d97b1fc7d8d426cf015b74f7abda1b  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-clickhouse.log
+4a9715dc00265f60dcd073791984b50ff7f0de89560e39224993e4152b0676e9  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-duckdb.log
+ffd23b7db30659f92582085511c85e7166cac68dd9a840dd93ffb208f22e9129  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-mongodb.log
+14ce3868c5c6ca14c7935f3d6c6364356d46592c95484fb9e283de2dacb5a851  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-mssql.log
+3e4323e71612f18587ad0a4378ac2635a580cc3c002b57682e15134c06774f14  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-mysql.log
+5e7b64496c431aee5fa922912b24164a692448ae74e073c703ca96ab20d61891  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-postgres.log
+b3f7cea8c89ae08fe5683fc0a0165463f02b2812769d27940540f412aed056fe  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-redis.log
+fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-drivers-sqlite.log
+32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/crates-mcp.log
+f3f8f9be3a60f5a3c07786f7fa068e007125262326cfe13002f99b9373542d1d  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/manifest.json
+aebff85a1066439af8baf30cc9a38537f1d9371da86bd6982b9cf463d7f586e9  docs/evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/report.json

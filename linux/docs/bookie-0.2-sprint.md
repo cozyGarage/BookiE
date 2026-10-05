@@ -416,12 +416,17 @@ Native ENUM ordinals, SET masks, exact bytes, SQL NULL state, and CSV restore
 are checked independently under both `EMPTY_STRING_IS_NULL` configurations;
 the core builder test pins the ordinary-text literal ([evidence](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: an empty VARCHAR also became SQL NULL through typed
+CSV import, while SQL-file replay preserved it. The shared import planner now
+reconstructs empty CHAR/VARCHAR/TEXT values with `SPACE(0)`; MySQL and MariaDB
+native mode contracts compare text bytes and NULL state independently for CSV
+and SQL replay ([evidence](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json)).
+
 October 5 local GTK + DuckDB value tier: 321 selected tests passed across all
-11 suites with no missing suites at source `8880a76f2f391f2c09e6f74c882a845f9dda4c6a`,
-with the SQL literal change present in the working tree.
-The app suite includes both MySQL and MariaDB keyed ENUM/SET grid contracts;
-the run report and suite logs are recorded in the
-[value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-sql-literal-results-2026-10-05/manifest.json) and the [SQL-file case packet](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json).
+11 suites with no missing suites at source `7664ae7c7b14002c81eb5673a46fa54d0aac2742`,
+with the empty-text SQL and typed-CSV changes present in the working tree.
+The run report and suite logs are recorded in the
+[value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/manifest.json) and the [MySQL/MariaDB import packet](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json).
 
 October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
 schema-qualified destination cast across a role `search_path` change between

@@ -214,7 +214,18 @@ fn insert_statement(
 }
 
 fn mysql_empty_string_type(data_type: &str) -> bool {
-    ["enum(", "set("].iter().any(|prefix| {
+    [
+        "enum(",
+        "set(",
+        "char",
+        "varchar",
+        "tinytext",
+        "text",
+        "mediumtext",
+        "longtext",
+    ]
+    .iter()
+    .any(|prefix| {
         data_type
             .trim()
             .get(..prefix.len())
@@ -326,16 +337,21 @@ mod tests {
     }
 
     #[test]
-    fn mysql_enum_set_empty_csv_cells_are_reconstructed_without_binding_empty_text() {
+    fn mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text() {
         let columns = vec![
             column("id", "INT"),
             column("state", "enum('', 'ready', 'NULL')"),
             column("permissions", "set('read', 'write')"),
+            column("note", "varchar(30)"),
         ];
-        let mapping = vec![Some(0), Some(1), Some(2)];
+        let mapping = vec![Some(0), Some(1), Some(2), Some(3)];
         let sheet = sheet(
-            &[&["1", "", ""], &["2", "ready", "read"], &["3", "\\N", "\\N"]],
-            &["id", "state", "permissions"],
+            &[
+                &["1", "", "", ""],
+                &["2", "ready", "read", "plain"],
+                &["3", "\\N", "\\N", "\\N"],
+            ],
+            &["id", "state", "permissions", "note"],
         );
         let options = CsvImportOptions {
             null_marker: "\\N".into(),
@@ -353,22 +369,59 @@ mod tests {
 
         assert_eq!(
             plan.statement,
-            "INSERT INTO `enum_rows` (`id`, `state`, `permissions`) VALUES (?, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END)"
+            "INSERT INTO `enum_rows` (`id`, `state`, `permissions`, `note`) VALUES (?, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END, CASE WHEN ? = 1 THEN SPACE(0) ELSE ? END)"
         );
         assert_eq!(
             plan.rows,
             vec![
-                vec![Value::Int(1), Value::Int(1), Value::Null, Value::Int(1), Value::Null],
+                vec![
+                    Value::Int(1),
+                    Value::Int(1),
+                    Value::Null,
+                    Value::Int(1),
+                    Value::Null,
+                    Value::Int(1),
+                    Value::Null,
+                ],
                 vec![
                     Value::Int(2),
                     Value::Int(0),
                     Value::Text("ready".into()),
                     Value::Int(0),
                     Value::Text("read".into()),
+                    Value::Int(0),
+                    Value::Text("plain".into()),
                 ],
-                vec![Value::Int(3), Value::Int(0), Value::Null, Value::Int(0), Value::Null],
+                vec![
+                    Value::Int(3),
+                    Value::Int(0),
+                    Value::Null,
+                    Value::Int(0),
+                    Value::Null,
+                    Value::Int(0),
+                    Value::Null,
+                ],
             ]
         );
+    }
+
+    #[test]
+    fn mysql_empty_string_reconstruction_is_limited_to_text_destinations() {
+        for data_type in [
+            "enum('', 'ready')",
+            "set('read', 'write')",
+            "char(8)",
+            "varchar(30)",
+            "tinytext",
+            "text",
+            "mediumtext",
+            "longtext",
+        ] {
+            assert!(mysql_empty_string_type(data_type), "{data_type}");
+        }
+        for data_type in ["json", "varbinary", "int"] {
+            assert!(!mysql_empty_string_type(data_type), "{data_type}");
+        }
     }
 
     #[test]
