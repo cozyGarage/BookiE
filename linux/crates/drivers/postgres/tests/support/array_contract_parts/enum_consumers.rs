@@ -93,6 +93,74 @@ async fn value_contract_custom_enum_array_projection_preserves_literal_null_and_
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute(
+            "CREATE TYPE value_contract_whitespace_enum AS ENUM \
+             (' leading', 'trailing ', ' both ', 'NULL', '')",
+        )
+        .await
+        .unwrap();
+    let expression = "ARRAY[' leading'::value_contract_whitespace_enum, \
+        'trailing '::value_contract_whitespace_enum, \
+        ' both '::value_contract_whitespace_enum, \
+        'NULL'::value_contract_whitespace_enum, \
+        ''::value_contract_whitespace_enum, NULL]";
+    let source = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_eq!(source.columns[0].data_type, "value_contract_whitespace_enum[]");
+    assert_eq!(
+        source.rows[0][0],
+        Value::Text(r#"{" leading","trailing "," both ","NULL","",NULL}"#.into())
+    );
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("value_contract_whitespace_enum[]".into()));
+    let Value::Text(native_json) = &native.rows[0][1] else {
+        panic!("native whitespace enum array JSON returned {:?}", native.rows[0][1]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
+        serde_json::json!([" leading", "trailing ", " both ", "NULL", "", null])
+    );
+
+    let csv = tablepro_core::export::render_csv(
+        &source.columns,
+        &source.rows,
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let mapping = [Some(0)];
+    let imported = tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &source.columns, &options, 2).unwrap();
+    assert_eq!(imported, source.rows[0]);
+
+    let rebound = connection
+        .query_params(
+            "SELECT pg_typeof($1::text::value_contract_whitespace_enum[])::text, \
+                    array_to_json($1::text::value_contract_whitespace_enum[])::text, \
+                    encode(array_send($1::text::value_contract_whitespace_enum[]), 'hex')",
+            &imported,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][0]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][1]);
+    assert_eq!(rebound.rows[0][2], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

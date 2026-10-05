@@ -54,6 +54,12 @@ agree, and CSV parse/bind/re-read preserves all four boundary values. The full
 SQL Server integration suite passed
 ([case evidence](evidence/mssql-smalldatetime-year-rollover-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 enum follow-up: PostgreSQL custom-enum arrays now preserve labels
+with leading, trailing and two-sided spaces through CSV parse and typed binding.
+The native JSON and array-wire oracles preserve those exact labels, an empty
+label, literal `NULL` and SQL NULL separately
+([case evidence](evidence/postgres-enum-array-whitespace-label-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,
