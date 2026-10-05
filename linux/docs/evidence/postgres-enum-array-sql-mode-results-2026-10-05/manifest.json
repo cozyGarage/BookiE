@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "a77878b13dc67549e663cadeb669b3969d3f93b5",
+  "working_tree_dirty": true,
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "custom enum[] SQL-file replay preserves a backslash label across PostgreSQL string-setting modes",
+  "test": "value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source_files": [
+    {
+      "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+      "sha256": "025a7257e966910c0505411b994470a1fa820a68b2d4c70b45f7b74261ce8de3"
+    }
+  ],
+  "contract": [
+    "The enum[] contains literal NULL, empty text, Unicode, comma, quote, markup, a backslash-bearing label and SQL NULL.",
+    "The same generated SQL file is replayed in transactions under all four standard_conforming_strings/backslash_quote combinations: on/safe_encoding, on/off, off/off and off/on.",
+    "Each replay is compared with native array text, array_to_json elements and array_send bytes.",
+    "An existing sibling enum[] row remains byte-identical and exactly one imported row is added in each mode; the transaction is rolled back after verification."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_file_exports_preserve_labels -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 148,
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other enum consumers/configurations and the broader B3 type/engine matrix remain open; this case does not qualify 0.2.0."
+  ]
+}

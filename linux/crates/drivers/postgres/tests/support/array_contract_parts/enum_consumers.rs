@@ -99,14 +99,14 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     connection
         .execute(
             "CREATE TYPE value_contract_file_enum AS ENUM \
-             ('NULL', '', '東京', 'a,b', 'a\"b', '<tag>&')",
+             ('NULL', '', '東京', 'a,b', 'a\"b', '<tag>&', 'slash\\path', 'sibling')",
         )
         .await
         .unwrap();
     let expression = "ARRAY['NULL'::value_contract_file_enum, \
         ''::value_contract_file_enum, '東京'::value_contract_file_enum, \
         'a,b'::value_contract_file_enum, 'a\"b'::value_contract_file_enum, \
-        '<tag>&'::value_contract_file_enum, NULL]";
+        '<tag>&'::value_contract_file_enum, 'slash\\path'::value_contract_file_enum, NULL]";
     let result = connection
         .query(&format!("SELECT {expression} AS value"))
         .await
@@ -130,7 +130,7 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     };
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
-        serde_json::json!(["NULL", "", "東京", "a,b", "a\"b", "<tag>&", null])
+        serde_json::json!(["NULL", "", "東京", "a,b", "a\"b", "<tag>&", "slash\\path", null])
     );
     let rebound = connection
         .query_params(
@@ -214,6 +214,21 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
         .execute("CREATE TABLE enum_array_filewriter_target (value value_contract_file_enum[])")
         .await
         .unwrap();
+    connection
+        .execute(
+            "INSERT INTO enum_array_filewriter_target \
+             VALUES (ARRAY['sibling'::value_contract_file_enum])",
+        )
+        .await
+        .unwrap();
+    let sibling = connection
+        .query(
+            "SELECT value::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM enum_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows.len(), 1);
     let sql_path = directory.path().join("enum-array.sql");
     tablepro_core::export::write_result_file(
         &sql_path,
@@ -231,18 +246,41 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
         |_| {},
     )
     .unwrap();
-    connection
-        .execute(&std::fs::read_to_string(sql_path).unwrap())
-        .await
-        .unwrap();
-    let restored = connection
-        .query(
-            "SELECT value::text, array_to_json(value)::text, \
-                    encode(array_send(value), 'hex') FROM enum_array_filewriter_target",
-        )
-        .await
-        .unwrap();
-    assert_eq!(restored.rows, vec![oracle.rows[0][1..].to_vec()]);
+    let sql_file = std::fs::read_to_string(sql_path).unwrap();
+    for (standard_conforming_strings, backslash_quote) in [
+        ("on", "safe_encoding"),
+        ("on", "off"),
+        ("off", "off"),
+        ("off", "on"),
+    ] {
+        let mut transaction = connection.begin().await.unwrap();
+        transaction
+            .execute(&format!(
+                "SET LOCAL standard_conforming_strings = {standard_conforming_strings}"
+            ))
+            .await
+            .unwrap();
+        transaction
+            .execute(&format!("SET LOCAL backslash_quote = {backslash_quote}"))
+            .await
+            .unwrap();
+        transaction.execute(&sql_file).await.unwrap();
+        let restored = transaction
+            .query(
+                "SELECT value::text, array_to_json(value)::text, \
+                        encode(array_send(value), 'hex') FROM enum_array_filewriter_target",
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            restored.rows.len(),
+            2,
+            "enum[] SQL replay with standard_conforming_strings={standard_conforming_strings}, backslash_quote={backslash_quote}"
+        );
+        assert!(restored.rows.contains(&oracle.rows[0][1..].to_vec()));
+        assert!(restored.rows.contains(&sibling.rows[0]));
+        transaction.rollback().await.unwrap();
+    }
 }
 
 #[tokio::test]

@@ -298,7 +298,11 @@ through JSON, CSV, XLSX and SQL file writers with labels `NULL`, empty text,
 Unicode, comma, quote and markup, alongside SQL NULL. Native type, `array_to_json`
 and `array_send` oracles verify the bound representation; replayed SQL restores
 the same native text, JSON elements and wire bytes. XLSX stores a string cell
-and XML-escapes markup. Other array families/configurations remain open. Separate
+and XML-escapes markup. SQL replay now also preserves a backslash-bearing label
+across all four `standard_conforming_strings`/`backslash_quote` combinations;
+native text, JSON, wire bytes and an existing sibling are checked
+([mode evidence](evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
+Other array families/configurations remain open. Separate
 Calc re-import cases cover `enum[]`, `bytea[]`, `timestamptz[]` and `interval[]`
 ([enum[]](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
 [bytea[]](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json),

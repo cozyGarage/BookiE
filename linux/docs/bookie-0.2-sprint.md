@@ -463,6 +463,11 @@ metadata is warmed and `search_path` changes on the same backend; empty/literal-
 SQL NULL, type results and shadow-only label refusal are checked
 ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: custom enum-array SQL replay now preserves a
+backslash label across all four `standard_conforming_strings`/`backslash_quote`
+combinations. Native text, JSON, `array_send` bytes and an existing sibling
+are verified ([evidence](evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: domain-over-enum `COALESCE` parameters now also match
 explicit native target-enum casts in both argument positions under a shadowed
 `search_path`, including empty text, literal `NULL`, SQL NULL and invalid

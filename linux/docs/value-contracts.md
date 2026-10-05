@@ -284,6 +284,10 @@ A custom enum-array file-writer contract preserves empty text, literal `NULL`,
 Unicode, comma, quote, markup and SQL NULL through JSON, CSV, XLSX and replayed
 SQL. Native `array_to_json` and `array_send` checks verify bound and restored
 values ([evidence](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json)).
+The SQL replay also preserves a backslash label under all four
+`standard_conforming_strings`/`backslash_quote` combinations, with native
+array text, JSON, wire-byte and sibling-row checks
+([mode evidence](evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
 Custom enum-array CSV import now uses a schema-qualified array cast and verifies
 native type, values and sibling-row bytes ([import evidence](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json)).
 An explicit null marker also preserves NULL arrays, empty arrays, SQL NULL

@@ -211,6 +211,10 @@ and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-r
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
 has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
 JSON and wire oracles ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
+Custom enum-array SQL replay now also has a backslash label checked under all
+four PostgreSQL string-setting combinations against native array text, JSON,
+wire bytes and a preserved sibling
+([evidence](evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
 
 The ordinary custom-enum shadow-schema case checks structured `=`, `IN` and
 `BETWEEN` filters on `enum_shadow_b.items` while `search_path` resolves the same
