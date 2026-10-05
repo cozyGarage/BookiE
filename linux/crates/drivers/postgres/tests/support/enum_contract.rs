@@ -160,6 +160,77 @@ async fn value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_fi
             Value::Bool(true),
         ]]
     );
+
+    let import_options = tablepro_core::import::CsvImportOptions::default();
+    let sheet =
+        tablepro_core::import::read_csv(b"id,status,sibling\n3,paused,csv import\n", &import_options, None).unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some("Enum \"Shelf"),
+            table: "Row \"Box",
+            columns: &columns,
+            mapping: &[Some(0), Some(1), Some(2)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert!(
+        plan.statement
+            .contains("$2::text::\"Enum \"\"Shelf\".\"State \"\"Kind\""),
+        "CSV import must quote and schema-qualify the enum target: {}",
+        plan.statement
+    );
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+    let imported = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text, sibling \
+             FROM \"Enum \"\"Shelf\".\"Row \"\"Box\" ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        imported.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("paused".into()),
+                Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
+                Value::Text("target".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("ready".into()),
+                Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
+                Value::Text("sibling".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("paused".into()),
+                Value::Text("\"Enum \"\"Shelf\".\"State \"\"Kind\"".into()),
+                Value::Text("csv import".into()),
+            ],
+        ]
+    );
+    let shadow = connection
+        .query(
+            "SELECT id, status::text, pg_typeof(status)::text, sibling \
+             FROM \"Enum \"\"Shadow\".\"Row \"\"Box\"",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        shadow.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("ready".into()),
+            Value::Text("\"State \"\"Kind\"".into()),
+            Value::Text("shadow".into()),
+        ]]
+    );
 }
 
 #[tokio::test]
