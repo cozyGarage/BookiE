@@ -26,6 +26,12 @@ pub async fn assert_scalar_contract(connection: &dyn Connection, driver: &str) {
     for text in corpus["texts"].as_array().unwrap() {
         assert_scalar(connection, driver, "text", Value::Text(text.as_str().unwrap().into())).await;
     }
+    if matches!(driver, "postgres" | "mssql" | "clickhouse" | "duckdb") {
+        let uuid = "12345678-9abc-def0-1122-334455667788";
+        assert_scalar(connection, driver, "uuid", Value::Uuid(uuid.parse().unwrap())).await;
+        assert_scalar(connection, driver, "text", Value::Text(uuid.into())).await;
+        assert_scalar(connection, driver, "uuid", Value::Null).await;
+    }
     assert_named_parameter_order(connection, driver).await;
     assert_long_text(connection, driver, corpus["long_text_bytes"].as_u64().unwrap() as usize).await;
     assert_scalar(connection, driver, "integer", Value::Null).await;
@@ -117,6 +123,9 @@ fn scalar_type(driver: &str, kind: &str) -> &'static str {
         ("mysql", "text") => "CHAR CHARACTER SET utf8mb4",
         ("mssql", "text") => "NVARCHAR(MAX)",
         (_, "text") => "TEXT",
+        ("postgres" | "duckdb", "uuid") => "UUID",
+        ("clickhouse", "uuid") => "Nullable(UUID)",
+        ("mssql", "uuid") => "UNIQUEIDENTIFIER",
         (_, "decimal") => "DECIMAL(28,8)",
         _ => panic!("unknown value contract kind"),
     }

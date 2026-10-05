@@ -47,6 +47,11 @@ Detailed native oracles, exact selectors and dated results are preserved in
 then search that ledger/test for the specific type and consumer; one starting
 point does not represent all support for that engine.
 
+The shared scalar contract checks native UUID parameters and SQL-literal
+round trips on PostgreSQL, SQL Server, ClickHouse and DuckDB. UUID-shaped text
+and typed SQL NULL are controls; DuckDB uses its logical result type to preserve
+`Value::Uuid` ([evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 

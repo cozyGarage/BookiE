@@ -11,6 +11,11 @@ Detailed native cases and old counts are in [type-contract history](type-contrac
 and [the value evidence index](value-contracts.md). Those records keep their
 source/SHA attribution; this summary does not certify the current tree.
 
+The shared UUID contract now checks bound and SQL-literal round trips on
+PostgreSQL, SQL Server, ClickHouse and DuckDB, with UUID-shaped text and SQL NULL
+as controls. DuckDB now decodes UUID by its logical column type and preserves
+the value as `Value::Uuid` ([evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json)).
+
 The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to
 canonical CSV output and SQL replay after switching from `SQL, DMY` to
 `ISO, MDY`; native JSON/wire oracles and sibling preservation pass

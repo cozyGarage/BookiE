@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "b3/shared-scalar-uuid-contract",
+  "baseline_commit": "ac1c579566c502cd8deb2b0098971abbd44a41d6",
+  "scope": "Native UUID value identity through bound parameters and SQL literals",
+  "source": {
+    "crates/core/tests/support/value_contract.rs": "d46d0606df49427b20988cb0639a43635dfd6792cda123b92c6e9bb208f9acfc",
+    "crates/drivers/duckdb/src/lib.rs": "dbb72a6e7074da1299bc78f47e530935afb8da074768de29bb2eb20e6c2aca98",
+    "crates/drivers/duckdb/Cargo.toml": "369f17ac157b042c11edf8bf7c40383f5b997f6dd9621c6aa3e5283383cf37ba",
+    "Cargo.lock": "a8491ff1f53c85642734a67509a758addffdc4df6ad5e875f92d810c4337b012"
+  },
+  "before_fix": "The new DuckDB assertion failed: a bound UUID cast to native UUID returned Value::Text(\"12345678-9abc-def0-1122-334455667788\") instead of Value::Uuid with the same identifier.",
+  "contract": [
+    "PostgreSQL, SQL Server, ClickHouse and DuckDB preserve Value::Uuid through parameter binding and SQL-literal replay.",
+    "A UUID-shaped VARCHAR/TEXT remains Value::Text.",
+    "A typed SQL NULL remains Value::Null."
+  ],
+  "validation": {
+    "focused_contract": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres -p tablepro-driver-mssql -p tablepro-driver-clickhouse -p tablepro-driver-duckdb --test integration value_contract_preserves_scalar_boundaries_through_parameters_and_exports -- --include-ignored --test-threads=1",
+      "result": "4 passed, 0 failed; one selected test in each driver package",
+      "log": "focused-contract.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline -p tablepro-driver-duckdb --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed"
+    }
+  },
+  "remaining": [
+    "The four-engine UUID contract does not establish support for UUID editing/export in every app consumer or every driver. Broader B3 remains open."
+  ],
+  "log_sha256": {
+    "focused-contract.txt": "a479ce706478ed78fa667122a8d0810b948957341a9fa4c44f68d79bf2d579c5"
+  }
+}

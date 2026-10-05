@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use duckdb::{Connection as DuckConnection, params_from_iter, types::ValueRef};
+use duckdb::{Connection as DuckConnection, core::LogicalTypeId, params_from_iter, types::ValueRef};
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
@@ -366,9 +366,13 @@ fn run_query(
     let mut truncated = false;
     let mut column_count = 0usize;
     let mut zoned_columns = Vec::new();
+    let mut uuid_columns = Vec::new();
     while let Some(row) = rows.next().map_err(map_duck_error)? {
         if column_count == 0 {
             column_count = row.as_ref().column_count();
+            uuid_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Uuid)
+                .collect();
             zoned_columns = (0..column_count)
                 .map(|i| {
                     matches!(
@@ -385,14 +389,17 @@ fn run_query(
         raw_rows.push(
             zoned_columns
                 .iter()
+                .zip(&uuid_columns)
                 .enumerate()
-                .map(|(i, zoned)| match duck_value_ref_to_value(row.get_ref_unwrap(i)) {
-                    Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                    Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
-                        Value::Text(format!("{timestamp}+00"))
-                    }
-                    value => value,
-                })
+                .map(
+                    |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                        Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                        Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
+                            Value::Text(format!("{timestamp}+00"))
+                        }
+                        value => value,
+                    },
+                )
                 .collect(),
         );
     }
@@ -443,7 +450,18 @@ fn run_query(
     })
 }
 
-fn duck_value_ref_to_value(v: ValueRef<'_>) -> Value {
+fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {
+    if uuid_column {
+        return match v {
+            ValueRef::Null => Value::Null,
+            ValueRef::Text(bytes) => std::str::from_utf8(bytes)
+                .ok()
+                .and_then(|text| text.parse().ok())
+                .map(Value::Uuid)
+                .unwrap_or_else(|| Value::Undecodable("UUID".into())),
+            _ => Value::Undecodable("UUID".into()),
+        };
+    }
     match v {
         ValueRef::Null => Value::Null,
         ValueRef::Boolean(b) => Value::Bool(b),
@@ -647,19 +665,25 @@ mod tests {
     #[test]
     fn intervals_preserve_signed_components_and_refuse_submicrosecond_values() {
         assert_eq!(
-            duck_value_ref_to_value(ValueRef::Interval {
-                months: -2,
-                days: 3,
-                nanos: -1_000,
-            }),
+            duck_value_ref_to_value(
+                ValueRef::Interval {
+                    months: -2,
+                    days: 3,
+                    nanos: -1_000,
+                },
+                false
+            ),
             Value::Text("-2 months 3 days -1 microsecond".into())
         );
         assert!(matches!(
-            duck_value_ref_to_value(ValueRef::Interval {
-                months: 0,
-                days: 0,
-                nanos: 1,
-            }),
+            duck_value_ref_to_value(
+                ValueRef::Interval {
+                    months: 0,
+                    days: 0,
+                    nanos: 1,
+                },
+                false
+            ),
             Value::Undecodable(_)
         ));
     }
@@ -667,11 +691,11 @@ mod tests {
     #[test]
     fn unsigned_bigint_keeps_the_signed_boundary_exact() {
         assert_eq!(
-            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64)),
+            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64), false),
             Value::Int(i64::MAX)
         );
         assert_eq!(
-            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64 + 1)),
+            duck_value_ref_to_value(ValueRef::UBigInt(i64::MAX as u64 + 1), false),
             Value::Text("9223372036854775808".into())
         );
     }
