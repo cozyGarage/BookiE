@@ -33,7 +33,7 @@ A domain-over-enum CASE follow-up checks both parameter branches with a
 same-named shadow enum leading `search_path`; native type/value checks preserve
 the target enum and outer domain and distinguish empty text, literal `NULL`,
 and SQL NULL ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
-Ordinary custom-enum `COALESCE`, `GREATEST` and `LEAST` parameter contexts now
+Ordinary custom-enum `COALESCE`, `NULLIF`, `GREATEST` and `LEAST` parameter contexts now
 also preserve the qualified target enum when a same-named shadow leads
 `search_path`, including empty/literal-`NULL` labels, SQL NULL and invalid
 shadow-only labels ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).

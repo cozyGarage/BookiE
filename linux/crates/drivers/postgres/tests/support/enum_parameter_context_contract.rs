@@ -313,6 +313,8 @@ async fn value_contract_enum_parameters_resolve_target_under_shadowed_search_pat
     let expressions = [
         ("COALESCE({p}::{t}, state)", "COALESCE($1, state)"),
         ("COALESCE(state, {p}::{t})", "COALESCE(state, $1)"),
+        ("NULLIF({p}::{t}, state)", "NULLIF($1, state)"),
+        ("NULLIF(state, {p}::{t})", "NULLIF(state, $1)"),
         ("GREATEST({p}::{t}, state)", "GREATEST($1, state)"),
         ("GREATEST(state, {p}::{t})", "GREATEST(state, $1)"),
         ("LEAST({p}::{t}, state)", "LEAST($1, state)"),

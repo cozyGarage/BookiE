@@ -10,12 +10,12 @@
   "source_files": [
     {
       "path": "crates/drivers/postgres/tests/support/enum_parameter_context_contract.rs",
-      "sha256": "8c3912b2696813cf9a7b083b0a8ff70f274d791bfcdf3da58c988b91cadc3d56"
+      "sha256": "0550be8512f78361299d1ca18a9a8cee0baa18cc70b0b9cf6d32f8f5a482f819"
     }
   ],
   "contract": [
     "A target enum and a same-named shadow enum have different labels; the shadow leads transaction-local search_path while queries address the target table by schema.",
-    "COALESCE, GREATEST and LEAST each infer a text/NULL parameter in both argument positions; results and pg_typeof values are compared with explicit casts to the target enum.",
+    "COALESCE, NULLIF, GREATEST and LEAST each infer a text/NULL parameter in both argument positions; results and pg_typeof values are compared with explicit casts to the target enum.",
     "Inputs include a regular label, the literal NULL label, the empty label and SQL NULL across rows containing those values and a NULL row.",
     "A shadow-only label is rejected with SQLSTATE 22P02 for every expression position, and target rows retain their values and native enum type."
   ],

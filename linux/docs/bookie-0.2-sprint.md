@@ -457,8 +457,8 @@ coverage in both result branches with a same-named shadow enum first in
 refusal and unchanged outer-domain rows are checked
 ([evidence](evidence/postgres-domain-case-shadowed-parameter-results-2026-10-05/manifest.json)).
 
-October 5 B3-1 follow-up: ordinary custom-enum `COALESCE`, `GREATEST` and
-`LEAST` parameter contexts now match native target-enum casts with a same-named
+October 5 B3-1 follow-up: ordinary custom-enum `COALESCE`, `NULLIF`, `GREATEST`
+and `LEAST` parameter contexts now match native target-enum casts with a same-named
 shadow first in `search_path`; empty/literal-`NULL`, SQL NULL, type results and
 shadow-only label refusal are checked ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
 
