@@ -759,6 +759,78 @@ async fn assert_collated_enum_round_trip(options: ConnectOptions) {
         .await
         .unwrap();
     assert_eq!(copied.rows, native.rows);
+
+    connection
+        .execute(
+            "CREATE TABLE set_binary_collation_source (
+                id INT PRIMARY KEY,
+                permissions SET('Café', 'cafe', 'Tea') CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+                opaque SET('raw') CHARACTER SET binary
+            )",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE set_binary_collation_copy LIKE set_binary_collation_source")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO set_binary_collation_source VALUES (1, 'cafe,Café', 'raw'), (2, 'Tea', 'raw')")
+        .await
+        .unwrap();
+    let set_columns = connection
+        .fetch_columns(None, "set_binary_collation_source")
+        .await
+        .unwrap();
+    let set_column = set_columns
+        .iter()
+        .position(|column| column.name == "permissions")
+        .unwrap();
+    assert_eq!(set_columns[set_column].collation.as_deref(), Some("utf8mb4_bin"));
+    let native = connection
+        .query(
+            "SELECT id, permissions, opaque, CAST(permissions + 0 AS CHAR), HEX(permissions), \
+             COLLATION(permissions) FROM set_binary_collation_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.columns[1].data_type, "SET");
+    assert_eq!(native.columns[2].data_type, "SET");
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("Café,cafe".into()),
+                Value::Bytes(b"raw".to_vec()),
+                Value::Text("3".into()),
+                Value::Text("436166C3A92C63616665".into()),
+                Value::Text("utf8mb4_bin".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("Tea".into()),
+                Value::Bytes(b"raw".to_vec()),
+                Value::Text("4".into()),
+                Value::Text("546561".into()),
+                Value::Text("utf8mb4_bin".into()),
+            ],
+        ]
+    );
+    for row in &native.rows {
+        connection
+            .execute_params("INSERT INTO set_binary_collation_copy VALUES (?, ?, ?)", &row[..3])
+            .await
+            .unwrap();
+    }
+    let copied = connection
+        .query(
+            "SELECT id, permissions, opaque, CAST(permissions + 0 AS CHAR), HEX(permissions), \
+             COLLATION(permissions) FROM set_binary_collation_copy ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(copied.rows, native.rows);
 }
 
 #[tokio::test]

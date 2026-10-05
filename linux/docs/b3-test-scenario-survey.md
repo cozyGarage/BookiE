@@ -46,6 +46,10 @@ enum ordinals, text, collation and label bytes
 valid-UTF-8 `BINARY(4)` control remains bytes; ordinals, label bytes, collation
 metadata and parameterized copies are checked
 ([binary-collation evidence](evidence/mysql-binary-enum-collation-results-2026-10-05/manifest.json)).
+The same collation now preserves SET labels as text in declared-member order
+and retains the native bitmask; SET values using the actual `binary` character
+set remain bytes through parameterized copies
+([SET evidence](evidence/mysql-binary-set-collation-results-2026-10-05/manifest.json)).
 Other collations and enum configurations remain open.
 
 ### October 5 PostgreSQL float4[] Calc follow-up

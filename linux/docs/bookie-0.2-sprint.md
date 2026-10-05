@@ -77,6 +77,11 @@ on both MySQL and MariaDB while `BINARY(4)` results remain bytes. Native
 ordinals, label bytes, collation metadata, and parameterized copies are checked
 ([case evidence](evidence/mysql-binary-enum-collation-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: MySQL and MariaDB `utf8mb4_bin` SET values now return
+canonical declared-member order with the native bitmask preserved. SET values
+using the actual `binary` character set remain bytes through parameterized copy
+([case evidence](evidence/mysql-binary-set-collation-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

@@ -175,6 +175,7 @@ impl ColumnType {
         let is_binary = flags.contains(ColumnFlags::BINARY);
         let is_unsigned = flags.contains(ColumnFlags::UNSIGNED);
         let is_enum = flags.contains(ColumnFlags::ENUM);
+        let is_set = flags.contains(ColumnFlags::SET);
 
         match self {
             ColumnType::Tiny if max_size == Some(1) => "BOOLEAN",
@@ -203,8 +204,9 @@ impl ColumnType {
             ColumnType::Geometry => "GEOMETRY",
             ColumnType::Json => "JSON",
 
-            // ENUM remains text even when its collation sets the binary flag.
+            // ENUM and SET remain text when a character collation sets the binary flag.
             ColumnType::String if is_enum => "ENUM",
+            ColumnType::String if is_set => "SET",
             ColumnType::String if is_binary => "BINARY",
             ColumnType::VarChar | ColumnType::VarString if is_binary => "VARBINARY",
 

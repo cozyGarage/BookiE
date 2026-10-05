@@ -574,7 +574,7 @@ fn decode_by_type(row: &MySqlRow, idx: usize, type_name: &str) -> Option<Value> 
         "YEAR" => temporal::year_value(row.try_get_raw(idx).ok()?),
         "BIT" => packed::bit_value(row.try_get_raw(idx).ok()?),
         "GEOMETRY" => packed::geometry_value(row.try_get_raw(idx).ok()?),
-        "ENUM" => row
+        "ENUM" | "SET" => row
             .try_get::<String, _>(idx)
             .map(Value::Text)
             .or_else(|_| row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes))
