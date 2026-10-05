@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "4e352c9bca9f1946d413ecd0b3a7630863620f03",
+  "engine": "Local MySQL dialect lexer and editor consumers; no server required",
+  "case": "Word-character delimiter matching at identifier boundaries",
+  "test": "ui::editor::statement_cursor::tests::mysql_word_character_delimiter_stops_at_keyword_boundary",
+  "contract": [
+    "With DELIMITER xyz, the delimiter-like substring in prefixxyzsuffix remains part of the identifier inside the routine.",
+    "The suffix delimiter in ENDxyz still terminates the routine, and the following SELECT remains a separate statement.",
+    "Planning, formatting, script planning and named parameter extraction agree before and after formatting."
+  ],
+  "regression": {
+    "before_fix": "The new assertion failed because the planner produced 3 statements instead of 2.",
+    "log": "pre-fix.txt"
+  },
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-app mysql_word_character_delimiter_stops_at_keyword_boundary -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "mysql_app_tests": {
+      "command": "rtk cargo test --locked -p tablepro-app mysql_ -- --nocapture",
+      "result": "14 passed, 9 ignored, 474 filtered out across 3 suites",
+      "log": "mysql-tests.txt"
+    },
+    "app_tests": {
+      "command": "rtk cargo test --locked -p tablepro-app",
+      "result": "468 passed, 31 ignored, 986 filtered out across 6 suites",
+      "log": "app-tests.txt"
+    },
+    "core_tests": {
+      "command": "rtk cargo test --locked -p tablepro-core",
+      "result": "540 passed across 3 suites",
+      "log": "core-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-core -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed with no warnings",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "pre-fix.txt": "5a796f936465542fa4efcf05d13a148e3edd839cf640c9ebe0d76cc2aca5ded2",
+    "test.txt": "c86d1edc4fd3584ed6ba19715e48315c23d50ddd4d1a1255ba85b09386b8e953",
+    "mysql-tests.txt": "b75341a56330504cd0fa65acd783ff8a8ad56be1808bb93893c242c0f774b84a",
+    "app-tests.txt": "3a798e8a9b48d3d7248d37a475fc03ca2f8cc58455c83e225dbbe44fc3600d20",
+    "core-tests.txt": "1a491956ed8ba4755bb4d57071d0e95dcfe8b6aecbbb35bf61939b953ce24c85",
+    "clippy.txt": "69abf03f51c838537fd661159b0e86faf902fe02fff45457d6bceb7dd6825605",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "This contract covers the tested word-character delimiter and identifier case; additional MySQL delimiter forms and other dialect consumer matrices remain open."
+  ]
+}

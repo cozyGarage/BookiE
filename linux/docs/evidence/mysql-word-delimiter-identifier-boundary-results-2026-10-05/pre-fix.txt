@@ -1,0 +1,3 @@
+Reproduction before lexer fix:
+rtk cargo test --locked -p tablepro-app mysql_word_character_delimiter_stops_at_keyword_boundary -- --nocapture
+Result: failed as expected. The planner produced 3 statements instead of 2 when `xyz` occurred inside `prefixxyzsuffix`.

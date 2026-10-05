@@ -1,0 +1,2 @@
+rtk cargo test --locked -p tablepro-app mysql_ -- --nocapture
+cargo test: 14 passed, 9 ignored, 474 filtered out (3 suites)

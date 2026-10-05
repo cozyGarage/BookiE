@@ -406,6 +406,13 @@ October 4 B3-5 follow-up: the MySQL `\d //` shorthand now has a named consumer
 contract across planning, formatting, parameter extraction and policy
 classification. See the [evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
 
+October 5 B3-5 follow-up: a `DELIMITER xyz` regression exposed premature
+splitting when delimiter text appeared inside an identifier. Word-character
+delimiters now require a token boundary after the delimiter; `prefixxyzsuffix`
+stays intact while `ENDxyz` terminates the routine. The editor consumer
+contract covers planning, formatting, parameter extraction and the trailing
+query ([evidence](evidence/mysql-word-delimiter-identifier-boundary-results-2026-10-05/manifest.json)).
+
 October 5 B3-5 follow-up: SQLite now has the equivalent malformed-tail
 consumer contract. The valid first statement remains selectable, whole-script
 planning and cursor selection inside the malformed tail fail closed, only the

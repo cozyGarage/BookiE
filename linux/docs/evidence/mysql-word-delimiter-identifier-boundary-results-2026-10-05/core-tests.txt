@@ -1,0 +1,2 @@
+rtk cargo test --locked -p tablepro-core
+cargo test: 540 passed (3 suites, 3.30s)
