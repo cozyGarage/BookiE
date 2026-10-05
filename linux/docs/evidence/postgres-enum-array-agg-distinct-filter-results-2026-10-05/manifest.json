@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "94c9c4b88c7ecbe8f9bf6b8f2b1f84b4a87cb424",
+  "scope": "PostgreSQL custom enum array_agg DISTINCT and FILTER result contract",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "1909985d8800fc8bd93679466831e7b8827e94f4236e7542f14c9be0c0f73415"
+  },
+  "selector": "value_contract_custom_enum_array_agg_distinct_filter_preserves_native_order_and_nulls",
+  "contract": [
+    "array_agg(DISTINCT label ORDER BY label) collapses duplicates in native enum order.",
+    "FILTER excludes rows that do not satisfy its predicate.",
+    "Duplicate SQL NULL inputs produce one NULL element, distinct from the literal enum label NULL.",
+    "The enum[] result retains native type, JSON values and PostgreSQL wire bytes after text-carrier rebinding."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_agg_distinct_filter_preserves_native_order_and_nulls -- --ignored --nocapture",
+      "result": "1 passed, 0 failed against Docker PostgreSQL",
+      "log": "focused-test.txt"
+    },
+    "strict_value_matrix": {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "339 tests passed across all 11 suites; no missing suites; GTK and DuckDB enabled; PostgreSQL selected 131 tests",
+      "local_report": "target/quality/20261005T112731484024Z-values/report.json"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other PostgreSQL array and aggregate type/consumer combinations remain open; this focused case does not close B3 or qualify the 0.2.0 release."
+  ]
+}

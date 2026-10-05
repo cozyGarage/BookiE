@@ -20,6 +20,13 @@ literal and parameter paths refuse safely. Nested values are still unsupported,
 so B3 stays open
 ([case evidence](evidence/duckdb-enum-list-result-refusal-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL custom enum `array_agg` now has a separate
+`DISTINCT`+`FILTER` scenario. It checks duplicate removal, declared enum ordering,
+selectively excluded labels, duplicate SQL NULL elements, result type, JSON and
+wire bytes after rebinding. This extends one aggregate case; the remaining B3
+array/type/consumer matrix stays open
+([case evidence](evidence/postgres-enum-array-agg-distinct-filter-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

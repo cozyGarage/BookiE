@@ -169,6 +169,76 @@ async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_agg_distinct_filter_preserves_native_order_and_nulls() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute(
+            "CREATE TYPE value_contract_array_agg_distinct_enum \
+             AS ENUM ('NULL', '', '東京', 'a,b', 'o''brien')",
+        )
+        .await
+        .unwrap();
+
+    let aggregate = "array_agg(DISTINCT label ORDER BY label) FILTER (WHERE keep_it)";
+    let source = "VALUES \
+        (true, 'NULL'::value_contract_array_agg_distinct_enum), \
+        (true, 'NULL'::value_contract_array_agg_distinct_enum), \
+        (true, ''::value_contract_array_agg_distinct_enum), \
+        (true, ''::value_contract_array_agg_distinct_enum), \
+        (true, '東京'::value_contract_array_agg_distinct_enum), \
+        (true, '東京'::value_contract_array_agg_distinct_enum), \
+        (true, 'a,b'::value_contract_array_agg_distinct_enum), \
+        (false, 'o''brien'::value_contract_array_agg_distinct_enum), \
+        (true, NULL::value_contract_array_agg_distinct_enum), \
+        (true, NULL::value_contract_array_agg_distinct_enum)";
+    let query = format!(
+        "WITH input(keep_it, label) AS ({source}) \
+         SELECT {aggregate} AS value FROM input"
+    );
+    let result = connection.query(&query).await.unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_array_agg_distinct_enum[]");
+    let Value::Text(_) = &result.rows[0][0] else {
+        panic!("custom enum aggregate must remain textual: {:?}", result.rows[0][0]);
+    };
+
+    let native = connection
+        .query(&format!(
+            "WITH input(keep_it, label) AS ({source}) \
+             SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM (SELECT {aggregate} AS value FROM input) AS aggregate_result"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows[0][0],
+        Value::Text("value_contract_array_agg_distinct_enum[]".into())
+    );
+    let Value::Text(json_text) = &native.rows[0][1] else {
+        panic!("native enum aggregate JSON oracle returned {:?}", native.rows[0][1]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(json_text).unwrap(),
+        serde_json::json!(["NULL", "", "東京", "a,b", null])
+    );
+
+    let rebound = connection
+        .query_params(
+            "SELECT pg_typeof($1::text::value_contract_array_agg_distinct_enum[])::text, \
+                    array_to_json($1::text::value_contract_array_agg_distinct_enum[])::text, \
+                    encode(array_send($1::text::value_contract_array_agg_distinct_enum[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][0]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][1]);
+    assert_eq!(rebound.rows[0][2], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
