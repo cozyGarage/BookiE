@@ -75,10 +75,10 @@
   },
   "checker_sha256": "6b4521bf5238b8595fa9a9277b668390fb8041a1937776af67dcae45bf6bb3fb",
   "log_sha256": {
-    "bookiee-export-test.txt": "95fa38084637a057e946e68e6d91c4d52717159c5ce9bbb79c23712968abc99e",
+    "bookiee-export-test.txt": "0c99293262c2192017b05398b7e61bfb5668b93d88ffa841e68ca83b9532ff29",
     "libreoffice-roundtrip.txt": "7064be7edca32d4ecde8de2df5f0c11b7f3e1b520b1f6c9f689860034d4b85ee",
     "consumer-check.txt": "50a582faa2914990b90868a4455bd409492482a74c76a7e0823ecec7cda364bd",
-    "libreoffice-version.txt": "8d65d53d9fc8f6caaeaa16013977052dc4bda05564f797a246690fe81f3d00c7",
+    "libreoffice-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
     "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
