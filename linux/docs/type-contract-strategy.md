@@ -406,6 +406,9 @@ and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-r
 The numeric[] shape also survives Gnumeric XLSX/ODS/XLSX re-import with the
 same wide precision, scale, special values and SQL NULL as text
 ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+The `float8[]` string cell also survives Gnumeric's XLSX/ODS/XLSX re-save with
+adjacent, negative-zero, subnormal, special and NULL values unchanged
+([Gnumeric evidence](evidence/postgres-float8-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 The UUID[] file-writer case now covers JSON, CSV, XLSX string cells and SQL
 replay with native type/value/JSON/wire checks and sibling preservation
 ([evidence](evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).

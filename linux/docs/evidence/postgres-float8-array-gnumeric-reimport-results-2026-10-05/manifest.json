@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "6b61e740b164d404b483967fc852a4de92bb6251",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "case": "PostgreSQL float8[] XLSX re-import through Gnumeric",
+  "test": "array_contract::value_contract_float8_array_file_exports_preserve_bits",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric 1.12.57-1.1+b4",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "PostgreSQL float8[] contains an adjacent double, negative zero, the minimum subnormal, NaN, positive and negative Infinity, and SQL NULL.",
+    "The native test checks double-precision array type, element bits, array_send bytes, and round-trip rebinding. The adjacent value is 3ff0000000000001, negative zero is 8000000000000000, and the minimum subnormal is 0000000000000001.",
+    "BookiE writes the array as an XLSX shared-string cell; Gnumeric preserves the exact text as an ODS string cell and an XLSX string through XLSX/ODS/XLSX re-save.",
+    "No formula is created in source.xlsx, the ODS workbook, or the re-saved XLSX workbook."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --offline --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_file_exports_preserve_bits -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "native-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "ssconvert source.xlsx gnumeric-roundtrip.ods",
+        "ssconvert gnumeric-roundtrip.ods gnumeric-roundtrip.xlsx"
+      ],
+      "result": "Both conversions exited successfully.",
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks require identical A2 text in the source XLSX, ODS and re-saved XLSX; string cell types; expected edge-case elements; and no formulas.",
+      "checker": "verify_roundtrip.py",
+      "result": "Exact float8[] text preserved across all three artifacts; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "driver_suite": {
+      "command": "rtk proxy cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 0 failed; 180 ignored across five test binaries.",
+      "log": "driver-suite.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "8db005d2f95aeb4b808d9bcbf6c8f54743073c1ba554b37f618ebac6fbc4239b",
+    "gnumeric-roundtrip.ods": "3cdc81ae3eb04d7031a2184c728643fe0dff67025a67d9fda8dcbc3845bceeea",
+    "gnumeric-roundtrip.xlsx": "944c557bb19d0d4771baf0aea88c146c3ad295553c5acb5b3cab6ca40301d186"
+  },
+  "remaining": [
+    "Other PostgreSQL array types, file-writer/session combinations, spreadsheet applications, and the broader B3 matrix remain open."
+  ]
+}
