@@ -1272,6 +1272,55 @@ async fn value_contract_float4_array_file_exports_preserve_values_for_calc_reimp
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_timestamp_array_rebind_preserves_values_across_dmy_datestyle() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("SET LOCAL DateStyle = 'SQL, DMY'").await.unwrap();
+    let expression = "ARRAY['2024-12-31 23:59:59.123456'::timestamp, \
+                      '2001-02-03 04:05:06'::timestamp, \
+                      '0002-12-31 23:59:59 BC'::timestamp, \
+                      '10000-01-01 00:00:00'::timestamp, \
+                      'infinity'::timestamp, '-infinity'::timestamp, NULL]";
+    let result = transaction
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("timestamp[]", &result);
+
+    let native = transaction
+        .query(&format!(
+            "SELECT current_setting('DateStyle'), pg_typeof({expression})::text, \
+                    {expression}::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("SQL, DMY".into()));
+    assert_eq!(native.rows[0][1], Value::Text("timestamp without time zone[]".into()));
+    assert_ne!(result.rows[0][0], native.rows[0][2]);
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("timestamp[] result must remain exact array text: {:?}", result.rows[0][0]);
+    };
+    assert!(driver_text.contains("2024-12-31 23:59:59.123456"), "{driver_text}");
+    assert!(driver_text.contains("0002-12-31 23:59:59 BC"), "{driver_text}");
+    assert!(driver_text.contains("10000-01-01 00:00:00"), "{driver_text}");
+    assert!(driver_text.contains("infinity"), "{driver_text}");
+    assert!(driver_text.contains("-infinity"), "{driver_text}");
+
+    transaction.execute("SET LOCAL DateStyle = 'ISO, MDY'").await.unwrap();
+    let rebound = transaction
+        .query_params(
+            "SELECT encode(array_send($1::text::timestamp[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][3]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
