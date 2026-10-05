@@ -1,0 +1,13 @@
+238b18960fba08ac4096814ac382c4ce223bae9af13a8397ff4a905bbc21f25d  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/report.json
+aa4937040a57fe104c3eb547fca6250f04663618df21291be6baf03fa997ba05  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/compile.log
+d5aae907bcf8ecc8261c429b65edbde8d540fa5540e5c86b66111b8376b377a3  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-app.log
+911c95c6a78395038951b5948d482880a2a62d3a60ba065b4f0911a46ff13e16  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-core.log
+81aa888f6c3515f39bbcdaa5d6a2a7e909323bb3a2444cefe69e8f5c637490c7  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-clickhouse.log
+17106b8c95afad911d2ff4791f87a728e22e86e05f945d9c97aa592ae5ea5807  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-duckdb.log
+ffcb83f2e43736ca28154ba23e1d41a6e04f0b29c6012e7fb1f8f2f736a73923  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-mongodb.log
+6fcffb776cc2b3ae778b857a9df1f0d5cb3085b952c3ab59a6ef64ecaf27b119  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-mssql.log
+1faafe721b0b4b499fdd59889369c80e80c6cfbc242657f68174e3281553384a  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-mysql.log
+d69ecb1fcc847f893f228c4fce6100ba91319e9aedb9fcdacf4cf3135ad6dff6  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-postgres.log
+f26ea0518327b14ad86bea65607989dab86f4f005ba8ceef2018e5017ddcf38b  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-redis.log
+bb6bfd3e6003bea0689cd74b530f7c2137db4334aca67746df8809717eb91539  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-drivers-sqlite.log
+b0756db0628a43307ab2ff164dcc5f7634bf4e36be108db19682e4bfc0edf1d8  docs/evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/crates-mcp.log

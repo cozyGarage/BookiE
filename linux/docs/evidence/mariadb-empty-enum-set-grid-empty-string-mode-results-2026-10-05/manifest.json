@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "ff4bdc4347b4f0fdb0e6971ceedc4efe98c9d63e",
+  "case": "MariaDB app keyed-grid edits preserve explicit empty ENUM and SET values under EMPTY_STRING_IS_NULL",
+  "engine": "MariaDB 11 and MySQL Docker integration fixtures",
+  "behavior_before_fix": {
+    "baseline_revision": "4957a5d8a",
+    "result": "MariaDB native keyed-grid edit stored both explicit empty ENUM and SET values as SQL NULL under EMPTY_STRING_IS_NULL.",
+    "evidence": "baseline-failure.txt",
+    "test_delta": "The mode cases were added to the existing app contract before the baseline run; the production keyed-update builder was unchanged."
+  },
+  "fix": "The shared MySQL keyed-update builder emits SPACE(0) for an empty Value::Text assigned to an ENUM or SET column. Empty text assigned to ordinary text columns remains a bound parameter.",
+  "contract": [
+    "The MariaDB app parser distinguishes blank input, which means SQL NULL, from explicit empty input, which means empty ENUM or zero-member SET.",
+    "Under EMPTY_STRING_IS_NULL alone and combined with STRICT_TRANS_TABLES, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES, native ordinal, byte, null-state, and sibling-row checks preserve both meanings.",
+    "The existing MySQL grid-edit contract passes across its twelve SQL mode combinations with the same SQL expression generation.",
+    "A core SQL-builder test confirms typed ENUM/SET empty values use SPACE(0), while ordinary text remains bound and primary-key parameters stay correctly ordered."
+  ],
+  "validation": {
+    "mariadb_grid": {
+      "command": "cargo test --locked -p tablepro-app --lib value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "log": "mariadb-grid.txt"
+    },
+    "mysql_grid": {
+      "command": "cargo test --locked -p tablepro-app --lib value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "log": "mysql-grid.txt"
+    },
+    "core_tests": {
+      "command": "cargo test --locked -p tablepro-core",
+      "passed": 537,
+      "failed": 0,
+      "suites": 3,
+      "log": "core-tests.txt"
+    },
+    "full_value_tier": {
+      "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+      "passed": 321,
+      "failed": 0,
+      "suites": 11,
+      "missing_suites": [],
+      "evidence": "../local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/manifest.json"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-core -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check HEAD",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+
+running 1 test
+test ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes ... FAILED
+
+failures:
+
+failures:
+    ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 492 filtered out; finished in 7.65s
+
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.05s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-d3f82a3d8397e81b)
+
+thread 'ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mariadb_enum_set_grid_edit_preserves_values_across_sql_modes' (1926452) panicked at crates/app/src/ui/browse_tab/../../../tests/support/mysql_enum_set_contract.rs:523:13:
+assertion `left == right` failed
+  left: [Text("null"), Null, Null, Text("null"), Null, Null]
+ right: [Text("value"), Text("5"), Text(""), Text("value"), Text("0"), Text("")]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p tablepro-app --lib`

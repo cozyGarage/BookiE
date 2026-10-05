@@ -144,6 +144,12 @@ The same import now also passes with `STRICT_TRANS_TABLES`, `ANSI_QUOTES`, and
 `NO_BACKSLASH_ESCAPES` combined with `EMPTY_STRING_IS_NULL`; native ENUM/SET
 ordinals, bytes, SQL NULL state, and the pre-existing sibling match the
 standalone-mode restore ([evidence](evidence/mariadb-empty-enum-set-combined-mode-results-2026-10-05/manifest.json)).
+The MariaDB keyed-grid contract now exercises `EMPTY_STRING_IS_NULL` alone and
+combined with strict, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES modes; it caught and
+guards a loss where explicit empty ENUM/SET edits became SQL NULL. The shared
+MySQL keyed-update builder now renders `SPACE(0)` for those typed empty edits,
+with native MySQL/MariaDB checks confirming other rows and values are preserved
+([evidence](evidence/mariadb-empty-enum-set-grid-empty-string-mode-results-2026-10-05/manifest.json)).
 A PostgreSQL 16 boundary test now preserves both a 63-byte ASCII label and a
 21-character three-byte UTF-8 label through scalar and enum-array projections,
 against `pg_enum`, JSON-element and wire oracles; an overlength 64-byte label is

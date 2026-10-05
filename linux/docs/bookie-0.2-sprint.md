@@ -403,6 +403,18 @@ with `EMPTY_STRING_IS_NULL`, `STRICT_TRANS_TABLES`, `ANSI_QUOTES` and
 `NO_BACKSLASH_ESCAPES` active together; the native ordinal/byte/NULL checks and
 untouched sibling match the standalone-mode case ([evidence](evidence/mariadb-empty-enum-set-combined-mode-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the MariaDB app grid's explicit empty ENUM and SET
+edits became SQL NULL under `EMPTY_STRING_IS_NULL`, including when combined
+with strict and quoting modes. The keyed-update builder now emits `SPACE(0)`
+for empty MySQL ENUM/SET values; native MySQL and MariaDB grid contracts pass,
+and ordinary text stays bound ([evidence](evidence/mariadb-empty-enum-set-grid-empty-string-mode-results-2026-10-05/manifest.json)).
+
+October 5 local GTK + DuckDB value tier: 321 selected tests passed across all
+11 suites with no missing suites at source `ff4bdc4347b4f0fdb0e6971ceedc4efe98c9d63e`.
+The app suite includes both MySQL and MariaDB keyed ENUM/SET grid contracts;
+the run report and suite logs are recorded in the
+[value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/manifest.json).
+
 October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
 schema-qualified destination cast across a role `search_path` change between
 planning and execution on a fresh connection. A distinct same-named enum leads
