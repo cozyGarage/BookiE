@@ -1,0 +1,1 @@
+int8[] precision/lower-bound text (76 characters), string cell kinds and no-formula checks passed through Calc ODS/XLSX re-save
