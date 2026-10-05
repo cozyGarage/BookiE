@@ -452,15 +452,7 @@ fn run_query(
 
 fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {
     if uuid_column {
-        return match v {
-            ValueRef::Null => Value::Null,
-            ValueRef::Text(bytes) => std::str::from_utf8(bytes)
-                .ok()
-                .and_then(|text| text.parse().ok())
-                .map(Value::Uuid)
-                .unwrap_or_else(|| Value::Undecodable("UUID".into())),
-            _ => Value::Undecodable("UUID".into()),
-        };
+        return duck_uuid_ref_to_value(v);
     }
     match v {
         ValueRef::Null => Value::Null,
@@ -516,6 +508,18 @@ fn duck_value_ref_to_value(v: ValueRef<'_>, uuid_column: bool) -> Value {
         ValueRef::Map(..) => Value::Undecodable("MAP".into()),
         ValueRef::Union(..) => Value::Undecodable("UNION".into()),
         other => Value::Undecodable(format!("{:?}", other.data_type())),
+    }
+}
+
+fn duck_uuid_ref_to_value(v: ValueRef<'_>) -> Value {
+    match v {
+        ValueRef::Null => Value::Null,
+        ValueRef::Text(bytes) => std::str::from_utf8(bytes)
+            .ok()
+            .and_then(|text| text.parse().ok())
+            .map(Value::Uuid)
+            .unwrap_or_else(|| Value::Undecodable("UUID".into())),
+        _ => Value::Undecodable("UUID".into()),
     }
 }
 

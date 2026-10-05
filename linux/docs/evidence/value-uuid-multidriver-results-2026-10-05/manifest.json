@@ -6,7 +6,7 @@
   "scope": "Native UUID value identity through bound parameters and SQL literals",
   "source": {
     "crates/core/tests/support/value_contract.rs": "d46d0606df49427b20988cb0639a43635dfd6792cda123b92c6e9bb208f9acfc",
-    "crates/drivers/duckdb/src/lib.rs": "dbb72a6e7074da1299bc78f47e530935afb8da074768de29bb2eb20e6c2aca98",
+    "crates/drivers/duckdb/src/lib.rs": "36400f7cf0ad63eaa3198477a2ddeb3ad544ed5ab6db0d5dab0298e60aa04254",
     "crates/drivers/duckdb/Cargo.toml": "369f17ac157b042c11edf8bf7c40383f5b997f6dd9621c6aa3e5283383cf37ba",
     "Cargo.lock": "a8491ff1f53c85642734a67509a758addffdc4df6ad5e875f92d810c4337b012"
   },
@@ -39,6 +39,6 @@
     "The four-engine UUID contract does not establish support for UUID editing/export in every app consumer or every driver. Broader B3 remains open."
   ],
   "log_sha256": {
-    "focused-contract.txt": "a479ce706478ed78fa667122a8d0810b948957341a9fa4c44f68d79bf2d579c5"
+    "focused-contract.txt": "69b73d413c9648f0dd7f80c72ecca9a9d81255204c1793c9fb503be7bc57600e"
   }
 }

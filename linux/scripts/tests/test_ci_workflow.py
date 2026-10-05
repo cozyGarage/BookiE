@@ -32,6 +32,10 @@ class CiWorkflowTests(unittest.TestCase):
             {
                 "postgres_numeric_parser_outputs_round_trip_through_server",
                 "postgres_extended_temporal_grid_edits_preserve_native_values",
+                "value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings",
+                "value_contract_postgres_float4_array_grid_edit_preserves_extreme_values_and_sibling",
+                "value_contract_postgres_integer_array_grid_edits_preserve_width_and_siblings",
+                "value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings",
                 "value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution",
                 "value_contract_mongodb_int32_grid_edit_preserves_integer_width",
                 "value_contract_mongodb_date_grid_edit_preserves_millisecond_instant",
@@ -48,6 +52,8 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mysql_spatial_grid_refusal_preserves_native_bytes",
                 "value_contract_mysql_bit_parser_edits_preserve_native_values",
                 "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
+                "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
+                "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
