@@ -239,6 +239,12 @@ false and SQL NULL through the pinned Calc round trip as a text cell. Native
 `array_to_json` and `array_send` match after rebinding. See the
 [boolean-array Calc evidence](evidence/postgres-boolean-array-calc-reimport-results-2026-10-05/manifest.json).
 
+October 5 B3-1 consumer follow-up: PostgreSQL `int8[]` with lower bound zero,
+`i64::MIN`, `9007199254740993`, `i64::MAX` and SQL NULL survives the pinned
+Calc round trip as exact text. Native `array_to_json` and `array_send` match
+after rebinding. See the
+[int8-array Calc evidence](evidence/postgres-int8-array-calc-reimport-results-2026-10-05/manifest.json).
+
 October 5 local GTK + DuckDB value tier: all 316 selected tests passed across
 all 11 suites, with no missing suites. PostgreSQL contributed 115 contracts;
 the current MySQL/MariaDB suite contributed 28. Compile reused 746 cached
