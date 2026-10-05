@@ -1,0 +1,7 @@
+Pinned image: debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9
+Installed package: gnumeric 1.12.57-1.1+b4
+Tool version: ssconvert 1.12.57 (see gnumeric-version.txt)
+
+For each of date, timestamp, time and timetz, ssconvert read <type>.source.xlsx,
+wrote <type>.gnumeric.ods, then read that ODS and wrote
+<type>.gnumeric.xlsx. All eight conversions exited successfully.

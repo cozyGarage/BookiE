@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "eade5fb5c23c2b19d0fa958d24f3741584b365ac",
+  "case": "PostgreSQL temporal array XLSX re-import through Gnumeric",
+  "tests": [
+    {
+      "selector": "array_contract::value_contract_date_array_file_exports_preserve_boundaries_for_calc_reimport",
+      "result": "1 passed, 0 failed",
+      "log": "date-test.txt"
+    },
+    {
+      "selector": "array_contract::value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport",
+      "result": "1 passed, 0 failed",
+      "log": "timestamp-test.txt"
+    },
+    {
+      "selector": "array_contract::value_contract_time_array_file_exports_preserve_boundaries_for_calc_reimport",
+      "result": "1 passed, 0 failed",
+      "log": "time-test.txt"
+    },
+    {
+      "selector": "array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport",
+      "result": "1 passed, 0 failed",
+      "log": "timetz-test.txt"
+    }
+  ],
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers.rs",
+    "sha256": "162cce0d6091f7130534efcdb1e23916d61c3f899a54006adefdc86e0323d046"
+  },
+  "engine": "PostgreSQL Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric 1.12.57-1.1+b4",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "date[] preserves BC, year 10000, positive and negative infinity, and SQL NULL.",
+    "timestamp[] preserves BC, year 10000, maximum finite timestamp, both infinities, and SQL NULL.",
+    "time[] preserves midnight, fractional microseconds, 23:59:59.999999, 24:00, and SQL NULL.",
+    "timetz[] preserves fractional wall times, both maximum legal offsets, and SQL NULL.",
+    "Each native contract checks PostgreSQL type/value/wire oracles after rebinding; Gnumeric XLSX/ODS/XLSX preserves exact text in string cells without formulas."
+  ],
+  "validation": {
+    "native_export_tests": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/<type>.source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration array_contract::<selector> -- --include-ignored --exact --test-threads=1",
+      "result": "All four tests passed; see per-case logs."
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "Install Gnumeric in the pinned Debian container.",
+        "For date, timestamp, time and timetz, convert source XLSX to ODS and ODS back to XLSX."
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "method": "Python standard-library ZIP/XML checks exact A2 array text, string cell types and absence of formulas in each source and re-saved workbook.",
+      "result": "All four array texts preserved exactly.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "artifact_sha256": {
+    "date.gnumeric.ods": "d7d7d739ac346e47a49aa89c7d05da32fa7997c6401b747f3d56d5aa2c3ca87a",
+    "date.gnumeric.xlsx": "7998a6ad911f7158d2a1eb6f2ca7be7379dedc2d3af061e5f000eae9e2ce3804",
+    "date.source.xlsx": "33ee838d5e1ff2ecf62270a69cd5891ef19b4a66e1b08ef42996b5fb83443a02",
+    "time.gnumeric.ods": "cf4d7fdb670f4390b74ffcb6a90675916e23d69bce9ab5a3ccccbdb54b7840f3",
+    "time.gnumeric.xlsx": "b4d0cefb59d130d3e2311816251d21824721d8f122685e8878f113fa44b5a069",
+    "time.source.xlsx": "5a1208cc41b06e7e41077b079b1fe7052fcfe56608969b8a7d123ba46f0a5007",
+    "timestamp.gnumeric.ods": "dc0b1c82316b559a495242e6934b70a831daad70d044281c241c02b132d54a30",
+    "timestamp.gnumeric.xlsx": "dae43b2a85356eaebf41671df659ae764ecbb6c8a8b4f8a4896edadbdf570d73",
+    "timestamp.source.xlsx": "7969e43ab11d9cacf2e8bd4f7755962944d2ee7d68fe35dec2f7ebb27990c56d",
+    "timetz.gnumeric.ods": "315be176df272a3fa5b94c19e2b3566c1c3e20190f6db6e2b14b24c39472ab31",
+    "timetz.gnumeric.xlsx": "1b5150e882d57f244100c9dd2886753a863487cc0cd116234a0928af023cb965",
+    "timetz.source.xlsx": "a57d1915b5ea2a67537e5ff8364e076ed862203372fdb1196bb04981cb5b7bf0"
+  },
+  "remaining": [
+    "Other spreadsheet applications, temporal array shapes and broader B3 consumer/session matrices remain open."
+  ],
+  "log_sha256": {
+    "date-test.txt": "baef4917235db0c45a7d05057aa48cdbdadc5ff141fb81f6bf94f81029c4a9f2",
+    "time-test.txt": "9cd0e83d31a4ad6a9a76cf8f5213fe953a8243ea4e73ee4044b10eaa4d7a3b60",
+    "timestamp-test.txt": "50dcba02f5e32d9019517f23906392e51752b1cd74ea2b7c7754a113e1b42048",
+    "timetz-test.txt": "4269fea5a93130872e184f3d3e7b07019012c855e188c755119bafa57a0a1b46",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "52c169a09b1be50e5fccfd0192466808e07c1cf7eeb13f4fc5d81b326fa1139e",
+    "consumer-check.txt": "5e03b1ec1f7afd91a68e135ba714deb1b9bae4a236a7e254f73cc1d66b2be232",
+    "verify_roundtrip.py": "0aa8bd106c63530f9bb0973822b8883b2ace61c6c069a28769e462d2de236188",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "31cbc7f6640f67db087c6e5aa939e60853dca2e6f513aa512be87c2347b865e9"
+  }
+}

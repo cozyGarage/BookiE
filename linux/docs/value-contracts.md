@@ -42,6 +42,11 @@ re-save: literal `NULL`, Unicode, markup and the `=1+1` label remain string
 cells, SQL NULL stays blank, and no formula is created
 ([evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+PostgreSQL `date[]`, `timestamp[]`, `time[]` and `timetz[]` XLSX text cells
+preserve their boundary values through Gnumeric's XLSX/ODS/XLSX re-save,
+including BC and extended years, infinities, 24:00, maximum offsets and SQL
+NULL ([evidence](evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `bytea[]` XLSX cell containing binary bytes, empty bytea and SQL
 NULL also survives Calc's ODS/XLSX re-save with its string contents unchanged
 ([evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)).

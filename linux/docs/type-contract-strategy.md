@@ -209,6 +209,10 @@ switching the transaction to `Asia/Kathmandu` preserve the original
 The workbook from that same `America/New_York` transaction also survives Calc
 and Gnumeric XLSX/ODS/XLSX re-saves as the identical canonical UTC string
 ([spreadsheet evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
+A separate Gnumeric XLSX/ODS/XLSX check preserves the boundary text in
+PostgreSQL `date[]`, `timestamp[]`, `time[]` and `timetz[]` cells, including BC
+and extended years, infinities, 24:00, maximum offsets and SQL NULL
+([evidence](evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/manifest.json)).
 A PostgreSQL `interval[]` XLSX cell preserves mixed signs, microseconds, zero
 intervals and SQL NULL through the same Calc re-save
 ([evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).

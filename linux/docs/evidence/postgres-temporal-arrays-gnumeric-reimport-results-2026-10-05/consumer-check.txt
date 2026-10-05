@@ -1,0 +1,6 @@
+Command: rtk proxy python3 docs/evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/verify_roundtrip.py
+Result: All four temporal arrays retain exact text and string cell types across XLSX/ODS/XLSX; no formulas found.
+
+The checker examines cell A2 in the source XLSX, Gnumeric ODS and Gnumeric XLSX
+for each case. It pins the complete array text, requires string cell types, and
+rejects formulas in each workbook.
