@@ -538,18 +538,20 @@ edit, inferred query/update parameters, a typed filter and invalid-label
 refusal while preserving the outer domain and a SQL NULL sibling. See the
 [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
-A contract at depths 6, 7, 8, 9, 10, 63, 64, 65 and 128 checks recursive enum-leaf
-metadata under a session `search_path` shadowed by a same-named enum, schema-aware
-keyed and draft writes (including SQL NULL), typed equality filters and exact
-outer-domain type/value while preserving a SQL NULL sibling. A same-backend
+A contract at depths 6, 7, 8, 9, 10, 63, 64, 65, 128, 129, 256, 260 and 300
+checks recursive enum-leaf metadata under a session `search_path` shadowed by a
+same-named enum, schema-aware keyed and draft writes (including SQL NULL), typed
+equality filters and exact outer-domain type/value while preserving a SQL NULL
+sibling. Separate follow-ups cover 257, 258 and 259 layers. A same-backend
 transaction changes `search_path` twice and repeats typed writes/filtering with
 previously fetched metadata; rollback leaves the original rows intact. Raw
 inferred SQL NULL updates preserve the outer domain type and invalid labels
 reach PostgreSQL through 63 layers. At depths 64, 65 and 128, raw inferred text
 (valid and invalid) and SQL NULL return an explicit unsupported result even
 after schema-aware work in the same-backend transaction; schema-aware
-operations pass through 256 layers. Domain depths beyond 256 and other
+operations pass through 300 layers. Domain depths beyond 300 and other
 enum/session configurations remain open; see the
+[300-layer evidence](evidence/postgres-domain-300-level-results-2026-10-05/manifest.json),
 [deep-domain boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [129/256-layer follow-up](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
 [domain-over-enum array parameter evidence](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json),
