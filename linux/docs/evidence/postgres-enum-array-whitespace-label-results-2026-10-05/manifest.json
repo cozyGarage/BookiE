@@ -6,12 +6,12 @@
   "scope": "PostgreSQL custom enum-array labels with boundary whitespace through CSV and typed rebinding",
   "source": {
     "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
-    "sha256": "6bc02fc1850b5737fd864935a442db20b4fffba1c0f1d73fadbe565cd73680c2"
+    "sha256": "269e377e6b5a55b55dfdf1c7ed65eab5ad1f6be9ba409024ea7b65a1ccff7169"
   },
   "engine": "PostgreSQL Docker integration fixture",
   "contract": [
     "Custom enum-array labels with leading, trailing and two-sided spaces retain their exact array text representation.",
-    "CSV rendering and typed parse-back preserve the complete array text.",
+    "The application schema-aware CSV insert plan preserves the enum array through typed insertion and does not modify a sibling row.",
     "Typed enum-array rebinding preserves PostgreSQL array_to_json and array_send results; leading/trailing spaces, empty label, literal NULL and SQL NULL remain distinct."
   ],
   "validation": {
@@ -41,8 +41,8 @@
     }
   },
   "log_sha256": {
-    "focused-test.txt": "ca612eea4efb02a0a0bf3263c5b82bb96f8c0cbce00f34e10af5ec483c182c25",
-    "enum-array-suite.txt": "d8e228cb1fcc555430d56cbfa6df9f123beeb359b586079528fbc370c5d5624a",
+    "focused-test.txt": "6371f52e17dc891a2c907f3fae33e015c6dcc7c40054bff13a4cb8790ff30c0b",
+    "enum-array-suite.txt": "840d44b2ea2d5f92af5b7b31c3f8657d39555fd58aaaa971cf69ad9c52832fc2",
     "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
     "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"

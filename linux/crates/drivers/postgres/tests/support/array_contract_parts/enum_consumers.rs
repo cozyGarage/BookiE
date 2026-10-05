@@ -99,22 +99,45 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
     connection
         .execute(
             "CREATE TYPE value_contract_whitespace_enum AS ENUM \
-             (' leading', 'trailing ', ' both ', 'NULL', '')",
+             (' leading', 'trailing ', ' both ', 'NULL', '', 'sibling')",
         )
         .await
         .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE value_contract_whitespace_target \
+             (id integer PRIMARY KEY, labels value_contract_whitespace_enum[])",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_whitespace_target VALUES \
+             (99, ARRAY['sibling'::value_contract_whitespace_enum])",
+        )
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query(
+            "SELECT encode(array_send(labels), 'hex') \
+             FROM value_contract_whitespace_target WHERE id = 99",
+        )
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
     let expression = "ARRAY[' leading'::value_contract_whitespace_enum, \
         'trailing '::value_contract_whitespace_enum, \
         ' both '::value_contract_whitespace_enum, \
         'NULL'::value_contract_whitespace_enum, \
         ''::value_contract_whitespace_enum, NULL]";
     let source = connection
-        .query(&format!("SELECT {expression} AS value"))
+        .query(&format!("SELECT 7 AS id, {expression} AS labels"))
         .await
         .unwrap();
-    assert_eq!(source.columns[0].data_type, "value_contract_whitespace_enum[]");
+    assert_eq!(source.columns[1].data_type, "value_contract_whitespace_enum[]");
     assert_eq!(
-        source.rows[0][0],
+        source.rows[0][1],
         Value::Text(r#"{" leading","trailing "," both ","NULL","",NULL}"#.into())
     );
 
@@ -141,7 +164,7 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
     );
     let options = tablepro_core::import::CsvImportOptions::default();
     let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let mapping = [Some(0)];
+    let mapping = [Some(0), Some(1)];
     let imported = tablepro_core::import::row_to_values(&sheet.rows[0], &mapping, &source.columns, &options, 2).unwrap();
     assert_eq!(imported, source.rows[0]);
 
@@ -150,13 +173,46 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
             "SELECT pg_typeof($1::text::value_contract_whitespace_enum[])::text, \
                     array_to_json($1::text::value_contract_whitespace_enum[])::text, \
                     encode(array_send($1::text::value_contract_whitespace_enum[]), 'hex')",
-            &imported,
+            std::slice::from_ref(&imported[1]),
         )
         .await
         .unwrap();
     assert_eq!(rebound.rows[0][0], native.rows[0][0]);
     assert_eq!(rebound.rows[0][1], native.rows[0][1]);
     assert_eq!(rebound.rows[0][2], native.rows[0][2]);
+
+    let columns = connection
+        .fetch_columns(None, "value_contract_whitespace_target")
+        .await
+        .unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "value_contract_whitespace_target",
+            columns: &columns,
+            mapping: &mapping,
+        },
+        &sheet,
+        &options,
+    )
+    .unwrap();
+    connection.execute_params(&plan.statement, &plan.rows[0]).await.unwrap();
+    let restored = connection
+        .query(
+            "SELECT id, pg_typeof(labels)::text, labels::text, array_to_json(labels)::text, \
+                    encode(array_send(labels), 'hex') \
+             FROM value_contract_whitespace_target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert_eq!(restored.rows[0][0], Value::Int(7));
+    assert_eq!(restored.rows[0][1], native.rows[0][0]);
+    assert_eq!(restored.rows[0][3], native.rows[0][1]);
+    assert_eq!(restored.rows[0][4], native.rows[0][2]);
+    assert_eq!(restored.rows[1][0], Value::Int(99));
+    assert_eq!(restored.rows[1][4], sibling_wire);
 }
 
 #[tokio::test]

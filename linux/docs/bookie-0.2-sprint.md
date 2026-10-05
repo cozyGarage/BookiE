@@ -55,9 +55,10 @@ SQL Server integration suite passed
 ([case evidence](evidence/mssql-smalldatetime-year-rollover-results-2026-10-05/manifest.json)).
 
 October 5 B3-1 enum follow-up: PostgreSQL custom-enum arrays now preserve labels
-with leading, trailing and two-sided spaces through CSV parse and typed binding.
-The native JSON and array-wire oracles preserve those exact labels, an empty
-label, literal `NULL` and SQL NULL separately
+with leading, trailing and two-sided spaces through the schema-aware CSV insert
+plan and typed binding. Native insertion preserves the exact array bytes and
+sibling row; JSON and wire oracles distinguish these labels, empty text, literal
+`NULL` and SQL NULL
 ([case evidence](evidence/postgres-enum-array-whitespace-label-results-2026-10-05/manifest.json)).
 
 Read [the documentation entry point](README.md) and the relevant ADR, then the
