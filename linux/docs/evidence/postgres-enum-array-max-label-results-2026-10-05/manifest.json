@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "1f851fbc8",
+  "scope": "PostgreSQL custom-enum label UTF-8 byte-length boundary through enum[]",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "44331ece023736d67bfcc9a2f74fb45772dbc45f4f1f218fda34fa207a3ffa6d"
+  },
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "A custom enum label of exactly 63 UTF-8 bytes is accepted and remains text in the enum[] result.",
+    "A 64-byte enum label is rejected by PostgreSQL with SQLSTATE 42602 rather than silently truncated.",
+    "The maximum label round-trips through typed enum[] binding with PostgreSQL array_to_json and array_send results preserved."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_accepts_maximum_utf8_label_length -- --ignored --nocapture",
+      "result": "1 passed",
+      "log": "focused-test.txt"
+    },
+    "custom_enum_array_suite": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array -- --ignored",
+      "result": "11 passed, 153 filtered out",
+      "log": "enum-array-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "diff_check": {
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "541003d6caaea9449b4bbc5dc63af933d606221d9eca49f66f6c562fb68f6a0f",
+    "enum-array-suite.txt": "9abd567db3c482ebd0fb8afec6ab4ae6eb9ed49adc9b61e24093b738eebc432d",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other PostgreSQL enum configurations, array families and consumers remain open; this case does not close B3 or qualify 0.2.0."
+  ]
+}

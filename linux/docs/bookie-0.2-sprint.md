@@ -61,6 +61,11 @@ sibling row; JSON and wire oracles distinguish these labels, empty text, literal
 `NULL` and SQL NULL
 ([case evidence](evidence/postgres-enum-array-whitespace-label-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 enum boundary follow-up: a 63-byte UTF-8 enum label is accepted
+and round-trips through `enum[]`; PostgreSQL rejects a 64-byte label with
+SQLSTATE `42602` rather than truncating it
+([case evidence](evidence/postgres-enum-array-max-label-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

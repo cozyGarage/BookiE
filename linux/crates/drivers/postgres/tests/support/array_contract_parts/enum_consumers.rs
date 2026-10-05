@@ -217,6 +217,78 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_accepts_maximum_utf8_label_length() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let maximum_label = "漢".repeat(21);
+    assert_eq!(maximum_label.len(), 63);
+    connection
+        .execute(&format!(
+            "CREATE TYPE value_contract_max_enum_label AS ENUM ('{maximum_label}')"
+        ))
+        .await
+        .unwrap();
+
+    let overlong_label = format!("{maximum_label}x");
+    assert_eq!(overlong_label.len(), 64);
+    let rejected = connection
+        .execute(&format!(
+            "CREATE TYPE value_contract_overlong_enum_label AS ENUM ('{overlong_label}')"
+        ))
+        .await;
+    assert!(
+        matches!(
+            rejected,
+            Err(tablepro_core::DriverError::Query {
+                sqlstate: Some(ref code),
+                ..
+            }) if code == "42602"
+        ),
+        "PostgreSQL must reject a 64-byte enum label without truncating it: {rejected:?}"
+    );
+
+    let expression = format!(
+        "ARRAY['{maximum_label}'::value_contract_max_enum_label]"
+    );
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_max_enum_label[]");
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("value_contract_max_enum_label[]".into()));
+    let Value::Text(array_text) = &result.rows[0][0] else {
+        panic!("maximum-label enum array must remain text: {:?}", result.rows[0][0]);
+    };
+    assert!(array_text.contains(&maximum_label));
+    assert_eq!(
+        native.rows[0][1],
+        Value::Text(serde_json::json!([maximum_label]).to_string())
+    );
+
+    let rebound = connection
+        .query_params(
+            "SELECT pg_typeof($1::text::value_contract_max_enum_label[])::text, \
+                    array_to_json($1::text::value_contract_max_enum_label[])::text, \
+                    encode(array_send($1::text::value_contract_max_enum_label[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][0]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][1]);
+    assert_eq!(rebound.rows[0][2], native.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
