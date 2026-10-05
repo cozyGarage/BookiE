@@ -509,7 +509,7 @@ mod tests {
 
     #[test]
     fn mysql_word_character_delimiter_stops_at_keyword_boundary() {
-        let sql = "DELIMITER xyz\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside xyz; :literal'; ENDxyz\r\nDELIMITER ;\r\nSELECT :after AS value";
+        let sql = "DELIMITER xyz\r\nCREATE PROCEDURE p() BEGIN SELECT 'inside xyz; :literal'; SELECT prefixxyzsuffix AS embedded; ENDxyz\r\nDELIMITER ;\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;
         let plan = plan_for(sql, grammar);
 
@@ -518,6 +518,7 @@ mod tests {
         let planned = script_statements(sql, "mysql").unwrap();
         assert_eq!(planned.statements.len(), 2);
         assert!(planned.statements[0].starts_with("CREATE PROCEDURE p()"));
+        assert!(planned.statements[0].contains("prefixxyzsuffix AS embedded"));
         assert!(planned.statements[0].ends_with("END"), "{:?}", planned.statements[0]);
         assert_eq!(planned.statements[1], "SELECT :after AS value");
         assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
@@ -527,7 +528,9 @@ mod tests {
         let reformatted = plan_for(&formatted, grammar);
         assert!(reformatted.diagnostics().is_empty());
         assert_eq!(reformatted.statements().len(), 2);
-        assert_eq!(script_statements(&formatted, "mysql").unwrap().statements.len(), 2);
+        let reformatted_script = script_statements(&formatted, "mysql").unwrap();
+        assert_eq!(reformatted_script.statements.len(), 2);
+        assert!(reformatted_script.statements[0].contains("prefixxyzsuffix AS embedded"));
         assert_eq!(
             tablepro_core::extract_named_parameters(&formatted, "mysql").names,
             ["after"]

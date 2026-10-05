@@ -50,7 +50,7 @@ impl<'a> Lexer<'a> {
         let start = self.pos;
         let first = *self.bytes.get(start)?;
         let token = match delimiter {
-            Some(delimiter) if !delimiter.is_empty() && self.text[start..].starts_with(delimiter) => {
+            Some(delimiter) if self.delimiter_at(start, delimiter) => {
                 self.plain(ScriptTokenKind::Semicolon, start + delimiter.len())
             }
             _ => self.lex_at(start, first, delimiter),
@@ -293,12 +293,21 @@ impl<'a> Lexer<'a> {
         let delimiter = delimiter.filter(|d| d.bytes().next().is_some_and(|b| self.is_word_part(b)));
         let mut end = from;
         while let Some(&b) = self.bytes.get(end) {
-            if !self.is_word_part(b) || delimiter.is_some_and(|d| self.bytes[end..].starts_with(d.as_bytes())) {
+            if !self.is_word_part(b) || delimiter.is_some_and(|d| self.delimiter_at(end, d)) {
                 break;
             }
             end += 1;
         }
         end
+    }
+
+    fn delimiter_at(&self, start: usize, delimiter: &str) -> bool {
+        if delimiter.is_empty() || !self.bytes[start..].starts_with(delimiter.as_bytes()) {
+            return false;
+        }
+        let end = start + delimiter.len();
+        !delimiter.bytes().next().is_some_and(|first| self.is_word_part(first))
+            || !self.bytes.get(end).is_some_and(|&next| self.is_word_part(next))
     }
 
     fn is_word_start(&self, b: u8) -> bool {
