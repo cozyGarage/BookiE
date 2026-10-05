@@ -18,6 +18,12 @@ and `SET SCHEMA`. The regression checks populated and zero-row result metadata,
 same-named shadow types, and native array type/value/wire-byte oracles; B3 stays
 open ([evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL enum range results in a warmed reader
+session now reflect label insertion and rename performed by another session.
+The shadowed-path contract checks updated order, qualified metadata and native
+catalog/JSON/wire values; the wider B3 matrix stays open
+([evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
+
 October 5 B3-1/B3-4 follow-up: a PostgreSQL `numeric[]` XLSX result now survives
 Gnumeric's XLSX/ODS/XLSX re-save with its 40-digit integer, high-scale decimal,
 scale-preserving decimal, NaN, infinities and SQL NULL unchanged as a string

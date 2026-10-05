@@ -77,6 +77,10 @@ The same session also observes `ALTER TYPE ... RENAME VALUE` after warming the
 range query; catalog order, target type metadata and rebound array bytes match
 the native result
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
+Separate reader and writer sessions now cover both migrations after the reader
+has warmed `enum_range`; the target array type, updated order and labels match
+catalog, JSON and native wire oracles under the shadowed path
+([cross-session evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
 Other catalog changes and enum session combinations remain open.
 
 ### October 5 PostgreSQL enum type rename/schema move
