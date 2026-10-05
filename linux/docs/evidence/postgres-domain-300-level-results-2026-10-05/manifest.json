@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "f59f0809a",
+  "scope": "PostgreSQL schema-aware domain-over-enum behavior at 300 nested domains",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs",
+    "sha256": "811f64a0c3b20f423ca22cae6ed97c5a336c7d92c92d0cc4f537628a571d42a8"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The reusable deep-domain contract now exercises 300 nested domains around a custom enum while a same-named shadow enum leads search_path.",
+    "Catalog enum-leaf metadata, schema-aware keyed updates, draft inserts, typed filters, invalid-label refusal, SQL NULL siblings, transaction writes, rollback and outer pg_typeof values are checked.",
+    "Raw inferred text and SQL NULL remain explicitly refused at depths of 64 or more; schema-aware operations pass at depth 300."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path -- --ignored --nocapture --test-threads=1",
+      "result": "1 passed; the contract covers 13 depths, including 300",
+      "log": "focused-test.txt"
+    },
+    "driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 165 ignored across 5 suites",
+      "log": "driver-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "0187f308b6be094f47203c7e09e19ec4cdaca0ddae79127d9031f14872305a3b",
+    "driver-suite.txt": "af1cf0a34cfcc2d73bb9b6f503d2db747a2cfbd925af3ff2506cdfc7916fdb0f",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Domain depths beyond 300, other PostgreSQL enum/session combinations, additional array families and consumers, and the wider B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}
