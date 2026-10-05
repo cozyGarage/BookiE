@@ -1017,6 +1017,131 @@ async fn value_contract_enum_type_rename_and_schema_move_refresh_session_metadat
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_type_rename_and_schema_move_refresh_other_session_metadata() {
+    let (_container, options) = crate::start_pg().await;
+    let setup = crate::connect(options.clone()).await;
+    setup.execute("CREATE SCHEMA value_contract_enum_cross_move_target").await.unwrap();
+    setup.execute("CREATE SCHEMA value_contract_enum_cross_move_shadow").await.unwrap();
+    setup.execute("CREATE SCHEMA value_contract_enum_cross_move_destination").await.unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_cross_move_target.state AS ENUM ('queued', 'complete')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_cross_move_shadow.state AS ENUM ('shadow-state')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_cross_move_shadow.phase AS ENUM ('shadow-phase')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TABLE value_contract_enum_cross_move_target.rows \
+             (id integer PRIMARY KEY, status value_contract_enum_cross_move_target.state)",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "INSERT INTO value_contract_enum_cross_move_target.rows VALUES (1, 'queued'), (2, NULL)",
+        )
+        .await
+        .unwrap();
+
+    let reader_connection = crate::connect(options.clone()).await;
+    let writer_connection = crate::connect(options).await;
+    let mut reader = reader_connection.open_session().await.unwrap();
+    let mut writer = writer_connection.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    reader
+        .query_params_controlled(
+            "SET search_path = value_contract_enum_cross_move_shadow, \
+             value_contract_enum_cross_move_target, public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+
+    let query = "SELECT id, status AS value FROM \
+                 value_contract_enum_cross_move_target.rows ORDER BY id";
+    let initial = reader.query_params_controlled(query, &[], &control).await.unwrap();
+    assert_eq!(initial.columns[1].data_type, "value_contract_enum_cross_move_target.state");
+    assert_eq!(
+        initial.rows,
+        vec![vec![Value::Int(1), Value::Text("queued".into())], vec![Value::Int(2), Value::Null]]
+    );
+
+    writer
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_cross_move_target.state RENAME TO phase",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let renamed = reader.query_params_controlled(query, &[], &control).await.unwrap();
+    assert_eq!(renamed.columns[1].data_type, "value_contract_enum_cross_move_target.phase");
+    assert_eq!(renamed.rows, initial.rows);
+
+    writer
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_cross_move_target.phase \
+             SET SCHEMA value_contract_enum_cross_move_destination",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let moved = reader.query_params_controlled(query, &[], &control).await.unwrap();
+    let moved_type = "value_contract_enum_cross_move_destination.phase";
+    assert_eq!(moved.columns[1].data_type, moved_type);
+    assert_eq!(moved.rows, initial.rows);
+
+    let empty = reader
+        .query_params_controlled(
+            "SELECT status AS value FROM value_contract_enum_cross_move_target.rows WHERE false",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.columns[0].data_type, moved_type);
+    assert!(empty.rows.is_empty());
+
+    let native = reader
+        .query_params_controlled(
+            "SELECT pg_typeof(status)::text, encode(enum_send(status), 'hex'), \
+             (SELECT string_agg(enumlabel::text, ',' ORDER BY enumsortorder) \
+              FROM pg_enum WHERE enumtypid = 'value_contract_enum_cross_move_destination.phase'::regtype) \
+             FROM value_contract_enum_cross_move_target.rows WHERE id = 1",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(moved_type.into()));
+    assert_eq!(native.rows[0][2], Value::Text("queued,complete".into()));
+    let rebound = reader
+        .query_params_controlled(
+            &format!("SELECT encode(enum_send($1::text::{moved_type}), 'hex')"),
+            std::slice::from_ref(&moved.rows[0][1]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][1]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
