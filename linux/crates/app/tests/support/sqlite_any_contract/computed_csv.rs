@@ -614,3 +614,96 @@ async fn sqlite_min_any_csv_round_trip_preserves_runtime_storage_classes() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.5), (3, 'textual'), (4, ''), \
+             (5, X'7465787420626C6F62'), (6, X'00FF80'), (7, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT, bytes TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, substr(value, 1, 4) AS result, \
+                    typeof(substr(value, 1, 4)) AS storage_class, \
+                    hex(substr(value, 1, 4)) AS bytes \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows.iter().map(|row| row[2].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("text".into()),
+            Value::Text("text".into()),
+            Value::Text("text".into()),
+            Value::Text("text".into()),
+            Value::Text("blob".into()),
+            Value::Text("blob".into()),
+            Value::Text("null".into()),
+        ]
+    );
+    assert_eq!(
+        result.rows.iter().map(|row| row[3].clone()).collect::<Vec<_>>(),
+        vec![
+            Value::Text("3432".into()),
+            Value::Text("312E35".into()),
+            Value::Text("74657874".into()),
+            Value::Text("".into()),
+            Value::Text("74657874".into()),
+            Value::Text("00FF80".into()),
+            Value::Text("".into()),
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2), Some(3)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), hex(result) FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("text".into()), Value::Text("3432".into())],
+            vec![Value::Text("text".into()), Value::Text("312E35".into())],
+            vec![Value::Text("text".into()), Value::Text("74657874".into())],
+            vec![Value::Text("text".into()), Value::Text("".into())],
+            vec![Value::Text("blob".into()), Value::Text("74657874".into())],
+            vec![Value::Text("blob".into()), Value::Text("00FF80".into())],
+            vec![Value::Text("null".into()), Value::Text("".into())],
+        ]
+    );
+}
