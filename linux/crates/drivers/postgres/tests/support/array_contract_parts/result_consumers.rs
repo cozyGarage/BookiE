@@ -660,30 +660,41 @@ async fn value_contract_time_array_file_exports_preserve_boundaries_for_calc_rei
 async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL TIME ZONE 'America/New_York'")
+        .await
+        .unwrap();
     let expression = "ARRAY[\
         '00:00:00+15:59'::timetz, '23:59:59.999999-15:59'::timetz, \
         '12:34:56.123456+05:30'::timetz, '12:34:56.123456-05:30'::timetz, NULL]";
-    let result = connection
+    let result = transaction
         .query(&format!("SELECT {expression} AS value"))
         .await
         .unwrap();
     assert_array_value("timetz[]", &result);
 
-    let oracle = connection
+    let oracle = transaction
         .query(&format!(
-            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+            "SELECT current_setting('TimeZone'), pg_typeof({expression})::text, \
+             array_to_json({expression})::text, \
              encode(array_send({expression}), 'hex')"
         ))
         .await
         .unwrap();
-    assert_eq!(oracle.rows[0][0], Value::Text("time with time zone[]".into()));
+    assert_eq!(oracle.rows[0][0], Value::Text("America/New_York".into()));
+    assert_eq!(oracle.rows[0][1], Value::Text("time with time zone[]".into()));
     assert_eq!(
-        oracle.rows[0][1],
+        oracle.rows[0][2],
         Value::Text(
             r#"["00:00:00+15:59","23:59:59.999999-15:59","12:34:56.123456+05:30","12:34:56.123456-05:30",null]"#.into()
         )
     );
-    let rebound = connection
+    transaction
+        .execute("SET LOCAL TIME ZONE 'UTC'")
+        .await
+        .unwrap();
+    let rebound = transaction
         .query_params(
             "SELECT array_to_json($1::text::timetz[])::text, \
              encode(array_send($1::text::timetz[]), 'hex')",
@@ -691,10 +702,101 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         )
         .await
         .unwrap();
-    assert_eq!(rebound.rows[0][0], oracle.rows[0][1]);
-    assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][2]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("timetz[] result must remain text: {:?}", result.rows[0][0]);
+    };
     let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let json_path = directory.path().join("timetz-array.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json_file: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json_file[0]["value"], *driver_text);
+
+    let csv_path = directory.path().join("timetz-array.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
+    transaction
+        .execute("CREATE TABLE timetz_array_filewriter_target (value timetz[])")
+        .await
+        .unwrap();
+    transaction
+        .execute(
+            "INSERT INTO timetz_array_filewriter_target \
+             VALUES (ARRAY['01:02:03+00'::timetz])",
+        )
+        .await
+        .unwrap();
+    let sibling = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM timetz_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("timetz-array.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "timetz_array_filewriter_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    transaction
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') FROM timetz_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert!(restored.rows.contains(&sibling.rows[0]));
+    assert!(restored.rows.contains(&vec![
+        oracle.rows[0][1].clone(),
+        oracle.rows[0][2].clone(),
+        oracle.rows[0][3].clone(),
+    ]));
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("timetz-array.xlsx"));
@@ -703,7 +805,7 @@ async fn value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reim
         &result,
         &tablepro_core::export::ResultExport {
             format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+            csv: &csv_options,
             sql: None,
         },
         || false,
