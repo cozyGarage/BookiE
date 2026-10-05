@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/shared-scalar-uuid-contract",
+  "baseline_commit": "fe46ae88eda435d7a016b779e772c6bb74109b5b",
+  "scope": "DuckDB UUID decoding in mixed multi-column and multi-row query results",
+  "source": {
+    "crates/drivers/duckdb/tests/integration.rs": "ccf8d7f3ec7bc9a5b6df0376a9f4df29dbf535c3251c0d2699ae5ea0f55270c6",
+    "crates/drivers/duckdb/src/lib.rs": "36400f7cf0ad63eaa3198477a2ddeb3ad544ed5ab6db0d5dab0298e60aa04254"
+  },
+  "contract": [
+    "A UUID logical-type column decodes to Value::Uuid when other columns precede and follow it.",
+    "UUID-shaped VARCHAR remains Value::Text in the same result rows.",
+    "Typed UUID NULL remains Value::Null across multiple rows."
+  ],
+  "validation": {
+    "focused_contract": {
+      "command": "rtk proxy cargo test --offline --locked -p tablepro-driver-duckdb --test integration value_contract_query_preserves_uuid_kinds_in_mixed_multirow_projection -- --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused-contract.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-contract.txt": "014f160e3ccf8eead4b701a8b9f69b251b1ec688213557fa83fc099d7993a196"
+  }
+}

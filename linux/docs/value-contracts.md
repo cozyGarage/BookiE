@@ -3,7 +3,7 @@
 The shared standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 [The B3 board](type-contract-strategy.md) owns remaining tasks. This page is a
 bounded entry into case evidence, not another conversion policy or aggregate
-support claim. Updated 2026-10-05; this index links evidence but does not run tests.
+support claim. Updated 2026-10-06; this index links evidence but does not run tests.
 
 Recent PostgreSQL enum-function evidence covers both `enum_range(NULL::type)`
 and bounded `enum_range(start, end)` semantics under a same-named leading
@@ -15,6 +15,10 @@ shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
 [same-session label addition](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json),
 [same-session label rename](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json),
 [same-session type rename/schema move](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+
+The October 6 strict GTK + DuckDB value tier passed 363 selected tests across
+all 11 suites with no missing suites. It records a dirty worktree at
+`fe46ae8`; see the [complete run packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-06/manifest.json).
 
 The PostgreSQL `timestamp[]` evidence now covers typed rebinding, canonical
 CSV export and SQL replay across a `DateStyle` change, with native array JSON
@@ -50,7 +54,9 @@ point does not represent all support for that engine.
 The shared scalar contract checks native UUID parameters and SQL-literal
 round trips on PostgreSQL, SQL Server, ClickHouse and DuckDB. UUID-shaped text
 and typed SQL NULL are controls; DuckDB uses its logical result type to preserve
-`Value::Uuid` ([evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json)).
+`Value::Uuid`. A mixed DuckDB projection checks the UUID type map across columns
+and rows ([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
+[mixed projection evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
 
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
