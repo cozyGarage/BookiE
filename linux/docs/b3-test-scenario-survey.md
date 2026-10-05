@@ -42,6 +42,10 @@ accent-insensitive inputs resolve to the declared canonical ENUM labels, the
 fetched column metadata preserves the collation, and parameterized copy keeps
 enum ordinals, text, collation and label bytes
 ([evidence](evidence/mysql-mariadb-enum-collation-results-2026-10-05/manifest.json)).
+`utf8mb4_bin` now returns ENUM labels as editable text on both engines while a
+valid-UTF-8 `BINARY(4)` control remains bytes; ordinals, label bytes, collation
+metadata and parameterized copies are checked
+([binary-collation evidence](evidence/mysql-binary-enum-collation-results-2026-10-05/manifest.json)).
 Other collations and enum configurations remain open.
 
 ### October 5 PostgreSQL float4[] Calc follow-up

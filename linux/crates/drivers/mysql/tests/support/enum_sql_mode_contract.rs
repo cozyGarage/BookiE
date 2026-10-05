@@ -635,6 +635,7 @@ async fn assert_collated_enum_round_trip(options: ConnectOptions) {
         )
         .await
         .unwrap();
+    assert_eq!(native.columns[1].data_type, "ENUM");
     assert_eq!(
         native.rows,
         vec![
@@ -665,6 +666,95 @@ async fn assert_collated_enum_round_trip(options: ConnectOptions) {
         .query(
             "SELECT id, mood, CAST(mood + 0 AS CHAR), HEX(mood), COLLATION(mood) \
              FROM enum_collation_copy ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(copied.rows, native.rows);
+
+    connection
+        .execute(
+            "CREATE TABLE enum_binary_collation_source (
+                id INT PRIMARY KEY,
+                mood ENUM('Café', 'cafe', 'Tea') CHARACTER SET utf8mb4 COLLATE utf8mb4_bin,
+                raw BINARY(4),
+                opaque ENUM('raw') CHARACTER SET binary
+            )",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE enum_binary_collation_copy LIKE enum_binary_collation_source")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO enum_binary_collation_source VALUES \
+             (1, 'Café', 'text', 'raw'), (2, 'cafe', 'data', 'raw'), (3, 'Tea', 'byte', 'raw')",
+        )
+        .await
+        .unwrap();
+
+    let binary_columns = connection
+        .fetch_columns(None, "enum_binary_collation_source")
+        .await
+        .unwrap();
+    let binary_mood = binary_columns.iter().position(|column| column.name == "mood").unwrap();
+    assert_eq!(binary_columns[binary_mood].collation.as_deref(), Some("utf8mb4_bin"));
+    let native = connection
+        .query(
+            "SELECT id, mood, raw, opaque, CAST(mood + 0 AS CHAR), HEX(mood), COLLATION(mood) \
+             FROM enum_binary_collation_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.columns[1].data_type, "ENUM");
+    assert_eq!(native.columns[2].data_type, "BINARY");
+    assert_eq!(native.columns[3].data_type, "ENUM");
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("Café".into()),
+                Value::Bytes(b"text".to_vec()),
+                Value::Bytes(b"raw".to_vec()),
+                Value::Text("1".into()),
+                Value::Text("436166C3A9".into()),
+                Value::Text("utf8mb4_bin".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("cafe".into()),
+                Value::Bytes(b"data".to_vec()),
+                Value::Bytes(b"raw".to_vec()),
+                Value::Text("2".into()),
+                Value::Text("63616665".into()),
+                Value::Text("utf8mb4_bin".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("Tea".into()),
+                Value::Bytes(b"byte".to_vec()),
+                Value::Bytes(b"raw".to_vec()),
+                Value::Text("3".into()),
+                Value::Text("546561".into()),
+                Value::Text("utf8mb4_bin".into()),
+            ],
+        ]
+    );
+    for row in &native.rows {
+        connection
+            .execute_params(
+                "INSERT INTO enum_binary_collation_copy (id, mood, raw, opaque) VALUES (?, ?, ?, ?)",
+                &row[..4],
+            )
+            .await
+            .unwrap();
+    }
+    let copied = connection
+        .query(
+            "SELECT id, mood, raw, opaque, CAST(mood + 0 AS CHAR), HEX(mood), COLLATION(mood) \
+             FROM enum_binary_collation_copy ORDER BY id",
         )
         .await
         .unwrap();
