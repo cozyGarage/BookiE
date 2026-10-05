@@ -1733,6 +1733,107 @@ async fn value_contract_interval_array_file_exports_preserve_values_under_interv
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_change() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL IntervalStyle = 'postgres_verbose'")
+        .await
+        .unwrap();
+    let expression = "ARRAY['1 year 2 mons 3 days 04:05:06.123456'::interval, \
+        '-1 year +2 mons -3 days -04:05:06.654321'::interval, \
+        '0.000001 seconds'::interval, '00:00:00'::interval, NULL]";
+    let result = transaction
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("interval[]", &result);
+    let native = transaction
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text("interval[]".into()));
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("interval[] result must remain exact array text: {:?}", result.rows[0][0]);
+    };
+
+    let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let sql_path = directory.path().join("interval-array-style-transition.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "interval_style_transition_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    transaction
+        .execute("CREATE TABLE interval_style_transition_target (value interval[])")
+        .await
+        .unwrap();
+
+    let csv_path = directory.path().join("interval-array-style-transition.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    let csv_value = csv.records().next().unwrap().unwrap()[0].to_owned();
+    assert_eq!(csv_value, *driver_text);
+
+    transaction.execute("SET LOCAL IntervalStyle = 'iso_8601'").await.unwrap();
+    let setting = transaction.query("SELECT current_setting('IntervalStyle')").await.unwrap();
+    assert_eq!(setting.rows[0][0], Value::Text("iso_8601".into()));
+    transaction
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let rebound = transaction
+        .query_params(
+            "SELECT encode(array_send($1::text::interval[]), 'hex')",
+            std::slice::from_ref(&Value::Text(driver_text.clone())),
+        )
+        .await
+        .unwrap();
+    let csv_rebound = transaction
+        .query_params(
+            "SELECT encode(array_send($1::text::interval[]), 'hex')",
+            std::slice::from_ref(&Value::Text(csv_value)),
+        )
+        .await
+        .unwrap();
+    let restored = transaction
+        .query("SELECT encode(array_send(value), 'hex') FROM interval_style_transition_target")
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][1]);
+    assert_eq!(csv_rebound.rows[0][0], native.rows[0][1]);
+    assert_eq!(restored.rows[0][0], native.rows[0][1]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
