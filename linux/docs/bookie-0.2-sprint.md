@@ -245,6 +245,12 @@ Calc round trip as exact text. Native `array_to_json` and `array_send` match
 after rebinding. See the
 [int8-array Calc evidence](evidence/postgres-int8-array-calc-reimport-results-2026-10-05/manifest.json).
 
+October 5 B3-1 consumer follow-up: PostgreSQL `smallint[]` and `integer[]`
+with signed boundaries, SQL NULL, and non-default lower bounds survive the
+pinned Calc re-save as exact text. Native array JSON and wire bytes match after
+rebinding. See the
+[integer-array Calc evidence](evidence/postgres-integer-arrays-calc-reimport-results-2026-10-05/manifest.json).
+
 October 5 local GTK + DuckDB value tier: all 316 selected tests passed across
 all 11 suites, with no missing suites. PostgreSQL contributed 115 contracts;
 the current MySQL/MariaDB suite contributed 28. Compile reused 746 cached

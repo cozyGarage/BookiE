@@ -692,6 +692,95 @@ async fn value_contract_int8_array_file_exports_preserve_precision_for_calc_reim
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_integer_arrays_file_exports_preserve_bounds_for_calc_reimport() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let smallint = "'[0:3]={-32768,0,32767,NULL}'::int2[]";
+    let integer = "'[2:6]={-2147483648,-16777217,16777217,2147483647,NULL}'::int4[]";
+    let result = connection
+        .query(&format!("SELECT {smallint} AS smallints, {integer} AS integers"))
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, "INT2[]");
+    assert_eq!(result.columns[1].data_type, "INT4[]");
+    let smallint_oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({smallint})::text, array_to_json({smallint})::text, \
+             encode(array_send({smallint}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let integer_oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({integer})::text, array_to_json({integer})::text, \
+             encode(array_send({integer}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(smallint_oracle.rows[0][0], Value::Text("smallint[]".into()));
+    assert_eq!(integer_oracle.rows[0][0], Value::Text("integer[]".into()));
+    assert_eq!(smallint_oracle.rows[0][1], Value::Text("[-32768,0,32767,null]".into()));
+    assert_eq!(
+        integer_oracle.rows[0][1],
+        Value::Text("[-2147483648,-16777217,16777217,2147483647,null]".into())
+    );
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::int2[])::text, encode(array_send($1::text::int2[]), 'hex'), \
+             array_to_json($2::text::int4[])::text, encode(array_send($2::text::int4[]), 'hex')",
+            &[result.rows[0][0].clone(), result.rows[0][1].clone()],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], smallint_oracle.rows[0][1]);
+    assert_eq!(rebound.rows[0][1], smallint_oracle.rows[0][2]);
+    assert_eq!(rebound.rows[0][2], integer_oracle.rows[0][1]);
+    assert_eq!(rebound.rows[0][3], integer_oracle.rows[0][2]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("integer-arrays.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut sheet,
+    )
+    .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    let (Value::Text(smallint_text), Value::Text(integer_text)) =
+        (&result.rows[0][0], &result.rows[0][1])
+    else {
+        panic!("integer array results must remain text: {:?}", result.rows[0]);
+    };
+    for cell in ["A2", "B2"] {
+        assert!(sheet.contains(&format!("<c r=\"{cell}\" t=\"s\">")), "{sheet}");
+    }
+    assert!(shared_strings.contains(smallint_text), "{shared_strings}");
+    assert!(shared_strings.contains(integer_text), "{shared_strings}");
+    assert!(!sheet.contains("<f>"), "{sheet}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

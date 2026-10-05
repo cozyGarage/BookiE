@@ -83,6 +83,12 @@ A PostgreSQL `int8[]` workbook preserves a lower bound of zero, `i64::MIN`,
 round trip as text. Native `array_to_json` and `array_send` match after rebind
 ([evidence](evidence/postgres-int8-array-calc-reimport-results-2026-10-05/manifest.json)).
 
+PostgreSQL `smallint[]` and `integer[]` workbooks preserve signed boundaries,
+values beyond single-precision exactness, SQL NULL, and lower bounds zero and
+two through Calc's XLSX/ODS/XLSX round trip. Native `array_to_json` and
+`array_send` match after rebinding
+([evidence](evidence/postgres-integer-arrays-calc-reimport-results-2026-10-05/manifest.json)).
+
 A PostgreSQL `timestamptz[]` XLSX cell preserves both sides of a repeated hour,
 a BC instant, infinities and SQL NULL through Calc's ODS/XLSX re-save as exact
 text ([evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json)).
