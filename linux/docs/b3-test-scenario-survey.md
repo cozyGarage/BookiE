@@ -917,6 +917,11 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   shadowed `search_path`, a qualified enum-array cast preserves flattened
   values, NULL elements, multidimensional/lower-bound wire bytes, empty arrays,
   SQL NULL, and target-label refusal ([evidence](evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json)).
+- October 5 B3-1 enum-identifier follow-up: schema and enum names containing
+  spaces and embedded quotes remain bound to the target enum when a same-named
+  quoted type leads transaction `search_path`; native type names, keyed-write
+  values, filters, target/sibling rows, and shadow-only label refusal are checked
+  ([evidence](evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json)).
 - B3-1 implementation follow-up: scalar and temporal arrays now preserve
   elements, dimensions and lower bounds through server wire, SQL and JSON checks;
   built-in `boolean[]`, `bytea[]`, `uuid[]`, `timestamptz[]`, `integer[]`, `text[]`, `numeric[]`, and

@@ -1,0 +1,7 @@
+a01830f27fafd45b4332be0715c65e935b198f4409b51bb63b59cb8fb0d8b2ff  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/clippy.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/diff-check.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/fmt.txt
+65e00a4b1654ceabfb476e9bd92a977461c2cef8ae1ac8914ba31dbcf650f6ce  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/focused-test.txt
+a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/ignored-inventory.txt
+2f39565821e2f3292461840dda093602ad7af913be020188e809b3ff0be29aa9  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/postgres-integration.txt
+59a8ade83527c09a38cc2b4ed98d6a5c76ee6ff6ab4e02bf1c68a71b28107599  docs/evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json

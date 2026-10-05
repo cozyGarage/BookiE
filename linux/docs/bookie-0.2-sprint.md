@@ -431,8 +431,12 @@ remain open ([evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026
 October 4 B3-1 follow-up: PostgreSQL custom enum metadata, keyed updates and
 structured equality filters cover schema/type/table names with spaces and
 embedded double quotes, with native type and sibling-row assertions. Other
-identifier and session/search_path combinations remain open ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
-[quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
+identifier and session/search_path combinations remain open. A follow-up now
+combines embedded-quote schema/type names with a same-named shadow type in
+`search_path`, checking keyed writes, filters, both table rows and native type
+names ([shadow-path evidence](evidence/postgres-enum-quoted-shadow-path-results-2026-10-05/manifest.json)); see the earlier
+[spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json) and
+[quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json).
 
 October 4 B3-1 follow-up: a same-named PostgreSQL enum under the pool role's
 default shadowed `search_path` cannot accept the target-only label; qualified

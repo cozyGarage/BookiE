@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "354894db81c6444f069caa2926747a419790dcf0",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs",
+  "source_file_sha256": "97fdfe35983b6b015caa27ac345e5727c07b284eae46ba564aa4dfd990f7fc5a",
+  "case": "PostgreSQL custom enum writes with quoted identifiers under shadowed search_path",
+  "scenario": {
+    "test": "value_contract_quoted_enum_identifiers_resist_shadowed_search_path",
+    "identifiers": {
+      "target_schema": "enum audit \"schema\"",
+      "enum_type": "state \"kind\"",
+      "shadow_schema": "enum_quoted_shadow"
+    },
+    "assertions": [
+      "The target and shadow schemas each define a same-named quoted enum and rows table; search_path leads with the shadow schema.",
+      "Catalog metadata and generated keyed update use the fully qualified, escaped target enum identifier.",
+      "The keyed write and structured filter select the target-only label and preserve the target sibling field.",
+      "A shadow-only enum label is rejected with native SQLSTATE 22P02 and rollback leaves target and shadow rows unchanged.",
+      "pg_typeof reports the qualified target type and quoted unqualified shadow type as PostgreSQL prints them under this search_path."
+    ]
+  },
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_quoted_enum_identifiers_resist_shadowed_search_path -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "log": "focused-test.txt"
+    },
+    "postgres_integration": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored --test-threads=1",
+      "passed": 151,
+      "failed": 0,
+      "filtered": 1,
+      "seconds": 341.86,
+      "log": "postgres-integration.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other PostgreSQL enum identifier/session combinations and the broader engine, consumer, and configuration matrix remain open."
+  ]
+}
