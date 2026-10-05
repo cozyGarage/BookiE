@@ -122,6 +122,10 @@ same-named leading shadow type: metadata stays qualified to the target schema,
 enum order and empty/Unicode labels match native JSON and wire-byte oracles,
 and rebinding refuses a shadow-only label
 ([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
+`enum_first` and `enum_last` now have scalar-result contracts under the same
+shadow-path collision, with qualified metadata, native `enum_send` byte checks,
+typed rebinding and SQLSTATE `22P02` for shadow-only labels
+([evidence](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

@@ -337,6 +337,12 @@ for a shadow-only label. Other B3 enum functions and session/search-path
 combinations remain open
 ([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 PostgreSQL enum follow-up: `enum_first` and `enum_last` now
+return the target schema's first and last labels with qualified result metadata
+under a same-named leading shadow type. Rebinding matches native `enum_send`
+bytes, and a shadow-only label is refused with SQLSTATE `22P02`
+([evidence](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json)).
+
 October 5 B3-4 SQLite follow-up: `substr()` over STRICT `ANY` now preserves
 TEXT, empty TEXT, UTF-8 and binary BLOB, and SQL NULL result classes through
 typed CSV re-import. Native `typeof()` and `hex()` check source and restored

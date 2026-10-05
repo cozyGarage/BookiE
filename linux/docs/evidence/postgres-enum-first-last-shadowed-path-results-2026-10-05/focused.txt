@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path -- --ignored --nocapture
+1 passed, 0 failed (PostgreSQL 16 Docker fixture)
