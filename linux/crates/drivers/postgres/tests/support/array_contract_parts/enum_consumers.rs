@@ -93,6 +93,68 @@ async fn value_contract_custom_enum_array_projection_preserves_literal_null_and_
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_agg_preserves_order_and_nulls() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE TYPE value_contract_array_agg_enum AS ENUM ('NULL', '', '東京', 'a,b', 'o''brien')")
+        .await
+        .unwrap();
+
+    let source = "VALUES \
+        (1, 'NULL'::value_contract_array_agg_enum), \
+        (2, ''::value_contract_array_agg_enum), \
+        (3, '東京'::value_contract_array_agg_enum), \
+        (4, 'a,b'::value_contract_array_agg_enum), \
+        (5, 'o''brien'::value_contract_array_agg_enum), \
+        (6, NULL::value_contract_array_agg_enum)";
+    let aggregate = format!(
+        "(SELECT array_agg(label ORDER BY ordinal) FROM ({source}) AS input(ordinal, label))"
+    );
+    let result = connection.query(&format!("SELECT {aggregate} AS value")).await.unwrap();
+    assert_eq!(result.columns[0].data_type, "value_contract_array_agg_enum[]");
+    let Value::Text(_) = &result.rows[0][0] else {
+        panic!("custom enum array aggregate must remain textual: {:?}", result.rows[0][0]);
+    };
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM (SELECT {aggregate} AS value) AS native"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("value_contract_array_agg_enum[]".into()));
+    let Value::Text(json_text) = &oracle.rows[0][1] else {
+        panic!("array_to_json oracle returned {:?}", oracle.rows[0][1]);
+    };
+    let expected_json = serde_json::json!(["NULL", "", "東京", "a,b", "o'brien", null]);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(json_text).unwrap(),
+        expected_json
+    );
+
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::value_contract_array_agg_enum[])::text, \
+                    encode(array_send($1::text::value_contract_array_agg_enum[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    let Value::Text(rebound_json) = &rebound.rows[0][0] else {
+        panic!("rebound array_to_json returned {:?}", rebound.rows[0][0]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(rebound_json).unwrap(),
+        expected_json
+    );
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
