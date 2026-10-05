@@ -16,9 +16,11 @@ shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
 [same-session label rename](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json),
 [same-session type rename/schema move](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
 
-The PostgreSQL temporal-array evidence now also includes `timestamp[]`
-rebinding across a `DateStyle` change, with native wire-byte checks
-([evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
+The PostgreSQL `timestamp[]` evidence now covers typed rebinding, canonical
+CSV export and SQL replay across a `DateStyle` change, with native array JSON
+and wire-byte checks plus sibling preservation
+([rebind evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
+[file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 
 ## Run
 

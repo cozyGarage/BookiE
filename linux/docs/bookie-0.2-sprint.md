@@ -30,6 +30,11 @@ file-writer assertions in one native contract. SQL replay restores the native
 type/value/JSON/wire bytes and leaves a pre-existing sibling row unchanged
 ([evidence](evidence/postgres-uuid-array-filewriter-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 follow-up: the PostgreSQL `timestamp[]` `DateStyle` transition
+now covers canonical CSV output and SQL replay after switching from `SQL, DMY`
+to `ISO, MDY`. Native array JSON/wire bytes match, and a sibling row is retained
+([evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
+
 October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
 inside the nested type fallback. The driver now explicitly refuses nested
 LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;

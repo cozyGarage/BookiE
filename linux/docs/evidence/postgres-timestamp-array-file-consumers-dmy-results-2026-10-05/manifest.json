@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "e4b7a12495a16f4b9bd161e2ecbe2f217662359e",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "timestamp[] CSV export and SQL replay across a DateStyle change",
+  "test": "array_contract::value_contract_timestamp_array_file_consumers_preserve_values_across_dmy_datestyle",
+  "contract": [
+    "The transaction fetches timestamp[] under DateStyle SQL, DMY with fractional seconds, BC and year-10000 values, infinities and SQL NULL; BookiE retains canonical ISO array text.",
+    "After changing DateStyle to ISO, MDY, typed binding preserves PostgreSQL array_to_json and array_send oracles.",
+    "CSV export preserves BookiE's canonical text. SQL-file replay under ISO, MDY restores the native timestamp[] type, JSON values and wire bytes.",
+    "A pre-existing timestamp[] sibling row is unchanged by SQL replay."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_timestamp_array_file_consumers_preserve_values_across_dmy_datestyle -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 179 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 499 declarations, Driver tier 366",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other temporal-array types, session transitions and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "focused.txt": "219eb19136968fe2961c47b69fc0198ed90b1029d93bd4d5a8825d0e9f84da37",
+    "driver-suite.txt": "dd7dd62e7e6cfe3bc34e7d09a08b10f532a0a257fbee50927a026d1b1e77326f",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}

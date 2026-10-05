@@ -13,9 +13,12 @@ Other delimiter punctuation and dialect-specific script boundaries remain open.
 
 `timestamp[]` now has a session transition case: BookiE preserves canonical
 array text fetched under `DateStyle = SQL, DMY`, and typed rebinding after
-switching to `ISO, MDY` reproduces PostgreSQL's original array wire bytes. The
+switching to `ISO, MDY` reproduces PostgreSQL's original array JSON and wire
+bytes. CSV export preserves the canonical text; SQL replay after the style
+change restores those native values and leaves a sibling row unchanged. The
 case includes fractional seconds, BC/year-10000 values, infinities and SQL NULL
-([evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
+([rebind evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
+[file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 Other temporal-array and consumer/session combinations remain open.
 
 ### October 5 PostgreSQL numeric[] Gnumeric follow-up

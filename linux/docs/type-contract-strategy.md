@@ -11,6 +11,12 @@ Detailed native cases and old counts are in [type-contract history](type-contrac
 and [the value evidence index](value-contracts.md). Those records keep their
 source/SHA attribution; this summary does not certify the current tree.
 
+The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to
+canonical CSV output and SQL replay after switching from `SQL, DMY` to
+`ISO, MDY`; native JSON/wire oracles and sibling preservation pass
+([evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
+Other temporal-array session/consumer combinations remain open.
+
 PostgreSQL inferred enum-array binding now has direct evidence for the
 domain-over-enum `ANY($1)` predicate, including native type and wire-byte
 oracles. Follow-up contracts cover containment and overlap operators with the
