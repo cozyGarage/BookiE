@@ -978,7 +978,7 @@ mod tests {
         assert_eq!(counted.rows, vec![vec![Value::Int(2)]]);
 
         let mixed = conn
-            .query("SELECT 1, 2.5, 'text', NULL, group_concat(label) FROM t")
+            .query("SELECT 1, 2.5, 'text', NULL, group_concat(label), CAST('text blob' AS BLOB) FROM t")
             .await
             .unwrap();
         assert_eq!(
@@ -989,6 +989,18 @@ mod tests {
                 Value::Text("text".into()),
                 Value::Null,
                 Value::Text("a,b".into()),
+                Value::Bytes(b"text blob".to_vec()),
+            ]]
+        );
+        let blob_oracle = conn
+            .query("SELECT typeof(CAST('text blob' AS BLOB)), hex(CAST('text blob' AS BLOB))")
+            .await
+            .unwrap();
+        assert_eq!(
+            blob_oracle.rows,
+            vec![vec![
+                Value::Text("blob".into()),
+                Value::Text("7465787420626C6F62".into())
             ]]
         );
     }
