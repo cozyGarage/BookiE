@@ -488,6 +488,11 @@ value tier passed 322 selected tests across all 11 suites, with no missing
 suites. The run compiled 17 packages with 709 fresh artifacts; report and logs
 are retained in the [run packet](evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/manifest.json).
 
+After the quoted PostgreSQL enum shadow-path case, the full local GTK + DuckDB
+value tier passed 329 selected tests across all 11 suites at `61acf2250`, with
+no missing suites. It compiled six packages with 740 fresh artifacts; report
+and suite logs are in the [run packet](evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/manifest.json).
+
 October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
 schema-qualified destination cast across a role `search_path` change between
 planning and execution on a fresh connection. A distinct same-named enum leads

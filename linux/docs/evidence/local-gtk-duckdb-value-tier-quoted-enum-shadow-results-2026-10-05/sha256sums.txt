@@ -1,0 +1,14 @@
+6e8e1a6a7c373dc14875632c93054107c3a90fde634585e426a41a1ead0d26ac  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/compile.log
+802c6b1ddb27dcf50c1d6875ad9a1edb4373b4a6cc914068887d9bc7e516fdf9  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-app.log
+03bfd93b05c9806dc6ea3b78ea6b8d55fc56c8190627117cf02a8899c37cae55  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-core.log
+4fb8cd795435cc97d957fd7a0260c5d1f8f0a544dc777bc5aedfc9c61bd5d265  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-clickhouse.log
+83d93f1bca6c272713829679dff87ce8934e24b169cc2b97d0c534350cf9de36  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-duckdb.log
+cf50faa82c1c43f5b9a25d8fffb13748954cf3ee4087e74afb04307fc662c9f0  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-mongodb.log
+7fa58877102247b1467cc5ce502df4530681c1ae110e052f4d25b073105f5d7c  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-mssql.log
+46ed8e747f5de8be1b6905b8f10519a588987ad51c9f3737847172d185d7d15c  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-mysql.log
+581ca923caa4ef0eac7f14f6f808821c367b3aa18778d59509d965471c2559a4  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-postgres.log
+8eb71b2bb7e126acb89f2f16c5b5814dbb0857c0fb294c38020084a3bac86391  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-redis.log
+ac5e59a4a0c23203d45b21b93788ddc7afba2d53b8be900059c34ffc4c178228  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-drivers-sqlite.log
+32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/crates-mcp.log
+7b562a86978109611709f443e567ef33f1991253979fda757d37cba3df6d3dda  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/manifest.json
+a12d29b1d6949e031e0f0ecfed386935e967fa26805cc17fe7b32eccec9f82c3  docs/evidence/local-gtk-duckdb-value-tier-quoted-enum-shadow-results-2026-10-05/report.json

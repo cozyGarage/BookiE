@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "61acf2250bb92778b35b868f0a97e4a400cd0825",
+  "working_tree_dirty": true,
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "environment": {
+    "gtk": true,
+    "duckdb": true,
+    "unit_only": false,
+    "fresh_compile_artifacts": 740,
+    "rebuilt_packages": 6,
+    "compile_seconds": 7.592
+  },
+  "result": {
+    "passed": 329,
+    "failed": 0,
+    "suites": 11,
+    "missing_suites": []
+  },
+  "suite_counts": {
+    "app": 55,
+    "core": 58,
+    "clickhouse": 6,
+    "duckdb": 30,
+    "mongodb": 15,
+    "mssql": 7,
+    "mysql": 29,
+    "postgres": 123,
+    "redis": 4,
+    "sqlite": 1,
+    "mcp": 1
+  },
+  "report": "report.json",
+  "compile_log": "compile.log",
+  "suite_logs": [
+    "crates-app.log",
+    "crates-core.log",
+    "crates-drivers-clickhouse.log",
+    "crates-drivers-duckdb.log",
+    "crates-drivers-mongodb.log",
+    "crates-drivers-mssql.log",
+    "crates-drivers-mysql.log",
+    "crates-drivers-postgres.log",
+    "crates-drivers-redis.log",
+    "crates-drivers-sqlite.log",
+    "crates-mcp.log"
+  ],
+  "notes": [
+    "The runner report revision matches the pushed linux commit.",
+    "The runner reports dirty=true because the two pre-existing untracked B4 scratch directories were present; tracked source was clean during the run.",
+    "The selected value tier passed but does not close B3 or qualify the 0.2.0 release."
+  ]
+}
