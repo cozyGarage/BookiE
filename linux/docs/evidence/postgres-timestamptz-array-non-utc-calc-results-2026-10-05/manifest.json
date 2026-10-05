@@ -2,8 +2,8 @@
   "schema_version": 1,
   "date": "2026-10-05",
   "branch": "linux",
-  "baseline_commit": "25b265354",
-  "case": "PostgreSQL timestamptz[] workbook re-import through Calc under a non-UTC source session",
+  "baseline_commit": "33c7710badc0a60439434fa707e55c47e73d5527",
+  "case": "PostgreSQL timestamptz[] workbook re-import through Calc and Gnumeric under a non-UTC source session",
   "test": "array_contract::value_contract_timestamptz_array_file_exports_preserve_instants_under_non_utc_session",
   "source": {
     "path": "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers.rs",
@@ -15,10 +15,17 @@
     "package": "4:26.8.0.3-2",
     "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
   },
+  "additional_application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
   "contract": [
     "The workbook is generated from a PostgreSQL transaction with TimeZone America/New_York; PostgreSQL's independent array text and array_to_json oracles show the two distinct fall-back offsets.",
     "BookiE decodes the timestamptz[] result to canonical UTC array text, which is stored as a shared-string XLSX cell.",
     "Calc opens source.xlsx, saves calc-roundtrip.ods, reopens it and saves calc-roundtrip.xlsx; both retain the exact canonical UTC array text, string cell type, and no formula.",
+    "Gnumeric ssconvert opens the same source.xlsx, saves gnumeric-roundtrip.ods, then saves gnumeric-roundtrip.xlsx; both retain the exact text as a string cell without a formula.",
     "The checker pins both repeated-hour UTC instants, the BC instant, infinities and SQL NULL in the preserved text."
   ],
   "validation": {
@@ -39,9 +46,11 @@
     "consumer_assertions": {
       "checker": "verify_roundtrip.py",
       "method": "Python standard-library ZIP/XML checks exact A2 text in source and re-saved XLSX/ODS, requires string cell kinds and rejects formulas.",
-      "result": "Canonical UTC array text and both repeated-hour instants preserved in all three workbooks.",
+      "result": "Canonical UTC array text and both repeated-hour instants preserved in source and both applications' re-saved ODS/XLSX files.",
       "log": "consumer-check.txt"
     },
+    "gnumeric_version": "gnumeric-version.txt",
+    "gnumeric_round_trip": "gnumeric-run.txt passed",
     "clippy": "clippy.txt passed",
     "format": "fmt.txt passed",
     "ignored_test_inventory": "ignored-inventory.txt passed",
@@ -50,7 +59,9 @@
   "artifact_sha256": {
     "source.xlsx": "5dece69c2758e2a02ffae5d0cfc14c4a0a5658041542d526c7deb67d50332f66",
     "calc-roundtrip.ods": "ca4bf02e73460b4e5c1b8c06c76c5113c9fadbd2595dbc44af2fad9f6896ce54",
-    "calc-roundtrip.xlsx": "dde0573890ea4ef3b468356ab07a2f05fdf424ff204ea1bda7589b6320f62201"
+    "calc-roundtrip.xlsx": "dde0573890ea4ef3b468356ab07a2f05fdf424ff204ea1bda7589b6320f62201",
+    "gnumeric-roundtrip.ods": "0cf2775b10a9e50c54d60e1ded7e59cdcb262ab63a43e9fa235f2c9e3db38418",
+    "gnumeric-roundtrip.xlsx": "4addbb2010ebe4e1acca482cb75f2adc70fea98fb7d5dfcf45d4b2a114784b85"
   },
   "remaining": [
     "Other spreadsheet applications, temporal-array session combinations and the broader B3 matrix remain open."
@@ -59,8 +70,10 @@
     "bookiee-export-test.txt": "3817aef26d4555149ae64b975f633273e1d3b7e47729e3f03bf83ff6c9fa4f5b",
     "calc-version.txt": "8d65d53d9fc8f6caaeaa16013977052dc4bda05564f797a246690fe81f3d00c7",
     "libreoffice-run.txt": "de31bac68e78c48e09b442a61da2587b775c3f46ffef8c27b9ae34e79df12760",
-    "consumer-check.txt": "9b873f52a30f3aa6f28daa5fc00e17d5ea645c58ba2862b3441f78a6ec612ea1",
-    "verify_roundtrip.py": "e8b92d09d3d793ca28b79c2424a6574b8dcdaf7fcc2755b81c55383a251c93f0",
+    "consumer-check.txt": "8fe323af43ccc132069c9cc1aceebee9958f2dd098754714a24fb6e04d7d3af9",
+    "verify_roundtrip.py": "cffcb3b0bb7810bfa106268b66af7444664871301ed448a57e9c56f324ad92eb",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "4a81d1d52534330b9e5db1ccfee0f827e58968c83077613ea4c272a393f7d1ed",
     "clippy.txt": "1e2b3f019d78f9f6f50a02ad022a82fe9d3d4de5adc180e566174417e2b07aa8",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",

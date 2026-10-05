@@ -1,1 +1,1 @@
-Canonical UTC timestamptz[] text, string cell types and no-formula checks passed through Calc XLSX/ODS/XLSX re-save
+Canonical UTC timestamptz[] text, string cell types and no-formula checks passed through Calc and Gnumeric XLSX/ODS/XLSX re-saves

@@ -18,10 +18,12 @@ NS = {
 def xlsx_cell(path):
     with ZipFile(path) as archive:
         sheet = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
-        shared = ET.fromstring(archive.read("xl/sharedStrings.xml"))
         cell = sheet.find('.//x:c[@r="A2"]', NS)
-        assert cell is not None and cell.get("t") == "s", ET.tostring(sheet)
+        assert cell is not None and cell.get("t") in ("s", "inlineStr"), ET.tostring(sheet)
         assert cell.find("x:f", NS) is None, ET.tostring(cell)
+        if cell.get("t") == "inlineStr":
+            return cell.findtext("x:is/x:t", namespaces=NS)
+        shared = ET.fromstring(archive.read("xl/sharedStrings.xml"))
         index = int(cell.findtext("x:v", namespaces=NS))
         return "".join(shared.find(f"x:si[{index + 1}]", NS).itertext())
 
@@ -41,6 +43,8 @@ for name, reader in (
     ("source.xlsx", xlsx_cell),
     ("calc-roundtrip.ods", ods_cell),
     ("calc-roundtrip.xlsx", xlsx_cell),
+    ("gnumeric-roundtrip.ods", ods_cell),
+    ("gnumeric-roundtrip.xlsx", xlsx_cell),
 ):
     actual = reader(BASE / name)
     assert actual == EXPECTED, f"{name}: {actual!r} != {EXPECTED!r}"
@@ -48,4 +52,4 @@ for name, reader in (
 assert '05:30:00.123456+00:00' in EXPECTED
 assert '06:30:00.123456+00:00' in EXPECTED
 assert ",NULL}" in EXPECTED and '"infinity"' in EXPECTED and '"-infinity"' in EXPECTED
-print("Canonical UTC timestamptz[] text, string cell types and no-formula checks passed through Calc XLSX/ODS/XLSX re-save")
+print("Canonical UTC timestamptz[] text, string cell types and no-formula checks passed through Calc and Gnumeric XLSX/ODS/XLSX re-saves")

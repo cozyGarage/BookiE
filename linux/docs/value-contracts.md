@@ -314,9 +314,9 @@ Under a New York session, a follow-up confirms PostgreSQL's native output uses
 the two fall-back offsets while BookiE's decoded value remains canonical UTC;
 binding and SQL replay in a later Kathmandu session preserve the original wire
 bytes ([session evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
-The workbook created in that session also survives LibreOffice Calc's
-XLSX/ODS/XLSX re-save with the same canonical UTC text and no formulas
-([Calc evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
+The workbook created in that session also survives LibreOffice Calc and
+Gnumeric XLSX/ODS/XLSX re-saves with the same canonical UTC text and no formulas
+([spreadsheet evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
 
 An `interval[]` file-writer case runs under `postgres_verbose` `IntervalStyle`
 on one transaction backend and verifies text binding, all four writers and

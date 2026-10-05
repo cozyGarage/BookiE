@@ -291,9 +291,9 @@ October 5 B3-2 session follow-up: `timestamptz[]` file export now runs under
 BookiE's result remains canonical UTC. Typed binding and SQL-file replay after
 switching to `Asia/Kathmandu` preserve native `array_send` bytes
 ([evidence](evidence/postgres-timestamptz-array-non-utc-session-results-2026-10-05/manifest.json)).
-The XLSX from that same New York session also survives Calc's ODS/XLSX re-save
-with the canonical UTC text, string cell kinds and no formulas
-([Calc evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
+The XLSX from that same New York session also survives Calc and Gnumeric
+ODS/XLSX re-saves with the canonical UTC text, string cell kinds and no formulas
+([spreadsheet evidence](evidence/postgres-timestamptz-array-non-utc-calc-results-2026-10-05/manifest.json)).
 
 October 5 B3-1 consumer follow-up: PostgreSQL `boolean[]` with true, false and
 SQL NULL survives the Calc re-save as exact text; native type, `array_to_json`
