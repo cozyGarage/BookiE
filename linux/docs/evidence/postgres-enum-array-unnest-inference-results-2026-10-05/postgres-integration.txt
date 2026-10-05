@@ -1,0 +1,5 @@
+Command:
+rtk cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored --test-threads=1
+
+Result:
+cargo test: 150 passed, 1 filtered out (1 suite, 353.09s)

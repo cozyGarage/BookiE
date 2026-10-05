@@ -1182,6 +1182,130 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type_unde
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_domain_enum_array_unnest_requires_qualified_cast_under_shadowed_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_unnest")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE SCHEMA value_contract_shadowed_unnest_shadow")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_unnest.state \
+             AS ENUM ('ready', 'NULL', '', '東京', 'comma,label')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_shadowed_unnest_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
+        )
+        .await
+        .unwrap();
+
+    let schema = "value_contract_shadowed_unnest";
+    let array_type = format!("{schema}.state[]");
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO value_contract_shadowed_unnest_shadow, public")
+        .await
+        .unwrap();
+
+    for (parameter, native_array) in [
+        (
+            Value::Text(r#"[0:1][2:3]={{"NULL",NULL},{"東京","comma,label"}}"#.into()),
+            format!(r#"'[0:1][2:3]={{{{"NULL",NULL}},{{"東京","comma,label"}}}}'::{array_type}"#),
+        ),
+        (Value::Text("{}".into()), format!("'{{}}'::{array_type}")),
+        (Value::Null, format!("NULL::{array_type}")),
+    ] {
+        transaction
+            .execute("SAVEPOINT untyped_unnest_parameter")
+            .await
+            .unwrap();
+        let untyped = transaction
+            .query_params(
+                "SELECT item FROM unnest($1) AS element(item)",
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .expect_err("unnest has no typed argument from which to infer an enum array");
+        assert!(
+            matches!(&untyped, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "42725"),
+            "expected PostgreSQL ambiguous-function SQLSTATE 42725, got {untyped:?}"
+        );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT untyped_unnest_parameter")
+            .await
+            .unwrap();
+
+        let native_items = transaction
+            .query(&format!(
+                "SELECT ordinality::bigint, item::text, item IS NULL \
+                 FROM unnest({native_array}) WITH ORDINALITY AS element(item, ordinality) \
+                 ORDER BY ordinality"
+            ))
+            .await
+            .unwrap();
+        let items = transaction
+            .query_params(
+                &format!(
+                    "SELECT ordinality::bigint, item::text, item IS NULL \
+                     FROM unnest($1::{array_type}) WITH ORDINALITY AS element(item, ordinality) \
+                     ORDER BY ordinality"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(items.rows, native_items.rows, "unnest values for {parameter:?}");
+
+        let native_type_and_bytes = transaction
+            .query(&format!(
+                "SELECT {native_array} IS NULL, pg_typeof({native_array})::text, \
+                 encode(array_send({native_array}), 'hex')"
+            ))
+            .await
+            .unwrap();
+        let type_and_bytes = transaction
+            .query_params(
+                &format!(
+                    "SELECT $1::{array_type} IS NULL, pg_typeof($1::{array_type})::text, \
+                     encode(array_send($1::{array_type}), 'hex')"
+                ),
+                std::slice::from_ref(&parameter),
+            )
+            .await
+            .unwrap();
+        assert_eq!(type_and_bytes.rows, native_type_and_bytes.rows, "array metadata and bytes for {parameter:?}");
+    }
+
+    transaction
+        .execute("SAVEPOINT shadow_only_unnest_label")
+        .await
+        .unwrap();
+    let invalid = transaction
+        .query_params(
+            &format!("SELECT item FROM unnest($1::{array_type}) AS element(item)"),
+            &[Value::Text(r#"{"shadow-only"}"#.into())],
+        )
+        .await
+        .expect_err("a label defined only by the shadow enum must be rejected");
+    assert!(
+        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected target enum invalid-label SQLSTATE 22P02, got {invalid:?}"
+    );
+    transaction.execute("ROLLBACK TO SAVEPOINT shadow_only_unnest_label").await.unwrap();
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_domain_over_enum_array_operators_infer_parameter_type_in_both_positions() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

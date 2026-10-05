@@ -53,6 +53,11 @@ The PostgreSQL 16 `trim_array` boundary is now explicit: a standalone
 (`42804`), while a schema-qualified array cast preserves NULL, empty, NULL
 element and lower-bound inputs against native result and wire oracles under a
 shadowed `search_path` ([evidence](evidence/postgres-trim-array-enum-inference-boundary-results-2026-10-05/manifest.json)).
+`unnest($1)` is now an explicit PostgreSQL boundary: without a typed argument,
+server function resolution returns SQLSTATE `42725`; a schema-qualified enum
+array cast works under a same-named shadowed `search_path`, with native value,
+type and wire-byte comparisons for NULL, empty, multidimensional, lower-bound,
+NULL-element and escaped-label cases ([unnest evidence](evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json)).
 Other inferred array operator/function contexts remain candidates; these cases
 do not close the PostgreSQL or B3 matrix. See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

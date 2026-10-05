@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "6883c1f1828ac471abce8f7580cdc9ba0a805453",
+  "working_tree_dirty": true,
+  "source_file": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs",
+  "source_file_sha256": "e513c77aa441493bb5e3e3fa9277e0241b949e476bce109ddfe3a85100fa14e3",
+  "case": "PostgreSQL 16 enum-array unnest inference boundary under a shadowed search_path",
+  "scenario": {
+    "test": "value_contract_domain_enum_array_unnest_requires_qualified_cast_under_shadowed_path",
+    "untyped_parameter": "unnest($1) is refused by native function resolution with SQLSTATE 42725 (function unnest(unknown) is not unique).",
+    "typed_parameter": "A schema-qualified target enum-array cast succeeds while a same-named shadow enum leads transaction search_path.",
+    "inputs": [
+      "two-dimensional array with lower bounds [0:1][2:3]",
+      "literal NULL enum label",
+      "SQL NULL element",
+      "Unicode and comma-bearing labels",
+      "empty array",
+      "SQL NULL array",
+      "shadow-only invalid label"
+    ],
+    "oracles": [
+      "native unnest row values, ordinality and SQL NULL flags",
+      "pg_typeof",
+      "array_send wire bytes",
+      "native SQLSTATE 42725 and 22P02"
+    ]
+  },
+  "validation": {
+    "focused_test": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_enum_array_unnest_requires_qualified_cast_under_shadowed_path -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "log": "focused-test.txt"
+    },
+    "postgres_integration": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration -- --ignored --test-threads=1",
+      "passed": 150,
+      "failed": 0,
+      "filtered": 1,
+      "seconds": 353.09,
+      "log": "postgres-integration.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other polymorphic array operator and function contexts remain candidates; this case does not close the PostgreSQL or B3 matrix."
+  ]
+}

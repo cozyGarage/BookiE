@@ -912,6 +912,11 @@ with broad retries, implicit skips, float-normalized comparisons or NULL fallbac
   does not prove coverage across every engine.
 - Review DBeaver statement-parser fixtures and the remaining SQLFluff dialect
   corpus selectively for our six SQL engines.
+- October 5 B3-1 enum-array follow-up: PostgreSQL cannot infer the enum-array
+  argument to `unnest($1)` (`42725`, ambiguous function); under a same-named
+  shadowed `search_path`, a qualified enum-array cast preserves flattened
+  values, NULL elements, multidimensional/lower-bound wire bytes, empty arrays,
+  SQL NULL, and target-label refusal ([evidence](evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json)).
 - B3-1 implementation follow-up: scalar and temporal arrays now preserve
   elements, dimensions and lower bounds through server wire, SQL and JSON checks;
   built-in `boolean[]`, `bytea[]`, `uuid[]`, `timestamptz[]`, `integer[]`, `text[]`, `numeric[]`, and

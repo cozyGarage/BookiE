@@ -530,6 +530,11 @@ text, SQL NULL and marker-shaped values. Formula-like text keeps its safety
 prefix after parsing; external spreadsheet paste and lossless restore remain
 open ([evidence](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL `unnest($1)` cannot infer an enum-array
+parameter (`42725`); a qualified target-array cast under a shadowed
+`search_path` matches native flattened values, type and wire bytes, including
+NULL/empty and multidimensional bounds ([evidence](evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: enum-array parameter text now has direct parser cases
 for quotes/escapes, empty text, NULL, bounds, nesting, ragged input and malformed
 tails. The native domain-over-enum `ANY($1)` contract passes with wire-byte

@@ -1,0 +1,8 @@
+5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/clippy.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/diff-check.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/fmt.txt
+229aee0c2d1554de07cbc8c01c1a013965c06ebaf434c69c6aaaa7c690feaee6  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/focused-test.txt
+a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/ignored-inventory.txt
+16d0b4da062b14690034df1d61b1e54a842ec8b4199a5d914d4040bf63c1794c  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/initial-sqlstate-observation.txt
+b490b3e3ec0e9e918e46b92701d1747084ca8a10ad16055bd77721be2d529185  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/postgres-integration.txt
+ecb7916d0f87d4bf10d4480ffcb614230f6594e3cf7019838b3ae635ba92077f  docs/evidence/postgres-enum-array-unnest-inference-results-2026-10-05/manifest.json
