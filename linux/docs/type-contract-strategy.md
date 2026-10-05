@@ -152,9 +152,10 @@ The warmed range query also observes `ALTER TYPE RENAME VALUE` in that session,
 with catalog-order and native array-byte checks after rebinding
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
 Separate reader and writer sessions now verify that a warmed range query sees
-both `ADD VALUE BEFORE` and `RENAME VALUE`, with catalog, JSON and wire-byte
-oracles under the shadowed path
-([cross-session evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
+`ADD VALUE BEFORE`, `RENAME VALUE` and `ADD VALUE AFTER`, with catalog, JSON
+and wire-byte oracles under the shadowed path
+([latest cross-session evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json),
+[original evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
 Result metadata now also follows same-session enum type renames and schema
 moves by catalog OID, including a zero-row projection under a shadowed
 `search_path` ([migration evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).

@@ -94,6 +94,9 @@ Separate reader and writer sessions now cover both migrations after the reader
 has warmed `enum_range`; the target array type, updated order and labels match
 catalog, JSON and native wire oracles under the shadowed path
 ([cross-session evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
+The writer now also inserts a label `AFTER` an existing value; the warmed
+reader sees that position and matches native metadata, JSON and wire oracles
+([follow-up evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json)).
 Other catalog changes and enum session combinations remain open.
 
 ### October 5 PostgreSQL enum type rename/schema move
