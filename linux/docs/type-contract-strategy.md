@@ -210,6 +210,12 @@ PostgreSQL `date[]` result text stays canonical ISO when fetched under
 `ISO, MDY` preserve the source array's native wire bytes
 ([evidence](evidence/postgres-date-array-sql-dmy-results-2026-10-05/manifest.json)).
 
+PostgreSQL `timestamp[]` now also stays canonical when fetched under
+`DateStyle = SQL, DMY`; rebinding after the transaction changes to `ISO, MDY`
+preserves the original `array_send` bytes for fractional, BC, extended-year,
+infinite and SQL NULL elements
+([evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
+
 PostgreSQL `interval[]` values also survive rebinding, CSV and SQL replay when
 the transaction changes from `postgres_verbose` to `iso_8601` `IntervalStyle`;
 native `array_send` bytes cover mixed-sign calendar/time components, zero and

@@ -150,6 +150,12 @@ metadata and native wire identity
 [first/last](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json),
 [min/max](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 follow-up: PostgreSQL `timestamp[]` now preserves canonical
+array text fetched under `DateStyle = SQL, DMY`; typed rebinding after switching
+to `ISO, MDY` preserves native wire bytes for fractional, BC, extended-year,
+infinite and SQL NULL elements
+([case evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

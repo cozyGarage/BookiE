@@ -13,6 +13,10 @@ shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
 [first/last](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json),
 [min/max](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
 
+The PostgreSQL temporal-array evidence now also includes `timestamp[]`
+rebinding across a `DateStyle` change, with native wire-byte checks
+([evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
+
 ## Run
 
 From `linux/`, use the existing value runner:
