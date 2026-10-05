@@ -425,23 +425,18 @@ impl BrowseTab {
             Some(m) => m,
             None => return,
         };
-        let mut rows: Vec<String> = Vec::with_capacity(positions.len());
+        let mut rows = Vec::with_capacity(positions.len());
         for pos in &positions {
             let Some(item) = model.item(*pos) else { continue };
             let Ok(row) = item.downcast::<crate::ui::row_object::RowObject>() else {
                 continue;
             };
-            let cells = row.cells_clone();
-            let line: Vec<String> = cells
-                .iter()
-                .map(|v| escape_tsv_cell(&crate::ui::grid::value_to_display_text(v)))
-                .collect();
-            rows.push(line.join("\t"));
+            rows.push(row.cells_clone());
         }
         if rows.is_empty() {
             return;
         }
-        let tsv = rows.join("\n");
+        let tsv = tablepro_core::export::render_tsv(&self.current_columns, &rows, false);
         let _ = sender.output(BrowseTabOutput::CopyToClipboard(tsv));
     }
 

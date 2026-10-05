@@ -151,6 +151,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::export::tests::clipboard_csv_is_published_and_read_back_exactly"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::export::tests::clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct"
     ]
   ],
   "keyring": [

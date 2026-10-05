@@ -166,29 +166,19 @@ fn csv_row_line_with_any_columns(row: &[Value], any_columns: &[bool], options: &
 }
 
 pub fn render_tsv(columns: &[ColumnInfo], rows: &[Vec<Value>], with_headers: bool) -> String {
+    let options = CsvOptions {
+        header_row: with_headers,
+        null_to_empty: false,
+        null_marker: Some(unique_csv_null_marker(rows)),
+        delimiter: CsvDelimiter::Tab,
+        ..CsvOptions::default()
+    };
     let mut lines = Vec::with_capacity(rows.len() + usize::from(with_headers));
     if with_headers {
-        lines.push(
-            columns
-                .iter()
-                .map(|column| escape_tsv_field(&column.name))
-                .collect::<Vec<_>>()
-                .join("\t"),
-        );
+        lines.push(csv_header_line(columns, &options));
     }
     for row in rows {
-        lines.push(
-            row.iter()
-                .map(|value| {
-                    let text = match value_to_text(value) {
-                        Some(text) => text,
-                        None => "NULL".to_string(),
-                    };
-                    escape_tsv_field(&text)
-                })
-                .collect::<Vec<_>>()
-                .join("\t"),
-        );
+        lines.push(csv_row_line(row, &options));
     }
     lines.join("\n")
 }
@@ -299,14 +289,6 @@ fn format_csv_cell(value: &Value, options: &CsvOptions) -> String {
         text = text.replace('.', ",");
     }
     escape_csv_field(&text, options, had_line_breaks)
-}
-
-fn escape_tsv_field(value: &str) -> String {
-    if value.contains(['\t', '\n', '\r', '"']) {
-        quote_field(value)
-    } else {
-        value.to_string()
-    }
 }
 
 pub(crate) struct CsvWriter {
@@ -793,7 +775,25 @@ mod tests {
 
         assert_eq!(
             render_tsv(&columns, &rows, true),
-            "\"a\tb\"\tvalue\n\"one\ntwo\"\"three\"\tNULL"
+            "\"a\tb\"\tvalue\n\"one\ntwo\"\"three\"\t\\N"
+        );
+    }
+
+    #[test]
+    fn tsv_renderer_keeps_null_empty_marker_and_formula_text_distinct() {
+        let columns = vec![column("status")];
+        let rows = vec![
+            vec![Value::Text("NULL".into())],
+            vec![Value::Text(String::new())],
+            vec![Value::Null],
+            vec![Value::Text("\\N".into())],
+            vec![Value::Text("\\NN".into())],
+            vec![Value::Text("=1+1".into())],
+        ];
+
+        assert_eq!(
+            render_tsv(&columns, &rows, false),
+            "NULL\n\"\"\n\\NNN\n\\N\n\\NN\n\"'=1+1\""
         );
     }
 }

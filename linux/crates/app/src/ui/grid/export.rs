@@ -129,4 +129,71 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    #[ignore = "requires isolated GTK display"]
+    fn clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct() {
+        gtk::init().unwrap();
+        let columns = vec![ColumnInfo {
+            name: "status".into(),
+            data_type: "sample_schema.status_kind".into(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: Some(tablepro_core::QualifiedTypeName {
+                schema: "sample_schema".into(),
+                name: "status_kind".into(),
+            }),
+        }];
+        let rows = vec![
+            vec![Value::Text("NULL".into())],
+            vec![Value::Text(String::new())],
+            vec![Value::Null],
+            vec![Value::Text("\\N".into())],
+            vec![Value::Text("\\NN".into())],
+            vec![Value::Text("=1+1".into())],
+        ];
+        let tsv = tablepro_core::export::render_tsv(&columns, &rows, false);
+        let window = gtk::Window::new();
+        let clipboard = window.clipboard();
+        clipboard.set_text(&tsv);
+
+        let received = gtk::glib::MainContext::default()
+            .block_on(clipboard.read_text_future())
+            .unwrap()
+            .unwrap();
+        assert_eq!(received.as_str(), tsv);
+
+        let options = tablepro_core::import::CsvImportOptions {
+            delimiter: tablepro_core::export::CsvDelimiter::Tab,
+            has_header: false,
+            null_marker: tablepro_core::export::unique_csv_null_marker(&rows),
+        };
+        let sheet = tablepro_core::import::read_csv(received.as_bytes(), &options, None).unwrap();
+        let pasted = sheet
+            .rows
+            .iter()
+            .enumerate()
+            .map(|(index, row)| {
+                tablepro_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
+                    .unwrap()
+                    .remove(0)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            pasted,
+            vec![
+                Value::Text("NULL".into()),
+                Value::Text(String::new()),
+                Value::Null,
+                Value::Text("\\N".into()),
+                Value::Text("\\NN".into()),
+                Value::Text("'=1+1".into()),
+            ]
+        );
+    }
 }

@@ -135,23 +135,6 @@ impl BrowseTab {
     }
 }
 
-/// TSV cells can't carry literal tab / newline / CR without breaking
-/// the row-or-column boundary. Spreadsheet apps (LibreOffice Calc,
-/// Excel) interpret these as field separators on paste, so a cell
-/// containing one would silently split. Replace with a single space
-/// to preserve the row structure on paste; the user can paste into
-/// a plain text view to see the originals.
-pub(super) fn escape_tsv_cell(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    for ch in text.chars() {
-        match ch {
-            '\t' | '\n' | '\r' => out.push(' '),
-            other => out.push(other),
-        }
-    }
-    out
-}
-
 /// Build a `(RowKey, cells)` pair for a persisted row given its full
 /// cell slice and the table's PK column indices. Returns `None` when
 /// pk_indices is empty (no PK), any index is out of range, or
@@ -213,34 +196,9 @@ pub(super) fn selected_positions(selection: &gtk::MultiSelection) -> Vec<u32> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_persisted_row_key, escape_tsv_cell, row_key_is_unreadable};
+    use super::{build_persisted_row_key, row_key_is_unreadable};
     use crate::services::change_tracker::RowKey;
     use tablepro_core::Value;
-
-    #[test]
-    fn escape_tsv_cell_passes_through_plain_text() {
-        assert_eq!(escape_tsv_cell("hello world"), "hello world");
-    }
-
-    #[test]
-    fn escape_tsv_cell_replaces_a_tab_so_it_cannot_split_into_another_column() {
-        assert_eq!(escape_tsv_cell("a\tb"), "a b");
-    }
-
-    #[test]
-    fn escape_tsv_cell_replaces_a_newline_so_it_cannot_split_into_another_row() {
-        assert_eq!(escape_tsv_cell("a\nb"), "a b");
-    }
-
-    #[test]
-    fn escape_tsv_cell_replaces_each_character_of_a_crlf_pair() {
-        assert_eq!(escape_tsv_cell("a\r\nb"), "a  b");
-    }
-
-    #[test]
-    fn escape_tsv_cell_keeps_unicode_content_intact() {
-        assert_eq!(escape_tsv_cell("caf\u{e9} \u{1f980}"), "caf\u{e9} \u{1f980}");
-    }
 
     #[test]
     pub(super) fn build_pk_single_column() {
