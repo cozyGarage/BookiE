@@ -1,0 +1,2 @@
+float4[] values, signed zero, min subnormal, special values and SQL NULL survive XLSX/ODS/Calc XLSX re-import as one text cell; no formulas
+Preserved 108 text characters

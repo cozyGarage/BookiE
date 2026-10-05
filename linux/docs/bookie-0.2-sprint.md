@@ -33,6 +33,13 @@ target table keeps its declared type and wire identity after rebinding, and a
 shadow-only label is refused
 ([case evidence](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL `float4[]` now has a LibreOffice Calc
+XLSX/ODS/XLSX re-import contract. Native element bytes cover an adjacent value,
+negative zero and the minimum subnormal; Calc preserves the shared-string cell
+exactly without formulas. Other array shapes and spreadsheet applications
+remain open
+([case evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
+
 Read [the documentation entry point](README.md) and the relevant ADR, then the
 owning packet. Detailed progress and old handoff prompts have moved to
 [sprint history](bookie-0.2-history.md). That archive retains source SHAs,

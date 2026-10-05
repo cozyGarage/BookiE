@@ -1,0 +1,4 @@
+convert /work/source.xlsx as a Calc document -> /work/recheck/source.ods using filter : calc8
+Overwriting: /work/recheck/source.ods
+convert /work/recheck/source.ods as a Calc document -> /work/recheck/source.xlsx using filter : Calc Office Open XML
+Overwriting: /work/recheck/source.xlsx

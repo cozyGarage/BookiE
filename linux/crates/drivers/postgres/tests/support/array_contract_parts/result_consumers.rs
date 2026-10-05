@@ -1034,6 +1034,92 @@ async fn value_contract_float8_array_file_exports_preserve_bits() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_float4_array_file_exports_preserve_values_for_calc_reimport() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "ARRAY[0.1::float4, 1.0000001192092896::float4, '-0'::float4, \
+        '1.40129846e-45'::float4, 'NaN'::float4, 'Infinity'::float4, \
+        '-Infinity'::float4, NULL]::float4[]";
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_array_value("float4[]", &result);
+
+    let oracle = connection
+        .query(&format!(
+            "SELECT pg_typeof({expression})::text, array_to_json({expression})::text, \
+                    encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(oracle.rows[0][0], Value::Text("real[]".into()));
+    let Value::Text(native_json) = &oracle.rows[0][1] else {
+        panic!("float4[] array_to_json returned {:?}", oracle.rows[0][1]);
+    };
+    let elements = serde_json::from_str::<serde_json::Value>(native_json).unwrap();
+    let elements = elements.as_array().unwrap();
+    assert_eq!(elements.len(), 8);
+    assert_eq!((elements[0].as_f64().unwrap() as f32).to_bits(), 0.1_f32.to_bits());
+    assert_eq!(
+        (elements[1].as_f64().unwrap() as f32).to_bits(),
+        f32::from_bits(0x3f800001).to_bits()
+    );
+    assert_eq!(
+        (elements[3].as_f64().unwrap() as f32).to_bits(),
+        f32::from_bits(1).to_bits()
+    );
+    assert_eq!(elements[4], "NaN");
+    assert_eq!(elements[5], "Infinity");
+    assert_eq!(elements[6], "-Infinity");
+    assert!(elements[7].is_null());
+
+    let element_wire = connection
+        .query(&format!(
+            "SELECT ordinality, item IS NULL, encode(float4send(item), 'hex') \
+             FROM unnest({expression}) WITH ORDINALITY AS element(item, ordinality) \
+             ORDER BY ordinality"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(element_wire.rows[0][2], Value::Text("3dcccccd".into()));
+    assert_eq!(element_wire.rows[1][2], Value::Text("3f800001".into()));
+    assert_eq!(element_wire.rows[2][2], Value::Text("80000000".into()));
+    assert_eq!(element_wire.rows[3][2], Value::Text("00000001".into()));
+    assert_eq!(element_wire.rows[7][1], Value::Bool(true));
+    assert_eq!(element_wire.rows[7][2], Value::Null);
+
+    let rebound = connection
+        .query_params(
+            "SELECT array_to_json($1::text::float4[])::text, \
+                    encode(array_send($1::text::float4[]), 'hex')",
+            std::slice::from_ref(&result.rows[0][0]),
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], oracle.rows[0][1]);
+    assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("float4-array.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_timestamptz_array_file_exports_preserve_instants() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
