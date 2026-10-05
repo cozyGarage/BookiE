@@ -150,9 +150,10 @@ The domain-over-enum `COALESCE` parameter contract now compares both argument
 positions against native casts under that shadowed path, with empty, literal
 `NULL`, SQL NULL and invalid shadow-only labels
 ([evidence](evidence/postgres-domain-coalesce-shadowed-results-2026-10-05/manifest.json)).
-Ordinary enum `COALESCE`, `NULLIF`, `GREATEST` and `LEAST` parameter inference is also
-checked against native target-enum casts under a same-named shadow `search_path`
-for empty/literal-`NULL` labels, SQL NULL and invalid shadow-only labels
+Ordinary enum `COALESCE`, `NULLIF`, `GREATEST` and `LEAST` parameter inference is
+also checked against native target-enum casts after warming metadata and
+switching to a same-named shadow `search_path` on the same backend, for
+empty/literal-`NULL` labels, SQL NULL and invalid shadow-only labels
 ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
 
 MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under

@@ -267,7 +267,8 @@ invalid labels retain native `22P02` behavior
 including their NULL handling, against explicitly typed enum expressions and
 `pg_typeof` results ([evidence](evidence/postgres-enum-greatest-least-parameter-inference-results-2026-10-05/manifest.json)).
 These `COALESCE`, `NULLIF`, `GREATEST` and `LEAST` contexts now also have a native
-same-named-shadow `search_path` contract for ordinary custom enums, with
+same-named-shadow `search_path` contract for ordinary custom enums, after
+warming target type metadata and switching paths on the same backend, with
 empty/literal-`NULL` labels, SQL NULL, type checks and shadow-only label refusal
 ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
 A follow-up also verifies `NULLIF(enum_column, $1)` infers both text and SQL

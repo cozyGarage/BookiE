@@ -1,1 +1,1 @@
-cargo test: 1 passed, 148 filtered out (1 suite, 2.11s)
+cargo test: 1 passed, 148 filtered out (1 suite, 2.02s)

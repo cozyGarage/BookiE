@@ -306,7 +306,21 @@ async fn value_contract_enum_parameters_resolve_target_under_shadowed_search_pat
 
     let mut transaction = connection.begin().await.unwrap();
     transaction
-        .execute(&format!("SET LOCAL search_path TO {shadow_schema}, public"))
+        .execute(&format!("SET LOCAL search_path TO {enum_schema}, public"))
+        .await
+        .unwrap();
+    let warmed = transaction
+        .query(&format!(
+            "SELECT state::text, pg_typeof(state)::oid = '{enum_type}'::regtype::oid \
+             FROM {enum_schema}.rows WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(warmed.rows, vec![vec![Value::Text("ready".into()), Value::Bool(true)]]);
+    transaction
+        .execute(&format!(
+            "SET LOCAL search_path TO {shadow_schema}, {enum_schema}, public"
+        ))
         .await
         .unwrap();
 
