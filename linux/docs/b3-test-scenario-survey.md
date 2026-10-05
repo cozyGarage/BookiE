@@ -5,7 +5,10 @@
 Parameterized labels in both branches of `UNION ALL` and both row positions of
 `VALUES` now match native schema-qualified enum literals for ordinary, empty,
 literal `NULL`, and SQL NULL labels. Result type and `enum_send` bytes are
-checked; invalid labels preserve PostgreSQL SQLSTATE `22P02`. The broader enum,
+checked; invalid labels preserve PostgreSQL SQLSTATE `22P02`. A companion
+transaction warms the target type, puts a same-named shadow enum first in
+`search_path`, reuses the prepared queries, and verifies target type identity
+plus `22P02` refusal for shadow-only labels. The broader enum,
 session-configuration and B3 matrices remain open
 ([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 

@@ -31,7 +31,10 @@ October 5 B3-1 follow-up: PostgreSQL enum parameters now have a native-oracle
 contract in both branches of `UNION ALL` and both row positions of `VALUES`.
 Ordinary, empty, literal `NULL`, and SQL NULL labels retain the inferred enum
 type and `enum_send` bytes; invalid labels fail with SQLSTATE `22P02`. This
-extends selected parameter contexts without closing the enum or B3 matrix
+also holds when a warmed transaction changes to a same-named shadow enum first
+in `search_path` and reuses the prepared queries; shadow-only labels retain the
+native `22P02` refusal. This extends selected parameter contexts without
+closing the enum or B3 matrix
 ([case evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 
 October 5 B3-1 follow-up: a companion PostgreSQL aggregate case puts a same-named

@@ -109,7 +109,9 @@ element, with native JSON/type/wire checks after rebinding
 Enum parameters in both branches of `UNION ALL` and both row positions of
 `VALUES` now match native enum literals for ordinary, empty, literal `NULL`,
 and SQL NULL labels. The contract compares `pg_typeof`, `enum_send` bytes and
-native invalid-label SQLSTATE `22P02`
+native invalid-label SQLSTATE `22P02`. A warmed transaction also changes to a
+same-named shadow enum first in `search_path`, reuses the prepared queries, and
+confirms target-column inference plus shadow-only label refusal
 ([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 The same aggregate also has a same-named enum in a leading shadow schema; native
 type OID and wire checks confirm the qualified table's enum array survives

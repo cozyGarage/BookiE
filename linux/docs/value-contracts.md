@@ -35,7 +35,8 @@ elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-byt
 
 PostgreSQL custom-enum parameters in either `UNION ALL` branch and either
 `VALUES` row preserve the native enum type and wire text; ordinary, empty,
-literal `NULL`, SQL NULL and invalid-label boundaries are checked
+literal `NULL`, SQL NULL and invalid-label boundaries are checked, including
+prepared-query reuse after a same-named shadow enum leads `search_path`
 ([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 
 PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits

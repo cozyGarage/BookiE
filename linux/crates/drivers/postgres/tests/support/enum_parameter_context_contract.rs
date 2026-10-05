@@ -548,3 +548,139 @@ async fn value_contract_enum_parameters_in_union_and_values_keep_native_type() {
         );
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_enum_set_operations_keep_target_type_under_shadowed_search_path() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let target_schema = "value_contract_enum_set_target";
+    let shadow_schema = "value_contract_enum_set_shadow";
+    let target_type = format!("{target_schema}.state");
+
+    for schema in [target_schema, shadow_schema] {
+        connection.execute(&format!("CREATE SCHEMA {schema}")).await.unwrap();
+    }
+    connection
+        .execute(&format!(
+            "CREATE TYPE {target_type} AS ENUM ('ready', 'paused', 'NULL', '')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {shadow_schema}.state AS ENUM ('ready', 'shadow-only')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE {target_schema}.rows (id INT PRIMARY KEY, state {target_type})"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("INSERT INTO {target_schema}.rows VALUES (1, 'ready')"))
+        .await
+        .unwrap();
+
+    let contexts = [
+        "SELECT 1 AS ordinal, $1 AS label \
+         UNION ALL SELECT 2, state FROM {target_schema}.rows WHERE id = 1 ORDER BY ordinal",
+        "SELECT 1 AS ordinal, state AS label FROM {target_schema}.rows WHERE id = 1 \
+         UNION ALL SELECT 2, $1 ORDER BY ordinal",
+        "SELECT ordinal, label FROM (VALUES (1, $1), \
+         (2, (SELECT state FROM {target_schema}.rows WHERE id = 1))) \
+         AS candidates(ordinal, label) ORDER BY ordinal",
+        "SELECT ordinal, label FROM (VALUES \
+         (1, (SELECT state FROM {target_schema}.rows WHERE id = 1)), (2, $1)) \
+         AS candidates(ordinal, label) ORDER BY ordinal",
+    ];
+    let queries = contexts.map(|sql| sql.replace("{target_schema}", target_schema));
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(&format!("SET LOCAL search_path TO {target_schema}, public"))
+        .await
+        .unwrap();
+    let warmed = transaction
+        .query(&format!(
+            "SELECT pg_typeof(state)::oid = '{target_type}'::regtype::oid \
+             FROM {target_schema}.rows WHERE id = 1"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(warmed.rows, vec![vec![Value::Bool(true)]]);
+
+    for sql in &queries {
+        transaction
+            .query_params(sql, &[Value::Text("paused".into())])
+            .await
+            .unwrap();
+    }
+    transaction
+        .execute(&format!(
+            "SET LOCAL search_path TO {shadow_schema}, {target_schema}, public"
+        ))
+        .await
+        .unwrap();
+
+    for parameter in [
+        Value::Text("paused".into()),
+        Value::Text("NULL".into()),
+        Value::Text(String::new()),
+        Value::Null,
+    ] {
+        for sql in &queries {
+            let native_parameter = match &parameter {
+                Value::Text(value) => format!("'{}'", value.replace('\'', "''")),
+                Value::Null => "NULL".into(),
+                other => panic!("unexpected enum parameter: {other:?}"),
+            };
+            let native_sql = sql.replace("$1", &format!("{native_parameter}::{target_type}"));
+            let native = transaction
+                .query(&format!(
+                    "SELECT ordinal, label::text, \
+                     pg_typeof(label)::oid = '{target_type}'::regtype::oid, \
+                     encode(enum_send(label), 'hex') FROM ({native_sql}) AS result"
+                ))
+                .await
+                .unwrap();
+            let inferred = transaction
+                .query_params(
+                    &format!(
+                        "SELECT ordinal, label::text, \
+                         pg_typeof(label)::oid = '{target_type}'::regtype::oid, \
+                         encode(enum_send(label), 'hex') FROM ({sql}) AS result"
+                    ),
+                    std::slice::from_ref(&parameter),
+                )
+                .await
+                .unwrap();
+            assert_eq!(inferred.rows, native.rows, "SQL: {sql}, parameter: {parameter:?}");
+            assert!(
+                inferred.rows.iter().all(|row| row.get(2) == Some(&Value::Bool(true))),
+                "result resolved to a shadow enum: {:?}",
+                inferred.rows
+            );
+        }
+    }
+
+    for sql in &queries {
+        transaction
+            .execute("SAVEPOINT invalid_shadow_enum_set_operation")
+            .await
+            .unwrap();
+        let invalid = transaction
+            .query_params(sql, &[Value::Text("shadow-only".into())])
+            .await
+            .expect_err("target-column inference must reject the shadow-only label");
+        assert!(
+            matches!(&invalid, DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected target enum SQLSTATE 22P02 for {sql}, got {invalid:?}"
+        );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT invalid_shadow_enum_set_operation")
+            .await
+            .unwrap();
+    }
+}

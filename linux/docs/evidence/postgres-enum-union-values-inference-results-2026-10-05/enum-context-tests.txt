@@ -1,10 +1,18 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
      Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
 
-running 3 tests
+running 11 tests
+test domain_contract::value_contract_enum_array_fill_preserves_type_bounds_and_nulls_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_generate_subscripts_requires_qualified_cast_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_sample_and_shuffle_preserve_multisets_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_shape_functions_preserve_bounds_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_array_to_string_preserves_labels_and_nulls_under_shadowed_path ... ok
+test domain_contract::value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path ... ok
+test enum_contract::value_contract_enum_null_label_and_sql_null_write_as_distinct_values ... ok
 test enum_parameter_context_contract::value_contract_enum_parameters_in_coalesce_array_append_and_nullif ... ok
 test enum_parameter_context_contract::value_contract_enum_parameters_in_union_and_values_keep_native_type ... ok
 test enum_parameter_context_contract::value_contract_enum_parameters_resolve_target_under_shadowed_search_path ... ok
+test enum_parameter_context_contract::value_contract_enum_set_operations_keep_target_type_under_shadowed_search_path ... ok
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 162 filtered out; finished in 5.91s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 155 filtered out; finished in 23.47s
 
