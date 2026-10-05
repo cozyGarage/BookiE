@@ -122,6 +122,10 @@ same-named leading shadow type: metadata stays qualified to the target schema,
 enum order and empty/Unicode labels match native JSON and wire-byte oracles,
 and rebinding refuses a shadow-only label
 ([evidence](evidence/postgres-enum-range-shadowed-path-results-2026-10-05/manifest.json)).
+The bounded two-argument form now checks inclusive bounds, NULL endpoints,
+reversed bounds, and a literal `NULL` label under the same shadow-path
+collision, with native type, JSON, dimensions, wire bytes and typed-rebind
+checks ([evidence](evidence/postgres-enum-range-bounds-shadowed-results-2026-10-05/manifest.json)).
 `enum_first` and `enum_last` now have scalar-result contracts under the same
 shadow-path collision, with qualified metadata, native `enum_send` byte checks,
 typed rebinding and SQLSTATE `22P02` for shadow-only labels

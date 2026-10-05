@@ -1,0 +1,4 @@
+Command:
+rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path -- --ignored --nocapture
+
+Result: 1 passed, 172 filtered out (1 suite, 1.95s).

@@ -1,5 +1,15 @@
 # B3 external test-scenario survey
 
+### October 5 PostgreSQL bounded enum_range follow-up
+
+Two-argument `enum_range(start, end)` now covers inclusive endpoints, either
+NULL endpoint as unbounded, both NULL endpoints, reversed bounds, and the
+literal `NULL` enum label. The cases run with a same-named enum first in
+`search_path`; native type, JSON, dimensions and wire bytes are checked, and
+typed rebinding matches PostgreSQL
+([evidence](evidence/postgres-enum-range-bounds-shadowed-results-2026-10-05/manifest.json)).
+The broader PostgreSQL enum and B3 matrices remain open.
+
 ### October 5 PostgreSQL Unicode enum identifiers
 
 A quoted Unicode schema and type name now survive enum metadata discovery,

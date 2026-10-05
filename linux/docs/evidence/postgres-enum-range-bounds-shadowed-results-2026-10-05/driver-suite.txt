@@ -1,0 +1,6 @@
+Command: rtk cargo test --offline --locked -p tablepro-driver-postgres
+Result: 45 passed, 174 ignored (5 suites, 5.81s).
+
+Clippy: rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings — passed.
+Formatting: rtk cargo fmt --all -- --check — passed.
+Diff whitespace: rtk git diff --check — passed.

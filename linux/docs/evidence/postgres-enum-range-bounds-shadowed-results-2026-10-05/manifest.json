@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "de6d5ba0a94c689815f2ce22c9727e4cd14322e8",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "bounded enum_range result and rebind with a same-named shadow enum in search_path",
+  "test": "array_contract::value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path",
+  "contract": [
+    "A custom enum and a different enum with the same type name exist in target and shadow schemas, with the shadow schema first in search_path.",
+    "Two-argument enum_range includes non-NULL endpoints; either NULL endpoint is unbounded, both NULL endpoints return the full declared range, and reversed bounds return an empty array.",
+    "A literal enum label named NULL remains distinct from SQL NULL; the cases also include empty text and Unicode labels.",
+    "Native pg_typeof, array_to_json, array_send and array_dims provide independent type, value, wire-byte and shape oracles.",
+    "Rebinding every returned array through its typed text cast reproduces PostgreSQL array_send bytes."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path -- --ignored --nocapture",
+      "result": "1 passed, 172 filtered out",
+      "log": "focused.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 174 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 494 declarations, Driver tier 361",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other PostgreSQL enum functions, value consumers, and search_path/session combinations remain open; this focused contract does not close B3."
+  ],
+  "log_sha256": {
+    "focused.txt": "c4439841089ec78437bf1f8414457aaa54b4cd69eb02c9486e81e3893a021005",
+    "driver-suite.txt": "fc2b16002d6378dbd929a70f3d6f22654c4e912666b1edc4f0335ba4302cf752",
+    "ignored-inventory.txt": "2830f29d298aeeaad1802c9f961ac942759d56353fef60fd3671ce429deb0aa6"
+  }
+}
