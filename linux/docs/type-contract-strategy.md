@@ -95,6 +95,10 @@ membership; shuffles preserve the full multiset; multidimensional operations
 select or reorder whole first-dimension slices. Empty/NULL inputs, sample-size
 boundaries and shadowed enum resolution are checked
 ([evidence](evidence/postgres-enum-random-arrays-results-2026-10-05/manifest.json)).
+An ordered `array_agg` result also checks custom enum-array result metadata,
+ordered labels, literal `NULL` versus SQL NULL, empty/Unicode/quoted labels,
+JSON semantics and native wire-byte equality after rebinding
+([evidence](evidence/postgres-enum-array-agg-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

@@ -74,6 +74,12 @@ assertions. Their empty/NULL inputs and sample-size boundary are also checked.
 [multi-array unnest evidence](evidence/postgres-enum-multi-array-unnest-results-2026-10-05/manifest.json),
 [random array evidence](evidence/postgres-enum-random-arrays-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: an ordered PostgreSQL `array_agg` of custom enum
+values now has a result-consumer contract. It checks enum[] metadata, label
+order, empty/Unicode/quoted values, literal `NULL` versus SQL NULL, JSON
+semantics and native `array_send` bytes after rebinding
+([evidence](evidence/postgres-enum-array-agg-results-2026-10-05/manifest.json)).
+
 The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These
 reports capture the dirty merge worktree with `origin/linux` at `6346a431c`

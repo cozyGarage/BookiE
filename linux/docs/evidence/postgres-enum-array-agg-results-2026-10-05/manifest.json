@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "f30bc6fa6afd9fe6555bb09a0704388e79278360",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs",
+    "sha256": "37b2513c71057cda265cc45396c21ce7299768cd59e9e9b1f6b755661048a2a2"
+  },
+  "engine": "PostgreSQL via local testcontainers/Docker",
+  "case": "Ordered custom enum array_agg result and typed rebind",
+  "test": "array_contract::value_contract_custom_enum_array_agg_preserves_order_and_nulls",
+  "contract": [
+    "array_agg(label ORDER BY ordinal) returns the custom enum[] metadata and a textual array value with deterministic label order.",
+    "The result distinguishes the literal NULL label from SQL NULL and preserves empty text, Unicode, comma and apostrophe labels.",
+    "Native array_to_json output matches the expected ordered JSON values; rebinding the returned text as the target enum[] preserves that JSON and the native array_send bytes."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_agg_preserves_order_and_nulls -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 478 declarations, including this Docker test",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "9f41e43926380fd22da6318170015566fbe55b23c5977c937533ae65d9f5824d",
+    "clippy.txt": "778e35422619f1717a82f21564b9d63808db6eb2f77ed12448617d888d73a1b5",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "36b084f4c3cb457337afb8a22c9b2c19c942b13cb56a0e7557701fd245d2dcfc",
+    "diff-check.txt": "83079924b46ef266548bb992c708cd3e9f03dd322f27a29b0f38302e4cbc641c"
+  },
+  "remaining": [
+    "This aggregate result contract does not close other enum-array result expressions or the broader engine/type/consumer/configuration matrix."
+  ]
+}
