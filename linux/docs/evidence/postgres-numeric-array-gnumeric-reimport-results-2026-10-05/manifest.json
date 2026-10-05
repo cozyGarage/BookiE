@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "8f3811bd40da7bd0133e115412958ae9b2436bf9",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "case": "PostgreSQL numeric[] XLSX re-import through Gnumeric",
+  "test": "array_contract::value_contract_numeric_array_file_exports_preserve_exact_text",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "package": "gnumeric 1.12.57-1.1+b4",
+    "container_image": "debian@sha256:dab11cdb0a9dcf4bbd68f671635b35f1f726b452b92396875b69bb2c7daa42a9"
+  },
+  "contract": [
+    "PostgreSQL's numeric[] contains a 40-digit integer, a high-scale decimal, scale-preserving 1.2300, NaN, positive and negative Infinity, and SQL NULL.",
+    "The native test checks pg_typeof, native numeric[] text, array_to_json, array_send, and the exact rebound values and wire bytes.",
+    "BookiE writes the array as a text cell in source.xlsx; Gnumeric preserves the exact text as an ODS string cell and an XLSX inline string through XLSX/ODS/XLSX re-save.",
+    "No formula is created in source.xlsx, the ODS workbook, or the re-saved XLSX workbook."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --offline --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_numeric_array_file_exports_preserve_exact_text -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "native-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "Install Gnumeric in the pinned Debian image.",
+        "ssconvert source.xlsx gnumeric-roundtrip.ods",
+        "ssconvert gnumeric-roundtrip.ods gnumeric-roundtrip.xlsx"
+      ],
+      "result": "Both conversions exited successfully.",
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "method": "Python standard-library ZIP/XML checks require the exact expected A2 text, XLSX shared or inline string type, ODS string type, and no formulas in any artifact.",
+      "checker": "verify_roundtrip.py",
+      "result": "Exact numeric[] text preserved across all three artifacts; no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk proxy python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "3e70d7a8bb08b44da2794ad04c891e185d631219a6fb56f16f8f35cf54c4b034",
+    "gnumeric-roundtrip.ods": "2e4787040132b6bc6b13484bfaa5800b4c900f65feb575c9247914153f35578f",
+    "gnumeric-roundtrip.xlsx": "ba7067c98aa78a22abe59b0252b33da39dfbd7a5f5c43b13b891d90dd4afd13a"
+  },
+  "log_sha256": {
+    "native-export-test.txt": "709bf1846126a1ad9c0b910c97f7f8e86722cbd75d5881118c481e0da4176fc8",
+    "gnumeric-version.txt": "deb47ba2d4af56fada7cb22bad27af56c733384ae8997bd165e2bfa63ba5323f",
+    "gnumeric-run.txt": "d2fd933b08254532f446a433902450415bd3fae925d44ad483cd350941d13155",
+    "consumer-check.txt": "66cbe1cc55ff7a133b5c2fea3349047812f70b38df1416df0a11daf750a7c947",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "checker_sha256": "95990988466952074f7e85405113b4e553e39f11f13f3a0863382664677ece7e",
+  "remaining": [
+    "Other PostgreSQL array types, file-writer/session combinations, spreadsheet applications, and the broader B3 matrix remain open."
+  ]
+}

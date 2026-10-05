@@ -18,6 +18,15 @@ case includes fractional seconds, BC/year-10000 values, infinities and SQL NULL
 ([evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json)).
 Other temporal-array and consumer/session combinations remain open.
 
+### October 5 PostgreSQL numeric[] Gnumeric follow-up
+
+The `numeric[]` XLSX cell now survives Gnumeric's XLSX/ODS/XLSX re-save with
+the 40-digit integer, high-scale and scale-preserving decimals, NaN, infinities
+and SQL NULL unchanged as text and without formulas. PostgreSQL's independent
+native-array checks remain in the export test; Calc coverage is separately
+recorded ([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+Other array shapes and spreadsheet/consumer combinations remain open.
+
 ### October 5 PostgreSQL bounded enum_range follow-up
 
 Two-argument `enum_range(start, end)` now covers inclusive endpoints, either

@@ -18,6 +18,13 @@ and `SET SCHEMA`. The regression checks populated and zero-row result metadata,
 same-named shadow types, and native array type/value/wire-byte oracles; B3 stays
 open ([evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
 
+October 5 B3-1/B3-4 follow-up: a PostgreSQL `numeric[]` XLSX result now survives
+Gnumeric's XLSX/ODS/XLSX re-save with its 40-digit integer, high-scale decimal,
+scale-preserving decimal, NaN, infinities and SQL NULL unchanged as a string
+cell without a formula. The existing Calc contract remains separate; the wider
+array/consumer matrix stays open
+([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
+
 October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
 inside the nested type fallback. The driver now explicitly refuses nested
 LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;

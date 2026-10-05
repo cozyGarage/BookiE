@@ -1,0 +1,1 @@
+Pinned Debian image, installed Gnumeric; ssconvert completed XLSX-to-ODS and ODS-to-XLSX conversions successfully.

@@ -394,6 +394,9 @@ for `text[]`, `uuid[]`, `date[]`, `timestamp[]`, `time[]`, `timetz[]`, `boolean[
 [bytea[] evidence](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json)
 and [timestamptz[] evidence](evidence/postgres-timestamptz-array-calc-reimport-results-2026-10-04/manifest.json),
 [interval[] evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
+The numeric[] shape also survives Gnumeric XLSX/ODS/XLSX re-import with the
+same wide precision, scale, special values and SQL NULL as text
+([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 The `float4[]` file-writer matrix now includes CSV text export, SQL-file replay
 and Calc XLSX/ODS/XLSX re-import: native `float4send` checks adjacent,
 negative-zero and minimum-subnormal elements; typed rebinding and SQL replay

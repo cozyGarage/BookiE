@@ -159,6 +159,10 @@ exact text ([evidence](evidence/postgres-interval-array-calc-reimport-results-20
 A PostgreSQL `numeric[]` XLSX cell preserves wide precision, scale, NaN,
 infinities and SQL NULL as one exact text value through Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json)).
+The same workbook also survives Gnumeric's XLSX/ODS/XLSX re-save with the
+40-digit integer, high-scale and scale-preserving decimals, NaN, infinities and
+SQL NULL unchanged as a string cell without formulas
+([Gnumeric evidence](evidence/postgres-numeric-array-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
 A PostgreSQL `float8[]` XLSX cell preserves an adjacent double, negative zero,
 the minimum subnormal, NaN, infinities and SQL NULL as exact text through the
