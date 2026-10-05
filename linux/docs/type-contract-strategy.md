@@ -15,8 +15,8 @@ The shared UUID contract now checks bound and SQL-literal round trips on
 PostgreSQL, SQL Server, ClickHouse and DuckDB, with UUID-shaped text and SQL NULL
 as controls. DuckDB now decodes UUID by its logical column type and preserves
 the value as `Value::Uuid`. A DuckDB mixed multi-column, multi-row regression
-also checks UUID, UUID-shaped text and typed NULL without relying on one-column
-results ([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
+checks UUID, UUID-shaped text and typed NULL alongside logical result metadata;
+a separate zero-row projection retains UUID metadata too ([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
 [mixed projection evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
 
 The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to

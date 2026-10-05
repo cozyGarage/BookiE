@@ -415,7 +415,11 @@ fn run_query(
                     .column_name(i)
                     .map(|s| s.to_string())
                     .unwrap_or_else(|_| format!("col{i}")),
-                data_type: format!("{:?}", stmt_ref.column_type(i)),
+                data_type: if stmt_ref.column_logical_type(i).id() == LogicalTypeId::Uuid {
+                    "UUID".into()
+                } else {
+                    format!("{:?}", stmt_ref.column_type(i))
+                },
                 nullable: true,
                 primary_key: false,
                 is_auto_increment: false,
