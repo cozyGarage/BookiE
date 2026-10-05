@@ -201,6 +201,43 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
     assert_eq!(rebound.rows[0][1], oracle.rows[0][3]);
 
     let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("uuid[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    let json_path = directory.path().join("uuid-array.json");
+    tablepro_core::export::write_result_file(
+        &json_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Json,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let json_file: serde_json::Value = serde_json::from_slice(&std::fs::read(json_path).unwrap()).unwrap();
+    assert_eq!(json_file[0]["value"], *driver_text);
+
+    let csv_path = directory.path().join("uuid-array.csv");
+    tablepro_core::export::write_result_file(
+        &csv_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Csv,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut csv = csv::Reader::from_path(csv_path).unwrap();
+    assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+    assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("uuid-array.xlsx"));
@@ -209,7 +246,7 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
         &result,
         &tablepro_core::export::ResultExport {
             format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+            csv: &csv_options,
             sql: None,
         },
         || false,
@@ -229,12 +266,60 @@ async fn value_contract_uuid_array_file_exports_preserve_values_for_calc_reimpor
         &mut shared_strings,
     )
     .unwrap();
-    let Value::Text(driver_text) = &result.rows[0][0] else {
-        panic!("uuid[] result must remain text: {:?}", result.rows[0][0]);
-    };
     assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
     assert!(shared_strings.contains(driver_text), "{shared_strings}");
     assert!(!sheet.contains("<f>"), "{sheet}");
+    connection
+        .execute("CREATE TABLE uuid_array_filewriter_target (value uuid[])")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO uuid_array_filewriter_target VALUES \
+             (ARRAY['00000000-0000-0000-0000-000000000001'::uuid])",
+        )
+        .await
+        .unwrap();
+    let sibling = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM uuid_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    let sql_path = directory.path().join("uuid-array.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &csv_options,
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: None,
+                table: "uuid_array_filewriter_target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    connection
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM uuid_array_filewriter_target",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert!(restored.rows.contains(&sibling.rows[0]));
+    assert!(restored.rows.contains(&oracle.rows[0]));
 }
 
 #[tokio::test]
