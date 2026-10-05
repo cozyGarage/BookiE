@@ -27,6 +27,196 @@ fn value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser
         assert_eq!(parsed, Value::Text(literal.into()), "{data_type}");
     }
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver, OperationControl};
+    use testcontainers::ImageExt;
+    use testcontainers::runners::AsyncRunner;
+    use testcontainers_modules::postgres::Postgres;
+
+    let container = Postgres::default().with_tag("16-alpine").start().await.unwrap();
+    let connection = drivers_postgres::PgDriver
+        .connect(ConnectOptions {
+            host: container.get_host().await.unwrap().to_string(),
+            port: container.get_host_port_ipv4(5432).await.unwrap(),
+            database: "postgres".into(),
+            username: "postgres".into(),
+            password: secrecy::SecretString::new("postgres".to_string().into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+
+    let cases = [
+        (
+            "date_array_grid",
+            "date",
+            r#"{"0002-12-31 BC","10000-01-01","infinity","-infinity",NULL}"#,
+            "ARRAY['2000-01-01'::date]",
+        ),
+        (
+            "time_array_grid",
+            "time",
+            r#"{"00:00:00","12:34:56.123456","23:59:59.999999","24:00:00",NULL}"#,
+            "ARRAY['12:00:00'::time]",
+        ),
+        (
+            "timestamp_array_grid",
+            "timestamp",
+            r#"{"0002-12-31 23:59:59.999999 BC","10000-01-01 00:00:00","294276-12-31 23:59:59.999999","infinity","-infinity",NULL}"#,
+            "ARRAY['2000-01-01 12:00:00'::timestamp]",
+        ),
+        (
+            "timetz_array_grid",
+            "timetz",
+            r#"{"00:00:00+15:59:59","23:59:59.999999-15:59:59","12:34:56.123456+05:30",NULL}"#,
+            "ARRAY['12:00:00+00'::timetz]",
+        ),
+    ];
+    let mut date_row_after_edit = None;
+    let mut date_sibling_after_edit = None;
+
+    for (table, data_type, literal, sibling) in cases {
+        connection
+            .execute_controlled(
+                &format!("CREATE TABLE {table} (id integer PRIMARY KEY, value pg_catalog.{data_type}[])"),
+                &control,
+            )
+            .await
+            .unwrap();
+        connection
+            .execute_controlled(
+                &format!(
+                    "INSERT INTO {table} VALUES \
+                     (1, ARRAY[NULL]::pg_catalog.{data_type}[]), (2, {sibling})"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let columns = connection
+            .fetch_columns_controlled(None, table, &control)
+            .await
+            .unwrap();
+        let id_index = columns.iter().position(|column| column.name == "id").unwrap();
+        let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+        let before = connection
+            .query_controlled(
+                &format!(
+                    "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                     encode(array_send(value), 'hex') FROM {table} ORDER BY id"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let sibling_before = before.rows[1].clone();
+
+        let parsed = parse_input_for_driver(literal, Some(&columns[value_index]), "postgres")
+            .unwrap_or_else(|error| panic!("{data_type}[] parser: {error}"));
+        assert_eq!(parsed, Value::Text(literal.into()), "{data_type}[] remains exact text");
+        let update = tablepro_core::sql_dialect::build_keyed_update(
+            "postgres",
+            None,
+            table,
+            &columns,
+            &[(value_index, parsed)],
+            &[Value::Int(1)],
+        )
+        .unwrap();
+        assert!(
+            update.0.contains("::text::pg_catalog."),
+            "{}[] cast: {}",
+            data_type,
+            update.0
+        );
+        assert_eq!(update.1[0], Value::Text(literal.into()));
+        assert_eq!(
+            connection
+                .execute_in_transaction_controlled(&[update], &control)
+                .await
+                .unwrap(),
+            vec![1],
+            "{data_type}[] keyed edit row count"
+        );
+
+        let after = connection
+            .query_controlled(
+                &format!(
+                    "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+                     encode(array_send(value), 'hex') FROM {table} ORDER BY id"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        let native = connection
+            .query_controlled(
+                &format!(
+                    "SELECT pg_typeof('{literal}'::pg_catalog.{data_type}[])::text, \
+                     ('{literal}'::pg_catalog.{data_type}[])::text, \
+                     array_to_json('{literal}'::pg_catalog.{data_type}[])::text, \
+                     encode(array_send('{literal}'::pg_catalog.{data_type}[]), 'hex')"
+                ),
+                &control,
+            )
+            .await
+            .unwrap();
+        assert_eq!(after.rows[0][1..], native.rows[0][..], "{data_type}[] native oracle");
+        assert_eq!(after.rows[1], sibling_before, "{data_type}[] changed its sibling row");
+        assert_eq!(after.rows[0][0], Value::Int(1));
+        let Value::Text(native_type) = &after.rows[0][1] else {
+            panic!("unexpected {data_type}[] type result: {:?}", after.rows[0][1]);
+        };
+        assert!(native_type.ends_with("[]"), "unexpected array type {native_type}");
+        if table == "date_array_grid" {
+            date_row_after_edit = Some(after.rows[0].clone());
+            date_sibling_after_edit = Some(after.rows[1].clone());
+        }
+        assert_eq!(id_index, 0, "primary key position in {table}");
+    }
+
+    let columns = connection
+        .fetch_columns_controlled(None, "date_array_grid", &control)
+        .await
+        .unwrap();
+    let value_index = columns.iter().position(|column| column.name == "value").unwrap();
+    let invalid = parse_input_for_driver("{not-a-date}", Some(&columns[value_index]), "postgres").unwrap();
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "date_array_grid",
+        &columns,
+        &[(value_index, invalid)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    let error = connection
+        .execute_in_transaction_controlled(&[update], &control)
+        .await
+        .expect_err("invalid date[] edit must be rejected by PostgreSQL");
+    assert!(
+        matches!(
+            &error,
+            tablepro_core::DriverError::Transaction { source, .. }
+                if matches!(source.as_ref(), tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22007")
+        ),
+        "invalid date[] should retain PostgreSQL's invalid datetime SQLSTATE: {error:?}"
+    );
+    let saved = connection
+        .query_controlled(
+            "SELECT id, pg_typeof(value)::text, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex') FROM date_array_grid ORDER BY id",
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(saved.rows[0], date_row_after_edit.unwrap());
+    assert_eq!(saved.rows[1], date_sibling_after_edit.unwrap());
+}
 use tablepro_core::{ColumnInfo, Value};
 
 #[test]

@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "c7ca1488387fe7fb478f6c694c7906869d5716dd",
+  "case": "PostgreSQL temporal array app parser and keyed grid edit",
+  "test": "ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings",
+  "sources": [
+    {
+      "path": "crates/app/tests/support/postgres_array_contract.rs",
+      "sha256": "1a1b6dc7bdfda975d17a57220ee431f65a3aa4cfc03f4fbf90f71d74abc17da2"
+    },
+    {
+      "path": "scripts/isolated-tests.json",
+      "sha256": "9e00b8fbce1469de696f8923a8595c67efdb42fa10a8dc55de23388c689b8439"
+    }
+  ],
+  "engine": "PostgreSQL 16 Alpine through testcontainers",
+  "contract": [
+    "The app reads PostgreSQL metadata, parses a grid edit as exact array text, builds the keyed UPDATE with an explicit pg_catalog array cast, and writes date[], time[], timestamp[] and timetz[].",
+    "Boundary inputs cover a BC DATE, year 10000, infinities, fractional times, 24:00, maximum finite TIMESTAMP, and timetz offsets \u00b115:59:59; each array includes SQL NULL.",
+    "After each edit, PostgreSQL type text, array text, array_to_json and array_send bytes match a separate native cast oracle; the sibling row remains byte-for-byte unchanged.",
+    "A malformed date[] edit reaches PostgreSQL and is rejected with SQLSTATE 22007; the full saved target and sibling rows remain unchanged."
+  ],
+  "validation": {
+    "native_app_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-app --lib ui::browse_tab::value_parse::postgres_array_contract::value_contract_postgres_temporal_array_grid_edits_preserve_boundaries_and_siblings -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "app-grid-edit-test.txt"
+    },
+    "app_lib_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-app --lib",
+      "result": "467 passed, 28 ignored",
+      "log": "app-lib-test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": "fmt.txt passed",
+    "ignored_test_inventory": "ignored-inventory.txt passed",
+    "diff_check": "diff-check.txt passed"
+  },
+  "remaining": [
+    "Other PostgreSQL array families and consumer paths, temporal array CSV/session cases, and the broader B3 matrix remain open."
+  ]
+}

@@ -33,6 +33,11 @@ point does not represent all support for that engine.
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 
+PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits
+preserve boundary values, native type and wire bytes through the parser and
+keyed-update builder; invalid date-array input is refused without changing
+either row ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
+
 A PostgreSQL custom `enum[]` XLSX cell preserves its NULL-label, empty, Unicode,
 quoted and markup text through LibreOffice Calc's ODS/XLSX re-save
 ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json)).

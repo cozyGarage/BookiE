@@ -223,6 +223,10 @@ and extended years, infinities, 24:00, maximum offsets and SQL NULL
 A PostgreSQL `interval[]` XLSX cell preserves mixed signs, microseconds, zero
 intervals and SQL NULL through the same Calc re-save
 ([evidence](evidence/postgres-interval-array-calc-reimport-results-2026-10-04/manifest.json)).
+The app parser and keyed-update path also round-trip `date[]`, `time[]`,
+`timestamp[]` and `timetz[]` boundary values against PostgreSQL type, JSON and
+wire-byte oracles, preserving sibling rows and refusing malformed date-array
+input ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
 
 SQLite computed `CASE` and `COALESCE` results now have native app CSV round
 trips with storage-class assertions; see the [CASE evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json)

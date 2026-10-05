@@ -257,6 +257,12 @@ extended-year values, infinities, end-of-day time, offset boundaries and SQL
 NULL preserved as exact text. XML checks confirm string cell types and no
 formulas ([evidence](evidence/postgres-temporal-arrays-gnumeric-reimport-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 app follow-up: `date[]`, `time[]`, `timestamp[]` and `timetz[]`
+now pass through the app parser and keyed grid update with PostgreSQL type,
+JSON and wire-byte oracles, including era, infinity, end-of-day and offset
+boundaries. A malformed date array is refused without changing the target or
+sibling ([evidence](evidence/postgres-temporal-array-grid-edit-results-2026-10-05/manifest.json)).
+
 October 5 B3-1/B3-4 follow-up: PostgreSQL `enum[]` file export now includes a
 formula-shaped `=1+1` label alongside empty, quoted, escaped, Unicode and SQL
 NULL values. Native SQL replay passes all four string-mode combinations, and
