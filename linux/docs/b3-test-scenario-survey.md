@@ -717,11 +717,12 @@ domain type through 63 layers; invalid text labels reach PostgreSQL and are
 refused. At 64 or more layers, valid text, invalid text and SQL NULL return an
 explicit unsupported operation both before and after schema-aware work in the
 same backend. Schema-aware writes and filters pass through 256 layers, with
-separate shadowed-session contracts extending that boundary through 259
+separate shadowed-session contracts extending that boundary through 260
 layers ([257-layer evidence](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json),
 [258-layer evidence](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json),
-[259-layer evidence](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json)).
-Domain depths beyond 259 and other enum/session combinations remain open; see the
+[259-layer evidence](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json),
+[260-layer evidence](evidence/postgres-domain-260-level-results-2026-10-05/manifest.json)).
+Domain depths beyond 260 and other enum/session combinations remain open; see the
 [four-level evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json),
 [five-level evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json)
 and [six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json)
