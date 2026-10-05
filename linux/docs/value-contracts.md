@@ -12,7 +12,8 @@ shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
 [bounded](evidence/postgres-enum-range-bounds-shadowed-results-2026-10-05/manifest.json),
 [first/last](evidence/postgres-enum-first-last-shadowed-path-results-2026-10-05/manifest.json),
 [min/max](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json),
-[same-session label addition](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
+[same-session label addition](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json),
+[same-session label rename](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
 
 The PostgreSQL temporal-array evidence now also includes `timestamp[]`
 rebinding across a `DateStyle` change, with native wire-byte checks

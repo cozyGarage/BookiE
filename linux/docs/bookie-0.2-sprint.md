@@ -158,6 +158,9 @@ The same-session `enum_range` contract now also observes a newly inserted label
 after `ALTER TYPE ADD VALUE BEFORE`, with catalog-order, qualified-type and
 wire-byte checks under a same-named leading shadow type
 ([migration evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
+It also observes `ALTER TYPE RENAME VALUE` after warming the range query, with
+the renamed label and unchanged declaration order verified in the same session
+([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
 
 October 5 B3-2 follow-up: PostgreSQL `timestamp[]` now preserves canonical
 array text fetched under `DateStyle = SQL, DMY`; typed rebinding after switching
