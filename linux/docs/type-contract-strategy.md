@@ -143,18 +143,21 @@ Scalar enum `min`/`max` aggregates now preserve declared enum order, qualified
 metadata and wire identity under the same shadow-path collision, including
 all-NULL and no-row aggregate results
 ([evidence](evidence/postgres-enum-min-max-shadowed-path-results-2026-10-05/manifest.json)).
-The existing session's `enum_range` result also follows both
-`ALTER TYPE ADD VALUE BEFORE` and `AFTER` migrations, preserving each inserted
-label's order and qualified type after native catalog and wire-byte checks
-([before/after evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json),
+The existing session's `enum_range` result also follows `ALTER TYPE ADD VALUE`
+with no position clause and the explicit `BEFORE` and `AFTER` forms, preserving
+the append and inserted-label order plus qualified type after native catalog
+and wire-byte checks
+([default/position evidence](evidence/postgres-enum-add-value-default-append-results-2026-10-05/manifest.json),
+[before/after evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json),
 [original BEFORE evidence](evidence/postgres-enum-add-value-session-results-2026-10-05/manifest.json)).
 The warmed range query also observes `ALTER TYPE RENAME VALUE` in that session,
 with catalog-order and native array-byte checks after rebinding
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
 Separate reader and writer sessions now verify that a warmed range query sees
-`ADD VALUE BEFORE`, `RENAME VALUE` and `ADD VALUE AFTER`, with catalog, JSON
-and wire-byte oracles under the shadowed path
-([latest cross-session evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json),
+`ADD VALUE BEFORE`, `RENAME VALUE`, `ADD VALUE AFTER` and default append, with
+catalog, JSON and wire-byte oracles under the shadowed path
+([latest append evidence](evidence/postgres-enum-add-value-default-append-results-2026-10-05/manifest.json),
+[cross-session position evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json),
 [original evidence](evidence/postgres-enum-cross-session-catalog-results-2026-10-05/manifest.json)).
 Result metadata now also follows same-session enum type renames and schema
 moves by catalog OID, including a zero-row projection under a shadowed

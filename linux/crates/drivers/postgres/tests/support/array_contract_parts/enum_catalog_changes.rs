@@ -141,6 +141,45 @@ async fn value_contract_enum_range_observes_added_label_order_in_same_session() 
         .await
         .unwrap();
     assert_eq!(rebound.rows[0][0], result.rows[0][3]);
+
+    session
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_alter_target.state ADD VALUE 'archived'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let appended = session
+        .query_params_controlled(
+            "SELECT enum_range(NULL::value_contract_enum_alter_target.state) AS value, \
+                    pg_typeof(enum_range(NULL::value_contract_enum_alter_target.state))::text, \
+                    array_to_json(enum_range(NULL::value_contract_enum_alter_target.state))::text, \
+                    encode(array_send(enum_range(NULL::value_contract_enum_alter_target.state)), 'hex')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(appended.columns[0].data_type, target_array);
+    assert_eq!(
+        appended.rows[0][0],
+        Value::Text(r#"{"queued","starting","working","complete","archived"}"#.into())
+    );
+    assert_eq!(appended.rows[0][1], Value::Text(target_array.into()));
+    assert_eq!(
+        appended.rows[0][2],
+        Value::Text(r#"["queued","starting","working","complete","archived"]"#.into())
+    );
+    let rebound = session
+        .query_params_controlled(
+            &format!("SELECT encode(array_send($1::text::{target_array}), 'hex')"),
+            std::slice::from_ref(&appended.rows[0][0]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], appended.rows[0][3]);
 }
 
 #[tokio::test]
@@ -338,6 +377,24 @@ async fn value_contract_enum_range_refreshes_labels_changed_by_another_session()
         Value::Text(r#"{"queued","started","in_progress","complete"}"#.into())
     );
 
+    writer
+        .query_params_controlled(
+            "ALTER TYPE value_contract_enum_cross_session_target.state ADD VALUE 'archived'",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let appended = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(appended.columns[0].data_type, target_array);
+    assert_eq!(
+        appended.rows[0][0],
+        Value::Text(r#"{"queued","started","in_progress","complete","archived"}"#.into())
+    );
+
     let native = reader
         .query_params_controlled(
             concat!(
@@ -355,13 +412,16 @@ async fn value_contract_enum_range_refreshes_labels_changed_by_another_session()
     assert_eq!(native.rows[0][0], Value::Text(target_array.into()));
     assert_eq!(
         native.rows[0][1],
-        Value::Text(r#"["queued","started","in_progress","complete"]"#.into())
+        Value::Text(r#"["queued","started","in_progress","complete","archived"]"#.into())
     );
-    assert_eq!(native.rows[0][3], Value::Text("queued,started,in_progress,complete".into()));
+    assert_eq!(
+        native.rows[0][3],
+        Value::Text("queued,started,in_progress,complete,archived".into())
+    );
     let rebound = reader
         .query_params_controlled(
             &format!("SELECT encode(array_send($1::text::{target_array}), 'hex')"),
-            std::slice::from_ref(&added_after.rows[0][0]),
+            std::slice::from_ref(&appended.rows[0][0]),
             &control,
         )
         .await
