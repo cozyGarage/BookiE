@@ -247,6 +247,11 @@ SQL NULL arrays, empty arrays and explicit multidimensional bounds. Each result
 is compared with a typed PostgreSQL query, inferred array type and `array_send`
 wire bytes ([evidence](evidence/postgres-enum-array-all-quantifier-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the same `ANY`/`ALL` matrix now runs in a transaction
+with a same-named shadow enum first in `search_path`; target types and wire
+bytes remain exact, and a shadow-only label fails with PostgreSQL `22P02`
+([evidence](evidence/postgres-enum-array-quantifier-shadowed-path-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: the existing PostgreSQL `text[]` workbook now also
 survives LibreOffice Calc XLSX-to-ODS-to-XLSX re-save. Its 84-character shared
 string is identical in all three artifacts, remains a string cell, contains

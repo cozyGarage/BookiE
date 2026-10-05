@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "321d1a992d7334bed8240dfce0c1eaf3df4ad6dc",
+  "scope": "PostgreSQL domain-over-enum ANY/ALL array parameter inference under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs",
+    "sha256": "7a9f94382fc1ea54b33fa6632674506a517797bf681af8a249d2b96ecc7e7778"
+  },
+  "selector": "value_contract_domain_over_enum_any_all_infer_array_parameter_type_under_shadowed_path",
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_domain_over_enum_any_all_infer_array_parameter_type_under_shadowed_path -- --ignored --nocapture",
+      "result": "1 passed against PostgreSQL 16 via local Testcontainers",
+      "log": "native-postgres.txt"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "assertions": [
+    "The domain-over-enum quantifier query runs inside a transaction whose search_path starts with a same-named shadow enum schema.",
+    "Both = ANY($1) and = ALL($1) retain the target enum-array parameter type and match native typed-query results and array_send bytes across ordinary, escaped, NULL, empty, multidimensional, lower-bound, and NULL-array cases.",
+    "A label that exists only in the shadow enum is refused with PostgreSQL SQLSTATE 22P02."
+  ],
+  "remaining": [
+    "Other inferred PostgreSQL array function/operator contexts and the wider B3 matrix remain open."
+  ]
+}

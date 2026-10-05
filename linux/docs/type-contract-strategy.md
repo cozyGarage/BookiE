@@ -60,9 +60,11 @@ and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-resu
 
 The enum-array text parameter codec now has direct grammar tests for quoted and
 escaped labels, empty text, SQL NULL, non-default lower bounds, nested arrays,
-ragged shapes, inconsistent bounds and malformed tails. Its existing native
-`ANY($1)` and `ALL($1)` quantifier contracts pass with server type and wire-byte comparisons
-([codec evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json)).
+ragged shapes, inconsistent bounds and malformed tails. Native `ANY($1)` and
+`ALL($1)` quantifier contracts pass with server type and wire-byte comparisons;
+a same-named shadow type in `search_path` is also refused when its label is
+bound ([codec evidence](evidence/postgres-enum-array-codec-boundaries-results-2026-10-05/manifest.json),
+[shadowed-path evidence](evidence/postgres-enum-array-quantifier-shadowed-path-results-2026-10-05/manifest.json)).
 
 An inferred enum-array parameter with domain elements is covered through 63
 domain layers and explicitly refused at 64 for both text and SQL NULL. The

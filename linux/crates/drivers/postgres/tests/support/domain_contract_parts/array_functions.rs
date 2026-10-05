@@ -945,7 +945,7 @@ async fn value_contract_domain_enum_array_functions_infer_first_array_parameter_
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
+async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type_under_shadowed_path() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     connection
@@ -953,9 +953,20 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
         .await
         .unwrap();
     connection
+        .execute("CREATE SCHEMA value_contract_domain_any_array_shadow")
+        .await
+        .unwrap();
+    connection
         .execute(
             "CREATE TYPE value_contract_domain_any_array.state \
              AS ENUM ('ready', 'paused', 'NULL', '', 'comma,label', 'quote\"label', 'backslash\\label')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_domain_any_array_shadow.state \
+             AS ENUM ('ready', 'shadow-only')",
         )
         .await
         .unwrap();
@@ -979,6 +990,12 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
              (1, 'ready'), (2, 'paused'), (3, 'NULL'), (4, ''), (5, NULL), \
              (6, 'comma,label'), (7, 'quote\"label'), (8, 'backslash\\label')",
         )
+        .await
+        .unwrap();
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO value_contract_domain_any_array_shadow, public")
         .await
         .unwrap();
 
@@ -1070,7 +1087,7 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
             ],
         ),
     ] {
-        let native_wire = connection
+        let native_wire = transaction
             .query(&format!(
                 "SELECT encode(array_send({native_array}), 'hex')"
             ))
@@ -1078,7 +1095,7 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
             .unwrap()
             .rows[0][0]
             .clone();
-        let result = connection
+        let result = transaction
             .query_params(
                 "SELECT id, status::value_contract_domain_any_array.state = ANY($1), \
                  pg_typeof($1)::text, pg_typeof(status)::text, encode(array_send($1), 'hex') \
@@ -1103,14 +1120,14 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
             "ANY with parameter {parameter:?}"
         );
 
-        let native_all = connection
+        let native_all = transaction
             .query(&format!(
                 "SELECT id, status::value_contract_domain_any_array.state = ALL({native_array}) \
                  FROM value_contract_domain_any_array.rows ORDER BY id"
             ))
             .await
             .unwrap();
-        let all = connection
+        let all = transaction
             .query_params(
                 "SELECT id, status::value_contract_domain_any_array.state = ALL($1), \
                  pg_typeof($1)::text, pg_typeof(status)::text, encode(array_send($1), 'hex') \
@@ -1136,11 +1153,11 @@ async fn value_contract_domain_over_enum_any_all_infer_array_parameter_type() {
         );
     }
 
-    let invalid = connection
+    let invalid = transaction
         .query_params(
             "SELECT status::value_contract_domain_any_array.state = ANY($1) \
              FROM value_contract_domain_any_array.rows WHERE id = 1",
-            &[Value::Text(r#"{"not-a-label"}"#.into())],
+            &[Value::Text(r#"{"shadow-only"}"#.into())],
         )
         .await
         .expect_err("invalid array enum labels must be refused by PostgreSQL");
