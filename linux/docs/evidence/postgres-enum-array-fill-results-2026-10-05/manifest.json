@@ -1,0 +1,54 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "890e90182ac07ab2b6bec488a0c150160a5cc17c",
+  "scope": "PostgreSQL enum-array array_fill polymorphic resolution, bounds and values under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/array_fill.rs",
+    "sha256": "be9f2f185faf2aa811dd49a61cfa4948eb676f301862b032082af59f12094a97"
+  },
+  "selector": "domain_contract::value_contract_enum_array_fill_preserves_type_bounds_and_nulls_under_shadowed_path",
+  "assertions": [
+    "An untyped array_fill($1, dimensions, bounds) call returns PostgreSQL SQLSTATE 42804; an explicit target-schema enum cast remains correct while a same-named shadow enum leads search_path.",
+    "Native enum values and bound text parameters agree on array dimensions, lower/upper bounds, cardinality, JSON output, pg_typeof, and array_send bytes.",
+    "Cases include an empty enum label, literal NULL, SQL NULL fill values, one- and two-dimensional fills, non-default lower bounds, and a zero-sized result.",
+    "A label defined only by the shadow enum is rejected with PostgreSQL SQLSTATE 22P02."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_array_fill_preserves_type_bounds_and_nulls_under_shadowed_path -- --ignored --nocapture",
+      "result": "passed, 1 test",
+      "log": "focused-test.txt"
+    },
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 333 selected tests across all 11 suites, no missing suites; PostgreSQL selected 127 tests",
+      "report": "report.json",
+      "postgres_log": "crates-drivers-postgres.log"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the driver test is registered",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "worktree_note": "The strict runner report records baseline 890e901 with dirty=true because this test and its docs were added in the worktree. The test source is pinned by SHA-256 above.",
+  "remaining": [
+    "Named enum-array candidates still include multi-array unnest, array_sample, and array_shuffle.",
+    "This contract does not close the broader PostgreSQL array or B3 matrix."
+  ]
+}

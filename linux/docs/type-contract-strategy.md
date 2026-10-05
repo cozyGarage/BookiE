@@ -79,9 +79,13 @@ rows, and reject a shadow-only label ([identifier evidence](evidence/postgres-en
 SQL NULL arrays, lower bounds, multidimensional arrays, and shadowed enum names.
 Untyped calls return SQLSTATE `42804`; qualified casts match native string,
 type, and wire-byte oracles ([evidence](evidence/postgres-enum-array-to-string-results-2026-10-05/manifest.json)).
-Remaining named PostgreSQL enum-array candidates include `array_fill`,
-multi-array `unnest`, and the random-result `array_sample` and `array_shuffle`
-functions. These cases do not close the PostgreSQL or B3 matrix.
+`array_fill` now checks polymorphic type inference and qualified enum casts
+under a same-named shadow path. Empty and `NULL` labels, SQL NULL fill values,
+zero-sized and multidimensional arrays, non-default bounds, JSON, native type,
+and `array_send` agree with native calls ([evidence](evidence/postgres-enum-array-fill-results-2026-10-05/manifest.json)).
+Remaining named PostgreSQL enum-array candidates include multi-array `unnest`
+and random-result `array_sample` and `array_shuffle`. These cases do not close
+the PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
 and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).

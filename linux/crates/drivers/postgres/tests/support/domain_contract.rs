@@ -8,6 +8,8 @@ include!("domain_contract_parts/array_functions.rs");
 
 include!("domain_contract_parts/array_to_string.rs");
 
+include!("domain_contract_parts/array_fill.rs");
+
 include!("domain_contract_parts/array_cat.rs");
 
 include!("domain_contract_parts/array_positions.rs");
