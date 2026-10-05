@@ -48,6 +48,13 @@ this existing-eight-driver stabilization scope.
 This table summarizes source/evidence ownership, not a fresh runtime pass.
 Consult each exact case/SHA; do not promote a whole type or engine from one test.
 
+October 5 B3 follow-up: PostgreSQL enum-array `generate_subscripts` now has an
+explicit untyped `42804` boundary and a qualified-cast contract under a
+same-named shadow enum, covering dimensions, reverse order, lower bounds,
+empty/NULL arrays, and native type/wire bytes. Other inferred array
+function/operator contexts and the broader B3 matrix remain open
+([case evidence](evidence/postgres-enum-array-generate-subscripts-results-2026-10-05/manifest.json)).
+
 The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These
 reports capture the dirty merge worktree with `origin/linux` at `6346a431c`

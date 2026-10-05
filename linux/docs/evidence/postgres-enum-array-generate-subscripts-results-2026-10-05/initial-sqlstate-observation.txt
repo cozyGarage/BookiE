@@ -1,0 +1,20 @@
+
+running 1 test
+test domain_contract::value_contract_enum_array_generate_subscripts_requires_qualified_cast_under_shadowed_path ... FAILED
+
+failures:
+
+failures:
+    domain_contract::value_contract_enum_array_generate_subscripts_requires_qualified_cast_under_shadowed_path
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 152 filtered out; finished in 2.14s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.18s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+thread 'domain_contract::value_contract_enum_array_generate_subscripts_requires_qualified_cast_under_shadowed_path' (2590969) panicked at crates/drivers/postgres/tests/support/domain_contract_parts/array_subscripts.rs:60:9:
+expected ambiguous-function SQLSTATE 42725, got Query { message: "could not determine polymorphic type because input has type unknown", sqlstate: Some("42804") }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p tablepro-driver-postgres --test integration`
