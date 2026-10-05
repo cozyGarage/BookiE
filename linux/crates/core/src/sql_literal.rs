@@ -215,11 +215,17 @@ pub fn build_insert_literal(
             continue;
         }
         names.push(quote_ident(driver_id, &column.name));
-        values.push(
+        let literal = if driver_id == "mysql" && matches!(value, Value::Text(text) if text.is_empty()) {
+            // MariaDB's EMPTY_STRING_IS_NULL mode turns an empty SQL string
+            // literal into NULL. SPACE(0) stays an empty value for text,
+            // ENUM, and SET destinations during SQL-file replay.
+            "SPACE(0)".to_owned()
+        } else {
             render_sql_literal(driver_id, value).map_err(|_| BuildSqlError::UnrepresentableValue {
                 column: column.name.clone(),
-            })?,
-        );
+            })?
+        };
+        values.push(literal);
     }
     if names.is_empty() {
         return Err(BuildSqlError::NothingToUpdate);
@@ -565,6 +571,23 @@ mod tests {
         let row = vec![Value::Int(7), Value::Text("hi".into())];
         let sql = build_insert_literal("mysql", None, "t", &columns, &row).expect("build the insert");
         assert_eq!(sql, "INSERT INTO `t` (`id`, `note`) VALUES (7, 'hi');");
+    }
+
+    #[test]
+    fn mysql_insert_literals_preserve_empty_text_under_empty_string_is_null_mode() {
+        let columns = vec![column("enum_value"), column("set_value"), column("note")];
+        let row = vec![
+            Value::Text(String::new()),
+            Value::Text(String::new()),
+            Value::Text(String::new()),
+        ];
+
+        let sql = build_insert_literal("mysql", None, "t", &columns, &row).expect("build the insert");
+
+        assert_eq!(
+            sql,
+            "INSERT INTO `t` (`enum_value`, `set_value`, `note`) VALUES (SPACE(0), SPACE(0), SPACE(0));"
+        );
     }
 
     #[test]

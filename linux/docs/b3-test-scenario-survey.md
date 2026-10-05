@@ -150,6 +150,12 @@ guards a loss where explicit empty ENUM/SET edits became SQL NULL. The shared
 MySQL keyed-update builder now renders `SPACE(0)` for those typed empty edits,
 with native MySQL/MariaDB checks confirming other rows and values are preserved
 ([evidence](evidence/mariadb-empty-enum-set-grid-empty-string-mode-results-2026-10-05/manifest.json)).
+The SQL-file writer had the same empty-value failure for ENUM and SET values.
+It now writes `SPACE(0)` for empty MySQL text literals; a core builder test also
+pins that expression for ordinary text columns. Native SQL-file and typed CSV
+round trips independently check ENUM ordinals, SET masks, bytes, NULL state,
+and sibling preservation under `EMPTY_STRING_IS_NULL` alone and with strict,
+ANSI, and backslash modes ([evidence](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json)).
 A PostgreSQL 16 boundary test now preserves both a 63-byte ASCII label and a
 21-character three-byte UTF-8 label through scalar and enum-array projections,
 against `pg_enum`, JSON-element and wire oracles; an overlength 64-byte label is

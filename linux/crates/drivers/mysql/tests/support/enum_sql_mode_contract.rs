@@ -48,10 +48,15 @@ async fn connect_in_mode(options: &ConnectOptions, mode: &str) -> Box<dyn Connec
         mode.split(',').any(|value| value.trim() == "STRICT_ALL_TABLES"),
         "STRICT_ALL_TABLES mode mismatch: {active}"
     );
+    assert_eq!(
+        active.split(',').any(|value| value.trim() == "EMPTY_STRING_IS_NULL"),
+        mode.split(',').any(|value| value.trim() == "EMPTY_STRING_IS_NULL"),
+        "EMPTY_STRING_IS_NULL mode mismatch: {active}"
+    );
     connection
 }
 
-async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
+async fn assert_enum_and_set_export_modes(options: ConnectOptions, extra_modes: &[&str]) {
     let setup = connect(options.clone()).await;
     setup
         .execute(
@@ -94,7 +99,7 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
     }
     setup.close().await.unwrap();
 
-    for (suffix, mode) in MODES.into_iter().enumerate() {
+    for (suffix, mode) in MODES.into_iter().chain(extra_modes.iter().copied()).enumerate() {
         let connection = connect_in_mode(&options, mode).await;
         connection.execute("DELETE FROM enum_mode_copy").await.unwrap();
         connection.execute("DELETE FROM enum_csv_copy").await.unwrap();
@@ -292,19 +297,22 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
                 .unwrap_or_else(|error| panic!("sql_mode {mode:?}; {statement}: {error}"));
         }
         std::fs::remove_file(path).unwrap();
-        let matching = connection
-            .query(
-                "SELECT COUNT(*) FROM enum_mode_source s \
-                 JOIN enum_mode_copy f ON s.id = f.id \
-                   AND s.mood + 0 <=> f.mood + 0 AND HEX(s.mood) <=> HEX(f.mood) \
-                   AND s.perms + 0 <=> f.perms + 0 AND HEX(s.perms) <=> HEX(f.perms) \
-                 JOIN enum_csv_copy c ON s.id = c.id \
-                   AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood) \
-                   AND s.perms + 0 <=> c.perms + 0 AND HEX(s.perms) <=> HEX(c.perms)",
-            )
-            .await
-            .unwrap();
-        assert_eq!(matching.rows, vec![vec![Value::Int(7)]], "sql_mode {mode:?}");
+        for copy_table in ["enum_mode_copy", "enum_csv_copy"] {
+            let matching = connection
+                .query(&format!(
+                    "SELECT COUNT(*) FROM enum_mode_source s \
+                     JOIN {copy_table} c ON s.id = c.id \
+                       AND s.mood + 0 <=> c.mood + 0 AND HEX(s.mood) <=> HEX(c.mood) \
+                       AND s.perms + 0 <=> c.perms + 0 AND HEX(s.perms) <=> HEX(c.perms)"
+                ))
+                .await
+                .unwrap();
+            assert_eq!(
+                matching.rows,
+                vec![vec![Value::Int(7)]],
+                "{copy_table} round trip under sql_mode {mode:?}"
+            );
+        }
         connection.close().await.unwrap();
     }
 }
@@ -313,14 +321,21 @@ async fn assert_enum_and_set_export_modes(options: ConnectOptions) {
 #[ignore = "requires docker"]
 async fn value_contract_enum_and_set_consumers_survive_mysql_sql_modes() {
     let (_container, options) = start_mysql().await;
-    assert_enum_and_set_export_modes(options).await;
+    assert_enum_and_set_export_modes(options, &[]).await;
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_enum_and_set_consumers_survive_mariadb_sql_modes() {
     let (_container, options) = start_mariadb().await;
-    assert_enum_and_set_export_modes(options).await;
+    assert_enum_and_set_export_modes(
+        options,
+        &[
+            "EMPTY_STRING_IS_NULL",
+            "EMPTY_STRING_IS_NULL,STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES",
+        ],
+    )
+    .await;
 }
 
 #[tokio::test]

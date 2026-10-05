@@ -1,0 +1,4 @@
+Command: cargo test --locked -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive_mariadb_sql_modes -- --ignored --nocapture
+Result: 1 passed, 0 failed, 61 filtered; MariaDB native integration fixture.
+Modes added: EMPTY_STRING_IS_NULL; EMPTY_STRING_IS_NULL,STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES.
+Each mode independently compares native ENUM ordinal and bytes, SET mask and bytes, SQL NULL state, and the untouched sibling for SQL-file replay and typed CSV restore.

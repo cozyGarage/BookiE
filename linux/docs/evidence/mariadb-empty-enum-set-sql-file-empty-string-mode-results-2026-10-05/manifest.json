@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "8880a76f2f391f2c09e6f74c882a845f9dda4c6a",
+  "case": "MariaDB EMPTY_STRING_IS_NULL preserves empty ENUM, SET, and text through SQL-file replay",
+  "engine": "MariaDB 11 and MySQL Docker integration fixtures",
+  "behavior_before_fix": {
+    "result": "The MariaDB consumer contract failed: only 5 of 7 source rows matched after SQL-file and typed CSV round trips were joined under EMPTY_STRING_IS_NULL. The typed CSV path already had separate passing evidence, isolating the remaining failure to SQL-file replay.",
+    "evidence": "baseline-failure.txt",
+    "test_delta": "The MariaDB mode and separate per-consumer assertions were added before the baseline run; the SQL literal writer was unchanged for that failure."
+  },
+  "fix": "The shared MySQL SQL insert literal builder emits SPACE(0) for empty Value::Text values. Native SQL-file replay checks the empty ENUM label and zero-member SET value under MariaDB EMPTY_STRING_IS_NULL; a core builder test pins the same literal for ordinary text columns. SQL NULL remains represented separately.",
+  "contract": [
+    "MariaDB runs EMPTY_STRING_IS_NULL alone and combined with STRICT_TRANS_TABLES, ANSI_QUOTES, and NO_BACKSLASH_ESCAPES.",
+    "SQL-file replay and typed CSV restore are compared independently against native ENUM ordinals and bytes, SET masks and bytes, SQL NULL state, and an untouched sibling row.",
+    "The existing MySQL mode matrix still passes with independent SQL-file and CSV assertions.",
+    "A core unit test pins the SQL expression SPACE(0) for empty MySQL insert literals."
+  ],
+  "validation": {
+    "mariadb_contract": {"command": "cargo test --locked -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive_mariadb_sql_modes -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "mariadb-contract.txt"},
+    "mysql_contract": {"command": "cargo test --locked -p tablepro-driver-mysql --test integration value_contract_enum_and_set_consumers_survive_mysql_sql_modes -- --ignored --nocapture", "passed": 1, "failed": 0, "log": "mysql-contract.txt"},
+    "core_tests": {"command": "cargo test --locked -p tablepro-core", "passed": 538, "failed": 0, "suites": 3, "log": "core-tests.txt"},
+    "full_value_tier": {"command": "./scripts/test-value-contracts.sh --gtk --duckdb", "passed": 321, "failed": 0, "suites": 11, "missing_suites": [], "evidence": "../local-gtk-duckdb-value-tier-empty-sql-literal-results-2026-10-05/manifest.json"},
+    "clippy": {"command": "cargo clippy --locked -p tablepro-core -p tablepro-driver-mysql --all-targets -- -D warnings", "result": "passed", "log": "clippy.txt"},
+    "format": {"command": "cargo fmt --all -- --check", "result": "passed", "log": "fmt.txt"},
+    "ignored_test_inventory": {"command": "python3 scripts/inventory-ignored-tests.py --check", "result": "passed", "log": "ignored-inventory.txt"},
+    "diff_check": {"command": "git diff --check", "result": "passed", "log": "diff-check.txt"}
+  }
+}

@@ -1,0 +1,2 @@
+Command: python3 scripts/inventory-ignored-tests.py --check
+Result: passed; ignored-test inventory and isolated registrations are OK.

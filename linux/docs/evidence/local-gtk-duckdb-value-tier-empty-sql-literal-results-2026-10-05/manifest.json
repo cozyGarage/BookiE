@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "base_commit": "8880a76f2f391f2c09e6f74c882a845f9dda4c6a",
+  "working_tree_dirty": true,
+  "change_under_test": "MySQL SQL-file empty text literals use SPACE(0) to preserve values under MariaDB EMPTY_STRING_IS_NULL.",
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "passed": 321,
+  "failed": 0,
+  "suites": 11,
+  "missing_suites": [],
+  "report": "report.json",
+  "logs": ["crates-app.log", "crates-core.log", "crates-drivers-clickhouse.log", "crates-drivers-duckdb.log", "crates-drivers-mongodb.log", "crates-drivers-mssql.log", "crates-drivers-mysql.log", "crates-drivers-postgres.log", "crates-drivers-redis.log", "crates-drivers-sqlite.log", "crates-mcp.log"],
+  "compile_log": "compile.log"
+}

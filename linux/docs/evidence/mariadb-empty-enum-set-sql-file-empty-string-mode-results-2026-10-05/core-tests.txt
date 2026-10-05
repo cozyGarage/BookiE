@@ -1,0 +1,3 @@
+Command: cargo test --locked -p tablepro-core
+Result: 538 passed across 3 suites, 0 failed.
+Includes mysql_insert_literals_preserve_empty_text_under_empty_string_is_null_mode.

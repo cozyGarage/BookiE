@@ -1,0 +1,22 @@
+
+running 1 test
+test enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes ... FAILED
+
+failures:
+
+failures:
+    enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 61 filtered out; finished in 6.92s
+
+   Compiling tablepro-core v0.1.0 (/home/trung/Projects/tablepro/linux/crates/core)
+   Compiling tablepro-driver-mysql v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.50s
+     Running tests/integration.rs (target/debug/deps/integration-245109a29f7e15d5)
+
+thread 'enum_sql_mode_contract::value_contract_enum_and_set_consumers_survive_mariadb_sql_modes' (1996788) panicked at crates/drivers/mysql/tests/support/enum_sql_mode_contract.rs:312:9:
+assertion `left == right` failed: sql_mode "EMPTY_STRING_IS_NULL"
+  left: [[Int(5)]]
+ right: [[Int(7)]]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p tablepro-driver-mysql --test integration`

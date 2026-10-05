@@ -409,11 +409,19 @@ with strict and quoting modes. The keyed-update builder now emits `SPACE(0)`
 for empty MySQL ENUM/SET values; native MySQL and MariaDB grid contracts pass,
 and ordinary text stays bound ([evidence](evidence/mariadb-empty-enum-set-grid-empty-string-mode-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: the same MariaDB mode also turned empty ENUM/SET
+values into SQL NULL during SQL-file replay. The shared MySQL SQL literal
+writer now emits `SPACE(0)` for empty text, including ordinary text columns.
+Native ENUM ordinals, SET masks, exact bytes, SQL NULL state, and CSV restore
+are checked independently under both `EMPTY_STRING_IS_NULL` configurations;
+the core builder test pins the ordinary-text literal ([evidence](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json)).
+
 October 5 local GTK + DuckDB value tier: 321 selected tests passed across all
-11 suites with no missing suites at source `ff4bdc4347b4f0fdb0e6971ceedc4efe98c9d63e`.
+11 suites with no missing suites at source `8880a76f2f391f2c09e6f74c882a845f9dda4c6a`,
+with the SQL literal change present in the working tree.
 The app suite includes both MySQL and MariaDB keyed ENUM/SET grid contracts;
 the run report and suite logs are recorded in the
-[value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-enum-grid-results-2026-10-05/manifest.json).
+[value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-sql-literal-results-2026-10-05/manifest.json) and the [SQL-file case packet](evidence/mariadb-empty-enum-set-sql-file-empty-string-mode-results-2026-10-05/manifest.json).
 
 October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
 schema-qualified destination cast across a role `search_path` change between
