@@ -39,6 +39,10 @@ literal `NULL`, SQL NULL and invalid-label boundaries are checked, including
 prepared-query reuse after a same-named shadow enum leads `search_path`
 ([evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 
+A PostgreSQL Unicode schema/type name also survives enum metadata discovery,
+keyed edits, draft inserts, and structured filters with native catalog
+verification ([evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+
 PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits
 preserve boundary values, native type and wire bytes through the parser and
 keyed-update builder; invalid date-array input is refused without changing

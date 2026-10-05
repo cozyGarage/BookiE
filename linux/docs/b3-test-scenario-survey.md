@@ -1,5 +1,13 @@
 # B3 external test-scenario survey
 
+### October 5 PostgreSQL Unicode enum identifiers
+
+A quoted Unicode schema and type name now survive enum metadata discovery,
+schema-aware keyed update, draft insert, and structured equality filtering.
+Native catalog checks confirm exact schema/type names, invalid labels preserve
+SQLSTATE `22P02`, and a SQL NULL row plus sibling text remain unchanged
+([evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+
 ### October 5 PostgreSQL enum set-operation inference follow-up
 
 Parameterized labels in both branches of `UNION ALL` and both row positions of

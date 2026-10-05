@@ -37,6 +37,12 @@ native `22P02` refusal. This extends selected parameter contexts without
 closing the enum or B3 matrix
 ([case evidence](evidence/postgres-enum-union-values-inference-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL enum metadata and schema-aware keyed edits,
+draft inserts and structured filters now cover a Unicode schema and type name.
+Native catalog checks retain both identifiers, and invalid labels return
+`22P02` without changing the sibling or SQL NULL row
+([case evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: a companion PostgreSQL aggregate case puts a same-named
 enum in a shadow schema first in `search_path`. Aggregation from the qualified
 target table keeps its declared type and wire identity after rebinding, and a
