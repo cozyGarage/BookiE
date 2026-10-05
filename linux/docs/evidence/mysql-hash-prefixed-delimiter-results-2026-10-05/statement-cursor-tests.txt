@@ -1,0 +1,40 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.32s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-dd913e1adcd462e4)
+
+running 21 tests
+test ui::editor::statement_cursor::tests::an_unterminated_construct_elsewhere_does_not_block_a_clean_statement_at_the_cursor ... ok
+test ui::editor::statement_cursor::tests::dialect_boundaries_and_unicode_cursor_are_preserved ... ok
+test ui::editor::statement_cursor::tests::mysql_punctuation_delimiter_preserves_hash_comments ... ok
+test ui::editor::statement_cursor::tests::gtk_character_offset_after_multibyte_text_selects_the_following_statement ... ok
+test ui::editor::statement_cursor::tests::only_mssql_go_batches_continue_after_an_error ... ok
+test ui::editor::statement_cursor::tests::mysql_colon_delimiter_does_not_leak_into_named_parameters ... ok
+test ui::editor::statement_cursor::tests::malformed_tail_is_not_accepted_as_a_valid_script_prefix ... ok
+test ui::editor::statement_cursor::tests::mysql_slash_delimiter_inside_comments_does_not_end_routine ... ok
+test ui::editor::statement_cursor::tests::mssql_go_repetition_is_preserved_and_refused_by_script_execution ... ok
+test ui::editor::statement_cursor::tests::mysql_slash_delimiter_is_preserved_across_planner_editor_and_parameters ... ok
+test ui::editor::statement_cursor::tests::mysql_delimiter_directives_agree_across_script_consumers ... ok
+test ui::editor::statement_cursor::tests::malformed_mysql_delimited_routine_blocks_the_whole_script ... ok
+test ui::editor::statement_cursor::tests::mysql_word_character_delimiter_stops_at_keyword_boundary ... ok
+test ui::editor::statement_cursor::tests::value_contract_postgres_malformed_dollar_quote_blocks_every_script_consumer ... ok
+test ui::editor::statement_cursor::tests::value_contract_mssql_malformed_tail_blocks_the_whole_go_script ... ok
+test ui::editor::statement_cursor::tests::value_contract_clickhouse_malformed_heredoc_blocks_full_script_consumers ... ok
+test ui::editor::statement_cursor::tests::mysql_quoted_delimiter_agrees_across_script_consumers ... ok
+test ui::editor::statement_cursor::tests::mssql_go_batches_keep_consumer_order_and_ignore_delimiter_comments ... ok
+test ui::editor::statement_cursor::tests::mysql_repeated_semicolon_delimiter_keeps_body_statements_together ... ok
+test ui::editor::statement_cursor::tests::value_contract_sqlite_malformed_tail_blocks_all_script_consumers ... ok
+test ui::editor::statement_cursor::tests::value_contract_mysql_short_delimiter_directive_keeps_routine_and_query_identity ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 479 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/tablepro_app-98de9b17d863bd0e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/logging.rs (target/debug/deps/logging-b46d149c7a123272)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+

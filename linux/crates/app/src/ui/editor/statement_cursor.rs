@@ -675,6 +675,37 @@ mod tests {
     }
 
     #[test]
+    fn mysql_punctuation_delimiter_preserves_hash_comments() {
+        let sql = "DELIMITER #!\r\nCREATE PROCEDURE p() BEGIN # comment with :hidden\r\nSELECT 'inside #! :literal'; END#!\r\nDELIMITER ;\r\nSELECT :after AS value";
+        let grammar = SqlGrammar::MySql;
+        let plan = plan_for(sql, grammar);
+
+        assert!(plan.diagnostics().is_empty());
+        assert_eq!(plan.statements().len(), 2);
+        let planned = script_statements(sql, "mysql").unwrap();
+        assert_eq!(planned.statements.len(), 2);
+        assert!(planned.statements[0].contains("# comment with :hidden"));
+        assert!(planned.statements[0].contains("'inside #! :literal'"));
+        assert!(planned.statements[0].ends_with("END"));
+        assert_eq!(planned.statements[1], "SELECT :after AS value");
+        assert_eq!(tablepro_core::extract_named_parameters(sql, "mysql").names, ["after"]);
+
+        let formatted = tablepro_core::sql_format::format_script(sql, grammar, LexicalSettings::default_for(grammar));
+        assert!(formatted.contains("DELIMITER #!"), "{formatted}");
+        let reformatted = plan_for(&formatted, grammar);
+        assert!(reformatted.diagnostics().is_empty());
+        let reformatted_script = script_statements(&formatted, "mysql").unwrap();
+        assert_eq!(reformatted_script.statements.len(), 2);
+        assert!(reformatted_script.statements[0].contains("# comment with :hidden"));
+        assert!(reformatted_script.statements[1].starts_with("SELECT"));
+        assert!(reformatted_script.statements[1].contains(":after AS value"));
+        assert_eq!(
+            tablepro_core::extract_named_parameters(&formatted, "mysql").names,
+            ["after"]
+        );
+    }
+
+    #[test]
     fn malformed_mysql_delimited_routine_blocks_the_whole_script() {
         let sql = "DELIMITER $$\r\nCREATE PROCEDURE p() BEGIN SELECT 'unfinished :inside\r\nEND$$\r\nDELIMITER ;\r\nSELECT :after AS value";
         let grammar = SqlGrammar::MySql;
