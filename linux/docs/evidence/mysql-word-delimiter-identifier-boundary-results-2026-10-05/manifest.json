@@ -28,8 +28,8 @@
     },
     "app_tests": {
       "command": "rtk cargo test --locked -p tablepro-app",
-      "result": "468 passed, 31 ignored, 986 filtered out across 6 suites",
-      "log": "app-tests.txt"
+      "result": "463 library tests, 3 integration tests and 2 subprocess checks passed; 31 library tests ignored; 0 failures",
+      "log": "app-tests-full.log"
     },
     "core_tests": {
       "command": "rtk cargo test --locked -p tablepro-core",
@@ -52,7 +52,8 @@
     "pre-fix.txt": "5a796f936465542fa4efcf05d13a148e3edd839cf640c9ebe0d76cc2aca5ded2",
     "test.txt": "c86d1edc4fd3584ed6ba19715e48315c23d50ddd4d1a1255ba85b09386b8e953",
     "mysql-tests.txt": "b75341a56330504cd0fa65acd783ff8a8ad56be1808bb93893c242c0f774b84a",
-    "app-tests.txt": "3a798e8a9b48d3d7248d37a475fc03ca2f8cc58455c83e225dbbe44fc3600d20",
+    "app-tests.txt": "ac8d7369d446b333d0c64edab1d51a6af4871819d9df8a451c6e83ecf15550e0",
+    "app-tests-full.log": "063f16a61470e50f498f907018b6a479ff2078377e52d1d4534ca766140b6098",
     "core-tests.txt": "1a491956ed8ba4755bb4d57071d0e95dcfe8b6aecbbb35bf61939b953ce24c85",
     "clippy.txt": "69abf03f51c838537fd661159b0e86faf902fe02fff45457d6bceb7dd6825605",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
