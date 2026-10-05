@@ -41,6 +41,15 @@ the native result
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
 Other catalog changes and enum session combinations remain open.
 
+### October 5 PostgreSQL enum type rename/schema move
+
+The same session now keeps enum-array result metadata current after
+`ALTER TYPE ... RENAME TO` and `SET SCHEMA`, even with a same-named shadow type
+first in `search_path`. Both populated and zero-row results report the moved
+qualified type; native type, JSON values and rebound array wire bytes agree
+([evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+Other catalog mutations and the broader B3 matrix remain open.
+
 ### October 5 PostgreSQL enum aggregate follow-up
 
 Scalar enum `min`/`max` results now preserve declaration order and target-schema

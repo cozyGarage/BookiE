@@ -141,6 +141,9 @@ after native catalog and wire-byte checks
 The warmed range query also observes `ALTER TYPE RENAME VALUE` in that session,
 with catalog-order and native array-byte checks after rebinding
 ([rename evidence](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json)).
+Result metadata now also follows same-session enum type renames and schema
+moves by catalog OID, including a zero-row projection under a shadowed
+`search_path` ([migration evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

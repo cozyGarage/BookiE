@@ -12,6 +12,12 @@ Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
 files and fixtures; a lane pass does not close a milestone.
 
+October 5 B3-1 follow-up: PostgreSQL enum result metadata now refreshes the
+type name by its catalog OID after a same-session `ALTER TYPE ... RENAME TO`
+and `SET SCHEMA`. The regression checks populated and zero-row result metadata,
+same-named shadow types, and native array type/value/wire-byte oracles; B3 stays
+open ([evidence](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
+
 October 5 B3 follow-up: DuckDB LIST<ENUM> result decoding previously panicked
 inside the nested type fallback. The driver now explicitly refuses nested
 LIST/STRUCT/ARRAY/MAP/UNION results using the existing `Undecodable` contract;
