@@ -372,6 +372,102 @@ async fn value_contract_enum_range_uses_qualified_type_under_shadowed_search_pat
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_range_bounds_target").await.unwrap();
+    connection.execute("CREATE SCHEMA value_contract_enum_range_bounds_shadow").await.unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_range_bounds_target.label AS ENUM \
+             ('first', 'NULL', '', '東京', 'last')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_range_bounds_shadow.label AS ENUM \
+             ('shadow-only', 'NULL')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "SET search_path = value_contract_enum_range_bounds_shadow, \
+             value_contract_enum_range_bounds_target, public",
+        )
+        .await
+        .unwrap();
+
+    let target_type = "value_contract_enum_range_bounds_target.label";
+    let target_array = "value_contract_enum_range_bounds_target.label[]";
+    let cases = format!(
+        "VALUES \
+         (1, 'bounded', 'first'::{target_type}, '東京'::{target_type}), \
+         (2, 'null_lower', NULL::{target_type}, ''::{target_type}), \
+         (3, 'null_upper', '東京'::{target_type}, NULL::{target_type}), \
+         (4, 'both_null', NULL::{target_type}, NULL::{target_type}), \
+         (5, 'reversed', 'last'::{target_type}, 'first'::{target_type}), \
+         (6, 'equal_label', 'NULL'::{target_type}, 'NULL'::{target_type})"
+    );
+    let result = connection
+        .query(&format!(
+            "WITH cases(ord, name, lower_bound, upper_bound) AS ({cases}) \
+             SELECT name, enum_range(lower_bound, upper_bound) AS value \
+             FROM cases ORDER BY ord"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, target_array);
+
+    let native = connection
+        .query(&format!(
+            "WITH cases(ord, name, lower_bound, upper_bound) AS ({cases}), \
+             ranges AS (SELECT ord, name, enum_range(lower_bound, upper_bound) AS value FROM cases) \
+             SELECT name, pg_typeof(value)::text, array_to_json(value)::text, \
+                    encode(array_send(value), 'hex'), array_dims(value) \
+             FROM ranges ORDER BY ord"
+        ))
+        .await
+        .unwrap();
+    let type_value = Value::Text(target_array.into());
+    let expected = [
+        ("bounded", serde_json::json!(["first", "NULL", "", "東京"]), Some("[1:4]")),
+        ("null_lower", serde_json::json!(["first", "NULL", ""]), Some("[1:3]")),
+        ("null_upper", serde_json::json!(["東京", "last"]), Some("[1:2]")),
+        ("both_null", serde_json::json!(["first", "NULL", "", "東京", "last"]), Some("[1:5]")),
+        ("reversed", serde_json::json!([]), None),
+        ("equal_label", serde_json::json!(["NULL"]), Some("[1:1]")),
+    ];
+    for (index, (name, expected_json, expected_dims)) in expected.into_iter().enumerate() {
+        assert_eq!(result.rows[index][0], Value::Text(name.into()));
+        assert_eq!(result.rows[index][0], native.rows[index][0]);
+        assert_eq!(native.rows[index][1], type_value);
+        let Value::Text(json_text) = &native.rows[index][2] else {
+            panic!("enum_range JSON oracle returned {:?}", native.rows[index][2]);
+        };
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(json_text).unwrap(),
+            expected_json
+        );
+        match expected_dims {
+            Some(dims) => assert_eq!(native.rows[index][4], Value::Text(dims.into())),
+            None => assert_eq!(native.rows[index][4], Value::Null),
+        }
+
+        let rebound = connection
+            .query_params(
+                &format!("SELECT encode(array_send($1::text::{target_array}), 'hex')"),
+                std::slice::from_ref(&result.rows[index][1]),
+            )
+            .await
+            .unwrap();
+        assert_eq!(rebound.rows[0][0], native.rows[index][3], "{name}");
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
