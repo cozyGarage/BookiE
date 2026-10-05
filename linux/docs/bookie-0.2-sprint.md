@@ -409,6 +409,12 @@ planning and execution on a fresh connection. A distinct same-named enum leads
 the new path; native target type/value checks confirm restoration and the
 shadow table remains empty ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: PostgreSQL custom-enum CSV import also handles schema,
+table and type identifiers with spaces and embedded quotes while a same-named
+shadow schema leads `search_path`. The generated cast selects the target enum;
+native type/value checks confirm the row and preserve target siblings and the
+shadow row ([evidence](evidence/postgres-enum-csv-quoted-identifiers-results-2026-10-05/manifest.json)).
+
 October 4 local integration gate: all 315 tests passed at
 `d783182f972036e8af1521b0e3d44acd54cf77a7` across six database drivers, MCP,
 policy/session, PostgreSQL socket and SSH suites. B3/B4 and release acceptance

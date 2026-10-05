@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "50c21cffc09c509cdbe5c13c78a92c874587d489",
+  "case": "PostgreSQL custom-enum CSV import supports schema, table, and type identifiers with spaces and embedded quotes under a same-named shadow search_path",
+  "test": "enum_contract::value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter",
+  "engine": "PostgreSQL Docker integration fixture",
+  "contract": [
+    "A CSV row imports into a target whose schema, table, and enum type names contain spaces and embedded double quotes.",
+    "The role search_path leads with a same-named shadow schema and enum that does not contain the target value.",
+    "The generated insert plan uses a correctly escaped, schema-qualified enum cast.",
+    "The imported row has the target native enum type; existing target rows and the shadow row remain unchanged."
+  ],
+  "validation": {
+    "focused_postgres": {
+      "command": "cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_quoted_identifiers_support_keyed_edit_and_filter -- --ignored --nocapture",
+      "passed": 1,
+      "failed": 0,
+      "filtered": 147,
+      "log": "focused-postgres.txt"
+    },
+    "clippy": {
+      "command": "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "git diff --check HEAD",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  }
+}

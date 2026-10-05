@@ -298,7 +298,10 @@ An ordering contract checks non-lexical enum sorting against `pg_enum.enumsortor
 and native enum types ([ordering evidence](evidence/postgres-enum-order-results-2026-10-04/manifest.json)).
 Schema/type/table identifiers with spaces and embedded quotes pass metadata
 discovery, a keyed edit and structured equality filtering with exact native
-type and sibling-row checks ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
+type and sibling-row checks; CSV import now also emits the escaped,
+schema-qualified enum cast under a same-named shadow path and preserves the
+target type and shadow row ([spaces evidence](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json),
+[CSV import evidence](evidence/postgres-enum-csv-quoted-identifiers-results-2026-10-05/manifest.json),
 [quote-escaping evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json));
 the same-name target/shadow type collision also passes keyed edit and filtering
 with the role's default `search_path` aimed at the shadow schema ([shadow-path evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json));

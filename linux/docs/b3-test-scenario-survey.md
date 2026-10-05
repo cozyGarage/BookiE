@@ -132,6 +132,10 @@ The import plan also survives a role `search_path` change before execution on a
 fresh connection, with another same-named decoy enum first; native target type,
 all four value/null states, the sibling, and the untouched shadow table are
 asserted ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
+CSV import into schema, table, and enum type identifiers with spaces and
+embedded quotes also passes while a same-named shadow schema leads the role's
+`search_path`; the generated cast, target type, sibling rows, and shadow row
+are checked ([evidence](evidence/postgres-enum-csv-quoted-identifiers-results-2026-10-05/manifest.json)).
 MariaDB 11's `EMPTY_STRING_IS_NULL` mode also has a native enum/set CSV restore
 contract: an empty ENUM label and zero-member SET stay distinct from SQL NULL
 by rebuilding empty text with a server expression; native ordinal/byte checks
