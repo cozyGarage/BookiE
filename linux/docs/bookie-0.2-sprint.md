@@ -473,6 +473,12 @@ backslash label across all four `standard_conforming_strings`/`backslash_quote`
 combinations. Native text, JSON, `array_send` bytes and an existing sibling
 are verified ([evidence](evidence/postgres-enum-array-sql-mode-results-2026-10-05/manifest.json)).
 
+October 5 B3-4 follow-up: GTK clipboard delivery now has isolated GDK
+publication/readback and CSV parser recovery coverage for enum labels, empty
+text, SQL NULL and marker-shaped values. Formula-like text keeps its safety
+prefix after parsing; external spreadsheet paste and lossless restore remain
+open ([evidence](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json)).
+
 October 5 B3-1 follow-up: domain-over-enum `COALESCE` parameters now also match
 explicit native target-enum casts in both argument positions under a shadowed
 `search_path`, including empty text, literal `NULL`, SQL NULL and invalid

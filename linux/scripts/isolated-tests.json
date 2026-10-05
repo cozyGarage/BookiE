@@ -131,6 +131,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column::tests::entering_edit_on_a_truncated_long_text_cell_seeds_the_full_value"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::export::tests::clipboard_csv_is_published_and_read_back_exactly"
     ]
   ],
   "keyring": [

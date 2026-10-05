@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "54ad5f691987b1761817762108755431973497fc",
+  "scope": "GTK clipboard delivery/readback and enum CSV parser recovery",
+  "source": {
+    "path": "crates/app/src/ui/grid/export.rs",
+    "sha256": "b35fa32f4215fb5aa4662a3bac0f5abe9f2af497721fe3f0c59c60c1a811ca63"
+  },
+  "selector": "ui::grid::export::tests::clipboard_csv_is_published_and_read_back_exactly",
+  "checks": [
+    {
+      "command": "rtk bash scripts/test-gtk-widgets.sh",
+      "result": "7 isolated GTK tests passed, including clipboard_csv_is_published_and_read_back_exactly",
+      "log": "gtk-tier.txt"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "assertions": [
+    "GDK clipboard readback exactly matches generated CSV text.",
+    "CSV parser recovery preserves literal NULL, empty text, SQL NULL, \\N, and \\NN with a collision-free null marker.",
+    "Formula-shaped text is sanitized to apostrophe-prefixed text and is not a lossless restore case."
+  ],
+  "remaining": [
+    "Paste behavior in external spreadsheet applications is unverified.",
+    "Lossless restoration of formula-shaped text is not supported by this safety-prefixed path."
+  ],
+  "environment_note": "GTK runner emitted a MESA DRI3 acceleration warning under the isolated display; all registered tests passed."
+}

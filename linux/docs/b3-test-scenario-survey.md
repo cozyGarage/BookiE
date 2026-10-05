@@ -935,3 +935,10 @@ the outer domain ([evidence](evidence/postgres-domain-coalesce-results-2026-10-0
 A companion contract covers text and SQL NULL in `array_append` and
 `array_prepend`, including domain-array input and base-enum-array output
 ([evidence](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json)).
+
+October 5 B3-4 follow-up: an isolated GTK test now publishes the generated enum
+CSV through GDK, reads the clipboard text back exactly, and checks CSV parser
+recovery for literal `NULL`, empty text, SQL NULL, marker-shaped labels and
+formula-shaped text. The formula-safe export prefix is preserved by import, so
+lossless formula-text restore is still open; paste through external spreadsheet
+applications is also unverified ([GTK clipboard evidence](evidence/gtk-clipboard-csv-delivery-results-2026-10-05/manifest.json)).
