@@ -406,6 +406,13 @@ October 4 B3-5 follow-up: the MySQL `\d //` shorthand now has a named consumer
 contract across planning, formatting, parameter extraction and policy
 classification. See the [evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
 
+October 5 B3-5 follow-up: SQLite now has the equivalent malformed-tail
+consumer contract. The valid first statement remains selectable, whole-script
+planning and cursor selection inside the malformed tail fail closed, only the
+safe-prefix named parameter is extracted, formatting retains the malformed
+text, and agent policy denies the unparseable/write statement. See the
+[SQLite malformed-tail evidence](evidence/sqlite-malformed-tail-results-2026-10-05/manifest.json).
+
 October 4 B3-5 follow-up: ClickHouse's shared parameter scanner now recognizes
 the same `$tag$...$tag$` heredoc rule as the script lexer, so placeholders
 inside closed or unterminated bodies are not extracted. An app contract checks

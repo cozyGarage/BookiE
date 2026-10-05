@@ -1,0 +1,2 @@
+rtk cargo test --locked -p tablepro-app value_contract_sqlite_malformed_tail_blocks_all_script_consumers -- --nocapture
+cargo test: 1 passed, 496 filtered out (3 suites, 0.00s)

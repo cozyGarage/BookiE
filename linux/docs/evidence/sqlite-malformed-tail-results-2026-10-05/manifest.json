@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "76b9057249b06620fbc826b456781240924f47f4",
+  "engine": "Local SQLite dialect parser and policy; no server required",
+  "case": "Malformed SQLite script tail across editor consumers",
+  "test": "ui::editor::statement_cursor::tests::value_contract_sqlite_malformed_tail_blocks_all_script_consumers",
+  "contract": [
+    "A malformed quoted tail produces a planner diagnostic and blocks whole-script execution, while the valid first statement remains selectable.",
+    "Cursor selection inside the malformed tail is refused; named parameter extraction returns only the safe-prefix parameter and retains malformed SQL.",
+    "Formatting retains the malformed tail, and local agent policy classifies it as unparseable/write and denies it with fail_closed_unparseable."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-app value_contract_sqlite_malformed_tail_blocks_all_script_consumers -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "test.txt": "081f45319bb2e2daa8a6f961ba7a2f6a6dca77277ea784afe68b4cbeab1b93c9",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "The equivalent malformed-tail consumer oracle is not yet recorded for every supported dialect.",
+    "The MySQL delimiter boundary matrix still needs cases beyond the forms already covered."
+  ]
+}
