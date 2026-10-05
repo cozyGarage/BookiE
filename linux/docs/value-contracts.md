@@ -41,7 +41,8 @@ prepared-query reuse after a same-named shadow enum leads `search_path`
 
 A PostgreSQL Unicode schema/type name also survives enum metadata discovery,
 keyed edits, draft inserts, and structured filters with native catalog
-verification ([evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+verification ([evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)); typed CSV import preserves the enum type and empty/literal-`NULL`/SQL-NULL values with the sibling row unchanged
+([CSV evidence](evidence/postgres-enum-unicode-csv-import-results-2026-10-05/manifest.json)).
 
 PostgreSQL `date[]`, `time[]`, `timestamp[]` and `timetz[]` app grid edits
 preserve boundary values, native type and wire bytes through the parser and

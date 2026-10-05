@@ -493,6 +493,8 @@ target type and shadow row ([spaces evidence](evidence/postgres-enum-quoted-iden
 Unicode schema and type names also pass metadata lookup, keyed edit, draft
 insert and structured filtering with native catalog checks
 ([Unicode evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json));
+typed CSV import preserves the same Unicode-named target enum and SQL NULL/empty/literal-`NULL` distinctions
+([CSV evidence](evidence/postgres-enum-unicode-csv-import-results-2026-10-05/manifest.json));
 the same-name target/shadow type collision also passes keyed edit and filtering
 with the role's default `search_path` aimed at the shadow schema ([shadow-path evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json));
 other identifier forms and transaction/session `search_path` permutations remain open.

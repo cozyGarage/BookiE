@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test enum_contract::value_contract_custom_enum_unicode_csv_import_preserves_native_type_and_nulls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 167 filtered out; finished in 2.14s
+

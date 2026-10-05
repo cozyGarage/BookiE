@@ -7,6 +7,9 @@ schema-aware keyed update, draft insert, and structured equality filtering.
 Native catalog checks confirm exact schema/type names, invalid labels preserve
 SQLSTATE `22P02`, and a SQL NULL row plus sibling text remain unchanged
 ([evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+Typed CSV import also preserves those identifiers and the target enum type,
+including empty text, literal `NULL`, SQL NULL, and a pre-existing sibling
+([CSV evidence](evidence/postgres-enum-unicode-csv-import-results-2026-10-05/manifest.json)).
 
 ### October 5 PostgreSQL enum set-operation inference follow-up
 

@@ -42,6 +42,10 @@ draft inserts and structured filters now cover a Unicode schema and type name.
 Native catalog checks retain both identifiers, and invalid labels return
 `22P02` without changing the sibling or SQL NULL row
 ([case evidence](evidence/postgres-enum-unicode-identifiers-results-2026-10-05/manifest.json)).
+The same Unicode schema/type identifiers now pass typed CSV import with a
+collision-free NULL marker; native catalog values preserve the empty label,
+literal `NULL`, SQL NULL and an untouched sibling
+([CSV evidence](evidence/postgres-enum-unicode-csv-import-results-2026-10-05/manifest.json)).
 
 October 5 B3-1 follow-up: a companion PostgreSQL aggregate case puts a same-named
 enum in a shadow schema first in `search_path`. Aggregation from the qualified

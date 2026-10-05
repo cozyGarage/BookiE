@@ -1214,3 +1214,156 @@ async fn value_contract_custom_enum_json_and_file_exports_preserve_empty_literal
     assert_eq!(std::fs::read(&json_path).unwrap(), previous);
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 2);
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_custom_enum_unicode_csv_import_preserves_native_type_and_nulls() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let schema = "value_contract_enum_csv_東京";
+    let type_name = "状態";
+    let quoted_schema = format!("\"{schema}\"");
+    let quoted_type = format!("\"{type_name}\"");
+    connection
+        .execute(&format!("CREATE SCHEMA {quoted_schema}"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {quoted_schema}.{quoted_type} AS ENUM ('ready', '東京', 'NULL', '')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE {quoted_schema}.source_rows \
+             (id INT PRIMARY KEY, state {quoted_schema}.{quoted_type}, note TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO {quoted_schema}.source_rows VALUES \
+             (1, 'NULL', 'literal NULL'), (2, '東京', 'unicode'), \
+             (3, '', 'empty label'), (4, NULL, 'sql NULL')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE {quoted_schema}.target_rows \
+             (id INT PRIMARY KEY, state {quoted_schema}.{quoted_type}, note TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO {quoted_schema}.target_rows VALUES (99, 'ready', 'sibling')"
+        ))
+        .await
+        .unwrap();
+
+    let source = connection
+        .query(&format!(
+            "SELECT id, state, note FROM {quoted_schema}.source_rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker,
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let columns = connection
+        .fetch_columns(Some(schema), "target_rows")
+        .await
+        .unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: type_name.into(),
+        })
+    );
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some(schema),
+            table: "target_rows",
+            columns: &columns,
+            mapping: &[Some(0), Some(1), Some(2)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert!(
+        plan.statement
+            .contains(&format!("$2::text::{quoted_schema}.{quoted_type}")),
+        "CSV import must use the Unicode target enum: {}",
+        plan.statement
+    );
+    let statements = plan
+        .rows
+        .iter()
+        .map(|row| (plan.statement.clone(), row.clone()))
+        .collect::<Vec<_>>();
+    connection.execute_in_transaction(&statements).await.unwrap();
+
+    let restored = connection
+        .query(&format!(
+            "SELECT r.id, r.state::text, n.nspname, t.typname, r.note \
+             FROM {quoted_schema}.target_rows r \
+             JOIN pg_type t ON t.oid = pg_typeof(r.state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace ORDER BY r.id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Text(schema.into()),
+                Value::Text(type_name.into()),
+                Value::Text("literal NULL".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("東京".into()),
+                Value::Text(schema.into()),
+                Value::Text(type_name.into()),
+                Value::Text("unicode".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text(String::new()),
+                Value::Text(schema.into()),
+                Value::Text(type_name.into()),
+                Value::Text("empty label".into()),
+            ],
+            vec![
+                Value::Int(4),
+                Value::Null,
+                Value::Text(schema.into()),
+                Value::Text(type_name.into()),
+                Value::Text("sql NULL".into()),
+            ],
+            vec![
+                Value::Int(99),
+                Value::Text("ready".into()),
+                Value::Text(schema.into()),
+                Value::Text(type_name.into()),
+                Value::Text("sibling".into()),
+            ],
+        ]
+    );
+}
