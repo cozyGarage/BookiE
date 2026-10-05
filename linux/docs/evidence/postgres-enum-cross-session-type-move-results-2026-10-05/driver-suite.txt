@@ -3,55 +3,55 @@
 
 running 44 tests
 test array::tests::value_contract_array_null_empty_and_escaped_text_stay_distinct ... ok
-test array::tests::value_contract_enum_array_labels_quote_null_text_and_preserve_sql_null ... ok
 test array::tests::value_contract_domain_array_decodes_elements_by_base_type_oid ... ok
+test array::tests::value_contract_enum_array_labels_quote_null_text_and_preserve_sql_null ... ok
+test decode::tests::value_contract_bit_strings_keep_leading_zeroes_and_reject_malformed_wire_values ... ok
 test array::tests::value_contract_malformed_array_dimensions_lengths_types_and_elements_are_refused ... ok
-test array::tests::value_contract_vectors_render_space_separated_elements_and_refuse_other_headers ... ok
 test array::tests::value_contract_temporal_array_elements_reject_malformed_payloads ... ok
 test decode::tests::value_contract_bit_wire_lengths_pin_byte_boundaries_and_padding ... ok
+test array::tests::value_contract_vectors_render_space_separated_elements_and_refuse_other_headers ... ok
 test decode::tests::value_contract_inet_and_cidr_use_postgres_text ... ok
-test decode::tests::value_contract_bit_strings_keep_leading_zeroes_and_reject_malformed_wire_values ... ok
 test decode::tests::value_contract_interval_extremes_and_mixed_signs_are_unambiguous ... ok
-test decode::tests::value_contract_lsn_preserves_both_halves_and_requires_eight_bytes ... ok
-test array::tests::value_contract_array_header_mutations_and_maximum_depth_are_bounded ... ok
 test decode::tests::value_contract_interval_query_duration_matches_postgres_style ... ok
+test decode::tests::value_contract_lsn_preserves_both_halves_and_requires_eight_bytes ... ok
+test decode::tests::value_contract_macaddr8_requires_eight_bytes_and_uses_postgres_lowercase_text ... ok
+test array::tests::value_contract_array_header_mutations_and_maximum_depth_are_bounded ... ok
+test decode::tests::value_contract_macaddr_requires_six_bytes_and_uses_postgres_lowercase_text ... ok
 test decode::tests::value_contract_pg_lsn_uses_uppercase_hex ... ok
 test decode::tests::value_contract_unknown_binary_types_stay_undecoded ... ok
-test decode::tests::value_contract_macaddr8_requires_eight_bytes_and_uses_postgres_lowercase_text ... ok
-test numeric::tests::value_contract_malformed_numeric_payloads_are_refused_without_rounding_or_panicking ... ok
 test decode::tests::value_contract_network_prefixes_families_flags_and_lengths_are_checked ... ok
-test decode::tests::value_contract_macaddr_requires_six_bytes_and_uses_postgres_lowercase_text ... ok
+test numeric::tests::value_contract_malformed_numeric_payloads_are_refused_without_rounding_or_panicking ... ok
 test numeric::tests::value_contract_numeric_preserves_base_groups_sign_scale_and_specials ... ok
-test params::tests::inferred_enum_array_text_preserves_quotes_escapes_nulls_and_bounds ... ok
 test params::tests::inferred_enum_array_text_refuses_malformed_shapes_and_trailing_data ... ok
-test params::tests::inferred_enum_array_text_rejects_nesting_beyond_postgres_dimension_limit ... ok
+test params::tests::inferred_enum_array_text_preserves_quotes_escapes_nulls_and_bounds ... ok
 test temporal::tests::value_contract_temporal_array_text_keeps_eras_instants_and_fractions ... ok
+test params::tests::inferred_enum_array_text_rejects_nesting_beyond_postgres_dimension_limit ... ok
 test temporal::tests::value_contract_time_keeps_end_of_day_and_microseconds ... ok
 test temporal::tests::value_contract_time_rejects_invalid_lengths_times_and_offsets ... ok
 test tests::a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect ... ok
 test tests::driver_metadata ... ok
-test tests::map_io_refused_returns_connection_refused ... ok
 test tests::map_certificate_failure_returns_tls_error ... ok
+test tests::map_io_refused_returns_connection_refused ... ok
 test tests::map_plain_io_failure_is_disconnected ... ok
 test tests::normalize_pg_default_keeps_an_expression_whole ... ok
-test tests::an_undecodable_column_is_reported_to_the_logs_with_its_index_and_type ... ok
 test tests::normalize_pg_default_strips_only_the_cast_on_a_plain_literal ... ok
 test tests::patched_sqlx_postgres_caps_scram_iterations ... ok
 test tests::quote_ident_doubles_embedded_quotes ... ok
 test tests::server_termination_states_are_disconnections_but_query_cancel_is_not ... ok
+test tests::an_undecodable_column_is_reported_to_the_logs_with_its_index_and_type ... ok
 test tests::undecodable_cell_cannot_be_bound_as_null ... ok
-test tests::structure_metadata_declarations_match_the_connection_impl ... ok
 test tests::unexpected_io_eof_is_disconnected_and_connection_refusal_stays_distinct ... ok
+test tests::structure_metadata_declarations_match_the_connection_impl ... ok
 test array::tests::value_contract_array_wire_limits_are_checked_before_decoding ... ok
 test decode::tests::value_contract_extreme_intervals_and_malformed_network_values_do_not_panic ... ok
 test numeric::tests::value_contract_numeric_wire_extremes_have_bounded_exact_output ... ok
 test array::tests::value_contract_expanded_array_text_has_an_explicit_size_bound ... ok
 
-test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
 
      Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
 
-running 179 tests
+running 180 tests
 test a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction ... ignored, requires docker
 test a_cancelled_session_statement_stops_on_the_server_and_keeps_the_session ... ignored, requires docker
 test a_column_collation_is_read_and_survives_a_type_change ... ignored, requires docker
@@ -80,6 +80,7 @@ test array_contract::value_contract_enum_min_max_keep_target_type_and_order_unde
 test array_contract::value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path ... ignored, requires docker
 test array_contract::value_contract_enum_range_observes_added_label_order_in_same_session ... ignored, requires docker
 test array_contract::value_contract_enum_range_observes_renamed_label_in_same_session ... ignored, requires docker
+test array_contract::value_contract_enum_range_refreshes_labels_changed_by_another_session ... ignored, requires docker
 test array_contract::value_contract_enum_range_uses_qualified_type_under_shadowed_search_path ... ignored, requires docker
 test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_other_session_metadata ... ignored, requires docker
 test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_session_metadata ... ignored, requires docker
@@ -232,7 +233,7 @@ test wide_numeric_contract::value_contract_numeric_special_grid_edits_match_serv
 test wide_numeric_contract::value_contract_wide_numeric_grid_edit_preserves_exact_value ... ignored, requires docker
 test an_unavailable_postgres_server_is_classified_as_connection_refused ... ok
 
-test result: ok. 1 passed; 0 failed; 178 ignored; 0 measured; 0 filtered out; finished in 5.00s
+test result: ok. 1 passed; 0 failed; 179 ignored; 0 measured; 0 filtered out; finished in 5.00s
 
      Running tests/smoke_local.rs (target/debug/deps/smoke_local-e1d81ca9e017cc4e)
 
