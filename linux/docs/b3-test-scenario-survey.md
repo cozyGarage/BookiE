@@ -86,6 +86,9 @@ The warmed session now also observes `ADD VALUE ... AFTER`; the label is
 inserted between existing values, and result type, JSON order and rebound wire
 bytes match PostgreSQL
 ([paired position evidence](evidence/postgres-enum-add-value-positions-results-2026-10-05/manifest.json)).
+The no-position `ADD VALUE` form also appends in declaration order after the
+same session has warmed `enum_range`, with native type, JSON and wire checks
+([default append evidence](evidence/postgres-enum-add-value-default-append-results-2026-10-05/manifest.json)).
 The same session also observes `ALTER TYPE ... RENAME VALUE` after warming the
 range query; catalog order, target type metadata and rebound array bytes match
 the native result
@@ -97,6 +100,9 @@ catalog, JSON and native wire oracles under the shadowed path
 The writer now also inserts a label `AFTER` an existing value; the warmed
 reader sees that position and matches native metadata, JSON and wire oracles
 ([follow-up evidence](evidence/postgres-enum-cross-session-add-after-results-2026-10-05/manifest.json)).
+The separate writer's no-position `ADD VALUE` also appends, and the warmed
+reader observes the final catalog order under the shadowed path
+([default append evidence](evidence/postgres-enum-add-value-default-append-results-2026-10-05/manifest.json)).
 Other catalog changes and enum session combinations remain open.
 
 ### October 5 PostgreSQL enum type rename/schema move

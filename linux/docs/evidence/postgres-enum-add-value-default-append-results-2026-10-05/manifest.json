@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "b3/postgres-enum-default-append",
+  "source_commit": "0eb9ef7d041f6e5759642545b34b2c0312ccde3b",
+  "engine": "PostgreSQL 16, Docker fixture",
+  "case": "default ADD VALUE appends in warmed same-session and reader/writer paths",
+  "tests": [
+    "array_contract::value_contract_enum_range_observes_added_label_order_in_same_session",
+    "array_contract::value_contract_enum_range_refreshes_labels_changed_by_another_session"
+  ],
+  "contract": [
+    "After explicit BEFORE and AFTER insertions, ADD VALUE without a position clause appends the label in declaration order.",
+    "Both a warmed session and a separate warmed reader observe the appended value.",
+    "The enum[] metadata, native JSON, pg_enum ordering, array_send bytes and typed rebinding agree with PostgreSQL under a same-named shadow search_path."
+  ],
+  "validation": {
+    "same_session_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_observes_added_label_order_in_same_session -- --ignored --nocapture",
+      "result": "1 passed, 179 filtered out",
+      "log": "focused-same-session.txt"
+    },
+    "cross_session_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration value_contract_enum_range_refreshes_labels_changed_by_another_session -- --ignored --nocapture",
+      "result": "1 passed, 179 filtered out",
+      "log": "focused-cross-session.txt"
+    },
+    "postgres_driver_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres",
+      "result": "45 passed, 181 ignored (5 suites)",
+      "log": "driver-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --offline --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "ignored_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; 501 declarations, Driver tier 368",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "remaining": [
+    "Other enum catalog/session permutations, additional array families and consumers, and the broader B3 matrix remain open."
+  ],
+  "log_sha256": {
+    "focused-same-session.txt": "07fdad6acdb6e331ffa3a6066404e3a66d53f8d519c7d7e377cffd2e06a1af77",
+    "focused-cross-session.txt": "b6946d56bf2860f8901eaed1479f00a942ee0261f5ca35dc6c49bf2ddb02d807",
+    "driver-suite.txt": "b1f9f2bd47dd22caef99b58fd4f2c13dc82a1f2ea3c62ad56bb49ac915193552",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  }
+}
