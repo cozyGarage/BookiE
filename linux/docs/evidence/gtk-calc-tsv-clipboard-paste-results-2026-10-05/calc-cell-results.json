@@ -1,0 +1,10 @@
+[
+  {"row": 1, "string": "NULL", "formula": "NULL", "type": "TEXT"},
+  {"row": 2, "string": "", "formula": "", "type": "EMPTY"},
+  {"row": 3, "string": "\\NNN", "formula": "\\NNN", "type": "TEXT"},
+  {"row": 4, "string": "\\N", "formula": "\\N", "type": "TEXT"},
+  {"row": 5, "string": "\\NN", "formula": "\\NN", "type": "TEXT"},
+  {"row": 6, "string": "'=1+1", "formula": "''=1+1", "type": "TEXT"},
+  {"row": 7, "string": "a\tb", "formula": "a\tb", "type": "TEXT"},
+  {"row": 8, "string": "one\ntwo\"three", "formula": "one\ntwo\"three", "type": "TEXT"}
+]

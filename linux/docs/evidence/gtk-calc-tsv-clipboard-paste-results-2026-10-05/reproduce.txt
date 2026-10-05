@@ -1,0 +1,13 @@
+LibreOffice Calc 26.8.0.3, using tablepro-lo-calc:26.8.0.3 on Xvfb :98
+(1280x800x24). The image ID is recorded in manifest.json.
+
+1. Start the clipboard payload owner and Calc with the shared X display.
+2. Put pasted-payload.tsv on the X11 clipboard as UTF8_STRING.
+3. Open a blank Calc sheet, select A1, press Ctrl+V, and accept Text Import.
+4. Run inspect_calc.py through the image's Python with UNO on port 2010.
+5. Compare A1:A8 with calc-cell-results.json. Formula must be empty or a text
+   cell; this packet records the actual UNO formula string for the text cell.
+
+The GDK clipboard publication/readback test is separately registered as
+ui::grid::export::tests::clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct.
+Together, that test and this consumer run cover publication and Calc paste.

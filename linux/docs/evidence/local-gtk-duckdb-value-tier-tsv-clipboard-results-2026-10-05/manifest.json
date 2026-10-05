@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-05",
+  "source_commit": "cbd8dcd990fa49f2f4795e845c88419e3a54f6fa",
+  "scope": "Strict GTK + DuckDB value-contract tier after the selected-row TSV clipboard fix",
+  "checks": [
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 329 selected tests across all 11 suites, no missing suites; GTK and DuckDB enabled",
+      "report": "report.json",
+      "logs": "compile.log and per-suite logs"
+    },
+    {
+      "command": "rtk bash scripts/test-gtk-widgets.sh",
+      "result": "passed: 8 isolated GTK clipboard/widget tests, including TSV clipboard publication and readback",
+      "log": "gtk-tier.txt"
+    }
+  ],
+  "assertions": [
+    "The runner report source revision matches source_commit and passed is true.",
+    "Every registered suite has exit_code 0 and missing_suites is empty.",
+    "GTK clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct passed in its isolated display run."
+  ],
+  "worktree_note": "The value-run report records dirty=true because documentation/evidence changed during the run and the two pre-existing B4 scratch directories remain untracked. Tracked source was exactly source_commit.",
+  "limitations": [
+    "This local tier is not installed Arch/Wayland, Debian/GNOME, or hosted CI acceptance.",
+    "LibreOffice Calc paste behavior is recorded separately in gtk-calc-tsv-clipboard-paste-results-2026-10-05."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "date": "2026-10-05",
+  "source_commit": "cbd8dcd990fa49f2f4795e845c88419e3a54f6fa",
+  "scope": "GTK TSV clipboard payload pasted into LibreOffice Calc",
+  "source": {
+    "serializer": "crates/core/src/export/csv.rs",
+    "serializer_sha256": "6db55d319ed07c6dc42248f5cacd3363350b6d79cf706cf0c8ea4e7037f444ca",
+    "clipboard_test": "crates/app/src/ui/grid/export.rs::clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct",
+    "clipboard_test_sha256": "21d39793379e75634f0c1c9d3f7faf6d49302f8ce6f3f6dcd5d2a241287ca8dd"
+  },
+  "environment": {
+    "consumer": "LibreOffice Calc 26.8.0.3 680(Build:3)",
+    "container_image": "tablepro-lo-calc:26.8.0.3",
+    "container_image_id": "sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c",
+    "display": "Xvfb :98, 1280x800x24"
+  },
+  "procedure": [
+    "Publish the TSV text below on the X11 clipboard using UTF8_STRING.",
+    "Open a blank Calc sheet, select A1, paste with Ctrl+V, and accept the Text Import dialog defaults.",
+    "Read A1:A8 through the LibreOffice UNO API; retained cells and types are in calc-cell-results.json."
+  ],
+  "assertions": [
+    "Literal NULL, SQL NULL marker \\NNN, and marker-shaped text \\N and \\NN remain distinct after paste.",
+    "Quoted empty text imports as an empty Calc cell; the explicit SQL NULL marker remains non-empty.",
+    "Formula-shaped text is stored as text and does not become a formula.",
+    "Quoted embedded tab, newline, and double quote remain in one text cell."
+  ],
+  "result": "passed",
+  "remaining": [
+    "This validates the TSV clipboard flavor in LibreOffice Calc only; other spreadsheet applications and the broader typed consumer matrix remain open."
+  ]
+}
