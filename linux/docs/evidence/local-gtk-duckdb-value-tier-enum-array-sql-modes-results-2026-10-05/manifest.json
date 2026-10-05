@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "f387b5d2ae5e2be83433da74852c455b1f9fa902",
+  "working_tree_dirty": true,
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "environment": {
+    "gtk": true,
+    "duckdb": true,
+    "unit_only": false,
+    "fresh_compile_artifacts": 709,
+    "rebuilt_packages": 17,
+    "compile_seconds": 20.532
+  },
+  "result": {
+    "passed": 322,
+    "failed": 0,
+    "suites": 11,
+    "missing_suites": []
+  },
+  "report": "report.json",
+  "compile_log": "compile.log",
+  "suite_logs": [
+    "crates-app.log",
+    "crates-core.log",
+    "crates-drivers-clickhouse.log",
+    "crates-drivers-duckdb.log",
+    "crates-drivers-mongodb.log",
+    "crates-drivers-mssql.log",
+    "crates-drivers-mysql.log",
+    "crates-drivers-postgres.log",
+    "crates-drivers-redis.log",
+    "crates-drivers-sqlite.log",
+    "crates-mcp.log"
+  ],
+  "sha256sums": "sha256sums.txt",
+  "notes": [
+    "The report revision matches the pushed linux commit.",
+    "The report's dirty flag reflects the two pre-existing untracked B4 scratch directories outside linux/; tracked source was clean during the run.",
+    "B3, B4 and B7 remain open; this local value tier does not qualify the 0.2.0 release."
+  ]
+}

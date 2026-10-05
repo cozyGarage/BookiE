@@ -1,0 +1,14 @@
+7e4ec3d520d7d4392dce9f0d669505c883c2ff2ff67ebba500837afbf918fdc6  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/report.json
+31e559110889967362c25a5e055ecdbc787d0989fdb9dc1079f5a8ed5db27f33  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/compile.log
+bcfcfdac5dd03a6050e924c2f29943a8501c45570ef4cf19dbc16d3ed1ce8088  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-app.log
+d3f883a5124e5fe4d79ad240836fd1957b24dc98c2f8afd6c719ca96c856f913  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-core.log
+646c36ece90f7259f5d62b808a0137e5f1ace114b08327e1900db45855e7ace3  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-clickhouse.log
+a6f1f50cf51824ac856673ef76e56a8d696b95678e899a0c4d28d629afeefa67  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-duckdb.log
+9a3f914ca7357f722fe951428a6fbaf1af40c9f1328c6a1826a0bb9e0736c295  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-mongodb.log
+603235fcd97fe0d3028f6cd084760a41b94c7745fd72fff7053e4a7e31db3a79  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-mssql.log
+15be4cfd40c7aafc440fcff2dde1809a464e4e5100ded1ad66bc82106252c045  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-mysql.log
+66dd83247e06664fe5d9a2300037e2596a3c3edd13353c6086d0d20b657e799c  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-postgres.log
+80781258979bac69f7bb8e337978f95106123ab5a8b90d3fc5264eb96f956f02  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-redis.log
+fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-drivers-sqlite.log
+32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/crates-mcp.log
+b7c5381f4c8a8cdfecedf141e0f8b510825dfdcdaf41f3c13485d2786e6a3b58  docs/evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/manifest.json

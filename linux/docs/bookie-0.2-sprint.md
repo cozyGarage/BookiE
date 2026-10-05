@@ -428,6 +428,11 @@ with the empty-text SQL and typed-CSV changes present in the working tree.
 The run report and suite logs are recorded in the
 [value-tier packet](evidence/local-gtk-duckdb-value-tier-empty-varchar-import-results-2026-10-05/manifest.json) and the [MySQL/MariaDB import packet](evidence/mariadb-empty-varchar-import-empty-string-mode-results-2026-10-05/manifest.json).
 
+After the PostgreSQL enum-array SQL-mode case, the full local GTK + DuckDB
+value tier passed 322 selected tests across all 11 suites, with no missing
+suites. The run compiled 17 packages with 709 fresh artifacts; report and logs
+are retained in the [run packet](evidence/local-gtk-duckdb-value-tier-enum-array-sql-modes-results-2026-10-05/manifest.json).
+
 October 5 B3-1 follow-up: PostgreSQL scalar-enum CSV import now also carries a
 schema-qualified destination cast across a role `search_path` change between
 planning and execution on a fresh connection. A distinct same-named enum leads
