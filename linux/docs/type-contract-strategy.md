@@ -188,6 +188,11 @@ ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.
 Native `typeof()` and `hex()` check both the source expression and restored
 values ([evidence](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json)).
 
+SQL Server `datetimeoffset(7)` now has an XLSX consumer assertion alongside its
+native-byte, CSV, SQL-literal and keyed-grid contracts. The workbook stores
+positive/negative offsets and calendar-boundary values as exact text cells with
+no formulas ([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
+
 The selected-row TSV clipboard path is also exercised in LibreOffice Calc 26.8.0.3:
 literal `NULL`, empty text, SQL NULL's collision-free marker, marker-shaped labels,
 formula-shaped text and quoted tab/newline text retain the asserted cell contents

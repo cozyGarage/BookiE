@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "source_commit": "6a0a3d1204d6c87a0ccd3fe7361c154ae9c56930",
+  "engine": "SQL Server, Docker fixture",
+  "case": "datetimeoffset(7) XLSX results remain exact text cells",
+  "test": "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
+  "contract": [
+    "Native datetimeoffset(7) result values with positive and negative offsets and minimum/maximum calendar values are exported to XLSX as shared-string cells.",
+    "Each value retains its exact local text, seven fractional digits, and original offset in sharedStrings.xml; worksheet cells contain no formulas.",
+    "The same fixture independently checks native DATEPART(TZOFFSET), datetimeoffset bytes, grid parse/keyed-write identity, and unchanged sibling data."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --all-features --lib value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk cargo test --offline --locked -p tablepro-app --all-features --lib",
+      "result": "478 passed, 32 ignored, 1014 filtered out (3 suites)",
+      "log": "app-lib-suite.txt"
+    },
+    "clippy": "rtk cargo clippy --offline --locked -p tablepro-app --all-features --all-targets -- -D warnings passed",
+    "format": "rtk cargo fmt --all -- --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other SQL Server native and non-SQL consumer combinations, wider temporal grid parity, spreadsheet-app re-import, and installed editing remain open; this case does not close B3."
+  ],
+  "log_sha256": {
+    "focused.txt": "02641dbc21bcdc6070b486e14775579cbf276888758046a52bd933379ac52d01",
+    "app-lib-suite.txt": "0d51b348d9fd2f1a555eaa328d22cb81dd36a85b45f225b96ef957f1e13d4f0a"
+  }
+}

@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-app --all-features --lib value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings -- --ignored --nocapture
+1 passed, 0 failed (SQL Server Docker fixture)

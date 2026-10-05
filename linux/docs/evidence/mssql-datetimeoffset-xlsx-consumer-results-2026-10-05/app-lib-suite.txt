@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-app --all-features --lib
+478 passed, 32 ignored, 1014 filtered out (3 suites)

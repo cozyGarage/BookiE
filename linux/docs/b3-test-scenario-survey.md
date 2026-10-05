@@ -342,6 +342,13 @@ TEXT, empty TEXT, UTF-8 and binary BLOB, and SQL NULL result classes through
 typed CSV re-import. Native `typeof()` and `hex()` check source and restored
 values ([evidence](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json)).
 
+October 5 B3-2 SQL Server follow-up: native `datetimeoffset(7)` values with
+positive and negative offsets plus calendar-boundary values now have an XLSX
+consumer assertion: each value is a shared-string cell with exact source text,
+and the sheet contains no formulas. Existing native byte and keyed-edit checks
+remain in the same Docker-backed contract
+([evidence](evidence/mssql-datetimeoffset-xlsx-consumer-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
