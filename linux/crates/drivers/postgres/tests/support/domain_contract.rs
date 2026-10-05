@@ -10,6 +10,8 @@ include!("domain_contract_parts/array_to_string.rs");
 
 include!("domain_contract_parts/array_fill.rs");
 
+include!("domain_contract_parts/multi_array_unnest.rs");
+
 include!("domain_contract_parts/array_cat.rs");
 
 include!("domain_contract_parts/array_positions.rs");

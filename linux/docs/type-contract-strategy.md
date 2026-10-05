@@ -83,9 +83,14 @@ type, and wire-byte oracles ([evidence](evidence/postgres-enum-array-to-string-r
 under a same-named shadow path. Empty and `NULL` labels, SQL NULL fill values,
 zero-sized and multidimensional arrays, non-default bounds, JSON, native type,
 and `array_send` agree with native calls ([evidence](evidence/postgres-enum-array-fill-results-2026-10-05/manifest.json)).
-Remaining named PostgreSQL enum-array candidates include multi-array `unnest`
-and random-result `array_sample` and `array_shuffle`. These cases do not close
-the PostgreSQL or B3 matrix.
+Multi-array `unnest` now covers a schema-qualified enum array beside an integer
+array under a same-named shadow path. The native oracle checks storage order,
+multidimensional flattening, shorter/NULL/empty-array NULL padding, ordinality,
+per-column types and shadow-only label refusal. Untyped calls return SQLSTATE
+`42725` ([evidence](evidence/postgres-enum-multi-array-unnest-results-2026-10-05/manifest.json)).
+Remaining named PostgreSQL enum-array candidates are random-result
+`array_sample` and `array_shuffle`; these cases do not close the PostgreSQL or
+B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),
 and [shadowed-path evidence](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).

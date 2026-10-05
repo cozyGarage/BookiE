@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-05",
+  "baseline_commit": "8da68bc6b0f96f6f55876e559694f66e55c60bb3",
+  "scope": "PostgreSQL multi-array unnest enum-array resolution, heterogeneous output, order and NULL padding under a shadowed search_path",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/domain_contract_parts/multi_array_unnest.rs",
+    "sha256": "3dfd921300d65004ce6a3a0456abded109c78b556180573c13d454823fb01d3a"
+  },
+  "selector": "domain_contract::value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path",
+  "assertions": [
+    "Untyped multi-array unnest($1, $2) returns PostgreSQL SQLSTATE 42725; explicit target-schema enum[] and integer[] casts work while a same-named shadow enum leads search_path.",
+    "Native arrays and bound parameters agree on output rows, ordinality, enum and integer element types, and storage order.",
+    "Cases cover unequal lengths in both directions, SQL NULL arrays, empty arrays, a multidimensional enum array with non-default bounds, and literal NULL/SQL NULL/empty enum labels.",
+    "Shorter arrays and SQL NULL enum arrays are padded with SQL NULL rows; multidimensional input is emitted in row-major storage order.",
+    "A label defined only by the shadow enum is rejected with PostgreSQL SQLSTATE 22P02."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_multi_array_unnest_pads_nulls_under_shadowed_path -- --ignored --nocapture",
+      "result": "passed, 1 test",
+      "log": "focused-test.txt"
+    },
+    {
+      "command": "rtk bash scripts/test-value-contracts.sh --gtk --duckdb",
+      "result": "passed: 334 selected tests across all 11 suites, no missing suites; PostgreSQL selected 128 tests",
+      "report": "report.json",
+      "postgres_log": "crates-drivers-postgres.log"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed; the driver test is registered",
+      "log": "ignored-inventory.txt"
+    },
+    {
+      "command": "rtk git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  ],
+  "worktree_note": "The strict runner report records baseline 8da68bc with dirty=true because this test and its docs were added in the worktree. The test source is pinned by SHA-256 above.",
+  "remaining": [
+    "The named random-result enum-array candidates are array_sample and array_shuffle.",
+    "This contract does not close the broader PostgreSQL array or B3 matrix."
+  ],
+  "reference": "PostgreSQL 16 array-function semantics: https://www.postgresql.org/docs/16/functions-array.html"
+}

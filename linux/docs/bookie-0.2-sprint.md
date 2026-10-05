@@ -62,11 +62,14 @@ including the empty-array distinction between NULL length and zero cardinality.
 elements, empty arrays and SQL NULL arrays, including calls under a shadowed
 enum path. `array_fill` now covers polymorphic inference, NULL/empty enum
 values, empty and multidimensional results, non-default bounds and native type
-and wire equality under a shadowed enum path. The remaining named enum-array
-candidates are multi-array `unnest` and random-result `array_sample`/`array_shuffle`
+and wire equality under a shadowed enum path. Multi-array `unnest` now checks
+heterogeneous enum/integer inputs, storage order, NULL padding and multidimensional
+flattening under a shadowed path. The remaining named enum-array candidates are
+random-result `array_sample`/`array_shuffle`
 ([shape evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json),
 [array_to_string evidence](evidence/postgres-enum-array-to-string-results-2026-10-05/manifest.json),
-[array_fill evidence](evidence/postgres-enum-array-fill-results-2026-10-05/manifest.json)).
+[array_fill evidence](evidence/postgres-enum-array-fill-results-2026-10-05/manifest.json),
+[multi-array unnest evidence](evidence/postgres-enum-multi-array-unnest-results-2026-10-05/manifest.json)).
 
 The merged working tree passed local quick CI and the strict GTK+DuckDB values
 layer (196 selected tests across all 11 suites, with no missing suites). These

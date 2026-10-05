@@ -1,0 +1,12 @@
+
+running 7 tests
+test temporal_boundaries::value_contract_supported_temporal_calendar_edges_match_native_text_and_bind_exactly ... ok
+test value_contract_all_legacy_datetime_ticks_round_trip_through_parameters ... ok
+test value_contract_datetimeoffset_keeps_its_offset_through_results_parameters_and_exports ... ok
+test value_contract_legacy_datetime_fallback_matches_session_batch_and_native_text ... ok
+test value_contract_money_values_are_refused_but_server_nulls_remain_null ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_contract_smalldatetime_rounding_matches_server_text ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 28 filtered out; finished in 40.70s
+
