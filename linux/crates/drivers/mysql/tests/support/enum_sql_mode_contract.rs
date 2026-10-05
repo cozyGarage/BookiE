@@ -603,3 +603,80 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
     );
     connection.close().await.unwrap();
 }
+
+async fn assert_collated_enum_round_trip(options: ConnectOptions) {
+    let connection = connect(options).await;
+    connection
+        .execute(
+            "CREATE TABLE enum_collation_source (
+                id INT PRIMARY KEY,
+                mood ENUM('Café', 'Tea') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            )",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE enum_collation_copy LIKE enum_collation_source")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enum_collation_source VALUES (1, 'CAFE'), (2, 'tEa')")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(None, "enum_collation_source").await.unwrap();
+    let mood = columns.iter().position(|column| column.name == "mood").unwrap();
+    assert_eq!(columns[mood].collation.as_deref(), Some("utf8mb4_unicode_ci"));
+
+    let native = connection
+        .query(
+            "SELECT id, mood, CAST(mood + 0 AS CHAR), HEX(mood), COLLATION(mood) \
+             FROM enum_collation_source ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("Café".into()),
+                Value::Text("1".into()),
+                Value::Text("436166C3A9".into()),
+                Value::Text("utf8mb4_unicode_ci".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("Tea".into()),
+                Value::Text("2".into()),
+                Value::Text("546561".into()),
+                Value::Text("utf8mb4_unicode_ci".into()),
+            ],
+        ]
+    );
+
+    for row in &native.rows {
+        connection
+            .execute_params("INSERT INTO enum_collation_copy (id, mood) VALUES (?, ?)", &row[..2])
+            .await
+            .unwrap();
+    }
+    let copied = connection
+        .query(
+            "SELECT id, mood, CAST(mood + 0 AS CHAR), HEX(mood), COLLATION(mood) \
+             FROM enum_collation_copy ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(copied.rows, native.rows);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_mysql_and_mariadb_collated_enum_inputs_preserve_canonical_labels() {
+    let (_mysql, mysql_options) = start_mysql().await;
+    assert_collated_enum_round_trip(mysql_options).await;
+
+    let (_mariadb, mariadb_options) = start_mariadb().await;
+    assert_collated_enum_round_trip(mariadb_options).await;
+}

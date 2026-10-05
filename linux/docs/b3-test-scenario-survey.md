@@ -35,6 +35,15 @@ and confirms PostgreSQL rejects a 64-byte label with SQLSTATE `42602`; native
 JSON and wire checks preserve the accepted label through typed rebinding
 ([evidence](evidence/postgres-enum-array-max-label-results-2026-10-05/manifest.json)).
 
+### October 5 MySQL/MariaDB enum-collation follow-up
+
+`utf8mb4_unicode_ci` is now covered on both MySQL and MariaDB: case- and
+accent-insensitive inputs resolve to the declared canonical ENUM labels, the
+fetched column metadata preserves the collation, and parameterized copy keeps
+enum ordinals, text, collation and label bytes
+([evidence](evidence/mysql-mariadb-enum-collation-results-2026-10-05/manifest.json)).
+Other collations and enum configurations remain open.
+
 ### October 5 PostgreSQL float4[] Calc follow-up
 
 The PostgreSQL `float4[]` file-writer case now checks CSV text export and SQL

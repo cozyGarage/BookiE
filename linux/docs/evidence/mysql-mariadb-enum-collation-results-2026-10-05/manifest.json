@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "branch": "linux",
+  "baseline_commit": "fded8ea7a",
+  "scope": "MySQL and MariaDB ENUM behavior under utf8mb4_unicode_ci",
+  "source": {
+    "path": "crates/drivers/mysql/tests/support/enum_sql_mode_contract.rs",
+    "sha256": "aaf3508cc90eaec4c3f52736fda77e2f0f10f20ef1e048f1020778b1a0c91e35"
+  },
+  "engines": [
+    "MySQL Docker integration fixture",
+    "MariaDB 11 Docker integration fixture"
+  ],
+  "contract": [
+    "utf8mb4_unicode_ci accepts case- and accent-insensitive input matching declared ENUM labels and returns each canonical declared label.",
+    "Fetched column metadata retains utf8mb4_unicode_ci.",
+    "Parameterized copy preserves enum ordinals, canonical text, collation, and label bytes on both engines."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-driver-mysql --test integration value_contract_mysql_and_mariadb_collated_enum_inputs_preserve_canonical_labels -- --ignored --nocapture",
+      "result": "1 passed; exercises both MySQL and MariaDB",
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-mysql --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "ignored_test_inventory": {
+      "command": "rtk python3 scripts/inventory-ignored-tests.py --check",
+      "result": "passed",
+      "log": "ignored-inventory.txt"
+    },
+    "diff_check": {
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "d8544e2cc72fc80a277ece2a2ab8ee45795c633b252091d3c9496b8efe9f76e6",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other MySQL/MariaDB collations and enum configurations and the broader B3 matrix remain open; this case does not close B3 or qualify 0.2.0."
+  ]
+}
