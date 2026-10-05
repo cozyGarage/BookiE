@@ -340,6 +340,10 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
         .await
         .unwrap();
     setup
+        .execute("CREATE TABLE enum_empty_mode_combined_target LIKE enum_empty_mode_source")
+        .await
+        .unwrap();
+    setup
         .execute(
             "INSERT INTO enum_empty_mode_source VALUES \
              (1, '', ''), (2, 'NULL', 'read'), (3, NULL, NULL)",
@@ -351,12 +355,16 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
         .await
         .unwrap();
     setup
+        .execute("INSERT INTO enum_empty_mode_combined_target VALUES (99, 'ready', 'write')")
+        .await
+        .unwrap();
+    setup
         .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL'")
         .await
         .unwrap();
     setup.close().await.unwrap();
 
-    let connection = connect(options).await;
+    let connection = connect(options.clone()).await;
     let active_mode = connection.query("SELECT @@SESSION.sql_mode").await.unwrap();
     let Value::Text(active_mode) = &active_mode.rows[0][0] else {
         panic!("unexpected sql_mode: {:?}", active_mode.rows)
@@ -496,6 +504,62 @@ async fn value_contract_mariadb_empty_enum_and_set_csv_restore_survive_empty_str
                 Value::Int(0),
             ],
         ]
+    );
+    connection.close().await.unwrap();
+
+    let setup = connect(options.clone()).await;
+    setup
+        .execute("SET GLOBAL sql_mode = 'EMPTY_STRING_IS_NULL,STRICT_TRANS_TABLES,ANSI_QUOTES,NO_BACKSLASH_ESCAPES'")
+        .await
+        .unwrap();
+    setup.close().await.unwrap();
+
+    let connection = connect(options).await;
+    let active_mode = connection.query("SELECT @@SESSION.sql_mode").await.unwrap();
+    let Value::Text(active_mode) = &active_mode.rows[0][0] else {
+        panic!("unexpected sql_mode: {:?}", active_mode.rows)
+    };
+    for mode in [
+        "EMPTY_STRING_IS_NULL",
+        "STRICT_TRANS_TABLES",
+        "ANSI_QUOTES",
+        "NO_BACKSLASH_ESCAPES",
+    ] {
+        assert!(
+            active_mode.split(',').any(|active| active.trim() == mode),
+            "{mode} must be active in combined sql_mode; got {active_mode}"
+        );
+    }
+    let columns = connection
+        .fetch_columns(None, "enum_empty_mode_combined_target")
+        .await
+        .unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "mysql",
+            schema: None,
+            table: "enum_empty_mode_combined_target",
+            columns: &columns,
+            mapping: &[Some(0), Some(1), Some(2)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+    let restored_combined = connection
+        .query(
+            "SELECT id, CAST(state + 0 AS CHAR), HEX(state), state IS NULL, \
+             CAST(permissions + 0 AS CHAR), HEX(permissions), permissions IS NULL \
+             FROM enum_empty_mode_combined_target ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        restored_combined.rows, restored.rows,
+        "combined sql_mode must preserve empty ENUM/SET, SQL NULL, and the existing sibling"
     );
     connection.close().await.unwrap();
 }
