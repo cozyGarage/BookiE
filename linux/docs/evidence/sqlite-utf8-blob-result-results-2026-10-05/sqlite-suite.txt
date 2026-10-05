@@ -1,0 +1,2 @@
+rtk cargo test --offline --locked -p tablepro-driver-sqlite
+47 passed, 0 failed

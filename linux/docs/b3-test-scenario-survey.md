@@ -324,6 +324,12 @@ values across declared INTEGER, REAL, BOOLEAN, DATE, TIME, DATETIME and BLOB
 columns against native `typeof()` results
 ([evidence](evidence/sqlite-declared-affinity-results-2026-10-05/manifest.json)).
 
+October 5 B3-1 follow-up: a computed SQLite BLOB whose bytes are valid UTF-8
+still decodes as `Value::Bytes`; native `typeof()` and `hex()` independently
+check its runtime class and exact bytes. This closes a decoder edge case only;
+the wider SQLite expression and consumer matrix remains open
+([evidence](evidence/sqlite-utf8-blob-result-results-2026-10-05/manifest.json)).
+
 October 4 B3-4 follow-up: a SQLite computed `CAST(value AS BLOB)` over STRICT
 `ANY` now checks INTEGER, REAL, TEXT, empty text, BLOB and SQL NULL results
 against `typeof()` and exact `hex()` bytes. JSON retains computed bytes as
