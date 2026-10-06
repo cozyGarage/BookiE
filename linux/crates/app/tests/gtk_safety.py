@@ -1417,9 +1417,10 @@ def main():
     scenarios.extend(gtk_ux.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
-        scenarios = [scenario for scenario in scenarios if scenario.__name__ == selected]
-        if not scenarios:
-            raise SystemExit(f"unknown GTK scenario: {selected}")
+        names = set(selected.split(","))
+        scenarios = [scenario for scenario in scenarios if scenario.__name__ in names]
+        if {scenario.__name__ for scenario in scenarios} != names:
+            raise SystemExit(f"unknown GTK scenario in: {selected}")
     for scenario in scenarios:
         run_scenario(binary, scenario)
         print(f"passed: {scenario.__name__}")

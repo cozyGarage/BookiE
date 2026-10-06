@@ -240,6 +240,45 @@ def scenarios(ui):
         ui.press_x11_key("Escape")
         ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG, present=False)
 
+    def psql(sql):
+        import subprocess
+        out = subprocess.run(
+            ["docker", "exec", os.environ["TABLEPRO_GTK_POSTGRES_CONTAINER"], "psql", "--username=postgres",
+             "--dbname=bookie_test", "--tuples-only", "--no-align", f"--command={sql}"],
+            check=True, capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
+    def wait_for_psql(sql, expected):
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and psql(sql) != expected:
+            time.sleep(ui.POLL_SECONDS)
+        assert psql(sql) == expected, (sql, psql(sql), expected)
+
+    def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.invoke_named_action_within("people", "Open people")
+        ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
+        click_cell("Grace Hopper", count=2)
+        for key in "gracey":
+            ui.press_x11_key(key)
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert psql("SELECT name FROM people WHERE id = 2") == "Grace Hopper", "an unsaved edit reached the server"
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_psql("SELECT name FROM people WHERE id = 2", "gracey")
+        assert ui.find_node(name="Approve once") is None, "a plain grid edit asked for approval"
+        ui.wait_for_node(name="1 unsaved change", present=False)
+
+        click_cell("2")
+        ui.press_x11_key("Delete")
+        ui.wait_for_node(name="1 unsaved change")
+        assert psql("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
+        ui.press_x11_key("s", ("Control_L",))
+        wait_for_psql("SELECT count(*) FROM people", "1")
+        wait_for_psql("SELECT id FROM people", "1")
+
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
@@ -250,6 +289,7 @@ def scenarios(ui):
     ]
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_saved_connection_browses_rows_and_values)
+        result.append(postgres_grid_edit_and_delete_commit_to_the_server)
     for scenario in result:
         scenario.environment = "local"
     return result

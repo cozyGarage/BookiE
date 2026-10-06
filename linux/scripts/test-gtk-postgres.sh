@@ -64,9 +64,10 @@ printf 'tablepro_test' | secret-tool store --label='BookiE GTK PostgreSQL fixtur
   connection-id 0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11 \
   kind db_password
 
-TABLEPRO_GTK_KEYRING_READY=1 \
+TABLEPRO_GTK_POSTGRES_CONTAINER="$container" \
+  TABLEPRO_GTK_KEYRING_READY=1 \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
   TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
   TABLEPRO_GTK_POSTGRES_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values}" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_grid_edit_and_delete_commit_to_the_server}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"
