@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/sqlite-affinity-check-constraint",
+  "source_commit": "92a60376359ce8a033a51107eb438843310bda90",
+  "source_sha256": {
+    "crates/app/tests/support/sqlite_numeric_affinity.rs": "15ea3b2990f52786fb2474e6db41dac21414fefe86fa7dd72e82cde8d63b751d"
+  },
+  "engine": "SQLite, in-memory NUMERIC affinity with CHECK(typeof(amount) != text)",
+  "case": "A constraint-rejected nonnumeric grid edit leaves the original SQLite value unchanged",
+  "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity::sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints",
+  "contract": [
+    "The grid parser accepts clearly nonnumeric text for SQLite NUMERIC affinity.",
+    "A table CHECK constraint that forbids TEXT rejects the keyed update.",
+    "After refusal, native typeof() and value assertions prove the original INTEGER and row remain unchanged."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path Cargo.toml -p tablepro-app --all-features --lib ui::browse_tab::value_parse::tests::sqlite_numeric_affinity::sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints -- --exact --test-threads=1",
+      "result": "1 passed",
+      "log": "focused.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path Cargo.toml -p tablepro-app --all-features --lib",
+      "result": "481 passed, 0 failed, 32 ignored",
+      "log": "app-lib.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path Cargo.toml -p tablepro-app --all-features --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "5b6877283ec35ed546ea452c832baf33ddfb2155c58010b459e9aaad64741f00",
+    "app-lib.txt": "7e7342ada92b125fd5c7e93c3c93bda2a6dee9e10b1efd9ebe8084a83541132e",
+    "clippy.txt": "db686130097063a728f8e24eb58349fb5fa79db5e279150fc28a50b287f526cb",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other affinity/storage-class pairs and installed grid editing remain open; this case does not close B3 or qualify 0.2.0."
+  ]
+}
