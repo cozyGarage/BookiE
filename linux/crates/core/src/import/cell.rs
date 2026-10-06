@@ -403,7 +403,9 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
         }
         Ok(value) => Ok(value),
         Err(_)
-            if driver_id == "sqlite" && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) =>
+            if driver_id == "sqlite"
+                && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal)
+                && !crate::is_numeric_input(text) =>
         {
             // SQLite affinity is advisory: a NUMERIC/INTEGER/REAL column
             // may legally store text when the input is not numeric.
@@ -673,6 +675,17 @@ mod tests {
                 value_for("not numeric", &target, &options, "mssql").unwrap_err(),
                 expected_error,
                 "the SQLite fallback must not mask a type error for {data_type}"
+            );
+        }
+        for (data_type, text, expected_error) in [
+            ("INTEGER", "9223372036854775808", CellError::NotAnInteger),
+            ("REAL", "1e999", CellError::NotANumber),
+            ("NUMERIC", "0.123456789012345678901234567890123", CellError::NotANumber),
+        ] {
+            assert_eq!(
+                value_for(text, &column("value", data_type), &options, "sqlite").unwrap_err(),
+                expected_error,
+                "numeric-looking input must not fall back to lossy SQLite text for {data_type}"
             );
         }
     }

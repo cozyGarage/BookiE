@@ -181,6 +181,7 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     match parse_input_for_column(text, col) {
         Err(_)
             if driver_id == "sqlite"
+                && !tablepro_core::is_numeric_input(text)
                 && col.is_some_and(|column| {
                     matches!(
                         classify_type(&column.data_type.to_ascii_lowercase()),

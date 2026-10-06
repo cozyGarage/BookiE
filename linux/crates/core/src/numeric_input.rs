@@ -21,6 +21,14 @@ pub fn parse_float_input(text: &str) -> Result<f64, FloatInputError> {
     Ok(value)
 }
 
+pub fn is_numeric_input(text: &str) -> bool {
+    match parse_float_input(text) {
+        Ok(value) => value.is_finite(),
+        Err(FloatInputError::Invalid) => false,
+        Err(FloatInputError::Overflow | FloatInputError::Underflow) => true,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -36,5 +44,9 @@ mod tests {
         assert!(parse_float_input("NaN").unwrap().is_nan());
         assert_eq!(parse_float_input("1e400"), Err(FloatInputError::Overflow));
         assert_eq!(parse_float_input("1e-400"), Err(FloatInputError::Underflow));
+        assert!(is_numeric_input("1e400"));
+        assert!(is_numeric_input("1e-400"));
+        assert!(!is_numeric_input("not numeric"));
+        assert!(!is_numeric_input("NaN"));
     }
 }

@@ -89,6 +89,18 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
     let columns = connection.fetch_columns(None, "flexible").await.unwrap();
     let before = connection.query("SELECT * FROM flexible ORDER BY id").await.unwrap();
 
+    for (name, input) in [
+        ("integer_amount", "9223372036854775808"),
+        ("real_amount", "1e999"),
+        ("numeric_amount", "0.123456789012345678901234567890123"),
+    ] {
+        let column = columns.iter().find(|column| column.name == name).unwrap();
+        assert!(
+            parse_input_for_grid_cell(input, Some(column), "sqlite", Some(&Value::Int(1))).is_err(),
+            "SQLite grid must reject numeric-looking input that affinity could round: {name}"
+        );
+    }
+
     for name in ["integer_amount", "real_amount", "numeric_amount"] {
         let index = columns.iter().position(|column| column.name == name).unwrap();
         let current = &before.rows[0][index];
