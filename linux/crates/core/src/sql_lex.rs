@@ -197,7 +197,7 @@ mod tests {
             ("mysql", "SELECT 'a\\';b'"),
             ("clickhouse", "SELECT 'a\\';b'"),
             ("postgres", "SELECT E'a\\';b'"),
-            ("postgres", "SELECT 1 /* outer /* inner */ ; still outer */"),
+            ("postgres", "SELECT 1 /* outer /* x */ ; still outer */"),
             ("mssql", "SELECT [a]];b]"),
             ("mysql", "SELECT `a``;b`"),
         ];
