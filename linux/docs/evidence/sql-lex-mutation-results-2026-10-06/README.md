@@ -6,8 +6,7 @@ survivors exposed uncovered behavior: ClickHouse backtick escapes and
 PostgreSQL dollar-tag characters after the first character. Added assertions
 now kill both. The remaining survivor changes `length > 0` to `length >= 0`
 after `skip_span` has already returned a positive length; it is equivalent for
-this call path. The timeouts came from mutants that can stop scanner progress;
-they remain open for B3-P6 triage.
+this call path.
 
 The raw reports are retained in `*-outcomes.json`. The first targeted recheck
 killed the ClickHouse mutation and still missed the PostgreSQL interior-tag
@@ -15,8 +14,20 @@ mutation. After adding the `$a-b$` case, the final targeted check killed that
 mutation too. A 24-mutant scanner-only recheck then exposed a nested-comment
 fixture whose inner terminator accidentally matched an `index *= 2` mutation.
 The fixture now uses a shorter inner comment; the final check catches that
-mutation, while the backward-index mutation still times out as expected.
-The focused unit selector passed 12 tests.
+mutation.
+
+The 13 original timeouts split into five zero-length span mutants and eight
+cursor arithmetic mutants. All five zero-length mutants came from consumers
+trusting `skip_span` to return a positive length. The named-parameter rewriter
+and SQL diagnostics scanner now ignore zero-length spans, matching
+`statement_spans`. The focused five-mutant recheck caught all five with no
+timeouts. The seven remaining timeout outcomes are cursor arithmetic mutants
+that move a scanner index backwards or fail to advance; they remain killed by
+the mutation runner timeout rather than counting as test failures.
+
+The focused unit selector passed 12 tests. The follow-up run after the guards
+passed all 535 core library tests and caught all five zero-length mutants.
+See the [zero-progress guard evidence](../sql-lex-zero-progress-guards-results-2026-10-06/manifest.json).
 
 The latest tested `sql_lex.rs` SHA-256 was
 `90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148`.
