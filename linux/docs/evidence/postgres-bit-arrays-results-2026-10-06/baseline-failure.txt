@@ -1,0 +1,24 @@
+
+running 1 test
+test array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv ... FAILED
+
+failures:
+
+---- array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv stdout ----
+
+thread 'array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv' (2544419) panicked at crates/drivers/postgres/tests/support/array_contract_parts/bit_array_consumers.rs:41:9:
+assertion `left == right` failed
+  left: Undecodable("BIT[]")
+ right: Text("{10101,00000,NULL}")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 187 filtered out; finished in 2.83s
+
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.53s
+     Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
+error: test failed, to rerun pass `-p tablepro-driver-postgres --test integration`

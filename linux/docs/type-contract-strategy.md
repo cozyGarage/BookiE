@@ -16,6 +16,12 @@ safe typed support needs qualified custom-array type metadata through query and
 import planning; the test does not mark that capability complete
 ([refusal evidence](evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json)).
 
+PostgreSQL `bit[]` and `varbit[]` now decode from their native array wire
+format. Fixed-width values, varying lengths, empty bit strings, SQL NULL,
+non-default lower bounds, parameter rebinding and typed CSV restore are checked
+against native JSON/type/wire oracles
+([evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json)).
+
 Detailed native cases and old counts are in [type-contract history](type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
 source/SHA attribution; this summary does not certify the current tree.

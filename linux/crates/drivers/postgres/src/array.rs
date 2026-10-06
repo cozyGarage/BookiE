@@ -7,6 +7,8 @@ pub(super) const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
 // space-separated values, so array text for them could not be imported again.
 const INT2VECTOR_OID: u32 = 22;
 const OIDVECTOR_OID: u32 = 30;
+const BIT_OID: u32 = 1560;
+const VARBIT_OID: u32 = 1562;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let info = raw.type_info();
@@ -225,6 +227,8 @@ fn supported(oid: u32) -> bool {
             | 1184
             | 1186
             | 1266
+            | BIT_OID
+            | VARBIT_OID
             | 1700
             | 2950
     )
@@ -245,6 +249,9 @@ fn element_text(oid: u32, enum_element: bool, bytes: &[u8]) -> Option<String> {
             bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>()
         ),
         19 | 25 | 1042 | 1043 if !bytes.contains(&0) => std::str::from_utf8(bytes).ok()?.into(),
+        BIT_OID | VARBIT_OID => {
+            crate::decode::decode_pg_binary_text(if oid == BIT_OID { "BIT" } else { "VARBIT" }, bytes)?
+        }
         20 => i64::from_be_bytes(bytes.try_into().ok()?).to_string(),
         21 => i16::from_be_bytes(bytes.try_into().ok()?).to_string(),
         23 => i32::from_be_bytes(bytes.try_into().ok()?).to_string(),
