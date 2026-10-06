@@ -201,11 +201,11 @@ def scenarios(ui):
         import glob
         for status in glob.glob("/proc/[0-9]*/status"):
             try:
+                executable = os.readlink(status.replace("status", "exe"))
                 text = open(status).read()
-                cmd = open(status.replace("status", "cmdline"), "rb").read()
             except OSError:
                 continue
-            if b"usr/bin/tablepro" not in cmd and b"tablepro-app" not in cmd:
+            if not executable.endswith("/usr/bin/tablepro"):
                 continue
             fields = dict(line.split(":", 1) for line in text.splitlines() if ":" in line)
             return int(fields["VmRSS"].split()[0]), int(fields["VmHWM"].split()[0])
