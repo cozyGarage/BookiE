@@ -32,6 +32,11 @@
       "result": "1 passed, 0 failed",
       "log": "unlisted-array-refusal.txt"
     },
+    "postgres_array_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "52 passed, 0 failed",
+      "log": "postgres-array-suite.txt"
+    },
     "clippy": {
       "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
       "result": "passed",
