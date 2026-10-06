@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-enum-array-markup-exports",
+  "source_commit": "1e8a293950c716da951b69adaa75e43ac48d24cc",
+  "source_files": {
+    "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs": "93b3346809503ac3e4eb0c5df03ee247622a39a2dcf80564c61afcb5bb1bdfa6"
+  },
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Custom enum[] XML, HTML, and Markdown file-writer escaping",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "contract": [
+    "The existing enum[] value contract supplies exact native type, array_to_json, array_send, SQL NULL element, empty label, literal NULL label, Unicode, quote, backslash, comma, markup, and formula-shaped label checks.",
+    "XML and HTML exports preserve PostgreSQL array text while escaping ampersands, angle brackets, quotes, and apostrophes.",
+    "Markdown export preserves markup as text and escapes backslashes; the value contract distinguishes literal NULL inside the array from its SQL NULL element through the native JSON oracle.",
+    "JSON, CSV, XLSX and SQL replay assertions remain in the same test, including native wire-byte equality and sibling-row preservation."
+  ],
+  "validation": {
+    "native_contract": {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_file_exports_preserve_labels -- --ignored --exact --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "postgres-enum-array-markup.txt"
+    },
+    "format": "rtk cargo fmt --all -- --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "postgres-enum-array-markup.txt": "a12c4d6307d4b6bf7b830cdcf476e97708e5d9a2a21dadeaa86eddbdc01deca2"
+  },
+  "remaining": [
+    "Other PostgreSQL array families and spreadsheet-application re-import combinations remain open; this case does not close the broader B3 engine, type, consumer, or configuration matrix."
+  ]
+}

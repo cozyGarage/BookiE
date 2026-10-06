@@ -87,6 +87,64 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
+    for (format, extension, escaped) in [
+        (
+            tablepro_core::export::ResultFormat::Xml,
+            "xml",
+            driver_text
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&apos;"),
+        ),
+        (
+            tablepro_core::export::ResultFormat::Html,
+            "html",
+            driver_text
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&#39;"),
+        ),
+    ] {
+        let path = directory.path().join(format!("enum-array.{extension}"));
+        tablepro_core::export::write_result_file(
+            &path,
+            &result,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &csv_options,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let markup = std::fs::read_to_string(path).unwrap();
+        assert!(markup.contains(&escaped), "{extension}: {markup}");
+        assert!(markup.contains("NULL"), "{extension}: {markup}");
+    }
+
+    let markdown_path = directory.path().join("enum-array.md");
+    tablepro_core::export::write_result_file(
+        &markdown_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Markdown,
+            csv: &csv_options,
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let markdown = std::fs::read_to_string(markdown_path).unwrap();
+    assert!(markdown.contains("&lt;tag&gt;&amp;"), "{markdown}");
+    assert!(markdown.contains("&#92;"), "{markdown}");
+    assert!(markdown.contains("NULL"), "{markdown}");
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("enum-array.xlsx"));
