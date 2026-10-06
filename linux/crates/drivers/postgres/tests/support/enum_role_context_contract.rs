@@ -357,7 +357,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
     admin
         .execute(
             "ALTER ROLE enum_role_login_contract SET search_path \
-             TO enum_role_login_shadow, enum_role_login_target, public",
+             TO enum_role_login_shadow, public",
         )
         .await
         .unwrap();
@@ -394,7 +394,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
         identity.rows,
         vec![vec![
             Value::Text("enum_role_login_contract".into()),
-            Value::Text("enum_role_login_shadow, enum_role_login_target, public".into()),
+            Value::Text("enum_role_login_shadow, public".into()),
         ]]
     );
 
