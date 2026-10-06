@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/postgres-enum-scalar-csv-whitespace",
-  "source_commit": "20465557e21d9e4b5b39a372816404e1de27c1c6",
+  "source_commit": "bb67ece25b9f0443fa2821e2826951b6399b7bc3",
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "Scalar custom-enum CSV export and typed restore preserve boundary whitespace",
   "test": "enum_contract::value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null",
@@ -31,8 +31,8 @@
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "postgres-enum-scalar-csv-whitespace.txt": "638c31160f81dd13db39900d21991e08be6aef544799b23344546737e2f93c1e",
-    "clippy.txt": "f7ebb3ad44b50bb53ff991f539d4301ca73d935f85f983e25e563efc70ef5d2c",
+    "postgres-enum-scalar-csv-whitespace.txt": "84039c9236f74298b7a0712f00a45a42589a8ab7374a53dd1becbcb57b58a1a9",
+    "clippy.txt": "8782f5beca5ae9aa7dc4288206ab77037b3b73307b401cdc2b23b723e3e9ed5f",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
