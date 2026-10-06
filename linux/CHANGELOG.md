@@ -34,6 +34,7 @@
 - Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
 - The editor find bar has Match case and Regular expression toggles.
 - A Switch database button in the window header lists the databases the account can open on PostgreSQL, MySQL, SQL Server, ClickHouse and MongoDB, reconnects to the one you pick and remembers it for that saved connection.
+- The Connect button in the connection form becomes Cancel while it is reaching the server, so a slow or unreachable host no longer has to be waited out.
 
 ### Changed
 

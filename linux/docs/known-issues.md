@@ -30,7 +30,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | Needs a chain editor in the form | gtk-widget |
 | UI-2 | ~~Failed connect has no Retry or Edit~~ | DONE | PR #87, `recovery_tests` | unit |
 | UI-3 | ~~Saved connection cannot be cancelled while connecting~~ | DONE | PR #87, `cancellation_tests` | unit |
-| UI-3b | The connect dialog's own Connect button has no cancel | OPEN | `connect_dialog/mod.rs` | gtk-widget |
+| UI-3b | ~~The connect dialog's own Connect button has no cancel~~ | DONE | `open_candidate` cancelled before anything is saved; scenario `connect_dialog_cancel_stops_a_hanging_connection` | gtk-installed |
 | UI-4 | ~~New connection form defaults to ClickHouse; no file pickers; bare TLS error~~ | DONE | PR #87 | unit |
 | UI-5 | ~~Test Connection result is a transient raw toast~~ | DONE | `test_result_text` test; scenarios `test_connection_reports_success_in_the_dialog` and `..._failure_...` | gtk-widget |
 | UI-6 | ~~`Ctrl+/` opened the shortcuts window instead of toggling an editor comment~~ | DONE | `window_shortcut_tests`; scenario `ctrl_slash_toggles_a_comment_in_the_editor` | gtk-installed |

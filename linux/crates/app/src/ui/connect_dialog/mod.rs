@@ -51,6 +51,7 @@ pub struct ConnectDialog {
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
     applied_driver: Option<u32>,
+    connect_cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +121,7 @@ pub enum ConnectDialogOutput {
 #[allow(clippy::large_enum_variant)]
 pub enum ConnectDialogCmd {
     Result(Result<connection_service::PreparedConnection, String>),
+    Cancelled,
     TestResult(Result<usize, String>),
 }
 
@@ -380,6 +382,7 @@ impl Component for ConnectDialog {
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
             applied_driver: None,
+            connect_cancel: None,
         };
         let widgets = view_output!();
         let selected = model.driver_combo.selected();
@@ -434,6 +437,10 @@ impl Component for ConnectDialog {
             }
 
             ConnectDialogInput::Submit => {
+                if let Some(cancel) = self.connect_cancel.take() {
+                    cancel.cancel();
+                    return;
+                }
                 self.set_busy(BusyKind::Connecting);
 
                 let idx = self.driver_combo.selected() as usize;
@@ -477,6 +484,8 @@ impl Component for ConnectDialog {
                 let ssh_environment = self.ssh_environment.clone();
 
                 let bound_id = self.bound_connection_id;
+                let cancel = tokio_util::sync::CancellationToken::new();
+                self.connect_cancel = Some(cancel.clone());
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
@@ -492,9 +501,15 @@ impl Component for ConnectDialog {
                                 environment,
                                 timeout_secs,
                                 query_timeout_secs,
+                                cancel,
                             })
                             .await;
-                            out.send(ConnectDialogCmd::Result(result)).ok();
+                            let message = match result {
+                                Ok(Some(prepared)) => ConnectDialogCmd::Result(Ok(prepared)),
+                                Ok(None) => ConnectDialogCmd::Cancelled,
+                                Err(error) => ConnectDialogCmd::Result(Err(error)),
+                            };
+                            out.send(message).ok();
                         })
                         .drop_on_shutdown()
                 });
@@ -565,7 +580,9 @@ impl Component for ConnectDialog {
 
     fn update_cmd(&mut self, msg: Self::CommandOutput, sender: ComponentSender<Self>, root: &Self::Root) {
         self.set_busy(BusyKind::None);
+        self.connect_cancel = None;
         match msg {
+            ConnectDialogCmd::Cancelled => self.show_toast(&crate::tr!("Connection cancelled.")),
             ConnectDialogCmd::Result(Ok(prepared)) => {
                 tracing::info!(driver = %prepared.driver_id, table_count = prepared.tables.len(), "connection prepared");
                 let _ = sender.output(ConnectDialogOutput::Prepared(Box::new(prepared)));
@@ -799,7 +816,7 @@ impl ConnectDialog {
     /// for a button that isn't running the test.
     fn set_busy(&self, kind: BusyKind) {
         let busy = !matches!(kind, BusyKind::None);
-        self.submit.set_sensitive(!busy);
+        self.submit.set_sensitive(!busy || matches!(kind, BusyKind::Connecting));
         self.test_button.set_sensitive(!busy);
         match kind {
             BusyKind::None => {
@@ -807,7 +824,7 @@ impl ConnectDialog {
                 self.test_button.set_label(&crate::tr!("Test"));
             }
             BusyKind::Connecting => {
-                self.submit.set_label(&crate::tr!("Connecting…"));
+                self.submit.set_label(&crate::tr!("Cancel"));
                 self.test_button.set_label(&crate::tr!("Test"));
             }
             BusyKind::Testing => {
@@ -838,9 +855,45 @@ struct ConnectRequest {
     environment: Environment,
     timeout_secs: u32,
     query_timeout_secs: Option<u32>,
+    cancel: tokio_util::sync::CancellationToken,
 }
 
-async fn run_connect(request: ConnectRequest) -> Result<connection_service::PreparedConnection, String> {
+struct OpenedCandidate {
+    conn: Box<dyn tablepro_core::Connection>,
+    tunnel: Option<tablepro_transport::Tunnel>,
+    server_version: Option<String>,
+    tables: Vec<tablepro_core::TableInfo>,
+    views: Vec<tablepro_core::TableInfo>,
+}
+
+async fn open_candidate(
+    driver: &dyn tablepro_core::DatabaseDriver,
+    opts: ConnectOptions,
+    ssh: Option<tablepro_transport::SshRoute>,
+    ssh_environment: &tablepro_transport::SshEnvironment,
+    timeout_secs: u32,
+) -> Result<OpenedCandidate, String> {
+    let (conn, tunnel) = connection_service::establish(driver, opts, ssh, ssh_environment).await?;
+    let server_version = conn.server_version().await.ok().flatten();
+    let control = crate::services::operation_control::bounded(timeout_secs);
+    let tables = conn
+        .list_tables_controlled(&control)
+        .await
+        .map_err(|e| format!("list_tables: {e}"))?;
+    let views = conn
+        .list_views_controlled(&control)
+        .await
+        .map_err(|e| format!("list_views: {e}"))?;
+    Ok(OpenedCandidate {
+        conn,
+        tunnel,
+        server_version,
+        tables,
+        views,
+    })
+}
+
+async fn run_connect(request: ConnectRequest) -> Result<Option<connection_service::PreparedConnection>, String> {
     let ConnectRequest {
         driver,
         driver_id,
@@ -853,28 +906,29 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         environment,
         timeout_secs,
         query_timeout_secs,
+        cancel,
     } = request;
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
 
-    let (conn, tunnel) = connection_service::establish(
+    let opening = open_candidate(
         driver.as_ref(),
         opts.clone(),
         ssh_for_establish.clone(),
         &ssh_environment,
-    )
-    .await?;
-    let server_version = conn.server_version().await.ok().flatten();
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = conn
-        .list_tables_controlled(&control)
-        .await
-        .map_err(|e| format!("list_tables: {e}"))?;
-    let views = conn
-        .list_views_controlled(&control)
-        .await
-        .map_err(|e| format!("list_views: {e}"))?;
+        timeout_secs,
+    );
+    let Some(opened) = connection_service::until_cancelled(&cancel, opening).await else {
+        return Ok(None);
+    };
+    let OpenedCandidate {
+        conn,
+        tunnel,
+        server_version,
+        tables,
+        views,
+    } = opened?;
 
     let identity = ConnectionIdentity {
         bound_id,
@@ -981,7 +1035,7 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         server_version,
         query_timeout_secs: saved.query_timeout_secs,
     };
-    Ok(connection_service::PreparedConnection::new(
+    Ok(Some(connection_service::PreparedConnection::new(
         tables,
         views,
         saved.driver_id.clone(),
@@ -989,7 +1043,7 @@ async fn run_connect(request: ConnectRequest) -> Result<connection_service::Prep
         conn,
         tunnel,
         params,
-    ))
+    )))
 }
 
 async fn save_one(connection: &SavedConnection) -> Result<(), tablepro_storage::StorageError> {

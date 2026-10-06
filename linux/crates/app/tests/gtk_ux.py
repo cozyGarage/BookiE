@@ -175,6 +175,28 @@ def scenarios(ui):
         ui.wait_for_node_containing("Test failed")
         assert ui.find_node_containing("Connection ok") is None
 
+    def connect_dialog_cancel_stops_a_hanging_connection(database, base):
+        import socket
+        import threading
+
+        server = socket.socket()
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", 5432))
+        server.listen(4)
+        held = []
+        threading.Thread(target=lambda: [held.append(server.accept()) for _ in range(4)], daemon=True).start()
+        try:
+            ui.invoke(ui.wait_for_node(name="New connection", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node(name="Connect to PostgreSQL")
+            set_entry("Host", "127.0.0.1")
+            ui.invoke(ui.wait_for_node(name="Connect", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+            ui.wait_for_node_containing("Connection cancelled")
+            ui.wait_for_node(name="Connect", role=pyatspi.ROLE_PUSH_BUTTON)
+            assert ui.find_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON) is None
+        finally:
+            server.close()
+
     def find_bar_replaces_every_match_in_the_editor(database, base):
         ui.set_editor_text("select a, a from t where a = 1")
         time.sleep(0.3)
@@ -341,6 +363,7 @@ def scenarios(ui):
         browse_edit_cell_and_save_persists_to_the_database,
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
+        connect_dialog_cancel_stops_a_hanging_connection,
     ]
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
