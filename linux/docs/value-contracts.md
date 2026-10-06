@@ -356,6 +356,10 @@ under the final shadowed path ([session evidence](evidence/postgres-enum-session
 
 Quoted schema/type identifiers containing spaces and embedded quotes now have
 metadata, keyed-edit, draft-insert and filter coverage ([evidence](evidence/postgres-quoted-enum-identifiers-results-2026-10-04/manifest.json)).
+Their CSV-import path also preserves the qualified enum type under a
+transaction-local shadowed `search_path`, keeps SQL NULL distinct from the
+literal `NULL`, and leaves the same-named shadow target unchanged
+([evidence](evidence/postgres-enum-quoted-csv-shadow-results-2026-10-06/manifest.json)).
 
 PostgreSQL custom-enum scalar and array labels at 63 bytes are verified for
 ASCII and three-byte UTF-8 text, and a 64-byte label is refused without leaving

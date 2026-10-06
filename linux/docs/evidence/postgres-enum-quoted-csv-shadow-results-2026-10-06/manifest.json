@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-quoted-enum-csv-shadowing",
+  "source_commit": "33e82a1904aeae851bb0f82a97f8a7b95b9b95dd",
+  "working_tree_note": "The tested source file matches source_commit; this evidence packet and its index entries were added afterward.",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs": "9d39832afa81bcaaee22ef1ca12e786f18f61864cb17ed5cd95cf6e775589e61"
+  },
+  "case": "PostgreSQL quoted enum CSV import under a transaction-local shadowed search_path",
+  "test": "quoted_enum_identifier_contract::value_contract_quoted_enum_identifiers_resist_shadowed_search_path",
+  "scenario": {
+    "identifiers": {
+      "target_schema": "enum audit \"schema\"",
+      "enum_type": "state \"kind\"",
+      "table": "import rows",
+      "shadow_schema": "enum_quoted_shadow"
+    },
+    "assertions": [
+      "The target and shadow schemas have same-named quoted enum and import table objects with different enum labels.",
+      "CSV generated from the target table imports under a transaction-local search_path led by the shadow schema, and the plan casts to the escaped qualified target enum.",
+      "Imported rows retain the target PostgreSQL enum type, SQL NULL remains distinct from the literal NULL label, and sibling text matches the source.",
+      "The pre-existing target rows and same-named shadow rows remain unchanged; the shadow import table retains only its seed row."
+    ]
+  },
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --locked --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_quoted_enum_identifiers_resist_shadowed_search_path -- --include-ignored --test-threads=1 --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "clippy": "cargo clippy --locked --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration -- -D warnings passed",
+    "format": "cargo fmt --manifest-path linux/Cargo.toml --all -- --check passed",
+    "diff_check": "git diff --check passed"
+  },
+  "log_sha256": {
+    "focused-test.txt": "f19665c572ccaf7fc84536115c7068b276d7a487e707fb06a89a99ed901575d7"
+  },
+  "remaining": [
+    "Other enum identifier forms, search_path/session permutations, consumer combinations and the wider B3 matrix remain open."
+  ]
+}
