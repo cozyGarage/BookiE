@@ -32,7 +32,15 @@ through binary result decoding, inferred typed binding, the keyed-update builder
 and typed CSV import. Tests compare native type, text, JSON and `array_send`
 bytes; malformed LSN elements are rejected before a write and sibling rows stay
 unchanged ([evidence](evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
-Other unlisted built-in and custom PostgreSQL array families remain open.
+
+The built-in PostgreSQL `macaddr[]` now preserves canonical six-octet text,
+SQL NULL and non-default lower bounds across binary result decoding, inferred
+typed bindings, keyed updates and typed CSV import. Tests compare native type,
+text, JSON and `array_send` bytes; malformed octets are rejected without
+changing the target or sibling row. The built-in OID census includes element
+OID 829. `macaddr8[]`, `inet[]`, `cidr[]` and other unlisted built-in and custom
+array families remain explicitly open
+([evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json)).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their

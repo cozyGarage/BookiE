@@ -46,7 +46,13 @@ def broken_links(root, files):
 
 def markdown_files(root):
     skipped = {"target", ".git", "node_modules", "evidence", "vendor"}
-    files = [p for p in root.rglob("*.md") if not skipped.intersection(p.relative_to(root).parts)]
+    generated = {"packaging/out"}
+    files = [
+        p
+        for p in root.rglob("*.md")
+        if not skipped.intersection(p.relative_to(root).parts)
+        and "/".join(p.relative_to(root).parts[:2]) not in generated
+    ]
     return files + sorted(root.parent.glob("*.md"))
 
 
