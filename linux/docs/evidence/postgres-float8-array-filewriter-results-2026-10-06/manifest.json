@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "linux",
+  "source_commit": "17c1515c8651fc4366bf79edcdc9131689194ade",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "case": "PostgreSQL float8[] file exports and SQL replay",
+  "test": "array_contract::value_contract_float8_array_file_exports_preserve_bits",
+  "contract": [
+    "The array contains an adjacent double, negative zero, the minimum subnormal, NaN, positive and negative Infinity, and SQL NULL.",
+    "JSON, CSV, XML, HTML, Markdown and XLSX exports preserve the driver text as text, with each format's escaping rules.",
+    "SQL export replay preserves the PostgreSQL double precision[] type, array_to_json value semantics and exact array_send bytes. Separate float8send assertions pin the adjacent value, negative-zero sign bit and minimum-subnormal bits."
+  ],
+  "validation": {
+    "focused_docker_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_float8_array_file_exports_preserve_bits -- --ignored --exact --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": {
+      "command": "rtk proxy git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "sha256": {
+    "source_file": "a4dfe6ea056f5399b2860145130a745301f173e9bc743f22175988e6a8d3d61e",
+    "focused.txt": "f685dfa1e59f393ccf672ea618854c808a58346d358762fcf4dd1e4127a31d5e",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, engine/type/consumer/configuration combinations and installed application re-imports remain open in B3."
+  ]
+}

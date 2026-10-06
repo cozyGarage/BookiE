@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/sql-lex-mysql-dollar-boundary",
+  "source_commit": "b4504d792d99b427a12ece69ae4cbe5f93a2afc0",
+  "source_files": {
+    "crates/core/src/sql_lex.rs": "f4097ac3c97524db2b83210c8787afbcba4f7a7883ad502596f30902d5b5e574"
+  },
+  "case": "MySQL dollar text does not open a PostgreSQL dollar-quoted span",
+  "contract": [
+    "A MySQL statement containing $tag$ followed by a semicolon splits at that semicolon; dollar-quoted bodies are dialect-specific.",
+    "The regression test kills the mutation that combines the unsupported-dialect and non-dollar-start guards with AND instead of OR.",
+    "The bounded subprocess test covers nested and ordinary comments, quoted strings, bracket identifiers, dollar-quoted bodies, statement separators and Unicode; it kills nonterminating mutants without hanging the test runner.",
+    "A focused 24-mutant run covers every mutation location from the earlier timeout rechecks and catches all 24 with zero misses or timeouts."
+  ],
+  "validation": {
+    "scanner_tests": {
+      "command": "rtk cargo test --locked -p tablepro-core sql_lex::tests -- --nocapture",
+      "result": "14 passed, 0 failed",
+      "log": "sql-lex-tests.txt"
+    },
+    "targeted_mutation": {
+      "command": "rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:85:56' --test-tool cargo --output target/quality/20261006-sql-lex-mysql-dollar-mutant-final-c2a3ced7 --timeout 8 --in-place -- --lib sql_lex::tests::a_mysql_dollar_delimiter_is_not_a_quoted_span",
+      "result": "1 mutant caught, 0 missed, 0 timed out",
+      "log": "mysql-dollar-mutation.txt"
+    },
+    "progress_mutation_recheck": {
+      "command": "rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:(2:5|29:5|48:5|62:5|69:23|78:24|85:5|116:19|121:19|125:15)' --test-tool cargo --output target/quality/20261006-sql-lex-progress-guard-full-c2a3ced7 --timeout 6 --in-place -- --lib sql_lex::tests::scanner_progress_makes_bounded_inputs_finish",
+      "result": "24 caught, 0 missed, 0 timed out",
+      "log": "progress-mutation-summary.json"
+    },
+    "format": "rtk cargo fmt --all -- --check passed",
+    "diff_check": "rtk git diff --check passed"
+  },
+  "log_sha256": {
+    "sql-lex-tests.txt": "65b94ad4b41ae3fbe861b3120cd8e91b0a08337912e7e18ef8532458c78e5f24",
+    "mysql-dollar-mutation.txt": "904c31025b259e346396f3ae3baaf724d92079d972fe042b8259de139db7d120",
+    "progress-mutation-summary.json": "017e6cc2f358f4d19234708e32d61a4df5df63d81c5e6e2c4d03edba32bd7784"
+  },
+  "remaining": [
+    "The broader B3 engine, type, consumer, and configuration matrix remains open."
+  ]
+}

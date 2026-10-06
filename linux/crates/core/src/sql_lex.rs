@@ -156,6 +156,8 @@ pub fn statement_at_cursor(sql: &str, driver_id: &str, cursor_byte: usize) -> Op
 #[cfg(test)]
 mod tests {
     use super::{skip_span, split_statements, statement_at_cursor};
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
 
     #[test]
     fn skip_span_returns_exact_byte_lengths_for_representative_spans() {
@@ -228,6 +230,80 @@ mod tests {
         assert_eq!(split.len(), 2);
         assert!(split[0].contains("SELECT 1; SELECT 2;"));
         assert_eq!(split[1], "SELECT 3");
+    }
+
+    #[test]
+    fn a_mysql_dollar_delimiter_is_not_a_quoted_span() {
+        assert_eq!(
+            split_statements("SELECT $tag$; SELECT 2", "mysql"),
+            vec!["SELECT $tag$", "SELECT 2"]
+        );
+    }
+
+    #[test]
+    fn scanner_progress_makes_bounded_inputs_finish() {
+        const CHILD: &str = "BOOKIEE_SQL_LEX_PROGRESS_CHILD";
+        if std::env::var_os(CHILD).is_some() {
+            let cases = [
+                (
+                    "/* outer /* inner */ still outer */; SELECT 1",
+                    "postgres",
+                    vec!["/* outer /* inner */ still outer */", "SELECT 1"],
+                ),
+                (
+                    "SELECT 1 /* outer /* x */ ; still outer */; SELECT 2",
+                    "postgres",
+                    vec!["SELECT 1 /* outer /* x */ ; still outer */", "SELECT 2"],
+                ),
+                ("SELECT 'a;b'; SELECT 2", "postgres", vec!["SELECT 'a;b'", "SELECT 2"]),
+                ("SELECT [a;b]; SELECT 2", "mssql", vec!["SELECT [a;b]", "SELECT 2"]),
+                (
+                    "SELECT 1 /* a;b */; SELECT 2",
+                    "postgres",
+                    vec!["SELECT 1 /* a;b */", "SELECT 2"],
+                ),
+                ("SELECT 1; SELECT 2", "postgres", vec!["SELECT 1", "SELECT 2"]),
+                ("SELECT '東京'; SELECT 2", "postgres", vec!["SELECT '東京'", "SELECT 2"]),
+                (
+                    "CREATE FUNCTION f() AS $body$ SELECT 1; SELECT 2; $body$ LANGUAGE sql; SELECT 3",
+                    "postgres",
+                    vec![
+                        "CREATE FUNCTION f() AS $body$ SELECT 1; SELECT 2; $body$ LANGUAGE sql",
+                        "SELECT 3",
+                    ],
+                ),
+                ("SELECT $tag$; SELECT 2", "mysql", vec!["SELECT $tag$", "SELECT 2"]),
+            ];
+            for (sql, driver, expected) in cases {
+                assert_eq!(split_statements(sql, driver), expected, "{driver}: {sql}");
+            }
+            return;
+        }
+
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish",
+            ])
+            .env(CHILD, "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                assert!(status.success(), "scanner child failed: {status}");
+                break;
+            }
+            if Instant::now() >= deadline {
+                child.kill().unwrap();
+                let _ = child.wait();
+                panic!("scanner did not finish bounded inputs within two seconds");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 
     #[test]

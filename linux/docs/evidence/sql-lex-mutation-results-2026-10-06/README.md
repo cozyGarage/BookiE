@@ -6,28 +6,39 @@ survivors exposed uncovered behavior: ClickHouse backtick escapes and
 PostgreSQL dollar-tag characters after the first character. Added assertions
 now kill both. The remaining survivor changes `length > 0` to `length >= 0`
 after `skip_span` has already returned a positive length; it is equivalent for
-this call path.
+this call path. The original broad run timed out on 13 mutants that can stop
+scanner progress; the focused bounded recheck below now catches all 13.
 
 The raw reports are retained in `*-outcomes.json`. The first targeted recheck
 killed the ClickHouse mutation and still missed the PostgreSQL interior-tag
 mutation. After adding the `$a-b$` case, the final targeted check killed that
-mutation too. A 24-mutant scanner-only recheck then exposed a nested-comment
-fixture whose inner terminator accidentally matched an `index *= 2` mutation.
-The fixture now uses a shorter inner comment; the final check catches that
-mutation.
+mutation too. A 24-mutant scanner-only recheck exposed a nested-comment
+fixture whose inner terminator accidentally matched an `index *= 2` mutation;
+the fixture was shortened, and the later bounded recheck catches the mutation.
+The current focused scanner unit suite passes 14 tests.
 
-The 13 original timeouts split into five zero-length span mutants and eight
-cursor arithmetic mutants. All five zero-length mutants came from consumers
-trusting `skip_span` to return a positive length. The named-parameter rewriter
+## Follow-up triage, October 6
+
+The focused selector initially found a missed guard mutation in
+`dollar_quote_length`: with the guard changed from `||` to `&&`, MySQL dollar
+text was incorrectly treated as a dollar-quoted body. The permanent regression
+`a_mysql_dollar_delimiter_is_not_a_quoted_span` kills that mutation.
+
+The scanner progress contract now runs representative inputs in a child test
+process with a two-second deadline. This converts a mutated infinite loop into
+a bounded test failure while checking the exact statement spans for nested and
+ordinary comments, quotes, bracket identifiers, dollar quotes, separators and
+Unicode. A focused rerun of 24 mutations across the original timeout locations
+and related guards reports 24 caught, 0 missed and 0 timed out. The 13 original
+timeout-classified mutations are all included and caught. Full results are in
+the [MySQL dollar-boundary packet](../sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json).
+
+The five zero-length-span timeout mutants also exposed two consumers that
+trusted `skip_span` to return a positive length. The named-parameter rewriter
 and SQL diagnostics scanner now ignore zero-length spans, matching
-`statement_spans`. The focused five-mutant recheck caught all five with no
-timeouts. The seven remaining timeout outcomes are cursor arithmetic mutants
-that move a scanner index backwards or fail to advance; they remain killed by
-the mutation runner timeout rather than counting as test failures.
-
-The focused unit selector passed 12 tests. The follow-up run after the guards
-passed all 535 core library tests and caught all five zero-length mutants.
-See the [zero-progress guard evidence](../sql-lex-zero-progress-guards-results-2026-10-06/manifest.json).
+`statement_spans`. The focused five-mutant recheck caught all five without a
+timeout; the [zero-progress guard packet](../sql-lex-zero-progress-guards-results-2026-10-06/manifest.json)
+records the regression and its test results.
 
 The latest tested `sql_lex.rs` SHA-256 was
 `90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148`.
