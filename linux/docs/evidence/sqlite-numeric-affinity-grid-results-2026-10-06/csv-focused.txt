@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+     Running tests/csv_import.rs (target/debug/deps/csv_import-9cb3fdd5bda69315)
+
+running 1 test
+test csv_import_preserves_text_in_sqlite_integer_real_and_numeric_affinities ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+

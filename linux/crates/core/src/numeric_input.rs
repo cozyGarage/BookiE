@@ -29,6 +29,20 @@ pub fn is_numeric_input(text: &str) -> bool {
     }
 }
 
+pub fn sqlite_affinity_decimal(text: &str) -> Option<rust_decimal::Decimal> {
+    let text = text.trim();
+    let decimal = if text.contains(['e', 'E']) {
+        rust_decimal::Decimal::from_scientific(text).ok()?
+    } else {
+        rust_decimal::Decimal::from_str_exact(text).ok()?
+    };
+    let float = text.parse::<f64>().ok()?;
+    if !float.is_finite() || rust_decimal::Decimal::from_str_exact(&float.to_string()).ok()? != decimal {
+        return None;
+    }
+    Some(decimal)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,5 +62,11 @@ mod tests {
         assert!(is_numeric_input("1e-400"));
         assert!(!is_numeric_input("not numeric"));
         assert!(!is_numeric_input("NaN"));
+        assert_eq!(sqlite_affinity_decimal("42.50").unwrap().to_string(), "42.50");
+        assert!(sqlite_affinity_decimal("1e3").is_some());
+        assert!(sqlite_affinity_decimal("9223372036854775808").is_none());
+        assert!(sqlite_affinity_decimal("1e999").is_none());
+        assert!(sqlite_affinity_decimal("1e-400").is_none());
+        assert!(sqlite_affinity_decimal("0.123456789012345678901234567890123").is_none());
     }
 }

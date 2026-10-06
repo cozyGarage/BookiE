@@ -141,59 +141,57 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     {
         return result;
     }
-    if let Some(result) = parse_mssql_datetimeoffset_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_mongodb_integer_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_mysql_spatial_input(col, driver_id) {
-        return result;
-    }
-    if driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type)) {
-        if matches!(trimmed, "NaN" | "Infinity" | "-Infinity") {
-            return Ok(Value::Text(trimmed.into()));
-        }
-        return match parse_decimal_value(trimmed) {
-            Ok(value) => Ok(value),
-            Err(_) if is_postgres_numeric_literal(trimmed) => Ok(Value::Text(trimmed.into())),
-            Err(error) => Err(error),
-        };
-    }
-    if let Some(result) = parse_postgres_extended_temporal_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_duckdb_date_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_mongodb_decimal_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_mongodb_date_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_duckdb_timestamptz_input(trimmed, col, driver_id) {
-        return result;
-    }
-    if let Some(result) = parse_duckdb_temporal_input(trimmed, col, driver_id) {
+    if let Some(result) = parse_special_driver_input(trimmed, col, driver_id) {
         return result;
     }
     match parse_input_for_column(text, col) {
-        Err(_)
-            if driver_id == "sqlite"
-                && !tablepro_core::is_numeric_input(text)
-                && col.is_some_and(|column| {
-                    matches!(
-                        classify_type(&column.data_type.to_ascii_lowercase()),
-                        TypeKind::Int | TypeKind::Float | TypeKind::Decimal
-                    )
-                }) =>
-        {
-            // SQLite affinity may store nonnumeric input as TEXT in numeric columns.
-            Ok(Value::Text(text.to_owned()))
-        }
+        Err(error) => match sqlite_numeric_affinity_fallback(text, col, driver_id) {
+            Some(value) => Ok(value),
+            None => Err(error),
+        },
         result => result,
     }
+}
+
+fn sqlite_numeric_affinity_fallback(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Value> {
+    if driver_id != "sqlite"
+        || !col.is_some_and(|column| {
+            matches!(
+                classify_type(&column.data_type.to_ascii_lowercase()),
+                TypeKind::Int | TypeKind::Float | TypeKind::Decimal
+            )
+        })
+    {
+        return None;
+    }
+    if let Some(decimal) = tablepro_core::sqlite_affinity_decimal(text) {
+        return Some(Value::Decimal(decimal));
+    }
+    (!tablepro_core::is_numeric_input(text)).then(|| Value::Text(text.to_owned()))
+}
+
+fn parse_special_driver_input(text: &str, col: Option<&ColumnInfo>, driver_id: &str) -> Option<Result<Value, String>> {
+    parse_mssql_datetimeoffset_input(text, col, driver_id)
+        .or_else(|| parse_mongodb_integer_input(text, col, driver_id))
+        .or_else(|| parse_mysql_spatial_input(col, driver_id))
+        .or_else(|| {
+            (driver_id == "postgres" && col.is_some_and(|column| is_postgres_numeric_type(&column.data_type))).then(
+                || match text {
+                    "NaN" | "Infinity" | "-Infinity" => Ok(Value::Text(text.into())),
+                    _ => match parse_decimal_value(text) {
+                        Ok(value) => Ok(value),
+                        Err(_) if is_postgres_numeric_literal(text) => Ok(Value::Text(text.into())),
+                        Err(error) => Err(error),
+                    },
+                },
+            )
+        })
+        .or_else(|| parse_postgres_extended_temporal_input(text, col, driver_id))
+        .or_else(|| parse_duckdb_date_input(text, col, driver_id))
+        .or_else(|| parse_mongodb_decimal_input(text, col, driver_id))
+        .or_else(|| parse_mongodb_date_input(text, col, driver_id))
+        .or_else(|| parse_duckdb_timestamptz_input(text, col, driver_id))
+        .or_else(|| parse_duckdb_temporal_input(text, col, driver_id))
 }
 
 fn parse_mssql_datetimeoffset_input(
