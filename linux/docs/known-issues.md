@@ -40,6 +40,10 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-8b | Second launch logs a GLib "did not unregister" warning | OPEN | Cosmetic | manual |
 | UI-9 | ~~No read-only viewer for long, JSON or binary cell values~~ | DONE | PR #91, `value_viewer` tests | unit + gtk-widget |
 | UI-9b | No row inspector side pane | OPEN | `AdwOverlaySplitView` trailing pane | gtk-widget |
+| UI-27 | ~~Editable result cells opened two menus on right-click~~ | DONE | Capture-phase gesture; end-to-end scenarios `view_value_*` and `columns_dialog_*` | gtk-installed |
+| UI-28 | ~~The grid cell menu had no standard keyboard shortcut~~ | DONE | Shift+F10 added beside the Menu key | gtk-installed |
+| UI-29 | ~~Editing a connection failed outright when the keyring was unavailable or its unlock was cancelled~~ | DONE | `prefill.rs` `readable` test; scenario `editing_a_saved_connection_*` | unit + gtk-installed |
+| UI-30 | ~~Find and replace fields had no accessible name~~ | DONE | Labels added; scenario `find_bar_replaces_every_match_in_the_editor` | gtk-installed |
 | UI-10 | Multi-statement results use one switcher button per statement | OPEN | Named, pinnable result tabs in `outcomes.rs` | gtk-widget |
 | UI-11 | Sidebar is a flat tables and views list; other objects only in the Catalog window | OPEN | `GtkTreeListModel` tree | gtk-widget |
 | UI-12 | No database or schema switcher | OPEN | Core has no `list_databases`; plan with B4 | driver-docker |
@@ -132,6 +136,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-14 | Keep refusing PK-less delete; no all-column fallback | ACCEPTED | Guard to preserve | unit |
 | TEST-15 | Lost-ack writes: reconnect success must not authorize replay | OPEN | Independent row and audit oracle | driver-docker |
 | TEST-16 | Mongo hostile-server handshake not run end to end | OPEN | | driver-docker |
+| TEST-18 | ~~The installed GTK suite had no scenarios for connection edit, find, value viewer or columns~~ | DONE | `gtk_ux.py`: four scenarios pass on the Arch runner | gtk-installed |
+| TEST-19 | ~~The installed GTK suite assumed no keyring and the old default driver~~ | DONE | Fixed in this change: isolated unlocked keyring in `test-gtk-safety.sh`, PostgreSQL title; keep both | gtk-installed |
 | TEST-17 | ~~No check that documentation links resolve~~ | DONE | `scripts/check-doc-links.py` in the harness | sandbox |
 
 ## Documentation and other
