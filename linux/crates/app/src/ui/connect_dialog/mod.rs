@@ -48,6 +48,7 @@ pub struct ConnectDialog {
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
+    applied_driver: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,9 +73,11 @@ fn auth_mode_for_row(row: u32) -> AuthMode {
 
 mod form;
 mod identity;
+mod prefill;
 
 use form::{AuthFormState, EndpointFormState, resolved_socket_path, socket_directory_is_valid};
 use identity::{ConnectionIdentity, find_existing, saved_connection_name};
+pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
 pub struct ConnectDialogInit {
     pub registry: Arc<DriverRegistry>,
@@ -83,6 +86,7 @@ pub struct ConnectDialogInit {
     /// record is written, so two connections to one endpoint stay
     /// separate instead of folding into whichever matched first.
     pub bound_connection_id: Option<Uuid>,
+    pub prefill: Option<ConnectionPrefill>,
     pub ssh_environment: tablepro_transport::SshEnvironment,
 }
 
@@ -358,10 +362,14 @@ impl Component for ConnectDialog {
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
+            applied_driver: None,
         };
         let widgets = view_output!();
         let selected = model.driver_combo.selected();
         model.apply_selected_driver(selected, &root);
+        if let Some(prefill) = &init.prefill {
+            model.apply_prefill(prefill, &root);
+        }
 
         // Make Connect the dialog's default widget so pressing Enter
         // from any AdwEntryRow submits the form. Per HIG, every
@@ -376,7 +384,9 @@ impl Component for ConnectDialog {
     fn update(&mut self, msg: Self::Input, sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
             ConnectDialogInput::DriverChanged(idx) => {
-                self.apply_selected_driver(idx, root);
+                if self.applied_driver != Some(idx) {
+                    self.apply_selected_driver(idx, root);
+                }
             }
 
             ConnectDialogInput::TlsModeChanged => {
@@ -560,6 +570,7 @@ impl Component for ConnectDialog {
 
 impl ConnectDialog {
     fn apply_selected_driver(&mut self, idx: u32, root: &adw::Dialog) {
+        self.applied_driver = Some(idx);
         let Some(entry) = self.drivers.get(idx as usize).cloned() else {
             return;
         };

@@ -27,6 +27,38 @@ impl App {
     }
 
     pub(super) fn on_open_connect(&mut self, sender: ComponentSender<Self>) {
+        self.open_connect_dialog(None, sender);
+    }
+
+    pub(super) fn on_edit_connection(&self, saved: tablepro_storage::SavedConnection, sender: ComponentSender<Self>) {
+        if crate::ui::connect_dialog::has_jump_chain(&saved) {
+            self.show_toast(&crate::tr!(
+                "This connection uses an SSH jump chain, which the form cannot edit yet. Edit ssh.jump in the saved connection file."
+            ));
+            return;
+        }
+        let reply = sender.clone();
+        sender.command(move |_, shutdown| {
+            shutdown
+                .register(async move {
+                    let message = match crate::ui::connect_dialog::load_prefill(saved).await {
+                        Ok(prefill) => AppMsg::EditConnectionLoaded(Box::new(prefill)),
+                        Err(error) => {
+                            tracing::warn!(%error, "loading the saved connection for editing failed");
+                            AppMsg::EditConnectionFailed(crate::tr!("The saved connection could not be loaded."))
+                        }
+                    };
+                    reply.input(message);
+                })
+                .drop_on_shutdown()
+        });
+    }
+
+    pub(super) fn open_connect_dialog(
+        &mut self,
+        prefill: Option<crate::ui::connect_dialog::ConnectionPrefill>,
+        sender: ComponentSender<Self>,
+    ) {
         if self.connection_transition != ConnectionTransition::Idle || self.dialog.is_some() {
             self.show_toast(&crate::tr!("A connection change is already in progress."));
             return;
@@ -36,7 +68,8 @@ impl App {
             .launch(ConnectDialogInit {
                 registry: self.registry.clone(),
                 preferences: self.preferences.clone(),
-                bound_connection_id: None,
+                bound_connection_id: prefill.as_ref().map(|prefill| prefill.saved.id),
+                prefill,
                 ssh_environment: self.database.ssh_environment(),
             })
             .forward(sender.input_sender(), |out| match out {

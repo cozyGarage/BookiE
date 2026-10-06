@@ -55,13 +55,16 @@ transient raw toast (`:546-556`); `Ctrl+/` is bound both to the shortcuts
 window and to editor comment toggle (`ui/app/shortcuts.rs:96`,
 `ui/editor/mod.rs:485-500`) and needs a live check.
 
-### Security finding
+### Guard coverage of the connect dialog
 
-Test Connection lists tables on a raw driver connection outside `PolicyGuard`
-(`ui/connect_dialog/mod.rs:516-525`). It is read-only and never handed out, but
-it breaks the repository invariant that every consumer connection is guarded.
-Route it through the guard or replace the probe with a connect-and-ping that
-runs no statement. This is packet UX-S1.
+Test Connection and the real Connect both list tables (and Connect lists
+views) on the raw driver connection returned by `establish`
+(`ui/connect_dialog/mod.rs:516-525`, `:843-850`). That connection is not yet
+registered with `DatabaseService` and is never handed to a consumer, but
+`PolicyGuard` audits metadata reads (`policy/src/guard/connection.rs:14`), so
+these two reads leave no audit record. This is pre-handout bootstrap, not a
+bypass. Whether bootstrap reads need a guard belongs to the B4 session
+ownership work, so no UX packet changes it.
 
 ## What to adopt from TablePro
 
@@ -194,7 +197,6 @@ for Phase 1.
 
 | ID | Packet | Gap | Acceptance |
 | --- | --- | --- | --- |
-| UX-S1 | Test Connection through `PolicyGuard` or a statement-free ping | security | Regression test that the probe uses the guarded path |
 | UX-1 | Edit saved connection from the welcome row and the window menu | G1 | Changing host/password/TLS persists; secret stays in Secret Service; unit test for bound-id save |
 | UX-2 | Connect failure: Retry and Edit Connection actions; startup restore falls back to the welcome view | G2 | Pure state test for the recovery choice; manual check |
 | UX-3 | Cancel button on the connecting toast, reaching the transport | G3 | Cancelled connect leaves no registered connection |

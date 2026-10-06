@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 use tablepro_ssh::{SshAuth, SshConfig};
 use tablepro_storage::{SavedSshAuth, SavedSshConfig};
@@ -105,6 +105,30 @@ impl SshSection {
         };
         section.refresh_auth_visibility();
         section
+    }
+
+    pub fn prefill(&self, saved: &SavedSshConfig, password: Option<&SecretString>, passphrase: Option<&SecretString>) {
+        self.host.set_text(&saved.host);
+        self.port.set_value(f64::from(saved.port));
+        self.user.set_text(&saved.username);
+        self.system_client
+            .set_active(saved.client == tablepro_storage::SshClient::OpenSsh);
+        match &saved.auth {
+            _ if saved.agent => self.auth_combo.set_selected(SSH_AUTH_AGENT),
+            SavedSshAuth::Password => self.auth_combo.set_selected(SSH_AUTH_PASSWORD),
+            SavedSshAuth::PrivateKey { path, .. } => {
+                self.auth_combo.set_selected(SSH_AUTH_KEY);
+                self.key_path.set_text(&path.to_string_lossy());
+            }
+        }
+        if let Some(password) = password {
+            self.password.set_text(password.expose_secret());
+        }
+        if let Some(passphrase) = passphrase {
+            self.passphrase.set_text(passphrase.expose_secret());
+        }
+        self.refresh_auth_visibility();
+        self.expander.set_enable_expansion(true);
     }
 
     pub fn set_visible(&self, visible: bool) {
