@@ -283,6 +283,14 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
         .await
         .unwrap();
     session.close().await.unwrap();
+    let native_target_rows = connection
+        .query(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM enum_role_target.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(target_rows.rows, native_target_rows.rows);
     assert_eq!(
         target_rows.rows,
         vec![
