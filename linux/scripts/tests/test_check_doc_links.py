@@ -30,7 +30,7 @@ class DocLinkTests(unittest.TestCase):
         self.assertEqual(self.broken({"a.md": "[b](gone.md#top)"}), [("a.md", "gone.md")])
 
     def test_urls_and_pure_anchors_are_not_files(self):
-        text = "[u](https://example.com/x) [m](mailto:a@b.c) [h](#here)"
+        text = "[u](https://example.com/x) [m](mailto:a@b.c) [h](#here) [t](tel:123) [f](ftp://host/file)"
         self.assertEqual(self.broken({"a.md": text}), [])
 
     def test_links_resolve_relative_to_the_linking_file(self):
