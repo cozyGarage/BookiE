@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-bytea-output-escape",
+  "baseline_commit": "05e8c77452a3ade86a764665ca6a52271bb9772d",
+  "case": "PostgreSQL bytea[] text binding across bytea_output settings",
+  "test": "binary_array_file_export_contract::value_contract_bytea_array_escape_output_rebinds_across_output_settings",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/binary_array_file_export_contract.rs",
+    "sha256": "d63f11948f62115aac0566a65219a9bd08a154ddd2791ec2635679566d9b526f"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "A raw bytea[]::text projection under bytea_output=escape contains octal escapes for binary bytes 0x00 and 0xff.",
+    "The fixture includes binary bytes 00ff275c, an empty bytea element, and SQL NULL; native type, per-element hex, and array_send bytes are the independent oracles.",
+    "The escaped array text rebinds as bytea[] under escape output and still rebinds to identical native array bytes after switching the session to hex output."
+  ],
+  "validation": {
+    "command": "cargo test --locked -p tablepro-driver-postgres --test integration binary_array_file_export_contract::value_contract_bytea_array_escape_output_rebinds_across_output_settings -- --include-ignored --exact --test-threads=1",
+    "result": "1 passed, 0 failed",
+    "log": "test.txt",
+    "cargo_fmt_check": "passed",
+    "diff_check": "passed"
+  },
+  "log_sha256": {
+    "test.txt": "d04082c74af3cb975abdccd56fe06c996cb3969e04be97e731c29d19a4bd7153"
+  }
+}
