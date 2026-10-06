@@ -19,8 +19,11 @@ import planning; the test does not mark that capability complete
 PostgreSQL `bit[]` and `varbit[]` now decode from their native array wire
 format. Fixed-width values, varying lengths, empty bit strings, SQL NULL,
 non-default lower bounds, parameter rebinding and typed CSV restore are checked
-against native JSON/type/wire oracles
-([evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json)).
+against native JSON/type/wire oracles. The app grid parser and keyed update also
+cover zero-based bounds, empty strings, NULL elements, byte equality, sibling
+preservation and SQLSTATE `22P02` refusal for malformed bits
+([result evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json),
+[grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
 
 Detailed native cases and old counts are in [type-contract history](type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their

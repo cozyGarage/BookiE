@@ -396,7 +396,6 @@ plus Oracle-native cases before claiming support. Define its NUMBER, DATE,
 timestamp/timezone, interval, LOB and empty-string semantics explicitly. Do not
 
 ## PostgreSQL `citext[]` refusal boundary — 2026-10-06
-## PostgreSQL `citext[]` refusal boundary — 2026-10-06
 
 The scalar `citext` contract covers case-preserving text and case-insensitive
 comparison, but the array path does not yet carry qualified custom-array type
@@ -417,3 +416,9 @@ array elements, and the SQL planner allowlists only PostgreSQL's built-in
 zero-based lower bound. Native `array_to_json`, `pg_typeof`, and `array_send`
 values are compared after text-parameter rebinding and typed CSV restore. See
 [evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
+
+The app grid contract now parses and writes `bit(5)[]` and `bit varying[]`
+through the fixed built-in casts. PostgreSQL 16 confirms edited types and
+`array_send` bytes match native literals for zero-based arrays, empty bit
+strings and SQL NULL elements. Malformed input returns SQLSTATE `22P02` and
+leaves the edited and sibling rows unchanged ([grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).

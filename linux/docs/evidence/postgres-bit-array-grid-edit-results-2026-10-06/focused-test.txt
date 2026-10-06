@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running unittests src/lib.rs (linux/target/debug/deps/tablepro_app-dd913e1adcd462e4)
+
+running 1 test
+test ui::browse_tab::value_parse::postgres_bit_array_grid::value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 533 filtered out; finished in 2.12s
+

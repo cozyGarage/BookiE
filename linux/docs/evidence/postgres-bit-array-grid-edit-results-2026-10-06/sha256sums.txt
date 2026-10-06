@@ -1,0 +1,4 @@
+9d024294daef55f19dda99629eb5964e2cca6ec1a40f4d29fb334703358309af  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/focused-test.txt
+b2c020f27a01faabb96e5d55c11fd219cf7c484c9cf34b3342bfc8444d934c89  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/clippy.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/format.txt
+cce85bb350ebcb28c00d446970f4e3d4d8a6eb24c42af65caa1e039e2149da75  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json

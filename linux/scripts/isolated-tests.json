@@ -33,6 +33,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::postgres_bit_array_grid::value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution"
     ],
     [

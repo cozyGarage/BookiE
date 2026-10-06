@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-bit-array-grid-edit",
+  "source_commit": "19cdcbc94ceb1a7c53e2420ba2b526ae00b6f96b",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "BIT and VARBIT keyed grid edits preserve wire values and reject malformed input",
+  "tests": [
+    "ui::browse_tab::value_parse::postgres_bit_array_grid::value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling"
+  ],
+  "contract": [
+    "The app parser keeps bit(5)[] and bit varying[] edits as exact array text; the keyed update uses the fixed pg_catalog.bit[] and pg_catalog.varbit[] casts.",
+    "Zero-based bounds, varying element lengths, an empty bit string, and SQL NULL elements match native array_send bytes and preserve the declared column types.",
+    "A malformed bit element returns PostgreSQL SQLSTATE 22P02 and leaves the edited row and sibling row unchanged."
+  ],
+  "validation": {
+    "app_server_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib bit_array_grid_edit -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "harness": {
+      "command": "rtk proxy bash scripts/test-harness.sh",
+      "result": "70 Python checks, ignored-test inventory, package checks, and function-size check passed"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "remaining": [
+    "Other built-in and custom PostgreSQL array families, enum configurations, consumers, and installed grid acceptance remain open in B3."
+  ]
+}
