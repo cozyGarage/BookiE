@@ -32,9 +32,11 @@ uuid.workspace = true
 chrono.workspace = true
 http = "1"
 secrecy.workspace = true
+tempfile.workspace = true
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tokio-util.workspace = true
+zip = { version = "8.3", default-features = false, features = ["deflate"] }
 
 [lints]
 workspace = true

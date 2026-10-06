@@ -116,6 +116,39 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         let value_index = csv_sheet.headers.iter().position(|name| name == "value").unwrap();
         let csv_json: serde_json::Value = serde_json::from_str(&csv_sheet.rows[0][value_index]).unwrap();
         assert_eq!(csv_json, oracle, "CSV export must preserve nested {expected_type} JSON");
+
+        let directory = tempfile::tempdir().unwrap();
+        let workbook_path = directory.path().join("nested.xlsx");
+        tablepro_core::export::write_result_file(
+            &workbook_path,
+            &source,
+            &tablepro_core::export::ResultExport {
+                format: tablepro_core::export::ResultFormat::Xlsx,
+                csv: &tablepro_core::export::CsvOptions::default(),
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+        let mut worksheet = String::new();
+        std::io::Read::read_to_string(
+            &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+            &mut worksheet,
+        )
+        .unwrap();
+        let mut shared_strings = String::new();
+        std::io::Read::read_to_string(
+            &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+            &mut shared_strings,
+        )
+        .unwrap();
+        assert!(worksheet.contains("<c r=\"A2\" t=\"s\">"), "{worksheet}");
+        assert!(
+            shared_strings.contains(&oracle.to_string()),
+            "XLSX text must preserve the native {expected_type} JSON oracle: {shared_strings}"
+        );
         assert_eq!(
             tablepro_core::sql_literal::render_sql_literal("clickhouse", &source.rows[0][0]),
             Err(tablepro_core::sql_literal::LiteralError::Unsupported),

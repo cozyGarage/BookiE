@@ -6223,11 +6223,13 @@ dependencies = [
  "serde",
  "serde_json",
  "tablepro-core",
+ "tempfile",
  "testcontainers",
  "tokio",
  "tokio-util",
  "uuid",
  "webpki-roots",
+ "zip 8.6.0",
 ]
 
 [[package]]
