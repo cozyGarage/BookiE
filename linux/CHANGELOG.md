@@ -11,6 +11,7 @@
 
 ### Changed
 
+- DuckDB value coverage now verifies that nested collections containing UHUGEINT values preserve native values in the oracle and are refused by lossy SQL literal and parameter consumers.
 - SQLite STRICT ANY typed CSV coverage now checks `hex()` results for mixed native inputs, including empty text and SQL NULL results that both produce empty TEXT.
 - B3 SQL lexer mutation evidence now records that the bounded scanner-progress test catches all ten tested cursor-arithmetic mutations; wider mutation and value-contract coverage remains open.
 - Grid context-menu CSV copies encode SQL NULL with a collision-free marker, keeping it distinct from empty text and enum labels; formula sanitization remains enabled.

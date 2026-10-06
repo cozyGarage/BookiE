@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/duckdb-nested-collection-refusal-contract",
+  "source_commit": "44f10b0bff162d424469b1b7b0c8bd66e09fa7d6",
+  "source_sha256": {
+    "crates/drivers/duckdb/tests/integration.rs": "019873ca637b4121188d418cd4e8d5b772fa74bd0898595374143240cb9e5326"
+  },
+  "engine": "DuckDB in-memory native connection",
+  "case": "nested collections containing UHUGEINT refuse lossy consumers",
+  "test": "value_contract_nested_collection_combinations_refuse_lossy_consumers",
+  "contract": [
+    "A STRUCT containing a UHUGEINT list and a MAP containing a UHUGEINT struct are checked against native typeof() and to_json() oracles, including SQL NULL elements.",
+    "The result decoder explicitly refuses both shapes as Undecodable(STRUCT) or Undecodable(MAP), rather than flattening or narrowing nested values.",
+    "SQL literal rendering and parameter rebinding both refuse the undecodable values."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --locked --manifest-path Cargo.toml -p tablepro-driver-duckdb --test integration value_contract_nested_collection_combinations_refuse_lossy_consumers -- --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "duckdb_driver_suite": {
+      "command": "rtk proxy cargo test --locked --manifest-path Cargo.toml -p tablepro-driver-duckdb",
+      "result": "56 passed across 2 suites; 0 failed; 0 ignored",
+      "log": "driver-tests.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --locked --manifest-path Cargo.toml -p tablepro-driver-duckdb --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": {
+      "command": "rtk proxy git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "sha256": {
+    "focused.txt": "c2e906ca31db1aff905c835623313fa5e5f2ce0e3d4d455d0853903c629a9a5e",
+    "driver-tests.txt": "c39790937b26a45288abdf9beec5d14c1dcf22cf29f113ae62366de053ae984f",
+    "clippy.txt": "0ebc970ab026afd258fbd1bb57fcf51628dd17c10e282a341e9c4753d37e5e79",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other nested type combinations, native sub-microsecond bindings and installed GTK editing remain open; this case does not close B3 or qualify 0.2.0."
+  ]
+}
