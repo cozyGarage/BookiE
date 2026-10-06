@@ -272,7 +272,7 @@ def scenarios(ui):
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         click_cell("2")
-        ui.press_x11_key("Escape")
+        ui.press_x11_key("Return")
         time.sleep(0.2)
         ui.press_x11_key("Delete")
         ui.wait_for_node(name="1 unsaved change")
