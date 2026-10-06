@@ -47,7 +47,6 @@ impl BrowseTab {
             .build();
         let paginator_label = gtk::Label::builder().build();
         paginator_label.add_css_class("dim-label");
-        paginator_label.set_accessible_role(gtk::AccessibleRole::Status);
 
         // Selection count badge — sits beside the paginator label.
         // Hidden when 0–1 rows selected; appears when the user
