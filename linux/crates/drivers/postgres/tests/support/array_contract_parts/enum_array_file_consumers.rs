@@ -252,6 +252,163 @@ async fn value_contract_custom_enum_array_file_exports_preserve_labels() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection
+        .execute("CREATE SCHEMA value_contract_enum_array_workbook_shapes")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TYPE value_contract_enum_array_workbook_shapes.label AS ENUM \
+             ('NULL', '', ' leading', 'trailing ', '東京', 'a,b', 'a\"b', '<tag>&', '=1+1', 'slash\\path', 'sibling')",
+        )
+        .await
+        .unwrap();
+
+    let enum_type = "value_contract_enum_array_workbook_shapes.label[]";
+    let expression = r#"'[0:1][-4:1]={{"NULL",""," leading","trailing ","東京","a,b"},{"a\"b","<tag>&","=1+1","slash\\path",NULL,"sibling"}}'::value_contract_enum_array_workbook_shapes.label[]"#;
+    let result = connection
+        .query(&format!("SELECT {expression} AS value"))
+        .await
+        .unwrap();
+    assert_eq!(result.columns[0].data_type, enum_type);
+    let Value::Text(array_text) = &result.rows[0][0] else {
+        panic!("enum[] workbook value must remain text: {:?}", result.rows[0][0]);
+    };
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text, array_dims(value), array_ndims(value), \
+                    array_to_json(value)::text, encode(array_send(value), 'hex') \
+             FROM (SELECT {expression} AS value) AS source"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(enum_type.into()));
+    assert_eq!(native.rows[0][1], Value::Text("[0:1][-4:1]".into()));
+    assert_eq!(native.rows[0][2], Value::Int(2));
+    let Value::Text(native_json) = &native.rows[0][3] else {
+        panic!("native enum[] JSON oracle is not text: {:?}", native.rows[0][3]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
+        serde_json::json!([
+            ["NULL", "", " leading", "trailing ", "東京", "a,b"],
+            ["a\"b", "<tag>&", "=1+1", "slash\\path", null, "sibling"]
+        ])
+    );
+
+    let rebound = connection
+        .query_params(
+            &format!(
+                "SELECT pg_typeof($1::text::{enum_type})::text, \
+                        array_dims($1::text::{enum_type}), array_to_json($1::text::{enum_type})::text, \
+                        encode(array_send($1::text::{enum_type}), 'hex')"
+            ),
+            &[Value::Text(array_text.clone())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][0]);
+    assert_eq!(rebound.rows[0][1], native.rows[0][1]);
+    assert_eq!(rebound.rows[0][2], native.rows[0][3]);
+    assert_eq!(rebound.rows[0][3], native.rows[0][4]);
+
+    let directory = tempfile::tempdir().unwrap();
+    let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("enum-array-shapes.xlsx"));
+    tablepro_core::export::write_result_file(
+        &xlsx_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut workbook = zip::ZipArchive::new(std::fs::File::open(xlsx_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut workbook.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet)
+        .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(
+        &mut workbook.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared_strings,
+    )
+    .unwrap();
+    let xml_text = array_text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    assert!(sheet.contains("<c r=\"A2\" t=\"s\">") && !sheet.contains("<f>"), "{sheet}");
+    assert!(shared_strings.contains(&xml_text), "{shared_strings}");
+
+    connection
+        .execute(&format!(
+            "CREATE TABLE value_contract_enum_array_workbook_shapes.target (value {enum_type})"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO value_contract_enum_array_workbook_shapes.target \
+             VALUES (ARRAY['sibling'::value_contract_enum_array_workbook_shapes.label])",
+        )
+        .await
+        .unwrap();
+    let sibling_wire = connection
+        .query(
+            "SELECT encode(array_send(value), 'hex') \
+             FROM value_contract_enum_array_workbook_shapes.target",
+        )
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let sql_path = directory.path().join("enum-array-shapes.sql");
+    tablepro_core::export::write_result_file(
+        &sql_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Sql,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: Some(tablepro_core::export::SqlTarget {
+                driver_id: "postgres",
+                schema: Some("value_contract_enum_array_workbook_shapes"),
+                table: "target",
+            }),
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute(&std::fs::read_to_string(sql_path).unwrap())
+        .await
+        .unwrap();
+    let restored = transaction
+        .query(
+            "SELECT pg_typeof(value)::text, array_dims(value), array_to_json(value)::text, \
+                    encode(array_send(value), 'hex') \
+             FROM value_contract_enum_array_workbook_shapes.target ORDER BY value::text",
+        )
+        .await
+        .unwrap();
+    assert_eq!(restored.rows.len(), 2);
+    assert!(restored.rows.iter().all(|row| row[0] == Value::Text(enum_type.into())));
+    assert!(restored.rows.iter().any(|row| row[1] == native.rows[0][1] && row[3] == native.rows[0][4]));
+    assert!(restored.rows.iter().any(|row| row[1] == Value::Text("[1:1]".into()) && row[3] == sibling_wire));
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_custom_enum_array_csv_import_preserves_labels_and_siblings() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;

@@ -316,8 +316,12 @@ without formulas ([whitespace evidence](evidence/postgres-enum-array-whitespace-
 Calc and Gnumeric preserve scalar labels with leading/trailing spaces through
 XLSX/ODS/XLSX re-save; empty enum labels remain refused and SQL NULL stays
 blank ([whitespace evidence](evidence/postgres-enum-scalar-whitespace-reimport-results-2026-10-06/manifest.json)).
-Other spreadsheet applications, enum-array shape combinations and enum cell
-shapes remain open.
+Calc and Gnumeric also preserve a 2×6 enum array with non-default lower bounds,
+empty and literal-`NULL` labels, a SQL NULL element, and formula-shaped text
+through XLSX/ODS/XLSX re-save. Native type, dimensions, JSON, wire bytes, typed
+rebinding and SQL replay are checked ([Calc evidence](evidence/postgres-enum-array-shapes-calc-results-2026-10-06/manifest.json),
+[Gnumeric evidence](evidence/postgres-enum-array-shapes-gnumeric-results-2026-10-06/manifest.json)).
+Other spreadsheet applications and enum-array shape combinations remain open.
 
 The PostgreSQL enum CSV importer now also has a round trip for double quotes,
 an embedded line break, backslashes and formula-shaped text across four

@@ -17,6 +17,7 @@
 
 ### Fixed
 
+- PostgreSQL enum-array XLSX exports preserve two-dimensional values and non-default lower bounds as text through LibreOffice Calc and Gnumeric re-saves, including empty labels, literal `NULL`, SQL NULL elements and formula-shaped labels.
 - MySQL query results keep their projected column metadata when no rows match, including inside transactions, and transaction queries obey the shared result cap.
 - MySQL multi-statement saves refuse non-DML statements before dispatch and distinguish rollback failure; successful rollback requests no longer imply that non-transactional table writes were reversed.
 - SQL Server rowversion and temporal period columns are read-only and omitted from generated INSERT statements, so copying or inserting rows does not try to overwrite server-owned values.
