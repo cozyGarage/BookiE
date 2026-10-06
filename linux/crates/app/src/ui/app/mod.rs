@@ -585,7 +585,9 @@ impl SimpleComponent for App {
         match msg {
             AppMsg::OpenConnect => self.on_open_connect(sender),
             AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
-            AppMsg::ConnectionPrepareFailed(message) => self.on_connection_prepare_failed(message),
+            AppMsg::ConnectionPrepareFailed(message, saved) => {
+                self.on_connection_prepare_failed(message, *saved, sender)
+            }
             AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),

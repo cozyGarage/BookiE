@@ -372,9 +372,10 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
+                    let attempted = saved.clone();
                     match connection_service::open_saved(registry, saved, timeout_secs, ssh_environment).await {
                         Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
-                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e)),
+                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
                     }
                 })
                 .drop_on_shutdown()
@@ -400,7 +401,12 @@ impl App {
         self.continue_connection_switch(sender);
     }
 
-    pub(super) fn on_connection_prepare_failed(&mut self, message: String) {
+    pub(super) fn on_connection_prepare_failed(
+        &mut self,
+        message: String,
+        saved: SavedConnection,
+        sender: ComponentSender<Self>,
+    ) {
         if self.connection_transition != ConnectionTransition::Connecting {
             tracing::warn!(error = %message, "discarding stale connection failure");
             return;
@@ -410,7 +416,24 @@ impl App {
         self.switch_cancel_audit_was_disabled = None;
         self.dismiss_loading_page();
         tracing::warn!(error = %message, "candidate connection failed");
-        self.set_status_page(super::StatusKind::Error, &crate::tr!("Connection failed"), &message);
+        self.show_connection_failed_alert(&message, saved, sender);
+    }
+
+    fn show_connection_failed_alert(&self, message: &str, saved: SavedConnection, sender: ComponentSender<Self>) {
+        let dialog = adw::AlertDialog::new(Some(&crate::tr!("Connection failed")), Some(message));
+        dialog.add_response("close", &crate::tr!("Close"));
+        dialog.add_response("edit", &crate::tr!("Edit Connection"));
+        dialog.add_response("retry", &crate::tr!("Try Again"));
+        dialog.set_response_appearance("retry", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("retry"));
+        dialog.set_close_response("close");
+        dialog.connect_response(None, move |dialog, response| {
+            dialog.close();
+            if let Some(msg) = recovery_message(response, saved.clone()) {
+                sender.input(msg);
+            }
+        });
+        dialog.present(Some(&self.window));
     }
 
     pub(super) fn on_connect_dialog_closed(&mut self) {
@@ -802,5 +825,55 @@ mod tests {
         let message = duplicate_connection_message("Sales (copy)");
         assert!(message.contains("Sales (copy)"));
         assert!(message.to_lowercase().contains("password"));
+    }
+}
+
+fn recovery_message(response: &str, saved: SavedConnection) -> Option<AppMsg> {
+    match response {
+        "retry" => Some(AppMsg::OpenSaved(saved)),
+        "edit" => Some(AppMsg::EditConnection(saved)),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    fn saved() -> SavedConnection {
+        SavedConnection {
+            id: Uuid::new_v4(),
+            name: "db".into(),
+            driver_id: "postgres".into(),
+            host: "h".into(),
+            port: 5432,
+            socket_dir: None,
+            database: "d".into(),
+            username: "u".into(),
+            use_tls: false,
+            tls_mode: None,
+            tls_root_cert: None,
+            read_only: false,
+            auth_mode: Default::default(),
+            environment: Default::default(),
+            ssh: None,
+            last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
+        }
+    }
+
+    #[test]
+    fn a_failed_connect_offers_retry_and_edit_for_the_same_connection() {
+        let original = saved();
+        let id = original.id;
+        assert!(matches!(recovery_message("retry", original.clone()), Some(AppMsg::OpenSaved(s)) if s.id == id));
+        assert!(matches!(recovery_message("edit", original), Some(AppMsg::EditConnection(s)) if s.id == id));
+    }
+
+    #[test]
+    fn closing_the_alert_starts_nothing() {
+        assert!(recovery_message("close", saved()).is_none());
+        assert!(recovery_message("", saved()).is_none());
     }
 }

@@ -8,7 +8,7 @@ use super::{OpenMode, SessionTeardownAction};
 pub enum AppMsg {
     OpenConnect,
     ConnectionPrepared(Box<crate::services::connection_service::PreparedConnection>),
-    ConnectionPrepareFailed(String),
+    ConnectionPrepareFailed(String, Box<SavedConnection>),
     ConnectionSwitchDecision(super::types::SwitchDecision),
     DialogClosed,
     SelectTable {
