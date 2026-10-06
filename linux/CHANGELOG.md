@@ -4,6 +4,7 @@
 
 ### Added
 
+- Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
 - PostgreSQL `bit[]` and `varbit[]` query results now preserve bit values through typed parameter and CSV re-import, including empty bit strings, SQL NULL, and non-default array bounds.

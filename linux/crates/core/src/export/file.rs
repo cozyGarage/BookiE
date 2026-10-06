@@ -44,7 +44,7 @@ pub(crate) trait ResultWriter {
     fn finish(&mut self, output: &mut dyn Write) -> Result<(), ExportError>;
 }
 
-fn writer_for(export: &ResultExport<'_>, result: &QueryResult) -> Result<Box<dyn ResultWriter>, ExportError> {
+pub(super) fn writer_for(export: &ResultExport<'_>, row_count: usize) -> Result<Box<dyn ResultWriter>, ExportError> {
     Ok(match export.format {
         ResultFormat::Csv => Box::new(CsvWriter::new(export.csv)),
         ResultFormat::Json => Box::new(JsonWriter::new()),
@@ -55,7 +55,7 @@ fn writer_for(export: &ResultExport<'_>, result: &QueryResult) -> Result<Box<dyn
             Some(target) => Box::new(SqlWriter::new(target)?),
             None => return Err(ExportError::MissingSqlTarget),
         },
-        ResultFormat::Xlsx => Box::new(XlsxWriter::new(result.rows.len())?),
+        ResultFormat::Xlsx => Box::new(XlsxWriter::new(row_count)?),
     })
 }
 
@@ -76,7 +76,7 @@ pub fn write_result_file(
         }
     };
     check()?;
-    let mut writer = writer_for(export, result)?;
+    let mut writer = writer_for(export, result.rows.len())?;
     write_atomically_checked(
         path,
         |output| {

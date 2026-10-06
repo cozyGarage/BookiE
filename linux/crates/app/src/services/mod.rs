@@ -6,6 +6,7 @@ pub mod config_io;
 pub mod connection_monitor;
 pub mod connection_service;
 pub mod database_service;
+pub mod export_pages;
 pub mod filter_settings;
 pub mod gtk_approval;
 pub mod mcp_service;

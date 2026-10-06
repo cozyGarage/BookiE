@@ -115,6 +115,11 @@ impl BrowseTab {
             Some(&crate::tr!("Export current page as JSON…")),
             Some("win.export-json"),
         );
+        export_menu.append(Some(&crate::tr!("Export all rows as CSV…")), Some("win.export-all-csv"));
+        export_menu.append(
+            Some(&crate::tr!("Export all rows as JSON…")),
+            Some("win.export-all-json"),
+        );
         let export_button = gtk::MenuButton::builder()
             .icon_name("document-save-symbolic")
             .tooltip_text(crate::tr!("Export results"))

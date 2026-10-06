@@ -69,6 +69,8 @@ pub(super) fn install_window_actions(
         input_action!("jump-column", AppMsg::JumpToColumn),
         input_action!("export-csv", AppMsg::ExportCsv),
         input_action!("export-json", AppMsg::ExportJson),
+        input_action!("export-all-csv", AppMsg::ExportAllCsv),
+        input_action!("export-all-json", AppMsg::ExportAllJson),
         input_action!("save-changes", AppMsg::SaveActiveBrowseTab),
         input_action!("undo-change", AppMsg::UndoActiveBrowseTab),
         input_action!("redo-change", AppMsg::RedoActiveBrowseTab),

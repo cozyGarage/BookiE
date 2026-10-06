@@ -480,6 +480,10 @@ impl BrowseTab {
         self.row_count_requests.begin()
     }
 
+    pub fn total_rows(&self) -> Option<u64> {
+        self.current_total_rows
+    }
+
     pub fn page_size(&self) -> u64 {
         self.page_size
     }

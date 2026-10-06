@@ -49,7 +49,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-10 | Multi-statement results use one switcher button per statement | OPEN | Named, pinnable result tabs in `outcomes.rs` | gtk-widget |
 | UI-11 | Sidebar is a flat tables and views list; other objects only in the Catalog window | OPEN | `GtkTreeListModel` tree | gtk-widget |
 | UI-12 | ~~No database or schema switcher~~ | DONE | `Connection::list_databases` plus guard audit test; five driver tests against real servers; scenario `postgres_database_switcher_reconnects_to_the_chosen_database` | unit + driver-docker + gtk-installed |
-| UI-13 | Export covers loaded rows or the current page only | OPEN | Full-table streaming export, progress, snapshot semantics | driver-docker |
+| UI-13 | ~~Export covers loaded rows or the current page only~~ | DONE | The browse export menu has Export all rows as CSV or JSON: pages of 5,000 rows through the same connection guard, a background job with progress and cancel that publishes the file only when complete, a CSV null-marker collision refused. Tests `export::paged` and `services::export_pages` (12,003 rows over SQLite, filter, error). Snapshot consistency is UI-13b | unit + sqlite |
+| UI-13b | A full export is not a snapshot: rows changed during the export can be missed or repeated | OPEN | Read all pages inside one session transaction (ADR 0008); the dialog says so until then | driver-docker |
 | UI-14 | ~~No way to hide grid columns~~ | DONE | `column_widths.rs` and `column_visibility.rs` tests | unit + gtk-widget |
 | UI-14b | Hidden columns are still fetched; column order is not saved; no find in loaded rows | OPEN | Reorder, then grid search bar | gtk-widget |
 | UI-15 | Preferences lack theme override, null style, editor font family, vim mode | OPEN | `preferences.rs`, `AdwStyleManager` | gtk-widget |

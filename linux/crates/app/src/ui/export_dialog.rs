@@ -4,10 +4,23 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 use tablepro_core::QueryResult;
+use tablepro_core::export::{ExportError, RowPage};
+use tokio_util::sync::CancellationToken;
 
 use crate::services::preferences::PreferencesStore;
 
+pub(crate) type PageFetcherFactory = std::sync::Arc<dyn Fn(CancellationToken) -> PageFetcher + Send + Sync>;
+
+pub(crate) type PageFetcher = Box<dyn FnMut() -> Result<Option<RowPage>, ExportError> + Send>;
+
+#[derive(Clone)]
+pub(crate) struct PagedExport {
+    pub(crate) total_rows: Option<usize>,
+    pub(crate) open: PageFetcherFactory,
+}
+
 pub(crate) struct ExportRequest {
+    pub(crate) paged: Option<PagedExport>,
     pub(crate) result: QueryResult,
     pub(crate) suggested_name: String,
     pub(crate) driver_id: String,
@@ -106,11 +119,28 @@ impl ExportFormat {
     }
 }
 
-fn available_formats(driver_id: &str) -> Vec<ExportFormat> {
+fn format_subtitle(result: &QueryResult, paged: Option<&PagedExport>) -> String {
+    match paged {
+        Some(PagedExport {
+            total_rows: Some(total),
+            ..
+        }) => crate::tr!("All {n} rows, read page by page; changes made meanwhile may be missed")
+            .replace("{n}", &total.to_string()),
+        Some(_) => crate::tr!("All rows, read page by page; changes made meanwhile may be missed"),
+        None if result.truncated => {
+            crate::tr!("{n} loaded rows (result truncated)").replace("{n}", &result.rows.len().to_string())
+        }
+        None => crate::tr!("{n} loaded rows / current page").replace("{n}", &result.rows.len().to_string()),
+    }
+}
+
+fn available_formats(driver_id: &str, paged: Option<&PagedExport>) -> Vec<ExportFormat> {
     let statements = tablepro_core::export::supports_sql_literals(driver_id);
+    let workbook_fits = paged.is_none_or(|paged| paged.total_rows.is_some());
     FORMATS
         .iter()
         .filter(|spec| statements || spec.format != ExportFormat::Sql)
+        .filter(|spec| workbook_fits || spec.format != ExportFormat::Xlsx)
         .map(|spec| spec.format)
         .collect()
 }
@@ -168,26 +198,24 @@ pub(crate) fn present_with_format(
     preferences: &PreferencesStore,
 ) {
     let ExportRequest {
+        paged,
         result,
         suggested_name,
         driver_id,
     } = request;
-    let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
+    let null_marker = if paged.is_some() {
+        "\\N".to_string()
+    } else {
+        tablepro_core::export::unique_csv_null_marker(&result.rows)
+    };
     let page = adw::PreferencesPage::new();
 
     let format_group = adw::PreferencesGroup::new();
-    let formats = available_formats(&driver_id);
+    let formats = available_formats(&driver_id, paged.as_ref());
     let labels: Vec<&str> = formats.iter().map(|format| format.label()).collect();
     let format_row = adw::ComboRow::builder()
         .title(crate::tr!("Format"))
-        .subtitle(
-            if result.truncated {
-                crate::tr!("{n} loaded rows (result truncated)")
-            } else {
-                crate::tr!("{n} loaded rows / current page")
-            }
-            .replace("{n}", &result.rows.len().to_string()),
-        )
+        .subtitle(format_subtitle(&result, paged.as_ref()))
         .model(&gtk::StringList::new(&labels))
         .build();
     format_row.set_selected(u32::from(json));
@@ -292,6 +320,7 @@ pub(crate) fn present_with_format(
                 suggested_name: suggested_name.clone(),
                 driver_id: driver_id.clone(),
                 result: result.clone(),
+                paged: paged.clone(),
                 include_header,
                 sanitize_formulas: safe_csv.is_active(),
                 null_marker: null_marker_for_export.clone(),
@@ -308,6 +337,7 @@ struct SaveRequest {
     suggested_name: String,
     driver_id: String,
     result: QueryResult,
+    paged: Option<PagedExport>,
     include_header: bool,
     sanitize_formulas: bool,
     null_marker: String,
@@ -320,6 +350,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
         suggested_name,
         driver_id,
         result,
+        paged,
         include_header,
         sanitize_formulas,
         null_marker,
@@ -362,7 +393,7 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             &toast_overlay,
             file::ExportJob {
                 path,
-                result: result.clone(),
+                source: job_source(&paged, &result),
                 format,
                 options,
                 driver_id: driver_id.clone(),
@@ -371,6 +402,17 @@ fn save_with_file_dialog(parent: &adw::ApplicationWindow, toast_overlay: &adw::T
             },
         );
     });
+}
+
+fn job_source(paged: &Option<PagedExport>, result: &QueryResult) -> file::JobSource {
+    match paged {
+        Some(paged) => file::JobSource::Paged {
+            columns: result.columns.clone(),
+            total: paged.total_rows,
+            open: paged.open.clone(),
+        },
+        None => file::JobSource::Loaded(result.clone()),
+    }
 }
 
 fn show_export_error(
@@ -419,13 +461,13 @@ mod tests {
 
     #[test]
     fn a_connection_without_sql_literals_is_not_offered_the_statement_format() {
-        assert!(available_formats("postgres").contains(&ExportFormat::Sql));
+        assert!(available_formats("postgres", None).contains(&ExportFormat::Sql));
         for driver_id in ["mongodb", "redis"] {
             assert!(
-                !available_formats(driver_id).contains(&ExportFormat::Sql),
+                !available_formats(driver_id, None).contains(&ExportFormat::Sql),
                 "{driver_id}"
             );
-            assert_eq!(available_formats(driver_id).len(), FORMATS.len() - 1);
+            assert_eq!(available_formats(driver_id, None).len(), FORMATS.len() - 1);
         }
     }
 
@@ -443,11 +485,14 @@ mod tests {
 
     #[test]
     fn the_selected_row_maps_to_the_format_offered_at_that_position() {
-        let formats = available_formats("mongodb");
+        let formats = available_formats("mongodb", None);
         assert_eq!(selected_format(&formats, 0), ExportFormat::Csv);
         assert_eq!(selected_format(&formats, 5), ExportFormat::Xlsx);
         assert_eq!(selected_format(&formats, 99), ExportFormat::Csv);
-        assert_eq!(selected_format(&available_formats("postgres"), 5), ExportFormat::Sql);
+        assert_eq!(
+            selected_format(&available_formats("postgres", None), 5),
+            ExportFormat::Sql
+        );
     }
 
     #[test]
@@ -480,5 +525,20 @@ mod tests {
             suggested_file_name("customers.json", ExportFormat::Csv),
             "customers.csv"
         );
+    }
+
+    #[test]
+    fn a_workbook_needs_a_known_row_count_when_rows_are_read_page_by_page() {
+        let unknown = PagedExport {
+            total_rows: None,
+            open: std::sync::Arc::new(|_| Box::new(|| Ok(None))),
+        };
+        let known = PagedExport {
+            total_rows: Some(10),
+            open: unknown.open.clone(),
+        };
+        assert!(!available_formats("sqlite", Some(&unknown)).contains(&ExportFormat::Xlsx));
+        assert!(available_formats("sqlite", Some(&known)).contains(&ExportFormat::Xlsx));
+        assert!(available_formats("sqlite", None).contains(&ExportFormat::Xlsx));
     }
 }

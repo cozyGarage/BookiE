@@ -118,6 +118,8 @@ pub enum AppMsg {
     JumpToColumn,
     ExportCsv,
     ExportJson,
+    ExportAllCsv,
+    ExportAllJson,
     ExportResults {
         result: QueryResult,
         name: String,

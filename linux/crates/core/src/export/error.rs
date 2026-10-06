@@ -30,6 +30,12 @@ pub enum ExportError {
         "HTML cannot preserve U+{codepoint:04X} at row {row}, column {column}. Export as JSON to keep the original text"
     )]
     HtmlCharacter { row: usize, column: usize, codepoint: u32 },
+    #[error(
+        "The text {marker} that stands for NULL also appears as a value at row {row}. Export as JSON or choose another format"
+    )]
+    NullMarkerCollision { marker: String, row: usize },
+    #[error("The rows could not be read: {0}")]
+    Source(String),
     #[error("The Excel workbook could not be built")]
     Workbook(#[from] rust_xlsxwriter::XlsxError),
 }
