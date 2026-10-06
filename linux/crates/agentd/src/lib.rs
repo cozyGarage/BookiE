@@ -26,6 +26,18 @@ struct OpenSession {
     key: SessionKey,
     connection: Arc<dyn Connection>,
     audit_state: Arc<AuditState>,
+    retired: Arc<std::sync::atomic::AtomicBool>,
+}
+
+struct SessionFaultSink {
+    retired: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl tablepro_policy::ConnectionFaultSink for SessionFaultSink {
+    fn connection_became_unusable(&self, operation: &str) {
+        tracing::warn!(operation, "a cached session became unusable and will be replaced");
+        self.retired.store(true, std::sync::atomic::Ordering::Release);
+    }
 }
 
 struct SessionConnection {
@@ -293,7 +305,21 @@ impl DaemonProvider {
             key,
             connection,
             audit_state: Arc::new(self.audit_state.new_connection_generation()),
+            retired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
+    }
+
+    fn session_retirement(&self, id: Uuid, connection: &Arc<dyn Connection>) -> Arc<std::sync::atomic::AtomicBool> {
+        self.sessions
+            .lock()
+            .ok()
+            .and_then(|sessions| {
+                sessions
+                    .get(&id)
+                    .filter(|session| Arc::ptr_eq(&session.connection, connection))
+                    .map(|session| session.retired.clone())
+            })
+            .unwrap_or_default()
     }
 
     fn session_audit_state(&self, id: Uuid, connection: &Arc<dyn Connection>) -> Arc<AuditState> {
@@ -322,7 +348,10 @@ impl DaemonProvider {
             audit: self.audit.clone(),
             audit_state: self.session_audit_state(saved.id, &raw),
         };
-        Arc::new(PolicyGuard::new(raw, ctx))
+        let fault = Arc::new(SessionFaultSink {
+            retired: self.session_retirement(saved.id, &raw),
+        });
+        Arc::new(PolicyGuard::new(raw, ctx).with_fault_sink(fault))
     }
 
     pub fn with_system_openssh(mut self, openssh: tablepro_transport::OpenSshEnvironment) -> Self {
@@ -341,7 +370,10 @@ impl DaemonProvider {
         let cached = self.cached_connection(saved.id, &key)?;
         if let Some(connection) = cached {
             let healthy = ping_is_healthy(connection.ping(), SESSION_PING_TIMEOUT).await;
-            if healthy && self.session_is_current(saved.id, &key, &connection)? {
+            let retired = self
+                .session_retirement(saved.id, &connection)
+                .load(std::sync::atomic::Ordering::Acquire);
+            if healthy && !retired && self.session_is_current(saved.id, &key, &connection)? {
                 return Ok(connection);
             }
             self.remove_session(saved.id, &key, &connection)?;
@@ -607,6 +639,7 @@ mod tests {
                 key: key.clone(),
                 connection: connection.clone(),
                 audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
         let issued = connection.clone();
@@ -647,6 +680,7 @@ mod tests {
                 key: old_key,
                 connection: connection.clone(),
                 audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 
@@ -761,6 +795,7 @@ mod tests {
                 key,
                 connection: connection.clone(),
                 audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 
@@ -866,6 +901,7 @@ mod tests {
                 key,
                 connection: connection.clone(),
                 audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 

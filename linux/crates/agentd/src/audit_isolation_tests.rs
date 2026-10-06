@@ -8,6 +8,7 @@ use tablepro_policy::{ApprovalOutcome, ApprovalRequest, AuditError, AuditEvent};
 
 struct WriteProbe {
     hang: bool,
+    panic: bool,
     executed: Arc<AtomicUsize>,
 }
 
@@ -31,6 +32,9 @@ impl Connection for WriteProbe {
 
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
         self.executed.fetch_add(1, Ordering::SeqCst);
+        if self.panic {
+            panic!("driver bug");
+        }
         if self.hang {
             std::future::pending::<()>().await;
         }
@@ -113,6 +117,7 @@ fn install_session(
     let executed = Arc::new(AtomicUsize::new(0));
     let connection: Arc<dyn Connection> = Arc::new(WriteProbe {
         hang,
+        panic: false,
         executed: executed.clone(),
     });
     let session = provider.new_session(SessionKey::from_saved(saved, [0; 32]), connection.clone());
@@ -156,4 +161,38 @@ async fn an_interrupted_write_blocks_only_its_own_connection_and_a_replacement_r
         .execute("INSERT INTO t VALUES (4)")
         .await
         .expect("a replacement session starts with a clean audit state");
+}
+
+#[tokio::test]
+async fn a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy() {
+    let provider = provider();
+    let saved = local_connection();
+    let connection: Arc<dyn Connection> = Arc::new(WriteProbe {
+        hang: false,
+        panic: true,
+        executed: Arc::new(AtomicUsize::new(0)),
+    });
+    let material = tablepro_transport::session_material_digest(&saved)
+        .await
+        .expect("material digest");
+    let session = provider.new_session(SessionKey::from_saved(&saved, material), connection.clone());
+    provider.sessions.lock().expect("sessions").insert(saved.id, session);
+
+    let reused = provider
+        .open_session(&saved)
+        .await
+        .expect("a healthy session is reused before the fault");
+    assert!(Arc::ptr_eq(&reused, &connection));
+
+    let guard = provider.guarded(&saved, Principal::human_gui(), connection);
+    guard
+        .execute("INSERT INTO t VALUES (1)")
+        .await
+        .expect_err("a panicking driver call is contained as an error");
+
+    assert!(
+        provider.open_session(&saved).await.is_err(),
+        "the faulted session must be retired and a fresh connection attempted (none is registered here)"
+    );
+    assert!(provider.sessions.lock().expect("sessions").get(&saved.id).is_none());
 }
