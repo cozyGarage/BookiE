@@ -126,7 +126,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-1b | ~~Lower the file-size baselines the guard notes as shrunk~~ | DONE | `file-size-baselines.txt` ratcheted; B3 has since split `result_consumers_temporal.rs` under the limit, so its baseline entry is removed | sandbox |
 | TEST-2 | Mutation: core and package survivors untriaged; portable evidence | OPEN | B3-P6 | sandbox |
 | TEST-3 | ~~No line-coverage number~~ | DONE | 2026-10-07 on the runner: `cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins` reports 58.1% of lines (47,493 of 112,706 uncovered), 58.7% of functions. Unit tier only: driver integration, GTK and installed tiers are not counted. Examples: storage `connections.rs` 94%, `secrets.rs` 55%, ssh `supervisor.rs` 0% | manual |
-| TEST-3b | Coverage is measured by hand, with no trend or floor | OPEN | Add `cargo llvm-cov` to the nightly Forgejo workflow, store the total, fail below a ratcheted floor | sandbox |
+| TEST-3b | Coverage is measured by hand, with no trend or floor | OPEN | The nightly Forgejo workflow runs `cargo llvm-cov` and fails below `coverage-floor.txt` (57). Not yet run on the schedule; trend storage still missing | sandbox |
 | TEST-4 | Full driver, TLS and SSH matrix not rerun on one candidate tree | OPEN | Run on the runner; see below | driver-docker |
 | TEST-5 | Hosted DuckDB container ownership fix not confirmed | UNVERIFIED | | manual |
 | TEST-6 | 117 unchecked items in [manual verification](manual-verification-0.2-features.md) | OPEN | Automate what GTK automation can reach | gtk-installed |
