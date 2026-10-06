@@ -51,6 +51,8 @@ remain source-pinned archives; use current boards and evidence manifests for
 active decisions and case proof.
 - [Architecture/evidence review](architecture-consistency-review-2026-10-03.md):
   source risks and unavailable raw proof; its manifest is a dated snapshot.
+- [App layer external audit](app-layer-external-audit-2026-10-06.md): GUI
+  usability gaps, TablePro/dbx UI comparison and the proposed parallel UX lane.
 - [Upstream main](upstream-main-review-2026-10-03.md) and
   [older releases](upstream-older-releases-review-2026-10-03.md): candidate fixes,
   mapped to the existing B3/B4 owners.

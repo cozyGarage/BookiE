@@ -339,6 +339,10 @@ impl App {
     /// the active Browse tab. Strip lives inside the tab (always
     /// constructed at init), so this is just a reveal flip.
     pub(super) fn on_show_filter_dialog(&self) {
+        if let Some(id) = self.selected_editor_tab_id() {
+            self.dispatch_to_editor(id, crate::ui::editor::SqlEditorInput::ShowFind);
+            return;
+        }
         let Some(id) = self.selected_browse_tab_id() else {
             self.show_toast(&crate::tr!("Open a table to filter rows."));
             return;

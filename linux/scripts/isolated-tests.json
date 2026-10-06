@@ -125,6 +125,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::find_bar::tests::find_selects_matches_and_replace_all_rewrites_every_occurrence"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column::tests::bind_does_not_open_binary_bytes_in_a_text_column_for_editing"
     ],
     [

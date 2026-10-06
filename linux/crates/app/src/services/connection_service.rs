@@ -156,6 +156,17 @@ pub async fn open_saved(
     ))
 }
 
+pub async fn until_cancelled<T>(
+    token: &tokio_util::sync::CancellationToken,
+    work: impl std::future::Future<Output = T>,
+) -> Option<T> {
+    tokio::select! {
+        biased;
+        () = token.cancelled() => None,
+        value = work => Some(value),
+    }
+}
+
 pub async fn establish(
     driver: &dyn tablepro_core::DatabaseDriver,
     opts: ConnectOptions,
@@ -176,5 +187,31 @@ fn message(error: TransportError) -> String {
                 .replace("{driver}", &driver_name)
         }
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    use tokio_util::sync::CancellationToken;
+
+    #[tokio::test]
+    async fn a_cancelled_token_abandons_work_that_never_finishes() {
+        let token = CancellationToken::new();
+        token.cancel();
+        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
+    }
+
+    #[tokio::test]
+    async fn finished_work_is_returned_when_nothing_cancels() {
+        assert_eq!(until_cancelled(&CancellationToken::new(), async { 7 }).await, Some(7));
+    }
+
+    #[tokio::test]
+    async fn cancelling_during_the_work_drops_it() {
+        let token = CancellationToken::new();
+        let canceller = token.clone();
+        tokio::spawn(async move { canceller.cancel() });
+        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
     }
 }

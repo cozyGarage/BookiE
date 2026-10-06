@@ -28,7 +28,10 @@ pub fn driver_message(error: &DriverError) -> String {
     match error {
         DriverError::ConnectionRefused => crate::tr!("Could not reach the database. Is it running?"),
         DriverError::AuthFailed => crate::tr!("Username or password is wrong."),
-        DriverError::Tls(detail) => crate::tr!("TLS handshake failed: {detail}").replace("{detail}", detail),
+        DriverError::Tls(detail) => crate::tr!(
+            "TLS handshake failed: {detail}. If this server does not use TLS, such as a local container, set TLS to Disabled."
+        )
+        .replace("{detail}", detail),
         DriverError::Query {
             message,
             sqlstate: Some(s),
@@ -101,6 +104,12 @@ pub fn keyring_message(failure: &tablepro_storage::KeyringFailure) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_tls_failure_points_at_the_tls_setting() {
+        let message = driver_message(&DriverError::Tls("certificate verify failed".into()));
+        assert!(message.contains("certificate verify failed"));
+        assert!(message.contains("set TLS to Disabled"));
+    }
 
     #[test]
     fn each_keyring_failure_says_what_to_do_next() {

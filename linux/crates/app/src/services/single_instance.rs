@@ -86,3 +86,14 @@ pub fn acquire() -> Result<Lock, LockError> {
         Err(LockError::Io(err))
     }
 }
+pub fn raise_running_instance(app_id: &str) {
+    use gtk4::gio::prelude::*;
+
+    let app = gtk4::Application::new(Some(app_id), gtk4::gio::ApplicationFlags::default());
+    if app.register(gtk4::gio::Cancellable::NONE).is_err() || !app.is_remote() {
+        tracing::info!("another BookiE instance is running and could not be reached over D-Bus; exiting");
+        return;
+    }
+    app.activate();
+    tracing::info!("another BookiE instance is running; asked it to show its window");
+}

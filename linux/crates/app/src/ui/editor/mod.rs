@@ -1,5 +1,6 @@
 mod completion;
 mod diagnostics;
+mod find_bar;
 mod finish_notice;
 pub(crate) mod open_file;
 use tablepro_core::sql_format as format_plan;
@@ -42,6 +43,7 @@ pub struct SqlEditor {
     catalog_origin: Option<crate::services::catalog::CatalogOrigin>,
     diagnostics: diagnostics::Diagnostics,
     source_view: sourceview5::View,
+    find: Option<find_bar::FindBar>,
     run_button: gtk::Button,
     session_button: gtk::ToggleButton,
     session: Option<session_mode::EditorSession>,
@@ -134,6 +136,7 @@ pub enum SqlEditorInput {
     Format,
     RunAtCursor,
     ToggleLineComment,
+    ShowFind,
     Explain,
     Grid(GridMsg),
     SessionToggled(bool),
@@ -370,7 +373,7 @@ impl SimpleComponent for SqlEditor {
         }
     }
 
-    fn init(init: Self::Init, _root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+    fn init(init: Self::Init, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let widgets = view_output!();
 
         let lang_manager = sourceview5::LanguageManager::default();
@@ -380,7 +383,13 @@ impl SimpleComponent for SqlEditor {
             buffer.set_text(&initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         } else {
-            widgets.source_view.buffer().set_text(&initial_text);
+            let buffer = sourceview5::Buffer::new(None::<&gtk::TextTagTable>);
+            buffer.set_text(&initial_text);
+            widgets.source_view.set_buffer(Some(&buffer));
+        }
+        let find = find_bar::FindBar::new(&widgets.source_view);
+        if let Some(find) = &find {
+            root.add_top_bar(find.widget());
         }
         apply_editor_scheme(&widgets.source_view);
         let view_for_theme = widgets.source_view.clone();
@@ -539,6 +548,7 @@ impl SimpleComponent for SqlEditor {
                 init.database.clone(),
             ),
             source_view: widgets.source_view.clone(),
+            find,
             run_button: widgets.run_button.clone(),
             session_button: widgets.session_button.clone(),
             session: None,
@@ -814,6 +824,12 @@ impl SimpleComponent for SqlEditor {
 
             SqlEditorInput::ReplaceQuery(text) => {
                 self.source_view.buffer().set_text(&text);
+            }
+
+            SqlEditorInput::ShowFind => {
+                if let Some(find) = &self.find {
+                    find.open();
+                }
             }
 
             SqlEditorInput::Format => {

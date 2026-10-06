@@ -114,6 +114,7 @@ pub struct App {
     /// alternative to a fire-and-forget 2 s toast that disappeared
     /// before the connection actually completed.
     connect_progress_toast: Option<adw::Toast>,
+    connect_cancel: Option<tokio_util::sync::CancellationToken>,
     reconnect_banner: adw::Banner,
     connections_factory: FactoryVecDeque<ConnectionRow>,
     connections_popover: gtk::Popover,
@@ -455,6 +456,7 @@ impl SimpleComponent for App {
                     WelcomeViewOutput::OpenSaved(saved) => AppMsg::OpenSaved(saved),
                     WelcomeViewOutput::ToggleFavorite(id) => AppMsg::ToggleConnectionFavorite(id),
                     WelcomeViewOutput::Organize(saved) => AppMsg::OrganizeConnection(saved),
+                    WelcomeViewOutput::Edit(saved) => AppMsg::EditConnection(saved),
                     WelcomeViewOutput::Duplicate(id) => AppMsg::DuplicateConnection(id),
                     WelcomeViewOutput::ExportBundle => AppMsg::ExportConnections,
                     WelcomeViewOutput::ImportBundle => AppMsg::ImportBundle,
@@ -484,6 +486,7 @@ impl SimpleComponent for App {
             content_holder: widgets.content_holder.clone(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
+            connect_cancel: None,
             reconnect_banner: widgets.reconnect_banner.clone(),
             connections_factory: workspace_chrome.connections_factory,
             connections_popover: widgets.connections_popover.clone(),
@@ -584,7 +587,9 @@ impl SimpleComponent for App {
         match msg {
             AppMsg::OpenConnect => self.on_open_connect(sender),
             AppMsg::ConnectionPrepared(prepared) => self.on_connection_prepared(prepared, sender),
-            AppMsg::ConnectionPrepareFailed(message) => self.on_connection_prepare_failed(message),
+            AppMsg::ConnectionPrepareFailed(message, saved) => {
+                self.on_connection_prepare_failed(message, *saved, sender)
+            }
             AppMsg::ConnectionSwitchDecision(decision) => self.on_connection_switch_decision(decision, sender),
             AppMsg::Disconnect => self.on_disconnect(sender),
             AppMsg::ForceDisconnect => self.request_disconnect(sender),
@@ -892,6 +897,11 @@ impl SimpleComponent for App {
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsInsert { tab_id, row_position } => self.on_copy_row_as_insert(tab_id, row_position),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
+            AppMsg::CancelConnect => self.on_cancel_connect(),
+            AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
+            AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
+            AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
+            AppMsg::EditConnectionFailed(message) => self.show_toast(&message),
             AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),
             AppMsg::ExportConnections => self.on_export_connections(sender),
             AppMsg::ExportConnectionsTo(choice) => self.on_export_connections_to(choice, sender),

@@ -33,6 +33,7 @@ pub enum WelcomeViewInput {
     OpenSaved(SavedConnection),
     ToggleFavorite(Uuid),
     Organize(SavedConnection),
+    Edit(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
     ExportBundle,
@@ -47,6 +48,7 @@ pub enum WelcomeViewOutput {
     OpenSaved(SavedConnection),
     ToggleFavorite(Uuid),
     Organize(SavedConnection),
+    Edit(SavedConnection),
     Duplicate(Uuid),
     Delete(Uuid),
     ExportBundle,
@@ -249,6 +251,9 @@ impl SimpleComponent for WelcomeView {
             WelcomeViewInput::Organize(saved) => {
                 let _ = sender.output(WelcomeViewOutput::Organize(saved));
             }
+            WelcomeViewInput::Edit(saved) => {
+                let _ = sender.output(WelcomeViewOutput::Edit(saved));
+            }
             WelcomeViewInput::Duplicate(id) => {
                 let _ = sender.output(WelcomeViewOutput::Duplicate(id));
             }
@@ -319,6 +324,7 @@ impl WelcomeView {
                 ConnectionRowOutput::Open(saved) => WelcomeViewInput::OpenSaved(saved),
                 ConnectionRowOutput::ToggleFavorite(id) => WelcomeViewInput::ToggleFavorite(id),
                 ConnectionRowOutput::Organize(saved) => WelcomeViewInput::Organize(saved),
+                ConnectionRowOutput::Edit(saved) => WelcomeViewInput::Edit(saved),
                 ConnectionRowOutput::Duplicate(id) => WelcomeViewInput::Duplicate(id),
                 ConnectionRowOutput::Delete(id) => WelcomeViewInput::Delete(id),
             });

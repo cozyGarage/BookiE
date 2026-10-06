@@ -1013,6 +1013,12 @@ impl App {
             .any(|tab| matches!(tab, WorkspaceTab::Editor(slot) if slot.running))
     }
 
+    pub(super) fn dispatch_to_editor(&self, tab_id: Uuid, msg: SqlEditorInput) {
+        if let Some(WorkspaceTab::Editor(slot)) = self.workspace_tabs.borrow().get(&tab_id) {
+            let _ = slot.controller.sender().send(msg);
+        }
+    }
+
     pub(super) fn on_replace_active_tab_query(&mut self, text: String, sender: ComponentSender<Self>) {
         // If an editor tab is active, replace its buffer in-place. If a
         // browse tab is active (or no tab at all), fall back to opening
