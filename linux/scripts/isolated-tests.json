@@ -125,6 +125,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::grid::value_viewer::tests::the_viewer_dialog_builds_and_shows_the_full_value"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::editor::find_bar::tests::find_selects_matches_and_replace_all_rewrites_every_occurrence"
     ],
     [

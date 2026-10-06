@@ -6,6 +6,7 @@ mod editing;
 mod export;
 mod presentation;
 mod types;
+mod value_viewer;
 pub(crate) use presentation::cell_allows_inline_edit;
 
 use gtk4::prelude::*;
