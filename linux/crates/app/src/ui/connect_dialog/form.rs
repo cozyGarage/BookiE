@@ -62,6 +62,11 @@ pub(super) fn socket_directory_is_valid(directory: &str) -> bool {
 pub(super) fn resolved_socket_path(directory: &str, port: u16) -> std::path::PathBuf {
     std::path::Path::new(directory).join(format!(".s.PGSQL.{port}"))
 }
+
+pub(super) fn default_driver_row(drivers: &[super::DriverEntry]) -> u32 {
+    drivers.iter().position(|d| d.id == "postgres").unwrap_or(0) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,5 +201,25 @@ mod tests {
             resolved_socket_path("/tmp", 6543),
             std::path::PathBuf::from("/tmp/.s.PGSQL.6543")
         );
+    }
+
+    fn driver(id: &str) -> crate::ui::connect_dialog::DriverEntry {
+        crate::ui::connect_dialog::DriverEntry {
+            id: id.to_string(),
+            display_name: id.to_string(),
+            maturity: tablepro_core::DriverMaturity::Stable,
+        }
+    }
+
+    #[test]
+    fn a_new_connection_starts_on_postgres_when_it_is_registered() {
+        let drivers = [driver("clickhouse"), driver("mysql"), driver("postgres")];
+        assert_eq!(default_driver_row(&drivers), 2);
+    }
+
+    #[test]
+    fn the_default_driver_falls_back_to_the_first_row() {
+        assert_eq!(default_driver_row(&[driver("clickhouse"), driver("sqlite")]), 0);
+        assert_eq!(default_driver_row(&[]), 0);
     }
 }

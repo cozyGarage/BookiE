@@ -4,6 +4,7 @@
 
 ### Added
 
+- The connection form starts on PostgreSQL, offers file pickers for SQLite and DuckDB files and for the TLS certificate authority, and a TLS failure now says to check the TLS setting.
 - A failed connection from the saved list now offers Try Again and Edit Connection instead of only Close.
 - Saved connections can be edited from the welcome list, including their password, TLS, timeouts and single-hop SSH settings.
 - PostgreSQL enum results and browse filters preserve the literal label `NULL` separately from SQL NULL across scalar and array projections and typed comparisons.

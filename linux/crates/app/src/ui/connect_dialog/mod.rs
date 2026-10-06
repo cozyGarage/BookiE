@@ -28,6 +28,7 @@ pub struct ConnectDialog {
     socket_dir: adw::EntryRow,
     resolved_socket: adw::ActionRow,
     database: adw::EntryRow,
+    database_file_picker: gtk::Box,
     username: adw::EntryRow,
     password: adw::PasswordEntryRow,
     auth_combo: adw::ComboRow,
@@ -71,11 +72,12 @@ fn auth_mode_for_row(row: u32) -> AuthMode {
     AUTH_MODE_ROWS.get(row as usize).copied().unwrap_or_default()
 }
 
+mod browse;
 mod form;
 mod identity;
 mod prefill;
 
-use form::{AuthFormState, EndpointFormState, resolved_socket_path, socket_directory_is_valid};
+use form::{AuthFormState, EndpointFormState, default_driver_row, resolved_socket_path, socket_directory_is_valid};
 use identity::{ConnectionIdentity, find_existing, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
@@ -174,6 +176,7 @@ impl Component for ConnectDialog {
         let driver_combo = adw::ComboRow::builder()
             .title(crate::tr!("Driver"))
             .model(&driver_model)
+            .selected(default_driver_row(&drivers))
             .build();
         let sender_for_combo = sender.clone();
         driver_combo.connect_selected_notify(move |row| {
@@ -207,6 +210,8 @@ impl Component for ConnectDialog {
             .build();
         let resolved_socket = adw::ActionRow::builder().title(crate::tr!("Resolved socket")).build();
         let database = adw::EntryRow::builder().title(crate::tr!("Database")).build();
+        let database_file_picker = browse::attach_database_file_picker(&database);
+        database_file_picker.set_visible(false);
         let username = adw::EntryRow::builder().title(crate::tr!("Username")).build();
         let password = adw::PasswordEntryRow::builder().title(crate::tr!("Password")).build();
         let tls_mode = adw::ComboRow::builder()
@@ -220,6 +225,7 @@ impl Component for ConnectDialog {
         let tls_root_cert = adw::EntryRow::builder()
             .title(crate::tr!("Certificate authority"))
             .build();
+        browse::attach_certificate_picker(&tls_root_cert);
         let sender_for_tls = sender.clone();
         tls_mode.connect_selected_notify(move |_| {
             sender_for_tls.input(ConnectDialogInput::TlsModeChanged);
@@ -309,7 +315,7 @@ impl Component for ConnectDialog {
         });
 
         let initial_title = drivers
-            .first()
+            .get(default_driver_row(&drivers) as usize)
             .map(|driver| crate::tr!("Connect to {name}").replace("{name}", &driver.display_name))
             .unwrap_or_else(|| crate::tr!("Connect"));
         let header_title = gtk::Label::new(Some(&initial_title));
@@ -342,6 +348,7 @@ impl Component for ConnectDialog {
             socket_dir,
             resolved_socket,
             database,
+            database_file_picker,
             username,
             password,
             auth_combo,
@@ -686,6 +693,7 @@ impl ConnectDialog {
         self.tls_root_cert.set_visible(
             !driver.is_file_based() && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
         );
+        self.database_file_picker.set_visible(self.form.file_based);
         self.database.set_title(&if self.form.file_based {
             crate::tr!("File path")
         } else {
