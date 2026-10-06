@@ -133,7 +133,14 @@ def scenarios(ui):
                 except Exception:
                     continue
             time.sleep(ui.POLL_SECONDS)
-        raise AssertionError(f"no editable cell holding {initial!r}:\n{ui.accessible_snapshot()}")
+        seen = []
+        for node in ui.descendants(ui.application_node()):
+            try:
+                node.queryEditableText()
+                seen.append((str(node.getRoleName()), ui.node_name(node), text_of(node)[:30]))
+            except Exception:
+                continue
+        raise AssertionError(f"no editable cell holding {initial!r}; editable nodes: {seen}")
 
     def stored_notes(database):
         import sqlite3
