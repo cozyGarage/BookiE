@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-domain-depth-over-300",
+  "baseline_commit": "ec85518971ef5684689a3ddb4678062b7c6693f6",
+  "working_tree_dirty": true,
+  "scope": "Extend schema-aware PostgreSQL domain-over-enum proof one level beyond the 300-domain checkpoint",
+  "source": {
+    "crates/drivers/postgres/tests/support/domain_contract_parts/deep_domains.rs": "b8f5234e709714aaf020eebbd5c41d65e6623409b9dbdb35771d22a0f4768166"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The existing reusable domain-over-enum contract now includes a 301-level schema-aware case, in addition to its established depth cases through 300.",
+    "At depth 301, catalog enum-leaf metadata, keyed edits, draft inserts, typed filters, invalid-label refusal, SQL NULL preservation, transaction writes, rollback and outer pg_typeof values are checked with a same-named shadow enum leading search_path.",
+    "Raw inferred text and SQL NULL remain explicitly refused at depths of 64 or more; the new case does not extend that parameter boundary or establish a maximum supported schema-aware depth."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --offline --locked -p tablepro-driver-postgres --test integration domain_contract::value_contract_deep_domain_levels_over_enum_ignore_shadowed_search_path -- --ignored --test-threads=1",
+      "result": "1 passed; the contract covers 14 depths, including 301",
+      "log": "focused-test.txt"
+    }
+  },
+  "log_sha256": {
+    "focused-test.txt": "9f66f27b5b9798437734a3e4aa25a9710e45ede3f4d12c4e98e007cb5638d1f2"
+  },
+  "remaining": [
+    "Depths beyond 301, other PostgreSQL enum/session combinations, additional array families and consumers, and the wider B3 matrix remain open; this case does not qualify 0.2.0."
+  ]
+}
