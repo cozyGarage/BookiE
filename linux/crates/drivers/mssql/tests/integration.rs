@@ -1349,18 +1349,3 @@ async fn value_contract_datetimeoffset_keeps_its_offset_through_results_paramete
     assert_eq!(zoned_copies_matching(conn.as_ref(), "zoned_exported").await, total);
     datetimeoffset_csv::assert_csv_round_trip(conn.as_ref(), &source).await;
 }
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn list_databases_returns_user_databases_and_hides_system_databases() {
-    let (_c, opts) = start_mssql().await;
-    let conn = connect(opts).await;
-    conn.execute("CREATE DATABASE alpha_db").await.unwrap();
-
-    let names = conn.list_databases().await.unwrap();
-
-    assert!(names.contains(&"alpha_db".to_string()), "{names:?}");
-    for hidden in ["master", "tempdb", "model", "msdb"] {
-        assert!(!names.contains(&hidden.to_string()), "{hidden} leaked: {names:?}");
-    }
-}

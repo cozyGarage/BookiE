@@ -7,6 +7,9 @@ mod connect_refusal;
 
 #[path = "support/clickhouse.rs"]
 mod clickhouse;
+
+#[path = "support/database_listing.rs"]
+mod database_listing;
 #[path = "support/disconnection.rs"]
 mod disconnection;
 #[path = "support/nested_values.rs"]
@@ -1189,17 +1192,4 @@ async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
     let literal = tablepro_core::sql_literal::render_sql_literal("clickhouse", &Value::DateTime(requested))
         .expect("the same whole-second value has an exact lower-scale literal");
     assert_eq!(literal, "toDateTime64('2262-04-12 00:00:00', 0)");
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn list_databases_returns_user_databases_and_hides_system_ones() {
-    let (_c, opts) = start_clickhouse().await;
-    let conn = connect(opts).await;
-    conn.execute("CREATE DATABASE alpha_db").await.unwrap();
-
-    let names = conn.list_databases().await.unwrap();
-
-    assert!(names.contains(&"alpha_db".to_string()), "{names:?}");
-    assert!(!names.contains(&"system".to_string()), "{names:?}");
 }

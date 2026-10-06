@@ -1164,6 +1164,9 @@ async fn decimal_results_preserve_all_fractional_digits() {
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
+#[path = "support/database_listing.rs"]
+mod database_listing;
+
 #[path = "support/enum_sql_mode_contract.rs"]
 mod enum_sql_mode_contract;
 #[path = "support/wide_decimal_csv.rs"]
@@ -1175,19 +1178,4 @@ async fn value_contract_wide_decimal_csv_bound_and_literal_round_trips_preserve_
     let (_container, options) = start_mysql().await;
     let connection = connect(options).await;
     wide_decimal_csv::assert_csv_bound_and_literal_round_trips(connection.as_ref()).await;
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn list_databases_returns_user_databases_and_hides_system_schemas() {
-    let (_c, opts) = start_mysql().await;
-    let conn = connect(opts).await;
-    conn.execute("CREATE DATABASE alpha_db").await.unwrap();
-
-    let names = conn.list_databases().await.unwrap();
-
-    assert!(names.contains(&"alpha_db".to_string()), "{names:?}");
-    for hidden in ["information_schema", "mysql", "performance_schema", "sys"] {
-        assert!(!names.contains(&hidden.to_string()), "{hidden} leaked: {names:?}");
-    }
 }

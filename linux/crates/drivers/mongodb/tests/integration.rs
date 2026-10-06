@@ -886,6 +886,9 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
 
 #[path = "support/census_cost.rs"]
 mod census_cost;
+
+#[path = "support/database_listing.rs"]
+mod database_listing;
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
@@ -894,18 +897,3 @@ mod stale_grid_edit_contract;
 
 #[path = "support/stale_grid_delete_contract.rs"]
 mod stale_grid_delete_contract;
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn list_databases_returns_databases_with_data_and_hides_internal_ones() {
-    let (_container, host, port) = start_mongo().await;
-    let conn = MongodbDriver.connect(opts(&host, port, "alpha_db")).await.unwrap();
-    conn.execute(r#"db.things.insertOne({"a": 1})"#).await.unwrap();
-
-    let names = conn.list_databases().await.unwrap();
-
-    assert!(names.contains(&"alpha_db".to_string()), "{names:?}");
-    for hidden in ["admin", "local", "config"] {
-        assert!(!names.contains(&hidden.to_string()), "{hidden} leaked: {names:?}");
-    }
-}

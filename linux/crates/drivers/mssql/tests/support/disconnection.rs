@@ -47,3 +47,6 @@ async fn a_disconnected_session_is_retired_after_server_loss() {
     assert!(matches!(error, DriverError::Disconnected), "{error:?}");
     assert!(!session.is_usable(), "a disconnected session must be retired");
 }
+
+#[path = "disconnection_parts/database_listing.rs"]
+mod database_listing;
