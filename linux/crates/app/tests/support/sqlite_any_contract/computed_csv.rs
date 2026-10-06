@@ -1134,3 +1134,4 @@ async fn sqlite_instr_any_csv_round_trip_preserves_integer_and_null_results() {
             .collect::<Vec<_>>()
     );
 }
+
