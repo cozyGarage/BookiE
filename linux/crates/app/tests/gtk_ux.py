@@ -258,7 +258,7 @@ def scenarios(ui):
     def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
         ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
         ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("people", "Open people")
+        ui.invoke_named_action_within("public.people", "Open people")
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         click_cell("Grace Hopper", count=2)
         for key in "gracey":
