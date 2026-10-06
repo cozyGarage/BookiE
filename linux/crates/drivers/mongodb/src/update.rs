@@ -1,6 +1,7 @@
 use mongodb::bson::{Bson, Document, doc};
 use sqlparser::ast::{
-    AssignmentTarget, BinaryOperator, Expr, FromTable, ObjectNamePart, Statement, TableFactor, Value as SqlValue,
+    AssignmentTarget, BinaryOperator, Expr, FromTable, FunctionArg, FunctionArgExpr, FunctionArguments, ObjectNamePart,
+    Statement, TableFactor, Value as SqlValue,
 };
 use sqlparser::dialect::GenericDialect;
 use sqlparser::parser::Parser;
@@ -216,10 +217,56 @@ fn selector_from_expr(expr: &Expr, params: &[Value], index: &mut usize) -> Resul
             };
             Ok(explicit_null_selector(field))
         }
+        Expr::Function(function)
+            if single_identifier(&function.name).as_deref() == Some("tablepro_mongodb_exact_field_set") =>
+        {
+            exact_field_set_selector(function, params, index)
+        }
         _ => Err(DriverError::Unsupported(
             "MongoDB grid write has an unsupported key predicate".into(),
         )),
     }
+}
+
+fn exact_field_set_selector(
+    function: &sqlparser::ast::Function,
+    params: &[Value],
+    index: &mut usize,
+) -> Result<Document, DriverError> {
+    let invalid = || DriverError::Unsupported("MongoDB delete has an invalid document field-set guard".into());
+    if function.parameters != FunctionArguments::None
+        || function.uses_odbc_syntax
+        || function.filter.is_some()
+        || function.null_treatment.is_some()
+        || function.over.is_some()
+        || !function.within_group.is_empty()
+    {
+        return Err(invalid());
+    }
+    let FunctionArguments::List(arguments) = &function.args else {
+        return Err(invalid());
+    };
+    if arguments.duplicate_treatment.is_some() || !arguments.clauses.is_empty() {
+        return Err(invalid());
+    }
+    let [FunctionArg::Unnamed(FunctionArgExpr::Expr(value))] = arguments.args.as_slice() else {
+        return Err(invalid());
+    };
+    let value = take_placeholder_value(value, params, index)?;
+    let Bson::Array(expected_fields) = value_to_bson(&value)? else {
+        return Err(invalid());
+    };
+    if expected_fields.iter().any(|field| !matches!(field, Bson::String(_))) {
+        return Err(invalid());
+    }
+    Ok(doc! {
+        "$expr": {
+            "$setEquals": [
+                { "$map": { "input": { "$objectToArray": "$$ROOT" }, "as": "field", "in": "$$field.k" } },
+                expected_fields,
+            ]
+        }
+    })
 }
 
 fn explicit_null_selector(field: String) -> Document {
