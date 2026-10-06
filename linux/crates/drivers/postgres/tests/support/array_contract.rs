@@ -71,6 +71,10 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
             "pg_lsn[]",
             "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
         ),
+        (
+            "macaddr[]",
+            "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]",
+        ),
     ] {
         let sql = format!("SELECT ({expression}) AS value, encode(array_send({expression}), 'hex') AS wire");
         let result = connection.query(&sql).await.unwrap();
@@ -594,6 +598,10 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
             "pg_lsn[]",
             "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
         ),
+        (
+            "macaddr[]",
+            "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]",
+        ),
     ];
     let definitions = cases
         .iter()
@@ -744,10 +752,10 @@ async fn value_contract_numeric_array_grid_edit_preserves_elements() {
 fn assert_array_value(kind: &str, result: &QueryResult) {
     let value = &result.rows[0][0];
     assert!(matches!(value, Value::Null | Value::Text(_)), "{kind}: {value:?}");
-    let expected_type = if kind == "bpchar[]" {
-        "CHAR[]".into()
-    } else {
-        kind.to_ascii_uppercase()
+    let expected_type = match kind {
+        "bpchar[]" => "CHAR[]".into(),
+        "pg_lsn[]" => "pg_lsn[]".into(),
+        _ => kind.to_ascii_uppercase(),
     };
     assert_eq!(result.columns[0].data_type, expected_type);
     let json = tablepro_core::export::row_to_json(&result.columns, &result.rows[0]);
