@@ -5,7 +5,7 @@
 Reconcile the two local commits (TLS endpoint identity and manual connection lab)
 with remote Linux through `2c5499947`, preserving its session-rotation/SCRAM fixes,
 SQLx 0.9/system SQLite, GResource and app-library groundwork. This is a stability
-release, not completion of the broader [0.2 sprint](bookie-0.2-sprint.md).
+release, not completion of the broader [0.2 sprint](../bookie-0.2-sprint.md).
 
 ## Review actions
 
@@ -41,7 +41,7 @@ Wayland install, rollback, and soak remain operator checks after downloading the
 
 ## Install and verify on Omarchy
 
-Follow [omarchy.md](omarchy.md). Close BookiE and privately back up existing
+Follow [omarchy.md](../omarchy.md). Close BookiE and privately back up existing
 `~/.config/tablepro` and `~/.local/share/tablepro` before upgrading. The package
 replaces the currently installed `tablepro` package but retains its application ID,
 XDG paths, keyring schema and compatibility commands.

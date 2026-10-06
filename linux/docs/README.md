@@ -33,7 +33,7 @@ on historical statements such as “next”, “current” or “pending”.
 
 ## Audit checkpoints
 
-[The October 3 release audit](release-audit-2026-10-03.md) is the latest broad
+[The October 3 release audit](archive/release-audit-2026-10-03.md) is the latest broad
 source/documentation audit, pinned to its recorded baseline; it does not audit
 the current `linux` head. The October 6 B3 follow-up is recorded on the
 [type/consumer board](type-contract-strategy.md) with its
@@ -49,12 +49,12 @@ Use the [changelog engineering history index](../CHANGELOG.md#historical-enginee
 to locate dated implementation and validation records. The long-form records
 remain source-pinned archives; use current boards and evidence manifests for
 active decisions and case proof.
-- [Architecture/evidence review](architecture-consistency-review-2026-10-03.md):
+- [Architecture/evidence review](archive/architecture-consistency-review-2026-10-03.md):
   source risks and unavailable raw proof; its manifest is a dated snapshot.
 - [App layer external audit](app-layer-external-audit-2026-10-06.md): GUI
   usability gaps, TablePro/dbx UI comparison and the proposed parallel UX lane.
-- [Upstream main](upstream-main-review-2026-10-03.md) and
-  [older releases](upstream-older-releases-review-2026-10-03.md): candidate fixes,
+- [Upstream main](archive/upstream-main-review-2026-10-03.md) and
+  [older releases](archive/upstream-older-releases-review-2026-10-03.md): candidate fixes,
   mapped to the existing B3/B4 owners.
 
 ## Keep context bounded

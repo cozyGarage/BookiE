@@ -3,8 +3,8 @@
 Archived 2026-10-03 from `0cf70382eed72c144ea94208dfef5f5706e0a7dd`. The original content below preserves
 dated decisions, commands, test counts and source evidence. Its words such as
 ‘current’, ‘next’ and ‘pending’ describe their original checkpoint.
-Use [the documentation entry point](README.md), [active sprint](bookie-0.2-sprint.md)
-and [the ADR index](decisions/README.md) for current instructions. Type/value rules
+Use [the documentation entry point](../README.md), [active sprint](../bookie-0.2-sprint.md)
+and [the ADR index](../decisions/README.md) for current instructions. Type/value rules
 are owned by ADR 0007; connection/session and persistence rules by ADRs 0008/0009.
 Read a relevant heading only; this ledger is not mandatory agent startup context.
 Append new case evidence with its own date, outcome and source SHA; do not
@@ -729,7 +729,7 @@ The focused Docker test passed: 1 passed, 0 failed.
 
 ## Current corpus
 
-The [type-contract strategy](type-contract-strategy.md) defines boundary families,
+The [type-contract strategy](../type-contract-strategy.md) defines boundary families,
 proof requirements and remaining driver targets. This status was reconciled through
 `linux` commit `b2bc42729b145b91f0f75f8d40b3fa0a69e7a31d` on 2026-09-29. The
 strict combined run passed with GTK and DuckDB enabled, including the app's
@@ -922,7 +922,7 @@ CSV export, typed `DOUBLE PRECISION` import, and JSON export/parse with exact
 samples remain finite; the fixed seed makes failures repeatable without another
 test dependency. The unignored core unit test passes. This broad corpus does
 not exhaust every finite `f64` encoding. See the
-[finite-float consumer evidence](evidence/finite-float-consumer-results-2026-10-04/manifest.json).
+[finite-float consumer evidence](../evidence/finite-float-consumer-results-2026-10-04/manifest.json).
 
 ```sh
 rtk cargo test --locked -p tablepro-core --lib value_contract_csv_and_json_round_trip_seeded_finite_float_bits
@@ -1102,7 +1102,7 @@ rtk cargo test -p tablepro-driver-mssql --test integration value_contract_legacy
 
 All three focused Docker tests passed locally, including parity through the
 session batch API. Portable command logs and source fingerprints
-are in [the evidence packet](evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
+are in [the evidence packet](../evidence/mssql-legacy-datetime-ticks-results-2026-10-04/manifest.json).
 
 The app grid follow-up verifies the displayed text fallback and typed
 fractional datetime through the app parser and keyed-update builder. It checks
@@ -1114,7 +1114,7 @@ seconds for `Value::DateTime`.
 rtk cargo test -p tablepro-app --lib ui::browse_tab::value_parse::mssql_legacy_datetime_contract::value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings -- --ignored --exact
 ```
 
-The SQL Server Docker contract passed; see the [app grid evidence](evidence/mssql-legacy-datetime-grid-edit-results-2026-10-04/manifest.json).
+The SQL Server Docker contract passed; see the [app grid evidence](../evidence/mssql-legacy-datetime-grid-edit-results-2026-10-04/manifest.json).
 
 ## SQL Server money float-decoding refusal
 
@@ -1674,7 +1674,7 @@ labels. A PostgreSQL 16 test checks `ready`, `paused`, SQL NULL, the native
 decoder uses the enum's UTF-8 wire label and quotes each array label so a SQL
 NULL element remains distinct. Before the fix, the scalar labels were
 `Undecodable`; the retained before-fix output is in
-[`before-fix.txt`](evidence/postgres-enum-results-2026-10-03/before-fix.txt).
+[`before-fix.txt`](../evidence/postgres-enum-results-2026-10-03/before-fix.txt).
 
 ### PostgreSQL domain-over-enum array text parameter, 2026-10-04
 
@@ -1683,13 +1683,13 @@ parameter. The input distinguishes the literal label `NULL`, empty text,
 Unicode, a comma-containing label and SQL NULL. The decoded array, JSON,
 `pg_typeof` and `array_send` bytes match an independently constructed native
 array; an invalid element is rejected with SQLSTATE `22P02`. See the
-[evidence manifest](evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-enum-array-parameter-results-2026-10-04/manifest.json).
 
 The same typed parameter path now checks a 2×2 array with lower bounds 0 and 3.
 The result asserts exact array text, dimensions, JSON shape, outer domain-array
 type and each bound while distinguishing the literal `NULL`, empty text,
 Unicode and SQL NULL. See the
-[bounds evidence](evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json).
+[bounds evidence](../evidence/postgres-domain-enum-array-bounds-results-2026-10-04/manifest.json).
 
 At this original October 3 decoder checkpoint, the adversarial scalar fixture
 whose enum label is literally `NULL` still surfaced SQLx's metadata resolution
@@ -1708,7 +1708,7 @@ native `UPDATE ... RETURNING` stores that label and fires its trigger once.
 Schema-aware keyed updates and draft inserts also preserve it separately from
 SQL NULL. Automatic parameter typing and the remaining enum consumer matrix
 remain open under ADR 0007. Current source fingerprints and native results are
-in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+in the [enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 A PostgreSQL 16 native regression creates `status_kind` and `items` in two
 schemas, then edits only the `enum_shadow_b.items` row. The app's fetched enum
@@ -1721,7 +1721,7 @@ shadow row. Under the same `search_path`, a structured equality filter on
 and row value remain `enum_shadow_b.status_kind`/`paused`. This closes the
 same-named cross-schema keyed-edit/filter combination, while other enum/session
 combinations remain open. See the
-[shadowed-filter evidence](evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
+[shadowed-filter evidence](../evidence/postgres-shadowed-enum-filter-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum structured filters (October 3)
 
@@ -1739,7 +1739,7 @@ The core unit suite passed 502 tests and the PostgreSQL integration suite passed
 74 tests. Workspace Clippy, file/function/panic/bounded-operation guards,
 formatting and diff checks passed. The initial failures and complete local test
 outputs are retained in the
-[enum evidence directory](evidence/postgres-enum-results-2026-10-03/). At this
+[enum evidence directory](../evidence/postgres-enum-results-2026-10-03/). At this
 checkpoint automatic parameter inference and enum import/export/MCP consumers
 were still open; the following section closes the named CSV import path.
 
@@ -1761,7 +1761,7 @@ value oracles confirm the restored rows.
 The core unit suite passed 504 tests and the PostgreSQL integration suite passed
 75 tests. Workspace Clippy, formatting, guards, ignored-test inventory and diff
 checks passed. The first failure, result logs and fingerprints are in the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 Other export encodings, automatic parameter inference and enum JSON/MCP
 consumers remained open at this CSV checkpoint; the shared JSON renderer case
 is covered in the following section. Automatic parameter inference and MCP delivery remain
@@ -1774,7 +1774,7 @@ literal label `NULL`, an empty label, Unicode, and SQL NULL, and checks the
 server-reported enum type for every row. The shared `render_json` serializer preserves the
 labels as JSON strings, including `"NULL"` and `""`, while SQL NULL becomes
 JSON null. The focused native selector passed; current source and output hashes
-are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+are recorded in the [enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 This proves the shared row-to-JSON result rendering for this PostgreSQL enum case.
 MCP transport serialization, the file-writer path, automatic parameter
@@ -1794,7 +1794,7 @@ The PostgreSQL 16 regression checks an enum label `NULL`, a SQL NULL match, a
 direct update, a transactional update, an invalid label rejected with SQLSTATE
 22P02, and an ordinary text parameter. Native `pg_typeof` and row postconditions
 verify stored values and types. The before-fix `enum = text` failure and
-after-fix focused result are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+after-fix focused result are recorded in the [enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 This closes text/SQL NULL inference where the server can determine a custom
 enum parameter from the expression context. Other dynamic parameter types,
@@ -1818,7 +1818,7 @@ JSON destination and leaves no staging file. XML, HTML, and Markdown output now
 have native enum contracts below; XLSX remains open under ADR 0007.
 
 The ignored Docker selector, focused result, full PostgreSQL suite, and current
-source/evidence hashes are recorded in the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+source/evidence hashes are recorded in the [enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum SQL file export restore (October 3)
 
@@ -1831,7 +1831,7 @@ all five rows survive with the original values. The focused Docker contract and
 complete PostgreSQL integration suite passed. XLSX enum file-writer behavior
 remains open; this case does not establish generic
 SQL export compatibility across unrelated destination schemas. See the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum XML file export (October 3)
 
@@ -1843,7 +1843,7 @@ element and escapes markup, quotes, apostrophes, and entity text so a label
 cannot create elements or be normalized into a different literal. The focused
 Docker contract passed. XLSX remains a separate consumer;
 this XML encoding is not an import/restore contract. See the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum HTML file export (October 3)
 
@@ -1853,7 +1853,7 @@ Unicode, a hostile image/event-handler label, and SQL NULL. The HTML keeps the
 three null/empty/text outcomes distinct and escapes the hostile label as text,
 with no raw image element emitted. The focused Docker contract passed. XLSX
 remains a separate consumer; HTML output is not an import/restore
-contract. See the [enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+contract. See the [enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum Markdown file export (October 3)
 
@@ -1867,7 +1867,7 @@ text cells now use JSON string quoting, while SQL NULL remains the unquoted
 look like HTML entities are escaped. The focused core and PostgreSQL tests
 passed, followed by the complete PostgreSQL suite. Markdown output is an
 explicit text encoding, not an import/restore contract. See the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL custom-enum XLSX file export (October 3)
 
@@ -1881,7 +1881,7 @@ one-based row and column and that the existing workbook remains unchanged with
 no staged file left behind. The XLSX format therefore supports the tested
 non-empty enum labels as text and explicitly refuses empty enum labels; this is
 not a general workbook import/restore claim. See the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### PostgreSQL money safe refusal
 
@@ -2065,7 +2065,7 @@ NULL element, SQL NULL versus an empty array, and native JSON/`array_send`
 oracles after qualified text binding and keyed edit. A domain CHECK violation
 returns `23514` and leaves both the edited row and its sibling unchanged. The
 focused Docker test and full PostgreSQL integration suite passed; see the
-[source-fingerprinted evidence](evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json).
+[source-fingerprinted evidence](../evidence/postgres-domain-bytea-array-results-2026-10-04/manifest.json).
 
 The UUID[] edit exposed a parser bug: `classify_type` matched the `uuid`
 substring before accounting for PostgreSQL array metadata, so it tried to parse
@@ -2876,9 +2876,9 @@ A second reproducer returned Undecodable for DATE infinity and date arrays. The 
 
 New unit contracts check temporal element lengths, out-of-range payloads, empty/null arrays, infinity signs, era formatting and interval extremes. A real PostgreSQL DATE at year 1,000,000 remains within the server's finite range but exceeds chrono's shared calendar: the driver returns `Undecodable("DATE")`, while an independent `date::text` column remains exactly `1000000-01-01`. The app date parser rejects that input, and SQL literal rendering and parameter binding refuse the undecodable marker. A TIMESTAMP at PostgreSQL's upper finite bound, `294276-12-31 23:59:59.999999`, is also accepted by the server but returned as `Undecodable("TIMESTAMP")`; its independent `timestamp::text` value is exact, and the app parser, SQL literal renderer and parameter binder refuse it. Full finite temporal support beyond chrono's range, unsupported element types and broader consumer parity remain open. These changes do not prove complete native-type support for PostgreSQL or the other drivers.
 
-Run `cargo test --locked -p tablepro-driver-postgres --lib value_contract`, then `cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --include-ignored --exact --test-threads=1` with Docker available. The combined strict value runner discovers all seven PostgreSQL server contracts. Updated fixture declarations are recorded in [ignored tests](ignored-tests.md).
+Run `cargo test --locked -p tablepro-driver-postgres --lib value_contract`, then `cargo test --locked -p tablepro-driver-postgres --test integration value_contract_dates_preserve_eras_large_years_and_instants -- --include-ignored --exact --test-threads=1` with Docker available. The combined strict value runner discovers all seven PostgreSQL server contracts. Updated fixture declarations are recorded in [ignored tests](../ignored-tests.md).
 
-Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](type-contract-strategy.md).
+Reference: [PostgreSQL interval input and storage](https://www.postgresql.org/docs/current/datatype-datetime.html#DATATYPE-INTERVAL-INPUT). The strategy for extending these proofs across drivers is in [type contracts](../type-contract-strategy.md).
 
 Mutation evidence: `target/quality/20260927-b3-pg-native-mutants/mutants.out/outcomes.json` records 74 selected mutations: 73 caught, one unviable, zero survivors and zero timeouts. This measurement ran value-contract unit tests for interval decoding/formatting, temporal-array dispatch/text and scalar temporal decoding; it was not a full-workspace mutation run. The separate PostgreSQL 16 fixture run supplies real-server evidence. Reproduce from the Linux workspace:
 
@@ -2928,7 +2928,7 @@ native and text values. The existing permissive-mode zero/partial-date
 read, bound-write and SQL-literal round-trip contract continues to pass. Both
 strict-mode cases and all nine MySQL/MariaDB value-contract tests pass, along
 with strict Clippy and formatting. Other modes and consumer
-paths remain open. See the [native evidence](evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json).
+paths remain open. See the [native evidence](../evidence/mysql-strict-zero-date-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB fractional TIME mode semantics (2026-10-04)
 
@@ -2941,7 +2941,7 @@ checks bound parameters and generated SQL literals independently, then checks
 the returned `Value::Time`, native text and `MICROSECOND()` against stored
 results. The test sets an empty session `sql_mode` for the baseline, so this
 records the engines' mode-absent temporal behavior rather than every vendor's
-unmodified server mode. See the [native evidence](evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
+unmodified server mode. See the [native evidence](../evidence/mysql-fractional-time-mode-results-2026-10-04/manifest.json),
 [MySQL SQL mode reference](https://dev.mysql.com/doc/refman/8.0/en/sql-mode.html)
 and [MariaDB SQL mode reference](https://mariadb.com/docs/server/server-management/variables-and-modes/sql_mode).
 Other temporal types, precisions, consumers and installed typed edits remain
@@ -2954,7 +2954,7 @@ between `.789` and `.790`. MySQL rounds to `.790` with
 `TIME_TRUNCATE_FRACTIONAL` absent and truncates to `.789` with that mode set;
 MariaDB truncates to `.789` with `TIME_ROUND_FRACTIONAL` absent and rounds to
 `.790` with it set. Both bound and generated-literal paths assert the returned
-time, cast text and native `MICROSECOND()` value. See the [native evidence](evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json).
+time, cast text and native `MICROSECOND()` value. See the [native evidence](../evidence/mysql-fractional-time-tie-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB exact-half DATETIME and TIMESTAMP boundaries (2026-10-04)
 
@@ -2964,7 +2964,7 @@ and truncates to `.789` with it enabled; MariaDB truncates to `.789` by default
 and rounds to `.790` with `TIME_ROUND_FRACTIONAL` enabled. Both bound and
 generated-literal paths assert the stored native value, cast text and
 `MICROSECOND()` result. TIMESTAMP runs set the session timezone to UTC and
-check epoch microseconds. See the [native evidence](evidence/mysql-fractional-half-boundary-matrix-results-2026-10-04/manifest.json).
+check epoch microseconds. See the [native evidence](../evidence/mysql-fractional-half-boundary-matrix-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB TIME fractional precision matrix (2026-10-04)
 
@@ -2973,7 +2973,7 @@ MySQL's default rounds at each declared precision and
 `TIME_TRUNCATE_FRACTIONAL` truncates; MariaDB's default truncates and
 `TIME_ROUND_FRACTIONAL` rounds. Both bound and generated-literal paths assert
 the returned `Value::Time`, cast text and `MICROSECOND()` result for every
-precision. See the [native evidence](evidence/mysql-time-precision-matrix-results-2026-10-04/manifest.json).
+precision. See the [native evidence](../evidence/mysql-time-precision-matrix-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB DATETIME and TIMESTAMP fractional precision matrix (2026-10-04)
 
@@ -2983,7 +2983,7 @@ MySQL rounds by default and truncates with `TIME_TRUNCATE_FRACTIONAL`; MariaDB
 truncates by default and rounds with `TIME_ROUND_FRACTIONAL`. Bound and
 generated-literal paths assert native values, cast text and `MICROSECOND()`;
 TIMESTAMP checks also pin the UTC epoch microseconds. See the
-[native evidence](evidence/mysql-datetime-timestamp-precision-matrix-results-2026-10-04/manifest.json).
+[native evidence](../evidence/mysql-datetime-timestamp-precision-matrix-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB fractional DATETIME mode semantics (2026-10-04)
 
@@ -2995,7 +2995,7 @@ absent, MySQL 8.1 stores `.790` and MariaDB 11 stores `.789`;
 literals are checked separately against returned `Value::DateTime`, cast text,
 and `MICROSECOND()`. As in the TIME cases, the tests clear session `sql_mode`
 for the baseline. Other temporal types, precisions and consumer paths remain
-open; see the [native evidence](evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json).
+open; see the [native evidence](../evidence/mysql-fractional-datetime-mode-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB fractional TIMESTAMP mode semantics (2026-10-04)
 
@@ -3007,7 +3007,7 @@ fractional modes absent, MySQL 8.1 stores `.790` and MariaDB 11 stores `.789`;
 literals are checked against returned `Value::TimestampTz`, UTC cast text,
 `MICROSECOND()`, and `UNIX_TIMESTAMP()` epoch microseconds. The session
 `sql_mode` is cleared for the baseline. Other temporal precisions and consumer
-paths remain open; see the [native evidence](evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
+paths remain open; see the [native evidence](../evidence/mysql-fractional-timestamp-mode-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB ENUM and SET consumers across SQL modes (2026-10-04)
 
@@ -3023,7 +3023,7 @@ JSON preserves every value. XML, HTML and Markdown escape markup-shaped ENUM
 and SET labels in all eight modes, including STRICT_ALL_TABLES with and without NO_BACKSLASH_ESCAPES. XLSX refuses the empty SET text and leaves a
 pre-existing destination unchanged. Both focused Docker tests, strict Clippy
 and formatting pass. SQL modes beyond these eight combinations and other enum/set
-consumers remain open; see the [native evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
+consumers remain open; see the [native evidence](../evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json).
 
 The app edit path now validates ENUM labels and SET members against MySQL's
 declared `column_type` before binding. A parser-to-keyed-edit contract preserves
@@ -3042,7 +3042,7 @@ NULL from explicit `''` empty ENUM and SET values against native ordinals/masks.
 Both engine paths also key-edit the declared literal label `NULL` and verify its
 non-NULL ordinal/bytes separately from the SQL NULL row. Additional SQL modes
 remain open; see the
-[grid evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
+[grid evidence](../evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
 
 ### MySQL/MariaDB ENUM and SET strict ANSI_QUOTES combinations (2026-10-04)
 
@@ -3051,8 +3051,8 @@ The file-consumer and app keyed-edit matrices add four configurations: each of
 and without `NO_BACKSLASH_ESCAPES`. The expanded twelve-mode tests pass on
 MySQL 8.1 and MariaDB 11. Native ENUM ordinals, SET masks, exact label bytes,
 invalid-value refusal and untouched siblings remain asserted. Other SQL modes
-and session settings remain open. See the [file-consumer evidence](evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json)
-and [grid-edit evidence](evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
+and session settings remain open. See the [file-consumer evidence](../evidence/mysql-enum-sql-mode-results-2026-10-04/manifest.json)
+and [grid-edit evidence](../evidence/mysql-enum-set-grid-edit-results-2026-10-04/manifest.json).
 
 ### MySQL text and JSON export under ANSI_QUOTES, 2026-09-30
 
@@ -3599,7 +3599,7 @@ checked independently; result decoding, SQL literal and parameter consumers
 refuse the ambiguous value. The focused unit and Docker contracts passed, then
 the strict GTK+DuckDB values layer passed all 190 tests across 11 suites and the
 local quick gate passed. The run reused all 747 Cargo artifacts. See the
-[review manifest](evidence/b3-review-2026-10-01/manifest.json) for reports and
+[review manifest](../evidence/b3-review-2026-10-01/manifest.json) for reports and
 hosted CI status.
 
 ```sh
@@ -4207,7 +4207,7 @@ unchanged. The focused Docker contract, strict ClickHouse Clippy and formatting
 passed. The shared XLSX writer's nested Extended JSON exact-text test also
 passes, but ClickHouse-specific workbook parity and spreadsheet-app re-import
 remain open, as do other nested/type combinations; see the
-[evidence manifest](evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/clickhouse-nested-tuple-map-results-2026-10-04/manifest.json).
 
 ## MongoDB late-page heterogeneity blocks grid editing, 2026-09-30
 
@@ -4451,7 +4451,7 @@ regression and the full driver package test run passed (65 tests across three
 suites). This closes the representation conflation without claiming a general
 missing-value type in the shared model. Collection census cost and concurrent
 writes during the scan remain open. Commands, initial failure, and fingerprints
-are in the [case manifest](evidence/mongodb-missing-null-results-2026-10-03/manifest.json).
+are in the [case manifest](../evidence/mongodb-missing-null-results-2026-10-03/manifest.json).
 
 ## MCP CSV null markers preserve PostgreSQL enum values (October 3)
 
@@ -4469,10 +4469,10 @@ This does not add an MCP import tool. The grid context-menu CSV serializer now
 chooses a collision-free NULL marker so SQL NULL, an empty enum label, literal
 `NULL`, and marker-shaped labels remain distinct in clipboard output. Formula
 sanitization remains enabled, so clipboard output is not a lossless restore
-format; see the [clipboard serializer evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
+format; see the [clipboard serializer evidence](../evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
 Other enum format/session coverage remains open.
 Commands and fingerprints are in the
-[PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[PostgreSQL enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### Grid clipboard CSV preserves enum NULL and empty text (October 4)
 
@@ -4484,7 +4484,7 @@ focused test and all 441 non-ignored app library tests pass; 20 tests remain
 ignored. Strict app Clippy and formatting pass. This verifies serialization
 only; OS clipboard delivery, spreadsheet paste/import, and lossless treatment
 of formula-shaped labels remain unverified. See the
-[clipboard CSV evidence](evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
+[clipboard CSV evidence](../evidence/postgres-enum-clipboard-csv-results-2026-10-04/manifest.json).
 
 ## Spreadsheet-safe PostgreSQL enum CSV is not reversible (October 3)
 
@@ -4496,7 +4496,7 @@ stores the apostrophe-prefixed label for both rows. This is a valid native enum
 value but a lossy restore. Raw-text export preserves both labels and remains the
 tested lossless import path. The export dialog now says to turn spreadsheet
 safety off for lossless re-import. See the native selector and retained output
-in the [PostgreSQL enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+in the [PostgreSQL enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ## PostgreSQL domain over enum value consumers — 2026-10-03
 
@@ -4541,7 +4541,7 @@ proves raw `domain = $1` is rejected by PostgreSQL with SQLSTATE 42883, while
 casting the column to its base enum lets PostgreSQL infer the enum type for
 bound text and SQL NULL parameters; `pg_typeof` and row outcomes are checked.
 Exact commands and results are in the
-[enum evidence manifest](evidence/postgres-enum-results-2026-10-03/manifest.json).
+[enum evidence manifest](../evidence/postgres-enum-results-2026-10-03/manifest.json).
 
 ### Domain-over-enum filter operator follow-up (October 3)
 
@@ -4550,7 +4550,7 @@ also cover `<>`, `<` and `BETWEEN`. Rows assert exact enum labels, keep literal
 `NULL` distinct from SQL NULL, and report the original domain through
 `pg_typeof`. The focused PostgreSQL 16 Docker contract and all 10 domain
 contract tests pass; other domain operators and session configurations remain open. See the
-[operator evidence](evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
+[operator evidence](../evidence/postgres-domain-enum-filter-results-2026-10-03/manifest.json).
 
 ### Domain-over-enum query parameter operator follow-up (October 3)
 
@@ -4560,7 +4560,7 @@ type for both BETWEEN bounds; native `pg_typeof` and row truth-value assertions
 pass. Raw domain `= $1` continues to fail with SQLSTATE 42883, as recorded by
 the same contract. The full domain suite passes all 10 tests. Other direct
 operator and session configurations remain open. See the
-[query-operator evidence](evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
+[query-operator evidence](../evidence/postgres-domain-enum-query-operators-results-2026-10-03/manifest.json).
 
 ## MongoDB browse metadata and cursor consistency — 2026-10-03
 
@@ -4600,7 +4600,7 @@ explicit NULL to an array containing NULL is preserved. MongoDB matches NULL
 guards with equality, field existence, and a non-array check, preserving the
 distinction between explicit BSON NULL, missing fields, and arrays that contain
 NULL. This is per-edited-field compare-and-set, not document-version tracking:
-ABA changes remain open. See the [evidence manifest](evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
+ABA changes remain open. See the [evidence manifest](../evidence/mongodb-stale-grid-edit-results-2026-10-04/manifest.json).
 
 ## MongoDB keyed deletes compare the materialized row — 2026-10-04
 
@@ -4616,7 +4616,7 @@ missing, and explicit NULL becoming an array containing NULL all return zero
 deleted rows and preserve the new values.
 This guards the visible row snapshot rather than providing document-version or
 snapshot isolation: ABA changes and fields added outside the materialized
-column set remain open. See the [evidence manifest](evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json).
+column set remain open. See the [evidence manifest](../evidence/mongodb-stale-grid-delete-results-2026-10-04/manifest.json).
 
 The shell `run_find` path still runs a full type census and then a filtered
 query. It merges types from returned rows, so a selected row that changes kind
@@ -4626,7 +4626,7 @@ preserve canonical Extended JSON markers for observed mixed values. Export does
 not refresh data or establish a collection snapshot. A diagnostic Docker test
 measures full-census time for 1,000 and 10,000 documents with a 50-row page;
 results are machine-specific and have no pass/fail threshold. These boundaries
-are covered by [the MongoDB census evidence manifest](evidence/mongodb-census-results-2026-10-03/manifest.json).
+are covered by [the MongoDB census evidence manifest](../evidence/mongodb-census-results-2026-10-03/manifest.json).
 
 ## SQLite REAL float edge checkpoint (2026-10-03)
 
@@ -4645,7 +4645,7 @@ Selectors: `sqlite_real_storage_preserves_float_edge_bits` and
 `crates/drivers/sqlite/tests/integration.rs`. The native integration suite passed
 23 tests; local `quick` and `change-contracts` layers also passed. Their retained
 report and source fingerprints are in
-[`sqlite REAL evidence`](evidence/sqlite-real-results-2026-10-03/manifest.json).
+[`sqlite REAL evidence`](../evidence/sqlite-real-results-2026-10-03/manifest.json).
 
 ## PostgreSQL nested domain-over-enum chain (2026-10-03)
 
@@ -4663,7 +4663,7 @@ native values/types for all rows.
 The focused new selector and all 92 PostgreSQL integration tests passed. Clippy
 passed for all PostgreSQL targets. The initial native assertion failure and
 current logs/source fingerprints are in the
-[nested-domain evidence manifest](evidence/postgres-nested-domain-results-2026-10-03/manifest.json).
+[nested-domain evidence manifest](../evidence/postgres-nested-domain-results-2026-10-03/manifest.json).
 PostgreSQL 16 rejects an uncast raw comparison between this domain column and
 an unknown text parameter with SQLSTATE `42883`; the test keeps that boundary
 explicit and verifies that casting both sides to the base enum returns the
@@ -4681,7 +4681,7 @@ unchanged rows. The focused selector and all 92 PostgreSQL integration tests
 passed, as did Clippy and `change-contracts`. This extends proof to three
 domain levels; it does not prove arbitrary depth or other enum/session
 configurations. See the
-[three-level evidence packet](evidence/postgres-three-level-domain-results-2026-10-03/manifest.json).
+[three-level evidence packet](../evidence/postgres-three-level-domain-results-2026-10-03/manifest.json).
 
 ## PostgreSQL three-level domain query distinctness parameters (2026-10-03)
 
@@ -4691,7 +4691,7 @@ parameter cast. `pg_typeof($1)` confirms inference as the qualified leaf enum,
 while `pg_typeof(status)` remains the outer domain. Exact truth tables include
 the literal label `NULL`, empty label, Unicode label and SQL NULL. The focused
 contract and all 10 domain contracts pass, along with Clippy and formatting.
-See the [query-operator evidence](evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
+See the [query-operator evidence](../evidence/postgres-three-level-enum-query-operator-results-2026-10-03/manifest.json).
 
 At the October 3 checkpoint, depths beyond three levels and other enum/session
 configurations remained open.
@@ -4709,7 +4709,7 @@ queries confirm the outer domain type and that a sibling SQL NULL remains
 unchanged. All 11 PostgreSQL domain contracts passed, including the existing
 three-layer parameter cases. Domain chains deeper than four layers and other
 enum/session combinations remain open. See the
-[four-domain-layer evidence](evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
+[four-domain-layer evidence](../evidence/postgres-four-level-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL five-domain-layer enum contract (2026-10-04)
 
@@ -4720,7 +4720,7 @@ preserve the five-layer outer domain. An invalid label is refused with SQLSTATE
 `22P02`, and independent stored-value/type checks confirm no partial change and
 preserve the neighboring SQL NULL. All 12 domain contracts passed, including
 the four-level case. Chains deeper than five and other enum/session combinations
-remain untested. See the [five-domain-layer evidence](evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
+remain untested. See the [five-domain-layer evidence](../evidence/postgres-five-level-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL six-domain-layer enum contract (2026-10-04)
 
@@ -4734,7 +4734,7 @@ confirm the row is unchanged and its SQL NULL sibling remains intact. The
 focused case and all 13 PostgreSQL domain contracts passed, along with Clippy,
 formatting and ignored-test inventory checks. Chains deeper than six layers and
 other enum/session combinations remain untested. See the
-[six-domain-layer evidence](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
+[six-domain-layer evidence](../evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL seven-domain-layer enum contract (2026-10-04)
 
@@ -4745,7 +4745,7 @@ invalid-label refusal (`22P02`), stored outer-domain type/value and an unchanged
 NULL sibling. The combined native PostgreSQL 16 test passed, as did PostgreSQL
 driver Clippy and formatting. Chains deeper than seven and other enum/session
 combinations remain untested. See the
-[six/seven-level evidence](evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
+[six/seven-level evidence](../evidence/postgres-seven-domain-results-2026-10-04/manifest.json).
 
 ## SQLite STRICT ANY runtime-kind-preserving grid edits (2026-10-03)
 
@@ -4785,7 +4785,7 @@ The follow-up app-library suite passed 438 tests with 20 ignored, including the
 NULL/new-cell policy and BLOB refusal contracts. Clippy and the mapped `change-contracts` layer
 passed. The failing-first log, full app test logs, local layer reports, and
 source fingerprints are in the
-[STRICT ANY evidence packet](evidence/sqlite-strict-any-results-2026-10-03/manifest.json).
+[STRICT ANY evidence packet](../evidence/sqlite-strict-any-results-2026-10-03/manifest.json).
 
 ## SQLite compound SELECT provenance over STRICT ANY (2026-10-04)
 
@@ -4799,7 +4799,7 @@ return the same cells. A direct table-column query still reports `ANY` when an
 unrelated UNION exists only in its filter. The focused test, all 47 driver tests
 and five app STRICT-ANY contracts passed, as did Clippy and formatting. Other
 computed-expression shapes and consumers remain open. See the
-[compound-result evidence](evidence/sqlite-union-any-results-2026-10-04/manifest.json).
+[compound-result evidence](../evidence/sqlite-union-any-results-2026-10-04/manifest.json).
 
 ## SQLite compound STRICT ANY result CSV/XLSX output (2026-10-04)
 
@@ -4810,8 +4810,8 @@ a shared string, and NULL as an absent cell. Six SQLite app `ANY` contracts
 passed with strict Clippy and formatting. This proves workbook cell output, not
 spreadsheet-application re-import. A later typed CSV case closes the native
 SQLite result-to-CSV-to-import gap; see the
-[compound-result CSV/XLSX evidence](evidence/sqlite-union-any-export-results-2026-10-04/manifest.json)
-and [typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
+[compound-result CSV/XLSX evidence](../evidence/sqlite-union-any-export-results-2026-10-04/manifest.json)
+and [typed CSV evidence](../evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 ## SQLite compound STRICT ANY typed CSV round trip (2026-10-04)
 
@@ -4826,7 +4826,7 @@ columns keep their declared behavior. Seven SQLite app `ANY` contracts, 514
 core tests plus 10 query-pipeline tests, all 47 SQLite driver tests, strict
 Clippy and formatting passed. Spreadsheet-app re-import and other computed
 expression consumers remain open; CASE consumer coverage is recorded below. See the
-[typed CSV evidence](evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
+[typed CSV evidence](../evidence/sqlite-union-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 ## SQLite computed CASE STRICT ANY CSV round trip (2026-10-04)
 
@@ -4837,13 +4837,13 @@ TEXT, SQL NULL, BLOB bytes, and text matching the reserved type-tag prefix all
 survive; the CASE result keeps conservative fallback metadata. Eight SQLite app
 `ANY` contracts passed with strict Clippy and formatting. Other computed-
 expression consumer paths remain open. See the
-[CASE CSV evidence](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json).
+[CASE CSV evidence](../evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json).
 
 The CASE fixture now includes empty TEXT. CSV export/import keeps it distinct
 from SQL NULL and restores the native storage class. XLSX refuses the empty
 cell, reports the correct data row and column, and leaves a pre-existing
 destination untouched with no temporary artifact left behind. See the [XLSX
-refusal evidence](evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json).
+refusal evidence](../evidence/sqlite-case-any-xlsx-refusal-results-2026-10-04/manifest.json).
 
 ## SQLite computed COALESCE STRICT ANY CSV round trip (2026-10-04)
 
@@ -4854,14 +4854,14 @@ stored TEXT, BLOB bytes and tag-prefix-shaped text survive. The expression
 retains fallback metadata. Nine SQLite app `ANY` contracts passed with strict
 Clippy and formatting. Other computed-expression shapes, spreadsheet-app
 re-import and installed editing remain open. See the
-[COALESCE CSV evidence](evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json)
-and [COALESCE metadata evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
+[COALESCE CSV evidence](../evidence/sqlite-coalesce-any-csv-roundtrip-results-2026-10-04/manifest.json)
+and [COALESCE metadata evidence](../evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
 The same contract inspects JSON output and XLSX XML. JSON preserves numeric
 INTEGER/REAL values separately from fallback/stored/tag-prefix strings and
 BLOB's `\x00ff` text encoding. In XLSX, INTEGER and REAL are numeric cells;
 fallback/stored/tag-prefix text and BLOB encoding are string cells, with no
 formula cells. Spreadsheet-application re-import remains open. See the
-[consumer evidence](evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).
+[consumer evidence](../evidence/sqlite-coalesce-any-xlsx-results-2026-10-04/manifest.json).
 
 ## DuckDB enum keyed grid edit, 2026-10-03
 
@@ -4881,7 +4881,7 @@ refuses an invalid label without changing the keyed row. The focused contract,
 all app-library tests with the optional DuckDB feature (444 passed, 20
 ignored), Clippy, and the mapped `change-contracts` layer passed. Installed
 GTK behavior remains open. See the
-[DuckDB enum keyed-edit evidence](evidence/duckdb-enum-keyed-results-2026-10-03/manifest.json).
+[DuckDB enum keyed-edit evidence](../evidence/duckdb-enum-keyed-results-2026-10-03/manifest.json).
 
 ## SQLite STRICT ANY CSV storage-class round trip (2026-10-03)
 
@@ -4914,7 +4914,7 @@ contracts. At that checkpoint, arbitrary SQLite query exports still reported
 result-column type `NULL` for a declared `ANY` column, so they could not select
 this type-aware encoding; see the follow-up below. Installed GTK behavior and
 other output formats remain open.
-See the [SQLite STRICT ANY CSV evidence](evidence/sqlite-strict-any-csv-results-2026-10-03/manifest.json).
+See the [SQLite STRICT ANY CSV evidence](../evidence/sqlite-strict-any-csv-results-2026-10-03/manifest.json).
 
 ## SQLite STRICT ANY query-result CSV round trip (2026-10-03)
 
@@ -4932,7 +4932,7 @@ separate STRICT `ANY` table preserves INTEGER, REAL, TEXT, BLOB, empty TEXT and
 SQL NULL, verified with native `typeof()` and returned values. The app's five
 focused STRICT ANY contracts, all 44 SQLite driver tests and SQLite driver
 Clippy pass. See the
-[query-result evidence](evidence/sqlite-strict-any-query-csv-results-2026-10-03/manifest.json).
+[query-result evidence](../evidence/sqlite-strict-any-query-csv-results-2026-10-03/manifest.json).
 
 At that checkpoint, zero-row results had no column metadata in the row-based
 conversion; see the follow-up below. Computed expressions and attached-schema
@@ -4954,7 +4954,7 @@ INTEGER, REAL, TEXT, BLOB, empty TEXT and SQL NULL with native `typeof()` proof.
 
 The focused SQLite driver case, all 45 driver tests, five app STRICT ANY
 contracts, Clippy, formatting and diff checks pass. See the
-[empty-result evidence](evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
+[empty-result evidence](../evidence/sqlite-query-empty-metadata-results-2026-10-03/manifest.json).
 Mixed `CASE` and `COALESCE` expressions now have native `typeof()` contracts.
 The CASE result covers INTEGER, SQL NULL and TEXT; COALESCE covers INTEGER,
 fallback TEXT and stored TEXT. Both retain SQLx's `NULL` fallback metadata
@@ -4963,8 +4963,8 @@ through a bound query; a separate zero-row expression query and transaction
 query preserve fallback metadata. COALESCE is checked through ordinary and bound
 queries. Direct-column queries continue recovering `ANY`.
 All 26 SQLite integration tests pass with strict Clippy and formatting. See the
-[CASE evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json) and
-[COALESCE evidence](evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
+[CASE evidence](../evidence/sqlite-computed-any-results-2026-10-04/manifest.json) and
+[COALESCE evidence](../evidence/sqlite-coalesce-any-results-2026-10-04/manifest.json).
 Other computed expressions, formats, storage-class combinations and installed
 GTK editing remain open. Attached-schema ambiguity is covered separately below.
 
@@ -4978,7 +4978,7 @@ database. A native fixture verifies declared STRICT `ANY` metadata for an
 unambiguous attached query and fallback metadata for both sources when names
 collide; row values remain exact. All 45 driver tests and five app STRICT ANY
 contracts pass, along with Clippy, formatting and diff checks. See the
-[attached-origin evidence](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json).
+[attached-origin evidence](../evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json).
 
 Other affinity/storage-class combinations, formats and installed GTK editing
 remain open.
@@ -4994,7 +4994,7 @@ query and transaction results preserve the unknown expression metadata without
 inventing rows. The existing direct-column checks continue to recover `ANY`
 for regular, bound and transaction queries. The focused case and all 25 SQLite
 integration tests pass, along with strict Clippy and formatting. See the
-[computed-expression evidence](evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
+[computed-expression evidence](../evidence/sqlite-computed-any-results-2026-10-04/manifest.json).
 
 Other computed-expression shapes and installed consumer paths remain open.
 
@@ -5009,7 +5009,7 @@ NULL, enum ordering and a Unicode label. Pattern filters exercise the enum to
 text comparison path. Both focused PostgreSQL 16 Docker cases and both complete
 10-test contract suites pass, as do PostgreSQL Clippy, formatting and diff
 checks. See the
-[operator matrix evidence](evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
+[operator matrix evidence](../evidence/postgres-enum-filter-matrix-results-2026-10-03/manifest.json).
 
 This closes structured-filter operator coverage for these enum fixtures. Direct
 query-parameter operator contexts, session/search_path combinations, deeper
@@ -5025,7 +5025,7 @@ are asserted. The same fixture retains `=`, `<>`, both `BETWEEN` bounds, SQL NUL
 parameter inference and the explicit SQLSTATE 42883 refusal for raw domain
 equality. The focused PostgreSQL 16 case and all 10 domain contracts pass, along
 with Clippy, formatting and diff checks. See the
-[ordering-parameter evidence](evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
+[ordering-parameter evidence](../evidence/postgres-domain-enum-param-operator-results-2026-10-03/manifest.json).
 
 Direct query parameters for list operators and other session/search_path
 combinations remained untested at that checkpoint.
@@ -5038,7 +5038,7 @@ parameters resolve to the qualified enum type, confirmed with `pg_typeof`, and
 the exact per-row truth values retain SQL NULL propagation. The focused
 PostgreSQL 16 case and all 10 domain contracts pass, as do Clippy, formatting
 and diff checks. See the
-[list-parameter evidence](evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
+[list-parameter evidence](../evidence/postgres-domain-enum-param-list-results-2026-10-03/manifest.json).
 
 Other direct query contexts and session/search_path combinations remain open.
 
@@ -5050,7 +5050,7 @@ domain-over-enum column cast to its base enum. PostgreSQL infers the parameter
 as the qualified enum type, while `pg_typeof(status)` remains the domain; exact
 per-row truth values prove NULL-safe semantics. All 10 domain contracts pass,
 along with Clippy and formatting. See the
-[NULL-safe distinctness evidence](evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
+[NULL-safe distinctness evidence](../evidence/postgres-domain-enum-distinct-parameter-results-2026-10-03/manifest.json).
 
 Other direct query contexts and session/search_path combinations remain open.
 
@@ -5062,7 +5062,7 @@ The same-named enum fixture now checks structured `IN` and `BETWEEN` filters on
 native type and target/shadow row assertions confirm the operators do not
 resolve through the colliding shadow type. The focused PostgreSQL 16 contract,
 all 10 enum contracts, Clippy, formatting and diff checks pass. See the
-[shadowed-filter matrix evidence](evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
+[shadowed-filter matrix evidence](../evidence/postgres-shadowed-enum-filter-matrix-results-2026-10-03/manifest.json).
 
 The other session/search_path and operator combinations remain open.
 
@@ -5070,7 +5070,7 @@ The same fixture also checks direct bound equality, `IN` and `BETWEEN` queries
 on `enum_shadow_b.items` while `search_path` resolves the colliding
 `enum_shadow_a.status_kind`. The target enum comparisons succeed, the returned
 column retains its qualified native type, and the shadow row remains unchanged.
-See the [direct parameter evidence](evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
+See the [direct parameter evidence](../evidence/postgres-shadowed-enum-parameter-results-2026-10-03/manifest.json).
 Within a transaction, `SET LOCAL search_path TO enum_shadow_a` also leaves
 `status = $1` against `enum_shadow_b.items` correctly inferred from the target
 column, without explicitly casting the column.
@@ -5089,7 +5089,7 @@ a transaction with `SET LOCAL search_path` still resolving the shadow schema,
 direct text equality and `IS NOT DISTINCT FROM` with SQL NULL select the expected
 target rows. The shadow rows, domain type and sibling values remain unchanged.
 The focused case and all 11 enum contracts pass; Clippy and formatting pass.
-See the [shadowed domain-over-enum evidence](evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json).
+See the [shadowed domain-over-enum evidence](../evidence/postgres-shadowed-domain-enum-results-2026-10-03/manifest.json).
 
 This proves the tested schema collision and operators. Other direct query
 operators and session/search_path configurations remain open.
@@ -5103,7 +5103,7 @@ and transaction-local `search_path` resolve the shadow schema. Each query checks
 ordered target row IDs, labels, SQL NULL behavior and the target domain reported
 by `pg_typeof(status)`; the shadow table and sibling values remain unchanged.
 The focused PostgreSQL 16 case and all 11 enum contracts pass, as do Clippy and
-formatting. See the [operator-matrix evidence](evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
+formatting. See the [operator-matrix evidence](../evidence/postgres-shadowed-domain-enum-operator-results-2026-10-03/manifest.json).
 
 Other schema/session configurations remain open; this case does not close B3.
 
@@ -5121,7 +5121,7 @@ The importer uses the
 target driver to restore MySQL `timestamp(6)` RFC3339 text as
 `Value::TimestampTz`, while generic/PostgreSQL naive timestamps remain
 `Value::DateTime`. Installed grid interaction and other format consumers remain
-open. See the [native app-edit and export/import evidence](evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
+open. See the [native app-edit and export/import evidence](../evidence/mysql-temporal-grid-edit-results-2026-10-04/manifest.json).
 
 ## PostgreSQL text array XML, HTML and Markdown file writers, 2026-10-04
 
@@ -5137,7 +5137,7 @@ distinct literal `NULL`, SQL NULL token, empty text, comma and markup payload.
 This proves one array family through four presentation formats, SQL replay and
 workbook text-cell output; other array families and spreadsheet-application
 re-import remain open. The focused test, strict Clippy and format check passed. See the [evidence
-manifest](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+manifest](../evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom-enum 63-byte label boundary, 2026-10-04
 
@@ -5149,7 +5149,7 @@ The multibyte label also survives `enum[]` projection with an SQL NULL element.
 The decoded array text quotes this label while PostgreSQL's canonical `::text`
 does not; native `array_to_json` and equal `array_send` bytes prove the result
 remains semantically identical and bindable. The focused case, strict Clippy
-and formatting pass. See the [evidence manifest](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
+and formatting pass. See the [evidence manifest](../evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json).
 
 ## PostgreSQL overlength custom-enum label refusal, 2026-10-04
 
@@ -5157,7 +5157,7 @@ A PostgreSQL 16 Docker contract attempts to create an enum with a 64-byte
 ASCII label, one byte over the server's 63-byte limit. PostgreSQL refuses the
 DDL with SQLSTATE `42602`; `to_regtype` confirms that no type was left behind.
 The focused case, strict Clippy and formatting pass. See the [evidence
-manifest](evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
+manifest](../evidence/postgres-enum-overlength-refusal-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom-enum declared ordering, 2026-10-04
 
@@ -5166,7 +5166,7 @@ so catalog order differs from lexical text order. `pg_enum.enumsortorder` is
 the independent ordering oracle; a shuffled result containing duplicates and
 SQL NULL confirms `ORDER BY label NULLS LAST` follows the native enum order,
 preserves the custom enum result type, and leaves NULL last. The focused test,
-strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-order-results-2026-10-04/manifest.json).
+strict Clippy and formatting pass. See the [evidence manifest](../evidence/postgres-enum-order-results-2026-10-04/manifest.json).
 
 ## PostgreSQL eight-domain-layer enum contract, 2026-10-04
 
@@ -5175,7 +5175,7 @@ eight nested domains. It verifies enum-leaf metadata, schema-aware keyed and
 draft writes (including SQL NULL), typed equality filtering, invalid-label
 refusal, exact outer-domain type/value and an untouched SQL NULL sibling. The
 focused test, strict Clippy and formatting pass. Deeper chains and other
-enum/session combinations remain open; see the [evidence manifest](evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
+enum/session combinations remain open; see the [evidence manifest](../evidence/postgres-eight-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL nine-domain-layer enum contract, 2026-10-04
 
@@ -5187,7 +5187,7 @@ transaction backend, it changes `search_path` twice, reuses metadata fetched
 before the changes for writes and filtering, and confirms rollback preserves
 the original rows. All 13 PostgreSQL domain-contract tests, strict Clippy and
 formatting pass. Greater depths and other enum/session
-combinations remain open; see the [evidence manifest](evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
+combinations remain open; see the [evidence manifest](../evidence/postgres-nine-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL deep domain-over-enum resolver boundary, 2026-10-04
 
@@ -5200,7 +5200,7 @@ parameters at 64 nested domains; BookieE reports both as explicit unsupported
 operations instead of internal errors, and neither operation changes the row.
 All 13 PostgreSQL domain-contract tests, strict Clippy and formatting pass.
 Other domain depths and session configurations remain open; see the
-[deep-domain evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json).
+[deep-domain evidence](../evidence/postgres-deep-domain-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum 257-layer boundary, 2026-10-04
 
@@ -5210,7 +5210,7 @@ and filters to 257 nested domains with a same-named enum first in
 domain correctly and preserves a SQL NULL sibling; rollback restores the
 pre-transaction values. Raw inferred enum text stays an explicit unsupported
 result at this depth. See the
-[257-layer evidence](evidence/postgres-domain-257-level-results-2026-10-04/manifest.json).
+[257-layer evidence](../evidence/postgres-domain-257-level-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum metadata after session search_path changes, 2026-10-04
 
@@ -5219,7 +5219,7 @@ the same backend, confirms the active schema each time, and then fetches and
 updates an enum column whose qualified target schema differs from the final
 shadow schema. Native type/value checks verify the target row changed and the
 shadow row did not. The transaction rolls back its session changes. The focused
-test, strict Clippy and formatting pass. See the [evidence manifest](evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
+test, strict Clippy and formatting pass. See the [evidence manifest](../evidence/postgres-enum-session-search-path-results-2026-10-04/manifest.json).
 
 ## MySQL word-character delimiter boundary, 2026-10-04
 
@@ -5232,7 +5232,7 @@ reference documents delimiter strings and warns that a delimiter can occur
 inside words; this case pins the lexer's word-character delimiter path. See the
 [MySQL client delimiter documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
 The focused app test, strict Clippy and formatting pass. See the [evidence
-manifest](evidence/mysql-word-delimiter-results-2026-10-04/manifest.json).
+manifest](../evidence/mysql-word-delimiter-results-2026-10-04/manifest.json).
 
 ## MySQL malformed routine human policy decision, 2026-10-04
 
@@ -5246,7 +5246,7 @@ the dialog, and denial leaves data unchanged. The same GTK harness confirms
 lexically malformed SQL is stopped by the editor planner before approval.
 MySQL-backed dialog routing remains open. The focused app test, strict Clippy
 and formatting pass. See the
-[evidence manifest](evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/mysql-malformed-human-approval-results-2026-10-04/manifest.json).
 
 ## GTK approval dialog for unparseable human SQL, 2026-10-04
 
@@ -5256,7 +5256,7 @@ the approval dialog with its class and SQL text; denying it leaves the database
 unchanged. A separate unterminated SQL script displays the planner error and
 does not open approval. All 29 GTK safety scenarios pass. The UI case uses a
 SQLite fixture and does not prove approval routing through a MySQL-backed
-connection. See the [evidence manifest](evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json).
+connection. See the [evidence manifest](../evidence/gtk-unparseable-approval-results-2026-10-04/manifest.json).
 
 ## MySQL quoted multi-character delimiter consumer agreement, 2026-10-04
 
@@ -5267,7 +5267,7 @@ routine followed by a parameterized SELECT; delimiter-shaped and placeholder
 text inside the quoted routine string remain part of the body. The MySQL client
 supports quoted delimiter arguments; see the [client command documentation](https://dev.mysql.com/doc/refman/8.4/en/mysql-commands.html).
 The focused app test, strict Clippy and formatting pass. See the [evidence
-manifest](evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json).
+manifest](../evidence/mysql-quoted-delimiter-results-2026-10-04/manifest.json).
 
 ## SQLite NULLIF computed STRICT ANY result round trip, 2026-10-04
 
@@ -5276,7 +5276,7 @@ TEXT, BLOB and SQL NULL rows while result metadata stays at its computed
 fallback. A CSV export/import round trip preserves each runtime class, exact
 BLOB bytes and a text value shaped like the reserved tag; native `typeof()` is
 the oracle. The focused app test, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/sqlite-nullif-any-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/sqlite-nullif-any-results-2026-10-04/manifest.json).
 
 ## SQLite MAX over computed STRICT ANY result round trip, 2026-10-04
 
@@ -5285,7 +5285,7 @@ BLOB and SQL NULL from separate groups while result metadata remains the
 computed fallback. Typed CSV export/import preserves each runtime class, exact
 BLOB bytes and text matching the reserved tag; native `typeof()` checks both
 source and restored cells. All 12 selected SQLite app contracts, strict Clippy
-and formatting pass. See the [evidence manifest](evidence/sqlite-max-any-results-2026-10-04/manifest.json).
+and formatting pass. See the [evidence manifest](../evidence/sqlite-max-any-results-2026-10-04/manifest.json).
 
 ## SQLite JSON extraction over STRICT ANY result round trip, 2026-10-04
 
@@ -5299,7 +5299,7 @@ selected SQLite app contracts, strict Clippy and formatting pass. JSON export
 keeps large integers numeric and preserves extracted strings; XLSX uses numeric
 cells for numeric results and shared strings for text, with no formulas.
 Spreadsheet-app re-import remains open. See the
-[evidence manifest](evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/sqlite-json-extract-any-results-2026-10-04/manifest.json).
 
 ## SQLite SUM over computed STRICT ANY result round trip, 2026-10-04
 
@@ -5310,7 +5310,7 @@ Typed CSV export/import preserves each result carrier, verified by native
 `typeof()`. Adding `9223372036854775807` and `1` returns SQLite's integer
 overflow error instead of a rounded value. All 14 selected SQLite app
 contracts, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/sqlite-sum-any-results-2026-10-04/manifest.json).
 
 ## SQLite AVG over computed STRICT ANY result round trip, 2026-10-04
 
@@ -5321,7 +5321,7 @@ Nonnumeric text and BLOB inputs yield REAL zero. A pair containing
 overflow. Typed CSV export/import preserves the computed values and runtime
 classes, checked with native `typeof()`. All 15 selected SQLite app contracts,
 strict Clippy and formatting pass. See the
-[evidence manifest](evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/sqlite-avg-any-results-2026-10-04/manifest.json).
 
 ## SQLite arithmetic over computed STRICT ANY result round trip, 2026-10-04
 
@@ -5332,7 +5332,7 @@ integer overflow to REAL, truncates integer division, and returns SQL NULL for
 division by zero. Typed CSV export/import restores each computed value and
 runtime class, checked with native `typeof()`. All 16 selected SQLite app
 contracts, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json).
 
 ## PostgreSQL numeric array file-writer contract, 2026-10-04
 
@@ -5343,7 +5343,7 @@ that the driver's quoted numeric elements remain semantically identical and
 bindable. JSON, CSV and XLSX preserve the driver's exact text representation;
 XLSX uses a string cell without a formula. Replayed SQL restores canonical
 PostgreSQL array text, JSON elements and wire bytes. The focused test, strict
-Clippy and formatting pass. See the [evidence manifest](evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json).
+Clippy and formatting pass. See the [evidence manifest](../evidence/postgres-numeric-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum-array file-writer contract, 2026-10-04
 
@@ -5353,7 +5353,7 @@ A PostgreSQL 16 Docker contract exports a custom `enum[]` containing literal
 JSON, CSV and XLSX preserve that text, with XLSX using a string cell and
 escaping markup. Replayed SQL restores native array text, JSON elements and
 wire bytes. The focused test, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum array file-writer contract, 2026-10-04
 
@@ -5363,7 +5363,7 @@ and SQL NULL through JSON, CSV, XML, HTML, Markdown and XLSX. A qualified text
 binding matches native `array_to_json` and `array_send` oracles. Replayed SQL
 restores the domain-array type, JSON values and wire bytes. Strict PostgreSQL
 Clippy and formatting pass; repository size guards report existing unrelated
-violations. See the [evidence manifest](evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json).
+violations. See the [evidence manifest](../evidence/postgres-domain-enum-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum-array CSV import contract, 2026-10-04
 
@@ -5374,7 +5374,7 @@ schema-qualified array cast. Native `pg_typeof`, `array_to_json` and
 `array_send` verify restored type, values and exact bytes; an existing sibling
 row remains unchanged. The PostgreSQL array contract group, focused core tests,
 strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-csv-import-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum-array CSV shape and NULL contract, 2026-10-04
 
@@ -5385,7 +5385,7 @@ label, an empty label, and Unicode, plus a two-dimensional array. Native
 `pg_typeof`, `array_dims`, `array_to_json` and `array_send` values match after
 import, and an existing sibling row retains its wire bytes. All 16 PostgreSQL
 array-contract tests, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-csv-shapes-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum-array import under a shadowed search_path, 2026-10-04
 
@@ -5395,7 +5395,7 @@ schema-aware CSV importer targets the table's enum array, whose label is not
 accepted by the shadow type. The qualified cast succeeds, native type/value
 checks pass and the sibling row remains unchanged. All 17 PostgreSQL
 array-contract tests, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-shadowed-enum-array-import-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum-array grid edit contract, 2026-10-04
 
@@ -5406,12 +5406,12 @@ and SQL NULL elements against native type, dimensions, JSON and wire oracles.
 An invalid label is refused without mutation and the sibling row retains its
 wire bytes. All 18 PostgreSQL array-contract tests, the focused app-parser test,
 strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-grid-edit-results-2026-10-04/manifest.json).
 
 The same grid path also distinguishes blank SQL NULL from the custom enum-array
 literal `{}`: blank input stores a typed SQL NULL, while `{}` stores a non-NULL
 empty array. The native PostgreSQL array contract group and app-parser test pass
-([evidence](evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
+([evidence](../evidence/postgres-enum-array-grid-null-results-2026-10-04/manifest.json)).
 
 ## PostgreSQL custom enum-array CSV default NULL marker, 2026-10-04
 
@@ -5421,7 +5421,7 @@ arrays containing SQL NULL elements remain distinct as well. Scalar enum blank
 cells still fail closed as ambiguous because an empty enum label is a valid
 scalar value. The full core suite, PostgreSQL array contract group, strict
 Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-default-null-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum array CSV import, 2026-10-04
 
@@ -5432,22 +5432,22 @@ comma-containing labels and SQL NULL elements against native type, JSON and
 wire-byte oracles. A domain CHECK rejects a forbidden label with SQLSTATE
 23514 without inserting the row. The PostgreSQL enum and domain contract
 groups, full core suite, strict Clippy and formatting pass. See the
-[evidence manifest](evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-enum-array-import-results-2026-10-04/manifest.json).
 
 The same domain-over-enum array now has app-parser and live keyed-grid coverage.
 Native array values and bytes survive valid edits; an invalid enum label trips
 the domain CHECK and transaction rollback preserves the stored row. The full
 domain contract group, focused app-parser test, strict Clippy and formatting
-pass ([grid evidence](evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
+pass ([grid evidence](../evidence/postgres-domain-enum-array-grid-results-2026-10-04/manifest.json)).
 
 A structured equality filter also binds this array as its qualified domain
 array type and matches native values, JSON and wire bytes. The domain-contract
-group, full core suite, strict Clippy and formatting pass ([filter evidence](evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
+group, full core suite, strict Clippy and formatting pass ([filter evidence](../evidence/postgres-domain-enum-array-filter-results-2026-10-04/manifest.json)).
 
 CSV import is also tested with a same-named domain in another schema placed
 first in `search_path`. The generated insert still casts to the target table's
 qualified domain-array type, preserves native type, JSON and wire bytes, and
-leaves the sibling row intact ([shadowed-path evidence](evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
+leaves the sibling row intact ([shadowed-path evidence](../evidence/postgres-domain-enum-array-shadowed-import-results-2026-10-04/manifest.json)).
 
 ## PostgreSQL arrays of UUID domains, 2026-10-04
 
@@ -5460,7 +5460,7 @@ wire bytes. A UUID rejected by the domain CHECK returns SQLSTATE 23514 and
 leaves the edited row and its sibling unchanged. The full PostgreSQL
 integration target, strict Clippy and formatting pass; repository size guards
 retain unrelated existing violations. See the
-[evidence manifest](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain arrays over text, numeric and timestamptz, 2026-10-04
 
@@ -5469,7 +5469,7 @@ timestamptz while the session timezone is Asia/Kathmandu. Qualified text
 bindings reproduce the native array JSON and wire bytes, including empty and
 literal `NULL` text, numeric scale, two instants in a DST fold, infinity and
 NULL elements. The focused contract, strict Clippy and formatting pass. See the
-[matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json).
+[matrix evidence](../evidence/postgres-domain-array-family-results-2026-10-04/manifest.json).
 
 ## PostgreSQL timestamptz-array file-writer contract, 2026-10-04
 
@@ -5479,7 +5479,7 @@ negative infinity and SQL NULL. The server's `array_to_json` and `array_send`
 oracles confirm both instants survive text binding; JSON, CSV and XLSX preserve
 the driver text as a string, and replayed SQL restores native text, JSON values
 and wire bytes. The entire PostgreSQL array contract group passed (13 tests),
-along with strict Clippy and formatting. See the [evidence manifest](evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).
+along with strict Clippy and formatting. See the [evidence manifest](../evidence/postgres-timestamptz-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL interval-array file-writer contract under postgres_verbose, 2026-10-04
 
@@ -5490,7 +5490,7 @@ days, fractional time and SQL NULL under transaction-local `IntervalStyle =
 replayed SQL restores native text, JSON elements and wire bytes under the same
 style. The rollback leaves the destination empty. All 14 array-contract tests,
 strict Clippy and formatting pass. Other interval styles remain untested. See
-the [evidence manifest](evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
+the [evidence manifest](../evidence/postgres-interval-array-filewriter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum-array Calc re-import, 2026-10-04
 
@@ -5500,7 +5500,7 @@ opening and saving as ODS, then reopening and saving as XLSX. The literal
 the same shared-string cell text. The native PostgreSQL writer test, pinned
 LibreOffice 26.8.0.3 round trip and standard-library OOXML/ODS checker pass.
 Other array shapes and spreadsheet applications remain open. See the
-[evidence manifest](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json).
 
 ## DuckDB literal NULL enum label grid edit, 2026-10-04
 
@@ -5509,7 +5509,7 @@ through the parser and keyed-update builder. Native `typeof`, text and null
 predicate checks show that row remains an ENUM value while its untouched sibling
 stays SQL NULL. The focused test and DuckDB-enabled app library suite pass, as
 do strict Clippy and formatting. Other DuckDB type, consumer and configuration
-cases plus installed editing remain open. See the [evidence manifest](evidence/duckdb-enum-null-label-results-2026-10-04/manifest.json).
+cases plus installed editing remain open. See the [evidence manifest](../evidence/duckdb-enum-null-label-results-2026-10-04/manifest.json).
 
 ## DuckDB enum raw CSV round trip, 2026-10-04
 
@@ -5521,7 +5521,7 @@ remains unchanged. Spreadsheet-safe mode prefixes `=1+1`, and its typed import
 plan maps that text to the same label as `'=1+1`; the safe encoding is for
 presentation, while raw CSV is required for lossless restore. The focused
 contract, all-feature app library suite, strict Clippy and formatting pass.
-Installed GTK editing remains open; see the [evidence manifest](evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
+Installed GTK editing remains open; see the [evidence manifest](../evidence/duckdb-enum-csv-roundtrip-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-bytea array edit with shadowed search_path, 2026-10-04
 
@@ -5532,7 +5532,7 @@ The qualified target-domain array cast succeeds; native type, JSON and
 `array_send` bytes match the target oracle, and the sibling row stays unchanged.
 The focused Docker test, strict Clippy and formatting pass. Other domain-array
 types, session/search_path combinations, enum boundaries and consumers remain
-open in B3. See the [evidence manifest](evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json).
+open in B3. See the [evidence manifest](../evidence/postgres-shadowed-domain-bytea-array-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum CSV quote and line-break round trip, 2026-10-04
 
@@ -5545,7 +5545,7 @@ combinations), and format auto-detection identifies the right delimiter and
 header for each one. Restored rows match exact text, UTF-8 bytes, native enum
 type and SQL NULL. The focused test, strict Clippy and formatting pass. Other
 session configurations and spreadsheet-specific import behavior remain open. See the
-[evidence manifest](evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-enum-csv-quoted-lines-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum SQL replay across string-literal modes, 2026-10-04
 
@@ -5557,7 +5557,7 @@ text with the same native enum type in both configurations. PostgreSQL text with
 backslashes now uses explicit `E''` syntax and doubles each backslash; ordinary
 values retain regular quoted-literal output. The native focused tests, core and
 app suites, strict Clippy and formatting pass. Other session settings and SQL
-literal edge cases remain open. See the [evidence manifest](evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json).
+literal edge cases remain open. See the [evidence manifest](../evidence/postgres-enum-sql-literal-session-modes-results-2026-10-04/manifest.json).
 
 ## SQLite STRICT ANY formula-shaped text through Calc, 2026-10-04
 
@@ -5570,7 +5570,7 @@ through ODS save and XLSX re-save; the numeric, text and blank cells retain thei
 prior kinds. The focused app regression, strict Clippy, formatting and
 standard-library OOXML/ODS checker pass. Other spreadsheet applications and
 workbook shapes remain unverified.
-See the [evidence manifest](evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json).
+See the [evidence manifest](../evidence/sqlite-xlsx-calc-formula-text-results-2026-10-04/manifest.json).
 
 ## PostgreSQL bytea[] XLSX through Calc, 2026-10-04
 
@@ -5580,7 +5580,7 @@ XLSX re-save with identical array text. Native `pg_typeof`, `array_to_json`,
 `array_send` and per-element hex checks establish the binary values, order,
 empty element and SQL NULL. The standard-library OOXML/ODS checker confirms the
 cell remains text and is not a formula. Other array families and spreadsheet
-applications remain open. See the [evidence manifest](evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json).
+applications remain open. See the [evidence manifest](../evidence/postgres-bytea-array-calc-reimport-results-2026-10-04/manifest.json).
 
 ## SQLite computed BLOB cast through typed CSV, 2026-10-04
 
@@ -5592,7 +5592,7 @@ in escaped text and XLSX writes non-NULL computed BLOB results as shared
 strings. Typed CSV import into a second STRICT `ANY` table preserves every
 result byte and storage class, including empty BLOB and SQL NULL. The focused
 contract, DuckDB-enabled app
-library suite, strict Clippy and formatting pass. See the [evidence manifest](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
+library suite, strict Clippy and formatting pass. See the [evidence manifest](../evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
 
 ## PostgreSQL custom enum with quoted identifiers, 2026-10-04
 
@@ -5604,8 +5604,8 @@ Identifiers containing embedded quotes and other session/search_path
 combinations remain open in this first spaces-only case. A follow-up now embeds
 double quotes in all three identifiers and confirms metadata, keyed update and
 filter SQL escape them correctly while preserving the native type and sibling
-row ([evidence](evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
-See the [spaces-case manifest](evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
+row ([evidence](../evidence/postgres-enum-identifier-escaping-results-2026-10-04/manifest.json)).
+See the [spaces-case manifest](../evidence/postgres-enum-quoted-identifiers-results-2026-10-04/manifest.json).
 
 ## PostgreSQL enum target under shadowed search_path, 2026-10-04
 
@@ -5616,7 +5616,7 @@ fetched for the target table, then the generated keyed update and structured
 equality filter select the target enum. Native `pg_typeof` text and `regtype`
 OID comparisons identify each type, while target siblings and the shadow row
 remain unchanged. Other transaction/session path permutations remain open. See
-the [evidence manifest](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json).
+the [evidence manifest](../evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json).
 
 ## PostgreSQL numeric[] XLSX through Calc, 2026-10-04
 
@@ -5627,7 +5627,7 @@ then reopens and saves XLSX; Python standard-library OOXML/ODS checks confirm
 the exact 122-character array text remains unchanged and no formula is added.
 The focused Docker contract, strict Clippy, formatting and round-trip checker
 pass. Other array families and spreadsheet applications remain open. See the
-[evidence manifest](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json).
 
 ## PostgreSQL float8[] exact-value XLSX through Calc, 2026-10-04
 
@@ -5640,7 +5640,7 @@ XLSX array cell survives LibreOffice Calc 26.8.0.3's ODS save and XLSX re-save
 as identical 390-character text without formulas. The focused contract, strict
 Clippy, formatting and OOXML/ODS checker pass. Other array families and
 spreadsheet applications remain open. See the
-[evidence manifest](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json).
 
 ## SQL Server GO script with malformed quoted tail, 2026-10-04
 
@@ -5650,7 +5650,7 @@ planning returns an error, named-parameter extraction keeps only the earlier
 safe parameter, and formatting preserves the malformed tail and batch
 delimiters. Policy classifies the script as unparseable/write and denies it to
 an agent. The focused app regression and strict unit-only GTK+DuckDB values
-runner pass; see the [evidence manifest](evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
+runner pass; see the [evidence manifest](../evidence/mssql-malformed-go-tail-results-2026-10-04/manifest.json).
 
 ## MySQL unparseable routine approval through GTK, 2026-10-04
 
@@ -5665,7 +5665,7 @@ both paths now share that fallback. The retained pre-fix accessibility tree
 shows the protocol error, and the post-fix GTK layer, strict unit-only values
 tier, Clippy, formatting and repository guards pass. This local GTK/Xvfb case
 does not qualify installed Wayland behavior or other dialects; see the
-[evidence manifest](evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/mysql-gtk-unparseable-approval-results-2026-10-04/manifest.json).
 
 ## MySQL short `\d` delimiter directive, 2026-10-04
 
@@ -5678,7 +5678,7 @@ and post-format planning and policy keep the same statement count and
 unparseable/write routine classification. The focused app selector, strict
 unit-only GTK+DuckDB values tier, Clippy and formatting pass. Other MySQL
 delimiter forms remain open; see the
-[evidence manifest](evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/mysql-short-delimiter-results-2026-10-04/manifest.json).
 
 ## ClickHouse malformed heredoc consumer contract, 2026-10-04
 
@@ -5691,7 +5691,7 @@ formatting, and unparseable/write classification with fail-closed agent denial.
 The initial contract failed because the generic scanner only recognized
 PostgreSQL dollar quotes. The focused core and app selectors, strict unit-only
 GTK+DuckDB values tier, Clippy, formatting and repository guards pass. See the
-[evidence manifest](evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/clickhouse-malformed-heredoc-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum schema-aware operations at 258 layers, 2026-10-04
 
@@ -5704,7 +5704,7 @@ along with PostgreSQL Clippy, formatting, file-size and ignored-test inventory
 checks. Raw inferred text/NULL remains explicitly unsupported from 64 layers;
 domain depths beyond 258 and additional enum/session parameter combinations
 remain open. See the
-[evidence manifest](evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-258-level-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum schema-aware operations at 259 layers, 2026-10-04
 
@@ -5714,7 +5714,7 @@ domains. It confirms the target outer-domain type and preserves a SQL NULL
 sibling while a same-named shadow enum leads `search_path`. The 258- and
 259-layer cases pass; raw inferred text/NULL remains explicitly unsupported
 from 64 layers, and greater domain depths and other session combinations remain
-open. See the [evidence manifest](evidence/postgres-domain-259-level-results-2026-10-04/manifest.json).
+open. See the [evidence manifest](../evidence/postgres-domain-259-level-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum COALESCE parameters, 2026-10-04
 
@@ -5727,7 +5727,7 @@ server's native common-type resolution selects the base enum. The corrected
 contract pins that behavior without changing production code. The focused case
 and all 16 domain contracts, PostgreSQL Clippy, formatting, file-size and
 ignored-test inventory checks pass. See the
-[evidence manifest](evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-coalesce-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum array functions, 2026-10-04
 
@@ -5739,7 +5739,7 @@ parameter inference and function output use the base `state` enum and `state[]`,
 and the source column remains `state_domain`. The entire domain contract group
 passes (17 tests), with PostgreSQL Clippy, formatting, ignored-test inventory,
 file-size and diff checks. See the
-[evidence manifest](evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-array-functions-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum `array_remove` parameter inference, 2026-10-04
 
@@ -5749,7 +5749,7 @@ An independently typed query supplies each output array; `pg_typeof` checks
 that the parameter is the base enum and the result is the base enum array. Both
 parameter forms pass in ready, paused and SQL NULL source rows. The case extends
 the inferred array-function matrix without changing production binding code;
-other function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json).
+other function contexts remain open. See the [evidence manifest](../evidence/postgres-domain-enum-array-remove-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum `array_position` parameter inference, 2026-10-04
 
@@ -5758,7 +5758,7 @@ A PostgreSQL 16 Docker contract covers text and SQL NULL parameters to
 compares returned positions with a separately executed typed native query and
 checks that the parameter is the base enum and the result is `integer`. The SQL
 NULL case confirms PostgreSQL matches a NULL array element; other inferred
-array-function contexts remain open. See the [evidence manifest](evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json).
+array-function contexts remain open. See the [evidence manifest](../evidence/postgres-domain-enum-array-position-results-2026-10-04/manifest.json).
 
 ## PostgreSQL domain-over-enum `array_replace` parameter inference, 2026-10-04
 
@@ -5768,7 +5768,7 @@ checks text replacement, NULL search, NULL replacement, and both parameters
 NULL. Each result array is compared with a separately typed native query, and
 `pg_typeof` verifies both parameters are the base enum and the result is the
 base enum array. Other inferred function and operator contexts remain open. See
-the [evidence manifest](evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json).
+the [evidence manifest](../evidence/postgres-domain-enum-array-replace-results-2026-10-04/manifest.json).
 
 ## PostgreSQL inferred enum-array parameter in `ANY`, 2026-10-04
 
@@ -5782,7 +5782,7 @@ whose declared bounds disagree with its contents returns `Unsupported` before
 dispatch. This new inferred path encodes PostgreSQL's binary array protocol;
 existing explicitly cast text parameters remain a separate path. The exact
 regression and all 99 PostgreSQL value contracts pass in the GTK + DuckDB
-value tier. See the [evidence manifest](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
+value tier. See the [evidence manifest](../evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json).
 
 ## PostgreSQL inferred enum-array operators, 2026-10-04
 
@@ -5793,7 +5793,7 @@ literal `NULL` versus SQL NULL, empty arrays, and native invalid-label errors.
 For each valid input, an independently cast native array provides operator
 results and `array_send` bytes; `pg_typeof($1)` and the source domain type are
 also asserted. The complete Docker-backed PostgreSQL integration suite passes
-129 tests. See the [evidence manifest](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
+129 tests. See the [evidence manifest](../evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json).
 
 ## PostgreSQL inferred enum-array operators under shadowed `search_path`, 2026-10-04
 
@@ -5803,7 +5803,7 @@ domain-over-enum source from another schema. All four operand orientations
 still infer the target enum-array type and match native literal-array results
 and `array_send` bytes. Invalid target labels return SQLSTATE `22P02` in both
 containment positions; savepoints isolate the expected server errors. The full
-PostgreSQL integration suite passes 129 tests. See the [evidence manifest](evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
+PostgreSQL integration suite passes 129 tests. See the [evidence manifest](../evidence/postgres-shadowed-enum-array-operator-results-2026-10-04/manifest.json).
 
 ## PostgreSQL inferred enum-array domain-depth boundary, 2026-10-04
 
@@ -5816,7 +5816,7 @@ the type resolver's depth budget. At depth 63, PostgreSQL itself returns
 SQLSTATE `42883` for scalar equality against `ANY(domain_array)`; the regression
 records this native operator-resolution refusal and uses array containment for
 the parameter-boundary oracle. The full Docker-backed PostgreSQL integration
-suite passes 130 tests. See the [evidence manifest](evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).
+suite passes 130 tests. See the [evidence manifest](../evidence/postgres-inferred-enum-array-depth-results-2026-10-04/manifest.json).
 
 ## GTK + DuckDB value tier with enum-array operator/depth cases, 2026-10-04
 
@@ -5825,7 +5825,7 @@ GTK + DuckDB value tier passes 297 contracts across all 11 suites, with no
 missing suites. PostgreSQL contributes 101 contracts, including inferred
 enum-array operators under shadowed `search_path` and the 62/63/64 domain-depth
 boundary. The raw report and suite logs are retained in the
-[evidence packet](evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
+[evidence packet](../evidence/full-value-tier-enum-array-depth-results-2026-10-04/manifest.json).
 
 ## PostgreSQL inferred domain-over-enum `array_cat` parameter, 2026-10-04
 
@@ -5836,7 +5836,7 @@ results for NULL elements, empty arrays, SQL NULL arrays, literal `NULL`, empty,
 comma, quote and backslash labels. It also runs with a same-named shadow enum
 first in `search_path`. Native explicit-array expressions provide the result
 oracle. The focused contract passed; the PostgreSQL selected value suite is
-recorded with the [evidence manifest](evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json).
+recorded with the [evidence manifest](../evidence/postgres-domain-enum-array-cat-results-2026-10-04/manifest.json).
 
 
 ## PostgreSQL inferred domain-over-enum `array_positions` parameter, 2026-10-04
@@ -5846,7 +5846,7 @@ parameter for a domain-over-enum source. The native control and bound query
 check repeated-value positions and PostgreSQL's NULL-element matching; the
 bound parameter and integer-array result types are asserted. A same-named shadow
 enum leads the transaction `search_path` to check schema resolution. See the
-[evidence manifest](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
 
 ## GTK + DuckDB value tier with PostgreSQL enum `array_positions`, 2026-10-04
 
@@ -5855,7 +5855,7 @@ GTK + DuckDB value tier passed 304 selected contracts across all 11 suites,
 including 106 PostgreSQL contracts and no missing suites. The PostgreSQL suite
 includes the inferred enum `array_positions` contract under shadowed
 `search_path`; the raw report and per-suite logs are retained in the
-[evidence packet](evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
+[evidence packet](../evidence/postgres-domain-enum-array-positions-results-2026-10-04/manifest.json).
 
 
 ## PostgreSQL domain-over-enum array comparison parameters, 2026-10-04
@@ -5867,7 +5867,7 @@ a SQL NULL array and a NULL element. The target schema is absent from
 `search_path`, where a same-named shadow enum leads. Parameter `array_send`
 bytes match the native typed value. This records PostgreSQL array dimensional-bound
 semantics as well as inferred parameter typing. See the
-[evidence manifest](evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json).
+[evidence manifest](../evidence/postgres-domain-enum-array-equality-results-2026-10-04/manifest.json).
 
 
 ## PostgreSQL domain-over-enum array workbook re-import through Calc, 2026-10-04
@@ -5878,7 +5878,7 @@ Calc 26.8.0.3 in the pinned Debian image opened the 50-code-point array-text
 cell, saved ODS, then reopened and saved XLSX. The shared-string XLSX cells and
 ODS string cell are identical; the text contains the literal `NULL`, empty label,
 Unicode, comma, quote, markup, formula-shaped label and SQL NULL marker. The
-[verification packet](evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json) retains all artifacts and logs.
+[verification packet](../evidence/postgres-domain-enum-array-calc-reimport-results-2026-10-04/manifest.json) retains all artifacts and logs.
 
 
 ## GTK + DuckDB value tier with temporal array Calc cases, 2026-10-05
@@ -5890,4 +5890,4 @@ for `date[]`, `timestamp[]`, `time[]` and `timetz[]`; MySQL/MariaDB passed 28.
 Compilation reused 746 fresh artifacts and rebuilt one package. The runner
 recorded `dirty: true`; `git status` showed only the two preserved B4 scratch
 directories outside `linux/`. The report and all per-suite logs are retained in
-the [evidence packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-05/manifest.json).
+the [evidence packet](../evidence/local-gtk-duckdb-value-tier-results-2026-10-05/manifest.json).

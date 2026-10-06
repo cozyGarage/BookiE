@@ -17,7 +17,7 @@ review, not a line-by-line security audit of every diff. No application tests,
 containers, hosted jobs or installed desktop checks were rerun during this review.
 Existing results below belong to their recorded revisions and environments.
 
-The [active continuation plan](bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
+The [active continuation plan](../bookie-0.2-sprint.md#current-continuation-plan-2026-10-03)
 owns new work. This file archives delivered changes and their remaining limits;
 it does not close B3, B4 or approve a release.
 
@@ -27,7 +27,7 @@ it does not close B3, B4 or approve a release.
 | --- | --- | --- |
 | B2 / integration | Preserved local safeguards on the remote sprint foundation; preference migration marker, durable mirrors, history tests and owned MCP shutdown | Installed migration and rollback at the candidate SHA |
 | B3 PostgreSQL | Wide NUMERIC and scale, arrays/dimensions/lower bounds, 24:00/timetz, eras/infinities, interval fields and vectors; independent server/wire oracles | Calendar extremes, remaining native families, exact editing and consumer parity |
-| B3 other drivers | MySQL zero/extended temporals, BIT/spatial/decimal values and SQL-mode-safe literals; SQL Server wide decimals and stored offsets; ClickHouse precision/scale/named zones; DuckDB native decimal/temporal bindings; SQLite affinity imports; MongoDB canonical Extended JSON, nested and top-level edits, binary subtype preservation | Remaining targets in the [type matrix](type-contract-strategy.md), mixed-type editing and installed grid acceptance; refusal and text fallback must remain explicit |
+| B3 other drivers | MySQL zero/extended temporals, BIT/spatial/decimal values and SQL-mode-safe literals; SQL Server wide decimals and stored offsets; ClickHouse precision/scale/named zones; DuckDB native decimal/temporal bindings; SQLite affinity imports; MongoDB canonical Extended JSON, nested and top-level edits, binary subtype preservation | Remaining targets in the [type matrix](../type-contract-strategy.md), mixed-type editing and installed grid acceptance; refusal and text fallback must remain explicit |
 | B3 consumers | Exact XLSX numeric/temporal/nested text; CSV empty/NULL distinction; XML/HTML character rules; binary SQL export, incomplete-row refusal, parser and mixed-binding regressions; MongoDB MCP/file round trips | Cross-format/consumer parity, generated boundaries and unresolved mutation findings |
 | B4 SSH | Built-in auth/two-hop tests, keepalive and closed-state API; OpenSSH caller cancellation, parent-death cleanup, ProxyJump and real auth/key tests; unused auth mode removed | Built-in trust prompt, closed-tunnel monitor wiring and installed prompt/cleanup checks |
 | B4 TLS | Service-name verification fixes for ClickHouse/MongoDB/Redis; SQL Server TLS fixture and no-plaintext-fallback regressions | MySQL and SQL Server TLS-through-SSH proof (C6); keep engine-specific claims |
@@ -36,8 +36,8 @@ it does not close B3, B4 or approve a release.
 | Build / evidence | Rust/toolchain/build reuse, layered runners, focused change-contract selection, immutable CI pins, strict result/artifact gates, SSH tier ownership and mutation shards | Evidence for the final tip, unresolved mutation survivors/timeouts, installed Arch package and candidate soak |
 | Maintenance | ClickHouse helper split, MongoDB module split and function-size refactors | Requalify affected behavior; refactoring is not additional feature acceptance |
 
-Detailed historical evidence remains in [value contracts](value-contracts.md),
-[CI audit](ci-audit-2026-09-27.md), [B4 board](b4-task-board.md) and
+Detailed historical evidence remains in [value contracts](../value-contracts.md),
+[CI audit](ci-audit-2026-09-27.md), [B4 board](../b4-task-board.md) and
 [September 26 reconciliation](reconciliation-2026-09-26.md).
 
 ## Findings that affect the next plan

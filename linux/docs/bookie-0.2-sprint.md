@@ -50,7 +50,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; prior DuckDB malformed-tail and decimal fixes remain covered. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; prior DuckDB malformed-tail and decimal fixes remain covered. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
 | B4 transport/sessions | Policy, daemon cache refusal, editor callback/retirement and awaited cleanup patches, built-in host consent and GUI uncertainty split merged through `6346a431c` | [Current B4 board](b4-task-board.md#b4-continuation-status-october-3): F4/F9, F6 and GUI F8 implementation are merged; MySQL DDL refusal, honest rollback reporting and the MyISAM-trigger rollback boundary have local regressions; headless generation/retirement parity, TLS/daemon/route/audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
@@ -79,10 +79,10 @@ engine/type/consumer/configuration case; preserve existing fallbacks/refusals.
 
 
 R1–R5/R7 have recorded fixes; R6 evidence portability and the remaining matrix
-stay open. U1 metadata/two INSERT paths have [native proof](upstream-u1-sql-server-2026-10-03.md);
+stay open. U1 metadata/two INSERT paths have [native proof](archive/upstream-u1-sql-server-2026-10-03.md);
 other consumers/ledger acceptance remain open. U2–U6 and older-release O1–O3
-are mapped in [main review](upstream-main-review-2026-10-03.md) and
-[older-release review](upstream-older-releases-review-2026-10-03.md). Reuse these
+are mapped in [main review](archive/upstream-main-review-2026-10-03.md) and
+[older-release review](archive/upstream-older-releases-review-2026-10-03.md). Reuse these
 owners; do not create a second completion cache, exporter or type policy.
 
 ## B4 next order
@@ -99,7 +99,7 @@ worktree descriptions. Recheck HEAD before starting; do not reapply merged work.
 | 4 | Combined affected gates, then installed Arch/Wayland acceptance |
 | After Arch | I1 Debian packaging and the required GNOME/Wayland pass |
 
-The [architecture review](architecture-consistency-review-2026-10-03.md#remaining-source-risks)
+The [architecture review](archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks)
 records panic privacy and headless retirement gaps alongside these owners.
 
 ## Arch / Omarchy / Wayland UI packets
@@ -145,7 +145,7 @@ diff/link checks; runtime/package claims require their actual owning checks.
 
 ## History lookup
 
-[Sprint history](bookie-0.2-history.md) preserves original scope, dated progress,
+[Sprint history](archive/bookie-0.2-history.md) preserves original scope, dated progress,
 commit tables, build-cache measurements and rollback details. Read a relevant
 section only. New current work updates this sprint/owning board; new case results
 update the value ledger, with links here instead of copied logs/counts.

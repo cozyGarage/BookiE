@@ -2,7 +2,7 @@
 
 Archived from `aeac107a4` on 2026-10-03. Reports below retain their original
 SHA/scope. Missing cache output cannot establish current acceptance.
-Current commands and evidence rules live in [the playbook](validation-playbook.md).
+Current commands and evidence rules live in [the playbook](../validation-playbook.md).
 
 ## October 1–2 local checks
 

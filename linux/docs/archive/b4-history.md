@@ -2,14 +2,14 @@
 
 Archived from `aeac107a4` on 2026-10-03. All status, ownership, worktree and
 next-task wording below belongs to its recorded checkpoint. Current tasks and
-acceptance are owned by [the B4 board](b4-task-board.md); use the shared checkout
+acceptance are owned by [the B4 board](../b4-task-board.md); use the shared checkout
 and cache for the current single-agent session. Historical results are retained
 as evidence, including reports that are unavailable locally.
 
 # Original B4 task board
 
 Surveyed on 2026-09-27 at `5fac54059` (source version 0.1.5). This board splits
-the open B4 work in [the 0.2 sprint](bookie-0.2-sprint.md) into small tasks that
+the open B4 work in [the 0.2 sprint](../bookie-0.2-sprint.md) into small tasks that
 separate agents can take in parallel.
 
 ## B4 continuation status (October 3)
@@ -94,7 +94,7 @@ this checkout. Never checkout, stash, reset or commit the B3 agent's changes.
 Do not run concurrent Cargo jobs against the same target or concurrent fixture
 scripts with the same Compose project/ports. Reserve Docker and build windows;
 do not prune the existing target or stop another agent's containers. Follow the
-[playbook concurrency guidance](validation-playbook.md#agent-task-template)
+[playbook concurrency guidance](../validation-playbook.md#agent-task-template)
 and record the actual worktree, base SHA and reservations in each handoff.
 
 ### Dispatch waves and dependencies
@@ -444,7 +444,7 @@ branches.
 
 ### Agent handoff and completion evidence
 
-Use the [existing handoff template](validation-playbook.md#agent-task-template).
+Use the [existing handoff template](../validation-playbook.md#agent-task-template).
 For each packet fill the absolute worktree, current full SHA, allowed files,
 other owners, exact reproducer, selected layers, available tools, build/fixture
 reservation and authorization. Do not assume push permission from this plan.
@@ -500,7 +500,7 @@ candidate, followed by the required Debian phase and the existing B7 process.
 ## September 28 continuation (historical evidence)
 
 Reviewed at `85fecbe0b`. See the [commit archive](sprint-review-2026-09-28.md)
-and [active order / Luna packets](bookie-0.2-sprint.md#b4-next-order).
+and [active order / Luna packets](../bookie-0.2-sprint.md#b4-next-order).
 A/B, C1–C5, D, G1/G2/G4 and H have recorded implementation/regression evidence;
 B4 remains open for C6, E, F, G3/G5 and active I tasks. A5's monitor follow-up is F9.
 Existing results apply to their recorded revisions; this review reran no tests.
@@ -528,19 +528,19 @@ A task that names a decision follows the recorded decision.
 ## Decisions
 
 The seven September 27 decisions are now recorded in
-[ADR 0008](decisions/0008-connection-and-session-ownership.md). The stable numbers
+[ADR 0008](../decisions/0008-connection-and-session-ownership.md). The stable numbers
 below preserve task references; the ADR owns the rules and this board owns
 implementation/acceptance. Accepted architecture is not a runtime pass.
 
 | Legacy decision | ADR section | Owning implementation |
 | --- | --- | --- |
-| 1: built-in host-key consent | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | F6 |
-| 2: unavailable Flatpak OpenSSH route | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I2 |
-| 3: connection uncertainty scope | [Uncertainty scope](decisions/0008-connection-and-session-ownership.md#uncertainty-scope) | F8; journal-wide failures remain fail-closed |
-| 4: implicit shared transaction starters | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E1 |
-| 5: unterminated shared transaction batches | [Identity and transaction ownership](decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E2 |
-| 6: transport/trust audit records | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I5 |
-| 7: verified daemon cache reuse | [Trust and route selection](decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | G3/G5 |
+| 1: built-in host-key consent | [Trust and route selection](../decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | F6 |
+| 2: unavailable Flatpak OpenSSH route | [Trust and route selection](../decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I2 |
+| 3: connection uncertainty scope | [Uncertainty scope](../decisions/0008-connection-and-session-ownership.md#uncertainty-scope) | F8; journal-wide failures remain fail-closed |
+| 4: implicit shared transaction starters | [Identity and transaction ownership](../decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E1 |
+| 5: unterminated shared transaction batches | [Identity and transaction ownership](../decisions/0008-connection-and-session-ownership.md#identity-and-transaction-ownership) | E2 |
+| 6: transport/trust audit records | [Trust and route selection](../decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | I5 |
+| 7: verified daemon cache reuse | [Trust and route selection](../decisions/0008-connection-and-session-ownership.md#trust-and-route-selection) | G3/G5 |
 
 ## Lane A: built-in SSH — implementation delivered; A5 monitor follow-up open
 

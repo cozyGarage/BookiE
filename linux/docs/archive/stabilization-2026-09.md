@@ -2,7 +2,7 @@
 
 Reviewed base: `7d82881323af083dc6e045971f31d505fdf03164`, branch `linux`, tracking `cozyGarage/TablePro:linux`. Review date: 2026-09-07; verification ledger finalized 2026-09-08. Stabilization candidate `751a458293eca384e8747d7661db1fe9f713401b` is committed and pushed to `origin/linux`. Local evidence below matches its implementation source hashes. Hosted candidate validation is pending.
 
-At the time of this review, [PLAN.md](../../PLAN.md) recorded the ten-day sprint and phase order. Current sequencing is in the [active sprint](bookie-0.2-sprint.md). [Upstream adoption](upstream-adoption.md) owns the whole-app comparison through pinned macOS 0.72. [Performance measurements](performance-2026-09.md) contain the reproducible raw samples.
+At the time of this review, [PLAN.md](../../../PLAN.md) recorded the ten-day sprint and phase order. Current sequencing is in the [active sprint](../bookie-0.2-sprint.md). [Upstream adoption](upstream-adoption.md) owns the whole-app comparison through pinned macOS 0.72. [Performance measurements](performance-2026-09.md) contain the reproducible raw samples.
 
 ## What changed
 
@@ -45,9 +45,9 @@ Toolchain: Rust/Cargo 1.93.1; GTK 4.22.4, libadwaita 1.9.3, GtkSourceView 5.20.0
 | Full Docker/TLS/SSH matrix on this working tree | Not rerun: Docker socket permission denied even outside sandbox; sudo requires a password. The local PostgreSQL alternative covers SQL/TLS-to-localhost behavior, not the bastion/Toxiproxy/other-engine fixtures |
 | RC soak / installed Arch package | Not performed; no candidate tag, publication or 30-attempt soak credit |
 
-The [validation manifest](evidence/2026-09-stabilization/validation.json) records commands, saved-log hashes and source hashes for the locally tested tree, now mapped to the committed candidate. The temporary PostgreSQL server was confirmed stopped during finalization. Prior process handles expired between sessions, so finalization verified saved completion output rather than recovering process exit codes.
+The [validation manifest](../evidence/2026-09-stabilization/validation.json) records commands, saved-log hashes and source hashes for the locally tested tree, now mapped to the committed candidate. The temporary PostgreSQL server was confirmed stopped during finalization. Prior process handles expired between sessions, so finalization verified saved completion output rather than recovering process exit codes.
 
-The [generated ignored-test ledger](ignored-tests.md) lists exact tests and their activation requirements. Subprocess helpers are counted separately. Test counts are evidence inventory, not proof of defect absence.
+The [generated ignored-test ledger](../ignored-tests.md) lists exact tests and their activation requirements. Subprocess helpers are counted separately. Test counts are evidence inventory, not proof of defect absence.
 
 Reproduce the affected real-engine slice against an isolated server compatible with the release fixture:
 

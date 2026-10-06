@@ -29,7 +29,7 @@ app tests passed, including the five census/browse race cases and the seven
 BSON parser/edit contracts. This confirms selected-row `run_find` type merging
 and export behavior on the current source; it does not change the off-page or
 non-snapshot limits above. See the
-[current regression evidence](evidence/mongodb-current-census-results-2026-10-04/manifest.json).
+[current regression evidence](../evidence/mongodb-current-census-results-2026-10-04/manifest.json).
 
 The app-server tests, driver timing test, and retained output are listed in the
-[MongoDB census evidence manifest](evidence/mongodb-census-results-2026-10-03/manifest.json).
+[MongoDB census evidence manifest](../evidence/mongodb-census-results-2026-10-03/manifest.json).

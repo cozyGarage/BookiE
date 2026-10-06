@@ -2,17 +2,17 @@
 
 Archived from `aeac107a4` on 2026-10-03. The September audit and subsequent
 notes below describe their dated source, including obsolete gaps and advice.
-Use [connection handling](connections.md) and [the B4 board](b4-task-board.md)
+Use [connection handling](../connections.md) and [the B4 board](../b4-task-board.md)
 for current rules and acceptance. Missing cache reports do not establish a pass.
 
 # Original connection handling
 
-Historical connection audit: 2026-09-07. The original audit and its coverage table below are dated snapshots. Later additions retain their own dates. Current B4 acceptance is in [the task board](b4-task-board.md), with evidence availability in [the consistency review](architecture-consistency-review-2026-10-03.md).
+Historical connection audit: 2026-09-07. The original audit and its coverage table below are dated snapshots. Later additions retain their own dates. Current B4 acceptance is in [the task board](../b4-task-board.md), with evidence availability in [the consistency review](architecture-consistency-review-2026-10-03.md).
 
 TablePro is a connection engine before it is a grid. This document records what
 the connection layer did at that checkpoint, what is proven, what is known to be
 wrong, and what has never been exercised. Every claim below was read out of the
-source at the audit date. Status terms match [ROADMAP.md](../ROADMAP.md):
+source at the audit date. Status terms match [ROADMAP.md](../../ROADMAP.md):
 **implemented** means the code and unit tests exist, **integrated** means every
 production entry point uses it, **release-verified** means a deterministic
 real-service test proves it.

@@ -15,7 +15,7 @@ current manifests and relevant production source. This is a consistency audit,
 not exhaustive semantic certification of every sentence or every Rust file.
 
 The [per-file inventory](architecture-consistency-2026-10-03-inventory.md) and
-[manifest](evidence/architecture-review-2026-10-03/manifest.json) retain coverage,
+[manifest](../evidence/architecture-review-2026-10-03/manifest.json) retain coverage,
 source fingerprints, dependency edges, evidence checks and unresolved links.
 The manifest describes its mechanical checks; it does not turn a screened
 document into a runtime pass.
@@ -31,10 +31,10 @@ audit. B3/B4 and installed-package acceptance remain open.
 
 | Question | Authority | How to use older records |
 | --- | --- | --- |
-| Crate boundaries, GTK ownership, secret storage, cancellation and panic strategy | Accepted [ADRs](decisions/README.md), `CLAUDE.md`, [architecture](../ARCHITECTURE.md), actual manifests | External planning advice cannot override these. Resolve a code/ADR mismatch explicitly |
-| Delivery order and milestone acceptance | [Active 0.2 sprint](bookie-0.2-sprint.md), with [B4 board](b4-task-board.md) and B3 case ledgers | PLAN is the capability backlog/entry point; ROADMAP summarizes it. Archived phase checkboxes do not close newer gates |
-| A specific bug, native type or consumer contract | [Value contracts](value-contracts.md), [B3 findings](b3-review-2026-10-01.md), retained evidence at its SHA | Match implementation fingerprint, selector, fixture and consumer scope. A nearby commit or test count is insufficient |
-| Test selection and execution ownership | [Validation playbook](validation-playbook.md), [testing](testing.md), executable layer catalog and workflows | Distinguish checked-in tests, local execution, hosted jobs and installed acceptance |
+| Crate boundaries, GTK ownership, secret storage, cancellation and panic strategy | Accepted [ADRs](../decisions/README.md), `CLAUDE.md`, [architecture](../../ARCHITECTURE.md), actual manifests | External planning advice cannot override these. Resolve a code/ADR mismatch explicitly |
+| Delivery order and milestone acceptance | [Active 0.2 sprint](../bookie-0.2-sprint.md), with [B4 board](../b4-task-board.md) and B3 case ledgers | PLAN is the capability backlog/entry point; ROADMAP summarizes it. Archived phase checkboxes do not close newer gates |
+| A specific bug, native type or consumer contract | [Value contracts](../value-contracts.md), [B3 findings](b3-review-2026-10-01.md), retained evidence at its SHA | Match implementation fingerprint, selector, fixture and consumer scope. A nearby commit or test count is insufficient |
+| Test selection and execution ownership | [Validation playbook](../validation-playbook.md), [testing](../testing.md), executable layer catalog and workflows | Distinguish checked-in tests, local execution, hosted jobs and installed acceptance |
 | External bug-fix adoption | [Main review](upstream-main-review-2026-10-03.md), [older releases](upstream-older-releases-review-2026-10-03.md), [adoption matrix](upstream-adoption.md) | Release notes and subjects nominate reproductions. Existing Linux contracts decide implementation |
 | Release approval | Frozen-candidate acceptance in the sprint | Source versions, recipes, historic published packages and a green fixture do not promote 0.2 |
 

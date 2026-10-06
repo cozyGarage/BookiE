@@ -49,7 +49,7 @@ earlier passing tests remain attributable to their recorded revision.
 These are candidates, not confirmed defects or completed fixes. Recheck current
 source and reserve the relevant files/fixtures before taking a packet. Return
 initial behavior, a minimized failing case if found, exact source SHA and
-affected-layer results through the [validation playbook](validation-playbook.md).
+affected-layer results through the [validation playbook](../validation-playbook.md).
 
 ### O1: connection and namespace ownership through transitions
 

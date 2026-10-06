@@ -33,7 +33,7 @@ Shutdown must flush persistence and settle governed operations.
 
 Operational restoration steps belong in [storage](../storage.md) and
 [state management](../state-management.md), with the prior draft restoration
-procedure retained in [sprint history](../bookie-0.2-history.md#workspace-rollback-procedure).
+procedure retained in [sprint history](../archive/bookie-0.2-history.md#workspace-rollback-procedure).
 Installed upgrade/rollback remains sprint B7 acceptance.
 
 ## Rationale

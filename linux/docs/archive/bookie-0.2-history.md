@@ -3,8 +3,8 @@
 Archived 2026-10-03 from `0cf70382eed72c144ea94208dfef5f5706e0a7dd`. The original content below preserves
 dated decisions, commands, test counts and source evidence. Its words such as
 ‘current’, ‘next’ and ‘pending’ describe their original checkpoint.
-Use [the documentation entry point](README.md), [active sprint](bookie-0.2-sprint.md)
-and [the ADR index](decisions/README.md) for current instructions. Type/value rules
+Use [the documentation entry point](../README.md), [active sprint](../bookie-0.2-sprint.md)
+and [the ADR index](../decisions/README.md) for current instructions. Type/value rules
 are owned by ADR 0007; connection/session and persistence rules by ADRs 0008/0009.
 Read a relevant heading only; this archive is not mandatory agent startup context.
 
@@ -54,7 +54,7 @@ boundary now has a permanent regression and exact runnable selector. See the
 evidence and a finite contract board; the remaining native-type matrix and
 session reconnect follow-up stay open. Continue with one bounded
 engine/type/consumer case at a time using the
-[agent task template](validation-playbook.md#agent-task-template).
+[agent task template](../validation-playbook.md#agent-task-template).
 The clean LT-TRUNG full gate passed on `8e7766c`; the strict GTK+DuckDB
 values layer passed 190 tests across 11 suites, including 28 DuckDB contracts,
 on code commit `67f5857`. The runner reused 746 fresh artifacts and rebuilt
@@ -72,13 +72,13 @@ fold contract passes the focused unit/server checks, strict 190-test values run
 and local quick gate on the tested `b4fd0e7` worktree; Build `37039255022`,
 Security `37039255289` and Flatpak `37039255134` all passed. Validation reused
 all 747 Cargo artifacts. See the
-[validation playbook](validation-playbook.md#lt-trung-pre-push-gate) for the
+[validation playbook](../validation-playbook.md#lt-trung-pre-push-gate) for the
 repeatable local gate and retained reports.
 
 1. **B3:** finish the remaining value and consumer contracts, one reproducible case
    per task. Reuse the existing corpus, engine fixtures and change-contract runner.
 2. **B4:** finish the open transport, policy, daemon and GUI tasks on the
-   [task board](b4-task-board.md). A completed lane does not close the milestone.
+   [task board](../b4-task-board.md). A completed lane does not close the milestone.
 3. **Arch Linux / Omarchy / Hyprland / native Wayland UI:** verify the resulting
    connection, session, grid and editor workflows, then package/upgrade/rollback.
    The existing B5/B6 implementations enter through this acceptance pass.
@@ -122,7 +122,7 @@ VM setup is a prerequisite for current B3/B4 implementation or the Arch UI pass.
 Start with **B3-P1**, then take one bounded case from P2–P5. Split a packet by
 engine/type/consumer before handing it off. Preserve known text fallbacks and
 explicit refusals; do not equate refusal with completed exact support. The
-[type matrix](type-contract-strategy.md) and [value evidence](value-contracts.md)
+[type matrix](../type-contract-strategy.md) and [value evidence](../value-contracts.md)
 carry detailed native-type targets. Do not rebuild completed scalar/BSON/export work.
 
 | Packet | Scope / files to inspect | Deliverable and completion evidence |
@@ -156,7 +156,7 @@ The completed ClickHouse nested consumer follow-up added
 server test and strict 165-test, 11-suite value runner passed. Exact JSON/CSV
 matches the native `toJSONString` oracle; SQL literal, binding and grid edit
 refusals preserve the stored row. Other nested combinations remain open; see
-the [type matrix](type-contract-strategy.md#current-evidence-and-next-targets)
+the [type matrix](../type-contract-strategy.md#current-evidence-and-next-targets)
 and [value evidence](value-contract-history.md#clickhouse-nested-map-of-tuple-arrays-2026-10-01).
 
 Two further nested cases add tuple- and array-nested maps of nullable decimals,
@@ -315,7 +315,7 @@ received the in-flight `listCollections` command before cancellation, requires
 The focused Docker test passed. This distinguishes cancellation from server
 loss and confirms later operations remain available. The cross-driver loss,
 cancellation and recovery expectations are now indexed in
-[disconnect contracts](disconnection-contracts.md), with each case mapped to
+[disconnect contracts](../disconnection-contracts.md), with each case mapped to
 its automated runner. The sandbox layer passed in 65.12 seconds, including the
 standalone Redis cancellation test; evidence is linked from the matrix. B3
 remains open for native-type and consumer targets.
@@ -332,7 +332,7 @@ ordinary shared pool still recovers. The focused case, test harness and quick
 layer passed, followed by the full `drivers` layer: 225 tests across driver,
 MCP, socket and SSH suites, zero failures and zero ignored tests among executed
 tests. The generated ignored-test ledger was updated so this Docker test is
-explicitly registered. See [disconnect contracts](disconnection-contracts.md)
+explicitly registered. See [disconnect contracts](../disconnection-contracts.md)
 for the exact test and execution command. B3 remains open for the remaining
 native-type and consumer targets.
 
@@ -347,7 +347,7 @@ between statements and caught the timezone preflight returning a stale handle;
 that path now closes the connection too. The ignored-test inventory has been
 refreshed. The final full drivers layer passed 228 tests across the six drivers,
 MCP, socket and SSH suites, with zero failures or ignored tests among those
-executed. See [disconnect contracts](disconnection-contracts.md) for report and
+executed. See [disconnect contracts](../disconnection-contracts.md) for report and
 commands.
 
 ### B4 next order
@@ -375,8 +375,8 @@ MongoDB/function refactors; earlier lane passes do not verify the final tree.
 
 ### Arch / Omarchy / Wayland UI packets
 
-Use [the manual checklist](manual-verification-0.2-features.md) and the existing
-[Omarchy package guide](omarchy.md). Work on application widgets and resources;
+Use [the manual checklist](../manual-verification-0.2-features.md) and the existing
+[Omarchy package guide](../omarchy.md). Work on application widgets and resources;
 this plan does not request changes to the user's Hyprland or system configuration.
 
 | Packet | Scope | Acceptance |
@@ -463,7 +463,7 @@ and open gaps. Do not claim new runtime passes from inspecting test source.
 No GNOME/Debian VM setup, production-code edits, release, push or publication.
 ```
 
-For implementation packets, fill the [validation playbook task template](validation-playbook.md#agent-task-template)
+For implementation packets, fill the [validation playbook task template](../validation-playbook.md#agent-task-template)
 with the selected ID, allowed paths, initial SHA, narrow reproducer, runner layers
 and fixture ownership. Run the narrow regression first, then applicable `full`,
 `change-contracts`, `values`, `security-policy`, `ssh`, `tls`, `drivers`,
@@ -491,7 +491,7 @@ Upstream force-pushed its `linux` branch after this table was written, so the
 Upstream Linux pin no longer resolves and `807d28094` is no longer an ancestor of
 `origin/linux`. That pin's commit is now `f3cbf7361 fix(linux): rebuild the
 GSettings schema when it changes and cover SQLite in dev-env`. The
-[2026-09-19 re-survey](upstream-sync.md) re-establishes the boundary and lists
+[2026-09-19 re-survey](../upstream-sync.md) re-establishes the boundary and lists
 what is genuinely new.
 
 [Build Linux](https://github.com/cozyGarage/TablePro/actions/runs/34802088529)
@@ -560,13 +560,13 @@ client panics and parser DoS need 0.62.4 or newer.
 
 ## Upstream feature adoption, September 2026
 
-Eleven of the thirteen features the [2026-09-19 re-survey](upstream-sync.md) found
+Eleven of the thirteen features the [2026-09-19 re-survey](../upstream-sync.md) found
 missing are merged; the other two already existed here in a different shape. The work
 ran as five parallel worktree branches and is recorded in `CHANGELOG.md` under
 `[Unreleased]`.
 
 It is not verified. No new GTK surface has been rendered, so
-[manual-verification-0.2-features.md](manual-verification-0.2-features.md) is the gate
+[manual-verification-0.2-features.md](../manual-verification-0.2-features.md) is the gate
 between this and any release candidate. Current sequencing is B3, B4, then
 Arch/Omarchy Wayland acceptance, as recorded in the continuation plan above.
 
@@ -612,7 +612,7 @@ references, tests, and differences. Implementation and release verification diff
 - [ ] **B4 transport/sessions**: network/OpenSSH/session integration in GUI/daemon,
   policy/audit guarded. Dedicated editor sessions, cancellation, transaction ownership,
   terminal outcomes/retirement. No weaker auth/TLS fallback.
-  Open work is split into small tasks on the [B4 task board](b4-task-board.md).
+  Open work is split into small tasks on the [B4 task board](../b4-task-board.md).
 - [ ] **B5 editor/files**: shared-planner highlighting, existing shortcuts, GTK/GIO
   Open/Save/Save As, dirty prompts/external-change detection. Open creates a tab;
   atomic save rejects stale versions until reload/overwrite/Save As is selected.
@@ -674,7 +674,7 @@ uncommitted work as a resulting commit.
 | B7 | Fast, driver and isolated widget evidence available | Freeze a candidate, run missing security/optional/package tiers and retry-free Wayland soak; reconcile release evidence at that SHA |
 
 Continue B3 with one consumer contract at a time, then close B4–B6 acceptance
-against the implemented code. The [manual checklist](manual-verification-0.2-features.md)
+against the implemented code. The [manual checklist](../manual-verification-0.2-features.md)
 is still open; isolated widget tests do not check its boxes automatically.
 
 ### B3 precision and export review: 2026-09-26
@@ -771,7 +771,7 @@ The next regression checkpoint broadens the shared contract to mixed, repeated
 named bindings through all six SQL drivers. Two installed UI scenarios check
 exact committed values and cancellation/retry; parser, transport option/refusal
 and export write-failure regressions cover adjacent boundaries. Evidence and
-scope are recorded in [value contracts](value-contracts.md). B3 remains open.
+scope are recorded in [value contracts](../value-contracts.md). B3 remains open.
 
 The XML consumer checkpoint reproduces carriage-return normalization through an
 independent parser and silent replacement of unsupported characters. XML now
@@ -781,7 +781,7 @@ oracle tests cover the round trip and visible refusal; this does not close B3.
 
 ### B3 shared boundary contract and build reuse: 2026-09-26
 
-The [value-contract suite](value-contracts.md) uses one corpus across all eight
+The [value-contract suite](../value-contracts.md) uses one corpus across all eight
 drivers and the grid, filter, CSV import, named parameter, JSON and MCP paths.
 SQL engines exercise binding and literal export separately. Driver fixtures do
 not stand in for every server version or every native type.
@@ -996,7 +996,7 @@ backup bytes, but an installed-package rollback is still a release gate.
   SQLite linking landed, independent of the GNOME 50 question.
 - 2026-09-16/17: reviewed the macOS `main` branch's Swift test suite (~1,300
   files) for adoptable test cases against `linux`'s own logic, tracked in
-  [docs/testing.md](testing.md)'s "Upstream test-suite parity" section.
+  [docs/testing.md](../testing.md)'s "Upstream test-suite parity" section.
   Ported 5 items — SSH (host-key/socket-path/connect-error edge cases),
   cell/value display (binary edge cases; surfaced but did not fix an
   `is_cell_editable` type-affinity gap needing GTK visual verification), row
@@ -1165,7 +1165,7 @@ isolated-test inventory passed. Debian package fixture could not run because
   on 2026-09-18 and closed without the changes the note assumed: the
   workspace writer merges per-connection entries under a file lock and is
   not a `StateFile<T>` duplicate (see
-  [state management](state-management.md)), and the comments record
+  [state management](../state-management.md)), and the comments record
   external parser and engine behaviour, which the repository rule now
   allows explicitly. No release was tagged or built in this pass;
   A5 and B3–B7 remain open as tracked above.
@@ -1330,7 +1330,7 @@ isolated-test inventory passed. Debian package fixture could not run because
   `ColumnView` bind cycle; this environment has no `xvfb-run`, so the test is
   confirmed to compile but not yet confirmed to fail pre-fix and pass
   post-fix on a real display. See
-  [manual-verification-0.2-features.md](manual-verification-0.2-features.md)
+  [manual-verification-0.2-features.md](../manual-verification-0.2-features.md)
   for the manual check.
   Not covered by this fix, tracked separately: `sql_literal.rs` renders any
   `Value::Bytes` as `/* bytes omitted */ NULL` in SQL export and copied
@@ -1370,7 +1370,7 @@ DuckDB date/time/timestamp and enum results no longer expose implementation debu
 
 ### B3 PostgreSQL interval and temporal-array checkpoint — September 27
 
-PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](type-contract-strategy.md) for remaining per-driver targets; B3 remains open and Oracle stays deferred.
+PostgreSQL interval tests now compare independent native fields across 59 deterministic boundary/generated cases and all four IntervalStyle settings. Extreme-hour exports and ambiguous mixed signs are fixed. Date/timestamp infinities and date/time/timetz/timestamp/timestamptz/interval array elements now preserve their values through native wire comparisons, bound parameters, SQL INSERT and JSON checks, including non-UTC session imports. Malformed element payloads and unsupported calendar ranges remain explicit refusals. See the [type-contract strategy](../type-contract-strategy.md) for remaining per-driver targets; B3 remains open and Oracle stays deferred.
 
 ### B3 MySQL native temporal checkpoint — September 27
 
@@ -1632,7 +1632,7 @@ nine prior survivors. The one remaining survivor changed into a timeout when
 the expanded test exercised its non-advancing exponent scanner. The final
 in-place run had 8 caught, 3 scanner-stall timeouts and no survivors or
 unviable mutants. The timeout bound prevented a hang. The parser regression,
-report paths and exact follow-up command are in [value contracts](value-contracts.md).
+report paths and exact follow-up command are in [value contracts](../value-contracts.md).
 
 B3 remains open for the remaining driver/type and consumer targets.
 
@@ -2198,7 +2198,7 @@ The disconnect audit reran the full `drivers` layer at clean commit
 failures and zero ignored executed tests in 969.9 seconds. All six remote
 drivers exercised established loss and reconnect/refusal distinctions; the
 per-driver mid-stream and cancellation expectations are recorded in
-[disconnect contracts](disconnection-contracts.md).
+[disconnect contracts](../disconnection-contracts.md).
 
 The same audit found that PostgreSQL's static array cast allowlist had only one
 end-to-end typed CSV INSERT test. A new live-server contract now covers all 20

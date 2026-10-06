@@ -15,7 +15,7 @@ release.
 Linux status values in this file come from source and grep checks. Every GUI
 flow still lacks installed acceptance in
 [manual verification](manual-verification-0.2-features.md). The
-[September adoption matrix](upstream-adoption.md) is partly stale: Jump to
+[September adoption matrix](archive/upstream-adoption.md) is partly stale: Jump to
 Column and XLSX export now exist.
 
 Paths below are relative to `linux/crates/app/src` unless stated.

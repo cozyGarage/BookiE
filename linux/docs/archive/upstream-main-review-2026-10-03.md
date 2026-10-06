@@ -25,10 +25,10 @@ The [older app-release follow-up](upstream-older-releases-review-2026-10-03.md) 
   GTK reproduction. Existing test names describe checked-in coverage, not tests
   executed in this review.
 
-Continue the [0.2 sprint](bookie-0.2-sprint.md) and
-[B4 board](b4-task-board.md). These packets refine their correctness work;
+Continue the [0.2 sprint](../bookie-0.2-sprint.md) and
+[B4 board](../b4-task-board.md). These packets refine their correctness work;
 they do not close B3/B4 or authorize a release. Read `CLAUDE.md` and the
-[validation playbook](validation-playbook.md) before implementation. Recheck
+[validation playbook](../validation-playbook.md) before implementation. Recheck
 the current branch and task ownership before editing.
 
 ## Work packets
@@ -161,7 +161,7 @@ Continuation at `aeac107a4`: `fetch_columns` now scans the collection and
 marks conflicting kinds `mixed`; native driver/app cases cover the named late
 Decimal128 fixture. The sample-only description below is the original review
 baseline. Whole-export scope, census cost and concurrent writes remain open in
-[the B3 board](type-contract-strategy.md), not a request to add another census.
+[the B3 board](../type-contract-strategy.md), not a request to add another census.
 
 Reference: [#3213](https://github.com/TableProApp/TablePro/commit/0ff3508258).
 Upstream builds its export header from a census of the selected source rather

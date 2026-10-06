@@ -3,8 +3,8 @@
 Archived 2026-10-03 from `0cf70382eed72c144ea94208dfef5f5706e0a7dd`. The original content below preserves
 dated decisions, commands, test counts and source evidence. Its words such as
 ‘current’, ‘next’ and ‘pending’ describe their original checkpoint.
-Use [the documentation entry point](README.md), [active sprint](bookie-0.2-sprint.md)
-and [the ADR index](decisions/README.md) for current instructions. Type/value rules
+Use [the documentation entry point](../README.md), [active sprint](../bookie-0.2-sprint.md)
+and [the ADR index](../decisions/README.md) for current instructions. Type/value rules
 are owned by ADR 0007; connection/session and persistence rules by ADRs 0008/0009.
 Read a relevant heading only; this archive is not mandatory agent startup context.
 
@@ -73,7 +73,7 @@ verify the fixture before using it as an oracle.
 ## Current evidence and next targets
 
 This is a prioritization ledger, not an exhaustive inventory of all crate tests.
-Detailed checkpoint evidence is in [value contracts](value-contracts.md).
+Detailed checkpoint evidence is in [value contracts](../value-contracts.md).
 
 | Driver | Evidence established by the B3 contract suite | Remaining native-type targets |
 | --- | --- | --- |
@@ -208,7 +208,7 @@ in-place retry exposed two equivalent Redis predicates, which were simplified
 before the final run. ClickHouse caught 4/5 mutants, with one unviable and none
 missed or timed out; the first run's missed connect-error distinction gained a
 regression before the final run. MySQL and MongoDB disconnect mapper mutation
-evidence is recorded in [value contracts](value-contracts.md).
+evidence is recorded in [value contracts](../value-contracts.md).
 
 PostgreSQL and MySQL have Docker regressions that terminate a slow query after
 row production has begun; each whole query must fail as `Disconnected`, never
@@ -228,7 +228,7 @@ cancellation separately: the held-open socket yields
 `OperationOutcomeUnknown(Cancelled)`, not `Disconnected`. PostgreSQL, MySQL,
 ClickHouse, Redis and SQL Server retain their distinct cancellation and
 post-cancellation connection policies. The tested expectations and runner
-ownership are consolidated in [disconnect contracts](disconnection-contracts.md).
+ownership are consolidated in [disconnect contracts](../disconnection-contracts.md).
 Native-type and consumer targets in this matrix remain open. Passing the
 server-loss and explicit reconnect cases does not close those other gaps.
 
@@ -237,7 +237,7 @@ The MongoDB cancellation cell now has a Docker regression: `currentOp` confirms
 `OperationOutcomeUnknown(Cancelled)`, and the same client successfully performs
 a later collection listing. This completes the consolidated disconnect and
 cancellation index; its per-driver test ownership and remaining post-cancellation
-limits are in [disconnect contracts](disconnection-contracts.md). Native-type
+limits are in [disconnect contracts](../disconnection-contracts.md). Native-type
 and consumer targets in this type matrix remain open.
 
 The strict combined values layer also passed against source SHA `636584f` on
@@ -289,7 +289,7 @@ the stored row unchanged. More nested temporal, decimal and collection
 combinations remain untested. Its scoped decoder mutation run caught 9 of 10
 generated changes; one was compile-time unviable, with no survivors or
 timeouts. The strict 163-test value run and quick layer passed on the working
-tree; details are in [value contracts](value-contracts.md).
+tree; details are in [value contracts](../value-contracts.md).
 
 An October 6 ClickHouse 24.8 follow-up adds
 `Map(UInt8, Array(Tuple(String, Nullable(UInt128))))` to the nested consumer
@@ -297,14 +297,14 @@ matrix. The native type/JSON oracle includes a UInt128 above `u64::MAX`, a NULL
 tuple field and an empty nested array; JSON/CSV retain the oracle value, while
 SQL literals, parameter binding and keyed edits refuse without changing the
 stored row. The focused case and all 33 ClickHouse integration tests passed
-([evidence](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
+([evidence](../evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
 
 The October 6 XLSX follow-up checks all 16 nested shapes from the same Docker
 contract. Each result is written as an XLSX text cell and its shared-string
 entry equals ClickHouse's native `toJSONString()` oracle; type-less write
 refusals remain unchanged. The focused contract and full 33-test ClickHouse
 integration suite passed
-([evidence](evidence/clickhouse-nested-xlsx-consumers-2026-10-06/manifest.json)).
+([evidence](../evidence/clickhouse-nested-xlsx-consumers-2026-10-06/manifest.json)).
 
 Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
@@ -326,7 +326,7 @@ in [value contracts](value-contract-history.md#mongodb-nested-bson-and-native-bo
 | MongoDB nested BSON / grid, JSON, CSV, XLSX, MCP | Existing integration cases cover nested values and Timestamp/regex/MinKey/MaxKey/JavaScriptCode/JavaScriptCodeWithScope/Symbol/Undefined/DbPointer top-level edits plus canonical Extended JSON preservation across these consumers. The CodeWithScope edit verifies native code and Int64 scope fields; standalone JavaScriptCode, Symbol, Undefined and DbPointer edits verify native BSON kinds. A new Docker-backed app contract parses and saves a whole nested document through the keyed-update path, then checks exact Int64, Decimal128 and ObjectId kinds, the stable row key and untouched sibling. Page metadata combines the first-50 sample with returned page rows. Homogeneous positive and negative Decimal128 values survive default CSV export, typed parsing (including removal of the formula-safety marker for a valid decimal), and keyed edit as native BSON Decimal128. Mixed BSON columns decode to canonical Extended JSON values; a Docker-backed mixed String/Decimal128 contract verifies distinct JSON values plus CSV and XLSX output, retains native stored kinds, and is read-only in the app grid. A separate ignored Docker-backed MCP `browse_table` contract first checks the seeded document through MongoDB's native BSON driver, then verifies exact Extended JSON markers for nested Decimal128, BSON DateTime, user binary subtype `80`, Int64 above 2^53, NULL and Unicode in the real MCP response. The focused MCP contract passed on the current baseline. BSON `int` grid edits now retain Int32 (rather than silently widening to Int64) and refuse overflow; `long` edits preserve Int64 including values above 2^53, with native server oracles. | Collection-wide heterogeneity outside the sampled and returned page remains unknown. Other top-level BSON kinds outside the named edit cases remain untested. |
 | SQLite NUMERIC affinity / parser, keyed grid save and import | The app parses `42.50` as Decimal, materializes the keyed edit, and SQLite stores the NUMERIC-affinity result as REAL `42.5`; driver contracts cover TEXT, BLOB, NULL, REAL and INTEGER transitions plus SQL-literal re-import | Installed GTK/package grid acceptance across the storage-class matrix remains open. |
 | ClickHouse Int128/UInt128 / result, SQL, JSON, CSV, XLSX and grid consumers | Local raw-token parser checks plus Docker-backed ClickHouse 24.8 tests prove Int128 signed minimum/maximum and UInt128 maximum remain exact `Value::Text` through results, text binding, SQL INSERT and CSV export/import both with formula sanitization disabled and default sanitization. The typed import removes the apostrophe marker only for valid Int128/UInt128 values in range; unit cases retain it for invalid, overflow, negative UInt128 and ordinary text. Keyed grid edits cover Int128 min/max and UInt128 zero/max adjacent values, with non-target row identity checked after each edit. JSON and XLSX writer contracts now check all three full-width values remain exact JSON strings and workbook shared-string cells. | Other value-consumer boundaries remain untested. |
-| JSON / floating point | Negative zero exports as numeric `-0.0`; parsing preserves its IEEE-754 sign bit and keeps positive zero and SQL NULL distinct. A deterministic matrix covers six explicit edge values, 65,536 raw finite-bit samples and 20,470 sign/exponent/mantissa boundary values (86,012 entries total) through CSV typed import and JSON export/parse with exact bit comparisons; the raw-bit sample excludes exponent-all-ones patterns. See [the retained finite-float evidence](evidence/finite-float-consumer-results-2026-10-04/manifest.json). Booleans remain JSON booleans and distinct from text `"true"`/`"false"` and SQL NULL. | Exhaustive finite-`f64` enumeration, spreadsheet-application re-import and broader temporal combinations remain open. |
+| JSON / floating point | Negative zero exports as numeric `-0.0`; parsing preserves its IEEE-754 sign bit and keeps positive zero and SQL NULL distinct. A deterministic matrix covers six explicit edge values, 65,536 raw finite-bit samples and 20,470 sign/exponent/mantissa boundary values (86,012 entries total) through CSV typed import and JSON export/parse with exact bit comparisons; the raw-bit sample excludes exponent-all-ones patterns. See [the retained finite-float evidence](../evidence/finite-float-consumer-results-2026-10-04/manifest.json). Booleans remain JSON booleans and distinct from text `"true"`/`"false"` and SQL NULL. | Exhaustive finite-`f64` enumeration, spreadsheet-application re-import and broader temporal combinations remain open. |
 | CSV / numeric, floating point, time zone and NULL | `BIGINT` CSV export/import preserves `i64::MIN`, `i64::MAX`, and `9007199254740993` exactly; typed `DECIMAL(10,4)` export/import preserves the `12.3000` trailing-zero scale; negative zero, the smallest positive subnormal, largest finite `f64`, six explicit edge values, 65,536 deterministic raw finite-bit samples and 20,470 deterministic sign/exponent/mantissa boundaries preserve IEEE-754 bits through CSV export, typed import and JSON export/parse (86,012 entries total); a nine-digit offset-origin `TIMESTAMP WITH TIME ZONE` produces identical canonical UTC text through CSV and JSON, then CSV typed import recovers the same instant; `NaN`, positive/negative infinity and NULL retain distinct float/null variants through CSV export/import | Exhaustive finite-`f64` enumeration, broader temporal combinations and spreadsheet-application import remain open. |
 | XLSX / wide numeric, temporal, nested BSON | Wide integers and exact decimals use text cells; temporal values use native cells only when exact, otherwise text; an offset-origin nine-digit `TIMESTAMP WITH TIME ZONE` is emitted as its exact canonical UTC instant; nested BSON markers are retained; Excel-safe finite floats remain numeric; negative zero, subnormals, values beyond 15 significant digits and out-of-range magnitudes use exact text cells, with workbook XML tests for both numeric boundaries | Spreadsheet-application re-import and remaining XLSX precision/format limitations remain per the checkpoint entries below. |
 
@@ -369,7 +369,7 @@ trailing spaces. Exported CSV parsing and typed import preserve both labels
 exactly; the native query checks their text, enum type, and sibling notes.
 The same case keeps empty-label versus SQL NULL ambiguity explicitly refused
 unless the CSV provides a NULL marker. See the
-[focused PostgreSQL evidence](evidence/postgres-enum-scalar-csv-whitespace-2026-10-06/manifest.json).
+[focused PostgreSQL evidence](../evidence/postgres-enum-scalar-csv-whitespace-2026-10-06/manifest.json).
 
 ## Test workflow
 
@@ -404,8 +404,8 @@ refusal boundary: non-null and empty arrays displayed as
 by `value_contract_citext_array_decodes_and_rebinds_exact_values` and
 `value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling`,
 which now cover result, parameter, grid and CSV round-trips against native wire
-oracles ([current evidence](evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json),
-[original refusal evidence](evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json)).
+oracles ([current evidence](../evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json),
+[original refusal evidence](../evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json)).
 
 ## PostgreSQL BIT and VARBIT arrays — 2026-10-06
 
@@ -418,10 +418,10 @@ zero-based lower bound. Native `array_to_json`, `pg_typeof`, and `array_send`
 values are compared after text-parameter rebinding and typed CSV restore. The
 built-in OID census includes BIT and VARBIT; remaining-unlisted array families
 continue to require visible refusal. See
-[evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
+[evidence](../evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
 
 The app grid contract now parses and writes `bit(5)[]` and `bit varying[]`
 through the fixed built-in casts. PostgreSQL 16 confirms edited types and
 `array_send` bytes match native literals for zero-based arrays, empty bit
 strings and SQL NULL elements. Malformed input returns SQLSTATE `22P02` and
-leaves the edited and sibling rows unchanged ([grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
+leaves the edited and sibling rows unchanged ([grid evidence](../evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
