@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-numeric-array-markup-exports",
+  "baseline_commit": "05e8c77452a3ade86a764665ca6a52271bb9772d",
+  "case": "PostgreSQL numeric[] exact text in XML, HTML, and Markdown exports",
+  "test": "array_contract::value_contract_numeric_array_file_exports_preserve_exact_text",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_numeric.rs",
+    "sha256": "8d55ac33fdac78a04093b66361b5a846c1b22522fc6b94699fc9d5c6a84e5d9b"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The numeric[] contains a 40-digit integer, a 30-digit fractional value, a scale-preserving 1.2300, NaN, positive and negative Infinity, and SQL NULL.",
+    "PostgreSQL native type, array text, array_to_json, and array_send oracles are checked; rebinding matches native JSON and wire bytes.",
+    "XML and HTML output preserve the complete array text with XML entities decoded by their format rules; Markdown output preserves its JSON-quoted array text with escaped backslashes.",
+    "Existing JSON, CSV, XLSX string-cell, and SQL replay checks continue to run in the same contract."
+  ],
+  "expected_driver_text": "{\"1234567890123456789012345678901234567890\",\"0.123456789012345678901234567891\",\"1.2300\",\"NaN\",\"Infinity\",\"-Infinity\",NULL}",
+  "validation": {
+    "command": "cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_numeric_array_file_exports_preserve_exact_text -- --include-ignored --exact --test-threads=1",
+    "result": "1 passed, 0 failed",
+    "log": "test.txt",
+    "cargo_fmt_check": "passed",
+    "diff_check": "passed"
+  },
+  "log_sha256": {
+    "test.txt": "07fdad6acdb6e331ffa3a6066404e3a66d53f8d519c7d7e377cffd2e06a1af77"
+  }
+}

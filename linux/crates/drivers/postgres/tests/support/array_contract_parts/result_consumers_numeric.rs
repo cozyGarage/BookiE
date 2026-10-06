@@ -93,6 +93,38 @@ async fn value_contract_numeric_array_file_exports_preserve_exact_text() {
     assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
     assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
 
+    for (extension, format) in [
+        ("xml", tablepro_core::export::ResultFormat::Xml),
+        ("html", tablepro_core::export::ResultFormat::Html),
+        ("md", tablepro_core::export::ResultFormat::Markdown),
+    ] {
+        let path = directory.path().join(format!("numeric-array.{extension}"));
+        tablepro_core::export::write_result_file(
+            &path,
+            &result,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &csv_options,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let output = std::fs::read_to_string(path).unwrap();
+        let expected = if extension == "md" {
+            serde_json::Value::String(driver_text.clone()).to_string().replace('\\', "&#92;")
+        } else {
+            driver_text
+                .replace('&', "&amp;")
+                .replace('<', "&lt;")
+                .replace('>', "&gt;")
+                .replace('"', "&quot;")
+                .replace('\'', "&apos;")
+        };
+        assert!(output.contains(&expected), "{extension}: {output}");
+    }
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("numeric-array.xlsx"));
