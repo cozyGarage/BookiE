@@ -52,6 +52,14 @@ class ChangeContractTests(unittest.TestCase):
         actions = CHECKER.select_actions(["crates/drivers/mysql/tests/integration.rs"], CHECKER.load_map())
         self.assertEqual(actions, [])
 
+    def test_exact_app_integration_regression_selects_only_its_test_target(self):
+        actions = CHECKER.select_actions(["crates/app/tests/stale_grid_update.rs"], CHECKER.load_map())
+        self.assertEqual(len(actions), 1)
+        self.assertEqual(actions[0]["target"], "--test=stale_grid_update")
+        self.assertEqual(actions[0]["required_tests"], [
+            "stale_sqlite_grid_update_rolls_back_the_batch_and_preserves_the_original_value"
+        ])
+
     def test_git_paths_are_normalized_to_the_linux_workspace(self):
         self.assertEqual(CHECKER.workspace_relative("linux/crates/core/src/query.rs", "linux/"),
                          "crates/core/src/query.rs")
