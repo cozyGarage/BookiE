@@ -159,10 +159,29 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
 | PERF-1 | PostgreSQL capped result about 12% slower, 58% lower RSS | OPEN | Profile release binaries | manual |
 | PERF-2 | Arbitrary results are materialized up to three caps (1M rows, 10M cells, 64 MiB estimated bytes), not streamed | OPEN | Baseline 2026-10-07 below: the byte cap binds first; GUI memory is about 2.5x the driver result; no streaming yet | driver-docker |
+| PERF-7 | The grid deep-clones every result row into its own GObject up front (`grid/mod.rs`), so a 100k-row result holds the rows twice plus one object per row: about 150 MB over idle against 61 MB for the driver result | OPEN | A lazy `GListModel` over the shared result that builds row objects only for visible rows; draft rows and edits kept in a small overlay. Target: at least 50% less memory at 100k rows, measured with `profile-baseline.sh`. Touches `grid/mod.rs`, `grid/column.rs`, `browse_tab/grid_render.rs` (all downcast to `ListStore`), so schedule with B3 | gtk-widget + profile |
+| PERF-8 | Editor results are materialized in one go up to the caps; dbx pages 100 rows by default and appends more through a server-side cursor session on scroll | OPEN | Cursor-style progressive loading for editor queries: classify and audit once at open, bounded pages, cancel reaches the server. Needs a core design and an ADR note | driver-docker |
+| PERF-9 | Hidden columns are still selected and transferred (dbx drops them from the query) | OPEN | Part of UI-14b: remove hidden non-key columns from the browse SELECT | unit + driver-docker |
+| PERF-10 | Long cell values are shipped whole to the grid (dbx sends a preview with the byte count and fetches the full value on demand) | OPEN | Preview plus on-demand full value through View Value, behind the guard | driver-docker |
 | PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | OPEN | Measure on real GPU rendering and with fewer drivers; see baseline below | manual |
 | PERF-6 | Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols); largest crates are `tablepro_app`, `std`, `mongodb`, `sqlparser`, `zbus` | OPEN | Decide on stripping and the MongoDB cost | manual |
 | PERF-3 | MongoDB census cost per browse not measured | OPEN | | driver-docker |
 | PERF-4 | Timing shows elapsed only, never server time | OPEN | With UI-20 | driver-docker |
+
+### What the reference client does differently
+
+Read from dbx at `d9338d1` (a Tauri and Vue app over a Rust core), source only;
+none of it was run. Its speed comes from holding and drawing less:
+
+- pages of 100 rows by default, a 10,000-row fetch ceiling, and more rows
+  appended through a server-side cursor session as the user scrolls;
+- result rows marked raw (`markRaw`), so no per-row reactive objects exist;
+- truncated cell previews with the full value fetched on demand, and hidden
+  columns left out of the query;
+- a canvas renderer with a fixed row height that paints only visible cells.
+
+Our grid has the same virtualization (`GtkColumnView`), but wraps each row in a
+GObject cloned from the result. PERF-7 to PERF-10 apply the same restraint.
 
 ### Performance baseline, 2026-10-07
 
