@@ -39,6 +39,10 @@ pub fn canonical_decimal128_text(text: &str) -> Result<String, DriverError> {
 
 #[async_trait]
 impl DatabaseDriver for MongodbDriver {
+    fn supports_database_listing(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "mongodb"
     }
@@ -200,6 +204,13 @@ impl MongodbConnection {
 
 #[async_trait]
 impl Connection for MongodbConnection {
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        let mut names = self.client.list_database_names().await.map_err(map_mongo_error)?;
+        names.retain(|name| !matches!(name.as_str(), "admin" | "local" | "config"));
+        names.sort();
+        Ok(names)
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let names = self.db().list_collection_names().await.map_err(map_mongo_error)?;
         let mut tables: Vec<TableInfo> = names

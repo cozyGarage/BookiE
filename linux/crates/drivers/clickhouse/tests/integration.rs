@@ -1190,3 +1190,16 @@ async fn datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal() {
         .expect("the same whole-second value has an exact lower-scale literal");
     assert_eq!(literal, "toDateTime64('2262-04-12 00:00:00', 0)");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn list_databases_returns_user_databases_and_hides_system_ones() {
+    let (_c, opts) = start_clickhouse().await;
+    let conn = connect(opts).await;
+    conn.execute("CREATE DATABASE alpha_db").await.unwrap();
+
+    let names = conn.list_databases().await.unwrap();
+
+    assert!(names.contains(&"alpha_db".to_string()), "{names:?}");
+    assert!(!names.contains(&"system".to_string()), "{names:?}");
+}

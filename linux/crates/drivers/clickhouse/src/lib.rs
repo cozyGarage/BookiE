@@ -41,6 +41,10 @@ pub struct ClickhouseDriver;
 
 #[async_trait]
 impl DatabaseDriver for ClickhouseDriver {
+    fn supports_database_listing(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         DRIVER_ID
     }
@@ -152,6 +156,25 @@ impl ClickhouseConnection {
 
 #[async_trait]
 impl Connection for ClickhouseConnection {
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        #[derive(Debug, Deserialize, clickhouse::Row)]
+        struct NameRow {
+            name: String,
+        }
+
+        let rows = self
+            .client
+            .query(
+                "SELECT name FROM system.databases
+                 WHERE name NOT IN ('system', 'information_schema', 'INFORMATION_SCHEMA')
+                 ORDER BY name",
+            )
+            .fetch_all::<NameRow>()
+            .await
+            .map_err(map_clickhouse_error)?;
+        Ok(rows.into_iter().map(|row| row.name).collect())
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         #[derive(Debug, Deserialize, clickhouse::Row)]
         struct Row {

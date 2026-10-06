@@ -362,6 +362,37 @@ async fn list_views_records_a_governed_read_outcome() {
 }
 
 #[tokio::test]
+async fn list_databases_is_a_governed_read_with_its_own_audit_record() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = PolicyGuard::new(
+        connection(Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            audit.clone(),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .list_databases()
+        .await
+        .expect_err("the stub driver lists no databases");
+    assert!(matches!(error, DriverError::Unsupported(_)), "{error}");
+
+    let events = audit.events.lock().expect("event lock");
+    let expected_hash = hex::encode(sha2::Sha256::digest(b"LIST DATABASES"));
+    assert!(
+        events
+            .iter()
+            .any(|event| event.decision_rule == "metadata_read" && event.sql_hash == expected_hash),
+        "list_databases must write a metadata audit record"
+    );
+}
+
+#[tokio::test]
 async fn list_objects_reports_an_unsupported_kind_and_audits_the_read_with_its_target() {
     let audit = Arc::new(SequenceAuditSink::new(vec![]));
     let guard = PolicyGuard::new(

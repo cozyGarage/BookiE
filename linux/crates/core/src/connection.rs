@@ -112,6 +112,9 @@ impl Default for ConnectOptions {
 
 #[async_trait]
 pub trait Connection: Send + Sync {
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        Err(DriverError::Unsupported("listing databases".into()))
+    }
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError>;
     async fn list_tables_controlled(&self, control: &OperationControl) -> Result<Vec<TableInfo>, DriverError> {
         run_controlled(self.list_tables(), control).await
