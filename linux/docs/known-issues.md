@@ -37,7 +37,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-7 | ~~Editor has no find or replace~~ | DONE | PR #87, `find_bar` widget test | gtk-widget |
 | UI-7b | ~~Find has no case or regex toggle~~ | DONE | `find_bar` widget test covers match case and regex | gtk-widget |
 | UI-8 | ~~Second launch exits silently~~ | DONE | PR #87, verified with D-Bus on the runner | gtk-installed |
-| UI-8b | Second launch logs a GLib "did not unregister" warning | OPEN | Cosmetic | manual |
+| UI-8b | ~~Second launch logged a GLib "did not unregister" warning~~ | DONE | Second launch runs through `Application::run`; scenario `a_second_launch_raises_the_window_and_exits_cleanly` | gtk-installed |
 | UI-9 | ~~No read-only viewer for long, JSON or binary cell values~~ | DONE | PR #91, `value_viewer` tests | unit + gtk-widget |
 | UI-9b | No row inspector side pane | OPEN | `AdwOverlaySplitView` trailing pane | gtk-widget |
 | UI-27 | ~~Editable result cells opened two menus on right-click~~ | DONE | Capture-phase gesture; end-to-end scenarios `view_value_*` and `columns_dialog_*` | gtk-installed |
@@ -88,7 +88,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | | driver-docker |
 | B4-18 | Connect and Test Connection read tables on a raw connection before hand-out, with no audit record | OPEN | A decision for ADR 0008, not a bypass | sandbox |
 | B4-19 | Hostile-server fixtures: real short or non-ASCII SCRAM nonces and excessive iterations | OPEN | Source-string tests only today | driver-docker |
-| B4-20 | Credential rotation during connect: fingerprint and assembly load material separately | OPEN | Race test | sandbox |
+| B4-20 | ~~Credential rotation during connect: fingerprint and assembly load material separately~~ | DONE | Daemon: `a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest` and `a_material_lookup_failure_*` tests; the GUI reconnect reuses the options captured at connect, so it has no second lookup | sandbox |
 | B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | | driver-docker |
 | B4-22 | Bundle export and import write no audit entries | OPEN | Needs an admin-event class ADR | sandbox |
 
