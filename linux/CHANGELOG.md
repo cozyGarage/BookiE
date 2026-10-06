@@ -39,6 +39,7 @@
 
 ### Changed
 
+- Large results use about 45% less memory in the grid because rows are built only when they scroll into view.
 - The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]`, `macaddr8[]`, `inet[]` and `cidr[]` result, typed binding, keyed update and CSV round-trip contracts; other array families remain open.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.
 - The documentation link checker skips generated packaged Markdown and keeps checking source documents.
@@ -74,7 +75,17 @@
 - Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
 - If the app is killed or crashes while using the system OpenSSH client, its ssh master process now exits with it instead of continuing to run in the background until the next launch.
 
+### Security
+
+- Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
+
 ## [0.1.5] - 2026-09-27
+- Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
+- The Debian package now includes the SSH password helper that the system OpenSSH client needs.
+- A lost connection stops reconnecting when the password, TLS setting or configuration is wrong and says why, instead of retrying forever.
+- SQL completion no longer mixes up the columns of tables that share a name in different schemas.
+- In the headless agent, a write interrupted on one connection no longer blocks governed writes on every other connection until restart.
+- The headless agent now replaces a cached connection after a driver panic or an unusable-connection fault instead of reusing it because its health check still answers.
 
 ### Added
 

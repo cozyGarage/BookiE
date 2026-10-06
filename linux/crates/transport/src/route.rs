@@ -81,6 +81,11 @@ pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<O
 }
 
 pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, TransportError> {
+    build_openssh_config(config, running_in_flatpak())
+}
+
+fn build_openssh_config(config: &SshConfig, sandboxed: bool) -> Result<OpenSshConfig, TransportError> {
+    ensure_system_ssh_available(sandboxed)?;
     let destination = SshDestination::new(&config.host, Some(config.port), Some(config.username.clone()))
         .map_err(|error| TransportError::Ssh(error.to_string()))?;
     let auth = match &config.auth {
@@ -268,5 +273,52 @@ exec sleep 300
             leftovers.is_empty(),
             "the master directory must be removed: {leftovers:?}"
         );
+    }
+}
+
+fn running_in_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some() || std::path::Path::new("/.flatpak-info").exists()
+}
+
+fn ensure_system_ssh_available(sandboxed: bool) -> Result<(), TransportError> {
+    if sandboxed {
+        return Err(TransportError::SystemSshUnavailableInSandbox);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod sandbox_tests {
+    use super::*;
+
+    #[test]
+    fn the_system_client_is_refused_only_inside_the_sandbox() {
+        assert!(matches!(
+            ensure_system_ssh_available(true),
+            Err(TransportError::SystemSshUnavailableInSandbox)
+        ));
+        assert!(ensure_system_ssh_available(false).is_ok());
+    }
+
+    #[test]
+    fn building_a_system_ssh_route_inside_the_sandbox_is_refused_before_any_process_starts() {
+        let config = SshConfig {
+            host: "bastion.example".into(),
+            port: 22,
+            username: "me".into(),
+            auth: SshAuth::Agent,
+        };
+        assert!(matches!(
+            build_openssh_config(&config, true),
+            Err(TransportError::SystemSshUnavailableInSandbox)
+        ));
+        assert!(build_openssh_config(&config, false).is_ok());
+    }
+
+    #[test]
+    fn the_refusal_names_the_remedy() {
+        let message = TransportError::SystemSshUnavailableInSandbox.to_string();
+        assert!(message.contains("Flatpak"), "{message}");
+        assert!(message.contains("built-in SSH client"), "{message}");
     }
 }

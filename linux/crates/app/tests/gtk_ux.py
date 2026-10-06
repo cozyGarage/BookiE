@@ -197,6 +197,62 @@ def scenarios(ui):
         finally:
             server.close()
 
+    def app_memory_kb():
+        import glob
+        for status in glob.glob("/proc/[0-9]*/status"):
+            try:
+                executable = os.readlink(status.replace("status", "exe"))
+                text = open(status).read()
+            except OSError:
+                continue
+            if not executable.endswith("/usr/bin/tablepro"):
+                continue
+            fields = dict(line.split(":", 1) for line in text.splitlines() if ":" in line)
+            return int(fields["VmRSS"].split()[0]), int(fields["VmHWM"].split()[0])
+        raise AssertionError("application process not found")
+
+    def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
+        import glob
+        import subprocess
+        for status in glob.glob("/proc/[0-9]*/status"):
+            try:
+                executable = os.readlink(status.replace("status", "exe"))
+                raw_environment = open(status.replace("status", "environ"), "rb").read()
+            except OSError:
+                continue
+            if executable.endswith("/usr/bin/tablepro"):
+                break
+        else:
+            raise AssertionError("application process not found")
+        environment = dict(item.split("=", 1) for item in raw_environment.decode().split("\0") if "=" in item)
+        result = subprocess.run([executable], env=environment, capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, (result.returncode, result.stderr)
+        assert "did not unregister" not in result.stderr, result.stderr
+        assert "asked it to show its window" in result.stderr, result.stderr
+        ui.wait_for_frame_containing(" — BookiE")
+
+    def profile_large_result_in_the_grid(database, base):
+        rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
+        sql = (
+            f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
+            "SELECT x, 'person-' || x, x * 1.5, x % 2, datetime('2026-01-01', '+' || (x % 100000) || ' seconds'), "
+            "'a note of moderate length for row ' || x || ' to give text columns some weight' FROM c"
+        )
+        before_rss, _ = app_memory_kb()
+        started = time.monotonic()
+        ui.run_sql(sql)
+        ui.wait_for_node_containing("done in", timeout=300)
+        shown = time.monotonic() - started
+        time.sleep(3)
+        after_rss, peak = app_memory_kb()
+        line = json.dumps({
+            "rows_requested": rows, "seconds_to_result": round(shown, 2),
+            "rss_before_mb": round(before_rss / 1024, 1), "rss_after_mb": round(after_rss / 1024, 1),
+            "peak_mb": round(peak / 1024, 1),
+        })
+        with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:
+            out.write(line + "\n")
+
     def find_bar_replaces_every_match_in_the_editor(database, base):
         ui.set_editor_text("select a, a from t where a = 1")
         time.sleep(0.3)
@@ -364,7 +420,10 @@ def scenarios(ui):
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
         connect_dialog_cancel_stops_a_hanging_connection,
+        a_second_launch_raises_the_window_and_exits_cleanly,
     ]
+    if os.environ.get("TABLEPRO_PROFILE_ROWS"):
+        result.append(profile_large_result_in_the_grid)
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):

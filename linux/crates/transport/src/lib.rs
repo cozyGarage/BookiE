@@ -20,6 +20,10 @@ const DATABASE_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 pub enum TransportError {
     #[error("ssh: {0}")]
     Ssh(String),
+    #[error(
+        "the system OpenSSH client is not available inside the Flatpak sandbox; switch this connection to the built-in SSH client"
+    )]
+    SystemSshUnavailableInSandbox,
     #[error("{0}")]
     Secret(String),
     #[error("{0}")]

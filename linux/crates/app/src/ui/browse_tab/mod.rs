@@ -125,7 +125,7 @@ pub struct BrowseTab {
     /// `current_columns`. Drives the cell value picker; empty for a
     /// driver that doesn't report foreign keys or a table with none.
     foreign_keys: Vec<ForeignKeyInfo>,
-    current_result: Option<QueryResult>,
+    current_result: Option<std::sync::Arc<QueryResult>>,
     /// Last row's primary-key values from the most recent page. Used
     /// for keyset seek when offset exceeds `KEYSET_OFFSET_THRESHOLD`.
     keyset_cursor: Option<Vec<tablepro_core::Value>>,
@@ -432,7 +432,7 @@ use value_parse::*;
 
 impl BrowseTab {
     pub fn snapshot(&self) -> Option<QueryResult> {
-        self.current_result.clone()
+        self.current_result.as_deref().cloned()
     }
 
     /// Cell values for the row at `position` in the live grid, which
@@ -963,7 +963,7 @@ impl SimpleComponent for BrowseTab {
                 }
                 self.current_columns = columns_for_browse_page(&self.driver_id, &self.current_columns, Some(&result));
                 self.keyset_cursor = extract_keyset_cursor(&self.current_columns, &result);
-                self.current_result = Some(result);
+                self.current_result = Some(std::sync::Arc::new(result));
                 // Defer rendering until columns are also loaded — the
                 // QueryResult's ColumnInfo lacks `primary_key` /
                 // `is_generated` / `is_auto_increment`, so rendering
@@ -974,7 +974,7 @@ impl SimpleComponent for BrowseTab {
                 self.render_grid_if_ready(sender);
             }
             BrowseTabInput::ColumnsLoaded(columns) => {
-                let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_ref());
+                let columns = columns_for_browse_page(&self.driver_id, &columns, self.current_result.as_deref());
                 let words: Vec<String> = columns.iter().map(|c| c.name.clone()).collect();
                 self.current_columns = columns.clone();
                 // Late-arriving columns: if RowsLoaded already cached a
@@ -982,7 +982,7 @@ impl SimpleComponent for BrowseTab {
                 // driver derives it from the first row), refill it now
                 // so the upcoming `render_grid_if_ready` builds headers
                 // against the real schema instead of an empty list.
-                if let Some(result) = self.current_result.as_mut()
+                if let Some(result) = self.current_result.as_mut().map(std::sync::Arc::make_mut)
                     && result.columns.is_empty()
                 {
                     result.columns = columns.clone();

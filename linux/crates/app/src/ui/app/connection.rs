@@ -747,6 +747,13 @@ impl App {
                 );
                 self.reconnect_banner.set_revealed(true);
             }
+            Some(ConnectionHealth::Failed { reason }) => {
+                self.reconnect_banner.set_title(
+                    &crate::tr!("Connection lost and cannot be restored: {reason}. Reopen the connection to retry.")
+                        .replace("{reason}", &reason),
+                );
+                self.reconnect_banner.set_revealed(true);
+            }
             _ => self.reconnect_banner.set_revealed(false),
         }
     }

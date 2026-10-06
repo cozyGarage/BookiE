@@ -828,3 +828,62 @@ async fn a_disconnected_write_reports_the_connection_as_unusable_without_a_panic
 
     assert_eq!(reports.load(Ordering::SeqCst), 1);
 }
+
+#[derive(Clone, Default)]
+struct CapturedLogs(Arc<Mutex<Vec<u8>>>);
+
+impl std::io::Write for CapturedLogs {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().expect("log lock").extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'writer> tracing_subscriber::fmt::MakeWriter<'writer> for CapturedLogs {
+    type Writer = CapturedLogs;
+
+    fn make_writer(&'writer self) -> Self::Writer {
+        self.clone()
+    }
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
+    let logs = CapturedLogs::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(logs.clone())
+        .with_max_level(tracing::Level::TRACE)
+        .finish();
+    let _scope = tracing::subscriber::set_default(subscriber);
+    let guard = PolicyGuard::new(
+        Arc::new(PanickingConn),
+        context(
+            Principal::human_gui(),
+            Environment::Local,
+            PolicyConfig::default(),
+            Arc::new(AutoApproveSink),
+            Arc::new(SequenceAuditSink::new(vec![])),
+            Arc::new(AuditState::new()),
+        ),
+    );
+
+    let error = guard
+        .list_tables()
+        .await
+        .expect_err("a panicking driver must surface as an error");
+
+    let logged = String::from_utf8(logs.0.lock().expect("log lock").clone()).expect("utf-8 logs");
+    assert!(
+        logged.contains("driver panicked"),
+        "the panic is still reported: {logged}"
+    );
+    assert!(
+        !logged.contains("codec read past the end of the buffer"),
+        "the panic message must not be logged: {logged}"
+    );
+    assert!(!error.to_string().contains("codec read past the end of the buffer"));
+}

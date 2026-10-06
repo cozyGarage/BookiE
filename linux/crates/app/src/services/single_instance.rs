@@ -94,6 +94,6 @@ pub fn raise_running_instance(app_id: &str) {
         tracing::info!("another BookiE instance is running and could not be reached over D-Bus; exiting");
         return;
     }
-    app.activate();
     tracing::info!("another BookiE instance is running; asked it to show its window");
+    app.run_with_args::<&str>(&[]);
 }

@@ -34,6 +34,7 @@ for required in \
   usr/bin/bookie-agentd \
   usr/bin/tablepro \
   usr/bin/tablepro-agentd \
+  usr/bin/tablepro-askpass \
   usr/share/applications/com.tablepro.linux.desktop \
   usr/share/metainfo/com.tablepro.linux.metainfo.xml \
   usr/share/icons/hicolor/scalable/apps/com.tablepro.linux.svg \

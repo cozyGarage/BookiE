@@ -55,11 +55,19 @@ impl SchemaIndex {
 
     pub fn columns_for(&self, table: &str) -> Option<&Vec<String>> {
         let key = table_key(table);
-        self.columns.get(&key)
+        if let Some(columns) = self.columns.get(&key) {
+            return Some(columns);
+        }
+        if key.contains('.') {
+            return None;
+        }
+        let mut matches = self.columns.iter().filter(|(known, _)| bare_name(known) == key);
+        let (_, columns) = matches.next()?;
+        matches.next().is_none().then_some(columns)
     }
 
     pub fn knows_columns(&self, table: &str) -> bool {
-        self.columns.contains_key(&table_key(table))
+        self.columns_for(table).is_some()
     }
 
     pub fn set_columns(&mut self, table: &str, columns: Vec<String>) {
@@ -76,11 +84,17 @@ pub enum Scope {
 
 pub fn table_key(table: &str) -> String {
     table
-        .rsplit('.')
-        .next()
-        .unwrap_or(table)
-        .trim_matches(|c| c == '"' || c == '`' || c == '[' || c == ']')
-        .to_ascii_lowercase()
+        .split('.')
+        .map(|part| {
+            part.trim_matches(|c| c == '"' || c == '`' || c == '[' || c == ']')
+                .to_ascii_lowercase()
+        })
+        .collect::<Vec<_>>()
+        .join(".")
+}
+
+fn bare_name(key: &str) -> &str {
+    key.rsplit('.').next().unwrap_or(key)
 }
 
 pub fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Vec<String> {
@@ -280,7 +294,7 @@ fn resolve_qualifier(qualifier: &str, references: &[(String, Option<String>)]) -
         }
     }
     for (table, _) in references {
-        if table_key(table) == lowered {
+        if bare_name(&table_key(table)) == lowered {
             return table.clone();
         }
     }
@@ -456,9 +470,38 @@ mod tests {
     }
 
     #[test]
-    fn table_key_ignores_schema_and_quoting() {
-        assert_eq!(table_key("public.\"Users\""), "users");
+    fn table_key_keeps_the_schema_and_ignores_quoting_and_case() {
+        assert_eq!(table_key("public.\"Users\""), "public.users");
         assert_eq!(table_key("`orders`"), "orders");
-        assert_eq!(table_key("[dbo].[Items]"), "items");
+        assert_eq!(table_key("[dbo].[Items]"), "dbo.items");
+    }
+
+    fn index_with(tables: &[(&str, &[&str])]) -> SchemaIndex {
+        let mut index = SchemaIndex::default();
+        for (table, columns) in tables {
+            index.set_columns(table, columns.iter().map(|column| column.to_string()).collect());
+        }
+        index
+    }
+
+    #[test]
+    fn same_named_tables_in_two_schemas_keep_separate_columns() {
+        let index = index_with(&[("a.items", &["a_id"]), ("b.items", &["b_id"])]);
+        assert_eq!(index.columns_for("a.items"), Some(&vec!["a_id".to_string()]));
+        assert_eq!(index.columns_for("b.\"Items\""), Some(&vec!["b_id".to_string()]));
+    }
+
+    #[test]
+    fn an_unqualified_name_that_matches_two_schemas_offers_no_columns() {
+        let index = index_with(&[("a.items", &["a_id"]), ("b.items", &["b_id"])]);
+        assert_eq!(index.columns_for("items"), None);
+        assert!(!index.knows_columns("items"));
+    }
+
+    #[test]
+    fn an_unqualified_name_resolves_when_only_one_schema_has_it() {
+        let index = index_with(&[("a.items", &["a_id"]), ("a.orders", &["o_id"])]);
+        assert_eq!(index.columns_for("items"), Some(&vec!["a_id".to_string()]));
+        assert!(index.knows_columns("Items"));
     }
 }

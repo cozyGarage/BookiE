@@ -25,6 +25,19 @@ pub(crate) const AGENT_UNKNOWN_HOST_KEY: tablepro_ssh::UnknownHostKey = tablepro
 struct OpenSession {
     key: SessionKey,
     connection: Arc<dyn Connection>,
+    audit_state: Arc<AuditState>,
+    retired: Arc<std::sync::atomic::AtomicBool>,
+}
+
+struct SessionFaultSink {
+    retired: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl tablepro_policy::ConnectionFaultSink for SessionFaultSink {
+    fn connection_became_unusable(&self, operation: &str) {
+        tracing::warn!(operation, "a cached session became unusable and will be replaced");
+        self.retired.store(true, std::sync::atomic::Ordering::Release);
+    }
 }
 
 struct SessionConnection {
@@ -263,19 +276,7 @@ impl ConnectionProvider for DaemonProvider {
             .ok_or_else(|| format!("connection {connection_id} not found"))?;
 
         let raw = self.open_session(&saved).await?;
-        let ctx = GuardContext {
-            connection_id: saved.id,
-            connection_name: saved.name.clone(),
-            driver_id: saved.driver_id.clone(),
-            environment: saved.environment,
-            read_only: saved.read_only,
-            principal,
-            policy: self.policy.clone(),
-            approval: self.approval.clone(),
-            audit: self.audit.clone(),
-            audit_state: self.audit_state.clone(),
-        };
-        Ok(Arc::new(PolicyGuard::new(raw, ctx)) as Arc<dyn Connection>)
+        Ok(self.guarded(&saved, principal, raw))
     }
 }
 
@@ -299,6 +300,60 @@ impl DaemonProvider {
         }
     }
 
+    fn new_session(&self, key: SessionKey, connection: Arc<dyn Connection>) -> OpenSession {
+        OpenSession {
+            key,
+            connection,
+            audit_state: Arc::new(self.audit_state.new_connection_generation()),
+            retired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        }
+    }
+
+    fn session_retirement(&self, id: Uuid, connection: &Arc<dyn Connection>) -> Arc<std::sync::atomic::AtomicBool> {
+        self.sessions
+            .lock()
+            .ok()
+            .and_then(|sessions| {
+                sessions
+                    .get(&id)
+                    .filter(|session| Arc::ptr_eq(&session.connection, connection))
+                    .map(|session| session.retired.clone())
+            })
+            .unwrap_or_default()
+    }
+
+    fn session_audit_state(&self, id: Uuid, connection: &Arc<dyn Connection>) -> Arc<AuditState> {
+        self.sessions
+            .lock()
+            .ok()
+            .and_then(|sessions| {
+                sessions
+                    .get(&id)
+                    .filter(|session| Arc::ptr_eq(&session.connection, connection))
+                    .map(|session| session.audit_state.clone())
+            })
+            .unwrap_or_else(|| Arc::new(self.audit_state.new_connection_generation()))
+    }
+
+    fn guarded(&self, saved: &SavedConnection, principal: Principal, raw: Arc<dyn Connection>) -> Arc<dyn Connection> {
+        let ctx = GuardContext {
+            connection_id: saved.id,
+            connection_name: saved.name.clone(),
+            driver_id: saved.driver_id.clone(),
+            environment: saved.environment,
+            read_only: saved.read_only,
+            principal,
+            policy: self.policy.clone(),
+            approval: self.approval.clone(),
+            audit: self.audit.clone(),
+            audit_state: self.session_audit_state(saved.id, &raw),
+        };
+        let fault = Arc::new(SessionFaultSink {
+            retired: self.session_retirement(saved.id, &raw),
+        });
+        Arc::new(PolicyGuard::new(raw, ctx).with_fault_sink(fault))
+    }
+
     pub fn with_system_openssh(mut self, openssh: tablepro_transport::OpenSshEnvironment) -> Self {
         self.ssh.openssh = Some(openssh);
         self
@@ -315,7 +370,10 @@ impl DaemonProvider {
         let cached = self.cached_connection(saved.id, &key)?;
         if let Some(connection) = cached {
             let healthy = ping_is_healthy(connection.ping(), SESSION_PING_TIMEOUT).await;
-            if healthy && self.session_is_current(saved.id, &key, &connection)? {
+            let retired = self
+                .session_retirement(saved.id, &connection)
+                .load(std::sync::atomic::Ordering::Acquire);
+            if healthy && !retired && self.session_is_current(saved.id, &key, &connection)? {
                 return Ok(connection);
             }
             self.remove_session(saved.id, &key, &connection)?;
@@ -333,13 +391,7 @@ impl DaemonProvider {
         self.sessions
             .lock()
             .map_err(|_| "session cache unavailable".to_string())?
-            .insert(
-                saved.id,
-                OpenSession {
-                    key,
-                    connection: connection.clone(),
-                },
-            );
+            .insert(saved.id, self.new_session(key, connection.clone()));
         Ok(connection)
     }
 
@@ -586,6 +638,8 @@ mod tests {
             OpenSession {
                 key: key.clone(),
                 connection: connection.clone(),
+                audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
         let issued = connection.clone();
@@ -625,6 +679,8 @@ mod tests {
             OpenSession {
                 key: old_key,
                 connection: connection.clone(),
+                audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 
@@ -738,6 +794,8 @@ mod tests {
             OpenSession {
                 key,
                 connection: connection.clone(),
+                audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 
@@ -842,6 +900,8 @@ mod tests {
             OpenSession {
                 key,
                 connection: connection.clone(),
+                audit_state: Arc::new(AuditState::new()),
+                retired: Default::default(),
             },
         );
 
@@ -855,3 +915,6 @@ mod tests {
 
 #[cfg(test)]
 mod session_tests;
+
+#[cfg(test)]
+mod audit_isolation_tests;

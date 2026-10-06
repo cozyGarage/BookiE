@@ -102,7 +102,7 @@ impl BrowseTab {
                 && let Some(row_obj) = model
                     .item(position)
                     .and_then(|o| o.downcast::<crate::ui::row_object::RowObject>().ok())
-                && let Some(store) = model.downcast::<gtk::gio::ListStore>().ok()
+                && let Some(store) = model.downcast::<crate::ui::row_store::RowStore>().ok()
                 && let Some(store_pos) = store.find(&row_obj)
             {
                 store.items_changed(store_pos, 1, 1);

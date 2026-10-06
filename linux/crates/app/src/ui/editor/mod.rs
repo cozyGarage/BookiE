@@ -94,7 +94,7 @@ pub struct StatementOutcome {
 
 #[derive(Debug, Clone)]
 pub enum StatementOutcomeKind {
-    Rows(QueryResult),
+    Rows(std::sync::Arc<QueryResult>),
     Error(String),
     NotRun,
 }

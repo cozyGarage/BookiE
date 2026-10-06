@@ -46,12 +46,16 @@ impl PolicyGuard {
     }
 
     fn report(&self, operation: &'static str, payload: &Box<dyn Any + Send>) -> String {
-        let detail = payload
+        let message_bytes = payload
             .downcast_ref::<&str>()
-            .map(|text| (*text).to_owned())
-            .or_else(|| payload.downcast_ref::<String>().cloned())
-            .unwrap_or_else(|| "no panic message".to_owned());
-        tracing::error!(operation, detail, "driver panicked; reporting it as a failed operation");
+            .map(|text| text.len())
+            .or_else(|| payload.downcast_ref::<String>().map(String::len))
+            .unwrap_or(0);
+        tracing::error!(
+            operation,
+            message_bytes,
+            "driver panicked; the message is withheld because it may hold query text or credentials"
+        );
         if let Some(fault) = &self.fault {
             fault.connection_became_unusable(operation);
         }
