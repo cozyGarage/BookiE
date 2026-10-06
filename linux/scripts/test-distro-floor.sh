@@ -16,7 +16,11 @@ for base in "${images[@]}"; do
     cargo test --manifest-path /src/Cargo.toml -p tablepro-app --lib 2>&1 | grep -E "^test result|FAILED|failed|panicked" | head
     bash /src/scripts/test-gtk-widgets.sh 2>&1 | tail -4
     if [ "${DISTRO_FLOOR_INSTALLED:-0}" = 1 ]; then
-      bash /src/scripts/test-gtk-safety.sh 2>&1 | tail -15
+      status=0
+      bash /src/scripts/test-gtk-safety.sh >/tmp/gtk-safety.log 2>&1 || status=$?
+      grep -v Adwaita-WARNING /tmp/gtk-safety.log | grep -v "^$" | tail -12
+      echo "installed GTK suite exit status: $status"
+      [ "$status" = 0 ]
     fi
   '
 done
