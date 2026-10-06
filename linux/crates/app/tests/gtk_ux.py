@@ -20,7 +20,7 @@ class XWindowAttributes(ctypes.Structure):
 ATSPI_WINDOW_Y_OFFSET = 19
 
 
-def x11_click(window_x, window_y, button=3, count=1):
+def x11_click(window_x, window_y, button=3, clicks=1):
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
     x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
@@ -55,7 +55,7 @@ def x11_click(window_x, window_y, button=3, count=1):
         xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y) + ATSPI_WINDOW_Y_OFFSET, 0)
         x11.XFlush(display)
         time.sleep(0.2)
-        for _ in range(count):
+        for _ in range(clicks):
             xtst.XTestFakeButtonEvent(display, button, 1, 0)
             xtst.XTestFakeButtonEvent(display, button, 0, 0)
             x11.XFlush(display)
@@ -117,7 +117,7 @@ def scenarios(ui):
     def click_cell(cell_text, count=1):
         cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
-        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1, count=count)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1, clicks=count)
         time.sleep(0.3)
 
     def editable_text_node(initial):
