@@ -308,7 +308,7 @@ def scenarios(ui):
         ui.wait_for_node(name="public.people", role=pyatspi.ROLE_LIST_ITEM)
         ui.invoke(ui.wait_for_node(name="Switch database", role=pyatspi.ROLE_TOGGLE_BUTTON))
         ui.wait_for_node(name="bookie_test")
-        ui.invoke(ui.wait_for_node(name="bookie_other", role=pyatspi.ROLE_LIST_ITEM))
+        ui.invoke(ui.wait_for_node(name="bookie_other", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="public.other_things", role=pyatspi.ROLE_LIST_ITEM)
         ui.wait_for_node(name="public.people", role=pyatspi.ROLE_LIST_ITEM, present=False)
         deadline = time.monotonic() + ui.WAIT_SECONDS

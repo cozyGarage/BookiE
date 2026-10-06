@@ -68,6 +68,25 @@ fn clear(list: &gtk::ListBox) {
     }
 }
 
+fn choice_button(choice: &DatabaseChoice, sender: &ComponentSender<App>) -> gtk::Button {
+    let content = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let label = gtk::Label::builder()
+        .label(&choice.name)
+        .xalign(0.0)
+        .hexpand(true)
+        .build();
+    content.append(&label);
+    if choice.current {
+        content.append(&gtk::Image::from_icon_name("object-select-symbolic"));
+    }
+    let button = gtk::Button::builder().child(&content).css_classes(["flat"]).build();
+    button.update_property(&[gtk::accessible::Property::Label(&choice.name)]);
+    let picked = sender.clone();
+    let name = choice.name.clone();
+    button.connect_clicked(move |_| picked.input(AppMsg::SwitchDatabase(name.clone())));
+    button
+}
+
 fn message_row(title: &str, subtitle: &str) -> adw::ActionRow {
     adw::ActionRow::builder().title(title).subtitle(subtitle).build()
 }
@@ -126,14 +145,7 @@ impl App {
             .map(|saved| saved.database.clone())
             .unwrap_or_default();
         for choice in database_choices(&names, &current) {
-            let row = adw::ActionRow::builder().title(&choice.name).activatable(true).build();
-            if choice.current {
-                row.add_suffix(&gtk::Image::from_icon_name("object-select-symbolic"));
-            }
-            let picked = sender.clone();
-            let name = choice.name.clone();
-            row.connect_activated(move |_| picked.input(AppMsg::SwitchDatabase(name.clone())));
-            self.databases_list.append(&row);
+            self.databases_list.append(&choice_button(&choice, &sender));
         }
     }
 
