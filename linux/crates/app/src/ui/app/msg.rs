@@ -8,7 +8,9 @@ use super::{OpenMode, SessionTeardownAction};
 pub enum AppMsg {
     OpenConnect,
     ConnectionPrepared(Box<crate::services::connection_service::PreparedConnection>),
-    ConnectionPrepareFailed(String),
+    ConnectionPrepareFailed(String, Box<SavedConnection>),
+    CancelConnect,
+    ConnectionCancelled,
     ConnectionSwitchDecision(super::types::SwitchDecision),
     DialogClosed,
     SelectTable {
@@ -26,6 +28,9 @@ pub enum AppMsg {
     ConnectionsLoaded(Vec<SavedConnection>),
     OpenSaved(SavedConnection),
     DeleteConnection(Uuid),
+    EditConnection(SavedConnection),
+    EditConnectionLoaded(Box<crate::ui::connect_dialog::ConnectionPrefill>),
+    EditConnectionFailed(String),
     DuplicateConnection(Uuid),
     ExportConnections,
     ExportConnectionsTo(crate::ui::connection_bundle::ExportChoice),
