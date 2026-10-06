@@ -72,7 +72,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-1 | C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback | OPEN | `driver-tls` fixture | driver-docker |
 | B4-2 | C6 SQL Server: same, needs a usable control connection | OPEN | | driver-docker |
 | B4-3 | G5: daemon provider through system OpenSSH; unknown host key declines without learning | OPEN | | driver-docker |
-| B4-4 | F8 headless: agentd shares one `AuditState`; needs per-connection generations | OPEN | `agentd/src/lib.rs` | sandbox |
+| B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` proves A is blocked after an interrupted write, B stays writable and a replacement recovers (fails with the old shared state) | sandbox |
 | B4-5 | Retire the daemon handle after panic or disconnect even when ping succeeds | OPEN | Small patch before G5 | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
 | B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | | sandbox |
@@ -144,7 +144,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-21 | ~~No installed-GTK scenario against a real PostgreSQL server~~ | DONE | `scripts/test-gtk-postgres.sh`: saved connection, keyring password, live rows, value viewer | gtk-installed |
 | TEST-22 | ~~The runner's default virtual CPU hid AVX, so MongoDB 7 containers exited and 29 driver tests failed~~ | DONE | `--cpu host`; MongoDB suite 31 of 31 on the runner | driver-docker |
 | TEST-23 | ~~No installed-GTK scenario against a real MySQL server~~ | DONE | `scripts/test-gtk-mysql.sh`: edit and delete reach the server, no approval prompt | gtk-installed |
-| TEST-24 | Forgejo also evaluates `.github/workflows` and warns that every job's `permissions` field is unsupported and ignored (preflight, fast, gtk-safety, current-stable-clippy, integration, driver-tls, postgres-release, duckdb, regression-gate); those jobs wait on an `ubuntu-24.04` runner that does not exist | OPEN | Scope Forgejo to `.forgejo/workflows`, or give the runner a Docker label; then use Authorized Integrations for any token capability the lab jobs need | manual |
+| TEST-24 | ~~Forgejo evaluated the GitHub workflows (unsupported `permissions` warnings, waiting on a missing `ubuntu-24.04` runner)~~ | DONE | Only the first push, before `.forgejo/` existed, did; later pushes run only `.forgejo/workflows/ci.yml`, whose quick layer ran on the Arch runner and caught a real function-size failure. Five stale waiting runs (1 to 5) can be cancelled in the Forgejo UI | manual |
 | TEST-17 | ~~No check that documentation links resolve~~ | DONE | `scripts/check-doc-links.py` in the harness | sandbox |
 
 ## Documentation and other

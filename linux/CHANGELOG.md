@@ -79,6 +79,7 @@
 - The Debian package now includes the SSH password helper that the system OpenSSH client needs.
 - A lost connection stops reconnecting when the password, TLS setting or configuration is wrong and says why, instead of retrying forever.
 - SQL completion no longer mixes up the columns of tables that share a name in different schemas.
+- In the headless agent, a write interrupted on one connection no longer blocks governed writes on every other connection until restart.
 
 ### Added
 
