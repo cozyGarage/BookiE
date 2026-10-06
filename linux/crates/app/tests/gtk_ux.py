@@ -271,29 +271,51 @@ def scenarios(ui):
             time.sleep(ui.POLL_SECONDS)
         assert psql(sql) == expected, (sql, psql(sql), expected)
 
-    def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
-        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
-        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
-        ui.invoke_named_action_within("public.people", "Open people")
+    def grid_edit_and_delete_commit_to_the_server(connection_name, table_anchor, oracle):
+        ui.open_saved_connection(connection_name)
+        ui.wait_for_frame_containing(f"{connection_name} — BookiE")
+        ui.invoke_named_action_within(table_anchor, "Open people")
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         click_cell("Grace Hopper", count=2)
         for key in "gracey":
             ui.press_x11_key(key)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
-        assert psql("SELECT name FROM people WHERE id = 2") == "Grace Hopper", "an unsaved edit reached the server"
+        assert oracle("SELECT name FROM people WHERE id = 2") == "Grace Hopper", "an unsaved edit reached the server"
         ui.press_x11_key("s", ("Control_L",))
-        wait_for_psql("SELECT name FROM people WHERE id = 2", "gracey")
+        wait_for_oracle(oracle, "SELECT name FROM people WHERE id = 2", "gracey")
         assert ui.find_node(name="Approve once") is None, "a plain grid edit asked for approval"
         ui.wait_for_node(name="1 unsaved change", present=False)
 
         open_cell_menu("gracey")
         choose_menu_item(13)
         ui.wait_for_node(name="1 unsaved change")
-        assert psql("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
+        assert oracle("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
-        wait_for_psql("SELECT count(*) FROM people", "1")
-        wait_for_psql("SELECT id FROM people", "1")
+        wait_for_oracle(oracle, "SELECT count(*) FROM people", "1")
+        wait_for_oracle(oracle, "SELECT id FROM people", "1")
+        assert ui.find_node(name="Approve once") is None, "a plain grid delete asked for approval"
+
+    def wait_for_oracle(oracle, sql, expected):
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and oracle(sql) != expected:
+            time.sleep(ui.POLL_SECONDS)
+        assert oracle(sql) == expected, (sql, oracle(sql), expected)
+
+    def mysql(sql):
+        import subprocess
+        out = subprocess.run(
+            ["docker", "exec", os.environ["TABLEPRO_GTK_MYSQL_CONTAINER"], "mysql", "--user=root",
+             "--password=tablepro_test", "--batch", "--skip-column-names", "bookie_test", f"--execute={sql}"],
+            check=True, capture_output=True, text=True,
+        )
+        return out.stdout.strip()
+
+    def postgres_grid_edit_and_delete_commit_to_the_server(database, base):
+        grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
+
+    def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
+        grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "people", mysql)
 
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
@@ -305,6 +327,8 @@ def scenarios(ui):
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
     ]
+    if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
+        result.append(mysql_grid_edit_and_delete_commit_to_the_server)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
