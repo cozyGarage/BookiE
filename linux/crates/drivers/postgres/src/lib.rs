@@ -342,8 +342,16 @@ impl Connection for PgConnection {
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let backend_pid = backend_pid_controlled(&mut connection, control).await?;
-        let (connection, result) =
-            controlled_query(connection, &self.cancellation_pool, backend_pid, sql, &[], control).await;
+        let (connection, result) = controlled_query(
+            connection,
+            &self.cancellation_pool,
+            backend_pid,
+            sql,
+            &[],
+            true,
+            control,
+        )
+        .await;
         drop(connection);
         result
     }
@@ -361,27 +369,38 @@ impl Connection for PgConnection {
     ) -> Result<QueryResult, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let backend_pid = backend_pid_controlled(&mut connection, control).await?;
-        let (connection, result) =
-            controlled_query(connection, &self.cancellation_pool, backend_pid, sql, params, control).await;
+        let (connection, result) = controlled_query(
+            connection,
+            &self.cancellation_pool,
+            backend_pid,
+            sql,
+            params,
+            true,
+            control,
+        )
+        .await;
         drop(connection);
         result
     }
 
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
-        let res = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .execute(&self.pool)
-            .await
-            .map_err(map_sqlx_error)?;
-        Ok(ExecResult {
-            rows_affected: res.rows_affected(),
-        })
+        let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
+        execute_connection(&mut connection, sql, &[]).await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let backend_pid = backend_pid_controlled(&mut connection, control).await?;
-        let (connection, result) =
-            controlled_execute(connection, &self.cancellation_pool, backend_pid, sql, &[], control).await;
+        let (connection, result) = controlled_execute(
+            connection,
+            &self.cancellation_pool,
+            backend_pid,
+            sql,
+            &[],
+            true,
+            control,
+        )
+        .await;
         drop(connection);
         result
     }
@@ -399,8 +418,16 @@ impl Connection for PgConnection {
     ) -> Result<ExecResult, DriverError> {
         let mut connection = acquire_controlled(&self.pool, control).await?;
         let backend_pid = backend_pid_controlled(&mut connection, control).await?;
-        let (connection, result) =
-            controlled_execute(connection, &self.cancellation_pool, backend_pid, sql, params, control).await;
+        let (connection, result) = controlled_execute(
+            connection,
+            &self.cancellation_pool,
+            backend_pid,
+            sql,
+            params,
+            true,
+            control,
+        )
+        .await;
         drop(connection);
         result
     }
@@ -599,7 +626,7 @@ impl Drop for PgTransaction {
 impl tablepro_core::Transaction for PgTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
         let connection = self.connection_mut()?;
-        query_connection(connection, sql, &[]).await
+        query_connection_once(connection, sql, &[]).await
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
@@ -608,7 +635,7 @@ impl tablepro_core::Transaction for PgTransaction {
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let connection = self.connection_mut()?;
-        query_connection(connection, sql, params).await
+        query_connection_once(connection, sql, params).await
     }
 
     async fn query_params_controlled(
@@ -625,6 +652,8 @@ impl tablepro_core::Transaction for PgTransaction {
             self.backend_pid,
             sql,
             params,
+            // An error aborts an explicit transaction; the caller must roll it back.
+            false,
             control,
         )
         .await;
@@ -634,7 +663,7 @@ impl tablepro_core::Transaction for PgTransaction {
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
         let connection = self.connection_mut()?;
-        execute_connection(connection, sql, &[]).await
+        execute_connection_once(connection, sql, &[]).await
     }
 
     async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
@@ -643,7 +672,7 @@ impl tablepro_core::Transaction for PgTransaction {
 
     async fn execute_params(&mut self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
         let connection = self.connection_mut()?;
-        execute_connection(connection, sql, params).await
+        execute_connection_once(connection, sql, params).await
     }
 
     async fn execute_params_controlled(
@@ -660,6 +689,8 @@ impl tablepro_core::Transaction for PgTransaction {
             self.backend_pid,
             sql,
             params,
+            // An error aborts an explicit transaction; the caller must roll it back.
+            false,
             control,
         )
         .await;
@@ -731,10 +762,17 @@ async fn controlled_query(
     backend_pid: i32,
     sql: &str,
     params: &[Value],
+    retry_stale_type_cache: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
     let result = run_server_cancellable(
-        query_connection(&mut connection, sql, params),
+        async {
+            if retry_stale_type_cache {
+                query_connection(&mut connection, sql, params).await
+            } else {
+                query_connection_once(&mut connection, sql, params).await
+            }
+        },
         request_cancellation(cancellation_pool, backend_pid),
         confirms_cancellation,
         control,
@@ -749,10 +787,17 @@ async fn controlled_execute(
     backend_pid: i32,
     sql: &str,
     params: &[Value],
+    retry_stale_type_cache: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<ExecResult, DriverError>) {
     let result = run_server_cancellable(
-        execute_connection(&mut connection, sql, params),
+        async {
+            if retry_stale_type_cache {
+                execute_connection(&mut connection, sql, params).await
+            } else {
+                execute_connection_once(&mut connection, sql, params).await
+            }
+        },
         request_cancellation(cancellation_pool, backend_pid),
         confirms_cancellation,
         control,
@@ -822,6 +867,22 @@ async fn query_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
+    let result = query_connection_once(connection, sql, params).await;
+    // A concurrent DROP/CREATE can leave a cached plan pointing at the old
+    // OID. PostgreSQL raises this before executing the statement, so clear
+    // SQLx's per-connection caches and retry the same operation once.
+    if result.as_ref().is_err_and(is_stale_type_cache_error) {
+        connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
+        return query_connection_once(connection, sql, params).await;
+    }
+    result
+}
+
+async fn query_connection_once(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+) -> Result<QueryResult, DriverError> {
     let description = if needs_enum_type_inference(params) {
         Some(describe_query_parameters(connection, sql, params).await?)
     } else {
@@ -857,6 +918,19 @@ async fn execute_connection(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
+    let result = execute_connection_once(connection, sql, params).await;
+    if result.as_ref().is_err_and(is_stale_type_cache_error) {
+        connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
+        return execute_connection_once(connection, sql, params).await;
+    }
+    result
+}
+
+async fn execute_connection_once(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    params: &[Value],
+) -> Result<ExecResult, DriverError> {
     let inferred_text_types = if needs_enum_type_inference(params) {
         describe_query_parameters(connection, sql, params)
             .await?
@@ -871,9 +945,32 @@ async fn execute_connection(
     })
 }
 
+fn is_stale_type_cache_error(error: &DriverError) -> bool {
+    matches!(
+        error,
+        DriverError::Query {
+            message,
+            sqlstate: Some(sqlstate),
+        } if sqlstate == "XX000" && message.starts_with("cache lookup failed for type ")
+    )
+}
+
 async fn stream_into_result(pool: &Pool<Postgres>, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
     let mut connection = pool.acquire().await.map_err(map_sqlx_error)?;
-    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
+    let result = stream_into_result_once(&mut connection, sql, limit).await;
+    if result.as_ref().is_err_and(is_stale_type_cache_error) {
+        connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
+        return stream_into_result_once(&mut connection, sql, limit).await;
+    }
+    result
+}
+
+async fn stream_into_result_once(
+    connection: &mut PoolConnection<Postgres>,
+    sql: &str,
+    limit: usize,
+) -> Result<QueryResult, DriverError> {
+    let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut **connection);
     let (mut result, mut type_infos) = collect_query_rows(&mut stream, limit).await?;
     drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
@@ -884,7 +981,7 @@ async fn stream_into_result(pool: &Pool<Postgres>, sql: &str, limit: usize) -> R
         result.columns = statement_columns(statement.columns());
         type_infos = statement_type_infos(statement.columns());
     }
-    refresh_enum_type_names(&mut connection, &mut result.columns, &type_infos).await?;
+    refresh_enum_type_names(connection, &mut result.columns, &type_infos).await?;
     Ok(result)
 }
 
