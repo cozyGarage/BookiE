@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- Ctrl+/ in the SQL editor now toggles a line comment instead of opening the keyboard shortcuts window.
+
 - Right-clicking an editable result cell opened the cell editor's own menu on top of the grid menu; only the grid menu opens now.
 - PostgreSQL enum-array XLSX exports preserve two-dimensional values and non-default lower bounds as text through LibreOffice Calc and Gnumeric re-saves, including empty labels, literal `NULL`, SQL NULL elements and formula-shaped labels.
 - MySQL query results keep their projected column metadata when no rows match, including inside transactions, and transaction queries obey the shared result cap.
