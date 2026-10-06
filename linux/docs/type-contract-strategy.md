@@ -297,10 +297,14 @@ and lossless re-import of the formula-safety prefix remain open.
 DuckDB app keyed edits now have a native `TIME_NS`/`TIMESTAMP_NS` contract:
 nanosecond edits preserve both declared types and all nine fractional digits,
 and leave a sibling row unchanged ([evidence](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json)).
-This closes the grid write path for these types. Direct nanosecond parameter
-binding remains open; the current Rust prepared-statement API binds through
-microsecond temporal calls, so this path uses exact text with DuckDB's target
-column cast.
+Parameterized INSERT and UPDATE also preserve nine-digit `TIME_NS` and
+`TIMESTAMP_NS` values, SQL NULLs and sibling fields through the target column's
+native type context ([evidence](evidence/duckdb-nanosecond-parameter-dml-results-2026-10-06/manifest.json)).
+Submicro values use exact text binding because the pinned DuckDB Rust value
+binding truncates nanosecond temporal values to microseconds. Expressions that
+need a native temporal parameter without a target-column context remain an
+explicit boundary; the unsupported `TIME_NS` plus interval operation is kept
+visible as DuckDB's native binder refusal.
 
 DuckDB nested-result refusal now covers a `STRUCT` containing a `UHUGEINT` list
 and a `MAP` containing a `UHUGEINT` struct. Native `typeof()` and JSON oracles

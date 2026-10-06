@@ -12,6 +12,7 @@
 - PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured `search_path` places a same-named shadow enum first; target-only/NULL values and native invalid-label refusal are covered.
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
+- DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
 
 ### Changed
 
