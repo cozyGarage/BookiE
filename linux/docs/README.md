@@ -28,6 +28,7 @@ on historical statements such as “next”, “current” or “pending”.
 | B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
 | B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
 | Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
+| Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [Platforms](platforms.md) | Keep one section per concern; the build floor is stated here |
 | Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
 | SonarCloud findings | [SonarCloud triage](sonarcloud-triage.md) | Confirm framework-specific findings against the native platform before changing source |
 | Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |

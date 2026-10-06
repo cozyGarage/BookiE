@@ -155,8 +155,7 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 | Roadmap | [ROADMAP.md](ROADMAP.md) |
 | Production audit | [docs/production-audit.md](docs/archive/production-audit.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Rust toolchains on Arch and Omarchy | [docs/toolchains.md](docs/toolchains.md) |
-| Arch / Omarchy internal package | [docs/omarchy.md](docs/omarchy.md) |
+| Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [docs/platforms.md](docs/platforms.md) |
 | Historical September stabilization evidence | [docs/stabilization-2026-09.md](docs/archive/stabilization-2026-09.md) |
 | Ignored-test inventory | [docs/ignored-tests.md](docs/ignored-tests.md) |
 | Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/archive/upstream-adoption.md) |

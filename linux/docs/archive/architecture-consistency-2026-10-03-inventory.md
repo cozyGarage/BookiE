@@ -23,7 +23,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/LICENSE.md](../../LICENSE.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/README.md](../../README.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/ROADMAP.md](../../ROADMAP.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/accessibility.md](../accessibility.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/accessibility.md](../platforms.md#accessibility) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/adding-drivers.md](../adding-drivers.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/b3-review-2026-10-01.md](b3-review-2026-10-01.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
 | [linux/docs/b3-test-scenario-survey.md](b3-test-scenario-survey.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
@@ -45,12 +45,12 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/decisions/README.md](../decisions/README.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/disconnection-contracts.md](../disconnection-contracts.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/driver-maturity.md](../driver-maturity.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/driver-priority.md](../driver-priority.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/driver-priority.md](../driver-maturity.md#order-the-engines-were-added) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/error-handling.md](../error-handling.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/flathub.md](../flathub.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/flathub.md](../platforms.md#flathub) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/ignored-tests.md](../ignored-tests.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/manual-verification-0.2-features.md](../manual-verification-0.2-features.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
-| [linux/docs/omarchy.md](../omarchy.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/omarchy.md](../platforms.md#arch-and-omarchy-package) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/performance-2026-09.md](performance-2026-09.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
 | [linux/docs/production-audit.md](production-audit.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
 | [linux/docs/reconciliation-2026-09-26.md](reconciliation-2026-09-26.md) | dated evidence/planning record | Screened; retain recorded revision and limits |
@@ -62,7 +62,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/state-management.md](../state-management.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/storage.md](../storage.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/testing.md](../testing.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/toolchains.md](../toolchains.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/toolchains.md](../platforms.md#rust-toolchain) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/type-contract-strategy.md](../type-contract-strategy.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/upstream-adoption.md](upstream-adoption.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/upstream-main-review-2026-10-03-inventory.md](upstream-main-review-2026-10-03-inventory.md) | dated evidence/planning record | Screened; retain recorded revision and limits |

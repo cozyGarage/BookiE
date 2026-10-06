@@ -376,7 +376,7 @@ MongoDB/function refactors; earlier lane passes do not verify the final tree.
 ### Arch / Omarchy / Wayland UI packets
 
 Use [the manual checklist](../manual-verification-0.2-features.md) and the existing
-[Omarchy package guide](../omarchy.md). Work on application widgets and resources;
+[Omarchy package guide](../platforms.md#arch-and-omarchy-package). Work on application widgets and resources;
 this plan does not request changes to the user's Hyprland or system configuration.
 
 | Packet | Scope | Acceptance |

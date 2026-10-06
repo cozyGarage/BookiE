@@ -24,4 +24,8 @@ users are not surprised by missing write or transaction paths. These are driver 
 
 Transport and TLS behaviour per driver is tracked in [connections.md](connections.md).
 
-See also [adding-drivers.md](adding-drivers.md) and [driver-priority.md](driver-priority.md).
+See also [adding-drivers.md](adding-drivers.md).
+
+## Order the engines were added
+
+ClickHouse (Stable), Redis (Experimental), DuckDB (Experimental, `--features duckdb`), MongoDB (Experimental). SSH jump-host chains belong in `crates/ssh` as sequential tunnels, not in drivers.

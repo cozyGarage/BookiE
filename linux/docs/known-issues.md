@@ -154,7 +154,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | --- | --- | --- | --- | --- |
 | DOC-1 | `po/tablepro.pot` is stale | OPEN | Run `update-translations.py` in its own commit | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
-| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [accessibility](accessibility.md) | gtk-installed |
+| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
 | DOC-5 | Cross-client value comparison (DBeaver, dbx) on lab VMs | OPEN | Seeded multi-engine VMs, ADR 0007 as oracle | manual |
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
