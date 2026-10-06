@@ -25,6 +25,12 @@ and wire-byte checks plus sibling preservation
 ([rebind evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
 [file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 
+The exact Rust Decimal positive/negative mantissa limit and 28-place scale now
+have parser, parameter, PostgreSQL typed-binding and SQL-literal checks. Values
+just outside the crate's range are rejected by explicit Decimal and grid input;
+Auto retains wide integers as text rather than guessing their type
+([evidence](evidence/rust-decimal-boundary-contract-results-2026-10-06/manifest.json)).
+
 ## Run
 
 From `linux/`, use the existing value runner:

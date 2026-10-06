@@ -76,6 +76,45 @@ async fn value_contract_numeric_domain_preserves_wide_value_across_consumers() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_rust_decimal_capacity_edges_round_trip_through_postgres() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    for text in [
+        "79228162514264337593543950335",
+        "-79228162514264337593543950335",
+        "0.0000000000000000000000000001",
+    ] {
+        let decimal: rust_decimal::Decimal = text.parse().unwrap();
+        let value = Value::Decimal(decimal);
+        assert_eq!(decimal.to_string(), text);
+        let bound = connection
+            .query_params(
+                "SELECT $1::numeric::text, pg_catalog.pg_typeof($1::numeric)::text",
+                std::slice::from_ref(&value),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            bound.rows,
+            vec![vec![Value::Text(text.into()), Value::Text("numeric".into())]],
+            "bound decimal {text}"
+        );
+
+        let literal = tablepro_core::sql_literal::render_sql_literal("postgres", &value).unwrap();
+        let restored = connection
+            .query(&format!("SELECT ({literal})::numeric::text"))
+            .await
+            .unwrap();
+        assert_eq!(
+            restored.rows,
+            vec![vec![Value::Text(text.into())]],
+            "literal decimal {text}"
+        );
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_wide_numeric_grid_edit_preserves_exact_value() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
