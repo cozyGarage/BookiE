@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "linux",
+  "baseline_commit": "fc755878333ed4973a773c5a0dca39abe8b3a456",
+  "working_tree_note": "The only pre-existing tracked modification was linux/scripts/ci-report.py; the integration source below matches baseline_commit.",
+  "case": "PostgreSQL custom enum-array XLSX re-import through Gnumeric",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs",
+    "sha256": "2cfdda0f63badd5e3a5577bd7493072edba9bcffa6a4efc675df0cbcd9333b32"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "container_image": "tablepro-gnumeric@sha256:b4e641af0a7a20dba709b3959b24f0d7ff753cb3c37309f112f2aa0537eeb1d1"
+  },
+  "contract": [
+    "BookiE exports a custom enum[] containing literal NULL, empty text, Unicode, comma and quote labels, markup, a formula-shaped label, a backslash label and a SQL NULL element as a non-formula string cell.",
+    "The ignored PostgreSQL integration test is explicitly selected with --include-ignored and passes its native enum type, array_to_json and array_send checks; its SQL replay assertions also preserve a pre-existing sibling row.",
+    "Gnumeric re-saves the XLSX as ODS and back to XLSX; the full escaped array literal remains identical and a string cell without formulas in each workbook format."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration custom_enum_array_file_exports_preserve_labels -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "ssconvert source.xlsx gnumeric-roundtrip.ods",
+        "ssconvert gnumeric-roundtrip.ods gnumeric-roundtrip.xlsx"
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "result": "Exact array string, string cell type, and no-formula assertions pass in source XLSX, re-saved ODS, and re-saved XLSX.",
+      "log": "consumer-check.txt",
+      "checker_sha256": "bc5566e4437c52dc364dc0129dce08016f7be3fd16c8679a73f2a6035ce53264"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "df5e6fc7904dfa9e129d80e55d902e99f82b92b71a9a899d1916455559576260",
+    "gnumeric-roundtrip.ods": "3390713bf63f469838ea4ea88bb5672d528bfca04abc90fe1d57812c2ea7f01c",
+    "gnumeric-roundtrip.xlsx": "62497093f4cc2494eba196f90addd71baba3e8da21581a56f3897513a8aef09f"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "a1663f1b156bccae7989a6c1e8120889d7c6aa5ae02874dc1c7181eddc680337",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "gnumeric-run.txt": "8b9aa02b198ec49c21c8af5cf1782d3b2a85e55d47c5699b08dbc7d6f4c504a8",
+    "consumer-check.txt": "3da9b16e37ba02be2d1757df9dee10ebe626e880805576cdc106b899b3eec06b",
+    "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+  },
+  "remaining": [
+    "Other spreadsheet applications, enum cell shapes, installed editing and the broader B3 matrix remain open."
+  ]
+}
