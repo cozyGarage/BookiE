@@ -188,7 +188,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     connection
         .execute(&format!(
             "INSERT INTO {quoted_schema}.rows VALUES \
-             (1, 'ready', 'target-one'), (2, 'NULL', 'target-two')"
+             (1, 'ready', 'target-one'), (2, 'NULL', 'target-two'), (3, NULL, 'target-null')"
         ))
         .await
         .unwrap();
@@ -203,6 +203,36 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
     assert_eq!(
         columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: type_name.into(),
+        })
+    );
+
+    let quoted_import_table = "\"import rows\"";
+    connection
+        .execute(&format!(
+            "CREATE TABLE {quoted_schema}.{quoted_import_table} \
+             (id INT PRIMARY KEY, state {quoted_schema}.{quoted_type}, sibling TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE enum_quoted_shadow.{quoted_import_table} \
+             (id INT PRIMARY KEY, state enum_quoted_shadow.{quoted_type}, sibling TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "INSERT INTO enum_quoted_shadow.{quoted_import_table} VALUES (99, 'ready', 'shadow-seed')"
+        ))
+        .await
+        .unwrap();
+    let import_columns = connection.fetch_columns(Some(schema), "import rows").await.unwrap();
+    assert_eq!(
+        import_columns[1].enum_type,
         Some(tablepro_core::QualifiedTypeName {
             schema: schema.into(),
             name: type_name.into(),
@@ -281,6 +311,46 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
         .await
         .unwrap();
 
+    let source = transaction
+        .query(&format!(
+            "SELECT id, state, sibling FROM {quoted_schema}.rows ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    let null_marker = tablepro_core::export::unique_csv_null_marker(&source.rows);
+    let csv_options = tablepro_core::export::CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        ..Default::default()
+    };
+    let csv = tablepro_core::export::render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = tablepro_core::import::CsvImportOptions {
+        null_marker,
+        ..Default::default()
+    };
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: Some(schema),
+            table: "import rows",
+            columns: &import_columns,
+            mapping: &[Some(0), Some(1), Some(2)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    assert!(
+        plan.statement
+            .contains(&format!("$2::text::{quoted_schema}.{quoted_type}")),
+        "CSV import must cast to the quoted destination enum despite search_path: {}",
+        plan.statement
+    );
+    for row in &plan.rows {
+        transaction.execute_params(&plan.statement, row).await.unwrap();
+    }
+
     let target = transaction
         .query(&format!(
             "SELECT id, state::text, pg_typeof(state)::text, sibling \
@@ -303,14 +373,28 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
                 Value::Text(format!("{quoted_schema}.{quoted_type}")),
                 Value::Text("target-two".into()),
             ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Text(format!("{quoted_schema}.{quoted_type}")),
+                Value::Text("target-null".into()),
+            ],
         ]
     );
-    let shadow = transaction
+    let imported = transaction
+        .query(&format!(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM {quoted_schema}.{quoted_import_table} ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(imported.rows, target.rows);
+    let shadow_rows = transaction
         .query("SELECT id, state::text, pg_typeof(state)::text, sibling FROM enum_quoted_shadow.rows ORDER BY id")
         .await
         .unwrap();
     assert_eq!(
-        shadow.rows,
+        shadow_rows.rows,
         vec![
             vec![
                 Value::Int(1),
@@ -325,6 +409,22 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
                 Value::Text("shadow-two".into()),
             ],
         ]
+    );
+    let shadow = transaction
+        .query(&format!(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM enum_quoted_shadow.{quoted_import_table} ORDER BY id"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        shadow.rows,
+        vec![vec![
+            Value::Int(99),
+            Value::Text("ready".into()),
+            Value::Text(quoted_type.into()),
+            Value::Text("shadow-seed".into()),
+        ]]
     );
     transaction.rollback().await.unwrap();
 }
