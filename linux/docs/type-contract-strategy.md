@@ -308,6 +308,12 @@ and exact bytes
 ([evidence](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json));
 other computed-expression shapes remain open.
 
+SQLite `hex(value)` over STRICT `ANY` now checks integer, real, UTF-8 and empty
+text, BLOB, SQL NULL, formula-shaped text and tag-shaped text. SQLite's native
+oracle reports TEXT for every result (including its empty-string result for
+SQL NULL); typed CSV restore preserves those results as TEXT in another STRICT
+`ANY` table ([evidence](evidence/sqlite-hex-any-csv-results-2026-10-06/manifest.json)).
+
 PostgreSQL scalar custom-enum XLSX values now survive LibreOffice Calc ODS/XLSX
 re-save with formula-shaped labels retained as text and SQL NULL left blank
 ([Calc evidence](evidence/postgres-enum-scalar-calc-reimport-results-2026-10-04/manifest.json)).
