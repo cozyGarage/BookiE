@@ -1,4 +1,5 @@
 use super::*;
+use crate::query::undecodable;
 use std::sync::{Arc, Mutex};
 
 #[test]
