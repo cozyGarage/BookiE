@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "date": "2026-10-06",
-  "branch": "b3/postgres-network-array-roundtrip",
-  "source_commit": "649795c98c85183e89292c52b586ba93cbbbf87f",
+  "branch": "fix/postgres-array-ci-guardrails",
+  "source_commit": "37176fae8",
   "source_sha256": {
     "crates/drivers/postgres/src/array.rs": "edd6c48d6955b10e7959a76c2769e8a10627f1ecadda9971cbc5cf98e6e67964",
-    "crates/drivers/postgres/src/params.rs": "d29aa861b6ef00897a884ebbea43e1313409e5890c8de15105d0753175d39a1d",
-    "crates/drivers/postgres/tests/support/array_contract.rs": "b2532ba2e5f5ff29581755d5fb3baf780c71336b884bc69a26f0e7b7feb106a0",
-    "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_temporal.rs": "83a5ae890964fd20c14f941aa1722232a251ef3afb4e93bc9363e2a566506dc9"
+    "crates/drivers/postgres/src/params.rs": "60597dba0ce1248b835116b22297d3d430d8928a19c4c4d7c0bb5a9c0990aabb",
+    "crates/drivers/postgres/tests/support/array_contract.rs": "9b13ad8f0a117dee8a61f8360756e65eff55d9248fea7d2b00ae34256b256043",
+    "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_temporal.rs": "3777f68afea9502553c9f17b0f5381056b938e60b76eee03e65d27500e185b19",
+    "crates/drivers/postgres/tests/support/array_contract_parts/network_array_consumers.rs": "b239c3a8b62041c5a7e3c291b88b5958eae8f74f7f9cb560fc886646119c84ff"
   },
   "engine": "PostgreSQL 16 in Docker via testcontainers",
   "case": "built-in inet[] and cidr[] binary result, inferred bind, keyed edit, CSV restore and invalid-input refusal",
@@ -50,7 +51,7 @@
     "postgres_full_integration": {
       "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
       "result": "192 passed, 0 failed",
-      "duration_seconds": 432.67,
+      "duration_seconds": 481.19,
       "log": "postgres-full-integration.txt"
     },
     "driver_unit": {
@@ -72,18 +73,24 @@
       "command": "rtk proxy bash scripts/test-harness.sh",
       "result": "86 Python checks, ignored-test inventory, documentation and packaging checks passed",
       "log": "harness.txt"
+    },
+    "local_preflight": {
+      "command": "rtk proxy ./scripts/ci-local.sh quick",
+      "result": "passed on the updated linux branch: file/function guardrails, workspace Clippy/unit tests and sandbox integration",
+      "log": "preflight-quick.txt"
     }
   },
   "log_sha256": {
-    "clippy.txt": "b32fc318d1870ea1f551ca2fefd680f66f4e4239fc6114f81844f52b6783287f",
-    "driver-unit.txt": "129cdd012ad97384850729f3db8cfccf574d94ba36dc3f1e8693a299f4a6bf02",
+    "clippy.txt": "159728bf9b607d746ab84105c384eb1dde63a66d9fe421b87fb1d86c323ee32d",
+    "driver-unit.txt": "d9863ea6909a18bd86fb1376f287b8711b9f7c68c5d2bdbf36d829e44f90500e",
     "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "harness.txt": "cb5a3701ab13d4cc7127b3a28502ace2036088a599cdc666413cb08130b808b8",
-    "network-arrays-focused.txt": "c030bdfad1548c3e56556c1111ca3d89a276751fd2aa119523ad2136bed5f3de",
-    "oid-census.txt": "60ec3f586f81a08aa25adcb8ba7eb5082ad75c5b4b007aec59662990a292aa88",
-    "postgres-array-contract.txt": "4485a1e30e4ad764fcaf13f0c2cfe78b94a17c0669564a2aaef182254e7b0fa9",
-    "postgres-full-integration.txt": "8f4077dea884fa0c2fe77bb5c9474ea1613cb005337f6c99e737b4783a7a9060",
-    "remaining-refusal.txt": "0be06b03d287c6c50fddc10a53e27e3c54b87c0463dc00c8fa0ca87d39684412"
+    "harness.txt": "82ceba3624ded7be0867effe4fdc202b4f3c7c3b87a077c30fcb04ead412293d",
+    "network-arrays-focused.txt": "28e1dd631b2c1838f5ed332fe261899632a4d8e62052581cd15052306c2f857e",
+    "oid-census.txt": "4ef6f0432efceec4780affa908966a013e9ce6fcafebb85a91ba49d3f5f4cdfe",
+    "postgres-array-contract.txt": "0fa7b64544055d97e76a2cba784c6396896d83b05e9160ab9d5abd2eef67aa23",
+    "postgres-full-integration.txt": "94d8849cb278cb88e7eb9794651d9734233dcc3368622bea234f185f33ea03a8",
+    "preflight-quick.txt": "6bfa42e9d60ff9a7bbe60d1f724a653a88e1e179bc25c891d0dc5bcd549ab86d",
+    "remaining-refusal.txt": "43eddaa07bcfbc49b0a21ecb08da6a84c4b77dbb2667e891840580f061f32a23"
   },
   "remaining": [
     "Other unlisted built-in and custom PostgreSQL array families remain open.",
