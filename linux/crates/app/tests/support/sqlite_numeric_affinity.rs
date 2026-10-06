@@ -128,3 +128,58 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_numeric_affinity_grid_edit_respects_storage_class_constraints() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE constrained (id INTEGER PRIMARY KEY, amount NUMERIC CHECK (typeof(amount) != 'text'))")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO constrained VALUES (1, 1)")
+        .await
+        .unwrap();
+    let columns = connection.fetch_columns(None, "constrained").await.unwrap();
+    let amount_index = columns.iter().position(|column| column.name == "amount").unwrap();
+    let current = connection
+        .query("SELECT amount FROM constrained WHERE id = 1")
+        .await
+        .unwrap();
+    let edit = parse_input_for_grid_cell(
+        "not numeric",
+        Some(&columns[amount_index]),
+        "sqlite",
+        Some(&current.rows[0][0]),
+    )
+    .unwrap();
+    assert_eq!(edit, Value::Text("not numeric".into()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "sqlite",
+        None,
+        "constrained",
+        &columns,
+        &[(amount_index, edit)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+
+    assert!(connection.execute_in_transaction(&[update]).await.is_err());
+    assert_eq!(
+        connection
+            .query("SELECT typeof(amount), amount FROM constrained WHERE id = 1")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("integer".into()), Value::Int(1)]],
+        "a constraint-rejected TEXT edit must leave the prior value unchanged"
+    );
+}
