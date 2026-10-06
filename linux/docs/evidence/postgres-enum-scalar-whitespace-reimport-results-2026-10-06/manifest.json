@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-enum-scalar-whitespace-reimport",
+  "baseline_commit": "05e8c77452a3ade86a764665ca6a52271bb9772d",
+  "case": "PostgreSQL scalar enum XLSX round-trip with leading/trailing-space labels",
+  "test": "enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/enum_file_export_contract.rs",
+    "sha256": "2561a1f912d851b552e4e8aeb88c35507f55a5aa18bf85670edbd6577e0d4609"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The scalar enum includes labels with leading and trailing spaces, literal NULL, Unicode, markup, formula-shaped text, an empty label, and SQL NULL.",
+    "The native result contract checks exact labels and enum type; XLSX labels remain string cells with no formulas.",
+    "The XLSX writer continues to refuse ambiguous empty enum labels without replacing the destination file.",
+    "Calc and Gnumeric re-save XLSX through ODS and back to XLSX; both preserve the exact space-padded labels, keep SQL NULL blank, and create no formulas."
+  ],
+  "expected_cells": {
+    "B2": "NULL",
+    "B3": "東京",
+    "B4": "<tag>&amp;",
+    "B5": "=1+1",
+    "B6": " leading",
+    "B7": "trailing ",
+    "B8": null
+  },
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration enum_file_export_contract::value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refuses_empty_safely -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc": {
+      "version": "LibreOffice 26.8.0.3 680(Build:3)",
+      "container_image": "tablepro-lo-calc:26.8.0.3@sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c",
+      "round_trip": "source.xlsx -> source.ods -> recheck/source.xlsx",
+      "log": "calc-roundtrip.txt"
+    },
+    "gnumeric": {
+      "version": "ssconvert 1.12.57",
+      "container_image": "tablepro-gnumeric:1.12.57@sha256:b4e641af0a7a20dba709b3959b24f0d7ff753cb3c37309f112f2aa0537eeb1d1",
+      "round_trip": "source.xlsx -> gnumeric-roundtrip.ods -> gnumeric-roundtrip.xlsx",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "result": "All five stages preserved exact labels and blank SQL NULL with no formulas.",
+      "log": "consumer-check.txt"
+    },
+    "diff_check": "passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "9c84ae7ac05c755e684bc5189792ac6e22f7b2d4b67341511f21e475b217e07e",
+    "source.ods": "dc31173d6188204ffc70323d473fc26d29ca9f33a5857c26e69d2643bb61a052",
+    "recheck/source.xlsx": "4681bbb5a0e7721c47763832e518ad96fc7b4ca66edb0d98527a942453c53d3e",
+    "gnumeric-roundtrip.ods": "b7cae24069256f178d669c8beded7b2b67ba5368b2887471c45ff72442e64cd1",
+    "gnumeric-roundtrip.xlsx": "2e9d590da18db60c622de39ca6d3fe506283d01ebdbb83e5c839bf00ee426e32"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "2777d5fc4293da2b77cd4a3dc83d098ebfef735575f873bccbda896b0b209efe",
+    "calc-roundtrip.txt": "3e78b26037cd1b124c32dd802e4f26ffd9deb67b8f25d8f8dd0fc2289af4e4ab",
+    "gnumeric-run.txt": "8b9aa02b198ec49c21c8af5cf1782d3b2a85e55d47c5699b08dbc7d6f4c504a8",
+    "consumer-check.txt": "0d80c7d20e1556abda197a0a0260dee3165195b752d0bfa9735999b3b32bc15b"
+  }
+}
