@@ -435,7 +435,24 @@ fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
 #[test]
 fn decimal_preservation_rejects_an_edit_that_would_round() {
     assert!(super::parse_decimal_value("0.123456789012345678901234567891").is_err());
-    assert!(super::parse_decimal_value("12.3400").is_ok());
+    for text in [
+        "79228162514264337593543950335",
+        "-79228162514264337593543950335",
+        "0.0000000000000000000000000001",
+        "12.3400",
+    ] {
+        assert!(matches!(
+            super::parse_decimal_value(text),
+            Ok(Value::Decimal(value)) if value.to_string() == text
+        ));
+    }
+    for text in [
+        "79228162514264337593543950336",
+        "-79228162514264337593543950336",
+        "0.00000000000000000000000000001",
+    ] {
+        assert!(super::parse_decimal_value(text).is_err(), "{text}");
+    }
 }
 
 #[test]

@@ -208,6 +208,38 @@ mod tests {
     }
 
     #[test]
+    fn value_contract_decimal_parameter_capacity_edges_remain_exact() {
+        for text in ["79228162514264337593543950335", "-79228162514264337593543950335"] {
+            assert!(matches!(
+                parse_parameter_value(ParameterKind::Decimal, text),
+                Ok(Value::Decimal(value)) if value.to_string() == text
+            ));
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Auto, text).unwrap(),
+                Value::Text(text.into())
+            );
+        }
+        let text = "0.0000000000000000000000000001";
+        for kind in [ParameterKind::Decimal, ParameterKind::Auto] {
+            assert!(matches!(
+                parse_parameter_value(kind, text),
+                Ok(Value::Decimal(value)) if value.to_string() == text
+            ));
+        }
+        for text in [
+            "79228162514264337593543950336",
+            "-79228162514264337593543950336",
+            "0.00000000000000000000000000001",
+        ] {
+            assert!(parse_parameter_value(ParameterKind::Decimal, text).is_err(), "{text}");
+            assert_eq!(
+                parse_parameter_value(ParameterKind::Auto, text).unwrap(),
+                Value::Text(text.into())
+            );
+        }
+    }
+
+    #[test]
     fn rewrites_named_parameters_per_dialect() {
         let sql = "SELECT * FROM users WHERE name = :name AND age > :age";
         let postgres = extract_named_parameters(sql, "postgres");
