@@ -857,6 +857,7 @@ fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
     let subscriber = tracing_subscriber::fmt()
         .with_writer(logs.clone())
         .with_max_level(tracing::Level::TRACE)
+        .with_ansi(false)
         .finish();
     let guard = PolicyGuard::new(
         Arc::new(PanickingConn),
