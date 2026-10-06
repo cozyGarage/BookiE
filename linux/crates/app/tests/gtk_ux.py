@@ -315,7 +315,7 @@ def scenarios(ui):
         grid_edit_and_delete_commit_to_the_server(ui.POSTGRES_CONNECTION_NAME, "public.people", psql)
 
     def mysql_grid_edit_and_delete_commit_to_the_server(database, base):
-        grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "people", mysql)
+        grid_edit_and_delete_commit_to_the_server(ui.MYSQL_CONNECTION_NAME, "bookie_test.people", mysql)
 
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
