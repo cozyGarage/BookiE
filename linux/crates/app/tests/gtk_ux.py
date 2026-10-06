@@ -20,7 +20,7 @@ class XWindowAttributes(ctypes.Structure):
 ATSPI_WINDOW_Y_OFFSET = 19
 
 
-def x11_click(window_x, window_y, button=3):
+def x11_click(window_x, window_y, button=3, count=1):
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
     x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
@@ -55,9 +55,11 @@ def x11_click(window_x, window_y, button=3):
         xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y) + ATSPI_WINDOW_Y_OFFSET, 0)
         x11.XFlush(display)
         time.sleep(0.2)
-        xtst.XTestFakeButtonEvent(display, button, 1, 0)
-        xtst.XTestFakeButtonEvent(display, button, 0, 0)
-        x11.XFlush(display)
+        for _ in range(count):
+            xtst.XTestFakeButtonEvent(display, button, 1, 0)
+            xtst.XTestFakeButtonEvent(display, button, 0, 0)
+            x11.XFlush(display)
+            time.sleep(0.08)
     finally:
         x11.XCloseDisplay(display)
 
@@ -111,6 +113,50 @@ def scenarios(ui):
             ui.press_x11_key("Down")
             time.sleep(0.1)
         ui.press_x11_key("Return")
+
+    def click_cell(cell_text, count=1):
+        cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_LABEL)
+        extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1, count=count)
+        time.sleep(0.3)
+
+    def editable_text_node(initial):
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_role(node) not in (pyatspi.ROLE_TEXT, pyatspi.ROLE_ENTRY):
+                    continue
+                try:
+                    node.queryEditableText()
+                    if text_of(node) == initial:
+                        return node
+                except Exception:
+                    continue
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"no editable cell holding {initial!r}:\n{ui.accessible_snapshot()}")
+
+    def stored_notes(database):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            return connection.execute("SELECT id, note FROM safety_items ORDER BY id").fetchall()
+
+    def browse_edit_cell_and_save_persists_to_the_database(database, base):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        click_cell("alpha", count=2)
+        editable_text_node("alpha").queryEditableText().setTextContents("ALPHA")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="1 unsaved change")
+        assert stored_notes(database) == [(1, "alpha"), (2, "beta")], "an unsaved edit reached the database"
+        ui.press_x11_key("s", ("Control_L",))
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and stored_notes(database) != [(1, "ALPHA"), (2, "beta")]:
+            time.sleep(ui.POLL_SECONDS)
+        assert stored_notes(database) == [(1, "ALPHA"), (2, "beta")], stored_notes(database)
+        ui.wait_for_node(name="1 unsaved change", present=False)
 
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
@@ -214,6 +260,7 @@ def scenarios(ui):
         view_value_opens_the_whole_cell_with_pretty_json,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
+        browse_edit_cell_and_save_persists_to_the_database,
     ]
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_saved_connection_browses_rows_and_values)
