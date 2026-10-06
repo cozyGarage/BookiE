@@ -70,6 +70,12 @@ keyed updates and typed CSV import. Native type/text/JSON and `array_send`
 comparisons cover both successful paths and malformed-input refusal with target
 and sibling rows unchanged ([evidence](evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
 
+PostgreSQL `macaddr[]` preserves canonical six-octet values, SQL NULL and
+non-default lower bounds through result decoding, inferred typed binding,
+keyed updates and typed CSV import. Native type/text/JSON and `array_send`
+comparisons cover malformed-input refusal and target/sibling preservation
+([evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json)).
+
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 

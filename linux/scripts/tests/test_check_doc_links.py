@@ -43,6 +43,19 @@ class DocLinkTests(unittest.TestCase):
     def test_links_into_generated_target_output_are_plain_text(self):
         self.assertEqual(self.broken({"a.md": "[r](../target/quality/x/report.json)"}), [])
 
+    def test_markdown_in_generated_package_output_is_not_indexed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            generated = root / "packaging/out/pkg/usr/share/doc/app/LICENSE.md"
+            source = root / "docs/source.md"
+            generated.parent.mkdir(parents=True)
+            source.parent.mkdir(parents=True)
+            generated.write_text("[missing](../not-shipped.md)")
+            source.write_text("source")
+            files = checker.markdown_files(root)
+            self.assertIn(source, files)
+            self.assertNotIn(generated, files)
+
     def test_a_directory_target_counts_as_existing(self):
         self.assertEqual(self.broken({"a.md": "[d](dir/)", "dir/f.txt": "x"}), [])
 

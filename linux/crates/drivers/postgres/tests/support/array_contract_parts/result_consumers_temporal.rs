@@ -708,12 +708,6 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
             "[\"192.0.2.0/24\",null]",
         ),
         (
-            "macaddr[]",
-            "ARRAY['08:00:2b:01:02:03'::macaddr, NULL]",
-            "{08:00:2b:01:02:03,NULL}",
-            "[\"08:00:2b:01:02:03\",null]",
-        ),
-        (
             "macaddr8[]",
             "ARRAY['08:00:2b:01:02:03:04:05'::macaddr8, NULL]",
             "{08:00:2b:01:02:03:04:05,NULL}",
@@ -869,6 +863,85 @@ async fn value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact() 
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_macaddr_array_binding_and_keyed_edit_preserve_native_bytes() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]";
+    let source = connection
+        .query(&format!(
+            "SELECT {expression} AS value, pg_typeof({expression})::text, \
+             {expression}::text, array_to_json({expression})::text, \
+             encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let value = &source.rows[0][0];
+    assert_eq!(
+        value,
+        &Value::Text("[0:2]={\"08:00:2b:01:02:03\",NULL,\"aa:bb:cc:dd:ee:ff\"}".into())
+    );
+    assert_eq!(source.rows[0][1], Value::Text("macaddr[]".into()));
+    assert_eq!(
+        source.rows[0][2],
+        Value::Text("[0:2]={08:00:2b:01:02:03,NULL,aa:bb:cc:dd:ee:ff}".into())
+    );
+    assert_eq!(
+        source.rows[0][3],
+        Value::Text("[\"08:00:2b:01:02:03\",null,\"aa:bb:cc:dd:ee:ff\"]".into())
+    );
+
+    connection
+        .execute("CREATE TABLE macaddr_array_grid (id integer PRIMARY KEY, value macaddr[], sibling text)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO macaddr_array_grid VALUES (1, ARRAY['00:00:00:00:00:01'::macaddr], 'target'), (2, ARRAY['00:00:00:00:00:02'::macaddr], 'sibling')")
+        .await
+        .unwrap();
+    connection
+        .execute_params(
+            "UPDATE macaddr_array_grid SET value = $1 WHERE id = $2",
+            &[value.clone(), Value::Int(1)],
+        )
+        .await
+        .expect("assignment context infers macaddr[] for a binary array parameter");
+    let mut columns = connection.fetch_columns(None, "macaddr_array_grid").await.unwrap();
+    columns[0].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "macaddr_array_grid",
+        &columns,
+        &[(1, value.clone())],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    let rows = connection
+        .query("SELECT id, value::text, encode(array_send(value), 'hex'), sibling FROM macaddr_array_grid ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(rows.rows[0][1], source.rows[0][2]);
+    assert_eq!(rows.rows[0][2], source.rows[0][4]);
+    assert_eq!(rows.rows[0][3], Value::Text("target".into()));
+    assert_eq!(rows.rows[1][3], Value::Text("sibling".into()));
+
+    let malformed = connection
+        .execute_params(
+            "UPDATE macaddr_array_grid SET value = $1 WHERE id = $2",
+            &[Value::Text("{08:00:2b:01:02:0g}".into()), Value::Int(1)],
+        )
+        .await;
+    assert!(malformed.is_err(), "malformed MAC octet must be rejected");
+    let after_invalid = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM macaddr_array_grid WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(after_invalid.rows[0][0], source.rows[0][4]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
@@ -884,8 +957,8 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         .await
         .expect("enumerate built-in array element OIDs");
     let supported_oids = [
-        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1560, 1562,
-        1700, 2950, 3220,
+        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 829, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1560,
+        1562, 1700, 2950, 3220,
     ];
     let mut seen_supported = Vec::new();
     let mut refused = 0;

@@ -9,6 +9,7 @@ const INT2VECTOR_OID: u32 = 22;
 const OIDVECTOR_OID: u32 = 30;
 const BIT_OID: u32 = 1560;
 const VARBIT_OID: u32 = 1562;
+const MACADDR_OID: u32 = 829;
 const PG_LSN_OID: u32 = 3220;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
@@ -238,6 +239,7 @@ fn supported(oid: u32) -> bool {
             | VARBIT_OID
             | 1700
             | 2950
+            | MACADDR_OID
             | PG_LSN_OID
     )
 }
@@ -260,6 +262,7 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
         BIT_OID | VARBIT_OID => {
             crate::decode::decode_pg_binary_text(if oid == BIT_OID { "BIT" } else { "VARBIT" }, bytes)?
         }
+        MACADDR_OID => crate::decode::decode_pg_binary_text("MACADDR", bytes)?,
         20 => i64::from_be_bytes(bytes.try_into().ok()?).to_string(),
         21 => i16::from_be_bytes(bytes.try_into().ok()?).to_string(),
         23 => i32::from_be_bytes(bytes.try_into().ok()?).to_string(),
@@ -449,6 +452,17 @@ mod tests {
             decode_binary(&bytes, PG_LSN_OID, false).as_deref(),
             Some("[0:4]={\"0/0\",\"0/FFFFFFFF\",\"1/0\",\"FFFFFFFF/FFFFFFFF\",NULL}")
         );
+    }
+
+    #[test]
+    fn value_contract_macaddr_arrays_decode_binary_elements_and_sql_null() {
+        let mac = [0x08, 0x00, 0x2b, 0x01, 0x02, 0x03];
+        let bytes = wire(MACADDR_OID, &[(2, 0)], &[Some(&mac), None]);
+        assert_eq!(
+            decode_binary(&bytes, MACADDR_OID, false).as_deref(),
+            Some(r#"[0:1]={"08:00:2b:01:02:03",NULL}"#)
+        );
+        assert_eq!(element_text(MACADDR_OID, false, &[0; 5]), None);
     }
 
     #[test]

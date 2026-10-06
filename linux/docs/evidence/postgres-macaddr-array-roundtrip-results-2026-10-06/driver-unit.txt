@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/drivers_postgres-a18f340f318501c3)
+
+running 4 tests
+test array::tests::value_contract_macaddr_arrays_decode_binary_elements_and_sql_null ... ok
+test decode::tests::value_contract_macaddr8_requires_eight_bytes_and_uses_postgres_lowercase_text ... ok
+test decode::tests::value_contract_macaddr_requires_six_bytes_and_uses_postgres_lowercase_text ... ok
+test params::tests::value_contract_macaddr_array_elements_encode_six_octets_and_refuse_malformed_text ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 0.00s
+

@@ -8,6 +8,7 @@ use crate::map_sqlx_error;
 use crate::query::{statement_columns, statement_type_infos};
 
 const PG_LSN_OID: u32 = 3220;
+const MACADDR_OID: u32 = 829;
 
 pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
@@ -102,7 +103,11 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
             }
             Ok(true)
         }
-        PgTypeKind::Simple if type_info.oid().is_some_and(|oid| oid.0 == PG_LSN_OID) => {
+        PgTypeKind::Simple
+            if type_info
+                .oid()
+                .is_some_and(|oid| matches!(oid.0, PG_LSN_OID | MACADDR_OID)) =>
+        {
             if domain_depth >= 64 {
                 return Err(DriverError::Unsupported(
                     "PostgreSQL array element domain hierarchy exceeds the driver's resolvable depth".into(),
@@ -179,9 +184,13 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
             for element in &elements.elements {
                 match element {
                     Some(value) => {
-                        if is_pg_lsn_type(element_type) {
+                        if has_base_oid(element_type, PG_LSN_OID) {
                             let encoded = encode_pg_lsn(value).ok_or("invalid PostgreSQL pg_lsn array element")?;
                             buffer.extend(&8_i32.to_be_bytes());
+                            buffer.extend(&encoded);
+                        } else if has_base_oid(element_type, MACADDR_OID) {
+                            let encoded = encode_pg_macaddr(value).ok_or("invalid PostgreSQL macaddr array element")?;
+                            buffer.extend(&6_i32.to_be_bytes());
                             buffer.extend(&encoded);
                         } else {
                             let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
@@ -212,15 +221,28 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
     }
 }
 
-fn is_pg_lsn_type(type_info: &PgTypeInfo) -> bool {
+fn has_base_oid(type_info: &PgTypeInfo, expected_oid: u32) -> bool {
     let mut current = type_info;
     loop {
         match current.kind() {
             PgTypeKind::Domain(base) => current = base,
-            PgTypeKind::Simple => return current.oid().is_some_and(|oid| oid.0 == PG_LSN_OID),
+            PgTypeKind::Simple => return current.oid().is_some_and(|oid| oid.0 == expected_oid),
             _ => return false,
         }
     }
+}
+
+fn encode_pg_macaddr(value: &str) -> Option<[u8; 6]> {
+    let mut bytes = [0; 6];
+    let mut parts = value.split(':');
+    for byte in &mut bytes {
+        let part = parts.next()?;
+        if part.len() != 2 {
+            return None;
+        }
+        *byte = u8::from_str_radix(part, 16).ok()?;
+    }
+    parts.next().is_none().then_some(bytes)
 }
 
 fn encode_pg_lsn(value: &str) -> Option<[u8; 8]> {
@@ -524,7 +546,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{encode_pg_lsn, parse_text_array_text};
+    use super::{encode_pg_lsn, encode_pg_macaddr, parse_text_array_text};
     use tablepro_core::DriverError;
 
     #[test]
@@ -591,6 +613,27 @@ mod tests {
         }
         for malformed in ["", "0", "/1", "1/", "1/2/3", "100000000/0", "0/100000000", "x/y"] {
             assert_eq!(encode_pg_lsn(malformed), None, "{malformed}");
+        }
+    }
+
+    #[test]
+    fn value_contract_macaddr_array_elements_encode_six_octets_and_refuse_malformed_text() {
+        assert_eq!(
+            encode_pg_macaddr("08:00:2b:01:02:03"),
+            Some([0x08, 0x00, 0x2b, 0x01, 0x02, 0x03])
+        );
+        assert_eq!(
+            encode_pg_macaddr("AA:bb:CC:dd:EE:fF"),
+            Some([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])
+        );
+        for malformed in [
+            "",
+            "08:00:2b:01:02",
+            "08:00:2b:01:02:03:04",
+            "8:00:2b:01:02:03",
+            "gg:00:2b:01:02:03",
+        ] {
+            assert_eq!(encode_pg_macaddr(malformed), None, "{malformed}");
         }
     }
 }
