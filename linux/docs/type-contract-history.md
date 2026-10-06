@@ -362,6 +362,15 @@ GEOMETRY, POINT and MULTIPOLYGON and confirms the refused edit leaves both rows
 unchanged. GTK-level read-only behavior remains covered separately; installed
 GTK-to-MySQL acceptance and other SQL-mode cases remain open.
 
+### PostgreSQL scalar-enum CSV boundary whitespace — October 6
+
+The scalar custom-enum CSV round trip now includes labels with leading and
+trailing spaces. Exported CSV parsing and typed import preserve both labels
+exactly; the native query checks their text, enum type, and sibling notes.
+The same case keeps empty-label versus SQL NULL ambiguity explicitly refused
+unless the CSV provides a NULL marker. See the
+[focused PostgreSQL evidence](evidence/postgres-enum-scalar-csv-whitespace-2026-10-06/manifest.json).
+
 ## Test workflow
 
 1. Add a failing native-engine or decoder reproducer. Record the failure before

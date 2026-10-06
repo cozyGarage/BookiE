@@ -395,6 +395,9 @@ another schema shadows it through `search_path` ([evidence](evidence/postgres-sh
 Scalar-enum CSV restore has the same configuration check with a target-only
 label, empty text, literal `NULL`, SQL NULL and an unchanged sibling row
 ([evidence](evidence/postgres-enum-csv-shadow-search-path-results-2026-10-05/manifest.json)).
+Scalar enum CSV export and typed restore also preserve leading and trailing
+label spaces exactly; native text and enum type assertions cover both rows
+([evidence](evidence/postgres-enum-scalar-csv-whitespace-2026-10-06/manifest.json)).
 The import plan also remains bound to its destination enum when a fresh
 execution connection changes the role's `search_path` to put a different
 same-named decoy enum first between planning and execution; native target type,
