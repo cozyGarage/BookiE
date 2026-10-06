@@ -23,6 +23,7 @@ on historical statements such as “next”, “current” or “pending”.
 | Type/value semantics and proof standard | [ADR 0007](decisions/0007-type-and-value-preservation.md) | Change a decision explicitly; link it from plans |
 | Connection/session/trust semantics | [ADR 0008](decisions/0008-connection-and-session-ownership.md) | B4 task IDs track implementation, not competing rules |
 | Durable identity and migration semantics | [ADR 0009](decisions/0009-persistence-and-identity-compatibility.md) | Operational procedures stay in storage/state guides |
+| Every known open issue outside B3, with its status and evidence | [Known issues ledger](known-issues.md) | Cross out a row only with the commit or test that closed it; `scripts/check-known-issues.py` enforces the format |
 | Milestones, order and acceptance | [Active sprint](bookie-0.2-sprint.md) | Keep current instructions compact; archive dated progress |
 | B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
 | B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
@@ -31,31 +32,20 @@ on historical statements such as “next”, “current” or “pending”.
 | Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
 | Active milestone / short status | [Sprint](bookie-0.2-sprint.md) / [ROADMAP](../ROADMAP.md) | Sprint owns acceptance; roadmap links to current boards |
 
-## Audit checkpoints
+## Archive
 
-[The October 3 release audit](archive/release-audit-2026-10-03.md) is the latest broad
-source/documentation audit, pinned to its recorded baseline; it does not audit
-the current `linux` head. The October 6 B3 follow-up is recorded on the
-[type/consumer board](type-contract-strategy.md) with its
-[UUID evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)
-and [local value-tier packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-06/manifest.json).
-The earlier documentation consolidation record is in its
-[evidence manifest](evidence/document-consolidation-2026-10-03/manifest.json).
-Historical inventories retain their original source/date.
+[docs/archive](archive/) holds the dated reviews, audits, inventories and long
+histories (sprint, B3, B4, connections, validation, value contracts). They are
+source-pinned evidence, not current instructions: open items from them live in
+the [ledger](known-issues.md). Use the
+[changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
+to locate a dated record, and the current boards and evidence manifests for
+active decisions and case proof. Useful starting points:
 
-## History and review lookup
-
-Use the [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
-to locate dated implementation and validation records. The long-form records
-remain source-pinned archives; use current boards and evidence manifests for
-active decisions and case proof.
-- [Architecture/evidence review](archive/architecture-consistency-review-2026-10-03.md):
-  source risks and unavailable raw proof; its manifest is a dated snapshot.
-- [App layer external audit](app-layer-external-audit-2026-10-06.md): GUI
-  usability gaps, TablePro/dbx UI comparison and the proposed parallel UX lane.
-- [Upstream main](archive/upstream-main-review-2026-10-03.md) and
-  [older releases](archive/upstream-older-releases-review-2026-10-03.md): candidate fixes,
-  mapped to the existing B3/B4 owners.
+- [Release audit, October 3](archive/release-audit-2026-10-03.md): the latest broad source audit, pinned to its baseline.
+- [Architecture review](archive/architecture-consistency-review-2026-10-03.md): source risks and unavailable raw proof.
+- [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx UI comparison.
+- [Upstream main](archive/upstream-main-review-2026-10-03.md) and [older releases](archive/upstream-older-releases-review-2026-10-03.md): candidate fixes.
 
 ## Keep context bounded
 

@@ -14,8 +14,8 @@ release.
 
 Linux status values in this file come from source and grep checks. Every GUI
 flow still lacks installed acceptance in
-[manual verification](manual-verification-0.2-features.md). The
-[September adoption matrix](archive/upstream-adoption.md) is partly stale: Jump to
+[manual verification](../manual-verification-0.2-features.md). The
+[September adoption matrix](upstream-adoption.md) is partly stale: Jump to
 Column and XLSX export now exist.
 
 Paths below are relative to `linux/crates/app/src` unless stated.
@@ -178,14 +178,14 @@ for Phase 1.
 | --- | --- | --- |
 | UX-F1 | A `CellView` display model and one `cell_view(&Value, &ColumnInfo)` mapping in `ui/grid/`. Widgets render `CellView` only. `grid/display.rs` already holds most of the text logic; this names it as the boundary | B3 owns the mapping and its ADR 0007 tests; UX owns widgets |
 | UX-F2 | A fake `tablepro_core` connection in a test-support location, wrapped by the real `PolicyGuard`, serving canned pages, slow pages, errors and cancellation | UX; used by the gtk-widgets tier |
-| UX-F3 | New features add `AppMsg::<Feature>(<Feature>Msg)` and an `ui/app/<feature>.rs` impl file instead of new top-level variants | UX convention, recorded in [code conventions](code-conventions.md) when first used |
+| UX-F3 | New features add `AppMsg::<Feature>(<Feature>Msg)` and an `ui/app/<feature>.rs` impl file instead of new top-level variants | UX convention, recorded in [code conventions](../code-conventions.md) when first used |
 | UX-F4 | One action table in `ui/app/shortcuts.rs` that feeds accelerators, the shortcuts dialog and Open Quickly commands | UX |
 
 ## Action plan
 
 ### Phase 0: use it today (no code)
 
-1. Start the [manual connection fixture](../tests/manual-connections/README.md).
+1. Start the [manual connection fixture](../../tests/manual-connections/README.md).
 2. Build an isolated development profile so tests never touch daily data:
    `cd linux && TABLEPRO_PROFILE=development cargo run -p tablepro-app`.
    Use a plain `cargo run -p tablepro-app` only for real daily connections.
@@ -267,4 +267,4 @@ HEAD and runs the command there with a shared target cache. `ai-lab01` on
 | File-size guard failing on `origin/linux` | `crates/drivers/postgres/tests/support/enum_contract_parts/scalar_consumers.rs` is 1384 lines against a 1369 ceiling after PR #84, so `scripts/preflight.sh` stops at that guard. B3 owns the fix |
 | Translations template is stale | `scripts/update-translations.py` rewrites about 2,400 lines of `po/tablepro.pot`; run it once on its own commit, not inside feature commits |
 | Cross-client value comparison | Build further lab VMs holding several database engines with seeded data, install DBeaver and dbx there (or on the runner), and compare what BookiE shows for the same values. Uses ADR 0007 outcomes as the oracle; feeds B3 evidence, not the UX lane. Schedule after UX Phase 2 |
-| Installed-desktop checks | Wayland and light/dark screenshots of the UX-1 to UX-6 flows still need the Arch/Omarchy installed pass in [manual verification](manual-verification-0.2-features.md) |
+| Installed-desktop checks | Wayland and light/dark screenshots of the UX-1 to UX-6 flows still need the Arch/Omarchy installed pass in [manual verification](../manual-verification-0.2-features.md) |
