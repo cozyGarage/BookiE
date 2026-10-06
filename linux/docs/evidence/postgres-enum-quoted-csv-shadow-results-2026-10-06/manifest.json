@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/postgres-quoted-enum-csv-shadowing",
-  "source_commit": "33e82a1904aeae851bb0f82a97f8a7b95b9b95dd",
+  "source_commit": "952280e335e78ad786a5a947e1f96d6af19c5b09",
   "working_tree_note": "The tested source file matches source_commit; this evidence packet and its index entries were added afterward.",
   "source_sha256": {
     "crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs": "9d39832afa81bcaaee22ef1ca12e786f18f61864cb17ed5cd95cf6e775589e61"
