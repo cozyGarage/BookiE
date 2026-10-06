@@ -42,8 +42,17 @@ OID 829. The built-in `macaddr8[]` now preserves eight-octet EUI-64 text,
 SQL NULL and non-default lower bounds across binary result decoding, inferred
 typed bindings, keyed updates and typed CSV import. Native type/text/JSON and
 `array_send` comparisons cover malformed-input refusal and target/sibling
-preservation; the OID census includes element OID 774. `inet[]`, `cidr[]` and
-other unlisted built-in and custom array families remain explicitly open
+preservation; the OID census includes element OID 774.
+
+The built-in PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 addresses,
+prefixes, SQL NULL and non-default lower bounds through binary result decoding,
+inferred typed bindings, keyed updates and typed CSV import. Native type, text,
+JSON and `array_send` comparisons cover full-host and network prefixes,
+malformed-prefix refusal, CIDR host-bit refusal and target/sibling preservation.
+The built-in OID census includes element OIDs 869 (`inet`) and 650 (`cidr`)
+([evidence](evidence/postgres-network-array-roundtrip-results-2026-10-06/manifest.json)).
+
+Other unlisted built-in and custom array families remain explicitly open
 ([macaddr[] evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json),
 [macaddr8[] evidence](evidence/postgres-macaddr8-array-roundtrip-results-2026-10-06/manifest.json)).
 

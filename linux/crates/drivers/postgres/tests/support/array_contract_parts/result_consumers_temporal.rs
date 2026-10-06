@@ -696,16 +696,10 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
     let connection = crate::connect(options).await;
     let cases = [
         (
-            "inet[]",
-            "ARRAY['192.0.2.1/24'::inet, NULL]",
-            "{192.0.2.1/24,NULL}",
-            "[\"192.0.2.1/24\",null]",
-        ),
-        (
-            "cidr[]",
-            "ARRAY['192.0.2.0/24'::cidr, NULL]",
-            "{192.0.2.0/24,NULL}",
-            "[\"192.0.2.0/24\",null]",
+            "money[]",
+            "ARRAY[NULL]::money[]",
+            "{NULL}",
+            "[null]",
         ),
     ];
 
@@ -1015,6 +1009,94 @@ async fn value_contract_macaddr8_array_binding_and_keyed_edit_preserve_native_by
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_inet_and_cidr_array_bindings_and_keyed_edits_preserve_native_bytes() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let inet_expression = "'[-1:2]={192.0.2.1/24,NULL,2001:db8::1/64,192.0.2.1}'::inet[]";
+    let cidr_expression = "'[0:3]={0.0.0.0/0,192.0.2.0/24,2001:db8::/32,2001:db8::1/128}'::cidr[]";
+    let inet = connection
+        .query(&format!(
+            "SELECT {inet_expression} AS value, pg_typeof({inet_expression})::text, \
+             {inet_expression}::text, array_to_json({inet_expression})::text, \
+             encode(array_send({inet_expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let cidr = connection
+        .query(&format!(
+            "SELECT {cidr_expression} AS value, pg_typeof({cidr_expression})::text, \
+             {cidr_expression}::text, array_to_json({cidr_expression})::text, \
+             encode(array_send({cidr_expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(inet.rows[0][1], Value::Text("inet[]".into()));
+    assert_eq!(inet.rows[0][0], Value::Text("[-1:2]={\"192.0.2.1/24\",NULL,\"2001:db8::1/64\",\"192.0.2.1\"}".into()));
+    assert_eq!(inet.rows[0][3], Value::Text("[\"192.0.2.1/24\",null,\"2001:db8::1/64\",\"192.0.2.1\"]".into()));
+    assert_eq!(cidr.rows[0][1], Value::Text("cidr[]".into()));
+    assert_eq!(cidr.rows[0][0], Value::Text("[0:3]={\"0.0.0.0/0\",\"192.0.2.0/24\",\"2001:db8::/32\",\"2001:db8::1/128\"}".into()));
+    assert_eq!(cidr.rows[0][3], Value::Text("[\"0.0.0.0/0\",\"192.0.2.0/24\",\"2001:db8::/32\",\"2001:db8::1/128\"]".into()));
+
+    connection
+        .execute("CREATE TABLE network_array_grid (id integer PRIMARY KEY, inet_value inet[], cidr_value cidr[], sibling text)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO network_array_grid VALUES (1, ARRAY['192.0.2.1/24'::inet], ARRAY['192.0.2.0/24'::cidr], 'target'), (2, ARRAY['192.0.2.2/24'::inet], ARRAY['192.0.2.0/25'::cidr], 'sibling')")
+        .await
+        .unwrap();
+    connection
+        .execute_params(
+            "UPDATE network_array_grid SET inet_value = $1, cidr_value = $2 WHERE id = $3",
+            &[inet.rows[0][0].clone(), cidr.rows[0][0].clone(), Value::Int(1)],
+        )
+        .await
+        .expect("assignment context infers inet[] and cidr[] binary parameter types");
+    let mut columns = connection.fetch_columns(None, "network_array_grid").await.unwrap();
+    columns[0].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "network_array_grid",
+        &columns,
+        &[(1, inet.rows[0][0].clone()), (2, cidr.rows[0][0].clone())],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    let rows = connection
+        .query("SELECT inet_value::text, encode(array_send(inet_value), 'hex'), cidr_value::text, encode(array_send(cidr_value), 'hex'), sibling FROM network_array_grid ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(rows.rows[0][0], inet.rows[0][2]);
+    assert_eq!(rows.rows[0][1], inet.rows[0][4]);
+    assert_eq!(rows.rows[0][2], cidr.rows[0][2]);
+    assert_eq!(rows.rows[0][3], cidr.rows[0][4]);
+    assert_eq!(rows.rows[0][4], Value::Text("target".into()));
+    assert_eq!(rows.rows[1][4], Value::Text("sibling".into()));
+
+    for (column, invalid) in [
+        ("inet_value", "{192.0.2.1/33}"),
+        ("cidr_value", "{192.0.2.1/24}"),
+    ] {
+        let error = connection
+            .execute_params(
+                &format!("UPDATE network_array_grid SET {column} = $1 WHERE id = $2"),
+                &[Value::Text(invalid.into()), Value::Int(1)],
+            )
+            .await;
+        assert!(error.is_err(), "invalid {column} value must be refused");
+    }
+    let after_invalid = connection
+        .query("SELECT encode(array_send(inet_value), 'hex'), encode(array_send(cidr_value), 'hex') FROM network_array_grid WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(after_invalid.rows[0][0], inet.rows[0][4]);
+    assert_eq!(after_invalid.rows[0][1], cidr.rows[0][4]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
@@ -1030,8 +1112,8 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         .await
         .expect("enumerate built-in array element OIDs");
     let supported_oids = [
-        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 774, 829, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1560,
-        1562, 1700, 2950, 3220,
+        16, 17, 19, 20, 21, 23, 25, 26, 650, 700, 701, 774, 829, 869, 1042, 1043, 1082, 1083, 1114, 1184,
+        1186, 1266, 1560, 1562, 1700, 2950, 3220,
     ];
     let mut seen_supported = Vec::new();
     let mut refused = 0;

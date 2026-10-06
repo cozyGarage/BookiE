@@ -10,6 +10,8 @@ use crate::query::{statement_columns, statement_type_infos};
 const PG_LSN_OID: u32 = 3220;
 const MACADDR8_OID: u32 = 774;
 const MACADDR_OID: u32 = 829;
+const CIDR_OID: u32 = 650;
+const INET_OID: u32 = 869;
 
 pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
@@ -107,7 +109,7 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
         PgTypeKind::Simple
             if type_info
                 .oid()
-                .is_some_and(|oid| matches!(oid.0, PG_LSN_OID | MACADDR_OID | MACADDR8_OID)) =>
+                .is_some_and(|oid| matches!(oid.0, PG_LSN_OID | MACADDR_OID | MACADDR8_OID | CIDR_OID | INET_OID)) =>
         {
             if domain_depth >= 64 {
                 return Err(DriverError::Unsupported(
@@ -199,6 +201,18 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
                                 encode_pg_mac_address::<8>(value).ok_or("invalid PostgreSQL macaddr8 array element")?;
                             buffer.extend(&8_i32.to_be_bytes());
                             buffer.extend(&encoded);
+                        } else if has_base_oid(element_type, INET_OID) {
+                            let encoded =
+                                encode_pg_network(value, false).ok_or("invalid PostgreSQL inet array element")?;
+                            let length = i32::try_from(encoded.len()).map_err(|_| "array element is too large")?;
+                            buffer.extend(&length.to_be_bytes());
+                            buffer.extend(&encoded);
+                        } else if has_base_oid(element_type, CIDR_OID) {
+                            let encoded =
+                                encode_pg_network(value, true).ok_or("invalid PostgreSQL cidr array element")?;
+                            let length = i32::try_from(encoded.len()).map_err(|_| "array element is too large")?;
+                            buffer.extend(&length.to_be_bytes());
+                            buffer.extend(&encoded);
                         } else {
                             let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
                             buffer.extend(&length.to_be_bytes());
@@ -250,6 +264,44 @@ fn encode_pg_mac_address<const OCTETS: usize>(value: &str) -> Option<[u8; OCTETS
         *byte = u8::from_str_radix(part, 16).ok()?;
     }
     parts.next().is_none().then_some(bytes)
+}
+
+fn encode_pg_network(value: &str, cidr: bool) -> Option<Vec<u8>> {
+    use std::net::IpAddr;
+
+    let (address, prefix) = value
+        .split_once('/')
+        .map_or((value, None), |(address, prefix)| (address, Some(prefix)));
+    if cidr && prefix.is_none() {
+        return None;
+    }
+    let address = address.parse::<IpAddr>().ok()?;
+    let (family, bits, octets) = match address {
+        IpAddr::V4(address) => {
+            let bits = match prefix {
+                Some(prefix) => prefix.parse::<u8>().ok()?,
+                None => 32,
+            };
+            if bits > 32 || (cidr && u32::from(address) & u32::MAX.checked_shr(u32::from(bits)).unwrap_or(0) != 0) {
+                return None;
+            }
+            (2, bits, address.octets().to_vec())
+        }
+        IpAddr::V6(address) => {
+            let bits = match prefix {
+                Some(prefix) => prefix.parse::<u8>().ok()?,
+                None => 128,
+            };
+            if bits > 128 || (cidr && u128::from(address) & u128::MAX.checked_shr(u32::from(bits)).unwrap_or(0) != 0) {
+                return None;
+            }
+            (3, bits, address.octets().to_vec())
+        }
+    };
+    let mut encoded = Vec::with_capacity(4 + octets.len());
+    encoded.extend([family, bits, u8::from(cidr), octets.len() as u8]);
+    encoded.extend(octets);
+    Some(encoded)
 }
 
 fn encode_pg_lsn(value: &str) -> Option<[u8; 8]> {
@@ -553,7 +605,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{encode_pg_lsn, encode_pg_mac_address, parse_text_array_text};
+    use super::{encode_pg_lsn, encode_pg_mac_address, encode_pg_network, parse_text_array_text};
     use tablepro_core::DriverError;
 
     #[test]
@@ -657,6 +709,40 @@ mod tests {
             "08:00:2b:01:02:03:04:05:06",
         ] {
             assert_eq!(encode_pg_mac_address::<8>(malformed), None, "{malformed}");
+        }
+    }
+
+    #[test]
+    fn value_contract_inet_and_cidr_array_elements_encode_network_byte_order_and_refuse_lossy_values() {
+        assert_eq!(
+            encode_pg_network("192.0.2.1/24", false),
+            Some(vec![2, 24, 0, 4, 192, 0, 2, 1])
+        );
+        assert_eq!(
+            encode_pg_network("192.0.2.1", false),
+            Some(vec![2, 32, 0, 4, 192, 0, 2, 1])
+        );
+        assert_eq!(
+            encode_pg_network("2001:db8::1/64", false),
+            Some(vec![
+                3, 64, 0, 16, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+            ])
+        );
+        assert_eq!(
+            encode_pg_network("192.0.2.0/24", true),
+            Some(vec![2, 24, 1, 4, 192, 0, 2, 0])
+        );
+        assert_eq!(
+            encode_pg_network("2001:db8::/32", true),
+            Some(vec![
+                3, 32, 1, 16, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ])
+        );
+        for malformed in ["", "192.0.2.1/33", "192.0.2.1/24/2", "not-an-address"] {
+            assert_eq!(encode_pg_network(malformed, false), None, "inet: {malformed}");
+        }
+        for malformed in ["192.0.2.1/24", "192.0.2.0", "2001:db8::1/64", "2001:db8::/129"] {
+            assert_eq!(encode_pg_network(malformed, true), None, "cidr: {malformed}");
         }
     }
 }
