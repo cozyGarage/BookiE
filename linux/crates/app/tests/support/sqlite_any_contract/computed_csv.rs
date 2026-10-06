@@ -707,3 +707,110 @@ async fn sqlite_substr_any_csv_round_trip_preserves_runtime_storage_classes() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_abs_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, -42), (2, -1.5), (3, '-42'), (4, 'not numeric'), \
+             (5, ''), (6, X'2D34'), (7, X'00FF'), (8, NULL), \
+             (9, -9223372036854775808)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, abs(value) AS result, \
+                    typeof(abs(value)) AS storage_class \
+             FROM flexible WHERE id < 9 ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Int(42), Value::Text("integer".into())],
+            vec![Value::Int(2), Value::Float(1.5), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Float(42.0), Value::Text("real".into())],
+            vec![Value::Int(4), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(5), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(6), Value::Float(4.0), Value::Text("real".into())],
+            vec![Value::Int(7), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(8), Value::Null, Value::Text("null".into())],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+    let restored = connection
+        .query("SELECT typeof(result), result FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Text("integer".into()), Value::Int(42)],
+            vec![Value::Text("real".into()), Value::Float(1.5)],
+            vec![Value::Text("real".into()), Value::Float(42.0)],
+            vec![Value::Text("real".into()), Value::Float(0.0)],
+            vec![Value::Text("real".into()), Value::Float(0.0)],
+            vec![Value::Text("real".into()), Value::Float(4.0)],
+            vec![Value::Text("real".into()), Value::Float(0.0)],
+            vec![Value::Text("null".into()), Value::Null],
+        ]
+    );
+
+    let overflow = connection
+        .query("SELECT abs(value) FROM flexible WHERE id = 9")
+        .await
+        .expect_err("abs(i64::MIN) must retain SQLite's integer-overflow refusal");
+    assert!(overflow.to_string().contains("integer overflow"), "{overflow}");
+    assert_eq!(
+        connection
+            .query("SELECT id, typeof(value), value FROM flexible ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![
+            vec![Value::Int(1), Value::Text("integer".into()), Value::Int(-42)],
+            vec![Value::Int(2), Value::Text("real".into()), Value::Float(-1.5)],
+            vec![Value::Int(3), Value::Text("text".into()), Value::Text("-42".into())],
+            vec![Value::Int(4), Value::Text("text".into()), Value::Text("not numeric".into())],
+            vec![Value::Int(5), Value::Text("text".into()), Value::Text(String::new())],
+            vec![Value::Int(6), Value::Text("blob".into()), Value::Bytes(b"-4".to_vec())],
+            vec![Value::Int(7), Value::Text("blob".into()), Value::Bytes(vec![0, 255])],
+            vec![Value::Int(8), Value::Text("null".into()), Value::Null],
+            vec![Value::Int(9), Value::Text("integer".into()), Value::Int(i64::MIN)],
+        ],
+        "overflowing computed expression must not alter source rows"
+    );
+}
