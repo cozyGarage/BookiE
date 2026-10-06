@@ -291,6 +291,14 @@ generated changes; one was compile-time unviable, with no survivors or
 timeouts. The strict 163-test value run and quick layer passed on the working
 tree; details are in [value contracts](value-contracts.md).
 
+An October 6 ClickHouse 24.8 follow-up adds
+`Map(UInt8, Array(Tuple(String, Nullable(UInt128))))` to the nested consumer
+matrix. The native type/JSON oracle includes a UInt128 above `u64::MAX`, a NULL
+tuple field and an empty nested array; JSON/CSV retain the oracle value, while
+SQL literals, parameter binding and keyed edits refuse without changing the
+stored row. The focused case and all 33 ClickHouse integration tests passed
+([evidence](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
+
 Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
 BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms
