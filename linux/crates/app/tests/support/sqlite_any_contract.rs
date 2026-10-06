@@ -305,3 +305,4 @@ async fn sqlite_cast_blob_any_csv_round_trip_preserves_computed_bytes() {
         ]
     );
 }
+include!("sqlite_any_contract/length_csv.rs");
