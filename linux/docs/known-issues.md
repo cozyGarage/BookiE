@@ -45,6 +45,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-29 | ~~Editing a connection failed outright when the keyring was unavailable or its unlock was cancelled~~ | DONE | `prefill.rs` `readable` test; scenario `editing_a_saved_connection_*` | unit + gtk-installed |
 | UI-30 | ~~Find and replace fields had no accessible name~~ | DONE | Labels added; scenario `find_bar_replaces_every_match_in_the_editor` | gtk-installed |
 | UI-31 | ~~Every cell edit on a SQLite or DuckDB table asked for a manual write approval~~ | DONE | `policy/tests/generated_updates_classify.rs` across five engines; scenario `browse_edit_cell_and_save_persists_to_the_database` | unit + gtk-installed |
+| UI-32 | ~~Every grid edit or delete on PostgreSQL, MySQL and SQL Server asked for approval (`blast_radius_unknown`) because the count query ran without its bound values~~ | DONE | `guard_tests_checked.rs` (driver-enforced one-row bound, fail-closed cases kept); `checked_write_tests`; scenario `postgres_grid_edit_and_delete_commit_to_the_server` | unit + gtk-installed |
 | UI-10 | Multi-statement results use one switcher button per statement | OPEN | Named, pinnable result tabs in `outcomes.rs` | gtk-widget |
 | UI-11 | Sidebar is a flat tables and views list; other objects only in the Catalog window | OPEN | `GtkTreeListModel` tree | gtk-widget |
 | UI-12 | No database or schema switcher | OPEN | Core has no `list_databases`; plan with B4 | driver-docker |

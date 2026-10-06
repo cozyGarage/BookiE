@@ -42,7 +42,7 @@
 
 ### Fixed
 
-- Saving an edited cell in a SQLite or DuckDB table no longer asks for a manual write approval every time.
+- Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 
 - Ctrl+/ in the SQL editor now toggles a line comment instead of opening the keyboard shortcuts window.
 
