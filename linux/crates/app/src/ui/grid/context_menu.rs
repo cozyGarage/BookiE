@@ -369,6 +369,7 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool, filterabl
     menu.append_section(None, &display);
     let actions = gio::Menu::new();
     actions.append(Some(&crate::tr!("Export Results…")), Some("cell.export"));
+    actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
     if row_operations {
         actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));

@@ -1,5 +1,6 @@
 mod column;
 mod column_jump;
+mod column_visibility;
 mod context_menu;
 mod display;
 mod editing;
@@ -136,13 +137,25 @@ pub fn build_column_view(
         columns.push(col);
     }
 
+    let grid_actions = gtk4::gio::SimpleActionGroup::new();
+    column_visibility::install(
+        &column_view,
+        &grid_actions,
+        &columns,
+        result.columns.iter().map(|column| column.name.clone()).collect(),
+        connection_id
+            .zip(column_widths.clone())
+            .map(|(id, store)| (id, table.to_string(), store)),
+    );
     column_jump::install(
         &column_view,
+        &grid_actions,
         &columns,
         result.columns.iter().map(|column| column.name.clone()).collect(),
         connection_id,
         database,
     );
+    column_view.insert_action_group("grid", Some(&grid_actions));
 
     if let Some((col_idx, ascending)) = sort
         && let Some(col) = columns.get(col_idx)
