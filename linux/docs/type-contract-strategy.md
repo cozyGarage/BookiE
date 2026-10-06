@@ -457,6 +457,9 @@ match the native array bytes; Calc preserves the full shared-string cell
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
 has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
 JSON and wire oracles ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
+With `bytea_output = 'escape'`, the raw `bytea[]::text` projection now rebinds
+under both escape and hex output settings while preserving each element and
+native array bytes ([session evidence](evidence/postgres-bytea-array-output-escape-results-2026-10-06/manifest.json)).
 Custom enum-array SQL replay now also has a backslash label checked under all
 four PostgreSQL string-setting combinations against native array text, JSON,
 wire bytes and a preserved sibling
