@@ -431,7 +431,7 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names() {
+async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names_and_hidden_role_path() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let schema = "EnumCaseTarget";
@@ -560,6 +560,188 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names()
                 Value::Text("shadow-one".into()),
             ],
         ]
+    );
+
+    connection
+        .execute("CREATE ROLE mixed_case_enum_contract NOLOGIN")
+        .await
+        .unwrap();
+    connection
+        .execute("GRANT USAGE ON SCHEMA \"EnumCaseTarget\", enumcasetarget TO mixed_case_enum_contract")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "GRANT USAGE ON TYPE \"EnumCaseTarget\".\"StateKind\", enumcasetarget.statekind \
+             TO mixed_case_enum_contract",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("GRANT SELECT, UPDATE ON \"EnumCaseTarget\".\"Rows\" TO mixed_case_enum_contract")
+        .await
+        .unwrap();
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = crate::no_timeout();
+    let original_search_path = session
+        .query_params_controlled("SHOW search_path", &[], &control)
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    session
+        .query_params_controlled("SET ROLE mixed_case_enum_contract", &[], &control)
+        .await
+        .unwrap();
+    session
+        .query_params_controlled("SET search_path TO enumcasetarget, public", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled(
+                "SELECT current_user::text, current_setting('search_path')::text",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![
+            Value::Text("mixed_case_enum_contract".into()),
+            Value::Text("enumcasetarget, public".into()),
+        ]]
+    );
+
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some("EnumCaseTarget"),
+        "Rows",
+        &columns,
+        &[(1, Value::Text("target-only".into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("\"EnumCaseTarget\".\"StateKind\""), "{update_sql}");
+    session
+        .query_params_controlled(&update_sql, &update_params, &control)
+        .await
+        .unwrap();
+
+    let selected = session
+        .query_params_controlled(
+            "SELECT id, state::text, pg_typeof(state)::text \
+             FROM \"EnumCaseTarget\".\"Rows\" \
+             WHERE state IS NOT DISTINCT FROM $1 ORDER BY id",
+            &[Value::Text("target-only".into())],
+            &control,
+        )
+        .await
+        .unwrap();
+    let native_selected = connection
+        .query(
+            "SELECT id, state::text, pg_typeof(state)::text \
+             FROM \"EnumCaseTarget\".\"Rows\" \
+             WHERE state IS NOT DISTINCT FROM 'target-only'::\"EnumCaseTarget\".\"StateKind\" \
+             ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(selected.rows, native_selected.rows);
+    assert_eq!(
+        selected.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("target-only".into()),
+                Value::Text("\"EnumCaseTarget\".\"StateKind\"".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("target-only".into()),
+                Value::Text("\"EnumCaseTarget\".\"StateKind\"".into()),
+            ],
+        ]
+    );
+
+    let invalid = session
+        .query_params_controlled(
+            "UPDATE \"EnumCaseTarget\".\"Rows\" SET state = $1 WHERE id = 2",
+            &[Value::Text("shadow-only".into())],
+            &control,
+        )
+        .await
+        .expect_err("a shadow label must be rejected for the quoted target enum");
+    let native_invalid = connection
+        .query("SELECT 'shadow-only'::\"EnumCaseTarget\".\"StateKind\"")
+        .await
+        .expect_err("native target enum rejects the shadow-only label");
+    let sqlstate = |error: &tablepro_core::DriverError| match error {
+        tablepro_core::DriverError::Query { sqlstate, .. } => sqlstate.clone(),
+        _ => None,
+    };
+    assert_eq!(sqlstate(&invalid).as_deref(), Some("22P02"));
+    assert_eq!(sqlstate(&invalid), sqlstate(&native_invalid));
+
+    let target_rows = session
+        .query_params_controlled(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM \"EnumCaseTarget\".\"Rows\" ORDER BY id",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    session
+        .query_params_controlled(
+            "SELECT set_config('search_path', $1, false)",
+            &[original_search_path],
+            &control,
+        )
+        .await
+        .unwrap();
+    session
+        .query_params_controlled("RESET ROLE", &[], &control)
+        .await
+        .unwrap();
+    session.close().await.unwrap();
+    let native_target_rows = connection
+        .query(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM \"EnumCaseTarget\".\"Rows\" ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(target_rows.rows, native_target_rows.rows);
+    assert_eq!(
+        target_rows.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("target-only".into()),
+                Value::Text("\"EnumCaseTarget\".\"StateKind\"".into()),
+                Value::Text("target-one".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("target-only".into()),
+                Value::Text("\"EnumCaseTarget\".\"StateKind\"".into()),
+                Value::Text("target-two".into()),
+            ],
+        ]
+    );
+    let shadow_rows = connection
+        .query("SELECT id, state::text, sibling FROM enumcasetarget.rows ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        shadow_rows.rows,
+        vec![vec![
+            Value::Int(1),
+            Value::Text("ready".into()),
+            Value::Text("shadow-one".into()),
+        ]]
     );
 }
 
