@@ -32,10 +32,10 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-3 | ~~Saved connection cannot be cancelled while connecting~~ | DONE | PR #87, `cancellation_tests` | unit |
 | UI-3b | The connect dialog's own Connect button has no cancel | OPEN | `connect_dialog/mod.rs` | gtk-widget |
 | UI-4 | ~~New connection form defaults to ClickHouse; no file pickers; bare TLS error~~ | DONE | PR #87 | unit |
-| UI-5 | Test Connection result is a transient raw toast | OPEN | Inline result row in the dialog | gtk-widget |
+| UI-5 | ~~Test Connection result is a transient raw toast~~ | DONE | `test_result_text` test; scenarios `test_connection_reports_success_in_the_dialog` and `..._failure_...` | gtk-widget |
 | UI-6 | ~~`Ctrl+/` opened the shortcuts window instead of toggling an editor comment~~ | DONE | `window_shortcut_tests`; scenario `ctrl_slash_toggles_a_comment_in_the_editor` | gtk-installed |
 | UI-7 | ~~Editor has no find or replace~~ | DONE | PR #87, `find_bar` widget test | gtk-widget |
-| UI-7b | Find has no case or regex toggle | OPEN | `SearchSettings` flags | gtk-widget |
+| UI-7b | ~~Find has no case or regex toggle~~ | DONE | `find_bar` widget test covers match case and regex | gtk-widget |
 | UI-8 | ~~Second launch exits silently~~ | DONE | PR #87, verified with D-Bus on the runner | gtk-installed |
 | UI-8b | Second launch logs a GLib "did not unregister" warning | OPEN | Cosmetic | manual |
 | UI-9 | ~~No read-only viewer for long, JSON or binary cell values~~ | DONE | PR #91, `value_viewer` tests | unit + gtk-widget |
@@ -143,6 +143,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-20 | ~~No scenario proved the browse edit-and-save loop against a database with an independent oracle~~ | DONE | `browse_edit_cell_and_save_persists_to_the_database` (SQLite, real key presses, `sqlite3` read-back) | gtk-installed |
 | TEST-21 | ~~No installed-GTK scenario against a real PostgreSQL server~~ | DONE | `scripts/test-gtk-postgres.sh`: saved connection, keyring password, live rows, value viewer | gtk-installed |
 | TEST-22 | ~~The runner's default virtual CPU hid AVX, so MongoDB 7 containers exited and 29 driver tests failed~~ | DONE | `--cpu host`; MongoDB suite 31 of 31 on the runner | driver-docker |
+| TEST-23 | ~~No installed-GTK scenario against a real MySQL server~~ | DONE | `scripts/test-gtk-mysql.sh`: edit and delete reach the server, no approval prompt | gtk-installed |
 | TEST-17 | ~~No check that documentation links resolve~~ | DONE | `scripts/check-doc-links.py` in the harness | sandbox |
 
 ## Documentation and other
