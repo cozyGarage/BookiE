@@ -27,6 +27,37 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
         .unwrap();
     let columns = connection.fetch_columns(None, "flexible").await.unwrap();
     let before = connection.query("SELECT * FROM flexible ORDER BY id").await.unwrap();
+    let integer_index = columns
+        .iter()
+        .position(|column| column.name == "integer_amount")
+        .unwrap();
+    let decimal = parse_input_for_grid_cell(
+        "42.50",
+        Some(&columns[integer_index]),
+        "sqlite",
+        Some(&before.rows[0][integer_index]),
+    )
+    .unwrap();
+    assert_eq!(decimal, Value::Decimal("42.50".parse().unwrap()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "sqlite",
+        None,
+        "flexible",
+        &columns,
+        &[(integer_index, decimal)],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+    assert_eq!(
+        connection
+            .query("SELECT typeof(integer_amount), integer_amount FROM flexible WHERE id = 1")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("real".into()), Value::Float(42.5)]],
+        "an exact decimal edit in an INTEGER-affinity column remains a REAL"
+    );
 
     for (name, input) in [
         ("integer_amount", "9223372036854775808"),
