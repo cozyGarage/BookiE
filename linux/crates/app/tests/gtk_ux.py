@@ -16,6 +16,9 @@ class XWindowAttributes(ctypes.Structure):
     ]
 
 
+ATSPI_WINDOW_Y_OFFSET = 19
+
+
 def x11_click(window_x, window_y, button=3):
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
@@ -48,7 +51,7 @@ def x11_click(window_x, window_y, button=3):
         if children:
             x11.XFree(children)
         assert origin is not None, "the application window was not found on the X display"
-        xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y), 0)
+        xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y) + ATSPI_WINDOW_Y_OFFSET, 0)
         x11.XFlush(display)
         time.sleep(0.2)
         xtst.XTestFakeButtonEvent(display, button, 1, 0)
