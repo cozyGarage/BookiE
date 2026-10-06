@@ -1,0 +1,9 @@
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.17s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test enum_role_context_contract::value_contract_enum_parameter_stays_with_target_type_after_set_role ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 184 filtered out; finished in 2.37s
+
