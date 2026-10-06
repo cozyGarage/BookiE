@@ -8,6 +8,7 @@ use crate::map_sqlx_error;
 use crate::query::{statement_columns, statement_type_infos};
 
 const PG_LSN_OID: u32 = 3220;
+const MACADDR8_OID: u32 = 774;
 const MACADDR_OID: u32 = 829;
 
 pub(super) struct PgParameterDescription {
@@ -106,7 +107,7 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
         PgTypeKind::Simple
             if type_info
                 .oid()
-                .is_some_and(|oid| matches!(oid.0, PG_LSN_OID | MACADDR_OID)) =>
+                .is_some_and(|oid| matches!(oid.0, PG_LSN_OID | MACADDR_OID | MACADDR8_OID)) =>
         {
             if domain_depth >= 64 {
                 return Err(DriverError::Unsupported(
@@ -189,8 +190,14 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
                             buffer.extend(&8_i32.to_be_bytes());
                             buffer.extend(&encoded);
                         } else if has_base_oid(element_type, MACADDR_OID) {
-                            let encoded = encode_pg_macaddr(value).ok_or("invalid PostgreSQL macaddr array element")?;
+                            let encoded =
+                                encode_pg_mac_address::<6>(value).ok_or("invalid PostgreSQL macaddr array element")?;
                             buffer.extend(&6_i32.to_be_bytes());
+                            buffer.extend(&encoded);
+                        } else if has_base_oid(element_type, MACADDR8_OID) {
+                            let encoded =
+                                encode_pg_mac_address::<8>(value).ok_or("invalid PostgreSQL macaddr8 array element")?;
+                            buffer.extend(&8_i32.to_be_bytes());
                             buffer.extend(&encoded);
                         } else {
                             let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
@@ -232,8 +239,8 @@ fn has_base_oid(type_info: &PgTypeInfo, expected_oid: u32) -> bool {
     }
 }
 
-fn encode_pg_macaddr(value: &str) -> Option<[u8; 6]> {
-    let mut bytes = [0; 6];
+fn encode_pg_mac_address<const OCTETS: usize>(value: &str) -> Option<[u8; OCTETS]> {
+    let mut bytes = [0; OCTETS];
     let mut parts = value.split(':');
     for byte in &mut bytes {
         let part = parts.next()?;
@@ -546,7 +553,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::{encode_pg_lsn, encode_pg_macaddr, parse_text_array_text};
+    use super::{encode_pg_lsn, encode_pg_mac_address, parse_text_array_text};
     use tablepro_core::DriverError;
 
     #[test]
@@ -619,11 +626,11 @@ mod tests {
     #[test]
     fn value_contract_macaddr_array_elements_encode_six_octets_and_refuse_malformed_text() {
         assert_eq!(
-            encode_pg_macaddr("08:00:2b:01:02:03"),
+            encode_pg_mac_address::<6>("08:00:2b:01:02:03"),
             Some([0x08, 0x00, 0x2b, 0x01, 0x02, 0x03])
         );
         assert_eq!(
-            encode_pg_macaddr("AA:bb:CC:dd:EE:fF"),
+            encode_pg_mac_address::<6>("AA:bb:CC:dd:EE:fF"),
             Some([0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff])
         );
         for malformed in [
@@ -633,7 +640,23 @@ mod tests {
             "8:00:2b:01:02:03",
             "gg:00:2b:01:02:03",
         ] {
-            assert_eq!(encode_pg_macaddr(malformed), None, "{malformed}");
+            assert_eq!(encode_pg_mac_address::<6>(malformed), None, "{malformed}");
+        }
+    }
+
+    #[test]
+    fn value_contract_macaddr8_array_elements_encode_eight_octets_and_refuse_malformed_text() {
+        assert_eq!(
+            encode_pg_mac_address::<8>("08:00:2b:01:02:03:04:05"),
+            Some([0x08, 0x00, 0x2b, 0x01, 0x02, 0x03, 0x04, 0x05])
+        );
+        for malformed in [
+            "08:00:2b:01:02:03",
+            "08:00:2b:01:02:03:04:0g",
+            "08:00:2b:01:02:03:04:005",
+            "08:00:2b:01:02:03:04:05:06",
+        ] {
+            assert_eq!(encode_pg_mac_address::<8>(malformed), None, "{malformed}");
         }
     }
 }

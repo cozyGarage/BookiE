@@ -11,6 +11,7 @@
 - Result grids have a Columns… menu entry to hide and show columns; the choice is remembered per table and at least one column always stays visible.
 - PostgreSQL `pg_lsn[]` preserves all 64 LSN bits and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - PostgreSQL `macaddr[]` preserves canonical six-octet values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
+- PostgreSQL `macaddr8[]` preserves canonical eight-octet EUI-64 values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
@@ -35,7 +36,7 @@
 
 ### Changed
 
-- The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]` and `macaddr[]` result, typed binding, keyed update and CSV round-trip contracts; `macaddr8[]`, `inet[]`, `cidr[]` and other array families remain open.
+- The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]` and `macaddr8[]` result, typed binding, keyed update and CSV round-trip contracts; `inet[]`, `cidr[]` and other array families remain open.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.
 - The documentation link checker skips generated packaged Markdown and keeps checking source documents.
 - The SQLite B3 summary removes duplicate `quote()`/`instr()` evidence links and links both typed-CSV packets directly.
