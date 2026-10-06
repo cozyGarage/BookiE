@@ -114,6 +114,7 @@ pub struct App {
     /// alternative to a fire-and-forget 2 s toast that disappeared
     /// before the connection actually completed.
     connect_progress_toast: Option<adw::Toast>,
+    connect_cancel: Option<tokio_util::sync::CancellationToken>,
     reconnect_banner: adw::Banner,
     connections_factory: FactoryVecDeque<ConnectionRow>,
     connections_popover: gtk::Popover,
@@ -485,6 +486,7 @@ impl SimpleComponent for App {
             content_holder: widgets.content_holder.clone(),
             toast_overlay: widgets.toast_overlay.clone(),
             connect_progress_toast: None,
+            connect_cancel: None,
             reconnect_banner: widgets.reconnect_banner.clone(),
             connections_factory: workspace_chrome.connections_factory,
             connections_popover: widgets.connections_popover.clone(),
@@ -895,6 +897,8 @@ impl SimpleComponent for App {
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsInsert { tab_id, row_position } => self.on_copy_row_as_insert(tab_id, row_position),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),
+            AppMsg::CancelConnect => self.on_cancel_connect(),
+            AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
             AppMsg::EditConnectionFailed(message) => self.show_toast(&message),

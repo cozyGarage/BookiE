@@ -363,7 +363,10 @@ impl App {
         self.set_loading_page(
             &crate::tr!("Connecting…"),
             &crate::tr!("Opening {name}").replace("{name}", &saved.name),
+            &sender,
         );
+        let cancel = tokio_util::sync::CancellationToken::new();
+        self.connect_cancel = Some(cancel.clone());
         let registry = self.registry.clone();
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
@@ -373,13 +376,32 @@ impl App {
             shutdown
                 .register(async move {
                     let attempted = saved.clone();
-                    match connection_service::open_saved(registry, saved, timeout_secs, ssh_environment).await {
-                        Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
-                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
+                    let work = connection_service::open_saved(registry, saved, timeout_secs, ssh_environment);
+                    match connection_service::until_cancelled(&cancel, work).await {
+                        Some(Ok(prepared)) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
+                        Some(Err(e)) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
+                        None => sender_clone.input(AppMsg::ConnectionCancelled),
                     }
                 })
                 .drop_on_shutdown()
         });
+    }
+
+    pub(super) fn on_cancel_connect(&self) {
+        if let Some(cancel) = &self.connect_cancel {
+            cancel.cancel();
+        }
+    }
+
+    pub(super) fn on_connection_cancelled(&mut self) {
+        self.connect_cancel = None;
+        if self.connection_transition != ConnectionTransition::Connecting || self.prepared_connection.is_some() {
+            return;
+        }
+        self.connection_transition = ConnectionTransition::Idle;
+        self.switch_cancel_audit_was_disabled = None;
+        self.dismiss_loading_page();
+        self.show_toast(&crate::tr!("Connection cancelled."));
     }
 
     pub(super) fn on_connection_prepared(
@@ -395,6 +417,7 @@ impl App {
             tracing::warn!("discarding duplicate prepared connection");
             return;
         }
+        self.connect_cancel = None;
         self.dismiss_loading_page();
         self.prepared_connection = Some(*prepared);
         self.connection_transition = ConnectionTransition::AwaitingDecision;
@@ -411,6 +434,7 @@ impl App {
             tracing::warn!(error = %message, "discarding stale connection failure");
             return;
         }
+        self.connect_cancel = None;
         self.connection_transition = ConnectionTransition::Idle;
         self.prepared_connection = None;
         self.switch_cancel_audit_was_disabled = None;

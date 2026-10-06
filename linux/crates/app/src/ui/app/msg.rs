@@ -9,6 +9,8 @@ pub enum AppMsg {
     OpenConnect,
     ConnectionPrepared(Box<crate::services::connection_service::PreparedConnection>),
     ConnectionPrepareFailed(String, Box<SavedConnection>),
+    CancelConnect,
+    ConnectionCancelled,
     ConnectionSwitchDecision(super::types::SwitchDecision),
     DialogClosed,
     SelectTable {

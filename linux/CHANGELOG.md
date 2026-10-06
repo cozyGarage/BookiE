@@ -4,6 +4,7 @@
 
 ### Added
 
+- A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
 - The SQL editor has find and replace: Ctrl+F opens a search bar with next, previous, a match count, Replace and Replace All.
 - The connection form starts on PostgreSQL, offers file pickers for SQLite and DuckDB files and for the TLS certificate authority, and a TLS failure now says to check the TLS setting.

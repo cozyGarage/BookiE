@@ -204,7 +204,7 @@ installed-Wayland acceptance.
 | --- | --- | --- | --- |
 | UX-1 | Edit saved connection from the welcome row; password, TLS, timeouts and single-hop SSH prefill; jump chains refused with a message | G1 | Done, `56990e9f2` |
 | UX-2 | Connect failure offers Try Again and Edit Connection; startup restore failure uses the same alert | G2 | Done, `c1da1e39a` |
-| UX-3 | Cancel button on the connecting toast, reaching the transport | G3 | Open |
+| UX-3 | Cancel button on the connecting toast; abandoning the connect drops its tunnel | G3 | Done for saved connections; the connect dialog's own Connect button has no cancel yet |
 | UX-4 | PostgreSQL default driver, file pickers for SQLite/DuckDB and the CA, TLS handshake hint | G4, G5 | Done, `d8cb8464d` |
 | UX-5 | Editor find and replace; `Ctrl+F` routes by tab type | G6 | Done, `b00c5601a`; widget test registered in `isolated-tests.json` |
 | UX-6 | Second launch raises the running window; development profile documented | G8, G9 | Done, `209ca7fc7` |
