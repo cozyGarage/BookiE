@@ -193,16 +193,26 @@ for Phase 1.
 4. Keep a dogfood log of every friction point with steps. New items join this
    table as UX packets, not as B3/B4 tasks.
 
-### Phase 1: first hour fixed (target: one week, S-sized, safe files)
+### Phase 1: first hour fixed (S-sized, safe files)
 
-| ID | Packet | Gap | Acceptance |
+Status on branch `ux/phase1-first-hour` (from `origin/linux` at `cffde8ff2`).
+Each packet has unit tests; the GTK widget test and the second-launch check
+ran on the Arch runner under Xvfb with a D-Bus session. None of this is
+installed-Wayland acceptance.
+
+| ID | Packet | Gap | Status |
 | --- | --- | --- | --- |
-| UX-1 | Edit saved connection from the welcome row and the window menu | G1 | Changing host/password/TLS persists; secret stays in Secret Service; unit test for bound-id save |
-| UX-2 | Connect failure: Retry and Edit Connection actions; startup restore falls back to the welcome view | G2 | Pure state test for the recovery choice; manual check |
-| UX-3 | Cancel button on the connecting toast, reaching the transport | G3 | Cancelled connect leaves no registered connection |
-| UX-4 | Connect dialog: file pickers for SQLite and CA, "create new SQLite file", PostgreSQL as default driver, TLS hint when a local host fails the handshake | G4, G5 | Unit tests for default and hint selection |
-| UX-5 | Editor find and replace; `Ctrl+F` routes by focused tab | G6 | Shortcut routing unit test; manual check |
-| UX-6 | Second launch raises the existing window; document `TABLEPRO_PROFILE` in the README | G8, G9 | Manual check; README diff |
+| UX-1 | Edit saved connection from the welcome row; password, TLS, timeouts and single-hop SSH prefill; jump chains refused with a message | G1 | Done, `56990e9f2` |
+| UX-2 | Connect failure offers Try Again and Edit Connection; startup restore failure uses the same alert | G2 | Done, `c1da1e39a` |
+| UX-3 | Cancel button on the connecting toast, reaching the transport | G3 | Open |
+| UX-4 | PostgreSQL default driver, file pickers for SQLite/DuckDB and the CA, TLS handshake hint | G4, G5 | Done, `8981ec113` |
+| UX-5 | Editor find and replace; `Ctrl+F` routes by tab type | G6 | Done, `b00c5601a`; widget test registered in `isolated-tests.json` |
+| UX-6 | Second launch raises the running window; development profile documented | G8, G9 | Done, `209ca7fc7` |
+
+Known limits: editing a connection with an SSH jump chain is refused until the
+form can edit chains; replace-all and find use GtkSourceView search with the
+default case-insensitive setting and no regex toggle; the second launch logs a
+cosmetic GLib warning about D-Bus unregistration.
 
 ### Phase 2: daily workflows (two to three weeks)
 
@@ -236,3 +246,25 @@ B3-hot files or core contracts and is scheduled with that owner.
 - A UX packet does not close any B3, B4 or B7 acceptance item. B7
   qualification still needs installed Arch and Debian/GNOME runs at a frozen
   SHA.
+
+## Test infrastructure and later work
+
+### Arch runner VM (done)
+
+`bookie-ci` is VMID 260 on `pmox-lab03`: Arch Linux, 10 vCPU, 28 GB RAM, 300 GB
+disk, on `labnet`. It has the GTK 4.22 / libadwaita 1.9 / GtkSourceView 5.20
+stack that Debian 13 lacks, Rust 1.98 and stable, Docker, Xvfb, a D-Bus
+session and Weston. A full debug build takes about two minutes. The lab
+repository holds `scripts/provision-bookie-ci.sh` and
+`scripts/bookie-ci-run.sh <checkout> '<command>'`, which pushes a checkout's
+HEAD and runs the command there with a shared target cache. `ai-lab01` on
+`pmox-lab01` was left alone: that node crashed under sustained full-core load.
+
+### Open items
+
+| Item | Notes |
+| --- | --- |
+| File-size guard failing on `origin/linux` | `crates/drivers/postgres/tests/support/enum_contract_parts/scalar_consumers.rs` is 1384 lines against a 1369 ceiling after PR #84, so `scripts/preflight.sh` stops at that guard. B3 owns the fix |
+| Translations template is stale | `scripts/update-translations.py` rewrites about 2,400 lines of `po/tablepro.pot`; run it once on its own commit, not inside feature commits |
+| Cross-client value comparison | Build further lab VMs holding several database engines with seeded data, install DBeaver and dbx there (or on the runner), and compare what BookiE shows for the same values. Uses ADR 0007 outcomes as the oracle; feeds B3 evidence, not the UX lane. Schedule after UX Phase 2 |
+| Installed-desktop checks | Wayland and light/dark screenshots of the UX-1 to UX-6 flows still need the Arch/Omarchy installed pass in [manual verification](manual-verification-0.2-features.md) |
