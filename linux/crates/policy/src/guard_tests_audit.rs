@@ -853,12 +853,13 @@ impl<'writer> tracing_subscriber::fmt::MakeWriter<'writer> for CapturedLogs {
 
 #[tokio::test(flavor = "current_thread")]
 async fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
+    use tracing::instrument::WithSubscriber;
+
     let logs = CapturedLogs::default();
     let subscriber = tracing_subscriber::fmt()
         .with_writer(logs.clone())
         .with_max_level(tracing::Level::TRACE)
         .finish();
-    let _scope = tracing::subscriber::set_default(subscriber);
     let guard = PolicyGuard::new(
         Arc::new(PanickingConn),
         context(
@@ -873,6 +874,7 @@ async fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
 
     let error = guard
         .list_tables()
+        .with_subscriber(subscriber)
         .await
         .expect_err("a panicking driver must surface as an error");
 

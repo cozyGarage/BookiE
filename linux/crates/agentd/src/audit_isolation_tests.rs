@@ -166,7 +166,9 @@ async fn an_interrupted_write_blocks_only_its_own_connection_and_a_replacement_r
 #[tokio::test]
 async fn a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy() {
     let provider = provider();
-    let saved = local_connection();
+    let mut saved = local_connection();
+    // This test covers session retirement, not external credential loading.
+    saved.driver_id = "sqlite".into();
     let connection: Arc<dyn Connection> = Arc::new(WriteProbe {
         hang: false,
         panic: true,
