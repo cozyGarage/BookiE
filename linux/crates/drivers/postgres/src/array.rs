@@ -1,5 +1,5 @@
-use sqlx::ValueRef;
 use sqlx::postgres::{PgTypeInfo, PgTypeKind, PgValueFormat, PgValueRef};
+use sqlx::{TypeInfo, ValueRef};
 use tablepro_core::Value;
 
 pub(super) const MAX_ARRAY_TEXT_BYTES: usize = 16 * 1024 * 1024;
@@ -17,13 +17,13 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     };
     let element_oid = element.oid()?.0;
     let value_oid = base_oid(element)?;
-    let enum_element = is_enum_element(element);
+    let text_element = is_text_element(element);
     match raw.format() {
         PgValueFormat::Binary => {
             let bytes = raw.as_bytes().ok()?;
             let text = match info.oid()?.0 {
                 INT2VECTOR_OID | OIDVECTOR_OID => decode_vector(bytes, element_oid),
-                _ => decode_binary_with_oid(bytes, element_oid, value_oid, enum_element),
+                _ => decode_binary_with_oid(bytes, element_oid, value_oid, text_element),
             }?;
             Some(Value::Text(text))
         }
@@ -31,11 +31,17 @@ pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     }
 }
 
-fn is_enum_element(info: &PgTypeInfo) -> bool {
-    match info.kind() {
-        PgTypeKind::Enum(_) => true,
-        PgTypeKind::Domain(base) => is_enum_element(base),
-        _ => false,
+pub(super) fn is_text_element(info: &PgTypeInfo) -> bool {
+    let mut current = info;
+    loop {
+        match current.kind() {
+            PgTypeKind::Enum(_) => return true,
+            PgTypeKind::Domain(base) => current = base,
+            // ponytail: PgTypeInfo omits custom namespaces; if unrelated
+            // simple types named citext are used, verify extension membership by OID.
+            PgTypeKind::Simple => return current.name().eq_ignore_ascii_case("citext"),
+            _ => return false,
+        }
     }
 }
 
@@ -106,11 +112,11 @@ fn read_dimensions(reader: &mut Reader<'_>, count: usize) -> Option<(Vec<Dimensi
 }
 
 #[cfg(test)]
-fn decode_binary(bytes: &[u8], expected_oid: u32, enum_element: bool) -> Option<String> {
-    decode_binary_with_oid(bytes, expected_oid, expected_oid, enum_element)
+fn decode_binary(bytes: &[u8], expected_oid: u32, text_element: bool) -> Option<String> {
+    decode_binary_with_oid(bytes, expected_oid, expected_oid, text_element)
 }
 
-fn decode_binary_with_oid(bytes: &[u8], expected_oid: u32, value_oid: u32, enum_element: bool) -> Option<String> {
+fn decode_binary_with_oid(bytes: &[u8], expected_oid: u32, value_oid: u32, text_element: bool) -> Option<String> {
     let mut reader = Reader { remaining: bytes };
     let count = reader.integer()?;
     let flags = reader.integer()?;
@@ -118,7 +124,7 @@ fn decode_binary_with_oid(bytes: &[u8], expected_oid: u32, value_oid: u32, enum_
     if !(0..=6).contains(&count)
         || !matches!(flags, 0 | 1)
         || oid != expected_oid
-        || (!enum_element && !supported(value_oid))
+        || (!text_element && !supported(value_oid))
     {
         return None;
     }
@@ -137,7 +143,7 @@ fn decode_binary_with_oid(bytes: &[u8], expected_oid: u32, value_oid: u32, enum_
             &mut reader,
             &dimensions,
             value_oid,
-            enum_element,
+            text_element,
             flags == 1,
             &mut output,
         )?;
@@ -149,7 +155,7 @@ fn append_dimension(
     reader: &mut Reader<'_>,
     dimensions: &[Dimension],
     oid: u32,
-    enum_element: bool,
+    text_element: bool,
     allows_null: bool,
     output: &mut String,
 ) -> Option<()> {
@@ -165,10 +171,10 @@ fn append_dimension(
                 output.push_str("NULL");
             } else {
                 let bytes = read_bounded_element(reader, length)?;
-                append_quoted(output, &element_text(oid, enum_element, bytes)?)?;
+                append_quoted(output, &element_text(oid, text_element, bytes)?)?;
             }
         } else {
-            append_dimension(reader, rest, oid, enum_element, allows_null, output)?;
+            append_dimension(reader, rest, oid, text_element, allows_null, output)?;
         }
         if output.len() >= MAX_ARRAY_TEXT_BYTES {
             return None;
@@ -234,8 +240,8 @@ fn supported(oid: u32) -> bool {
     )
 }
 
-fn element_text(oid: u32, enum_element: bool, bytes: &[u8]) -> Option<String> {
-    if enum_element {
+fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
+    if text_element {
         return Some(std::str::from_utf8(bytes).ok()?.into());
     }
     Some(match oid {

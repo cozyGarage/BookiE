@@ -7,14 +7,14 @@ evidence packet, and this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
 
-PostgreSQL scalar `citext` preserves exact label text while comparisons remain
-case-insensitive. The new `citext[]` regression confirms that non-null arrays
-still decode as `Undecodable("CITEXT[]")` (including empty arrays), while SQL
-NULL remains distinct and CSV displays the undecodable marker. SQL literal and
-parameter consumers refuse the value. This is a confirmed open B3 capability:
-safe typed support needs qualified custom-array type metadata through query and
-import planning; the test does not mark that capability complete
-([refusal evidence](evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json)).
+PostgreSQL `citext` scalar and array values preserve exact label text while
+comparisons remain case-insensitive. `citext[]` now round-trips SQL NULL, empty
+arrays, zero lower bounds, empty elements, literal `NULL`, quoting and Unicode
+through result decoding, typed parameter binding, keyed grid edits and CSV
+export/import. Native `array_send`, JSON, type and sibling-row checks are the
+oracles; malformed array text and same-named composite types are refused without
+data loss ([evidence](evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json)).
+Other custom PostgreSQL array families remain open.
 
 PostgreSQL `bit[]` and `varbit[]` now decode from their native array wire
 format. Fixed-width values, varying lengths, empty bit strings, SQL NULL,
