@@ -302,6 +302,21 @@ def scenarios(ui):
             time.sleep(ui.POLL_SECONDS)
         assert oracle(sql) == expected, (sql, oracle(sql), expected)
 
+    def postgres_database_switcher_reconnects_to_the_chosen_database(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.wait_for_node(name="public.people", role=pyatspi.ROLE_LIST_ITEM)
+        ui.invoke(ui.wait_for_node(name="Switch database", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="bookie_test")
+        ui.invoke(ui.wait_for_node(name="bookie_other", role=pyatspi.ROLE_LIST_ITEM))
+        ui.wait_for_node(name="public.other_things", role=pyatspi.ROLE_LIST_ITEM)
+        ui.wait_for_node(name="public.people", role=pyatspi.ROLE_LIST_ITEM, present=False)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and {c["name"]: c["database"] for c in saved_connections(base)}.get(ui.POSTGRES_CONNECTION_NAME) != "bookie_other":
+            time.sleep(ui.POLL_SECONDS)
+        databases = {connection["name"]: connection["database"] for connection in saved_connections(base)}
+        assert databases[ui.POSTGRES_CONNECTION_NAME] == "bookie_other", databases
+
     def mysql(sql):
         import subprocess
         out = subprocess.run(
@@ -332,6 +347,7 @@ def scenarios(ui):
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
+        result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     for scenario in result:
         scenario.environment = "local"
     return result

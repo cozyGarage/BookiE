@@ -27,6 +27,12 @@ pub enum AppMsg {
     ReloadConnections,
     ConnectionsLoaded(Vec<SavedConnection>),
     OpenSaved(SavedConnection),
+    LoadDatabases,
+    DatabasesLoaded {
+        connection_id: Uuid,
+        result: Result<Vec<String>, String>,
+    },
+    SwitchDatabase(String),
     DeleteConnection(Uuid),
     EditConnection(SavedConnection),
     EditConnectionLoaded(Box<crate::ui::connect_dialog::ConnectionPrefill>),
