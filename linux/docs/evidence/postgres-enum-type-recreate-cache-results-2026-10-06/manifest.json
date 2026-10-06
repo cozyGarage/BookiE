@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-06",
+  "case": "PostgreSQL enum drop/recreate with a warm client cache",
+  "source_commit": "4f51bdb7cbdd9d15ad88459af41d9dd8e66836a3",
+  "source_sha256": {
+    "crates/drivers/postgres/src/lib.rs": "499f087b80df60e775a4cf88b19cf223d686002dbc1702111379cfb4acc66346",
+    "crates/drivers/postgres/src/session.rs": "4ed2788f10b0291a858712f3cd63da5aef3919b4ccde32945d0dde599b95e621",
+    "crates/drivers/postgres/tests/support/array_contract_parts/enum_catalog_changes.rs": "57f259a2c4808500b8928643bfc52c97085fac0934e2f237781b20e76fb2d879"
+  },
+  "initial_behavior": "A previously prepared enum_range query failed after another session dropped and recreated its enum with XX000: cache lookup failed for type.",
+  "contract": [
+    "Warm pooled query, controlled session query and execute statements before replacing a target enum while a same-named shadow enum leads search_path.",
+    "After recreation, verify the prepared query returns the new labels, qualified array metadata, distinct replacement scalar/array OIDs and PostgreSQL array_send bytes.",
+    "Clear cached statements and retry only the matching stale-type-cache error on non-transactional query and execute paths; transaction operations do not retry inside an aborted transaction."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_drop_and_recreate_refreshes_a_warm_session_type_oid -- --ignored --nocapture",
+      "result": "1 passed; Docker-backed PostgreSQL 16"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --lib",
+      "result": "44 passed"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "rtk cargo fmt --check",
+      "result": "passed"
+    }
+  ],
+  "status": "Focused enum cache-transition case passed; B3 remains open."
+}
