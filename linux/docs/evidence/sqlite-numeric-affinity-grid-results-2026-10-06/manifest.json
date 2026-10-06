@@ -2,10 +2,10 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/sqlite-numeric-affinity-grid",
-  "source_commit": "e5bfe4ac31d8b5d2c13ba22d29a529783e240749",
+  "source_commit": "46d1377c510851c19c28f765bd45a4fa2aa40bdd",
   "source_sha256": {
     "crates/app/src/ui/browse_tab/value_parse.rs": "c5082b8b3c2a19168a35a409c9b5c69c42220a860a4175a5014eb0a5fe8209ca",
-    "crates/app/tests/support/sqlite_numeric_affinity.rs": "2492773c66c5483272077ac5f04e0ca50a7dd7c7fc2d43f8ed2dbce588be0d66",
+    "crates/app/tests/support/sqlite_numeric_affinity.rs": "dc4ced491223d505ac9e278e40d479e91497a860b3b30ef8a8a61f6b8eb4159f",
     "crates/core/src/import/cell.rs": "cfcae37f44bdd6ef9625c865861c984d9cfb5dcabe18d801099fa97835e74274",
     "crates/core/src/import/cell/tests/sqlite_affinity.rs": "892faa3e15d6f2632cf3d34ac97cb0ff1a93413bfd213eb45ad2de4586b7f3b3",
     "crates/core/src/lib.rs": "bf52185b3f220408f6616f62a8b641743658ce4c93c55e659838791829560f5d",
@@ -17,7 +17,8 @@
   "contract": [
     "SQLite INTEGER, REAL and NUMERIC grid edits retain clearly nonnumeric input as TEXT; MySQL and SQL Server remain strict.",
     "Exactly representable decimal inputs such as 42.50 remain accepted for SQLite numeric affinity columns; numeric-looking overflow and excess precision are rejected before affinity can round them.",
-    "Native SQLite typeof() confirms edited/imported storage classes and untouched sibling rows retain their original native values."
+    "Native SQLite typeof() confirms edited/imported storage classes and untouched sibling rows retain their original native values.",
+    "A live keyed grid edit of 42.50 in an INTEGER-affinity column stores REAL 42.5; storage class, exact value and sibling row assertions guard the conversion."
   ],
   "validation": {
     "focused_test": {
@@ -58,7 +59,7 @@
     }
   },
   "log_sha256": {
-    "focused.txt": "a9db14ef276e04b06bc75a481b7192e6f552ca9d0213cae71ccafa7eb2e6bbba",
+    "focused.txt": "d0793069ad00b7a6246ef7917507f65d39ca31007e5dcab98fd20cbb423fbdc7",
     "core-focused.txt": "d32c5fc38c5b1852219c674e1cfc07a49fa7dc8f2cdb7213fba7533e80178410",
     "csv-focused.txt": "53a55499ca0b7eaa96e42bf8eba8180056d74b5c50eac205333bbe5d3da8af47",
     "core-lib.txt": "7429be8bdf55fd51c6238b6ab82eedaeee0c8a2fd67fcc7587976193d24e880a",
