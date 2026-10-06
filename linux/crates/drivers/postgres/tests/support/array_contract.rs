@@ -75,6 +75,10 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
             "macaddr[]",
             "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]",
         ),
+        (
+            "macaddr8[]",
+            "'[0:2]={08:00:2b:01:02:03:04:05,NULL,AA:BB:CC:DD:EE:FF:00:11}'::macaddr8[]",
+        ),
     ] {
         let sql = format!("SELECT ({expression}) AS value, encode(array_send({expression}), 'hex') AS wire");
         let result = connection.query(&sql).await.unwrap();
@@ -601,6 +605,10 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         (
             "macaddr[]",
             "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]",
+        ),
+        (
+            "macaddr8[]",
+            "'[0:2]={08:00:2b:01:02:03:04:05,NULL,AA:BB:CC:DD:EE:FF:00:11}'::macaddr8[]",
         ),
     ];
     let definitions = cases
