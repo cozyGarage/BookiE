@@ -93,7 +93,7 @@ pub fn run() {
         use gtk4::prelude::*;
         relm4::main_application().connect_activate(|app| {
             if let Some(window) = app.active_window() {
-                tracing::info!("another launch asked this instance to show its window");
+                tracing::info!("main window activated");
                 window.present();
             }
         });
