@@ -32,7 +32,7 @@ pub fn run() {
     let _instance_lock = match services::single_instance::acquire() {
         Ok(lock) => Some(lock),
         Err(services::single_instance::LockError::AlreadyRunning) => {
-            tracing::info!("another BookiE instance is running; exiting");
+            services::single_instance::raise_running_instance(config::APP_ID);
             return;
         }
         Err(e) => {
@@ -89,6 +89,15 @@ pub fn run() {
     let mcp_bridge = mcp_server.as_ref().map(|server| server.bridge.clone());
     enable_system_openssh(database.clone());
 
+    {
+        use gtk4::prelude::*;
+        relm4::main_application().connect_activate(|app| {
+            if let Some(window) = app.active_window() {
+                tracing::info!("another launch asked this instance to show its window");
+                window.present();
+            }
+        });
+    }
     let app = RelmApp::new(config::APP_ID);
     app.run::<ui::App>(ui::AppInit {
         registry,

@@ -92,6 +92,14 @@ cd linux
 cargo run -p tablepro-app
 ```
 
+A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/tablepro-devel` and its own keyring schema:
+
+```bash
+TABLEPRO_PROFILE=development cargo run -p tablepro-app
+```
+
+Starting a second copy of the same profile asks the running one to show its window and then exits.
+
 ### SQL Server Kerberos
 
 Run `kinit` before connecting and confirm the ticket with `klist`. Select **Windows (Kerberos)** in the SQL Server connection form and enter the server's real DNS hostname. SQL Server requests `MSSQLSvc/<host>:<port>`, including when SSH forwards the socket through localhost.
