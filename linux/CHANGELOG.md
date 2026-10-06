@@ -13,6 +13,7 @@
 - PostgreSQL `macaddr[]` preserves canonical six-octet values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - PostgreSQL `macaddr8[]` preserves canonical eight-octet EUI-64 values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 addresses, prefixes, SQL NULL and array bounds through results, inferred typed bindings, keyed updates and typed CSV import; invalid prefixes and non-network CIDR host bits are refused without changing target or sibling rows.
+- PostgreSQL custom enum identifiers preserve metadata and keyed edits when a mixed-case quoted schema/type collides with lowercase names earlier in `search_path`; native catalog and shadow-row checks verify the selected type.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
