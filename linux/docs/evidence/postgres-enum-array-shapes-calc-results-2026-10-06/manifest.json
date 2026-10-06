@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-enum-array-workbook-shapes",
+  "source_commit": "f695db0a226109fd6403757a35b7c443c832fca0",
+  "working_tree_note": "The tested source file matches source_commit; evidence files were generated in the working tree after the source commit.",
+  "case": "PostgreSQL custom enum-array multidimensional XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs": "6deb78bf55e528d339b6f85e0421ee5a3fcf18da58a3ffda37a3f0daf4fc090a",
+    "scripts/xlsx_roundtrip.py": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a",
+    "docs/evidence/postgres-enum-array-shapes-calc-results-2026-10-06/verify_roundtrip.py": "731634d41f71d2cdce75e6986949d39ae6276921920896066341bf30fb81456c"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3",
+    "container_image": "tablepro-lo-calc@sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c"
+  },
+  "contract": [
+    "A 2 by 6 custom enum array with dimensions [0:1][-4:1] preserves literal NULL, an empty label, a SQL NULL element, Unicode, quotes, whitespace, a backslash, and a formula-shaped label.",
+    "PostgreSQL type, dimensions, JSON, array_send bytes and typed rebinding agree; SQL replay restores the same array bytes and preserves a sibling row.",
+    "Calc re-saves the XLSX as ODS and back to XLSX; all three workbooks retain the exact array text in a string cell without formulas."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx rtk proxy cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "soffice --headless --convert-to ods --outdir <evidence-dir> source.xlsx",
+        "soffice --headless --convert-to xlsx --outdir <evidence-dir> calc-roundtrip.ods"
+      ],
+      "version_log": "libreoffice-version.txt",
+      "log": "calc-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "result": "Exact array text, string-cell type, and no-formula assertions pass on source XLSX, Calc-saved ODS, and Calc-saved XLSX.",
+      "log": "consumer-check.txt",
+      "checker_sha256": "731634d41f71d2cdce75e6986949d39ae6276921920896066341bf30fb81456c",
+      "shared_checker": "scripts/xlsx_roundtrip.py",
+      "shared_checker_sha256": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "ae51244e45107e1acaf020c17cb3c0ee633b7f88a0f5d7003b27d4b3c4c1064a",
+    "calc-roundtrip.ods": "0ebcc8d403d5800143af8735eb53cd70dc8b65c80916cdf0ab60062bfbd75b9a",
+    "calc-roundtrip.xlsx": "c7c4dc0e7e0a216e9765a19a77d763599fd44a9a2072f0087f5e2ceeaf2584a5"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "56721ccd7f74970c0da1fe0dec0af6aff1528cd6c90e94f6db725b07d23305e7",
+    "calc-run.txt": "0ea394e838054cca973e159ee4acc2890bbfb41a6c61fad50d0b76c9d6985454",
+    "libreoffice-version.txt": "8d65d53d9fc8f6caaeaa16013977052dc4bda05564f797a246690fe81f3d00c7",
+    "consumer-check.txt": "caffdb8ecff2eb09ee93351c9edbbfa02163a34e135ef56d0903187d59f771cf"
+  },
+  "remaining": [
+    "Other spreadsheet applications and enum-array shape permutations remain open."
+  ]
+}

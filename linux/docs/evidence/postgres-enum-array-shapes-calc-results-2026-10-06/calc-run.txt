@@ -1,0 +1,2 @@
+convert /work/source.xlsx as a Calc document -> /work/source.ods using filter : calc8
+convert /work/calc-roundtrip.ods as a Calc document -> /work/calc-roundtrip.xlsx using filter : Calc Office Open XML

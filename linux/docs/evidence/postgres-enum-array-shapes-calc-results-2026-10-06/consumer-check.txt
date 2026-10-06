@@ -1,0 +1,1 @@
+LibreOffice Calc preserved enum[] shape, bounds, NULL distinctions, and string-cell text across XLSX/ODS/XLSX

@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-enum-array-workbook-shapes",
+  "source_commit": "f695db0a226109fd6403757a35b7c443c832fca0",
+  "working_tree_note": "The tested source file matches source_commit; evidence files were generated in the working tree after the source commit.",
+  "case": "PostgreSQL custom enum-array multidimensional XLSX re-import through Gnumeric",
+  "test": "array_contract::value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs": "6deb78bf55e528d339b6f85e0421ee5a3fcf18da58a3ffda37a3f0daf4fc090a",
+    "scripts/xlsx_roundtrip.py": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a",
+    "docs/evidence/postgres-enum-array-shapes-gnumeric-results-2026-10-06/verify_roundtrip.py": "9149a3d7dfd321190ac9d9e5160cd012271c67f597ee91a35d2d80a3b301a52f"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "Gnumeric",
+    "version": "1.12.57",
+    "container_image": "tablepro-gnumeric@sha256:b4e641af0a7a20dba709b3959b24f0d7ff753cb3c37309f112f2aa0537eeb1d1"
+  },
+  "contract": [
+    "A 2 by 6 custom enum array with dimensions [0:1][-4:1] preserves literal NULL, an empty label, a SQL NULL element, Unicode, quotes, whitespace, a backslash, and a formula-shaped label.",
+    "PostgreSQL type, dimensions, JSON, array_send bytes and typed rebinding agree; SQL replay restores the same array bytes and preserves a sibling row.",
+    "Gnumeric re-saves the XLSX as ODS and back to XLSX; all three workbooks retain the exact array text in a string cell without formulas."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx rtk proxy cargo test --locked -p tablepro-driver-postgres --test integration value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "gnumeric_round_trip": {
+      "steps": [
+        "ssconvert source.xlsx gnumeric-roundtrip.ods",
+        "ssconvert gnumeric-roundtrip.ods gnumeric-roundtrip.xlsx"
+      ],
+      "version_log": "gnumeric-version.txt",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "result": "Exact array text, string-cell type, and no-formula assertions pass on source XLSX, Gnumeric-saved ODS, and Gnumeric-saved XLSX.",
+      "log": "consumer-check.txt",
+      "checker_sha256": "9149a3d7dfd321190ac9d9e5160cd012271c67f597ee91a35d2d80a3b301a52f",
+      "shared_checker": "scripts/xlsx_roundtrip.py",
+      "shared_checker_sha256": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a"
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "eb449bb42431d757a55b84b79c47f0712d2694387dbedd45cef53228c379aaef",
+    "gnumeric-roundtrip.ods": "46f68293234ea8f2035ed9a11bedb0e590b5eef26b34ef259ab527c961432009",
+    "gnumeric-roundtrip.xlsx": "e7f52c49eae42e445bc40cba3f33746bdccdf332d6c405137b008cd58d1e93a0"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "5b1d68c03c05f5c730ffb0e5fcad3fce5064851bfe32242aebfb6ad1966f8b03",
+    "gnumeric-run.txt": "8b9aa02b198ec49c21c8af5cf1782d3b2a85e55d47c5699b08dbc7d6f4c504a8",
+    "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
+    "consumer-check.txt": "6e2ca88411544032a530c992bf357141f6663456e6721c5f12e90d249c22ca75"
+  },
+  "remaining": [
+    "Other spreadsheet applications and enum-array shape permutations remain open."
+  ]
+}
