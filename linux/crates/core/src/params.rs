@@ -109,7 +109,7 @@ pub fn extract_named_parameters(sql: &str, driver_id: &str) -> NamedParameters {
     while index < bytes.len() {
         let rest = &sql[index..];
 
-        if let Some(length) = skip_span(rest, driver_id) {
+        if let Some(length) = skip_span(rest, driver_id).filter(|length| *length > 0) {
             out.push_str(&sql[index..index + length]);
             index += length;
             continue;
