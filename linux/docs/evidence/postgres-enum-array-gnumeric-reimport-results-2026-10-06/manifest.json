@@ -40,7 +40,7 @@
       "result": "Exact array string, string cell type, and no-formula assertions pass in source XLSX, re-saved ODS, and re-saved XLSX.",
       "log": "consumer-check.txt",
       "checker_sha256": "e183eb9dc415e94dc46f471f20c0772e7e32ae6a003a9be84f48096f54dd1858",
-      "shared_checker_sha256": "a152f7e9932ac9782acd780a9a64fb89a6ee4faa37b6174b5affc8e5a8f7de07"
+      "shared_checker_sha256": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a"
     }
   },
   "artifact_sha256": {
