@@ -164,41 +164,6 @@ impl Type<Postgres> for PgInferredTextParameter<'_> {
     }
 }
 
-fn encode_array_element(
-    buffer: &mut PgArgumentBuffer,
-    element_type: &PgTypeInfo,
-    value: &str,
-) -> Result<(), sqlx::error::BoxDynError> {
-    if has_base_oid(element_type, PG_LSN_OID) {
-        let encoded = encode_pg_lsn(value).ok_or("invalid PostgreSQL pg_lsn array element")?;
-        buffer.extend(&8_i32.to_be_bytes());
-        buffer.extend(&encoded);
-    } else if has_base_oid(element_type, MACADDR_OID) {
-        let encoded = encode_pg_mac_address::<6>(value).ok_or("invalid PostgreSQL macaddr array element")?;
-        buffer.extend(&6_i32.to_be_bytes());
-        buffer.extend(&encoded);
-    } else if has_base_oid(element_type, MACADDR8_OID) {
-        let encoded = encode_pg_mac_address::<8>(value).ok_or("invalid PostgreSQL macaddr8 array element")?;
-        buffer.extend(&8_i32.to_be_bytes());
-        buffer.extend(&encoded);
-    } else if has_base_oid(element_type, INET_OID) {
-        let encoded = encode_pg_network(value, false).ok_or("invalid PostgreSQL inet array element")?;
-        let length = i32::try_from(encoded.len()).map_err(|_| "array element is too large")?;
-        buffer.extend(&length.to_be_bytes());
-        buffer.extend(&encoded);
-    } else if has_base_oid(element_type, CIDR_OID) {
-        let encoded = encode_pg_network(value, true).ok_or("invalid PostgreSQL cidr array element")?;
-        let length = i32::try_from(encoded.len()).map_err(|_| "array element is too large")?;
-        buffer.extend(&length.to_be_bytes());
-        buffer.extend(&encoded);
-    } else {
-        let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
-        buffer.extend(&length.to_be_bytes());
-        buffer.extend(value.as_bytes());
-    }
-    Ok(())
-}
-
 impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
     fn encode_by_ref(&self, buffer: &mut PgArgumentBuffer) -> Result<IsNull, sqlx::error::BoxDynError> {
         if let Some(elements) = &self.text_array {
@@ -219,12 +184,7 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
                 buffer.extend(&length.to_be_bytes());
                 buffer.extend(&lower_bound.to_be_bytes());
             }
-            for element in &elements.elements {
-                match element {
-                    Some(value) => encode_array_element(buffer, element_type, value)?,
-                    None => buffer.extend(&(-1_i32).to_be_bytes()),
-                }
-            }
+            encode_inferred_array_elements(buffer, element_type, &elements.elements)?;
             return Ok(IsNull::No);
         }
         match self.value {
@@ -243,6 +203,43 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
     fn size_hint(&self) -> usize {
         self.value.map_or(0, str::len)
     }
+}
+
+fn encode_inferred_array_elements(
+    buffer: &mut PgArgumentBuffer,
+    element_type: &PgTypeInfo,
+    elements: &[Option<String>],
+) -> Result<(), sqlx::error::BoxDynError> {
+    for element in elements {
+        let Some(value) = element else {
+            buffer.extend(&(-1_i32).to_be_bytes());
+            continue;
+        };
+        if has_base_oid(element_type, PG_LSN_OID) {
+            let encoded = encode_pg_lsn(value).ok_or("invalid PostgreSQL pg_lsn array element")?;
+            buffer.extend(&8_i32.to_be_bytes());
+            buffer.extend(&encoded);
+        } else if has_base_oid(element_type, MACADDR_OID) {
+            let encoded = encode_pg_mac_address::<6>(value).ok_or("invalid PostgreSQL macaddr array element")?;
+            buffer.extend(&6_i32.to_be_bytes());
+            buffer.extend(&encoded);
+        } else if has_base_oid(element_type, MACADDR8_OID) {
+            let encoded = encode_pg_mac_address::<8>(value).ok_or("invalid PostgreSQL macaddr8 array element")?;
+            buffer.extend(&8_i32.to_be_bytes());
+            buffer.extend(&encoded);
+        } else if has_base_oid(element_type, INET_OID) || has_base_oid(element_type, CIDR_OID) {
+            let encoded = encode_pg_network(value, has_base_oid(element_type, CIDR_OID))
+                .ok_or("invalid PostgreSQL network array element")?;
+            let length = i32::try_from(encoded.len()).map_err(|_| "array element is too large")?;
+            buffer.extend(&length.to_be_bytes());
+            buffer.extend(&encoded);
+        } else {
+            let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
+            buffer.extend(&length.to_be_bytes());
+            buffer.extend(value.as_bytes());
+        }
+    }
+    Ok(())
 }
 
 fn has_base_oid(type_info: &PgTypeInfo, expected_oid: u32) -> bool {

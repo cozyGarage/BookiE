@@ -115,6 +115,7 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
 include!("array_contract_parts/result_consumers_text.rs");
 include!("array_contract_parts/result_consumers_numeric.rs");
 include!("array_contract_parts/result_consumers_temporal.rs");
+include!("array_contract_parts/network_array_consumers.rs");
 include!("array_contract_parts/citext_array_consumers.rs");
 include!("array_contract_parts/bit_array_consumers.rs");
 
