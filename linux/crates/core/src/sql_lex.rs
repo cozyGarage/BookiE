@@ -231,6 +231,14 @@ mod tests {
     }
 
     #[test]
+    fn a_mysql_dollar_delimiter_is_not_a_quoted_span() {
+        assert_eq!(
+            split_statements("SELECT $tag$; SELECT 2", "mysql"),
+            vec!["SELECT $tag$", "SELECT 2"]
+        );
+    }
+
+    #[test]
     fn a_mysql_hash_comment_does_not_end_a_statement() {
         let sql = "SELECT 1 # note ; here\n; SELECT 2";
         assert_eq!(
