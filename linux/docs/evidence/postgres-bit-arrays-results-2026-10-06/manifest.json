@@ -25,5 +25,6 @@
     "typed CSV import restores all values, NULL states, native types, and array_send bytes"
   ],
   "scope_limit": "This closes the BIT/VARBIT array result, rebind, and CSV path only; other PostgreSQL array families, consumers, session configurations, and B3 acceptance remain open.",
-  "checksums": "sha256sums.txt"
+  "checksums": "sha256sums.txt",
+  "baseline_evidence": "baseline-failure.txt"
 }

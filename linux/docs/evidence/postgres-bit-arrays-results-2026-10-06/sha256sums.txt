@@ -1,2 +1,3 @@
+e045ca12b6faccba6953a686386d4975747017a9c7b3f52ee6ab7b0d3e6c2efc  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/baseline-failure.txt
 350db1d970de44b63900bdfde6beddef92d31df9ca848db301b5733f892dd4ad  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/focused-test.txt
-39eac5c29b77db6f40c55aa5e8a0c8abd2219d7f181f3139a1c3f2e11c043f92  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/manifest.json
+635946e025a099f5ae5154e34933829c979380ad1ca6cd1535a5ac1126521d5a  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/manifest.json
