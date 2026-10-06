@@ -1,6 +1,6 @@
 # Testing
 
-The [September 29 regression audit](regression-audit-2026-09-29.md) records the latest findings, added tests, structure changes and execution evidence.
+The [September 29 regression audit](archive/regression-audit-2026-09-29.md) records the latest findings, added tests, structure changes and execution evidence.
 
 Start with the [validation playbook](validation-playbook.md) for the executable
 layer catalog, local commands, CI ownership, agent handoffs and regression intake.
@@ -20,9 +20,9 @@ dirty status, compiler, mode/features, per-binary counts, output and exit status
 The `release` mode now includes fast, widget, driver, TLS, keyring, PostgreSQL
 release, installed GTK, optional DuckDB and supply-chain checks. It does not
 certify package installation, Wayland, upgrade/rollback or retry-free candidate soak.
-See [0.1.4 review actions and evidence](release-0.1.4.md).
+See [0.1.4 review actions and evidence](archive/release-0.1.4.md).
 
-Run test commands from the `linux/` workspace root. Current scope and acceptance are in [the active sprint](bookie-0.2-sprint.md); the [bug and consistency audit](bug-consistency-2026-09.md) records its dated source tree; [the earlier September audit](stabilization-2026-09.md) records historical evidence.
+Run test commands from the `linux/` workspace root. Current scope and acceptance are in [the active sprint](bookie-0.2-sprint.md); the [bug and consistency audit](archive/bug-consistency-2026-09.md) records its dated source tree; [the earlier September audit](archive/stabilization-2026-09.md) records historical evidence.
 
 ## Current local checks
 
@@ -298,7 +298,7 @@ The Debian testing container provides the GNOME 50 libraries required by the sel
 
 ## Measuring how good the tests are
 
-The [September CI audit](ci-audit-2026-09-27.md) distinguishes executed tests,
+The [September CI audit](archive/ci-audit-2026-09-27.md) distinguishes executed tests,
 intentional tier exclusions, omitted SSH fixtures and packaging-only green runs.
 Build Linux's final regression gate rejects failed, cancelled, missing and
 unexpectedly skipped jobs. Docker SSH fixtures run through `bash scripts/test-ssh.sh`.
@@ -414,9 +414,9 @@ which is exactly the gap mutation testing measures.
 
 ## Upstream test-suite parity
 
-The [September adoption record](testing-history.md#upstream-test-suite-parity)
+The [September adoption record](archive/testing-history.md#upstream-test-suite-parity)
 preserves the original cases and counts. Current case candidates and ownership
-are in [the scenario survey](b3-test-scenario-survey.md) and the B3/B4 boards.
+are in [the scenario survey](archive/b3-test-scenario-survey.md) and the B3/B4 boards.
 Reproduce a candidate against current source before changing it; a historical
 claim of zero tests does not establish a current coverage gap.
 
@@ -439,6 +439,6 @@ without carrying the test bodies in the production file.
 
 ## Browse performance
 
-See [the September measurements](performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
+See [the September measurements](archive/performance-2026-09.md) and the `browse_benchmark` example in the release-test crate. One warm-up plus five measured samples cover first, filtered, deep, wide and capped result sets. Run each case in a separate process against a disposable fixture, with builds complete before measuring. Report memory improvements and latency regressions separately.
 
-The [bug and consistency audit](bug-consistency-2026-09.md) records the newer targeted mutation findings. cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.
+The [bug and consistency audit](archive/bug-consistency-2026-09.md) records the newer targeted mutation findings. cargo-mutants creates its report beneath `<output>/mutants.out/`; CI summaries distinguish missing reports from zero findings and retain the measurement step outcome.

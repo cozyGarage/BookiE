@@ -365,7 +365,8 @@ impl Connection for PolicyGuard {
             .map(|(sql, _)| sql.trim().trim_end_matches(';'))
             .collect::<Vec<_>>()
             .join(";\n");
-        let authorization = self.authorize(&combined, true, None).await?;
+        let enforced_rows = self.enforced_batch_rows(statements, expect_one);
+        let authorization = self.authorize_bounded(&combined, enforced_rows, None).await?;
         self.require_governed_write_available()?;
         let operation = self.operation(
             &combined,

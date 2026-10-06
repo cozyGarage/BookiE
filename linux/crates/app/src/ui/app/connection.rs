@@ -41,14 +41,8 @@ impl App {
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
-                    let message = match crate::ui::connect_dialog::load_prefill(saved).await {
-                        Ok(prefill) => AppMsg::EditConnectionLoaded(Box::new(prefill)),
-                        Err(error) => {
-                            tracing::warn!(%error, "loading the saved connection for editing failed");
-                            AppMsg::EditConnectionFailed(crate::tr!("The saved connection could not be loaded."))
-                        }
-                    };
-                    reply.input(message);
+                    let prefill = crate::ui::connect_dialog::load_prefill(saved).await;
+                    reply.input(AppMsg::EditConnectionLoaded(Box::new(prefill)));
                 })
                 .drop_on_shutdown()
         });

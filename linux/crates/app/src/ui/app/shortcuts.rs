@@ -88,32 +88,33 @@ pub(super) fn install_window_actions(
     disconnect_action
 }
 
+pub(super) const WINDOW_SHORTCUTS: &[(&str, &str)] = &[
+    ("<Primary>question", "win.shortcuts"),
+    ("<Primary>q", "win.quit"),
+    ("<Primary>w", "win.close-current"),
+    ("<Primary>e", "win.open-editor"),
+    ("<Primary>t", "win.open-editor"),
+    ("<Primary>o", "win.open-file"),
+    ("F5", "win.refresh-page"),
+    ("<Primary>f", "win.open-filter"),
+    ("<Primary>comma", "win.preferences"),
+    ("<Primary>h", "win.show-history"),
+    ("<Primary>p", "win.open-quickly"),
+    ("<Primary><Shift>j", "win.jump-column"),
+    ("<Primary>d", "win.save-favorite"),
+    ("<Primary><Shift>d", "win.show-saved-queries"),
+    ("<Primary>s", "win.save-changes"),
+    ("<Primary><Shift>s", "win.save-file-as"),
+    ("<Primary>z", "win.undo-change"),
+    ("<Primary>y", "win.redo-change"),
+    ("<Primary><Shift>z", "win.redo-change"),
+    ("<Primary><Shift>t", "win.reopen-closed-tab"),
+];
+
 pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
     let controller = gtk::ShortcutController::new();
     controller.set_scope(gtk::ShortcutScope::Global);
-    for (trigger, action) in [
-        ("<Primary>question", "win.shortcuts"),
-        ("<Primary>slash", "win.shortcuts"),
-        ("<Primary>q", "win.quit"),
-        ("<Primary>w", "win.close-current"),
-        ("<Primary>e", "win.open-editor"),
-        ("<Primary>t", "win.open-editor"),
-        ("<Primary>o", "win.open-file"),
-        ("F5", "win.refresh-page"),
-        ("<Primary>f", "win.open-filter"),
-        ("<Primary>comma", "win.preferences"),
-        ("<Primary>h", "win.show-history"),
-        ("<Primary>p", "win.open-quickly"),
-        ("<Primary><Shift>j", "win.jump-column"),
-        ("<Primary>d", "win.save-favorite"),
-        ("<Primary><Shift>d", "win.show-saved-queries"),
-        ("<Primary>s", "win.save-changes"),
-        ("<Primary><Shift>s", "win.save-file-as"),
-        ("<Primary>z", "win.undo-change"),
-        ("<Primary>y", "win.redo-change"),
-        ("<Primary><Shift>z", "win.redo-change"),
-        ("<Primary><Shift>t", "win.reopen-closed-tab"),
-    ] {
+    for (trigger, action) in WINDOW_SHORTCUTS {
         controller.add_shortcut(make_shortcut(trigger, action));
     }
     window.add_controller(controller);
@@ -327,4 +328,38 @@ fn find_search_entry(widget: &gtk::Widget) -> Option<gtk::SearchEntry> {
         next = child.next_sibling();
     }
     None
+}
+
+#[cfg(test)]
+mod window_shortcut_tests {
+    use super::WINDOW_SHORTCUTS;
+    use std::collections::HashSet;
+
+    const EDITOR_OWNED: &[&str] = &[
+        "<Primary>slash",
+        "<Primary>Return",
+        "<Primary><Shift>Return",
+        "<Primary><Shift>f",
+    ];
+
+    #[test]
+    fn no_trigger_is_bound_twice_at_window_level() {
+        let mut seen = HashSet::new();
+        for (trigger, action) in WINDOW_SHORTCUTS {
+            assert!(
+                seen.insert(*trigger),
+                "{trigger} is bound twice (second action {action})"
+            );
+        }
+    }
+
+    #[test]
+    fn window_shortcuts_never_take_a_key_the_editor_owns() {
+        for (trigger, action) in WINDOW_SHORTCUTS {
+            assert!(
+                !EDITOR_OWNED.contains(trigger),
+                "{trigger} would steal an editor key for {action}"
+            );
+        }
+    }
 }

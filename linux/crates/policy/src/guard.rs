@@ -116,10 +116,33 @@ impl PolicyGuard {
         self.authorize_classified(sql, facts, control).await
     }
 
+    async fn authorize_bounded(
+        &self,
+        sql: &str,
+        enforced_rows: Option<u64>,
+        control: Option<&OperationControl>,
+    ) -> Result<Authorization, DriverError> {
+        let facts = classify(sql, &self.ctx.driver_id);
+        if let Some(decision) = shared_connection_decision(sql, &self.ctx.driver_id, &facts) {
+            return self.resolve_authorization(sql, facts, decision, None).await;
+        }
+        self.authorize_with_bound(sql, facts, enforced_rows, control).await
+    }
+
     async fn authorize_classified(
         &self,
         sql: &str,
         facts: StatementFacts,
+        control: Option<&OperationControl>,
+    ) -> Result<Authorization, DriverError> {
+        self.authorize_with_bound(sql, facts, None, control).await
+    }
+
+    async fn authorize_with_bound(
+        &self,
+        sql: &str,
+        facts: StatementFacts,
+        enforced_rows: Option<u64>,
         control: Option<&OperationControl>,
     ) -> Result<Authorization, DriverError> {
         let env_policy = self
@@ -138,7 +161,10 @@ impl PolicyGuard {
 
         self.require_governed_write_available()?;
         let estimated_rows = if facts.contains_mutating_dml && env_policy.blast_radius_max_rows.is_some() {
-            self.estimate_blast_radius(sql, &facts, control).await?
+            match enforced_rows {
+                Some(rows) => Some(rows),
+                None => self.estimate_blast_radius(sql, &facts, control).await?,
+            }
         } else {
             None
         };
@@ -252,6 +278,21 @@ impl PolicyGuard {
                 }
             }
         }
+    }
+
+    fn enforced_batch_rows(&self, statements: &[(String, Vec<Value>)], expect_one: &[usize]) -> Option<u64> {
+        let mut total = 0u64;
+        for (index, (sql, _)) in statements.iter().enumerate() {
+            if expect_one.contains(&index) {
+                total += 1;
+                continue;
+            }
+            match count_sql_for_mutation(sql, &self.ctx.driver_id)? {
+                crate::blast_radius::BlastRadiusRewrite::Known(rows) => total += rows,
+                crate::blast_radius::BlastRadiusRewrite::CountQuery(_) => return None,
+            }
+        }
+        Some(total)
     }
 
     async fn estimate_blast_radius(

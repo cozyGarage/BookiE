@@ -40,19 +40,7 @@ impl App {
             .as_ref()
             .and_then(|id| self.registry.get(id))
             .is_none_or(|driver| driver.reports_rows_affected());
-        let uses_checked_writes = self
-            .current_driver_id
-            .as_deref()
-            .is_some_and(|id| matches!(id, "postgres" | "mysql" | "mssql" | "sqlite"));
-        let checked_writes = if uses_checked_writes {
-            sources
-                .iter()
-                .enumerate()
-                .filter_map(|(index, source)| matches!(source, StatementSource::Update { .. }).then_some(index))
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
+        let checked_writes = checked_write_indexes(self.current_driver_id.as_deref(), &sources);
         self.set_row_op_in_flight(true);
         // Increment the in-flight counter so window-close blocks until
         // the transaction resolves. Decrement happens in the
@@ -251,5 +239,47 @@ mod tests {
     fn warning_handles_lowercase_and_whitespace() {
         let stmts = vec![stmt("  update t set x = 1 where id = 5")];
         assert!(compute_concurrency_warning(&stmts, &[0]).is_some());
+    }
+}
+
+fn checked_write_indexes(driver_id: Option<&str>, sources: &[StatementSource]) -> Vec<usize> {
+    if !driver_id.is_some_and(|id| matches!(id, "postgres" | "mysql" | "mssql" | "sqlite")) {
+        return Vec::new();
+    }
+    sources
+        .iter()
+        .enumerate()
+        .filter_map(|(index, source)| {
+            matches!(source, StatementSource::Update { .. } | StatementSource::Delete { .. }).then_some(index)
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod checked_write_tests {
+    use super::*;
+    use crate::services::change_tracker::RowKey;
+
+    fn sources() -> Vec<StatementSource> {
+        vec![
+            StatementSource::Insert { draft_id: 1 },
+            StatementSource::Update {
+                row_key: RowKey::Persisted(vec![]),
+            },
+            StatementSource::Delete {
+                row_key: RowKey::Persisted(vec![]),
+            },
+        ]
+    }
+
+    #[test]
+    fn keyed_updates_and_deletes_are_checked_and_inserts_are_not() {
+        assert_eq!(checked_write_indexes(Some("postgres"), &sources()), vec![1, 2]);
+    }
+
+    #[test]
+    fn engines_without_checked_transactions_check_nothing() {
+        assert!(checked_write_indexes(Some("clickhouse"), &sources()).is_empty());
+        assert!(checked_write_indexes(None, &sources()).is_empty());
     }
 }

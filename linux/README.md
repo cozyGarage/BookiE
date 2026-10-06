@@ -3,7 +3,7 @@
 This is the canonical product, installation and build guide for the Linux
 application. The repository overview is at [the root README](../README.md).
 
-Current delivery scope and evidence: [active sprint](docs/bookie-0.2-sprint.md). The [October 3 consistency review](docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
+Current delivery scope and evidence: [active sprint](docs/bookie-0.2-sprint.md). The [October 3 consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
 BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Relm4. It is a fork of [TablePro](https://github.com/TableProApp/TablePro). The Rust workspace is rooted in this `linux/` directory.
 
@@ -11,7 +11,7 @@ BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Re
 
 The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse. Redis and MongoDB are experimental, and DuckDB is an optional build feature.
 
-Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/production-audit.md) for current limits.
+Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
 
 The Linux client remains under development. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance; the September audits retain their dated verification. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4). Wayland soak remains an operator check after install.
 
@@ -134,7 +134,7 @@ If native development packages are unavailable, `scripts/dev-env.sh` can use Deb
 
 ## Packaging
 
-The current package is BookiE 0.1.4. Download it from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4), or see [the release evidence](docs/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
+The current package is BookiE 0.1.4. Download it from the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4), or see [the release evidence](docs/archive/release-0.1.4.md) and [packaging/README.md](packaging/README.md). To rebuild the Arch package from a clean commit:
 
 ```bash
 TABLEPRO_RC_COMMIT="$(git rev-parse HEAD)" TABLEPRO_RC_VERSION=0.1.5 ./scripts/build-arch-rc.sh
@@ -150,13 +150,13 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 |---|---|
 | Architecture and crate boundaries | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Roadmap | [ROADMAP.md](ROADMAP.md) |
-| Production audit | [docs/production-audit.md](docs/production-audit.md) |
+| Production audit | [docs/production-audit.md](docs/archive/production-audit.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Rust toolchains on Arch and Omarchy | [docs/toolchains.md](docs/toolchains.md) |
 | Arch / Omarchy internal package | [docs/omarchy.md](docs/omarchy.md) |
-| Historical September stabilization evidence | [docs/stabilization-2026-09.md](docs/stabilization-2026-09.md) |
+| Historical September stabilization evidence | [docs/stabilization-2026-09.md](docs/archive/stabilization-2026-09.md) |
 | Ignored-test inventory | [docs/ignored-tests.md](docs/ignored-tests.md) |
-| Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/upstream-adoption.md) |
+| Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/archive/upstream-adoption.md) |
 | Optional upstream reference review | [docs/upstream-sync.md](docs/upstream-sync.md) |
 | Adding a database driver | [docs/adding-drivers.md](docs/adding-drivers.md) |
 | Driver maturity | [docs/driver-maturity.md](docs/driver-maturity.md) |
@@ -166,7 +166,7 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 | Storage | [docs/storage.md](docs/storage.md) |
 | Error handling | [docs/error-handling.md](docs/error-handling.md) |
 | Testing | [docs/testing.md](docs/testing.md) |
-| Latest regression audit | [docs/regression-audit-2026-09-29.md](docs/regression-audit-2026-09-29.md) |
+| Latest regression audit | [docs/regression-audit-2026-09-29.md](docs/archive/regression-audit-2026-09-29.md) |
 | Architecture decisions | [docs/decisions/](docs/decisions/) |
 
 ## License

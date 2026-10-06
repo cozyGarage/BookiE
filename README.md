@@ -6,7 +6,7 @@ BookiE features, supported systems, installation and user-facing guidance, use
 the canonical [Linux application guide](linux/README.md). The two pages have
 different audiences and should not duplicate product or build instructions.
 
-Current delivery scope and evidence: [active sprint](linux/docs/bookie-0.2-sprint.md). The [October 3 consistency review](linux/docs/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
+Current delivery scope and evidence: [active sprint](linux/docs/bookie-0.2-sprint.md). The [October 3 consistency review](linux/docs/archive/architecture-consistency-review-2026-10-03.md) reconciles the accumulated documentation. Earlier audits prove their recorded source trees; package release approval remains separate.
 
 TablePro is a native Linux database client built with Rust, GTK4, libadwaita, GtkSourceView, and Relm4. Current development is on the `linux` branch. The Cargo workspace is under `linux/` and requires Rust 1.98.
 
@@ -33,7 +33,7 @@ Database support is provided by static Rust crates compiled into the app:
 
 See [`linux/docs/driver-maturity.md`](linux/docs/driver-maturity.md) for current limits.
 
-See the [bug and consistency audit](linux/docs/bug-consistency-2026-09.md) for its dated test results and the [macOS 0.72 gap review](linux/docs/upstream-adoption.md) for follow-up features.
+See the [bug and consistency audit](linux/docs/archive/bug-consistency-2026-09.md) for its dated test results and the [macOS 0.72 gap review](linux/docs/archive/upstream-adoption.md) for follow-up features.
 
 ## Architecture
 

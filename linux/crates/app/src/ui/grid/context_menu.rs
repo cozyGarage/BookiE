@@ -369,6 +369,7 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool, filterabl
     menu.append_section(None, &display);
     let actions = gio::Menu::new();
     actions.append(Some(&crate::tr!("Export Results…")), Some("cell.export"));
+    actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
     if row_operations {
         actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
@@ -455,7 +456,10 @@ pub(super) fn attach_cell_gesture(
     let edit_action = menus.edit_action.clone();
     let gesture_popover = popover.clone();
     let gesture_name = column_name.clone();
-    let gesture = gtk::GestureClick::builder().button(3).build();
+    let gesture = gtk::GestureClick::builder()
+        .button(3)
+        .propagation_phase(gtk::PropagationPhase::Capture)
+        .build();
     gesture.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
         select_row_for_menu(&view, POSITION_SLOT.get(&gesture_widget).unwrap_or(0));
@@ -479,7 +483,7 @@ pub(super) fn attach_cell_gesture(
     let key_context = menus.context.clone();
     let key_action = menus.edit_action.clone();
     let shortcut = gtk::Shortcut::builder()
-        .trigger(&crate::ui::shortcut::parse("Menu"))
+        .trigger(&crate::ui::shortcut::parse("Menu|<Shift>F10"))
         .action(&gtk::CallbackAction::new(move |_, _| {
             select_row_for_menu(&key_view, POSITION_SLOT.get(&key_widget).unwrap_or(0));
             *key_context.borrow_mut() = Some(CellContext {

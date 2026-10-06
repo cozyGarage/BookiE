@@ -40,6 +40,7 @@ impl FindBar {
             .hexpand(true)
             .placeholder_text(crate::tr!("Find"))
             .build();
+        entry.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Find"))]);
         let previous = flat_button("go-up-symbolic", &crate::tr!("Previous match"));
         let next = flat_button("go-down-symbolic", &crate::tr!("Next match"));
         let count = gtk::Label::builder().xalign(1.0).width_chars(12).build();
@@ -222,6 +223,7 @@ fn replace_controls() -> (gtk::Box, gtk::Entry, gtk::Button, gtk::Button) {
         .hexpand(true)
         .placeholder_text(crate::tr!("Replace with"))
         .build();
+    entry.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Replace with"))]);
     let replace_one = gtk::Button::with_label(&crate::tr!("Replace"));
     let replace_all = gtk::Button::with_label(&crate::tr!("Replace All"));
     let row = row_of(&[entry.upcast_ref(), replace_one.upcast_ref(), replace_all.upcast_ref()]);

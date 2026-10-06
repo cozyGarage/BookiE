@@ -1,13 +1,13 @@
 # Capability evidence
 
-Historical capability audit: 2026-09-07. Current scope and acceptance are in the [active sprint](bookie-0.2-sprint.md); the [consistency review](architecture-consistency-review-2026-10-03.md) records evidence availability.
+Historical capability audit: 2026-09-07. Current scope and acceptance are in the [active sprint](bookie-0.2-sprint.md); the [consistency review](archive/architecture-consistency-review-2026-10-03.md) records evidence availability.
 
 This historical audit evaluates ten capabilities previously listed as "Already
 useful on Linux" in `PLAN.md`. Its evidence and verdicts apply to the September
 7, 2026 audit snapshot, not current coverage. Status terms follow
 [ROADMAP.md](../ROADMAP.md); current work belongs to the active sprint and boards.
 
-The September [bug and consistency audit](bug-consistency-2026-09.md) is also historical; historical numeric counts below describe the earlier audit, not current totals.
+The September [bug and consistency audit](archive/bug-consistency-2026-09.md) is also historical; historical numeric counts below describe the earlier audit, not current totals.
 
 Evidence tiers are the regression tiers in [testing.md](testing.md):
 `unit`, `sandbox`, `driver`, `release`, `gtk`.

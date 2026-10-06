@@ -20,8 +20,8 @@ execution and installed acceptance are separate states.
 
 Source integration above was checked locally. No fresh hosted result is inferred
 from a merge. Historical local/hosted reports and original packets are preserved
-in [B4 history](b4-history.md); missing worktree/cache paths remain unavailable
-evidence. Fresh audit results are in [the release audit](release-audit-2026-10-03.md).
+in [B4 history](archive/b4-history.md); missing worktree/cache paths remain unavailable
+evidence. Fresh audit results are in [the release audit](archive/release-audit-2026-10-03.md).
 
 ## Remaining tasks
 
@@ -74,8 +74,8 @@ failure. Record exact source hashes, commands, counts and raw sanitized logs.
 
 ## Historical packets
 
-The [October 2 dispatch plan](b4-history.md#october-2-review-and-dispatch-plan),
-[October 3 checkpoint](b4-history.md#october-3-integration-checkpoint), original
+The [October 2 dispatch plan](archive/b4-history.md#october-2-review-and-dispatch-plan),
+[October 3 checkpoint](archive/b4-history.md#october-3-integration-checkpoint), original
 lane tables, seven decision IDs, worktree reservations and detailed reproducers
 are dated history. Their old “open”, “next” and “not merged” wording does not
 override the current status above. Keep original task IDs when adding evidence.
