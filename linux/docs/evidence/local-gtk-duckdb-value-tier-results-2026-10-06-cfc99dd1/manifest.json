@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "linux",
+  "source_commit": "cfc99dd1c999d54c91dee747a4abe6e7b617147a",
+  "source_tree_dirty": false,
+  "case": "Local GTK + DuckDB value-contract tier across all 11 suites",
+  "command": "./scripts/test-value-contracts.sh --gtk --duckdb",
+  "result": {
+    "passed": 364,
+    "failed": 0,
+    "suites": 11,
+    "missing_suites": [],
+    "gtk": true,
+    "duckdb": true
+  },
+  "suite_results": {
+    "crates/app/Cargo.toml": {
+      "tests": 59,
+      "exit_code": 0,
+      "seconds": 137.201,
+      "log": "crates-app.log"
+    },
+    "crates/core/Cargo.toml": {
+      "tests": 58,
+      "exit_code": 0,
+      "seconds": 3.219,
+      "log": "crates-core.log"
+    },
+    "crates/drivers/clickhouse/Cargo.toml": {
+      "tests": 6,
+      "exit_code": 0,
+      "seconds": 30.988,
+      "log": "crates-drivers-clickhouse.log"
+    },
+    "crates/drivers/duckdb/Cargo.toml": {
+      "tests": 32,
+      "exit_code": 0,
+      "seconds": 2.168,
+      "log": "crates-drivers-duckdb.log"
+    },
+    "crates/drivers/mongodb/Cargo.toml": {
+      "tests": 15,
+      "exit_code": 0,
+      "seconds": 14.497,
+      "log": "crates-drivers-mongodb.log"
+    },
+    "crates/drivers/mssql/Cargo.toml": {
+      "tests": 7,
+      "exit_code": 0,
+      "seconds": 37.684,
+      "log": "crates-drivers-mssql.log"
+    },
+    "crates/drivers/mysql/Cargo.toml": {
+      "tests": 30,
+      "exit_code": 0,
+      "seconds": 349.181,
+      "log": "crates-drivers-mysql.log"
+    },
+    "crates/drivers/postgres/Cargo.toml": {
+      "tests": 151,
+      "exit_code": 0,
+      "seconds": 302.25,
+      "log": "crates-drivers-postgres.log"
+    },
+    "crates/drivers/redis/Cargo.toml": {
+      "tests": 4,
+      "exit_code": 0,
+      "seconds": 1.517,
+      "log": "crates-drivers-redis.log"
+    },
+    "crates/drivers/sqlite/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.016,
+      "log": "crates-drivers-sqlite.log"
+    },
+    "crates/mcp/Cargo.toml": {
+      "tests": 1,
+      "exit_code": 0,
+      "seconds": 0.003,
+      "log": "crates-mcp.log"
+    }
+  },
+  "compile": {
+    "exit_code": 0,
+    "seconds": 17.158,
+    "fresh_artifacts": 720,
+    "rebuilt_packages": [
+      "path+file:///home/trung/Projects/tablepro/linux/crates/agentd#tablepro-agentd@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/app#tablepro-app@0.1.5",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/core#tablepro-core@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/driver-tls-tests#tablepro-driver-tls-tests@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/clickhouse#tablepro-driver-clickhouse@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/duckdb#tablepro-driver-duckdb@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/mongodb#tablepro-driver-mongodb@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/mssql#tablepro-driver-mssql@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/mysql#tablepro-driver-mysql@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/postgres#tablepro-driver-postgres@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/redis#tablepro-driver-redis@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/drivers/sqlite#tablepro-driver-sqlite@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/mcp#tablepro-mcp@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/policy#tablepro-policy@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/release-tests#tablepro-release-tests@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/storage#tablepro-storage@0.1.0",
+      "path+file:///home/trung/Projects/tablepro/linux/crates/transport#tablepro-transport@0.1.0"
+    ]
+  },
+  "report": "report.json",
+  "logs_sha256": {
+    "compile.log": "86ed734b69031e46a5bf9539599167e637792fc076be6c5e7af2c0ec004935cf",
+    "crates-app.log": "cf752485e8306806ed51a85d2eadc9bcfe278928c61ea7d97ee46a643971e7bb",
+    "crates-core.log": "fbb44827a27a2b89765250b18f490b5a569460f4688d0e447c47da5021bae9ca",
+    "crates-drivers-clickhouse.log": "67c5e3b85106eb2907a1aedf1ae26b039e749858375e6131337e4a52ebfdaabd",
+    "crates-drivers-duckdb.log": "af88f834d472c93d866b8bb47affeed8f29fa109bc4e7f4a775db6316748c071",
+    "crates-drivers-mongodb.log": "a460f79a2f9c0c03dd2eb577950e383b210ffb2b43971d549ed830887957042e",
+    "crates-drivers-mssql.log": "d273e498c55f06232c543651bc0bdf1fa61afdaa79e79425ee20c42be66db4fc",
+    "crates-drivers-mysql.log": "c4c7e57c8c7f3e46cd42a49ada8c8ba9d35ec475754080398f7053237657d0f8",
+    "crates-drivers-postgres.log": "bc59867db52004dbd66405b4cf1140914c23bd5a122ea6df558c6b705a4e899a",
+    "crates-drivers-redis.log": "bb06ed71978c3b8608d2a0183205b2acabc288b58a4342417e471dc8e24a6dc5",
+    "crates-drivers-sqlite.log": "fda03b0e23f5e85e856e9fe62512afe99eccf5163e449d10e2800db5f816a4e8",
+    "crates-mcp.log": "32bfcd564ffd2b66b71625596972c7e6a94971a1361c650dadc4dd829f789062",
+    "report.json": "c2261d74927eaae046d665c36b8df1938e6fd157953f99b31a8a0d331b156406"
+  }
+}
