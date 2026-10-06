@@ -431,6 +431,140 @@ async fn value_contract_quoted_enum_identifiers_resist_shadowed_search_path() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let schema = "EnumCaseTarget";
+    let type_name = "StateKind";
+    connection.execute("CREATE SCHEMA \"EnumCaseTarget\"").await.unwrap();
+    connection.execute("CREATE SCHEMA enumcasetarget").await.unwrap();
+    connection
+        .execute("CREATE TYPE \"EnumCaseTarget\".\"StateKind\" AS ENUM ('ready', 'target-only')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE enumcasetarget.statekind AS ENUM ('ready', 'shadow-only')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE \"EnumCaseTarget\".\"Rows\" \
+             (id INT PRIMARY KEY, state \"EnumCaseTarget\".\"StateKind\", sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enumcasetarget.rows \
+             (id INT PRIMARY KEY, state enumcasetarget.statekind, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO \"EnumCaseTarget\".\"Rows\" VALUES \
+             (1, 'ready', 'target-one'), (2, 'ready', 'target-two')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enumcasetarget.rows VALUES (1, 'ready', 'shadow-one')")
+        .await
+        .unwrap();
+    connection
+        .execute("SET search_path TO enumcasetarget, \"EnumCaseTarget\", public")
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(Some(schema), "Rows").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: type_name.into(),
+        })
+    );
+
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(schema),
+        "Rows",
+        &columns,
+        &[(1, Value::Text("target-only".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("\"EnumCaseTarget\".\"StateKind\""), "{update_sql}");
+    connection.execute_params(&update_sql, &update_params).await.unwrap();
+
+    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+        "postgres",
+        &columns,
+        &FilterSet {
+            rules: vec![FilterRule {
+                column: "state".into(),
+                op: FilterOp::Eq,
+                value: Some(FilterValue::Single("target-only".into())),
+            }],
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+    let filtered = connection
+        .query_params(
+            &format!("SELECT id, state::text FROM \"EnumCaseTarget\".\"Rows\" WHERE {where_sql}"),
+            &filter_params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        filtered.rows,
+        vec![vec![Value::Int(1), Value::Text("target-only".into())]]
+    );
+
+    let native = connection
+        .query(
+            "SELECT n.nspname, t.typname, r.state::text, r.sibling \
+             FROM \"EnumCaseTarget\".\"Rows\" r \
+             JOIN pg_type t ON t.oid = pg_typeof(r.state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace \
+             UNION ALL \
+             SELECT n.nspname, t.typname, r.state::text, r.sibling \
+             FROM enumcasetarget.rows r \
+             JOIN pg_type t ON t.oid = pg_typeof(r.state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace \
+             ORDER BY 1, 2, 4",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Text("EnumCaseTarget".into()),
+                Value::Text("StateKind".into()),
+                Value::Text("target-only".into()),
+                Value::Text("target-one".into()),
+            ],
+            vec![
+                Value::Text("EnumCaseTarget".into()),
+                Value::Text("StateKind".into()),
+                Value::Text("ready".into()),
+                Value::Text("target-two".into()),
+            ],
+            vec![
+                Value::Text("enumcasetarget".into()),
+                Value::Text("statekind".into()),
+                Value::Text("ready".into()),
+                Value::Text("shadow-one".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;

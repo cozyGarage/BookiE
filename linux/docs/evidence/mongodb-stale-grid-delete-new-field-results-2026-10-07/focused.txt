@@ -1,0 +1,14 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling tablepro-driver-mongodb v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/mongodb)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.73s
+     Running tests/integration.rs (linux/target/debug/deps/integration-fc39c0a96012db67)
+
+running 2 tests
+test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_concurrent_document_change ... ok
+test stale_grid_delete_contract::value_contract_stale_grid_delete_preserves_field_added_after_materialization ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 31 filtered out; finished in 2.11s
+
