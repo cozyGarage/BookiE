@@ -2,20 +2,21 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/sql-lex-mysql-dollar-boundary",
-  "source_commit": "516c804c37bfcadb8f1c9b09a0ecf1c2e3631ef5",
+  "source_commit": "b4504d792d99b427a12ece69ae4cbe5f93a2afc0",
   "source_files": {
-    "crates/core/src/sql_lex.rs": "3b115e1abaf56b561f92835deec0795404d7e8aaad04f548a44d3179a69136e2"
+    "crates/core/src/sql_lex.rs": "f4097ac3c97524db2b83210c8787afbcba4f7a7883ad502596f30902d5b5e574"
   },
   "case": "MySQL dollar text does not open a PostgreSQL dollar-quoted span",
   "contract": [
     "A MySQL statement containing $tag$ followed by a semicolon splits at that semicolon; dollar-quoted bodies are dialect-specific.",
     "The regression test kills the mutation that combines the unsupported-dialect and non-dollar-start guards with AND instead of OR.",
-    "Existing direct span-length assertions now catch five zero-span mutations that had timed out when run with the full parallel scanner test set. Seven index-progress mutations still timed out in the narrowed mutation recheck and remain open for triage."
+    "The bounded subprocess test covers nested and ordinary comments, quoted strings, bracket identifiers, dollar-quoted bodies, statement separators and Unicode; it kills nonterminating mutants without hanging the test runner.",
+    "A focused 24-mutant run covers every mutation location from the earlier timeout rechecks and catches all 24 with zero misses or timeouts."
   ],
   "validation": {
     "scanner_tests": {
       "command": "rtk cargo test --locked -p tablepro-core sql_lex::tests -- --nocapture",
-      "result": "13 passed, 0 failed",
+      "result": "14 passed, 0 failed",
       "log": "sql-lex-tests.txt"
     },
     "targeted_mutation": {
@@ -23,19 +24,20 @@
       "result": "1 mutant caught, 0 missed, 0 timed out",
       "log": "mysql-dollar-mutation.txt"
     },
-    "zero_span_mutation_recheck": {
-      "command": "cargo mutants narrowed to lines 2, 29, 48, 62 and 85 with --lib sql_lex::tests::skip_span_returns_exact_byte_lengths_for_representative_spans",
-      "result": "13 caught, 0 timed out; one unrelated MySQL dollar-boundary mutation was missed and is caught by the new regression above"
+    "progress_mutation_recheck": {
+      "command": "rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:(2:5|29:5|48:5|62:5|69:23|78:24|85:5|116:19|121:19|125:15)' --test-tool cargo --output target/quality/20261006-sql-lex-progress-guard-full-c2a3ced7 --timeout 6 --in-place -- --lib sql_lex::tests::scanner_progress_makes_bounded_inputs_finish",
+      "result": "24 caught, 0 missed, 0 timed out",
+      "log": "progress-mutation-summary.json"
     },
     "format": "rtk cargo fmt --all -- --check passed",
     "diff_check": "rtk git diff --check passed"
   },
   "log_sha256": {
-    "sql-lex-tests.txt": "8b0c985a045d0a23a7fe7f60c4d1b0c121ee6d525562f25687d05df5b99aa6ab",
-    "mysql-dollar-mutation.txt": "904c31025b259e346396f3ae3baaf724d92079d972fe042b8259de139db7d120"
+    "sql-lex-tests.txt": "65b94ad4b41ae3fbe861b3120cd8e91b0a08337912e7e18ef8532458c78e5f24",
+    "mysql-dollar-mutation.txt": "904c31025b259e346396f3ae3baaf724d92079d972fe042b8259de139db7d120",
+    "progress-mutation-summary.json": "017e6cc2f358f4d19234708e32d61a4df5df63d81c5e6e2c4d03edba32bd7784"
   },
   "remaining": [
-    "Seven index-progress mutations still timed out in the narrowed scanner recheck; confirm those results and triage the remaining statement-span mutation before closing the scanner mutation item.",
     "The broader B3 engine, type, consumer, and configuration matrix remains open."
   ]
 }
