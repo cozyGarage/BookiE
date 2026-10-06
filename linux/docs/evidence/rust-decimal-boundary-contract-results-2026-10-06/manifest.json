@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-06",
+  "case": "Exact rust_decimal representable boundaries across parser, parameter and PostgreSQL consumers",
+  "source_commit": "fdf78411f6404df0e5bc9499964d29a8e6688d43",
+  "source_sha256": {
+    "crates/core/src/params.rs": "b91aba781786b053d3ae0b49689b0ff4288b89400bb6a5bd09457b2a0c627966",
+    "crates/app/tests/support/value_parse.rs": "c9b37e698cb95609485b36c2265fcb774eb53a626730bec8d4cf2f4448b752ac",
+    "crates/drivers/postgres/tests/support/wide_numeric_contract.rs": "06540bb8df302ae94c7b24469a344b7693dd0ba14bf70e5bc3d54dcfc43d467c"
+  },
+  "contract": [
+    "Accept positive and negative maximum rust_decimal mantissas and the maximum scale of 28 without changing their text.",
+    "Reject one-step-over magnitude and scale in the explicit Decimal and grid parser paths.",
+    "Keep over-i64 integer input as text for Auto parameter mode instead of guessing Decimal.",
+    "Round-trip each supported edge through PostgreSQL bound NUMERIC and rendered SQL literal; compare native numeric::text and result type."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-core value_contract_decimal_parameter_capacity_edges_remain_exact",
+      "result": "1 passed"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-app --lib decimal_preservation_rejects_an_edit_that_would_round",
+      "result": "1 passed"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_rust_decimal_capacity_edges_round_trip_through_postgres -- --ignored --nocapture",
+      "result": "1 passed; PostgreSQL 16 Docker"
+    },
+    {
+      "command": "rtk cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-core -p tablepro-app -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed"
+    }
+  ],
+  "scope_limit": "This proves the supported rust_decimal scalar boundary paths. It does not change wide PostgreSQL NUMERIC or BSON Decimal128 text/tag fallbacks, and it does not test a DECIMAL(28,8) column at these wider bounds.",
+  "status": "Focused parser, parameter, PostgreSQL bound/literal and lint checks passed; B3 remains open."
+}
