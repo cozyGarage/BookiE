@@ -115,8 +115,13 @@ fn unique_name(name: String, taken: &mut Vec<String>) -> String {
 
 /// The engine's own spelling for a value shape. Unknown engines take the
 /// ANSI-leaning set, which every supported engine parses.
+pub fn supports_table_creation(driver_id: &str) -> bool {
+    matches!(driver_id, "postgres" | "mysql" | "sqlite" | "mssql" | "duckdb")
+}
+
 pub fn type_name(driver_id: &str, kind: ColumnKind) -> &'static str {
     match driver_id {
+        "duckdb" if kind == ColumnKind::Json => "JSON",
         "sqlite" => sqlite_type(kind),
         "mysql" => mysql_type(kind),
         "mssql" => mssql_type(kind),
@@ -361,5 +366,22 @@ mod tests {
         assert!(!columns[0].primary_key);
         assert!(!columns[0].auto_increment);
         assert_eq!(columns[0].default_value, None);
+    }
+
+    #[test]
+    fn only_engines_with_plain_create_table_offer_table_creation_from_a_file() {
+        for engine in ["postgres", "mysql", "sqlite", "mssql", "duckdb"] {
+            assert!(supports_table_creation(engine), "{engine}");
+        }
+        for engine in ["clickhouse", "mongodb", "redis", "unknown"] {
+            assert!(!supports_table_creation(engine), "{engine}");
+        }
+    }
+
+    #[test]
+    fn duckdb_spells_json_without_the_postgres_binary_suffix() {
+        assert_eq!(type_name("duckdb", ColumnKind::Json), "JSON");
+        assert_eq!(type_name("postgres", ColumnKind::Json), "JSONB");
+        assert_eq!(type_name("duckdb", ColumnKind::Int), "BIGINT");
     }
 }

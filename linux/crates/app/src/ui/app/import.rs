@@ -52,6 +52,15 @@ impl App {
     }
 
     pub(super) fn on_create_table_from_csv(&self, schema: Option<String>, sender: ComponentSender<Self>) {
+        if !tablepro_core::import::supports_table_creation(self.driver_id()) {
+            self.show_error_alert(
+                &crate::tr!("Can't create a table"),
+                &crate::tr!(
+                    "This connection type cannot create a table from a file. Import into an existing table instead."
+                ),
+            );
+            return;
+        }
         self.choose_csv_file(schema, None, sender);
     }
 
