@@ -320,11 +320,17 @@ refuse without changing the stored row. The full ClickHouse Docker integration
 suite passes 33 tests
 ([evidence](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
 
-SQLite computed `CAST(value AS BLOB)` results now have JSON and XLSX text-cell
-assertions plus typed CSV restore, all checked against native storage classes
-and exact bytes
-([evidence](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json));
-other computed-expression shapes remain open.
+SQLite STRICT `ANY` computed-result contracts now cover `CASE`, `COALESCE`,
+`NULLIF`, `MIN`/`MAX`, `SUBSTR`, `ABS`, `ROUND`, `hex`, `quote`, `instr`,
+`length` and `CAST(value AS BLOB)`. Typed CSV restore checks native storage
+classes and exact values or bytes; BLOB casts also have JSON and XLSX text-cell
+assertions. Representative evidence: [CASE](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),
+[SUBSTR](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json),
+[ABS](evidence/sqlite-abs-any-csv-results-2026-10-06/manifest.json),
+[ROUND](evidence/sqlite-round-any-csv-results-2026-10-06/manifest.json),
+[BLOB cast](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
+Other computed functions and aggregate families, attached-origin metadata,
+non-CSV consumer combinations and installed editing remain open.
 
 SQLite `hex(value)` over STRICT `ANY` now checks integer, real, UTF-8 and empty
 text, BLOB, SQL NULL, formula-shaped text and tag-shaped text. SQLite's native
