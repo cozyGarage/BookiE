@@ -46,6 +46,10 @@ additional privacy, value and evidence tasks without duplicating this board.
 Headless panic retirement belongs with G5 and F8-headless; make it a separate
 small patch before their combined acceptance.
 
+The agentd panic-retirement unit test uses a credential-free saved connection
+and carries its tracing subscriber through the async operation. Secret Service
+behavior stays in the dedicated keyring tier.
+
 ## Acceptance order
 
 1. Continue B3's bounded cases and evidence reconciliation. B3 completion
