@@ -11,6 +11,8 @@ pub struct FindBar {
     view: sourceview5::View,
     context: sourceview5::SearchContext,
     count: gtk::Label,
+    match_case: gtk::ToggleButton,
+    regex: gtk::ToggleButton,
 }
 
 pub fn match_label(position: i32, count: i32) -> String {
@@ -45,6 +47,8 @@ impl FindBar {
         let next = flat_button("go-down-symbolic", &crate::tr!("Next match"));
         let count = gtk::Label::builder().xalign(1.0).width_chars(12).build();
         count.add_css_class("dim-label");
+        let match_case = flat_toggle("Aa", &crate::tr!("Match case"));
+        let regex = flat_toggle(".*", &crate::tr!("Regular expression"));
         let replace_toggle = gtk::ToggleButton::builder()
             .icon_name("edit-find-replace-symbolic")
             .tooltip_text(crate::tr!("Replace"))
@@ -56,6 +60,8 @@ impl FindBar {
             previous.upcast_ref(),
             next.upcast_ref(),
             count.upcast_ref(),
+            match_case.upcast_ref(),
+            regex.upcast_ref(),
             replace_toggle.upcast_ref(),
         ]);
 
@@ -83,8 +89,11 @@ impl FindBar {
             view: view.clone(),
             context,
             count,
+            match_case,
+            regex,
         };
         find.connect(&settings, &previous, &next, &replace_one, &replace_all);
+        find.connect_search_options(&settings);
         Some(find)
     }
 
@@ -145,6 +154,21 @@ impl FindBar {
             if !open {
                 handle.view.grab_focus();
             }
+        });
+    }
+
+    fn connect_search_options(&self, settings: &sourceview5::SearchSettings) {
+        let handle = self.handle();
+        let case_settings = settings.clone();
+        let case_handle = handle.clone();
+        self.match_case.connect_toggled(move |toggle| {
+            case_settings.set_case_sensitive(toggle.is_active());
+            case_handle.step(true, true);
+        });
+        let regex_settings = settings.clone();
+        self.regex.connect_toggled(move |toggle| {
+            regex_settings.set_regex_enabled(toggle.is_active());
+            handle.step(true, true);
         });
     }
 
@@ -238,6 +262,12 @@ fn row_of(widgets: &[&gtk::Widget]) -> gtk::Box {
     row
 }
 
+fn flat_toggle(label: &str, tooltip: &str) -> gtk::ToggleButton {
+    let toggle = gtk::ToggleButton::builder().label(label).tooltip_text(tooltip).build();
+    toggle.add_css_class("flat");
+    toggle
+}
+
 fn flat_button(icon: &str, tooltip: &str) -> gtk::Button {
     let button = gtk::Button::builder().icon_name(icon).tooltip_text(tooltip).build();
     button.add_css_class("flat");
@@ -292,6 +322,26 @@ mod tests {
 
         find.handle().step(true, false);
         assert_eq!(find.count.text(), "2 of 3");
+
+        buffer.set_text("Aa aA");
+        find.entry.set_text("a");
+        find.entry.emit_by_name::<()>("search-changed", &[]);
+        settle(&find.context);
+        assert_eq!(find.context.occurrences_count(), 4);
+        find.match_case.set_active(true);
+        settle(&find.context);
+        assert_eq!(find.context.occurrences_count(), 2);
+        find.regex.set_active(true);
+        find.entry.set_text("[aA]+");
+        find.entry.emit_by_name::<()>("search-changed", &[]);
+        settle(&find.context);
+        assert_eq!(find.context.occurrences_count(), 2);
+        find.match_case.set_active(false);
+        find.regex.set_active(false);
+        buffer.set_text("select a, a from t where a = 1");
+        find.entry.set_text("a");
+        find.entry.emit_by_name::<()>("search-changed", &[]);
+        settle(&find.context);
 
         find.replace_entry.set_text("b");
         find.handle().replace_all();

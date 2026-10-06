@@ -30,6 +30,7 @@
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
 - Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
+- The editor find bar has Match case and Regular expression toggles.
 
 ### Changed
 
