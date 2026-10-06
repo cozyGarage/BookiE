@@ -105,6 +105,70 @@ pub enum Value {
 /// is not capped here. Prefer streaming export ([`crate::export`]) for
 /// large result sets instead of raising this further for GUI queries.
 pub const MAX_QUERY_ROWS: usize = 1_000_000;
+pub const MAX_QUERY_RESULT_CELLS: usize = 10_000_000;
+pub const MAX_QUERY_RESULT_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Debug, Default)]
+pub struct QueryResultBudget {
+    rows: usize,
+    cells: usize,
+    bytes: usize,
+}
+
+impl QueryResultBudget {
+    pub fn admit(&mut self, row: &[Value]) -> bool {
+        let cells = self.cells.saturating_add(row.len());
+        let row_bytes = row_size(row);
+        let bytes = self.bytes.saturating_add(row_bytes);
+        if self.rows >= MAX_QUERY_ROWS || cells > MAX_QUERY_RESULT_CELLS || bytes > MAX_QUERY_RESULT_BYTES {
+            return false;
+        }
+        self.rows += 1;
+        self.cells = cells;
+        self.bytes = bytes;
+        true
+    }
+}
+
+fn value_size(value: &Value) -> usize {
+    match value {
+        Value::Text(text) | Value::Undecodable(text) => text.capacity(),
+        Value::Bytes(bytes) => bytes.capacity(),
+        Value::Json(value) => json_heap_size(value),
+        _ => 0,
+    }
+}
+
+fn row_size(row: &[Value]) -> usize {
+    row.len()
+        .saturating_mul(std::mem::size_of::<Value>())
+        .saturating_add(std::mem::size_of::<Vec<Value>>())
+        .saturating_add(
+            row.iter()
+                .fold(0usize, |total, value| total.saturating_add(value_size(value))),
+        )
+}
+
+fn json_heap_size(value: &serde_json::Value) -> usize {
+    match value {
+        serde_json::Value::String(value) => value.capacity(),
+        serde_json::Value::Array(values) => values
+            .capacity()
+            .saturating_mul(std::mem::size_of::<serde_json::Value>())
+            .saturating_add(
+                values
+                    .iter()
+                    .fold(0usize, |total, value| total.saturating_add(json_heap_size(value))),
+            ),
+        serde_json::Value::Object(values) => values.iter().fold(0usize, |total, (key, value)| {
+            total
+                .saturating_add(std::mem::size_of::<(String, serde_json::Value)>())
+                .saturating_add(key.capacity())
+                .saturating_add(json_heap_size(value))
+        }),
+        _ => 0,
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct QueryResult {
@@ -120,7 +184,7 @@ pub struct ExecResult {
 
 #[cfg(test)]
 mod tests {
-    use super::{ColumnInfo, QualifiedTypeName};
+    use super::{ColumnInfo, QualifiedTypeName, QueryResultBudget, Value};
 
     #[test]
     fn enum_catalog_metadata_does_not_change_column_info_wire_shape() {
@@ -144,5 +208,26 @@ mod tests {
         assert!(wire.get("enum_type").is_none());
         let decoded: ColumnInfo = serde_json::from_value(wire).unwrap();
         assert_eq!(decoded.enum_type, None);
+    }
+
+    #[test]
+    fn result_budget_caps_cells_and_dynamic_value_storage() {
+        let row = vec![Value::Text("x".into())];
+        let mut byte_budget = QueryResultBudget {
+            bytes: super::MAX_QUERY_RESULT_BYTES - super::row_size(&row),
+            ..QueryResultBudget::default()
+        };
+        assert!(byte_budget.admit(&row));
+        assert!(!byte_budget.admit(&row));
+        let mut cell_budget = QueryResultBudget {
+            cells: super::MAX_QUERY_RESULT_CELLS,
+            ..QueryResultBudget::default()
+        };
+        assert!(!cell_budget.admit(&[Value::Null]));
+        let mut row_budget = QueryResultBudget {
+            rows: super::MAX_QUERY_ROWS,
+            ..QueryResultBudget::default()
+        };
+        assert!(!row_budget.admit(&[Value::Null]));
     }
 }

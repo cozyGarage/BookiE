@@ -17,7 +17,7 @@ mod temporal;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Transport, Value, check_pre_dispatch,
+    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Transport, Value, check_pre_dispatch,
     run_controlled_setup, run_server_cancellable,
 };
 
@@ -248,6 +248,14 @@ impl Connection for MysqlConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
         validate_atomic_batch(statements)?;
         let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
         let mut affected = Vec::with_capacity(statements.len());
@@ -260,6 +268,9 @@ impl Connection for MysqlConnection {
                 }
             };
             match q.execute(&mut *tx).await {
+                Ok(res) if expect_one.contains(&idx) && res.rows_affected() != 1 => {
+                    return Err(transaction_failure(tx, idx, DriverError::ConcurrentModification).await);
+                }
                 Ok(res) => affected.push(res.rows_affected()),
                 Err(e) => {
                     return Err(transaction_failure(tx, idx, map_sqlx_error(e)).await);
@@ -640,6 +651,7 @@ async fn params_into_result(
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
     let mut rows = Vec::with_capacity(limit.min(1024));
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
@@ -647,7 +659,14 @@ async fn params_into_result(
             truncated = true;
             break;
         }
-        rows.push((0..columns.len()).map(|index| extract_value(&row, index)).collect());
+        let values = (0..columns.len())
+            .map(|index| extract_value(&row, index))
+            .collect::<Vec<_>>();
+        if !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        rows.push(values);
     }
     Ok(QueryResult {
         columns,

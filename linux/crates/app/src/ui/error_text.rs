@@ -14,6 +14,9 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
             crate::tr!("Column {column} contains a value that cannot be copied into a SQL statement.")
                 .replace("{column}", column)
         }
+        BuildSqlError::UnsupportedDriver(driver) => {
+            crate::tr!("Optimistic grid updates are not supported for {driver}.").replace("{driver}", driver)
+        }
         BuildSqlError::StaleColumns => crate::tr!(
             "This table's columns changed after you started editing (for example, in a Structure tab). \
              Reload the page and reapply your changes."
@@ -34,6 +37,9 @@ pub fn driver_message(error: &DriverError) -> String {
             .replace("{message}", message),
         DriverError::Query { message, .. } => crate::tr!("Query failed: {message}").replace("{message}", message),
         DriverError::Disconnected => crate::tr!("The connection was closed. Try reconnecting."),
+        DriverError::ConcurrentModification => crate::tr!(
+            "This row changed in the database after you loaded it. Your edits are still available; reload the row and reapply them."
+        ),
         DriverError::ReadOnly => {
             crate::tr!("This connection is read-only. Reopen it without read-only mode to make changes.")
         }

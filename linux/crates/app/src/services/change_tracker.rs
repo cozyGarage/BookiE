@@ -34,7 +34,7 @@ use tablepro_core::{
     ColumnInfo, Value,
     sql_dialect::{
         build_insert_from_draft, build_keyed_delete, build_keyed_update, build_mongodb_keyed_delete,
-        build_mongodb_keyed_update,
+        build_mongodb_keyed_update, build_optimistic_keyed_update,
     },
 };
 
@@ -542,6 +542,10 @@ impl TabChangeTracker {
             let pk_values = readable_pk_values(pk_keyvalues)?;
             if driver_id == "mongodb" {
                 out.push(build_mongodb_keyed_update(schema, table, columns, &edits, &pk_values)?);
+            } else if matches!(driver_id, "postgres" | "mysql" | "mssql" | "sqlite") {
+                out.push(build_optimistic_keyed_update(
+                    driver_id, schema, table, columns, &edits, &pk_values,
+                )?);
             } else {
                 let new_values = edits
                     .iter()
@@ -845,6 +849,11 @@ mod tests {
         assert!(matches!(sources[0], StatementSource::Insert { .. }));
         assert!(stmts[1].0.starts_with("UPDATE"));
         assert!(matches!(sources[1], StatementSource::Update { .. }));
+        assert!(stmts[1].0.contains("\"name\" IS NOT DISTINCT FROM $3"));
+        assert_eq!(
+            stmts[1].1,
+            vec![Value::Text("new".into()), Value::Int(5), Value::Text("old".into())]
+        );
         assert!(stmts[2].0.starts_with("DELETE"));
         assert!(matches!(sources[2], StatementSource::Delete { .. }));
     }
@@ -950,12 +959,14 @@ mod tests {
         t.track_cell_edit(key, 2, Value::Text("old".into()), Value::Text("new".into()));
         let (stmts, _sources) = t.materialize("postgres", None, "t", &columns).unwrap();
         assert_eq!(stmts.len(), 1);
-        // SET "name" = $1 then WHERE "a" = $2 AND "b" IS NULL
         assert_eq!(
             stmts[0].0,
-            "UPDATE \"t\" SET \"name\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL"
+            "UPDATE \"t\" SET \"name\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL AND \"name\" IS NOT DISTINCT FROM $3"
         );
-        assert_eq!(stmts[0].1, vec![Value::Text("new".into()), Value::Int(1)]);
+        assert_eq!(
+            stmts[0].1,
+            vec![Value::Text("new".into()), Value::Int(1), Value::Text("old".into())]
+        );
     }
 
     #[test]

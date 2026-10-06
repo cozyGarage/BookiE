@@ -215,6 +215,16 @@ pub trait Connection: Send + Sync {
     /// transactional. Returns one `rows_affected` value per successful
     /// statement, in order. Used by the inline-edit changeset Save flow.
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError>;
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        if expect_one.is_empty() {
+            return self.execute_in_transaction(statements).await;
+        }
+        Err(DriverError::Unsupported("checked transaction writes".into()))
+    }
     /// Bounded form of [`Connection::execute_in_transaction`]. The
     /// default drops the transaction future on an interruption, which
     /// rolls the transaction back but cannot prove it did, so the
@@ -226,6 +236,17 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<Vec<u64>, DriverError> {
         run_controlled(self.execute_in_transaction(statements), control).await
+    }
+    async fn execute_in_transaction_checked_controlled(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+        control: &OperationControl,
+    ) -> Result<Vec<u64>, DriverError> {
+        if expect_one.is_empty() {
+            return self.execute_in_transaction_controlled(statements, control).await;
+        }
+        run_controlled(self.execute_in_transaction_checked(statements, expect_one), control).await
     }
     /// Indexes defined on `table`. Implementations may include the
     /// implicit primary-key index with `primary = true` so the UI can

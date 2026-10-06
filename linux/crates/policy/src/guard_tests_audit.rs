@@ -32,6 +32,20 @@ fn rollback_failure_is_audited_as_an_unknown_transaction_outcome() {
     assert_eq!(super::super::error_category(&error), AuditErrorCategory::Unknown);
 }
 
+#[test]
+fn confirmed_transaction_rollback_is_not_audited_as_an_unknown_outcome() {
+    let error = DriverError::Transaction {
+        statement_index: 1,
+        source: Box::new(DriverError::ConcurrentModification),
+    };
+
+    assert_eq!(
+        super::super::transaction_error_outcome(&error),
+        (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false)
+    );
+    assert_eq!(super::super::error_category(&error), AuditErrorCategory::Transaction);
+}
+
 #[tokio::test]
 async fn post_execution_audit_failure_poisons_shared_state() {
     let executes = Arc::new(AtomicUsize::new(0));

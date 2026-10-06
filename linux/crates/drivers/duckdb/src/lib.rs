@@ -5,7 +5,7 @@ use duckdb::{Connection as DuckConnection, core::LogicalTypeId, params_from_iter
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, TableInfo, Value,
+    QueryResult, QueryResultBudget, TableInfo, Value,
 };
 
 mod temporal;
@@ -363,6 +363,7 @@ fn run_query(
     // DuckDB requires the statement to be stepped before column metadata
     // is available. Collect all values first (capped), then read names.
     let mut raw_rows: Vec<Vec<Value>> = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     let mut column_count = 0usize;
     let mut zoned_columns = Vec::new();
@@ -386,22 +387,25 @@ fn run_query(
             truncated = true;
             break;
         }
-        raw_rows.push(
-            zoned_columns
-                .iter()
-                .zip(&uuid_columns)
-                .enumerate()
-                .map(
-                    |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
-                        Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                        Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
-                            Value::Text(format!("{timestamp}+00"))
-                        }
-                        value => value,
-                    },
-                )
-                .collect(),
-        );
+        let values = zoned_columns
+            .iter()
+            .zip(&uuid_columns)
+            .enumerate()
+            .map(
+                |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                    Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                    Value::Text(timestamp) if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") => {
+                        Value::Text(format!("{timestamp}+00"))
+                    }
+                    value => value,
+                },
+            )
+            .collect::<Vec<_>>();
+        if !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        raw_rows.push(values);
     }
     if column_count == 0
         && let Some(stmt_ref) = rows.as_ref()

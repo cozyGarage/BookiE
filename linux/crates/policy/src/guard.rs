@@ -785,6 +785,7 @@ fn transaction_error_outcome(error: &DriverError) -> (AuditTerminalStatus, Audit
     match error {
         DriverError::Cancelled => (AuditTerminalStatus::Cancelled, AuditTransactionOutcome::Pending, false),
         DriverError::TimedOut => (AuditTerminalStatus::TimedOut, AuditTransactionOutcome::Pending, false),
+        DriverError::Transaction { .. } => (AuditTerminalStatus::Failed, AuditTransactionOutcome::RolledBack, false),
         _ => (AuditTerminalStatus::Unknown, AuditTransactionOutcome::Unknown, true),
     }
 }
@@ -801,6 +802,7 @@ fn is_ambiguous_post_dispatch(error: &DriverError) -> bool {
         DriverError::Transaction { source, .. } => is_ambiguous_post_dispatch(source),
         DriverError::TransactionRollbackFailed { .. } => true,
         DriverError::Query { .. }
+        | DriverError::ConcurrentModification
         | DriverError::ReadOnly
         | DriverError::PolicyDenied(_)
         | DriverError::Unsupported(_)
@@ -815,6 +817,7 @@ fn error_category(error: &DriverError) -> AuditErrorCategory {
         DriverError::AuthFailed | DriverError::IntegratedAuth(_) => AuditErrorCategory::Authentication,
         DriverError::Tls(_) => AuditErrorCategory::Tls,
         DriverError::Query { .. } => AuditErrorCategory::Query,
+        DriverError::ConcurrentModification => AuditErrorCategory::Transaction,
         DriverError::ReadOnly => AuditErrorCategory::ReadOnly,
         DriverError::PolicyDenied(_) => AuditErrorCategory::Policy,
         DriverError::Unsupported(_) => AuditErrorCategory::Unsupported,

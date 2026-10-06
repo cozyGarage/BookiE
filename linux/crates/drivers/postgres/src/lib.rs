@@ -13,8 +13,8 @@ use futures::stream::StreamExt;
 
 use tablepro_core::{
     CONTROL_SETUP_TIMEOUT, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult,
-    ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, TableInfo, Transport,
-    Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
+    ForeignKeyInfo, IndexInfo, MAX_QUERY_ROWS, OperationControl, QualifiedTypeName, QueryResult, QueryResultBudget,
+    TableInfo, Transport, Value, check_pre_dispatch, run_controlled_setup, run_server_cancellable,
 };
 
 mod array;
@@ -24,6 +24,7 @@ mod numeric;
 mod params;
 mod session;
 mod temporal;
+mod transaction;
 
 use params::{bind_pg_params, describe_query_parameters, needs_enum_type_inference, pg_parameter_type_infos};
 
@@ -405,33 +406,15 @@ impl Connection for PgConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
-        let mut affected = Vec::with_capacity(statements.len());
-        for (idx, (sql, params)) in statements.iter().enumerate() {
-            let sql = sql.as_str();
-            let inferred_text_types = if needs_enum_type_inference(params) {
-                match describe_query_parameters(&mut tx, sql, params).await {
-                    Ok(description) => description.inferred_text_types,
-                    Err(error) => return Err(transaction_failure(tx, idx, error).await),
-                }
-            } else {
-                Vec::new()
-            };
-            let q = match bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, &inferred_text_types) {
-                Ok(query) => query,
-                Err(error) => {
-                    return Err(transaction_failure(tx, idx, error).await);
-                }
-            };
-            match q.execute(&mut *tx).await {
-                Ok(res) => affected.push(res.rows_affected()),
-                Err(e) => {
-                    return Err(transaction_failure(tx, idx, map_sqlx_error(e)).await);
-                }
-            }
-        }
-        tx.commit().await.map_err(map_sqlx_error)?;
-        Ok(affected)
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        transaction::execute_in_transaction_checked(&self.pool, statements, expect_one).await
     }
 
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
@@ -984,6 +967,7 @@ where
     let mut type_infos = Vec::new();
     let mut type_names = Vec::new();
     let mut rows = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
@@ -1017,13 +1001,16 @@ where
         }
         // Decode while streaming so the wire rows and the final Value matrix
         // do not both occupy memory for the entire result.
-        rows.push(
-            type_names
-                .iter()
-                .enumerate()
-                .map(|(index, type_name)| extract_value(&row, index, type_name))
-                .collect::<Result<Vec<_>, _>>()?,
-        );
+        let values = type_names
+            .iter()
+            .enumerate()
+            .map(|(index, type_name)| extract_value(&row, index, type_name))
+            .collect::<Result<Vec<_>, _>>()?;
+        if !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        rows.push(values);
     }
     Ok((
         QueryResult {

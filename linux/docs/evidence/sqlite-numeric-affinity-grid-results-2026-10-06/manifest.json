@@ -13,7 +13,7 @@
   },
   "engine": "SQLite, in-memory, INTEGER/REAL/NUMERIC affinity",
   "case": "SQLite numeric-affinity edits preserve text and exact numbers while refusing overflow, underflow and rounding",
-  "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values",
+  "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values",
   "contract": [
     "SQLite INTEGER, REAL and NUMERIC grid edits retain clearly nonnumeric input as TEXT; MySQL and SQL Server remain strict.",
     "Exactly representable decimals such as 42.50 remain accepted; integer/floating overflow, floating underflow and excess decimal precision are rejected before affinity can lose value.",

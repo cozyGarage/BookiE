@@ -17,12 +17,13 @@ use futures::stream::StreamExt;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Value, check_pre_dispatch, run_controlled_setup,
-    run_server_cancellable,
+    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
+    run_controlled_setup, run_server_cancellable,
 };
 
 mod interrupt;
 mod session;
+mod transaction;
 
 use interrupt::InterruptHandle;
 
@@ -300,33 +301,15 @@ impl Connection for SqliteConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
-        let mut tx = self.pool.begin().await.map_err(map_sqlx_error)?;
-        let mut affected = Vec::with_capacity(statements.len());
-        for (idx, (sql, params)) in statements.iter().enumerate() {
-            let sql = sql.as_str();
-            let q = match bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params) {
-                Ok(query) => query,
-                Err(error) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(error),
-                    });
-                }
-            };
-            match q.execute(&mut *tx).await {
-                Ok(res) => affected.push(res.rows_affected()),
-                Err(e) => {
-                    let _ = tx.rollback().await;
-                    return Err(DriverError::Transaction {
-                        statement_index: idx,
-                        source: Box::new(map_sqlx_error(e)),
-                    });
-                }
-            }
-        }
-        tx.commit().await.map_err(map_sqlx_error)?;
-        Ok(affected)
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        transaction::execute_in_transaction_checked(&self.pool, statements, expect_one).await
     }
 
     async fn fetch_indexes(&self, _schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
@@ -521,18 +504,30 @@ async fn stream_into_result(
     let columns = result_columns(connection, statement.columns(), sql).await;
     drop(statement);
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut *connection);
-    let mut collected: Vec<SqliteRow> = Vec::new();
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
-        if collected.len() >= limit {
+        if rows.len() >= limit {
             truncated = true;
             break;
         }
-        collected.push(row);
+        let values = (0..columns.len())
+            .map(|index| extract_value(&row, index))
+            .collect::<Vec<_>>();
+        if !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        rows.push(values);
     }
     drop(stream);
-    Ok(rows_into_result(columns, &collected, truncated))
+    Ok(QueryResult {
+        columns,
+        rows,
+        truncated,
+    })
 }
 
 async fn result_columns(
@@ -859,18 +854,30 @@ async fn params_into_result(
     drop(statement);
     let query = bind_sqlite_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
-    let mut collected: Vec<SqliteRow> = Vec::new();
+    let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(row_result) = stream.next().await {
         let row = row_result.map_err(map_sqlx_error)?;
-        if collected.len() >= limit {
+        if rows.len() >= limit {
             truncated = true;
             break;
         }
-        collected.push(row);
+        let values = (0..columns.len())
+            .map(|index| extract_value(&row, index))
+            .collect::<Vec<_>>();
+        if !budget.admit(&values) {
+            truncated = true;
+            break;
+        }
+        rows.push(values);
     }
     drop(stream);
-    Ok(rows_into_result(columns, &collected, truncated))
+    Ok(QueryResult {
+        columns,
+        rows,
+        truncated,
+    })
 }
 
 async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError>

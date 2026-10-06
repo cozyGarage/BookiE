@@ -23,8 +23,8 @@ use shell::{
 use update::{parse_keyed_delete, parse_keyed_update};
 
 use tablepro_core::{
-    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, TableInfo, Value,
+    ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult,
+    MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, TableInfo, Value,
 };
 
 pub struct MongodbDriver;
@@ -148,6 +148,19 @@ fn tls_for(config: &tablepro_core::TlsConfig, service_host: &str) -> Tls {
 struct MongodbConnection {
     client: Client,
     database_name: String,
+}
+
+fn bounded_document_rows(docs: &[Document], columns: &[ColumnInfo]) -> (Vec<Vec<Value>>, bool) {
+    let mut rows = Vec::new();
+    let mut budget = QueryResultBudget::default();
+    for doc in docs {
+        let row = document_to_row(doc, columns);
+        if !budget.admit(&row) {
+            return (rows, true);
+        }
+        rows.push(row);
+    }
+    (rows, false)
 }
 
 impl MongodbConnection {
@@ -376,20 +389,31 @@ impl MongodbConnection {
             .await
             .map_err(map_mongo_error)?;
         let mut docs = Vec::new();
+        let mut source_bytes = 0usize;
+        let mut source_cells = 0usize;
         let mut truncated = false;
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            if docs.len() >= MAX_QUERY_ROWS {
+            let size = mongodb::bson::to_vec(&doc)
+                .map_err(|_| DriverError::Internal("failed to size BSON result".into()))?
+                .len();
+            let cells = source_cells.saturating_add(doc.len());
+            if docs.len() >= MAX_QUERY_ROWS
+                || source_bytes.saturating_add(size) > MAX_QUERY_RESULT_BYTES
+                || cells > MAX_QUERY_RESULT_CELLS
+            {
                 truncated = true;
                 break;
             }
+            source_bytes += size;
+            source_cells = cells;
             docs.push(doc);
         }
         merge_page_types(&mut columns, &docs);
-        let rows = docs.iter().map(|doc| document_to_row(doc, &columns)).collect();
+        let (rows, row_truncated) = bounded_document_rows(&docs, &columns);
         Ok(QueryResult {
             columns,
             rows,
-            truncated,
+            truncated: truncated || row_truncated,
         })
     }
 
@@ -397,20 +421,31 @@ impl MongodbConnection {
         let coll = self.db().collection::<Document>(&q.collection);
         let mut cursor = coll.aggregate(q.pipeline).await.map_err(map_mongo_error)?;
         let mut docs = Vec::new();
+        let mut source_bytes = 0usize;
+        let mut source_cells = 0usize;
         let mut truncated = false;
         while let Some(doc) = cursor.try_next().await.map_err(map_mongo_error)? {
-            if docs.len() >= MAX_QUERY_ROWS {
+            let size = mongodb::bson::to_vec(&doc)
+                .map_err(|_| DriverError::Internal("failed to size BSON result".into()))?
+                .len();
+            let cells = source_cells.saturating_add(doc.len());
+            if docs.len() >= MAX_QUERY_ROWS
+                || source_bytes.saturating_add(size) > MAX_QUERY_RESULT_BYTES
+                || cells > MAX_QUERY_RESULT_CELLS
+            {
                 truncated = true;
                 break;
             }
+            source_bytes += size;
+            source_cells = cells;
             docs.push(doc);
         }
         let columns = columns_from_docs(&docs);
-        let rows = docs.iter().map(|d| document_to_row(d, &columns)).collect();
+        let (rows, row_truncated) = bounded_document_rows(&docs, &columns);
         Ok(QueryResult {
             columns,
             rows,
-            truncated,
+            truncated: truncated || row_truncated,
         })
     }
 }

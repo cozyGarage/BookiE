@@ -40,6 +40,19 @@ impl App {
             .as_ref()
             .and_then(|id| self.registry.get(id))
             .is_none_or(|driver| driver.reports_rows_affected());
+        let uses_checked_writes = self
+            .current_driver_id
+            .as_deref()
+            .is_some_and(|id| matches!(id, "postgres" | "mysql" | "mssql" | "sqlite"));
+        let checked_writes = uses_checked_writes
+            .then(|| {
+                sources
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, source)| matches!(source, StatementSource::Update { .. }).then_some(index))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         self.set_row_op_in_flight(true);
         // Increment the in-flight counter so window-close blocks until
         // the transaction resolves. Decrement happens in the
@@ -54,7 +67,13 @@ impl App {
             shutdown
                 .register(async move {
                     let control = crate::services::operation_control::bounded(timeout_secs);
-                    match conn.execute_in_transaction_controlled(&statements, &control).await {
+                    let result = if checked_writes.is_empty() {
+                        conn.execute_in_transaction_controlled(&statements, &control).await
+                    } else {
+                        conn.execute_in_transaction_checked_controlled(&statements, &checked_writes, &control)
+                            .await
+                    };
+                    match result {
                         Ok(affected) => {
                             // Optimistic-concurrency guard: every UPDATE
                             // and DELETE in our materialised set targets

@@ -4,6 +4,7 @@
     { "prefix": "crates/core/src/", "package": "tablepro-core", "target": "--lib" },
     { "prefix": "crates/core/tests/", "package": "tablepro-core", "target": "--tests" },
     { "prefix": "crates/app/src/", "package": "tablepro-app", "target": "--lib" },
+    { "prefix": "crates/app/tests/", "package": "tablepro-app", "target": "--tests" },
     { "prefix": "crates/mcp/src/", "package": "tablepro-mcp", "target": "--lib" },
     {
       "prefix": "crates/drivers/",
@@ -13,6 +14,34 @@
     }
   ],
   "exact_tests": {
+    "crates/core/src/query.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "query::tests::result_budget_caps_cells_and_dynamic_value_storage"
+      ]
+    },
+    "crates/core/src/sql_dialect/updates.rs": {
+      "package": "tablepro-core",
+      "target": "--lib",
+      "tests": [
+        "sql_dialect::updates::tests::optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax"
+      ]
+    },
+    "crates/app/src/services/change_tracker.rs": {
+      "package": "tablepro-app",
+      "target": "--lib",
+      "tests": [
+        "services::change_tracker::tests::materialize_orders_inserts_then_updates_then_deletes"
+      ]
+    },
+    "crates/app/tests/stale_grid_update.rs": {
+      "package": "tablepro-app",
+      "target": "--tests",
+      "tests": [
+        "stale_sqlite_grid_update_rolls_back_the_batch_and_preserves_the_original_value"
+      ]
+    },
     "crates/core/src/sql_dialect.rs": {
       "package": "tablepro-core",
       "target": "--lib",

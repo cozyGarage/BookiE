@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, DriverMaturity, ExecResult, MAX_QUERY_ROWS,
-    QueryResult, TableInfo, Value, error_chain_text, looks_like_tls_failure,
+    QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text, looks_like_tls_failure,
 };
 
 pub struct RedisDriver;
@@ -459,13 +459,19 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
         },
         RedisValue::Array(items) | RedisValue::Set(items) => {
             let mut rows = Vec::new();
+            let mut budget = QueryResultBudget::default();
             let mut truncated = false;
             for item in items {
                 if rows.len() >= MAX_QUERY_ROWS {
                     truncated = true;
                     break;
                 }
-                rows.push(vec![redis_scalar(item)]);
+                let row = vec![redis_scalar(item)];
+                if !budget.admit(&row) {
+                    truncated = true;
+                    break;
+                }
+                rows.push(row);
             }
             QueryResult {
                 columns: vec![text_col("value")],
@@ -474,12 +480,17 @@ fn redis_value_to_result(value: RedisValue) -> QueryResult {
             }
         }
         RedisValue::Map(pairs) => {
-            let truncated = pairs.len() > MAX_QUERY_ROWS;
-            let rows = pairs
-                .into_iter()
-                .take(MAX_QUERY_ROWS)
-                .map(|(k, v)| vec![redis_scalar(k), redis_scalar(v)])
-                .collect();
+            let mut rows = Vec::new();
+            let mut budget = QueryResultBudget::default();
+            let mut truncated = false;
+            for (key, value) in pairs {
+                let row = vec![redis_scalar(key), redis_scalar(value)];
+                if !budget.admit(&row) {
+                    truncated = true;
+                    break;
+                }
+                rows.push(row);
+            }
             QueryResult {
                 columns: vec![text_col("key"), text_col("value")],
                 rows,
@@ -1036,10 +1047,11 @@ mod tests {
     }
 
     #[test]
-    fn redis_value_to_result_truncates_an_array_past_the_row_cap() {
+    fn redis_value_to_result_truncates_an_array_at_a_shared_budget() {
         let items = (0..MAX_QUERY_ROWS + 1).map(|i| RedisValue::Int(i as i64)).collect();
         let result = redis_value_to_result(RedisValue::Array(items));
-        assert_eq!(result.rows.len(), MAX_QUERY_ROWS);
+        assert!(!result.rows.is_empty());
+        assert!(result.rows.len() < MAX_QUERY_ROWS);
         assert!(result.truncated);
     }
 
@@ -1063,7 +1075,8 @@ mod tests {
             })
             .collect();
         let result = redis_value_to_result(RedisValue::Map(pairs));
-        assert_eq!(result.rows.len(), MAX_QUERY_ROWS);
+        assert!(!result.rows.is_empty());
+        assert!(result.rows.len() < MAX_QUERY_ROWS);
         assert!(result.truncated, "a cut-off Redis map must never look complete");
     }
 

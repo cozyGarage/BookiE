@@ -50,6 +50,87 @@ pub fn build_keyed_update(
     Ok((sql, params))
 }
 
+pub fn build_optimistic_keyed_update(
+    driver_id: &str,
+    schema: Option<&str>,
+    table: &str,
+    columns: &[ColumnInfo],
+    edits: &[(usize, Value, Value)],
+    pk_values: &[Value],
+) -> Result<(String, Vec<Value>), BuildSqlError> {
+    let pk_indexes = checked_pk_indexes(columns, pk_values)?;
+    if edits.is_empty() {
+        return Err(BuildSqlError::NothingToUpdate);
+    }
+    if edits.iter().any(|(col_idx, _, _)| *col_idx >= columns.len()) {
+        return Err(BuildSqlError::StaleColumns);
+    }
+    let mut assignments = Vec::with_capacity(edits.len());
+    let mut params = Vec::with_capacity(edits.len() * 3 + pk_values.len());
+    for (col_idx, _, new_value) in edits {
+        let name = quote_ident(driver_id, &columns[*col_idx].name);
+        let placeholder = placeholder_for(driver_id, params.len());
+        let value_sql = if driver_id == "postgres" {
+            postgres_text_cast_type(&columns[*col_idx], new_value)
+                .map(|type_name| format!("{placeholder}::text::{type_name}"))
+                .unwrap_or(placeholder)
+        } else {
+            placeholder
+        };
+        assignments.push(format!("{name} = {value_sql}"));
+        params.push(new_value.clone());
+    }
+    let mut predicates = vec![keyed_where_clause(
+        driver_id,
+        columns,
+        &pk_indexes,
+        pk_values,
+        &mut params,
+    )];
+    for (col_idx, old_value, _) in edits {
+        if columns[*col_idx].primary_key {
+            continue;
+        }
+        let name = quote_ident(driver_id, &columns[*col_idx].name);
+        predicates.push(optimistic_predicate(driver_id, &name, old_value, &mut params)?);
+    }
+    let qualified = qualified_table(driver_id, schema, table);
+    Ok((
+        build_update(
+            driver_id,
+            &qualified,
+            &assignments.join(", "),
+            &predicates.join(" AND "),
+        ),
+        params,
+    ))
+}
+
+fn optimistic_predicate(
+    driver_id: &str,
+    name: &str,
+    old_value: &Value,
+    params: &mut Vec<Value>,
+) -> Result<String, BuildSqlError> {
+    let placeholder = placeholder_for(driver_id, params.len());
+    let predicate = match driver_id {
+        "postgres" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "sqlite" | "duckdb" => format!("{name} IS {placeholder}"),
+        "mysql" => format!("{name} <=> {placeholder}"),
+        "mssql" => {
+            let next = placeholder_for(driver_id, params.len() + 1);
+            params.push(old_value.clone());
+            params.push(old_value.clone());
+            return Ok(format!(
+                "({name} = {placeholder} OR ({name} IS NULL AND {next} IS NULL))"
+            ));
+        }
+        _ => return Err(BuildSqlError::UnsupportedDriver(driver_id.into())),
+    };
+    params.push(old_value.clone());
+    Ok(predicate)
+}
+
 /// Build a MongoDB grid update with compare-and-set predicates for every
 /// edited field. MongoDB's update adapter translates equality against BSON
 /// NULL to an explicit-null type check, keeping missing fields distinct.
@@ -151,7 +232,9 @@ pub fn build_mongodb_keyed_delete(
 
 #[cfg(test)]
 mod tests {
-    use super::{build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update};
+    use super::{
+        build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update, build_optimistic_keyed_update,
+    };
     use crate::{ColumnInfo, Value};
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {
@@ -270,6 +353,31 @@ mod tests {
         .unwrap();
         assert_eq!(sql, "UPDATE \"records\" SET \"payload\" = $1 WHERE \"id\" = $2");
         assert_eq!(params, vec![Value::Text("edited".into()), Value::Int(7)]);
+    }
+
+    #[test]
+    fn optimistic_updates_compare_the_original_value_with_null_safe_dialect_syntax() {
+        let mut columns = [column("id", true), column("payload", false)];
+        columns[1].nullable = true;
+        for (driver, expected) in [
+            ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
+            ("sqlite", "\"payload\" IS ?"),
+            ("mysql", "`payload` <=> ?"),
+            ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
+        ] {
+            let (sql, params) = build_optimistic_keyed_update(
+                driver,
+                None,
+                "records",
+                &columns,
+                &[(1, Value::Null, Value::Text("edited".into()))],
+                &[Value::Int(7)],
+            )
+            .unwrap();
+            assert!(sql.contains(expected), "{driver}: {sql}");
+            assert_eq!(params.last(), Some(&Value::Null));
+            assert_eq!(params.first(), Some(&Value::Text("edited".into())));
+        }
     }
 
     #[test]

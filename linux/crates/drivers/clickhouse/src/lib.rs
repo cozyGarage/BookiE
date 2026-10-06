@@ -18,8 +18,8 @@ use value_literal::literal;
 
 use tablepro_core::{
     ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo, IndexInfo,
-    MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Value, error_chain_text, looks_like_tls_failure,
-    run_server_cancellable, sql_dialect::quote_ident,
+    MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, error_chain_text,
+    looks_like_tls_failure, run_server_cancellable, sql_dialect::quote_ident,
 };
 
 const DRIVER_ID: &str = "clickhouse";
@@ -405,6 +405,7 @@ async fn fetch_result(
     let columns = response_columns(names, types)?;
 
     let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     while let Some(line) = reader.next_line().await? {
         if line.is_empty() {
@@ -423,7 +424,12 @@ async fn fetch_result(
                 sqlstate: None,
             });
         }
-        rows.push(response_row(raw, &columns)?);
+        let row = response_row(raw, &columns)?;
+        if !budget.admit(&row) {
+            truncated = true;
+            break;
+        }
+        rows.push(row);
     }
 
     Ok(QueryResult {

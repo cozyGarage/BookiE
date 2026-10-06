@@ -352,6 +352,44 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
+        if expect_one.is_empty() {
+            return self.execute_in_transaction(statements).await;
+        }
+        let combined = statements
+            .iter()
+            .map(|(sql, _)| sql.trim().trim_end_matches(';'))
+            .collect::<Vec<_>>()
+            .join(";\n");
+        let authorization = self.authorize(&combined, true, None).await?;
+        self.require_governed_write_available()?;
+        let operation = self.operation(
+            &combined,
+            Some(Uuid::new_v4()),
+            &authorization.facts,
+            &authorization.decision,
+            authorization.approval_outcome,
+            authorization.preview_state,
+        );
+        self.handle_intent_failure(self.record_intent(&operation).await)?;
+        let mut pending_write = self.ctx.audit_state.pending_write();
+        let start = Instant::now();
+        let result = self
+            .caught_write(
+                "EXECUTE CHECKED TRANSACTION",
+                self.inner.execute_in_transaction_checked(statements, expect_one),
+            )
+            .await;
+        let rows = result.as_ref().ok().map(|values| values.iter().sum());
+        self.audit_transaction_result(&operation, start, &result, rows).await?;
+        pending_write.disarm();
+        result
+    }
+
     async fn fetch_indexes(&self, schema: Option<&str>, table: &str) -> Result<Vec<IndexInfo>, DriverError> {
         let target = schema.map_or_else(|| table.to_string(), |schema| format!("{schema}.{table}"));
         let operation = self.metadata_operation("FETCH INDEXES", vec![target]);

@@ -12,7 +12,7 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tablepro_core::sql_dialect::build_order_and_pagination;
 use tablepro_core::{
     AuthMode, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, TableInfo, Value, check_pre_dispatch,
+    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
     run_server_cancellable,
 };
 
@@ -410,6 +410,14 @@ impl Connection for MssqlConnection {
     }
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
+        self.execute_in_transaction_checked(statements, &[]).await
+    }
+
+    async fn execute_in_transaction_checked(
+        &self,
+        statements: &[(String, Vec<Value>)],
+        expect_one: &[usize],
+    ) -> Result<Vec<u64>, DriverError> {
         let mut client = self.client().await?;
         exec_simple(&mut client, "BEGIN TRANSACTION").await?;
         let mut affected = Vec::with_capacity(statements.len());
@@ -426,7 +434,25 @@ impl Connection for MssqlConnection {
             };
             let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
             match client.execute(sql.as_str(), &refs).await {
-                Ok(res) => affected.push(res.total()),
+                Ok(res) => {
+                    let total = res.total();
+                    if expect_one.contains(&idx) && total != 1 {
+                        let source = DriverError::ConcurrentModification;
+                        let rollback = exec_simple(&mut client, "ROLLBACK").await;
+                        return Err(match rollback {
+                            Ok(()) => DriverError::Transaction {
+                                statement_index: idx,
+                                source: Box::new(source),
+                            },
+                            Err(error) => DriverError::TransactionRollbackFailed {
+                                statement_index: idx,
+                                source: Box::new(source),
+                                rollback_error: Box::new(error),
+                            },
+                        });
+                    }
+                    affected.push(total);
+                }
                 Err(e) => {
                     let _ = exec_simple(&mut client, "ROLLBACK").await;
                     return Err(DriverError::Transaction {
@@ -595,6 +621,7 @@ async fn run_batch(client: &mut MssqlClient, sql: &str, limit: usize) -> Result<
 async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> Result<QueryResult, DriverError> {
     let mut columns: Vec<ColumnInfo> = Vec::new();
     let mut rows: Vec<Vec<Value>> = Vec::new();
+    let mut budget = QueryResultBudget::default();
     let mut truncated = false;
     let mut result_sets = 0usize;
     // The stream is read to its end rather than dropped early: tiberius only
@@ -613,12 +640,16 @@ async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> 
             QueryItem::Row(_) if rows.len() >= limit => truncated = true,
             QueryItem::Row(row) => {
                 let types: Vec<ColumnType> = row.columns().iter().map(Column::column_type).collect();
-                rows.push(
-                    row.into_iter()
-                        .zip(types)
-                        .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type))
-                        .collect(),
-                );
+                let values = row
+                    .into_iter()
+                    .zip(types)
+                    .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type))
+                    .collect::<Vec<_>>();
+                if budget.admit(&values) {
+                    rows.push(values);
+                } else {
+                    truncated = true;
+                }
             }
         }
     }

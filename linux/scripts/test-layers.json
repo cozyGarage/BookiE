@@ -9,6 +9,17 @@
         {
           "argv": [
             "python3",
+            "scripts/validate-evidence.py",
+            "--strict",
+            "docs/evidence/sqlite-numeric-affinity-grid-results-2026-10-06/manifest.json",
+            "docs/evidence/sqlite-affinity-check-constraint-results-2026-10-06/manifest.json"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit"
+        },
+        {
+          "argv": [
+            "python3",
             "-m",
             "unittest",
             "discover",

@@ -33,11 +33,11 @@ chosen dependencies and source versions when implementation begins.
 adds DBeaver, pgAdmin, Beekeeper Studio and DB Browser for SQLite examples,
 an explicit BookiE-core versus dbx-core comparison, and bounded current-code
 verification. Its priority findings are relational stale-write protection,
-evidence-selector/source validation and shared result-memory budgets. It also
-records the strengths and limits of the recent SQLite fixes: 530 core and two
-native SQLite app-library tests passed locally; release/hosted/installed gates
-remain separate. Use that review for detailed evidence and proposed packets;
-the sections below remain the deferred post-0.2.0 restructuring plan.
+evidence-selector/source validation and shared result-memory budgets. A
+2026-10-06 implementation follow-up records those changes and local checks;
+cross-engine runtime, hosted CI, installed GTK and packaging gates remain
+separate. Use that review for detailed evidence and residual gaps; the sections
+below remain the deferred post-0.2.0 restructuring plan.
 
 ## 1. Root workspace, preserving existing ownership
 

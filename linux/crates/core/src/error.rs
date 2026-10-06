@@ -35,6 +35,9 @@ pub enum DriverError {
     #[error("operation timed out")]
     TimedOut,
 
+    #[error("row changed since it was loaded")]
+    ConcurrentModification,
+
     #[error("operation outcome is unknown after interruption: {source}")]
     OperationOutcomeUnknown { source: Box<DriverError> },
 

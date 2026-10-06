@@ -6,10 +6,15 @@ use crate::{ColumnInfo, Value};
 #[path = "sql_dialect/postgres_enum_tests.rs"]
 mod postgres_enum_tests;
 
+mod error;
 #[path = "sql_dialect/updates.rs"]
 mod updates;
 
-pub use updates::{build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update};
+pub use error::BuildSqlError;
+
+pub use updates::{
+    build_keyed_update, build_mongodb_keyed_delete, build_mongodb_keyed_update, build_optimistic_keyed_update,
+};
 
 pub const MAX_IDENT_BYTES: usize = 256;
 
@@ -39,24 +44,6 @@ pub fn validate_ident(name: &str) -> Result<(), IdentError> {
         return Err(IdentError::ControlCharacter);
     }
     Ok(())
-}
-
-#[derive(Debug, Error)]
-pub enum BuildSqlError {
-    #[error("table has no primary key")]
-    NoPrimaryKey,
-
-    #[error("nothing to update")]
-    NothingToUpdate,
-
-    #[error("new_values length {got} does not match columns length {expected}")]
-    LengthMismatch { expected: usize, got: usize },
-
-    #[error("column {column} contains a value that cannot be represented in a SQL statement")]
-    UnrepresentableValue { column: String },
-
-    #[error("the table's columns changed since this edit was made; reload and reapply your changes")]
-    StaleColumns,
 }
 
 pub fn quote_ident(driver_id: &str, name: &str) -> String {

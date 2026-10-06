@@ -4,8 +4,9 @@ Reviewed 2026-10-06; companion to [external-audit.md](external-audit.md).
 This is a bounded review of Linux BookiE and selected primary-source examples,
 not an exhaustive audit of any client. Findings nominate work for the existing
 [B3](linux/docs/type-contract-strategy.md) and
-[B4](linux/docs/b4-task-board.md) owners; they do not change sprint order or
-claim release acceptance. No product code or workflows changed.
+[B4](linux/docs/b4-task-board.md) owners; they did not change sprint order or
+claim release acceptance. The implementation follow-up below records changes
+made after the review; it does not claim hosted or release acceptance.
 
 ## Inspected sources
 
@@ -101,12 +102,19 @@ comparison, and MySQL changed-row versus matched-row reporting needs explicit
 handling. Engines without reliable counts need an honest unsupported/refusal
 path or a separately proven locking/version strategy.
 
-Acceptance packet: two independent sessions; edit/edit, edit/delete and
-delete/edit conflicts; composite keys; NULL and unchanged-value updates;
-generated fields; batch conflict after an earlier successful statement;
-rollback preserves all rows, sibling rows and pending drafts. Test affected
-count anomalies and missing count entries. Register in the existing B3
-grid/bind owner; no product fix implemented by this audit.
+Implemented for PostgreSQL, MySQL, SQL Server and SQLite: edited values now
+join the primary-key predicate using each dialect's NULL-safe equality. Checked
+affected counts are validated before commit; a conflict rolls back the full
+batch and leaves the change tracker pending for retry or review. The checked
+transaction API passes through PolicyGuard. MongoDB retains its existing
+compare-and-set path. Other engines are not routed through the new SQL builder.
+
+Regression coverage includes dialect SQL/parameter assertions and a native
+SQLite transaction where an earlier insert is rolled back after a stale edit;
+the other writer's value remains stored. Remaining coverage: live two-session
+tests for PostgreSQL/MySQL/SQL Server, composite-key runtime cases, driver
+count anomalies, pending-draft UI interaction, and non-transactional MySQL
+tables. These are separate from the local SQLite proof and hosted gates.
 
 ### R2 — Medium: evidence lookup can select zero tests or confuse historic source with current source
 
@@ -118,13 +126,13 @@ file. A historical hash mismatch is not a failing product test. The top-level
 numeric-affinity `test` field also omits the `sqlite_numeric_affinity::` module;
 the command inside `validation.focused_test` has the correct selector.
 
-Add one evidence validator using the existing runner conventions: distinguish
-historical versus current compatibility, validate declared paths/digests at
-their recorded source, compare canonical selectors with Cargo test discovery,
-and require the expected selected/executed count. A stale selector must never
-produce an accepted zero-test run. Do not rewrite old hashes to make history
-look current or duplicate every log into plans. This prevents misleading
-acceptance across all engines, not just SQLite.
+Implemented `linux/scripts/validate-evidence.py`, its unit tests, strict checks
+for the two current SQLite evidence packets, and a harness-tier CI invocation.
+It checks selector/command agreement, logged execution and pass counts, and
+source/log digest shape and archived log digests. Full-history source drift or
+missing legacy logs are review warnings; strict current packets fail closed.
+The validator leaves historical hashes intact. Run without `--strict` to
+inventory legacy warning debt.
 
 ### R3 — Medium: row caps do not bound result memory
 
@@ -135,15 +143,13 @@ cells can exhaust memory far below a row limit. MCP's request-body cap protects
 incoming requests, not database result allocation. GTK virtualization likewise
 does not bound the retained backing result.
 
-Introduce one shared result budget/completeness model and enforce it while
-collecting, with row/cell/decoded-byte limits, checked arithmetic and a reason
-for truncation/refusal. Retain query/multi-result identity and drain, cancel or
-retire handles according to each driver's protocol. A decoded budget does not
-alone bound allocations already performed by a driver/native library; document
-that layer separately. Prove below/exactly/above limit, one enormous cell,
-empty results and connection reuse. Benchmark peak RSS and end-to-end
-delivery for GUI and headless consumers. This is a source-backed design gap,
-not a measured OOM or comparative performance result.
+Implemented a shared decoded-result row/cell/byte budget in `tablepro-core`
+and applied it to SQL, document, key-value and Redis result collectors.
+Exceeding the budget sets the existing `truncated` flag. The core unit test
+covers row, cell and byte boundaries. This retained-value budget does not
+include all driver protocol buffers, native client allocations or MongoDB's
+intermediate BSON documents; peak RSS, connection reuse after truncation and
+GUI/headless delivery remain to measure.
 
 ### R4 — Shared parsing is useful; consolidate decisions without erasing engine semantics
 
@@ -191,15 +197,24 @@ an explicit dependency allowlist and both consumers tested. Rust ownership
 helps memory safety; it does not itself enforce database identity, stale-write
 protection, precision, cancellation or resource budgets.
 
-## Verification in this review
+## Verification in the original review
 
 - `cargo test --manifest-path linux/Cargo.toml -p tablepro-core --lib`: **530 passed**, zero ignored/failed.
 - App all-features library selector `ui::browse_tab::value_parse::tests::sqlite_numeric_affinity`: **2 passed**, 511 filtered, zero failed/ignored; native in-memory SQLite assertions, not an installed GTK interaction run.
 - Two evidence packets: six current matching source digests, one historical differing source digest, eleven matching log digests.
 - Pinned pgAdmin reader extracted directly from its source and executed with the reported late Latin-1 byte: input **5,242,884 bytes**, output **9,437,188 characters**, duplicated prefix **4,194,304 characters**. No pgAdmin server/browser run.
-- SQLite SQL-semantics probe: stale overwrite affected **1** row. No Rust/GTK concurrency regression added or product fix made.
+- SQLite SQL-semantics probe: stale overwrite affected **1** row. The follow-up adds the Rust rollback regression below.
 
 Commands ran on the changing checkout described above, not an immutable release
-candidate. Full workspace, server-engine matrix, GTK/Wayland, packaging,
-installed runtime and hosted CI were not rerun. Reconcile each proposed packet
-with the current owning board before implementation; refresh source pins then.
+candidate. The original review did not run full workspace, server-engine
+matrix, GTK/Wayland, packaging, installed runtime or hosted CI. Reconcile each
+remaining packet with the current owning board before implementation.
+
+## Implementation follow-up — 2026-10-06
+
+- Local `tablepro-core --lib`: 532 tests passed, including the new result-budget and dialect-builder regressions.
+- Local SQLite stale-grid integration: 1 passed; it proves transaction rollback and preservation of the concurrent writer's value.
+- Evidence-validator unit tests: 4 passed; strict checks for the two current SQLite packets passed. Historical inventory remains warning-only.
+- Linux `ci-local.sh quick`: passed after rerunning unsandboxed for local-socket cancellation tests. It includes the harness, non-GTK Clippy/unit suites and sandbox integration tier; 69 Python tests and 532 core tests passed.
+- The stale SQLite integration and change-tracker materialization selectors passed after the transaction helper refactor; actionlint v1.7.12 workflow-lint passed.
+- Existing 0.2.0 B3 cases were retained. This follow-up adds independent optimistic-write and result-budget checks; it does not close the B3 sprint or claim cross-engine runtime, installed GTK interaction, packaging or peak-RSS acceptance.
