@@ -9,6 +9,7 @@ const INT2VECTOR_OID: u32 = 22;
 const OIDVECTOR_OID: u32 = 30;
 const BIT_OID: u32 = 1560;
 const VARBIT_OID: u32 = 1562;
+const PG_LSN_OID: u32 = 3220;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let info = raw.type_info();
@@ -237,6 +238,7 @@ fn supported(oid: u32) -> bool {
             | VARBIT_OID
             | 1700
             | 2950
+            | PG_LSN_OID
     )
 }
 
@@ -277,6 +279,7 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
             _ => return None,
         },
         2950 => uuid::Uuid::from_slice(bytes).ok()?.to_string(),
+        PG_LSN_OID => crate::decode::decode_pg_binary_text("PG_LSN", bytes)?,
         1082 | 1083 | 1114 | 1184 | 1186 | 1266 => temporal_element(oid, bytes)?,
         _ => return None,
     })
@@ -429,6 +432,23 @@ mod tests {
             Some(r#"{"NULL","","a,b","a\"b","東京",NULL}"#)
         );
         assert_eq!(element_text(9001, true, &[0xff]), None);
+    }
+
+    #[test]
+    fn value_contract_pg_lsn_arrays_decode_maximum_and_null_elements() {
+        let zero = 0_u64.to_be_bytes();
+        let low_max = u64::from(u32::MAX).to_be_bytes();
+        let high_one = (1_u64 << 32).to_be_bytes();
+        let maximum = u64::MAX.to_be_bytes();
+        let bytes = wire(
+            PG_LSN_OID,
+            &[(5, 0)],
+            &[Some(&zero), Some(&low_max), Some(&high_one), Some(&maximum), None],
+        );
+        assert_eq!(
+            decode_binary(&bytes, PG_LSN_OID, false).as_deref(),
+            Some("[0:4]={\"0/0\",\"0/FFFFFFFF\",\"1/0\",\"FFFFFFFF/FFFFFFFF\",NULL}")
+        );
     }
 
     #[test]

@@ -1,0 +1,11 @@
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.70s
+     Running unittests src/lib.rs (target/debug/deps/drivers_postgres-a18f340f318501c3)
+
+running 3 tests
+test decode::tests::value_contract_pg_lsn_uses_uppercase_hex ... ok
+test array::tests::value_contract_pg_lsn_arrays_decode_maximum_and_null_elements ... ok
+test params::tests::value_contract_pg_lsn_array_elements_encode_full_unsigned_words ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 0.00s
+
