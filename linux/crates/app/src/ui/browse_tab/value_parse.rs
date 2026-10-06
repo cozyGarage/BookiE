@@ -178,7 +178,22 @@ pub(super) fn parse_input_for_driver(text: &str, col: Option<&ColumnInfo>, drive
     if let Some(result) = parse_duckdb_temporal_input(trimmed, col, driver_id) {
         return result;
     }
-    parse_input_for_column(text, col)
+    match parse_input_for_column(text, col) {
+        Err(_)
+            if driver_id == "sqlite"
+                && !tablepro_core::is_numeric_input(text)
+                && col.is_some_and(|column| {
+                    matches!(
+                        classify_type(&column.data_type.to_ascii_lowercase()),
+                        TypeKind::Int | TypeKind::Float | TypeKind::Decimal
+                    )
+                }) =>
+        {
+            // SQLite affinity may store nonnumeric input as TEXT in numeric columns.
+            Ok(Value::Text(text.to_owned()))
+        }
+        result => result,
+    }
 }
 
 fn parse_mssql_datetimeoffset_input(
