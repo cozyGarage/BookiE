@@ -3,11 +3,32 @@ import json
 import time
 
 
-def x11_click(x, y, button=3):
+class XWindowAttributes(ctypes.Structure):
+    _fields_ = [
+        ("x", ctypes.c_int), ("y", ctypes.c_int), ("width", ctypes.c_int), ("height", ctypes.c_int),
+        ("border_width", ctypes.c_int), ("depth", ctypes.c_int), ("visual", ctypes.c_void_p),
+        ("root", ctypes.c_ulong), ("window_class", ctypes.c_int), ("bit_gravity", ctypes.c_int),
+        ("win_gravity", ctypes.c_int), ("backing_store", ctypes.c_int), ("backing_planes", ctypes.c_ulong),
+        ("backing_pixel", ctypes.c_ulong), ("save_under", ctypes.c_int), ("colormap", ctypes.c_ulong),
+        ("map_installed", ctypes.c_int), ("map_state", ctypes.c_int), ("all_event_masks", ctypes.c_long),
+        ("your_event_mask", ctypes.c_long), ("do_not_propagate_mask", ctypes.c_long),
+        ("override_redirect", ctypes.c_int), ("screen", ctypes.c_void_p),
+    ]
+
+
+def x11_click(window_x, window_y, button=3):
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
     x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
     x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+    x11.XDefaultRootWindow.restype = ctypes.c_ulong
+    x11.XQueryTree.argtypes = [
+        ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong), ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.POINTER(ctypes.c_ulong)), ctypes.POINTER(ctypes.c_uint),
+    ]
+    x11.XGetWindowAttributes.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.POINTER(XWindowAttributes)]
+    x11.XFree.argtypes = [ctypes.c_void_p]
     x11.XFlush.argtypes = [ctypes.c_void_p]
     x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
     xtst.XTestFakeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
@@ -15,7 +36,19 @@ def x11_click(x, y, button=3):
     display = x11.XOpenDisplay(None)
     assert display, "X11 display is unavailable"
     try:
-        xtst.XTestFakeMotionEvent(display, -1, int(x), int(y), 0)
+        root = x11.XDefaultRootWindow(display)
+        root_return, parent, children, count = ctypes.c_ulong(), ctypes.c_ulong(), ctypes.POINTER(ctypes.c_ulong)(), ctypes.c_uint()
+        x11.XQueryTree(display, root, ctypes.byref(root_return), ctypes.byref(parent), ctypes.byref(children), ctypes.byref(count))
+        origin = None
+        for index in range(count.value):
+            attrs = XWindowAttributes()
+            x11.XGetWindowAttributes(display, children[index], ctypes.byref(attrs))
+            if attrs.map_state == 2 and attrs.width >= 800 and attrs.height >= 600:
+                origin = (attrs.x, attrs.y)
+        if children:
+            x11.XFree(children)
+        assert origin is not None, "the application window was not found on the X display"
+        xtst.XTestFakeMotionEvent(display, -1, origin[0] + int(window_x), origin[1] + int(window_y), 0)
         x11.XFlush(display)
         time.sleep(0.2)
         xtst.XTestFakeButtonEvent(display, button, 1, 0)
