@@ -535,7 +535,7 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
         .await
         .unwrap();
     connection
-        .execute("CREATE TYPE value_contract_enum_import.status AS ENUM ('NULL', '東京', 'o''brien', 'with,comma', '')")
+        .execute("CREATE TYPE value_contract_enum_import.status AS ENUM ('NULL', '東京', 'o''brien', 'with,comma', '', ' leading', 'trailing ')")
         .await
         .unwrap();
     connection
@@ -550,7 +550,8 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
             "INSERT INTO value_contract_enum_import.source_rows VALUES \
              (1, 'NULL', 'literal null'), (2, '東京', 'unicode'), \
              (3, 'o''brien', 'apostrophe'), (4, 'with,comma', 'delimiter'), \
-             (5, '', 'empty label'), (6, NULL, 'sql null')",
+             (5, '', 'empty label'), (6, NULL, 'sql null'), \
+             (7, ' leading', 'leading space'), (8, 'trailing ', 'trailing space')",
         )
         .await
         .unwrap();
@@ -576,6 +577,8 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
     assert_eq!(exported_sheet.rows[0], vec!["1", "NULL", "literal null"]);
     assert_eq!(exported_sheet.rows[4], vec!["5", "", "empty label"]);
     assert_eq!(exported_sheet.rows[5], vec!["6", "", "sql null"]);
+    assert_eq!(exported_sheet.rows[6], vec!["7", " leading", "leading space"]);
+    assert_eq!(exported_sheet.rows[7], vec!["8", "trailing ", "trailing space"]);
 
     let columns = connection
         .fetch_columns(Some("value_contract_enum_import"), "target_rows")
@@ -605,7 +608,7 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
         .unwrap();
     assert_eq!(untouched.rows, vec![vec![Value::Int(0)]]);
 
-    let explicit_csv = "id,status,note\n1,NULL,literal null\n2,東京,unicode\n3,\"o'brien\",apostrophe\n4,\"with,comma\",delimiter\n5,,empty label\n6,\\N,sql null\n";
+    let explicit_csv = "id,status,note\n1,NULL,literal null\n2,東京,unicode\n3,\"o'brien\",apostrophe\n4,\"with,comma\",delimiter\n5,,empty label\n6,\\N,sql null\n7,\" leading\",leading space\n8,\"trailing \",trailing space\n";
     let options = tablepro_core::import::CsvImportOptions {
         null_marker: "\\N".into(),
         ..Default::default()
@@ -629,7 +632,7 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
         "enum CSV input must bind with its catalog type: {}",
         plan.statement
     );
-    assert_eq!(plan.rows.len(), 6);
+    assert_eq!(plan.rows.len(), 8);
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
     }
@@ -679,6 +682,18 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
                 Value::Null,
                 Value::Text("value_contract_enum_import.status".into()),
                 Value::Text("sql null".into()),
+            ],
+            vec![
+                Value::Int(7),
+                Value::Text(" leading".into()),
+                Value::Text("value_contract_enum_import.status".into()),
+                Value::Text("leading space".into()),
+            ],
+            vec![
+                Value::Int(8),
+                Value::Text("trailing ".into()),
+                Value::Text("value_contract_enum_import.status".into()),
+                Value::Text("trailing space".into()),
             ],
         ]
     );

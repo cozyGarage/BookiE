@@ -92,6 +92,8 @@ The import plan also survives a role `search_path` change before execution on a
 fresh connection, with another same-named decoy enum first; native target type,
 all four value/null states, the sibling, and the untouched shadow table are
 asserted ([evidence](evidence/postgres-enum-csv-search-path-transition-results-2026-10-05/manifest.json)).
+Scalar enum CSV export and typed restore now also retain leading and trailing
+label spaces exactly ([evidence](evidence/postgres-enum-scalar-csv-whitespace-2026-10-06/manifest.json)).
 CSV import into schema, table, and enum type identifiers with spaces and
 embedded quotes also passes while a same-named shadow schema leads the role's
 `search_path`; the generated cast, target type, sibling rows, and shadow row

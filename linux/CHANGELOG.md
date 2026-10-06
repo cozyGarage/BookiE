@@ -7,6 +7,7 @@
 - PostgreSQL enum results and browse filters preserve the literal label `NULL` separately from SQL NULL across scalar and array projections and typed comparisons.
 - PostgreSQL UUID-domain arrays preserve their values through result decoding, bound writes, and keyed edits.
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
+- PostgreSQL scalar enum CSV export and typed restore preserve leading and trailing label spaces.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
 - PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` with a same-named shadow enum in `search_path`, including SQL NULL, target-only values and native invalid-label refusal.
 - PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured `search_path` places a same-named shadow enum first; target-only/NULL values and native invalid-label refusal are covered.
