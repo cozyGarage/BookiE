@@ -798,24 +798,22 @@ async fn pagination_and_truncated_flag() {
     assert!(!last.truncated);
 }
 
-/// `MAX_QUERY_ROWS` bounds an arbitrary `query`; the flag has to fire
-/// on the row past the cap, not on a result that merely fills it.
+/// The decoded-result budget truncates arbitrary queries and reports it.
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn query_truncates_at_the_row_cap() {
+async fn query_truncates_when_result_memory_budget_is_exceeded() {
     let (_c, opts) = start_clickhouse().await;
     let conn = connect(opts).await;
 
     let cap = tablepro_core::MAX_QUERY_ROWS;
-    let exact = conn.query(&format!("SELECT number FROM numbers({cap})")).await.unwrap();
-    assert_eq!(exact.rows.len(), cap);
-    assert!(!exact.truncated, "a result of exactly the cap is complete");
-
     let over = conn
         .query(&format!("SELECT number FROM numbers({})", cap + 1))
         .await
         .unwrap();
-    assert_eq!(over.rows.len(), cap);
+    assert!(!over.rows.is_empty());
+    assert!(over.rows.len() < cap, "decoded memory budget binds before row cap");
+    assert_eq!(over.rows.first(), Some(&vec![Value::Int(0)]));
+    assert_eq!(over.rows.last(), Some(&vec![Value::Int((over.rows.len() - 1) as i64)]));
     assert!(over.truncated);
 }
 

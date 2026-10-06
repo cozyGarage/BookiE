@@ -129,27 +129,19 @@ async fn query_preserves_duplicate_column_names_and_row_order() {
 }
 
 #[tokio::test]
-async fn query_marks_only_results_over_the_row_cap_as_truncated() {
+async fn query_truncates_when_result_memory_budget_is_exceeded() {
     let connection = native_connection().await;
     let cap = tablepro_core::MAX_QUERY_ROWS;
-
-    let exact = connection
-        .query(&format!("SELECT i FROM range({cap}) AS t(i)"))
-        .await
-        .unwrap();
-    assert_eq!(exact.rows.len(), cap);
-    assert_eq!(exact.rows.first(), Some(&vec![Value::Int(0)]));
-    assert_eq!(exact.rows.last(), Some(&vec![Value::Int((cap - 1) as i64)]));
-    assert!(!exact.truncated, "exactly MAX_QUERY_ROWS is a complete result");
-    drop(exact);
 
     let over = connection
         .query(&format!("SELECT i FROM range({}) AS t(i)", cap + 1))
         .await
         .unwrap();
-    assert_eq!(over.rows.len(), cap);
-    assert_eq!(over.rows.last(), Some(&vec![Value::Int((cap - 1) as i64)]));
-    assert!(over.truncated, "an additional server row must be reported");
+    assert!(!over.rows.is_empty());
+    assert!(over.rows.len() < cap, "decoded memory budget binds before row cap");
+    assert_eq!(over.rows.first(), Some(&vec![Value::Int(0)]));
+    assert_eq!(over.rows.last(), Some(&vec![Value::Int((over.rows.len() - 1) as i64)]));
+    assert!(over.truncated, "remaining server rows must be reported");
 }
 
 async fn native_connection() -> Box<dyn Connection> {

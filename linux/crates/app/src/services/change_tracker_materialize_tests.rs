@@ -50,16 +50,15 @@ fn materialize(tracker: &TabChangeTracker) -> (Vec<(String, Vec<Value>)>, Vec<St
         .expect("the batch must build")
 }
 
-/// The primary-key value each statement targets, read from the last
-/// bound parameter of its WHERE clause.
+/// The primary-key value each update targets, read from its WHERE placeholder.
 fn targeted_ids(statements: &[(String, Vec<Value>)]) -> Vec<i64> {
     statements
         .iter()
         .filter_map(|(sql, params)| {
-            if !sql.contains("WHERE") {
-                return None;
-            }
-            match params.last() {
+            let (_, predicate) = sql.split_once("WHERE \"id\" = $")?;
+            let digits: String = predicate.chars().take_while(char::is_ascii_digit).collect();
+            let index = digits.parse::<usize>().ok()?.checked_sub(1)?;
+            match params.get(index) {
                 Some(Value::Int(id)) => Some(*id),
                 _ => None,
             }
@@ -150,10 +149,19 @@ fn several_edits_to_one_row_become_a_single_update() {
     assert_eq!(statements.len(), 1, "one row must not be updated twice in one batch");
     assert_eq!(sources.len(), 1);
     let (sql, params) = &statements[0];
-    assert_eq!(sql, "UPDATE \"t\" SET \"note\" = $1, \"label\" = $2 WHERE \"id\" = $3");
+    assert_eq!(
+        sql,
+        "UPDATE \"t\" SET \"note\" = $1, \"label\" = $2 WHERE \"id\" = $3 AND \"note\" IS NOT DISTINCT FROM $4 AND \"label\" IS NOT DISTINCT FROM $5"
+    );
     assert_eq!(
         params,
-        &vec![Value::Text("note".into()), Value::Text("label".into()), Value::Int(1)]
+        &vec![
+            Value::Text("note".into()),
+            Value::Text("label".into()),
+            Value::Int(1),
+            Value::Null,
+            Value::Null,
+        ]
     );
 }
 
@@ -196,11 +204,14 @@ fn a_null_key_component_is_matched_with_is_null_rather_than_equality() {
         .materialize("postgres", None, "t", &columns)
         .expect("the batch must build");
     let (sql, params) = &statements[0];
-    assert_eq!(sql, "UPDATE \"t\" SET \"note\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL");
+    assert_eq!(
+        sql,
+        "UPDATE \"t\" SET \"note\" = $1 WHERE \"a\" = $2 AND \"b\" IS NULL AND \"note\" IS NOT DISTINCT FROM $3"
+    );
     assert_eq!(
         params,
-        &vec![Value::Text("x".into()), Value::Int(1)],
-        "a NULL key component must not consume a placeholder"
+        &vec![Value::Text("x".into()), Value::Int(1), Value::Null],
+        "a NULL key component must not consume a placeholder, but the old cell value does"
     );
 }
 
@@ -294,6 +305,7 @@ fn typed_primary_keys_reach_the_where_clause_unchanged() {
         let (statements, _) = tracker.materialize("postgres", None, "t", &columns).unwrap();
         let mut update_params = vec![Value::Text("edited".into())];
         update_params.extend(key_values.iter().cloned());
+        update_params.push(Value::Null);
         assert_eq!(statements[0].1, update_params);
         assert_eq!(statements[1].1, key_values);
     }

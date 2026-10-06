@@ -99,10 +99,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let observed = task.await.expect("observer task");
             let result = result?;
             let sampled_active_ms = observed?;
-            assert_eq!(
-                result.rows.len(),
-                if scenario == "capped" { MAX_QUERY_ROWS } else { 100 }
-            );
+            if scenario == "capped" {
+                assert!(!result.rows.is_empty());
+                assert!(
+                    result.rows.len() < MAX_QUERY_ROWS,
+                    "decoded memory budget should bind first"
+                );
+            } else {
+                assert_eq!(result.rows.len(), 100);
+            }
             assert_eq!(result.truncated, scenario == "capped");
             println!(
                 "{}",
