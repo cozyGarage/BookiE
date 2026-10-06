@@ -9,6 +9,7 @@ use super::GridMsg;
 use super::display::{POSITION_SLOT, ROW_KEY_SLOT};
 use super::editing::enter_edit_mode;
 use super::export;
+use super::value_viewer;
 
 #[derive(Clone)]
 struct CellContext {
@@ -150,6 +151,23 @@ pub(super) fn install_grid_context_menus(
             })
             .build()
     };
+    let view_value_action = {
+        let context = context.clone();
+        let view = column_view.downgrade();
+        gio::ActionEntry::builder("view-value")
+            .activate(move |_, _, _| {
+                let context = context.borrow();
+                let Some(slot) = context.as_ref() else { return };
+                let Some(view) = view.upgrade() else { return };
+                let Some(value) = row_at(&view, position(slot)).and_then(|row| row.into_iter().nth(slot.col_index))
+                else {
+                    return;
+                };
+                let copy_text = super::display::value_to_full_edit_text(&value);
+                value_viewer::present(&view, &slot.column_name, &value, copy_text);
+            })
+            .build()
+    };
     let show_row_json_action = {
         let context = context.clone();
         let sender = sender.clone();
@@ -260,6 +278,7 @@ pub(super) fn install_grid_context_menus(
         copy_csv_headers_entry,
         copy_markdown_entry,
         copy_in_clause_action,
+        view_value_action,
         show_row_json_action,
         export_action,
         copy_row_action,
@@ -345,6 +364,7 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool, filterabl
     if filterable {
         display.append(Some(&crate::tr!("Filter by This Value")), Some("cell.filter-by-value"));
     }
+    display.append(Some(&crate::tr!("View Value…")), Some("cell.view-value"));
     display.append(Some(&crate::tr!("Show Row as JSON")), Some("cell.show-row-json"));
     menu.append_section(None, &display);
     let actions = gio::Menu::new();

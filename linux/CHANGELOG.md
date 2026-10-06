@@ -4,6 +4,7 @@
 
 ### Added
 
+- Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
 - The SQL editor has find and replace: Ctrl+F opens a search bar with next, previous, a match count, Replace and Replace All.
