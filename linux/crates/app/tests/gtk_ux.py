@@ -145,7 +145,16 @@ def scenarios(ui):
         open_cell_menu('{"a":1}')
         choose_menu_item(3)
         ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
-        ui.wait_for_node_containing('"a": 1')
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            if any(
+                ui.node_role(node) == pyatspi.ROLE_TEXT and '"a": 1' in text_of(node)
+                for node in ui.descendants(ui.application_node())
+            ):
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError(f"the viewer did not show pretty JSON:\n{ui.accessible_snapshot()}")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
 
     def columns_dialog_hides_a_column_and_keeps_the_last_one(database, base):
@@ -156,7 +165,9 @@ def scenarios(ui):
         ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG)
         switches = [
             node for node in ui.descendants(ui.application_node())
-            if ui.node_name(node) in ("alpha", "beta") and ui.node_role(node) == pyatspi.ROLE_SWITCH
+            if ui.node_name(node) in ("alpha", "beta")
+            and ui.node_role(node) == pyatspi.ROLE_SWITCH
+            and node.queryAction().nActions > 0
         ]
         assert len(switches) == 2, ui.accessible_snapshot()
         by_name = {ui.node_name(node): node for node in switches}
