@@ -120,28 +120,6 @@ def scenarios(ui):
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2, button=1, clicks=count)
         time.sleep(0.3)
 
-    def editable_text_node(initial):
-        deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline:
-            for node in ui.descendants(ui.application_node()):
-                if ui.node_role(node) not in (pyatspi.ROLE_TEXT, pyatspi.ROLE_ENTRY):
-                    continue
-                try:
-                    node.queryEditableText()
-                    if text_of(node) == initial:
-                        return node
-                except Exception:
-                    continue
-            time.sleep(ui.POLL_SECONDS)
-        seen = []
-        for node in ui.descendants(ui.application_node()):
-            try:
-                node.queryEditableText()
-                seen.append((str(node.getRoleName()), ui.node_name(node), text_of(node)[:30]))
-            except Exception:
-                continue
-        raise AssertionError(f"no editable cell holding {initial!r}; editable nodes: {seen}")
-
     def stored_notes(database):
         import sqlite3
         with sqlite3.connect(database) as connection:
@@ -154,15 +132,16 @@ def scenarios(ui):
         ui.invoke_named_action_within("safety_items", "Open safety_items")
         ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
         click_cell("alpha", count=2)
-        editable_text_node("alpha").queryEditableText().setTextContents("ALPHA")
+        for key in "gamma":
+            ui.press_x11_key(key)
         ui.press_x11_key("Return")
         ui.wait_for_node(name="1 unsaved change")
         assert stored_notes(database) == [(1, "alpha"), (2, "beta")], "an unsaved edit reached the database"
         ui.press_x11_key("s", ("Control_L",))
         deadline = time.monotonic() + ui.WAIT_SECONDS
-        while time.monotonic() < deadline and stored_notes(database) != [(1, "ALPHA"), (2, "beta")]:
+        while time.monotonic() < deadline and stored_notes(database) != [(1, "gamma"), (2, "beta")]:
             time.sleep(ui.POLL_SECONDS)
-        assert stored_notes(database) == [(1, "ALPHA"), (2, "beta")], stored_notes(database)
+        assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
