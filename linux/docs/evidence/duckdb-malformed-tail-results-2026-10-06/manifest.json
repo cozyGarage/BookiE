@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/duckdb-malformed-tail-consumers",
+  "source_commit": "357b8e52f2331b24ddaa2f70fc3d68ec3f3ad9be",
+  "case": "Malformed DuckDB script tail fails closed across editor consumers",
+  "test": "ui::editor::statement_cursor::tests::value_contract_duckdb_malformed_tail_blocks_all_script_consumers",
+  "contract": [
+    "DuckDB scripts use the existing PostgreSQL-style script lexer, matching DuckDB documented PostgreSQL-like syntax and dollar-quoted strings.",
+    "An unterminated quoted tail reports a planner diagnostic and blocks whole-script execution while the valid prefix remains cursor-selectable.",
+    "The malformed tail is not cursor-selectable; parameter extraction exposes only the safe-prefix parameter and retains the tail.",
+    "Formatting retains the malformed tail and the formatted script remains diagnosed.",
+    "Agent policy classifies the script as unparseable/write and denies it with fail_closed_unparseable."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk cargo test --locked -p tablepro-app value_contract_duckdb_malformed_tail_blocks_all_script_consumers -- --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "test.txt"
+    },
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "clippy": {
+      "command": "rtk cargo clippy --locked -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "limits": [
+    "This validates script lexical consumers and policy only; it does not execute DuckDB SQL or close other dialect, value-type, or installed-editor acceptance."
+  ],
+  "source_sha256": {
+    "crates/app/src/ui/editor/statement_cursor.rs": "47b5deef734584075a51b67cb0e0bbeee8bc6d4445c823268a0d3324f8242a4a"
+  },
+  "log_sha256": {
+    "test.txt": "a492ab42a38d5ad017c176a8dc052502d77294779e77499b66126a569c107e6b",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+  }
+}
