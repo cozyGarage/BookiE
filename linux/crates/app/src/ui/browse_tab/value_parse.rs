@@ -884,6 +884,10 @@ mod mysql_spatial_contract;
 mod postgres_array_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/postgres_bit_array_grid.rs"]
+mod postgres_bit_array_grid;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mongodb_nested_edit_contract.rs"]
 mod mongodb_nested_edit_contract;
 
