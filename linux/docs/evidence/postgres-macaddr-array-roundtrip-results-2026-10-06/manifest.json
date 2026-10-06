@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/postgres-macaddr-array-roundtrip",
-  "source_commit": "0fe2b7872d6eb43f6c95a2a9eec89e2dbc99374b",
+  "source_commit": "b2ddc6274bb41377990252e92d9a4b91a06016ff",
   "source_sha256": {
     "crates/drivers/postgres/src/array.rs": "7932b03895c1bd0ab77e2cf3d11bef223512a680f4655f0ea5fca139a68eaf2c",
     "crates/drivers/postgres/src/params.rs": "d0dd7b775f4d058dbcd4730cb386009aa70d1162468fa05da906a6feec0093cf",
@@ -66,6 +66,17 @@
       "command": "rtk proxy bash scripts/test-harness.sh",
       "result": "70 Python checks, ignored-test inventory, package validation and function-size checks passed",
       "log": "harness.txt"
+    },
+    "postgres_full_integration_after_merge": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "190 passed, 0 failed",
+      "duration_seconds": 432,
+      "log": "postgres-full-integration-after-merge.txt"
+    },
+    "local_harness_after_merge": {
+      "command": "rtk proxy bash scripts/test-harness.sh",
+      "result": "86 Python checks, ignored-test inventory, package validation and function-size checks passed",
+      "log": "harness-after-merge.txt"
     }
   },
   "log_sha256": {
@@ -76,7 +87,9 @@
     "macaddr-focused.txt": "ac891781801b080b490eb144ae80e7a5323b4e093e06126b683b7e143213669a",
     "oid-census.txt": "b362bacae90dc2994b18894b9b8721ce2dca4d3ce2277eb88b5582c0868c2feb",
     "postgres-array-contract.txt": "21bad671bbe1f58336c815fdd12463da10e43c831c1df17f07b8b623a688d07a",
-    "postgres-full-integration.txt": "45e2c4ee54288a243e2387bdd2e0ed458c074c1fc7266344a08afdb0ea95e3ee"
+    "postgres-full-integration.txt": "45e2c4ee54288a243e2387bdd2e0ed458c074c1fc7266344a08afdb0ea95e3ee",
+    "postgres-full-integration-after-merge.txt": "c50f6d3ee05849cc88157748028cc003282226aa98c89cdb5e55365251c0bd18",
+    "harness-after-merge.txt": "20a0e7fbfb63daa8625f0aec5ec0095eae766d5d11c8d3356c5e7bea00256545"
   },
   "remaining": [
     "Other unlisted PostgreSQL built-in and custom array families remain open; macaddr8[], inet[] and cidr[] still refuse visibly.",
