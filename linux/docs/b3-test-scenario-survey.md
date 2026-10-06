@@ -86,10 +86,13 @@ does not establish server semantics or satisfy our authorization rules.
 Inventory status below comes from current local code/tests, not new executions.
 
 PostgreSQL `bit[]` and `varbit[]` are now covered through binary result decode,
-typed parameter rebinding and CSV import. The fixture includes fixed-width and
-varying bit lengths, empty bit strings, SQL NULL, and non-default array bounds;
-native JSON, type and wire bytes are the oracles. See the [B3 evidence
-packet](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
+typed parameter rebinding, CSV import and app keyed grid edits. The fixtures
+include fixed-width and varying bit lengths, empty bit strings, SQL NULL,
+non-default array bounds, malformed input refusal and sibling preservation;
+native JSON, type and wire bytes are the oracles. The built-in OID census and
+remaining-unlisted refusal test agree with the allowlist. See the [result evidence
+packet](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json) and [grid
+evidence packet](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json).
 
 The PostgreSQL enum CSV case now distinguishes raw-text restore from
 spreadsheet-safe output. Formula protection can make two distinct enum labels

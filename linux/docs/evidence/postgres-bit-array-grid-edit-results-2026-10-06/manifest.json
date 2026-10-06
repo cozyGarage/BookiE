@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-bit-array-grid-edit",
+  "source_commit": "8d049a949e48b09d26f05638b92a13105404f318",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "BIT and VARBIT keyed grid edits preserve wire values and reject malformed input",
+  "tests": [
+    "ui::browse_tab::value_parse::postgres_bit_array_grid::value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling",
+    "array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist",
+    "array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles"
+  ],
+  "contract": [
+    "The app parser keeps bit(5)[] and bit varying[] edits as exact array text; the keyed update uses the fixed pg_catalog.bit[] and pg_catalog.varbit[] casts.",
+    "Zero-based bounds, varying element lengths, an empty bit string, and SQL NULL elements match native array_send bytes and preserve the declared column types.",
+    "A malformed bit element returns PostgreSQL SQLSTATE 22P02 and leaves the edited row and sibling row unchanged.",
+    "The built-in type OID census includes BIT and VARBIT in the supported array allowlist; only arrays that remain unlisted are expected to refuse decoding."
+  ],
+  "validation": {
+    "app_server_contract": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-app --lib bit_array_grid_edit -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "array_oid_census": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "array-oid-census.txt"
+    },
+    "remaining_builtin_refusal_matrix": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "unlisted-array-refusal.txt"
+    },
+    "postgres_array_contract_suite": {
+      "command": "rtk proxy cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "52 passed, 0 failed",
+      "log": "postgres-array-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "postgres_driver_clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "driver-clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path linux/Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "harness": {
+      "command": "rtk proxy bash scripts/test-harness.sh",
+      "result": "70 Python checks, ignored-test inventory, package checks, and function-size check passed"
+    },
+    "diff_check": "rtk git diff --check passed"
+  },
+  "baseline_failure": {
+    "source_commit": "8914acac1acfacb7ae13b7f03b72b62f9ca663ba",
+    "cause": "The driver suite still expected bit[] and varbit[] to be undecodable and omitted their OIDs from the supported-array census.",
+    "evidence": "baseline-driver-integration-failure.txt"
+  },
+  "remaining": [
+    "Other built-in and custom PostgreSQL array families, enum configurations, consumers, and installed grid acceptance remain open in B3."
+  ]
+}

@@ -1,0 +1,9 @@
+9d024294daef55f19dda99629eb5964e2cca6ec1a40f4d29fb334703358309af  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/focused-test.txt
+b2c020f27a01faabb96e5d55c11fd219cf7c484c9cf34b3342bfc8444d934c89  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/clippy.txt
+0a253115944246becf8bf2ff37ac26e28edb960d3b3b2f76aee1e301c8b069f9  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/driver-clippy.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/format.txt
+16f2b3e272f6e216eca4f32318058189c759eb03b34ab5c5925cc853293058a8  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/array-oid-census.txt
+f6a2097e95665d804c8280880f74d0c55cfbc22cd166a4e71353d1c98cd920a8  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/unlisted-array-refusal.txt
+35079f2eabd61f15cde57af5ebf6f5946d419f453de61c3d7d8e455c93104cb2  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/postgres-array-suite.txt
+978a7b7a8bcacc43c2004172473b610d90c7cfaf89017fc2ec18e70e8cb2cf3a  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/baseline-driver-integration-failure.txt
+9887a7b8fb12ba960486ab67ff6707c3f603a1406e937b0ef30b648f0bb34943  linux/docs/evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json
