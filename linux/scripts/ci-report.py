@@ -32,7 +32,7 @@ with (directory / "output.log").open("w") as log:
     for line in process.stdout:
         print(line, end="", flush=True)
         log.write(line)
-        if re.search(r"test result: .*?\d+ passed;", line):
+        if re.match(r"test result: (?:ok|FAILED)\. \d+ passed;", line):
             report["test_summaries"].append(line.strip())
     status = process.wait()
 report.update(status="passed" if status == 0 else "failed", exit_code=status,
