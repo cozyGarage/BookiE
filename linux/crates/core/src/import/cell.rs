@@ -402,17 +402,22 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
             }
         }
         Ok(value) => Ok(value),
-        Err(_)
-            if driver_id == "sqlite"
-                && matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal)
-                && !crate::is_numeric_input(text) =>
-        {
-            // SQLite affinity is advisory: a NUMERIC/INTEGER/REAL column
-            // may legally store text when the input is not numeric.
-            Ok(Value::Text(text.to_owned()))
-        }
-        Err(error) => Err(error),
+        Err(error) => parse_sqlite_affinity_fallback(text, kind, driver_id).unwrap_or(Err(error)),
     }
+}
+
+fn parse_sqlite_affinity_fallback(text: &str, kind: ColumnKind, driver_id: &str) -> Option<Result<Value, CellError>> {
+    if driver_id != "sqlite" || !matches!(kind, ColumnKind::Int | ColumnKind::Float | ColumnKind::Decimal) {
+        return None;
+    }
+    if let Some(decimal) = crate::sqlite_affinity_decimal(text) {
+        return Some(Ok(Value::Decimal(decimal)));
+    }
+    if !crate::is_numeric_input(text) {
+        // SQLite affinity may store nonnumeric input as TEXT.
+        return Some(Ok(Value::Text(text.to_owned())));
+    }
+    None
 }
 
 fn duckdb_extended_calendar_text<'a>(text: &'a str, data_type: &str) -> Option<&'a str> {
@@ -624,6 +629,9 @@ fn decimal_type_limits(data_type: &str) -> Option<(usize, usize)> {
 mod tests {
     use super::*;
 
+    #[path = "sqlite_affinity.rs"]
+    mod sqlite_affinity_tests;
+
     fn column(name: &str, data_type: &str) -> ColumnInfo {
         ColumnInfo {
             name: name.to_owned(),
@@ -649,44 +657,6 @@ mod tests {
         );
         for text in crate::parser_contract::corpus_texts("texts") {
             assert_eq!(parse_cell(&text, ColumnKind::Text).unwrap(), Value::Text(text.clone()));
-        }
-    }
-
-    #[test]
-    fn sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers() {
-        let options = CsvImportOptions::default();
-        for (data_type, expected_error) in [
-            ("INTEGER", CellError::NotAnInteger),
-            ("REAL", CellError::NotANumber),
-            ("NUMERIC", CellError::NotANumber),
-        ] {
-            let target = column("value", data_type);
-            assert_eq!(
-                value_for("not numeric", &target, &options, "sqlite"),
-                Ok(Value::Text("not numeric".into())),
-                "SQLite affinity stores nonnumeric input as text for {data_type}"
-            );
-            assert_eq!(
-                value_for("not numeric", &target, &options, "mysql").unwrap_err(),
-                expected_error,
-                "the SQLite fallback must not mask a type error for {data_type}"
-            );
-            assert_eq!(
-                value_for("not numeric", &target, &options, "mssql").unwrap_err(),
-                expected_error,
-                "the SQLite fallback must not mask a type error for {data_type}"
-            );
-        }
-        for (data_type, text, expected_error) in [
-            ("INTEGER", "9223372036854775808", CellError::NotAnInteger),
-            ("REAL", "1e999", CellError::NotANumber),
-            ("NUMERIC", "0.123456789012345678901234567890123", CellError::NotANumber),
-        ] {
-            assert_eq!(
-                value_for(text, &column("value", data_type), &options, "sqlite").unwrap_err(),
-                expected_error,
-                "numeric-looking input must not fall back to lossy SQLite text for {data_type}"
-            );
         }
     }
 

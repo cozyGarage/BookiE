@@ -42,7 +42,7 @@ pub use error::DriverError;
 pub use filter::{
     BuildFilterError, Combinator, FilterOp, FilterRule, FilterSet, FilterValue, build_filter_where, equality_rule,
 };
-pub use numeric_input::{FloatInputError, is_numeric_input, parse_float_input};
+pub use numeric_input::{FloatInputError, is_numeric_input, parse_float_input, sqlite_affinity_decimal};
 pub use operation::{
     CANCELLATION_DISPATCH_TIMEOUT, CANCELLATION_GRACE, CONTROL_SETUP_TIMEOUT, Interruption, OperationControl,
     check_pre_dispatch, run_controlled_setup, run_server_cancellable,
