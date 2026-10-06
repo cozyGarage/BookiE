@@ -560,8 +560,9 @@ inferred SQL NULL updates preserve the outer domain type and invalid labels
 reach PostgreSQL through 63 layers. At depths 64, 65 and 128, raw inferred text
 (valid and invalid) and SQL NULL return an explicit unsupported result even
 after schema-aware work in the same-backend transaction; schema-aware
-operations pass through 300 layers. Domain depths beyond 300 and other
+operations pass through 301 layers. Domain depths beyond 301 and other
 enum/session configurations remain open; see the
+[301-layer evidence](evidence/postgres-domain-301-level-results-2026-10-06/manifest.json),
 [300-layer evidence](evidence/postgres-domain-300-level-results-2026-10-05/manifest.json),
 [deep-domain boundary evidence](evidence/postgres-deep-domain-results-2026-10-04/manifest.json),
 [129/256-layer follow-up](evidence/postgres-deep-domain-followup-results-2026-10-04/manifest.json),
@@ -571,6 +572,14 @@ enum/session configurations remain open; see the
 [eight-domain follow-up](evidence/postgres-eight-domain-results-2026-10-04/manifest.json)
 and the [nine-domain follow-up](evidence/postgres-nine-domain-results-2026-10-04/manifest.json),
 plus the [six-domain checkpoint](evidence/postgres-six-level-domain-results-2026-10-04/manifest.json).
+
+An October 6 follow-up extends the same schema-aware contract through 301
+domain layers, one beyond the previous checkpoint. It preserves enum-leaf
+metadata, keyed writes, draft inserts, typed filters, SQL NULL siblings,
+invalid-label refusal and rollback with a same-named shadow enum in
+`search_path` ([301-layer evidence](evidence/postgres-domain-301-level-results-2026-10-06/manifest.json)).
+This is a tested boundary case, not a maximum-depth claim; deeper chains remain
+open.
 
 PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
 UTF-8 scalar and array labels plus refusal of a 64-byte label without partial type creation; see
