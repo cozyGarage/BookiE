@@ -240,7 +240,7 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
     connection
         .execute(
             "CREATE TYPE value_contract_xlsx_enum AS ENUM \
-             ('NULL', '', '東京', '<tag>&amp;', '=1+1')",
+             ('NULL', '', '東京', '<tag>&amp;', '=1+1', ' leading', 'trailing ')",
         )
         .await
         .unwrap();
@@ -250,7 +250,8 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
             "SELECT id, label, pg_typeof(label)::text AS native_type FROM (VALUES \
              (1, 'NULL'::value_contract_xlsx_enum), (2, ''::value_contract_xlsx_enum), \
              (3, '東京'::value_contract_xlsx_enum), (4, '<tag>&amp;'::value_contract_xlsx_enum), \
-             (5, '=1+1'::value_contract_xlsx_enum), (6, NULL::value_contract_xlsx_enum)) \
+             (5, '=1+1'::value_contract_xlsx_enum), (6, ' leading'::value_contract_xlsx_enum), \
+             (7, 'trailing '::value_contract_xlsx_enum), (8, NULL::value_contract_xlsx_enum)) \
              AS labels(id, label) ORDER BY id",
         )
         .await
@@ -285,6 +286,16 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
             ],
             vec![
                 Value::Int(6),
+                Value::Text(" leading".into()),
+                Value::Text("value_contract_xlsx_enum".into())
+            ],
+            vec![
+                Value::Int(7),
+                Value::Text("trailing ".into()),
+                Value::Text("value_contract_xlsx_enum".into())
+            ],
+            vec![
+                Value::Int(8),
                 Value::Null,
                 Value::Text("value_contract_xlsx_enum".into())
             ],
@@ -296,7 +307,8 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
             "SELECT id, label, pg_typeof(label)::text AS native_type FROM (VALUES \
              (1, 'NULL'::value_contract_xlsx_enum), (2, ''::value_contract_xlsx_enum), \
              (3, '東京'::value_contract_xlsx_enum), (4, '<tag>&amp;'::value_contract_xlsx_enum), \
-             (5, '=1+1'::value_contract_xlsx_enum), (6, NULL::value_contract_xlsx_enum)) \
+             (5, '=1+1'::value_contract_xlsx_enum), (6, ' leading'::value_contract_xlsx_enum), \
+             (7, 'trailing '::value_contract_xlsx_enum), (8, NULL::value_contract_xlsx_enum)) \
              AS labels(id, label) WHERE id <> 2 ORDER BY id",
         )
         .await
@@ -308,7 +320,9 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
             all_rows.rows[2].clone(),
             all_rows.rows[3].clone(),
             all_rows.rows[4].clone(),
-            all_rows.rows[5].clone()
+            all_rows.rows[5].clone(),
+            all_rows.rows[6].clone(),
+            all_rows.rows[7].clone()
         ]
     );
 
@@ -338,17 +352,25 @@ async fn value_contract_custom_enum_xlsx_file_export_keeps_text_labels_and_refus
         &mut shared_strings,
     )
     .unwrap();
-    for cell in ["B2", "B3", "B4", "B5"] {
+    for cell in ["B2", "B3", "B4", "B5", "B6", "B7"] {
         assert!(sheet.contains(&format!("<c r=\"{cell}\" t=\"s\">")), "{sheet}");
     }
     assert!(
-        !sheet.contains("r=\"B6\""),
+        !sheet.contains("r=\"B8\""),
         "SQL NULL should remain a blank cell: {sheet}"
     );
     assert!(shared_strings.contains("<t>NULL</t>"), "{shared_strings}");
     assert!(shared_strings.contains("<t>東京</t>"), "{shared_strings}");
     assert!(shared_strings.contains("&lt;tag&gt;&amp;amp;"), "{shared_strings}");
     assert!(shared_strings.contains("<t>=1+1</t>"), "{shared_strings}");
+    assert!(
+        shared_strings.contains("<t xml:space=\"preserve\"> leading</t>"),
+        "{shared_strings}"
+    );
+    assert!(
+        shared_strings.contains("<t xml:space=\"preserve\">trailing </t>"),
+        "{shared_strings}"
+    );
     assert!(!sheet.contains("<f>"), "enum labels must not become formulas: {sheet}");
 
     let refusal_path = directory.path().join("preserve.xlsx");
