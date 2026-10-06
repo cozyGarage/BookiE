@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/duckdb-decimal-boundary-roundtrip",
-  "source_commit": "4aebe78f5b1356d6b0d395e6e9f61cf442fbfc22",
+  "source_commit": "d9818deaf2e998d3d82e5f3ba0e3c233502d8a0b",
   "case": "rust_decimal capacity boundaries retain typed values through DuckDB parameters and SQL literals",
   "contracts": [
     "Positive and negative maximum rust_decimal mantissas round-trip through DuckDB typed parameters and rendered SQL literals.",
@@ -30,14 +30,21 @@
       "result": "passed",
       "log": "clippy.txt"
     },
-    "diff_check": "rtk git diff --check passed"
+    "diff_check": "rtk git diff --check passed",
+    "local_quick_gate": {
+      "command": "rtk bash scripts/ci-local.sh quick",
+      "result": "passed; exit_code 0",
+      "report": "target/quality/20261006T072628605649Z-quick/report.json",
+      "working_tree_at_run": "Only the already-tested Decimal integration contract was being moved from integration.rs to the support module; both resulting files are source-hashed above."
+    }
   },
   "limits": [
     "Embedded DuckDB contract; this does not close DuckDB nested collection/interval limits, other consumers, or the wider B3 matrix."
   ],
   "source_sha256": {
     "crates/core/src/sql_literal.rs": "787197e88e6336eb82cd185c5f065d06d0bfc87df95885f3e0cbefc21d55ba51",
-    "crates/drivers/duckdb/tests/integration.rs": "7a9e59729f6f520639e62cb82486d950fe5af76f209c184cf0c5d4963d663338"
+    "crates/drivers/duckdb/tests/integration.rs": "6b58cdcc53a00ba128c983b6534efc2859816dda2ff5e0e4d84d83cebd613a27",
+    "crates/drivers/duckdb/tests/support/rust_decimal_boundaries.rs": "34d2fa0c0cf267e264aa244fe7094b95582a3e538d69e08a21ba0f05903abd47"
   },
   "log_sha256": {
     "core-test.txt": "86eddb859767af7ba5653fce8f5e93d92c0de57a0b5ea2f1fe76978a06693a24",
