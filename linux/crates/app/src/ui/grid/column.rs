@@ -500,7 +500,7 @@ mod tests {
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
-        let store = selection.model().unwrap().downcast::<gtk4::gio::ListStore>().unwrap();
+        let store = selection.model().unwrap().downcast::<crate::ui::row_store::RowStore>().unwrap();
         for (value, allowed) in [
             (Value::Bytes(vec![1]), false),
             (Value::Text("true".into()), false),
@@ -575,7 +575,7 @@ mod tests {
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
-        let store = selection.model().unwrap().downcast::<gtk4::gio::ListStore>().unwrap();
+        let store = selection.model().unwrap().downcast::<crate::ui::row_store::RowStore>().unwrap();
         let context = gtk4::glib::MainContext::default();
         for (value, active, edit) in [(Value::Int(0), false, "true"), (Value::Int(1), true, "false")] {
             store.splice(0, 1, &[crate::ui::row_object::RowObject::new(vec![value])]);
@@ -676,7 +676,7 @@ mod tests {
         let store = selection
             .model()
             .expect("selection model")
-            .downcast::<gtk4::gio::ListStore>()
+            .downcast::<crate::ui::row_store::RowStore>()
             .expect("row store");
         store.remove(0);
         store.insert(

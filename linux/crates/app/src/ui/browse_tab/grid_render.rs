@@ -10,9 +10,9 @@ pub(super) fn column_layout_matches(rendered: &[ColumnInfo], current: &[ColumnIn
 }
 
 impl BrowseTab {
-    pub(super) fn list_store(&self) -> Option<gtk::gio::ListStore> {
+    pub(super) fn list_store(&self) -> Option<crate::ui::row_store::RowStore> {
         let selection = self.current_selection.as_ref()?;
-        selection.model()?.downcast::<gtk::gio::ListStore>().ok()
+        selection.model()?.downcast::<crate::ui::row_store::RowStore>().ok()
     }
 
     /// Notify the chain (ListStore → SelectionModel → ColumnView) that
@@ -304,11 +304,8 @@ impl BrowseTab {
     /// Replace the rows in the existing `ListStore` without touching
     /// the columns / factories / selection model. Drafts are
     /// re-prepended so they survive the swap.
-    pub(super) fn refresh_grid_data(&self, result: &QueryResult, store: &gtk::gio::ListStore) {
-        store.remove_all();
-        for row in &result.rows {
-            store.append(&crate::ui::row_object::RowObject::new(row.clone()));
-        }
+    pub(super) fn refresh_grid_data(&self, result: &QueryResult, store: &crate::ui::row_store::RowStore) {
+        store.replace_rows(result.rows.clone());
         self.reprepend_drafts();
     }
 
