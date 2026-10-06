@@ -180,7 +180,8 @@ def scenarios(ui):
         ui.wait_for_node(name="alpha")
 
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
-        ui.set_editor_text("select 1")
+        editor = ui.set_editor_text("select 1")
+        assert editor.queryComponent().grabFocus(), "the editor did not take keyboard focus"
         time.sleep(0.3)
         ui.press_x11_key("slash", ("Control_L",))
         deadline = time.monotonic() + ui.WAIT_SECONDS
