@@ -97,6 +97,16 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
             return Err(LiteralError::Unsupported);
         }
         Value::Float(value) => format!("{value:e}"),
+        Value::Decimal(value) if driver_id == "duckdb" => {
+            let precision = value
+                .mantissa()
+                .unsigned_abs()
+                .to_string()
+                .len()
+                .max(value.scale() as usize)
+                .max(1);
+            format!("CAST({value} AS DECIMAL({precision}, {}))", value.scale())
+        }
         Value::Decimal(value) if driver_id == "clickhouse" => format!("toDecimal128('{value}', {})", value.scale()),
         Value::Decimal(value) => value.to_string(),
         Value::Text(text) => string_literal(driver_id, text),
@@ -325,6 +335,10 @@ mod tests {
         assert_eq!(
             render_sql_literal("clickhouse", &decimal).unwrap(),
             "toDecimal128('99999999999999999999.99999999', 8)"
+        );
+        assert_eq!(
+            render_sql_literal("duckdb", &decimal).unwrap(),
+            "CAST(99999999999999999999.99999999 AS DECIMAL(28, 8))"
         );
         for driver in ["postgres", "mysql", "sqlite", "mssql", "clickhouse", "duckdb"] {
             assert_eq!(render_sql_literal(driver, &Value::Float(1e-200)).unwrap(), "1e-200");
