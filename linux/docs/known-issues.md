@@ -132,7 +132,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-8 | Process-restart and JSON-export GTK scenarios: installed proof pending | UNVERIFIED | | gtk-installed |
 | TEST-9 | O2: SQL Server `max` text and binary at 64 KiB and MB sizes | OPEN | | driver-docker |
 | TEST-10 | O3: multiple result sets, later sets are discarded | OPEN | Design across core, driver, guard, MCP, GUI | driver-docker |
-| TEST-11 | U3: completion `table_key` keeps only the last dotted part, so `a.items` and `b.items` conflate | OPEN | Test pins the old behaviour | unit |
+| TEST-11 | ~~U3: completion conflated same-named tables in different schemas~~ | DONE | `table_key` keeps the schema; an ambiguous bare name offers no columns; three new `completion` tests replace the one that pinned the defect | unit |
 | TEST-12 | U6: MongoDB metadata scan cost, writes to read documents, cancellation | OPEN | | driver-docker |
 | TEST-13 | MongoDB nested filters, binary UUID, MQL; Redis Sentinel and Cluster | OPEN | | driver-docker |
 | TEST-14 | Keep refusing PK-less delete; no all-column fallback | ACCEPTED | Guard to preserve | unit |
