@@ -1,0 +1,175 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.151079574,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.357075083,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:21:89: replace == with != in skip_span",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "skip_span",
+            "return_type": "-> Option<usize>",
+            "span": {
+              "start": {
+                "line": 1,
+                "column": 1
+              },
+              "end": {
+                "line": 26,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 21,
+              "column": 89
+            },
+            "end": {
+              "line": 21,
+              "column": 91
+            }
+          },
+          "replacement": "!=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_21_col_89.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_21_col_89.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.203045864,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.357849484,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:97:67: replace != with == in dollar_quote_length",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "dollar_quote_length",
+            "return_type": "-> Option<usize>",
+            "span": {
+              "start": {
+                "line": 84,
+                "column": 1
+              },
+              "end": {
+                "line": 106,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 97,
+              "column": 67
+            },
+            "end": {
+              "line": 97,
+              "column": 69
+            }
+          },
+          "replacement": "==",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "MissedMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_97_col_67.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_97_col_67.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.1529557559999999,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 3.306686418,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 2,
+  "missed": 1,
+  "caught": 1,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0,
+  "start_time": "2026-10-06T03:08:53.839717821Z",
+  "end_time": "2026-10-06T03:09:06.377663058Z",
+  "cargo_mutants_version": "27.1.0"
+}

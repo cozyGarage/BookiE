@@ -6,7 +6,7 @@ The baseline binary was rebuilt with the PostgreSQL driver source from `7d828813
 
 ## Method
 
-`crates/release-tests/examples/browse_benchmark.rs` creates a uniquely named million-row table in an explicitly enabled disposable fixture and drops it afterward. Each scenario runs in its own process, with one warm-up and five measured samples. First/filtered/deep pages return 100 rows; deep uses the existing keyset path at id 900000; wide returns 200 columns. Capped queries request 1.1 million rows and assert exactly `MAX_QUERY_ROWS` (one million), a truncation flag and preserved data.
+`crates/release-tests/examples/browse_benchmark.rs` creates a uniquely named million-row table in an explicitly enabled disposable fixture and drops it afterward. Each scenario runs in its own process, with one warm-up and five measured samples. First/filtered/deep pages return 100 rows; deep uses the existing keyset path at id 900000; wide returns 200 columns. At the time of these measurements, capped queries requested 1.1 million rows and asserted exactly `MAX_QUERY_ROWS` (one million), a truncation flag and preserved data. The later decoded-result memory budget can truncate before that row limit.
 
 A separate connection samples server activity every 5 ms and continues until the tagged statement is inactive. `sampled_active_ms` is an approximate observed span including transfer/backpressure, not the engine's reported execution time; null means the query was not sampled. VmHWM is process high-water RSS, including fixture setup and the warm-up. It does not reset between attempts; compare the scenario peak, not per-attempt memory deltas.
 

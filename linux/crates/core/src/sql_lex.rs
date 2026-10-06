@@ -155,7 +155,41 @@ pub fn statement_at_cursor(sql: &str, driver_id: &str, cursor_byte: usize) -> Op
 
 #[cfg(test)]
 mod tests {
-    use super::{split_statements, statement_at_cursor};
+    use super::{skip_span, split_statements, statement_at_cursor};
+
+    #[test]
+    fn skip_span_returns_exact_byte_lengths_for_representative_spans() {
+        let cases = [
+            ("-- note\n;", "postgres", 8),
+            ("/*x*/;", "postgres", 5),
+            ("# note\n;", "mysql", 7),
+            ("'a\\';b';", "mysql", 7),
+            ("E'a\\';b';", "postgres", 8),
+            ("`a\\`;b`;", "clickhouse", 7),
+            ("[a]]b];", "mssql", 6),
+            ("$x$;body$x$;", "postgres", 11),
+        ];
+
+        for (sql, driver, expected) in cases {
+            assert_eq!(skip_span(sql, driver), Some(expected), "{driver}: {sql}");
+        }
+        assert_eq!(skip_span("$1$body$1$;", "postgres"), None);
+        assert_eq!(skip_span("$a-b$body$a-b$;", "postgres"), None);
+    }
+
+    #[test]
+    fn mysql_block_comments_close_at_the_first_terminator() {
+        assert_eq!(
+            split_statements("SELECT 1 /* outer /* inner */ ; SELECT 2", "mysql"),
+            vec!["SELECT 1 /* outer /* inner */", "SELECT 2"]
+        );
+    }
+
+    #[test]
+    fn empty_sql_and_cursor_at_end_are_safe() {
+        assert!(split_statements("", "postgres").is_empty());
+        assert_eq!(statement_at_cursor("SELECT 1", "postgres", 8), Some("SELECT 1".into()));
+    }
 
     #[test]
     fn escaped_quotes_and_nested_comments_keep_statement_boundaries() {
@@ -163,7 +197,7 @@ mod tests {
             ("mysql", "SELECT 'a\\';b'"),
             ("clickhouse", "SELECT 'a\\';b'"),
             ("postgres", "SELECT E'a\\';b'"),
-            ("postgres", "SELECT 1 /* outer /* inner */ ; still outer */"),
+            ("postgres", "SELECT 1 /* outer /* x */ ; still outer */"),
             ("mssql", "SELECT [a]];b]"),
             ("mysql", "SELECT `a``;b`"),
         ];

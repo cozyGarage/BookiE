@@ -391,10 +391,16 @@ async fn capped_stream_preserves_columns_values_and_connection_reuse() {
         result.columns.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
         ["id", "label"]
     );
-    assert_eq!(result.rows.len(), MAX_QUERY_ROWS);
+    assert!(!result.rows.is_empty());
+    assert!(
+        result.rows.len() < MAX_QUERY_ROWS,
+        "decoded memory budget binds before row cap"
+    );
     assert!(result.truncated);
     assert_eq!(result.rows[0], [Value::Int(1), Value::Text("kept".into())]);
-    assert_eq!(result.rows[MAX_QUERY_ROWS - 1][0], Value::Int(MAX_QUERY_ROWS as i64));
+    let last_id = result.rows.len() as i64;
+    assert_eq!(result.rows.last().unwrap()[0], Value::Int(last_id));
+    assert_eq!(result.rows.last().unwrap()[1], Value::Text("kept".into()));
     drop(result);
     let next = connection.query("SELECT 42::bigint AS answer").await.unwrap();
     assert_eq!(next.rows, vec![vec![Value::Int(42)]]);

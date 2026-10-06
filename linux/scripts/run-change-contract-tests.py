@@ -115,14 +115,18 @@ def select_actions(files, data):
             continue
         package = package_from_manifest(path) if scope.get("package_from_manifest") else scope["package"]
         target = scope.get("target", "--lib")
+        exact = data["exact_tests"].get(path)
+        if exact:
+            exact_target = exact.get("target", "--lib")
+            integration_subset = target == "--tests" and exact_target.startswith("--test=")
+            if exact["package"] != package or (exact_target != target and not integration_subset):
+                raise ValueError(f"exact-test package does not match source package for {path}")
+            target = exact_target
         key = (package, target)
         action = actions.setdefault(
             key, {"package": package, "target": target, "full_suite": False, "required_tests": set()}
         )
-        exact = data["exact_tests"].get(path)
         if exact:
-            if exact["package"] != package or exact.get("target", "--lib") != target:
-                raise ValueError(f"exact-test package does not match source package for {path}")
             action["required_tests"].update(exact["tests"])
         else:
             action["full_suite"] = True
