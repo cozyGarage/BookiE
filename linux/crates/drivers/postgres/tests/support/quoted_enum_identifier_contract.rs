@@ -615,7 +615,7 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
             name: type_name.into(),
         })
     );
-    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+    let (update_sql, _) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
         Some(schema),
         "Rows",
@@ -640,37 +640,57 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
     .unwrap()
     .unwrap();
 
-    let mut transaction = connection.begin().await.unwrap();
-    transaction
-        .execute("SET LOCAL search_path TO enumcaselocal, \"EnumCaseLocal\", public")
-        .await
-        .unwrap();
-    transaction.execute_params(&update_sql, &update_params).await.unwrap();
-    let filtered = transaction
-        .query_params(
-            &format!("SELECT id FROM \"EnumCaseLocal\".\"Rows\" WHERE {where_sql}"),
-            &filter_params,
-        )
-        .await
-        .unwrap();
-    assert_eq!(filtered.rows, vec![vec![Value::Int(1)]]);
+    for (search_path, id, expected_ids) in [
+        ("enumcaselocal, \"EnumCaseLocal\", public", 1, vec![1]),
+        ("enumcaselocal, public", 2, vec![1, 2]),
+    ] {
+        let mut transaction = connection.begin().await.unwrap();
+        transaction
+            .execute(&format!("SET LOCAL search_path TO {search_path}"))
+            .await
+            .unwrap();
+        assert_eq!(
+            transaction.query("SHOW search_path").await.unwrap().rows,
+            vec![vec![Value::Text(search_path.into())]],
+            "the target schema should be present only in the first path"
+        );
 
-    transaction.execute("SAVEPOINT before_invalid_label").await.unwrap();
-    let invalid = transaction
-        .execute_params(&update_sql, &[Value::Text("shadow-only".into()), Value::Int(1)])
-        .await
-        .expect_err("a shadow-only label is invalid for the target enum");
-    assert!(
-        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
-        "expected native enum SQLSTATE 22P02, got {invalid:?}"
-    );
-    transaction
-        .execute("ROLLBACK TO SAVEPOINT before_invalid_label")
-        .await
-        .unwrap();
-    transaction.commit().await.unwrap();
+        transaction
+            .execute_params(&update_sql, &[Value::Text("target-only".into()), Value::Int(id)])
+            .await
+            .unwrap();
+        let filtered = transaction
+            .query_params(
+                &format!("SELECT id FROM \"EnumCaseLocal\".\"Rows\" WHERE {where_sql}"),
+                &filter_params,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            filtered.rows,
+            expected_ids
+                .into_iter()
+                .map(|id| vec![Value::Int(id)])
+                .collect::<Vec<_>>()
+        );
 
-    assert_eq!(connection.query("SHOW search_path").await.unwrap().rows, original_path);
+        transaction.execute("SAVEPOINT before_invalid_label").await.unwrap();
+        let invalid = transaction
+            .execute_params(&update_sql, &[Value::Text("shadow-only".into()), Value::Int(id)])
+            .await
+            .expect_err("a shadow-only label is invalid for the target enum");
+        assert!(
+            matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+            "expected native enum SQLSTATE 22P02, got {invalid:?}"
+        );
+        transaction
+            .execute("ROLLBACK TO SAVEPOINT before_invalid_label")
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+
+        assert_eq!(connection.query("SHOW search_path").await.unwrap().rows, original_path);
+    }
     let native = connection
         .query(
             "SELECT n.nspname, t.typname, r.state::text, r.sibling \
@@ -698,7 +718,7 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
             vec![
                 Value::Text("EnumCaseLocal".into()),
                 Value::Text("StateKind".into()),
-                Value::Text("ready".into()),
+                Value::Text("target-only".into()),
                 Value::Text("target-two".into()),
             ],
             vec![
