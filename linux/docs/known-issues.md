@@ -33,7 +33,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-3b | The connect dialog's own Connect button has no cancel | OPEN | `connect_dialog/mod.rs` | gtk-widget |
 | UI-4 | ~~New connection form defaults to ClickHouse; no file pickers; bare TLS error~~ | DONE | PR #87 | unit |
 | UI-5 | Test Connection result is a transient raw toast | OPEN | Inline result row in the dialog | gtk-widget |
-| UI-6 | `Ctrl+/` is bound to the shortcuts window and to editor comment toggle | UNVERIFIED | Live check on Xvfb, then fix | gtk-widget |
+| UI-6 | ~~`Ctrl+/` opened the shortcuts window instead of toggling an editor comment~~ | DONE | `window_shortcut_tests`; scenario `ctrl_slash_toggles_a_comment_in_the_editor` | gtk-installed |
 | UI-7 | ~~Editor has no find or replace~~ | DONE | PR #87, `find_bar` widget test | gtk-widget |
 | UI-7b | Find has no case or regex toggle | OPEN | `SearchSettings` flags | gtk-widget |
 | UI-8 | ~~Second launch exits silently~~ | DONE | PR #87, verified with D-Bus on the runner | gtk-installed |
