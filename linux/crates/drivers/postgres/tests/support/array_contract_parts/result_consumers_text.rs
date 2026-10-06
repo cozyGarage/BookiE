@@ -869,6 +869,65 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
     assert_eq!(rebound.rows[0][1], oracle.rows[0][2]);
 
     let directory = tempfile::tempdir().unwrap();
+    let csv_options = tablepro_core::export::CsvOptions::default();
+    let Value::Text(driver_text) = &result.rows[0][0] else {
+        panic!("boolean[] result must remain text: {:?}", result.rows[0][0]);
+    };
+    for (format, extension) in [
+        (tablepro_core::export::ResultFormat::Json, "json"),
+        (tablepro_core::export::ResultFormat::Csv, "csv"),
+        (tablepro_core::export::ResultFormat::Xml, "xml"),
+        (tablepro_core::export::ResultFormat::Html, "html"),
+        (tablepro_core::export::ResultFormat::Markdown, "md"),
+    ] {
+        let path = directory.path().join(format!("boolean-array.{extension}"));
+        tablepro_core::export::write_result_file(
+            &path,
+            &result,
+            &tablepro_core::export::ResultExport {
+                format,
+                csv: &csv_options,
+                sql: None,
+            },
+            || false,
+            |_| {},
+        )
+        .unwrap();
+        let output = std::fs::read_to_string(path).unwrap();
+        let validated = match format {
+            tablepro_core::export::ResultFormat::Json => {
+                let json: serde_json::Value = serde_json::from_str(&output).unwrap();
+                assert_eq!(json[0]["value"], *driver_text);
+                true
+            }
+            tablepro_core::export::ResultFormat::Csv => {
+                let mut csv = csv::Reader::from_reader(output.as_bytes());
+                assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
+                assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+                true
+            }
+            tablepro_core::export::ResultFormat::Xml => {
+                let escaped = driver_text.replace('"', "&quot;");
+                assert!(output.contains(&format!("<value>{escaped}</value>")), "{output}");
+                true
+            }
+            tablepro_core::export::ResultFormat::Html => {
+                let escaped = driver_text.replace('"', "&quot;");
+                assert!(output.contains(&format!("<td>{escaped}</td>")), "{output}");
+                true
+            }
+            tablepro_core::export::ResultFormat::Markdown => {
+                let escaped = serde_json::Value::String(driver_text.clone())
+                    .to_string()
+                    .replace('\\', "&#92;");
+                assert!(output.contains(&format!("| {escaped} |")), "{output}");
+                true
+            }
+            _ => false,
+        };
+        assert!(validated, "export loop included an unvalidated format");
+    }
+
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| directory.path().join("boolean-array.xlsx"));
@@ -877,7 +936,7 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
         &result,
         &tablepro_core::export::ResultExport {
             format: tablepro_core::export::ResultFormat::Xlsx,
-            csv: &tablepro_core::export::CsvOptions::default(),
+            csv: &csv_options,
             sql: None,
         },
         || false,
@@ -897,9 +956,6 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
         &mut shared_strings,
     )
     .unwrap();
-    let Value::Text(driver_text) = &result.rows[0][0] else {
-        panic!("boolean[] result must remain text: {:?}", result.rows[0][0]);
-    };
     assert!(sheet.contains("<c r=\"A2\" t=\"s\">"), "{sheet}");
     assert!(shared_strings.contains(driver_text), "{shared_strings}");
     assert!(!sheet.contains("<f>"), "{sheet}");

@@ -33,6 +33,13 @@ and related guards reports 24 caught, 0 missed and 0 timed out. The 13 original
 timeout-classified mutations are all included and caught. Full results are in
 the [MySQL dollar-boundary packet](../sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json).
 
+The five zero-length-span timeout mutants also exposed two consumers that
+trusted `skip_span` to return a positive length. The named-parameter rewriter
+and SQL diagnostics scanner now ignore zero-length spans, matching
+`statement_spans`. The focused five-mutant recheck caught all five without a
+timeout; the [zero-progress guard packet](../sql-lex-zero-progress-guards-results-2026-10-06/manifest.json)
+records the regression and its test results.
+
 The latest tested `sql_lex.rs` SHA-256 was
 `90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148`.
 

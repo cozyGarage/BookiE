@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-06",
+  "case": "SQL lexer consumers advance when a span length is zero",
+  "source_commit": "479bad05291b37240ab5abb63089dd2f4dee510e",
+  "source_sha256": {
+    "crates/core/src/params.rs": "762b8ca10dc909951b29b915ae653c7986af2fab2aea05e53c44a12d750ac0fb",
+    "crates/core/src/sql_diagnostics.rs": "fe1a9b8457e3487b8a6fa306dc22448ccadae17e081e56f0b4d2a41d1191c9a0",
+    "crates/core/src/sql_lex.rs": "90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148"
+  },
+  "change": "Named-parameter extraction and SQL diagnostics now ignore zero-length skip_span results, matching the statement scanner.",
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-core --lib",
+      "result": "535 passed"
+    },
+    {
+      "command": "rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:(2:5|29:5)' --test-tool cargo --output target/quality/20261006-sql-lex-zero-progress-guards --timeout 20 --in-place -- --lib",
+      "result": "5 mutants tested: 5 caught, 0 timeouts, 0 missed, 0 unviable",
+      "mutants": [
+        "skip_span -> None",
+        "skip_span -> Some(0)",
+        "skip_span -> Some(1)",
+        "quoted_length -> 0",
+        "quoted_length -> 1"
+      ]
+    }
+  ],
+  "remaining_mutation_note": "Seven cursor-arithmetic mutants still make the focused scanner tests hit the configured mutation timeout; see the linked SQL lexer mutation report.",
+  "status": "B3 remains open; this resolves the zero-length span consumer hangs only."
+}
