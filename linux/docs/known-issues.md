@@ -100,7 +100,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | SEC-2 | U2: Copy as SQL keeps auto-increment values; IDENTITY and GENERATED ALWAYS need an engine-aware default | OPEN | | driver-docker |
 | SEC-3 | U1: SQL Server server-owned columns proven for metadata and two INSERT paths only | OPEN | Grid, CSV import, Copy as SQL, SQL export | driver-docker |
 | SEC-4 | T-SQL batches: `SELECT 1` then UPDATE or DROP; MERGE alone or final | UNVERIFIED | Native verification | driver-docker |
-| SEC-5 | `cargo-audit` and `cargo deny` not run locally; RUSTSEC-2023-0071 ignored | OPEN | Run on the runner | manual |
+| SEC-5 | ~~`cargo-audit` and `cargo deny` not run locally; RUSTSEC-2023-0071 ignored~~ | DONE | `cargo deny check` on the Arch runner: advisories, bans, licenses and sources ok; the RUSTSEC-2023-0071 ignore stays documented in `deny.toml` | manual |
 | SEC-6 | PostgreSQL result cap is client side only | OPEN | Never append LIMIT blindly | driver-docker |
 | SEC-7 | Durable audit filesystem work can outlive the MCP deadline | ACCEPTED | Fails closed by design | n/a |
 | SEC-8 | Trusted production mutations, unattended MCP writes and a public package are not approved | ACCEPTED | Decision, not work | n/a |
