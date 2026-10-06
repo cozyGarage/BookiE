@@ -569,7 +569,8 @@ impl SimpleComponent for BrowseTab {
                 },
             ))
             .child(
-                &adw::Spinner::builder()
+                &gtk::Spinner::builder()
+                    .spinning(true)
                     .width_request(32)
                     .height_request(32)
                     .halign(gtk::Align::Center)

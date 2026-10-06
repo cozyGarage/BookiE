@@ -127,10 +127,17 @@ fn make_shortcut(trigger: &str, action: &str) -> gtk::Shortcut {
         .build()
 }
 
-pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
-    let dialog = adw::ShortcutsDialog::new();
-    add_shortcut_section(
-        &dialog,
+pub(super) fn build_shortcuts_dialog() -> gtk::ShortcutsWindow {
+    let dialog = gtk::ShortcutsWindow::builder()
+        .title(crate::tr!("Keyboard Shortcuts"))
+        .modal(true)
+        .build();
+    let section = gtk::ShortcutsSection::builder()
+        .section_name("shortcuts")
+        .max_height(14)
+        .build();
+    add_shortcut_group(
+        &section,
         &crate::tr!("General"),
         &[
             ("<Primary>e", crate::tr!("Open SQL editor")),
@@ -148,8 +155,8 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary>q", crate::tr!("Quit")),
         ],
     );
-    add_shortcut_section(
-        &dialog,
+    add_shortcut_group(
+        &section,
         &crate::tr!("Browse table"),
         &[
             ("F2", crate::tr!("Edit focused cell")),
@@ -179,8 +186,8 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>z", crate::tr!("Redo last change")),
         ],
     );
-    add_shortcut_section(
-        &dialog,
+    add_shortcut_group(
+        &section,
         &crate::tr!("SQL editor"),
         &[
             ("<Primary>Return", crate::tr!("Run query")),
@@ -197,8 +204,8 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>f", crate::tr!("Format SQL")),
         ],
     );
-    add_shortcut_section(
-        &dialog,
+    add_shortcut_group(
+        &section,
         &crate::tr!("Table structure"),
         &[
             ("<Primary>s", crate::tr!("Save pending DDL")),
@@ -206,26 +213,27 @@ pub(super) fn build_shortcuts_dialog() -> adw::ShortcutsDialog {
             ("<Primary><Shift>z", crate::tr!("Redo DDL change")),
         ],
     );
-    add_shortcut_section(
-        &dialog,
+    add_shortcut_group(
+        &section,
         &crate::tr!("Dialogs"),
         &[("Escape", crate::tr!("Close dialog"))],
     );
-    install_browse_key_captions(&dialog);
+    dialog.add_section(&section);
     dialog
 }
 
-fn add_shortcut_section(dialog: &adw::ShortcutsDialog, title: &str, entries: &[(&str, String)]) {
-    let section = adw::ShortcutsSection::new(Some(title));
+fn add_shortcut_group(section: &gtk::ShortcutsSection, title: &str, entries: &[(&str, String)]) {
+    let group = gtk::ShortcutsGroup::builder().title(title).build();
     for (accelerator, title) in entries {
-        let item_accelerator = tablepro_core::browse_item_accelerator(accelerator).unwrap_or(accelerator);
-        let item = adw::ShortcutsItem::new(title, item_accelerator);
-        if let Some(visible) = tablepro_core::browse_visible_key(accelerator) {
-            item.set_subtitle(&localized_browse_key(visible));
+        let shortcut = gtk::ShortcutsShortcut::builder().title(title).build();
+        if gtk::accelerator_parse(*accelerator).is_some() {
+            shortcut.set_accelerator(Some(accelerator));
+        } else {
+            shortcut.set_subtitle(Some(&localized_browse_key(accelerator)));
         }
-        section.add(item);
+        group.append(&shortcut);
     }
-    dialog.add(section);
+    section.append(&group);
 }
 
 fn localized_browse_key(key: &str) -> String {
@@ -237,97 +245,6 @@ fn localized_browse_key(key: &str) -> String {
         "Ctrl-click" => crate::tr!("Ctrl-click"),
         other => other.to_string(),
     }
-}
-
-fn install_browse_key_captions(dialog: &adw::ShortcutsDialog) {
-    present_browse_key_captions(dialog.upcast_ref::<gtk::Widget>());
-    let mapped = dialog.clone();
-    dialog.connect_map(move |_| present_browse_key_captions(mapped.upcast_ref::<gtk::Widget>()));
-    let searched = dialog.clone();
-    if let Some(entry) = find_search_entry(dialog.upcast_ref::<gtk::Widget>()) {
-        entry.connect_search_changed(move |_| {
-            let searched = searched.clone();
-            gtk::glib::idle_add_local_once(move || {
-                present_browse_key_captions(searched.upcast_ref::<gtk::Widget>());
-            });
-        });
-    }
-}
-
-fn present_browse_key_captions(widget: &gtk::Widget) {
-    if widget.has_css_class("shortcut-row") {
-        present_browse_row(widget);
-    }
-    let mut next = widget.first_child();
-    while let Some(child) = next {
-        present_browse_key_captions(&child);
-        next = child.next_sibling();
-    }
-}
-
-fn present_browse_row(row: &gtk::Widget) {
-    let Some((subtitle, caption)) = browse_subtitle(row) else {
-        return;
-    };
-    if write_key_caption(row, &caption) {
-        subtitle.set_visible(false);
-    }
-}
-
-fn browse_subtitle(widget: &gtk::Widget) -> Option<(gtk::Label, String)> {
-    if let Some(label) = widget.downcast_ref::<gtk::Label>()
-        && label.has_css_class("subtitle")
-        && is_browse_key_caption(label.text().as_str())
-    {
-        return Some((label.clone(), label.text().to_string()));
-    }
-    let mut next = widget.first_child();
-    while let Some(child) = next {
-        if let Some(found) = browse_subtitle(&child) {
-            return Some(found);
-        }
-        next = child.next_sibling();
-    }
-    None
-}
-
-fn is_browse_key_caption(text: &str) -> bool {
-    tablepro_core::browse_drawn_shortcuts()
-        .entries()
-        .into_iter()
-        .any(|shortcut| localized_browse_key(shortcut.visible_key) == text)
-}
-
-fn write_key_caption(widget: &gtk::Widget, caption: &str) -> bool {
-    if let Some(shortcut) = widget.downcast_ref::<adw::ShortcutLabel>() {
-        if shortcut.accelerator().is_empty() {
-            shortcut.set_disabled_text(caption);
-            return true;
-        }
-        return false;
-    }
-    let mut next = widget.first_child();
-    while let Some(child) = next {
-        if write_key_caption(&child, caption) {
-            return true;
-        }
-        next = child.next_sibling();
-    }
-    false
-}
-
-fn find_search_entry(widget: &gtk::Widget) -> Option<gtk::SearchEntry> {
-    if let Some(entry) = widget.downcast_ref::<gtk::SearchEntry>() {
-        return Some(entry.clone());
-    }
-    let mut next = widget.first_child();
-    while let Some(child) = next {
-        if let Some(found) = find_search_entry(&child) {
-            return Some(found);
-        }
-        next = child.next_sibling();
-    }
-    None
 }
 
 #[cfg(test)]
@@ -361,5 +278,45 @@ mod window_shortcut_tests {
                 "{trigger} would steal an editor key for {action}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod dialog_tests {
+    use super::build_shortcuts_dialog;
+    use relm4::gtk::{self, prelude::*};
+
+    fn shortcuts_under(widget: &gtk::Widget, found: &mut Vec<gtk::ShortcutsShortcut>) {
+        if let Some(shortcut) = widget.downcast_ref::<gtk::ShortcutsShortcut>() {
+            found.push(shortcut.clone());
+        }
+        let mut next = widget.first_child();
+        while let Some(child) = next {
+            shortcuts_under(&child, found);
+            next = child.next_sibling();
+        }
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn the_shortcuts_window_lists_keys_and_describes_mouse_gestures() {
+        relm4::adw::init().unwrap();
+        let dialog = build_shortcuts_dialog();
+        let mut found = Vec::new();
+        shortcuts_under(dialog.upcast_ref::<gtk::Widget>(), &mut found);
+        assert!(found.len() > 50, "only {} entries", found.len());
+        let accelerator = |title: &str| {
+            found
+                .iter()
+                .find(|s| s.title().as_deref() == Some(title))
+                .map(|s| s.accelerator())
+        };
+        assert_eq!(accelerator("Quit").flatten().as_deref(), Some("<Primary>q"));
+        let gesture = found
+            .iter()
+            .find(|s| s.title().as_deref() == Some("Toggle clicked row in selection"))
+            .unwrap();
+        assert_eq!(gesture.subtitle().as_deref(), Some("Ctrl-click"));
+        assert!(gesture.accelerator().is_none());
     }
 }

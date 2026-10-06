@@ -402,8 +402,8 @@ impl BrowseTab {
     }
 
     pub(super) fn show_loading_inner(&self, title: &str, description: &str) {
-        // adw::Spinner replaces deprecated gtk::Spinner (GTK 4.12+).
-        let spinner = adw::Spinner::builder()
+        let spinner = gtk::Spinner::builder()
+            .spinning(true)
             .width_request(32)
             .height_request(32)
             .halign(gtk::Align::Center)

@@ -28,7 +28,7 @@ BookiE 0.1.4 (tag `linux-v0.1.4`) targets:
 
 **Ubuntu 24.04 and 25.10 cannot run this line.** GTK CI builds in Debian testing for the GNOME 50 library baseline.
 
-Runtime baseline: GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+. Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
+Runtime baseline: GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ (Ubuntu 24.04 and Debian 13 or newer). Build with Rust 1.98. No AUR, Flathub, or Fedora package. No 32-bit or ARM artifacts.
 
 ## Named query parameters
 
@@ -51,7 +51,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 | Layer | Technology |
 |---|---|
 | Language | Rust 1.98+ |
-| GUI | GTK4 4.22+, GLib 2.88+, libadwaita 1.9+, GtkSourceView 5.18+ |
+| GUI | GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ |
 | Components | Relm4 |
 | Async work | Tokio for database and service work, GLib main context for GTK |
 | Drivers | sqlx, tiberius, clickhouse, and engine-specific Rust crates |

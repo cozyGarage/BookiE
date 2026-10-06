@@ -135,6 +135,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::app::shortcuts::dialog_tests::the_shortcuts_window_lists_keys_and_describes_mouse_gestures"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::grid::column_visibility::tests::hiding_a_column_hides_it_persists_it_and_keeps_the_last_one"
     ],
     [
