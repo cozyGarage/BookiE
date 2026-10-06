@@ -44,6 +44,7 @@ See the [bug and consistency audit](linux/docs/archive/bug-consistency-2026-09.m
 - `linux/crates/mcp`: MCP authentication, scopes, allowlists, rate limits, and tools
 - `linux/crates/agentd`: headless MCP process
 - `linux/crates/storage`: Secret Service integration, saved connections, history, and audit journal
+- `linux/crates/transport`: shared saved-connection, credential, and route assembly for GUI and daemon
 - `linux/crates/ssh`: SSH tunnels
 
 All GUI, MCP, and agent database access passes through policy-gated connection handles. MCP scopes and connection allowlists do not replace SQL policy checks.
