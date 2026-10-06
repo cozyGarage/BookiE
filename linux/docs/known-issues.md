@@ -169,6 +169,12 @@ command at a checkout's HEAD with the helper in the lab repository,
 `scripts/bookie-ci-run.sh <checkout> '<command>'`. Tiers that pass there are
 recorded per PR; none of them replaces the installed Wayland pass (PKG-1).
 
+A lab Forgejo (VM 250 on pmox-lab03, `http://192.168.1.246:3000`, repository
+`trung/bookie`, private) mirrors `linux` and runs `.forgejo/workflows/ci.yml`
+on the `arch` runner (`forgejo-runner` as a systemd service on `bookie-ci`, host
+mode, capacity 1, shared cargo cache). It is a visual lab copy of the checks
+above, not a replacement for the GitHub gates.
+
 The VM must use the `host` CPU type: the default virtual CPU hides AVX and
 MongoDB 5 and later will not start. `scripts/test-gtk-postgres.sh` and the
 Docker driver suites (`scripts/ci-local.sh integration`) run there.
