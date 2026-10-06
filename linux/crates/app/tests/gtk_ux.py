@@ -41,10 +41,12 @@ def scenarios(ui):
         return json.loads(files[0].read_text())["connections"]
 
     def open_cell_menu(cell_text):
-        cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_TABLE_CELL)
-        assert cell.queryComponent().grabFocus(), "the grid cell did not take keyboard focus"
-        time.sleep(0.3)
-        ui.press_x11_key("Menu")
+        cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_LABEL)
+        component = cell.queryComponent()
+        window = component.getExtents(pyatspi.WINDOW_COORDS)
+        desktop = component.getExtents(pyatspi.DESKTOP_COORDS)
+        screen = component.getExtents(pyatspi.XY_SCREEN)
+        raise AssertionError(f"PROBE window={(window.x, window.y, window.width, window.height)} desktop={(desktop.x, desktop.y)} screen={(screen.x, screen.y)}")
 
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
