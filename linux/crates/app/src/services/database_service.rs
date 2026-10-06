@@ -61,6 +61,7 @@ pub struct ConnectionMetadata {
 pub enum ConnectionHealth {
     Healthy,
     Reconnecting { attempt: u32 },
+    Failed { reason: String },
 }
 
 pub struct ReconnectParams {

@@ -124,14 +124,24 @@ async fn reconnect_loop(
         }
 
         match try_reconnect(params).await {
+            Err(failure) if failure.permanent => {
+                tracing::warn!(error = %failure.message, attempt, "reconnect cannot succeed; giving up");
+                set_health(
+                    inner,
+                    ConnectionHealth::Failed {
+                        reason: failure.message,
+                    },
+                );
+                return Err(());
+            }
             Ok((conn, tunnel)) => {
                 swap_connection(inner, conn, tunnel, fault);
                 set_health(inner, ConnectionHealth::Healthy);
                 tracing::info!(attempt, "reconnect succeeded");
                 return Ok(());
             }
-            Err(e) => {
-                tracing::warn!(error = %e, attempt, delay_secs = delay.as_secs(), "reconnect failed; backing off");
+            Err(failure) => {
+                tracing::warn!(error = %failure.message, attempt, delay_secs = delay.as_secs(), "reconnect failed; backing off");
                 attempt += 1;
                 set_health(inner, ConnectionHealth::Reconnecting { attempt });
                 delay = next_delay(delay);
@@ -144,8 +154,10 @@ fn next_delay(prev: Duration) -> Duration {
     std::cmp::min(prev.saturating_mul(2), BACKOFF_MAX)
 }
 
-async fn try_reconnect(params: &ReconnectParams) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
-    connection_service::establish(
+async fn try_reconnect(
+    params: &ReconnectParams,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), connection_service::EstablishFailure> {
+    connection_service::establish_classified(
         params.driver.as_ref(),
         params.opts.clone(),
         params.ssh.clone(),
@@ -252,6 +264,66 @@ mod tests {
             self.attempts.fetch_add(1, Ordering::SeqCst);
             Err(DriverError::ConnectionRefused)
         }
+    }
+
+    struct RejectingDriver {
+        attempts: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl DatabaseDriver for RejectingDriver {
+        fn id(&self) -> &'static str {
+            "rejecting"
+        }
+
+        fn display_name(&self) -> &'static str {
+            "Rejecting"
+        }
+
+        fn default_port(&self) -> u16 {
+            0
+        }
+
+        async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            Err(DriverError::AuthFailed)
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_credential_failure_ends_the_retry_loop_and_reports_the_reason() {
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let inner = Arc::new(Mutex::new(EntryInner {
+            connection: Arc::new(IdleConn {
+                attached: Arc::new(Mutex::new(None)),
+                pings: Arc::new(AtomicUsize::new(0)),
+            }) as Arc<dyn Connection>,
+            tunnel: None,
+            health: ConnectionHealth::Healthy,
+            audit_state: Arc::new(AuditState::new()),
+        }));
+        let params = ReconnectParams {
+            driver: Arc::new(RejectingDriver {
+                attempts: attempts.clone(),
+            }),
+            opts: ConnectOptions::default(),
+            ssh: None,
+            environment: tablepro_transport::SshEnvironment::builtin(tablepro_ssh::UnknownHostKey::Learn),
+        };
+
+        let outcome = reconnect_loop(&inner, &params, &CancellationToken::new(), &Arc::new(Notify::new())).await;
+
+        assert!(outcome.is_err());
+        assert_eq!(
+            attempts.load(Ordering::SeqCst),
+            1,
+            "a wrong password must not be retried forever"
+        );
+        let health = inner.lock().expect("entry lock").health.clone();
+        assert!(
+            matches!(health, ConnectionHealth::Failed { ref reason } if reason.contains("password")),
+            "{health:?}"
+        );
     }
 
     struct IdleConn {

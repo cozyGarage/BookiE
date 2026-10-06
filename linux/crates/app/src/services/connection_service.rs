@@ -167,15 +167,57 @@ pub async fn until_cancelled<T>(
     }
 }
 
+pub struct EstablishFailure {
+    pub message: String,
+    pub permanent: bool,
+}
+
+pub async fn establish_classified(
+    driver: &dyn tablepro_core::DatabaseDriver,
+    opts: ConnectOptions,
+    ssh: Option<SshRoute>,
+    environment: &SshEnvironment,
+) -> Result<(Box<dyn Connection>, Option<Tunnel>), EstablishFailure> {
+    tablepro_transport::establish(driver, opts, ssh, environment)
+        .await
+        .map_err(|error| EstablishFailure {
+            permanent: is_permanent_failure(&error),
+            message: message(error),
+        })
+}
+
 pub async fn establish(
     driver: &dyn tablepro_core::DatabaseDriver,
     opts: ConnectOptions,
     ssh: Option<SshRoute>,
     environment: &SshEnvironment,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
-    tablepro_transport::establish(driver, opts, ssh, environment)
+    establish_classified(driver, opts, ssh, environment)
         .await
-        .map_err(message)
+        .map_err(|failure| failure.message)
+}
+
+pub fn is_permanent_failure(error: &TransportError) -> bool {
+    use tablepro_core::DriverError;
+    match error {
+        TransportError::Driver(driver) => matches!(
+            driver,
+            DriverError::AuthFailed
+                | DriverError::Tls(_)
+                | DriverError::IntegratedAuth(_)
+                | DriverError::PolicyDenied(_)
+                | DriverError::Unsupported(_)
+        ),
+        TransportError::Keyring(_)
+        | TransportError::Secret(_)
+        | TransportError::IntegratedAuthUnsupported(_)
+        | TransportError::LocalSocketUnsupported(_)
+        | TransportError::LocalSocketWithSsh
+        | TransportError::LocalSocketWithTls
+        | TransportError::InvalidLocalSocket(_)
+        | TransportError::SystemSshUnavailableInSandbox => true,
+        TransportError::Ssh(_) | TransportError::DatabaseTimeout { .. } => false,
+    }
 }
 
 fn message(error: TransportError) -> String {
@@ -213,5 +255,40 @@ mod cancellation_tests {
         let canceller = token.clone();
         tokio::spawn(async move { canceller.cancel() });
         assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
+    }
+}
+
+#[cfg(test)]
+mod failure_tests {
+    use super::*;
+    use tablepro_core::DriverError;
+    use tablepro_storage::KeyringFailure;
+
+    #[test]
+    fn wrong_credentials_tls_and_configuration_are_permanent() {
+        for error in [
+            TransportError::Driver(DriverError::AuthFailed),
+            TransportError::Driver(DriverError::Tls("bad certificate".into())),
+            TransportError::Driver(DriverError::IntegratedAuth("no ticket".into())),
+            TransportError::Driver(DriverError::PolicyDenied("blocked".into())),
+            TransportError::Keyring(KeyringFailure::Locked),
+            TransportError::IntegratedAuthUnsupported("sqlite".into()),
+            TransportError::LocalSocketWithSsh,
+        ] {
+            assert!(is_permanent_failure(&error), "{error} should stop a reconnect");
+        }
+    }
+
+    #[test]
+    fn a_server_that_is_down_or_slow_is_worth_retrying() {
+        for error in [
+            TransportError::Driver(DriverError::ConnectionRefused),
+            TransportError::Driver(DriverError::Disconnected),
+            TransportError::Driver(DriverError::TimedOut),
+            TransportError::Ssh("connection reset".into()),
+            TransportError::DatabaseTimeout { seconds: 30 },
+        ] {
+            assert!(!is_permanent_failure(&error), "{error} should keep retrying");
+        }
     }
 }

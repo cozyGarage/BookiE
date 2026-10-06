@@ -77,6 +77,7 @@
 ## [0.1.5] - 2026-09-27
 - Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
 - The Debian package now includes the SSH password helper that the system OpenSSH client needs.
+- A lost connection stops reconnecting when the password, TLS setting or configuration is wrong and says why, instead of retrying forever.
 
 ### Added
 
