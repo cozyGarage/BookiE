@@ -6,17 +6,17 @@ Implementation is authorized; no 0.2 release is approved.
 During consolidation, `573435766` merged F4/F9 and `8c0f17494` updated the B4 board;
 they are preserved in this checkout. The history files retain the earlier `0cf70382e` snapshot.
 
-## Current continuation plan: 2026-10-06
+## Current continuation plan: 2026-10-07
 
-Current source baseline: `5cdb3660bfb56131551489ecbb8584e472019f24` on
-`linux`, pushed to `origin/linux`. October 6 merges #65–#67 retain the DuckDB
-malformed-tail and decimal literal fixes plus the ignored-test inventory;
-merges #81 and #82 add SQLite STRICT `ANY` `length()` typed-CSV coverage and a
-ClickHouse nested `Map → Array → Tuple → UInt128` contract with native consumer
-oracles and safe write refusals. Their implementation, tests, and source-pinned
+Current integrated source baseline: `a9a8c1bc0eda5b87aaa30105ee0c2233e3291094`
+on `linux`, pushed to `origin/linux`. Merges #103/#105 add PostgreSQL mixed-case
+enum shadow-name coverage and MongoDB stale-field delete protection; #106 fixes
+Rust formatting; #107 makes two regressions deterministic in the full suite.
+Earlier October 6 merges #65–#67, #81 and #82 retain the DuckDB, SQLite and
+ClickHouse cases described below. Their implementations and source-pinned
 evidence are linked from the [B3 board](type-contract-strategy.md) and
 [value evidence index](value-contracts.md). B3 remains open: the broader
-engine/type/consumer/configuration matrix, mutation triage, and installed grid
+engine/type/consumer/configuration matrix, mutation triage and installed grid
 acceptance still need work. These merges do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME

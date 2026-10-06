@@ -14,7 +14,7 @@ Every shipped feature is free to use. TablePro has no account, license, subscrip
 
 ## Status
 
-The Linux client is under active development. It includes database browsing, SQL editing, structure editing, inline row changes, query history, SSH tunnels, policy checks, audit records, MCP access, and a headless MCP process.
+The Linux client is under active development toward BookiE 0.2.0. B3 type/value consumer coverage remains open, followed by B4 transport/session acceptance and installed desktop qualification. It includes database browsing, SQL editing, structure editing, inline row changes, query history, SSH tunnels, policy checks, audit records, MCP access, and a headless MCP process. The GTK grid creates row objects on demand over an in-memory result; it does not yet stream or page large results from the database.
 
 PostgreSQL is the furthest along: server-confirmed cancellation, certificate hostname and authority verification, verified TLS through an SSH tunnel, read-only denial, rollback, blocking-lock reporting, and reconnect run as deterministic container checks. MySQL, ClickHouse, Redis, and MongoDB also have driver TLS fixture evidence; those fixtures do not establish full transport or packaging readiness. Packaging is not release-verified. [`linux/ROADMAP.md`](linux/ROADMAP.md) links to current milestone status and the detailed acceptance boards.
 
@@ -44,6 +44,7 @@ See the [bug and consistency audit](linux/docs/archive/bug-consistency-2026-09.m
 - `linux/crates/mcp`: MCP authentication, scopes, allowlists, rate limits, and tools
 - `linux/crates/agentd`: headless MCP process
 - `linux/crates/storage`: Secret Service integration, saved connections, history, and audit journal
+- `linux/crates/transport`: shared saved-connection, credential, and route assembly for GUI and daemon
 - `linux/crates/ssh`: SSH tunnels
 
 All GUI, MCP, and agent database access passes through policy-gated connection handles. MCP scopes and connection allowlists do not replace SQL policy checks.

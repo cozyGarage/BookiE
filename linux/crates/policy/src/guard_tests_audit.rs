@@ -851,10 +851,8 @@ impl<'writer> tracing_subscriber::fmt::MakeWriter<'writer> for CapturedLogs {
     }
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
-    use tracing::instrument::WithSubscriber;
-
+#[test]
+fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
     let logs = CapturedLogs::default();
     let subscriber = tracing_subscriber::fmt()
         .with_writer(logs.clone())
@@ -872,11 +870,14 @@ async fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
         ),
     );
 
-    let error = guard
-        .list_tables()
-        .with_subscriber(subscriber)
-        .await
-        .expect_err("a panicking driver must surface as an error");
+    let error = tracing::subscriber::with_default(subscriber, || {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("test runtime")
+            .block_on(guard.list_tables())
+            .expect_err("a panicking driver must surface as an error")
+    });
 
     let logged = String::from_utf8(logs.0.lock().expect("log lock").clone()).expect("utf-8 logs");
     assert!(

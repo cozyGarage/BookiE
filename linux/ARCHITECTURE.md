@@ -2,7 +2,7 @@
 
 TablePro is a Linux-only Rust workspace rooted in `linux/`. GTK4 and Relm4 provide the desktop UI. Domain, policy, storage, SSH, MCP, and database drivers are separate crates so they can be tested without starting the application.
 
-Reviewed against Linux `4b7814f5e` on 2026-10-03. See the [cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) for document authority, evidence limits and remaining source risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing.
+The architecture description below reflects the current `linux` branch. The [cross-session consistency review](docs/archive/architecture-consistency-review-2026-10-03.md) is a dated source snapshot, useful for its document authority, evidence limits and then-open risks. Accepted [decisions](docs/decisions/README.md) constrain implementation; the [active sprint](docs/bookie-0.2-sprint.md) owns delivery sequencing and current acceptance.
 
 ## Workspace layout
 
@@ -33,7 +33,7 @@ The workspace currently has these driver crates: PostgreSQL, MySQL, SQLite, SQL 
 
 `tablepro-core` defines shared connection options, values, errors, operation control, and driver traits. It does not depend on another workspace crate.
 
-Driver crates implement the core traits. They do not depend on GTK. `tablepro-policy` applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal; it depends on core, policy audit types, and SSH configuration types. `tablepro-transport` depends on core, SSH and storage to assemble saved credentials and establish routes. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients.
+Driver crates implement the core traits. They do not depend on GTK. SQLx backs PostgreSQL, MySQL, and SQLite; Tiberius backs SQL Server, while the remaining engines use their own crates. `rust_decimal` is the shared decimal carrier, with exactness established per engine and consumer under [ADR 0007](docs/decisions/0007-type-and-value-preservation.md). `tablepro-policy` applies authorization and audit rules around core connections. `tablepro-storage` owns saved connections, Secret Service access, query history, and the audit journal; it depends on core, policy audit types, and SSH configuration types. `tablepro-transport` depends on core, SSH and storage to assemble saved credentials and establish routes. `tablepro-mcp` combines core, policy, and storage behavior for MCP clients.
 
 `tablepro-app` and `tablepro-agentd` are composition roots. They register drivers and assemble policy, storage, transport, and connection services for their process. `tablepro-release-tests` is a test-only consumer that assembles core, policy, SSH, storage, and the PostgreSQL driver against the release fixture.
 
@@ -104,6 +104,8 @@ The application owns an `AdwTabView` for connection workspaces. Tabs are represe
 Table tabs combine data browsing and structure views. Pending row changes and pending structure changes are tracked by tab UUID. Closing, saving, discarding, and reconnecting pass through application-level routing so cross-tab state is handled in one place.
 
 Workspace state is persisted per connection. Unknown persisted tab kinds deserialize to an `Unknown` variant and are dropped during restore instead of failing the whole file.
+
+Browse results use a custom `gio::ListModel` (`RowStore`) behind GTK's list and selection models. It retains the shared `QueryResult` and creates GTK `RowObject`s when the view requests items; edited and inserted draft rows become live objects in that model. This avoids eagerly allocating one GObject per result row, but query rows and cell values remain fully materialized in memory. It is not database paging or constant-memory handling of large results.
 
 ## Driver contract
 
