@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: "0 20 * * *"
   workflow_dispatch:
+env:
+  GITHUB_STEP_SUMMARY: /dev/null
+
 jobs:
   coverage:
     runs-on: arch
