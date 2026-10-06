@@ -1,6 +1,6 @@
 # Validation playbook
 
-Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. See [the evidence consistency review](architecture-consistency-review-2026-10-03.md#evidence-audit) and its inventory for exact paths; retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.
+Evidence availability checked October 3: some dated `target/quality` links below are unavailable in this checkout. They remain historical references, not current passes. See [the evidence consistency review](archive/architecture-consistency-review-2026-10-03.md#evidence-audit) and its inventory for exact paths; retrieve exact-SHA artifacts or rerun before using missing raw proof for acceptance.
 
 Use this page to select checks, hand work to another agent, and review its evidence.
 The executable catalog is [test-layers.json](../scripts/test-layers.json).
@@ -36,8 +36,8 @@ This runs the fast workspace gate, app-server and cross-driver value contracts,
 Docker driver/TLS/PostgreSQL fixtures, keyring and dependency policy checks.
 The runner saves a commit-pinned report and logs under `target/quality/`.
 Fresh local results and remaining gaps are owned by
-[the release audit](release-audit-2026-10-03.md); prior October 1–2 counts and
-cache measurements are in [validation history](validation-history.md).
+[the release audit](archive/release-audit-2026-10-03.md); prior October 1–2 counts and
+cache measurements are in [validation history](archive/validation-history.md).
 
 Run `quick` for a short edit loop. Run the pre-push gate after changes that
 touch shared core/value paths or before handing a B3 slice to review. Keep the
@@ -142,7 +142,7 @@ Build/package, mutation, coverage and acceptance retain their existing entrypoin
 | Mutation | Linux test quality; [local instructions](testing.md#mutation-testing) | Selected/generated count, caught/missed/timeout/unviable counts and outcomes JSON |
 | Coverage | Linux test quality; [local instructions](testing.md#coverage) | LCOV, exclusions and summary; no score threshold implied |
 | Flatpak | Flatpak Linux (packaging only) | Artifacts for both profiles; not regression acceptance |
-| Arch / Debian candidate | [Release guide](release-0.1.4.md) and packaging scripts | Immutable SHA, package checksum, validator output |
+| Arch / Debian candidate | [Release guide](archive/release-0.1.4.md) and packaging scripts | Immutable SHA, package checksum, validator output |
 | GTK soak | GTK Safety Soak | Five independent retry-free attempts at one resolved SHA |
 | Installed acceptance | [Manual feature checklist](manual-verification-0.2-features.md) and sprint gates | VM/desktop version, Wayland session, package checksum, steps, result and screenshots |
 
@@ -236,7 +236,7 @@ All reports must distinguish local results, hosted results and installed accepta
    leave unresolved survivors/timeouts open.
 8. Update scenario evidence and the owning sprint task. Keep the test with the fix.
 
-Use [the scenario survey](b3-test-scenario-survey.md) and
+Use [the scenario survey](archive/b3-test-scenario-survey.md) and
 [value contracts](value-contracts.md) as the B3 case backlog. Current examples:
 
 | Encountered scenario | Permanent regression home | Next edge to investigate |

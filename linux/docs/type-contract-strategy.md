@@ -34,7 +34,7 @@ bytes; malformed LSN elements are rejected before a write and sibling rows stay
 unchanged ([evidence](evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
 Other unlisted built-in and custom PostgreSQL array families remain open.
 
-Detailed native cases and old counts are in [type-contract history](type-contract-history.md)
+Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
 source/SHA attribution; this summary does not certify the current tree.
 
@@ -761,8 +761,8 @@ refused. Both app round trips have a native `typeof()`/value oracle. Empty query
 results retain their column metadata and CSV header. Other computed-expression
 shapes, attached-origin patterns and formats, and installed editing remain open;
 see the
-[table CSV case](value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)
-and [query-result case](value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03).
+[table CSV case](archive/value-contract-history.md#sqlite-strict-any-csv-storage-class-round-trip-2026-10-03)
+and [query-result case](archive/value-contract-history.md#sqlite-strict-any-query-result-csv-round-trip-2026-10-03).
 See the [computed-expression case](evidence/sqlite-computed-any-results-2026-10-04/manifest.json)
 and [attached-origin case](evidence/sqlite-attached-any-metadata-results-2026-10-03/manifest.json) for the tested fallback behavior.
 
@@ -784,16 +784,16 @@ row, including untested combinations, requires exact support before B3 closes.
 
 | ID | Accepted gap | Evidence |
 | --- | --- | --- |
-| B3-OOS-PG-1 | Built-in ranges/multiranges, geometric values, named composites and native `money` | [Ranges](value-contract-history.md#postgresql-built-in-range-family-refusal), [geometry](value-contract-history.md#postgresql-geometric-types-exact-server-oracle-and-visible-refusal), [composites](value-contract-history.md#postgresql-composite-explicit-refusal), [money](value-contract-history.md#postgresql-money-safe-refusal) |
-| B3-OOS-PG-2 | `json[]`/`jsonb[]` result, SQL-literal and parameter consumers | [JSON array contracts](value-contract-history.md#postgresql-array-checkpoint) |
-| B3-OOS-DUCK-1 | Named nested collection shapes containing unsigned values outside decoder support | [Nested unsigned values](value-contract-history.md#duckdb-nested-uhugeint-refusal-boundaries-2026-09-30) |
-| B3-OOS-DUCK-2 | Sub-microsecond edits to lower-precision temporal columns | [Edit precision refusal](value-contract-history.md#duckdb-timestamptz-grid-edit-precision-boundary) |
-| B3-OOS-MYSQL-1 | Spatial and too-wide `BIT(64)` values as editable grid cells | [Spatial](value-contract-history.md#mysql-spatial-bytes-in-the-gtk-grid), [BIT](value-contract-history.md#mysql-signed-and-unsigned-integer-grid-parser-2026-09-30) |
-| B3-OOS-MYSQL-2 | MySQL `TIMESTAMP` instant decoding in a non-UTC dedicated session | [Session contract](value-contract-history.md#mysql-native-time-zero-date-and-year-checkpoint) |
-| B3-OOS-MSSQL-1 | `money`/`smallmoney` and `sql_variant` | [Variant](value-contract-history.md#sql-server-sql_variant-metadata-refusal), [money](value-contract-history.md#sql-server-money-float-decoding-refusal) |
-| B3-OOS-CH-1 | Tested ambiguous/out-of-range `DateTime64` values and nested shapes refused by type-less consumers | [Nested consumers](value-contract-history.md#clickhouse-nested-value-consumer-boundary-2026-09-30), [DateTime64 bounds](value-contract-history.md#clickhouse-datetime649-server-boundary-behavior-2026-09-29) |
-| B3-OOS-MONGO-1 | BSON DateTime grid edits finer than one millisecond | [DateTime precision](value-contract-history.md#mongodb-bson-datetime-grid-edit-precision) |
-| B3-OOS-REDIS-1 | Pub/Sub, `MONITOR` and `CLIENT TRACKING` through the one-shot query interface | [Redis refusals](value-contract-history.md#redis-pubsub-and-monitor-stream-refusal-2026-09-29) |
+| B3-OOS-PG-1 | Built-in ranges/multiranges, geometric values, named composites and native `money` | [Ranges](archive/value-contract-history.md#postgresql-built-in-range-family-refusal), [geometry](archive/value-contract-history.md#postgresql-geometric-types-exact-server-oracle-and-visible-refusal), [composites](archive/value-contract-history.md#postgresql-composite-explicit-refusal), [money](archive/value-contract-history.md#postgresql-money-safe-refusal) |
+| B3-OOS-PG-2 | `json[]`/`jsonb[]` result, SQL-literal and parameter consumers | [JSON array contracts](archive/value-contract-history.md#postgresql-array-checkpoint) |
+| B3-OOS-DUCK-1 | Named nested collection shapes containing unsigned values outside decoder support | [Nested unsigned values](archive/value-contract-history.md#duckdb-nested-uhugeint-refusal-boundaries-2026-09-30) |
+| B3-OOS-DUCK-2 | Sub-microsecond edits to lower-precision temporal columns | [Edit precision refusal](archive/value-contract-history.md#duckdb-timestamptz-grid-edit-precision-boundary) |
+| B3-OOS-MYSQL-1 | Spatial and too-wide `BIT(64)` values as editable grid cells | [Spatial](archive/value-contract-history.md#mysql-spatial-bytes-in-the-gtk-grid), [BIT](archive/value-contract-history.md#mysql-signed-and-unsigned-integer-grid-parser-2026-09-30) |
+| B3-OOS-MYSQL-2 | MySQL `TIMESTAMP` instant decoding in a non-UTC dedicated session | [Session contract](archive/value-contract-history.md#mysql-native-time-zero-date-and-year-checkpoint) |
+| B3-OOS-MSSQL-1 | `money`/`smallmoney` and `sql_variant` | [Variant](archive/value-contract-history.md#sql-server-sql_variant-metadata-refusal), [money](archive/value-contract-history.md#sql-server-money-float-decoding-refusal) |
+| B3-OOS-CH-1 | Tested ambiguous/out-of-range `DateTime64` values and nested shapes refused by type-less consumers | [Nested consumers](archive/value-contract-history.md#clickhouse-nested-value-consumer-boundary-2026-09-30), [DateTime64 bounds](archive/value-contract-history.md#clickhouse-datetime649-server-boundary-behavior-2026-09-29) |
+| B3-OOS-MONGO-1 | BSON DateTime grid edits finer than one millisecond | [DateTime precision](archive/value-contract-history.md#mongodb-bson-datetime-grid-edit-precision) |
+| B3-OOS-REDIS-1 | Pub/Sub, `MONITOR` and `CLIENT TRACKING` through the one-shot query interface | [Redis refusals](archive/value-contract-history.md#redis-pubsub-and-monitor-stream-refusal-2026-09-29) |
 
 ## Bounded case record
 
@@ -810,7 +810,7 @@ Smallest remaining gap / next action; affected files and layer ownership:
 Status: open | reproduced | fixed with named proof | blocked/unrun acceptance
 ```
 
-Use [the scenario survey](b3-test-scenario-survey.md) for candidate boundaries
+Use [the scenario survey](archive/b3-test-scenario-survey.md) for candidate boundaries
 and [the validation playbook](validation-playbook.md#turn-every-finding-into-a-regression)
 for execution. A defect needs initial failure, narrow correction and valid/
 invalid neighbors. Native tests assert stored kind/value and unchanged siblings.
@@ -822,6 +822,6 @@ their own native semantics; another engine's fixtures are not their proof.
 
 ## Historical reconciliation
 
-[Type-contract history](type-contract-history.md) retains the September 28–
+[Type-contract history](archive/type-contract-history.md) retains the September 28–
 October 2 native/consumer matrix and follow-ups. For an exact case, search its
 engine/type heading and inspect only that section and the referenced test.

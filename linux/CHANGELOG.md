@@ -6,6 +6,9 @@
 
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
+- PostgreSQL `bit[]` and `varbit[]` query results now preserve bit values through typed parameter and CSV re-import, including empty bit strings, SQL NULL, and non-default array bounds.
+- The result grid's cell menu also opens with Shift+F10, and the editor find fields have accessible names.
+- Result grids have a Columns… menu entry to hide and show columns; the choice is remembered per table and at least one column always stays visible.
 - PostgreSQL `pg_lsn[]` preserves all 64 LSN bits and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
@@ -40,6 +43,11 @@
 
 ### Fixed
 
+- Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
+
+- Ctrl+/ in the SQL editor now toggles a line comment instead of opening the keyboard shortcuts window.
+
+- Right-clicking an editable result cell opened the cell editor's own menu on top of the grid menu; only the grid menu opens now.
 - PostgreSQL enum-array XLSX exports preserve two-dimensional values and non-default lower bounds as text through LibreOffice Calc and Gnumeric re-saves, including empty labels, literal `NULL`, SQL NULL elements and formula-shaped labels.
 - MySQL query results keep their projected column metadata when no rows match, including inside transactions, and transaction queries obey the shared result cap.
 - MySQL multi-statement saves refuse non-DML statements before dispatch and distinguish rollback failure; successful rollback requests no longer imply that non-transactional table writes were reversed.
@@ -477,11 +485,11 @@ This index is the entry point for dated implementation and validation history.
 The linked archives preserve source-pinned details and case evidence; they are
 not current task instructions.
 
-- **Sprint and milestone history:** [0.1.x → 0.2 delivery record](docs/bookie-0.2-history.md).
-- **B4 implementation history:** [transport, policy, session and UI packets](docs/b4-history.md).
-- **Value contracts:** [driver and consumer case results](docs/value-contract-history.md); current lookup is the [value evidence index](docs/value-contracts.md).
-- **Type contracts:** [historical matrices and reconciliation](docs/type-contract-history.md); current remaining work is the [B3 board](docs/type-contract-strategy.md).
-- **Connections:** [dated connection audit and follow-ups](docs/connections-history.md); current behavior is in [connections](docs/connections.md).
-- **Testing:** [upstream test adoption record](docs/testing-history.md); runnable layers are in [testing](docs/testing.md).
-- **Validation:** [local validation checkpoints](docs/validation-history.md); current commands are in the [validation playbook](docs/validation-playbook.md).
-- **BookiE 0.1.1:** retired and superseded by the 0.2 sprint; the earlier release review remains in [September 14 evidence](docs/sprint-2026-09-14.md).
+- **Sprint and milestone history:** [0.1.x → 0.2 delivery record](docs/archive/bookie-0.2-history.md).
+- **B4 implementation history:** [transport, policy, session and UI packets](docs/archive/b4-history.md).
+- **Value contracts:** [driver and consumer case results](docs/archive/value-contract-history.md); current lookup is the [value evidence index](docs/value-contracts.md).
+- **Type contracts:** [historical matrices and reconciliation](docs/archive/type-contract-history.md); current remaining work is the [B3 board](docs/type-contract-strategy.md).
+- **Connections:** [dated connection audit and follow-ups](docs/archive/connections-history.md); current behavior is in [connections](docs/connections.md).
+- **Testing:** [upstream test adoption record](docs/archive/testing-history.md); runnable layers are in [testing](docs/testing.md).
+- **Validation:** [local validation checkpoints](docs/archive/validation-history.md); current commands are in the [validation playbook](docs/validation-playbook.md).
+- **BookiE 0.1.1:** retired and superseded by the 0.2 sprint; the earlier release review remains in [September 14 evidence](docs/archive/sprint-2026-09-14.md).

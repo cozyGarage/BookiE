@@ -8,6 +8,7 @@ use crate::services::database_service::DatabaseService;
 
 pub(super) fn install(
     view: &gtk::ColumnView,
+    actions: &gio::SimpleActionGroup,
     columns: &[gtk::ColumnViewColumn],
     names: Vec<String>,
     connection: Option<uuid::Uuid>,
@@ -27,9 +28,7 @@ pub(super) fn install(
         }
         present(&view, columns.clone(), &names, connection, install_database.clone());
     });
-    let actions = gio::SimpleActionGroup::new();
     actions.add_action(&action);
-    view.insert_action_group("grid", Some(&actions));
     let controller = gtk::ShortcutController::new();
     controller.set_propagation_phase(gtk::PropagationPhase::Capture);
     controller.add_shortcut(

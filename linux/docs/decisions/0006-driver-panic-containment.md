@@ -5,7 +5,7 @@
 
 ## October 3 implementation/privacy note
 
-The unwind containment decision remains accepted. The source currently logs the caught payload, and the default panic hook may also expose it. “Logs only” below describes the original routing; it does not make arbitrary payload text safe or override the no-secret/SQL logging rule. [The consistency review](../architecture-consistency-review-2026-10-03.md#remaining-source-risks) defines the redaction and headless retirement follow-ups. Keep unwind enabled while addressing them.
+The unwind containment decision remains accepted. The source currently logs the caught payload, and the default panic hook may also expose it. “Logs only” below describes the original routing; it does not make arbitrary payload text safe or override the no-secret/SQL logging rule. [The consistency review](../archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks) defines the redaction and headless retirement follow-ups. Keep unwind enabled while addressing them.
 
 ## Context
 
@@ -27,7 +27,7 @@ The guard then reports the fault through an optional `ConnectionFaultSink` insta
 Returned errors, audit fields and UI messages must omit the raw panic payload.
 The current logger sends it to `tracing`, and the default hook can also print it;
 this violates the shared logging privacy rule and remains an implementation gap
-tracked by [the release audit](../release-audit-2026-10-03.md#small-release-tasks).
+tracked by [the release audit](../archive/release-audit-2026-10-03.md#small-release-tasks).
 Keep operation identity and containment while removing arbitrary payload text.
 
 ## Rationale

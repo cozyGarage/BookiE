@@ -3,7 +3,7 @@
 Source checked at `aeac107a4` on 2026-10-03. [ADR 0008](decisions/0008-connection-and-session-ownership.md)
 owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md)
 cancellation, and [the B4 board](b4-task-board.md) remaining acceptance.
-The [September connection audit](connections-history.md) retains older source
+The [September connection audit](archive/connections-history.md) retains older source
 claims and coverage tables; its gaps are not current status.
 
 ## Shared assembly and ownership
@@ -37,7 +37,7 @@ PostgreSQL's release fixture covers TLS through SSH. Driver TLS fixtures cover
 direct CA/hostname/encryption and no-fallback cases, including SQL Server. MySQL
 and SQL Server TLS through a real SSH route remain B4 C6; a direct TLS pass or
 SSH authentication pass does not close them. See [testing](testing.md) for
-commands and [the release audit](release-audit-2026-10-03.md) for fresh results.
+commands and [the release audit](archive/release-audit-2026-10-03.md) for fresh results.
 
 Saved custom CA assembly exists. Configured client certificate/key integration
 is U5; internal `TlsConfig` fields do not establish saved-connection mTLS support.

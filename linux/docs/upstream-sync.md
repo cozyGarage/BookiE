@@ -5,13 +5,13 @@ Rust/Linux foundations as well as behavior review. Apple source trees remain exc
 
 ## 2026-10-03: macOS main applicability review
 
-Follow-up: [U1 SQL Server handoff](upstream-u1-sql-server-2026-10-03.md)
+Follow-up: [U1 SQL Server handoff](archive/upstream-u1-sql-server-2026-10-03.md)
 records the manual metadata fix for rowversion and temporal period columns,
 the failing-before/passing-after native regression, and remaining U1 consumers.
 
 Reviewed macOS main at `5c2df3b60cd40c25ba86c57e3d1c87499340cb3c` against
 BookiE `linux` at `7b08dd4786db22ac38bc341f29d0f350412af82d`.
-The [review and agent work packets](upstream-main-review-2026-10-03.md)
+The [review and agent work packets](archive/upstream-main-review-2026-10-03.md)
 identify SQL Server server-owned columns and identity copying, qualified
 autocomplete keys, reconnect failure handling, client-certificate integration
 and MongoDB export coverage. Its inventory distinguishes subject screening
@@ -225,7 +225,7 @@ The entry should describe behavior, not file-by-file source movement. There shou
 - Manual behavior adoption: `a45fb4672` character warnings, `c180dbcac` cancellable/atomic export, and `558502f87` catalog refresh. Linux uses native Rust/GTK implementations, owning-connection identity, shared serializers and off-thread loaded-row export.
 - Additional Linux fixes: dialect-aware IN literals and lexical spans, Redis browse isolation, MongoDB JSON/BSON numbers, and structure-save notification without rename. Updated a yanked transitive dependency.
 - Not ported: Apple source/UI/services, plugin ABI, new engines or full database dump/restore. Existing Linux filters and reopen stack remain; further parity work is deferred.
-- Verification and remaining gates: [September 14 sprint ledger](sprint-2026-09-14.md). This is a source/behavior review, not a macOS runtime test or release approval.
+- Verification and remaining gates: [September 14 sprint ledger](archive/sprint-2026-09-14.md). This is a source/behavior review, not a macOS runtime test or release approval.
 
 ## 2026-08-18: exact wide integers, export target, and unterminated SQL literals
 
@@ -261,7 +261,7 @@ The entry should describe behavior, not file-by-file source movement. There shou
 - Linux relevance: non-text pattern filters emitted invalid PostgreSQL operators, the daemon view wrapper inherited an empty default, sidebar refresh lacked connection identity, and DuckDB JSON functions required a downloaded extension.
 - Manual port: PostgreSQL text-pattern conversion; ordinary/controlled view forwarding; stale-sidebar rejection; bundled JSON/Parquet. Invalid count fallback and redundant post-DDL browse reads were additional Linux findings. Structure/editor transactions use separate pooled handles; a real-engine regression confirms isolation.
 - Not ported: Apple UI, plugins, licensing, bulk dump/restore behavior without a Linux counterpart. Timing remains a specified follow-up, not fabricated engine time.
-- Historical verification: [stabilization ledger](stabilization-2026-09.md); [performance evidence](performance-2026-09.md). No Apple source tree was merged.
+- Historical verification: [stabilization ledger](archive/stabilization-2026-09.md); [performance evidence](archive/performance-2026-09.md). No Apple source tree was merged.
 
 The editor now uses the imported planner for execution and run-at-cursor as well
 as formatting, following upstream `statement_cursor.rs`. Fork differences: retain

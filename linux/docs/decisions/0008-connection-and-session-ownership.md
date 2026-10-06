@@ -50,7 +50,7 @@ one shared `AuditState` to all cached connections. GUI source integration does
 not prove headless parity or installed recovery. F4/F9 reconnect/session
 invalidation and F6 host consent are merged. Remaining transport, daemon,
 audit and installed acceptance live on [the B4 board](../b4-task-board.md),
-with current source findings in [the release audit](../release-audit-2026-10-03.md).
+with current source findings in [the release audit](../archive/release-audit-2026-10-03.md).
 
 ## Rationale
 

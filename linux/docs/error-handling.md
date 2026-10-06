@@ -56,7 +56,7 @@ Use the `tracing` crate. `app::logging::init` installs a `tracing_subscriber` fo
 - `debug!`: verbose internal flow.
 - `trace!`: structural diagnostics and timings. Off by default; the same privacy rules apply.
 
-Never log passwords, secret tokens, connection strings, SQL text, query parameters, or unmasked results at any level. Dependency panic payloads and raw network frames can contain the same data; do not treat them as safe diagnostics. The current panic logger still needs the privacy follow-up in [the architecture review](architecture-consistency-review-2026-10-03.md#remaining-source-risks). Nothing enforces this automatically: no lint or CI step greps for sensitive identifiers, so it is a review obligation. `print!`, `println!`, `eprint!`, `eprintln!` and `dbg!` are denied by the workspace lints, which keeps application logging on `tracing`; protocol output that must reach stdout writes through an explicit `std::io::stdout` handle instead.
+Never log passwords, secret tokens, connection strings, SQL text, query parameters, or unmasked results at any level. Dependency panic payloads and raw network frames can contain the same data; do not treat them as safe diagnostics. The current panic logger still needs the privacy follow-up in [the architecture review](archive/architecture-consistency-review-2026-10-03.md#remaining-source-risks). Nothing enforces this automatically: no lint or CI step greps for sensitive identifiers, so it is a review obligation. `print!`, `println!`, `eprint!`, `eprintln!` and `dbg!` are denied by the workspace lints, which keeps application logging on `tracing`; protocol output that must reach stdout writes through an explicit `std::io::stdout` handle instead.
 
 ## `unwrap` and `expect`
 

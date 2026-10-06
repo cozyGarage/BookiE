@@ -47,7 +47,7 @@ Read [docs/storage.md](docs/storage.md) before changing persisted data. Do not p
 
 ## GTK changes
 
-Keep UI state in Relm4 components and move testable rules into pure Rust services. Add unit tests for extracted logic. Safety-sensitive GTK flows need targeted tests when they can run deterministically. The current release blockers are listed in [docs/production-audit.md](docs/production-audit.md).
+Keep UI state in Relm4 components and move testable rules into pure Rust services. Add unit tests for extracted logic. Safety-sensitive GTK flows need targeted tests when they can run deterministically. The current release blockers are listed in [docs/production-audit.md](docs/archive/production-audit.md).
 
 Include before and after screenshots for visible changes. Test both light and dark themes when colors or contrast change.
 
