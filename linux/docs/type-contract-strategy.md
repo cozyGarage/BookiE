@@ -658,6 +658,11 @@ A restricted PostgreSQL session now verifies enum parameter inference after
 label and SQL NULL retain the qualified target enum type; a shadow-only label
 matches PostgreSQL's native `22P02` refusal, and target/shadow siblings remain
 unchanged ([evidence](evidence/postgres-enum-set-role-shadow-results-2026-10-06/manifest.json)).
+A separate login-role contract verifies the role's configured default
+`search_path` on a fresh connection, with a same-named shadow enum first; bound
+target-only and SQL NULL values retain the qualified target type and shadow-only
+labels match native `22P02` refusal
+([evidence](evidence/postgres-enum-role-default-search-path-results-2026-10-06/manifest.json)).
 
 PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
 UTF-8 scalar and array labels plus refusal of a 64-byte label without partial type creation; see
