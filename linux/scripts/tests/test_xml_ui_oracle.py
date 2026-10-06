@@ -19,12 +19,18 @@ class XmlOracleTests(unittest.TestCase):
         scenarios.assert_xml(ET.fromstring(FIXTURE))
 
     def test_normalized_carriage_returns_are_rejected(self):
+        parsed = ET.fromstring(FIXTURE.replace("&#13;", "\r"))
         with self.assertRaises(AssertionError):
-            scenarios.assert_xml(ET.fromstring(FIXTURE.replace("&#13;", "\r")))
+            scenarios.assert_xml(parsed)
 
     def test_empty_text_cannot_be_reported_as_null(self):
+        parsed = ET.fromstring(FIXTURE.replace("<note></note>", '<note null="true"/>'))
         with self.assertRaises(AssertionError):
-            scenarios.assert_xml(ET.fromstring(FIXTURE.replace("<note></note>", '<note null="true"/>')))
+            scenarios.assert_xml(parsed)
+
+    def test_malformed_xml_is_a_parser_error(self):
+        with self.assertRaises(ET.ParseError):
+            ET.fromstring("<rows><row></rows>")
 
     def test_scenarios_are_registered_by_default(self):
         cases = scenarios.scenarios(object())
