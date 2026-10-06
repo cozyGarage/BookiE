@@ -45,6 +45,19 @@ def scenarios(ui):
             candidates.append(node)
         return text_of(max(candidates, key=lambda node: node.queryText().characterCount))
 
+    def set_entry(name, text):
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            for node in ui.descendants(ui.application_node()):
+                if ui.node_name(node) == name and ui.node_role(node) in (pyatspi.ROLE_ENTRY, pyatspi.ROLE_TEXT):
+                    try:
+                        node.queryEditableText().setTextContents(text)
+                        return
+                    except Exception:
+                        continue
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"no entry named {name!r}:\n{ui.accessible_snapshot()}")
+
     def saved_connections(base):
         files = list((base / "config").glob("*/connections.json"))
         assert len(files) == 1, files
@@ -75,9 +88,9 @@ def scenarios(ui):
         time.sleep(0.3)
         ui.press_x11_key("f", ("Control_L",))
         ui.wait_for_node(name="Next match", role=pyatspi.ROLE_PUSH_BUTTON)
-        ui.set_text_by_name("Find", "a")
+        set_entry("Find", "a")
         ui.invoke(ui.wait_for_node(name="Replace", role=pyatspi.ROLE_TOGGLE_BUTTON))
-        ui.set_text_by_name("Replace with", "b")
+        set_entry("Replace with", "b")
         ui.invoke(ui.wait_for_node(name="Replace All", role=pyatspi.ROLE_PUSH_BUTTON))
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline and editor_text() != "select b, b from t where b = 1":

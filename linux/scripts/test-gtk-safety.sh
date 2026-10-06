@@ -58,6 +58,13 @@ gdbus call --session \
   --object-path /org/a11y/bus \
   --method org.a11y.Bus.GetAddress >/dev/null
 
+if command -v gnome-keyring-daemon >/dev/null 2>&1; then
+  keyring_home="$XDG_RUNTIME_DIR/keyring-home"
+  mkdir -p "$keyring_home/data"
+  eval "$(printf 'tablepro-test' | HOME="$keyring_home" XDG_DATA_HOME="$keyring_home/data" \
+    gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+fi
+
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 if [[ -n "${TABLEPRO_GTK_BINARY:-}" ]]; then
   test_binary="$TABLEPRO_GTK_BINARY"
