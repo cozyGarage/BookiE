@@ -891,3 +891,82 @@ async fn sqlite_round_any_csv_round_trip_preserves_runtime_storage_classes() {
         ]
     );
 }
+
+#[tokio::test]
+async fn sqlite_hex_any_csv_round_trip_keeps_hex_results_as_text() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.5), (3, 'é'), (4, ''), (5, X'00FF'), \
+             (6, NULL), (7, '=1+1'), (8, 'bookie:sqlite-any:v1:integer:9')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, hex(value) AS result, typeof(hex(value)) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("3432".into()), Value::Text("text".into())],
+            vec![Value::Int(2), Value::Text("312E35".into()), Value::Text("text".into())],
+            vec![Value::Int(3), Value::Text("C3A9".into()), Value::Text("text".into())],
+            vec![Value::Int(4), Value::Text(String::new()), Value::Text("text".into())],
+            vec![Value::Int(5), Value::Text("00FF".into()), Value::Text("text".into())],
+            vec![Value::Int(6), Value::Text(String::new()), Value::Text("text".into())],
+            vec![Value::Int(7), Value::Text("3D312B31".into()), Value::Text("text".into())],
+            vec![
+                Value::Int(8),
+                Value::Text("626F6F6B69653A73716C6974652D616E793A76313A696E74656765723A39".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result.rows[0..]
+            .iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone()])
+            .collect::<Vec<_>>()
+    );
+}
