@@ -1,0 +1,24 @@
+ignored-test inventory and isolated registrations: OK
+....................................usage: runner [-h] [--list] [layers ...]
+runner: error: another layer runner owns this checkout; wait for it to finish
+.Evidence: /tmp/tmp26p393c5/evidence/report.json
+cancel/1: /usr/bin/python3 -c pass
+  cancelled: not executed
+cancel/2: /usr/bin/python3 -c pass
+  not_run: not executed
+...Evidence: /tmp/tmp3z7_ggsp/evidence/report.json
+bad/1: /usr/bin/python3 -c raise SystemExit(9)
+  failed: bad-1.log
+
+good/1: /usr/bin/python3 -c print('done')
+  passed: good-1.log
+..............................
+----------------------------------------------------------------------
+Ran 70 tests in 2.085s
+
+OK
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  /tmp/bookie-candidate-test-mfgtcw1x/bookie-0.1.1-1-x86_64.pkg.tar.zst
+candidate archive and rejection checks passed
+✔ Validation was successful.
+Debian package symlink validation passed
+function-size checker: OK

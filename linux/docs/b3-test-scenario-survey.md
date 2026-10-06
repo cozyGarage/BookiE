@@ -36,7 +36,8 @@ No external source code or fixtures were copied.
   before changing production behavior; keep the reproducer as a permanent regression.
 - Current coverage includes eight-driver scalar contracts, PostgreSQL exact
   BIT/VARBIT and MACADDR/MACADDR8 text, IPv6 inet/cidr and maximum pg_lsn
-  scalar contracts plus `pg_lsn[]` result/bind/keyed-update/CSV parity, scalar and temporal arrays,
+  scalar contracts plus `pg_lsn[]` and `macaddr[]` result/bind/keyed-update/CSV
+  parity, scalar and temporal arrays,
   DuckDB scalar HUGEINT/UHUGEINT boundaries and enum consumer parity, temporal eras/infinities/interval fields, MongoDB nested BSON
   consumers and SQLite NUMERIC-affinity transitions. B3 remains open for uncovered
   type/consumer combinations and installed grid acceptance; a deterministic 86,012-entry finite-float CSV/JSON corpus is now retained, while exhaustive finite-`f64` enumeration remains open. See the current status
@@ -92,6 +93,14 @@ updates and typed CSV restore against native type/text/JSON/`array_send`
 oracles. Invalid elements are refused before writes and the sibling row stays
 unchanged ([evidence](evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
 Other unlisted array families remain open.
+
+PostgreSQL `macaddr[]` now decodes its six-byte binary elements and round-trips
+canonical values, SQL NULL and lower bounds through inferred binding, keyed
+updates and typed CSV import. The native type/text/JSON and `array_send`
+oracles agree; malformed octets are refused without changing either row. The
+catalog census now includes element OID 829. `macaddr8[]`, `inet[]` and `cidr[]`
+remain explicitly undecodable
+([evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json)).
 
 PostgreSQL `citext[]`, `bit[]` and `varbit[]` are now covered through results,
 typed parameter rebinding, keyed grid edits and CSV restore. The citext fixture
