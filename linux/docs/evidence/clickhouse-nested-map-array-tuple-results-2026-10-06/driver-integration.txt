@@ -1,0 +1,40 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/integration.rs (target/debug/deps/integration-f902b16e4094605a)
+
+running 33 tests
+test a_cancelled_query_is_killed_on_the_server_and_the_client_stays_usable ... ok
+test a_column_comment_round_trips_and_an_uncommented_column_reads_as_none ... ok
+test a_lost_clickhouse_server_is_reported_as_disconnected ... ok
+test an_unavailable_clickhouse_server_is_classified_as_connection_refused ... ok
+test bad_sql_returns_query_error ... ok
+test binary_sql_exports_round_trip_null_empty_and_every_byte ... ok
+test connect_list_tables_and_pk_detection ... ok
+test copied_in_clause_keeps_backslash_payload_as_data ... ok
+test datetime64_nanosecond_boundaries_pin_server_clamp_and_local_refusal ... ok
+test decimal_and_nonfinite_results_are_not_rounded_or_changed_to_null ... ok
+test decimal_results_keep_the_declared_scale_including_trailing_zeroes ... ok
+test disconnection::graceful_server_stop_during_row_stream_returns_an_error_not_partial_rows ... ok
+test disconnection::server_loss_during_row_stream_fails_the_whole_query_as_disconnected ... ok
+test full_row_update_applies ... ok
+test inline_edit_update_applies ... ok
+test literals_with_quotes_and_placeholders_round_trip ... ok
+test nested_values::value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers ... ok
+test pagination_and_truncated_flag ... ok
+test parameterised_types_decode_to_typed_values ... ok
+test query_truncates_when_result_memory_budget_is_exceeded ... ok
+test temporal::second_precision_datetime64_beyond_nanosecond_limit_round_trips ... ok
+test temporal_parameters_keep_fractional_seconds ... ok
+test temporal_sql_exports_keep_fractional_seconds ... ok
+test the_driver_declares_server_side_cancellation ... ok
+test value_contract_ambiguous_datetime64_local_time_is_refused ... ok
+test value_contract_datetime64_named_timezone_preserves_the_instant ... ok
+test value_contract_datetime64_precision_0_through_9_is_exact ... ok
+test value_contract_nonexistent_datetime64_input_matches_server_normalization ... ok
+test value_contract_preserves_scalar_boundaries_through_parameters_and_exports ... ok
+test value_roundtrip_common_types ... ok
+test views_appear_in_the_table_list ... ok
+test wide_integer_binding_and_sql_export_preserve_exact_server_values ... ok
+test wide_integer_grid_edits_preserve_exact_values_and_row_identity ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 165.14s
+
