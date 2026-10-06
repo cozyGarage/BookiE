@@ -62,6 +62,7 @@ async fn sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values() {
     for (name, input) in [
         ("integer_amount", "9223372036854775808"),
         ("real_amount", "1e999"),
+        ("real_amount", "1e-400"),
         ("numeric_amount", "0.123456789012345678901234567890123"),
     ] {
         let column = columns.iter().find(|column| column.name == name).unwrap();

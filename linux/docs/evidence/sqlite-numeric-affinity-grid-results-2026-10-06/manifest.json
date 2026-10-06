@@ -2,23 +2,23 @@
   "schema_version": 1,
   "date": "2026-10-06",
   "branch": "b3/sqlite-numeric-affinity-grid",
-  "source_commit": "46d1377c510851c19c28f765bd45a4fa2aa40bdd",
+  "source_commit": "11ca1ed10425e0559a06260b8dff16112c1670a3",
   "source_sha256": {
     "crates/app/src/ui/browse_tab/value_parse.rs": "c5082b8b3c2a19168a35a409c9b5c69c42220a860a4175a5014eb0a5fe8209ca",
-    "crates/app/tests/support/sqlite_numeric_affinity.rs": "dc4ced491223d505ac9e278e40d479e91497a860b3b30ef8a8a61f6b8eb4159f",
+    "crates/app/tests/support/sqlite_numeric_affinity.rs": "16031443d58702718cf725514bd09f4c1d222532420b6187da87508719f39389",
     "crates/core/src/import/cell.rs": "cfcae37f44bdd6ef9625c865861c984d9cfb5dcabe18d801099fa97835e74274",
-    "crates/core/src/import/cell/tests/sqlite_affinity.rs": "892faa3e15d6f2632cf3d34ac97cb0ff1a93413bfd213eb45ad2de4586b7f3b3",
+    "crates/core/src/import/cell/tests/sqlite_affinity.rs": "8749cc698aeac1b738cd8bbee3d991a701ef4228dea96e85c82eaf411606f773",
     "crates/core/src/lib.rs": "bf52185b3f220408f6616f62a8b641743658ce4c93c55e659838791829560f5d",
     "crates/core/src/numeric_input.rs": "956455ea759d73cdc0ad98d040ab3a2a5763ec41252e7660d72ac1c52138916c"
   },
   "engine": "SQLite, in-memory, INTEGER/REAL/NUMERIC affinity",
-  "case": "SQLite numeric-affinity grid edits and CSV imports preserve text and exact numeric values without affinity rounding",
+  "case": "SQLite numeric-affinity edits preserve text and exact numbers while refusing overflow, underflow and rounding",
   "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values",
   "contract": [
     "SQLite INTEGER, REAL and NUMERIC grid edits retain clearly nonnumeric input as TEXT; MySQL and SQL Server remain strict.",
-    "Exactly representable decimal inputs such as 42.50 remain accepted for SQLite numeric affinity columns; numeric-looking overflow and excess precision are rejected before affinity can round them.",
-    "Native SQLite typeof() confirms edited/imported storage classes and untouched sibling rows retain their original native values.",
-    "A live keyed grid edit of 42.50 in an INTEGER-affinity column stores REAL 42.5; storage class, exact value and sibling row assertions guard the conversion."
+    "Exactly representable decimals such as 42.50 remain accepted; integer/floating overflow, floating underflow and excess decimal precision are rejected before affinity can lose value.",
+    "Native SQLite typeof() confirms grid/import storage classes and untouched sibling rows retain original values.",
+    "CHECK-constrained nonnumeric grid writes fail without changing the prior native value."
   ],
   "validation": {
     "focused_test": {
@@ -59,12 +59,12 @@
     }
   },
   "log_sha256": {
-    "focused.txt": "d0793069ad00b7a6246ef7917507f65d39ca31007e5dcab98fd20cbb423fbdc7",
+    "focused.txt": "c081e2fbe1a023ec765bbdee4508e4172394113b5029b543e0d7a22f7b911f3a",
     "core-focused.txt": "d32c5fc38c5b1852219c674e1cfc07a49fa7dc8f2cdb7213fba7533e80178410",
     "csv-focused.txt": "53a55499ca0b7eaa96e42bf8eba8180056d74b5c50eac205333bbe5d3da8af47",
-    "core-lib.txt": "7429be8bdf55fd51c6238b6ab82eedaeee0c8a2fd67fcc7587976193d24e880a",
-    "app-lib.txt": "c2e5e59f6b1ec6f5f40929912d3992519c8c38d784118fb908c7b5e24feaae36",
-    "clippy.txt": "97d031275d81328003dc8caa7b82450b1c3e1153dbf16d536976bdda613258aa",
+    "core-lib.txt": "c8c43796f6bc61855a00b29eb9a88f0e2f175110c68f0847bcdd8464d2e74b6e",
+    "app-lib.txt": "52d5c8b6e0a0914b6db44948eeed68209578c3f1717a3c1b6a8bb2607c4847ee",
+    "clippy.txt": "ee3011a8a42f3100ba32e0e93cce8a5b416e220c817d0d60e84823f5341e042e",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "remaining": [
