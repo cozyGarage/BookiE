@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/drivers_postgres-a18f340f318501c3)
+
+running 3 tests
+test decode::tests::value_contract_inet_and_cidr_use_postgres_text ... ok
+test array::tests::value_contract_inet_and_cidr_arrays_decode_network_bytes ... ok
+test params::tests::value_contract_inet_and_cidr_array_elements_encode_network_byte_order_and_refuse_lossy_values ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 49 filtered out; finished in 0.00s
+

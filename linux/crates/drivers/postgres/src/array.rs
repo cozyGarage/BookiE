@@ -11,6 +11,8 @@ const BIT_OID: u32 = 1560;
 const VARBIT_OID: u32 = 1562;
 const MACADDR8_OID: u32 = 774;
 const MACADDR_OID: u32 = 829;
+const INET_OID: u32 = 869;
+const CIDR_OID: u32 = 650;
 const PG_LSN_OID: u32 = 3220;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
@@ -242,6 +244,8 @@ fn supported(oid: u32) -> bool {
             | 2950
             | MACADDR_OID
             | MACADDR8_OID
+            | INET_OID
+            | CIDR_OID
             | PG_LSN_OID
     )
 }
@@ -266,6 +270,8 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
         }
         MACADDR_OID => crate::decode::decode_pg_binary_text("MACADDR", bytes)?,
         MACADDR8_OID => crate::decode::decode_pg_binary_text("MACADDR8", bytes)?,
+        INET_OID => crate::decode::decode_pg_binary_text("INET", bytes)?,
+        CIDR_OID => crate::decode::decode_pg_binary_text("CIDR", bytes)?,
         20 => i64::from_be_bytes(bytes.try_into().ok()?).to_string(),
         21 => i16::from_be_bytes(bytes.try_into().ok()?).to_string(),
         23 => i32::from_be_bytes(bytes.try_into().ok()?).to_string(),
@@ -477,6 +483,25 @@ mod tests {
             Some(r#"[0:1]={"08:00:2b:01:02:03:04:05",NULL}"#)
         );
         assert_eq!(element_text(MACADDR8_OID, false, &[0; 7]), None);
+    }
+
+    #[test]
+    fn value_contract_inet_and_cidr_arrays_decode_network_bytes() {
+        let ipv4_inet = [2, 24, 0, 4, 192, 0, 2, 1];
+        let ipv6_inet = [3, 64, 0, 16, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let inet = wire(INET_OID, &[(2, 0)], &[Some(&ipv4_inet), Some(&ipv6_inet)]);
+        assert_eq!(
+            decode_binary(&inet, INET_OID, false).as_deref(),
+            Some(r#"[0:1]={"192.0.2.1/24","2001:db8::1/64"}"#)
+        );
+
+        let ipv4_cidr = [2, 24, 1, 4, 192, 0, 2, 0];
+        let ipv6_cidr = [3, 32, 1, 16, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let cidr = wire(CIDR_OID, &[(2, -1)], &[Some(&ipv4_cidr), Some(&ipv6_cidr)]);
+        assert_eq!(
+            decode_binary(&cidr, CIDR_OID, false).as_deref(),
+            Some(r#"[-1:0]={"192.0.2.0/24","2001:db8::/32"}"#)
+        );
     }
 
     #[test]

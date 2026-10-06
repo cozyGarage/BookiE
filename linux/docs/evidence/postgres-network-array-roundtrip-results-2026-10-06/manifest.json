@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-network-array-roundtrip",
+  "source_commit": "649795c98c85183e89292c52b586ba93cbbbf87f",
+  "source_sha256": {
+    "crates/drivers/postgres/src/array.rs": "edd6c48d6955b10e7959a76c2769e8a10627f1ecadda9971cbc5cf98e6e67964",
+    "crates/drivers/postgres/src/params.rs": "d29aa861b6ef00897a884ebbea43e1313409e5890c8de15105d0753175d39a1d",
+    "crates/drivers/postgres/tests/support/array_contract.rs": "b2532ba2e5f5ff29581755d5fb3baf780c71336b884bc69a26f0e7b7feb106a0",
+    "crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_temporal.rs": "83a5ae890964fd20c14f941aa1722232a251ef3afb4e93bc9363e2a566506dc9"
+  },
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "built-in inet[] and cidr[] binary result, inferred bind, keyed edit, CSV restore and invalid-input refusal",
+  "tests": [
+    "array_contract::value_contract_inet_and_cidr_array_bindings_and_keyed_edits_preserve_native_bytes",
+    "value_contracts::value_contract_arrays_preserve_elements_dimensions_and_exports",
+    "array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist",
+    "array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles",
+    "array::tests::value_contract_inet_and_cidr_arrays_decode_network_bytes",
+    "params::tests::value_contract_inet_and_cidr_array_elements_encode_network_byte_order_and_refuse_lossy_values"
+  ],
+  "contract": [
+    "Binary inet[] and cidr[] results preserve IPv4/IPv6 addresses, prefixes, SQL NULL and non-default lower bounds using element OIDs 869 and 650.",
+    "Inferred bindings and keyed edits preserve native array_send bytes; typed CSV import restores both array types.",
+    "Native type, text, JSON and wire comparisons cover host and network prefixes, including /0 and full address width.",
+    "Malformed prefixes and CIDR host bits are refused without changing target or sibling rows.",
+    "The built-in OID census includes inet and cidr; other unlisted built-in and custom array families remain open."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration value_contract_inet_and_cidr_array_bindings_and_keyed_edits_preserve_native_bytes -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "network-arrays-focused.txt"
+    },
+    "postgres_array_contract": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration value_contract_arrays_preserve_elements_dimensions_and_exports -- --ignored --nocapture",
+      "result": "1 passed, 0 failed; includes typed CSV array restore",
+      "log": "postgres-array-contract.txt"
+    },
+    "builtin_oid_census": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration value_contract_builtin_array_oid_census_matches_decode_allowlist -- --ignored --nocapture",
+      "result": "1 passed, 0 failed",
+      "log": "oid-census.txt"
+    },
+    "remaining_refusal": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration value_contract_unlisted_builtin_arrays_refuse_with_native_oracles -- --ignored --nocapture",
+      "result": "1 passed, 0 failed; money[] remains refused",
+      "log": "remaining-refusal.txt"
+    },
+    "postgres_full_integration": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration -- --include-ignored --test-threads=1",
+      "result": "192 passed, 0 failed",
+      "duration_seconds": 432.67,
+      "log": "postgres-full-integration.txt"
+    },
+    "driver_unit": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --lib inet_and_cidr",
+      "result": "3 passed, 0 failed",
+      "log": "driver-unit.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy -p tablepro-driver-postgres --tests -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "local_harness": {
+      "command": "rtk proxy bash scripts/test-harness.sh",
+      "result": "86 Python checks, ignored-test inventory, documentation and packaging checks passed",
+      "log": "harness.txt"
+    }
+  },
+  "log_sha256": {
+    "clippy.txt": "b32fc318d1870ea1f551ca2fefd680f66f4e4239fc6114f81844f52b6783287f",
+    "driver-unit.txt": "129cdd012ad97384850729f3db8cfccf574d94ba36dc3f1e8693a299f4a6bf02",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "harness.txt": "cb5a3701ab13d4cc7127b3a28502ace2036088a599cdc666413cb08130b808b8",
+    "network-arrays-focused.txt": "c030bdfad1548c3e56556c1111ca3d89a276751fd2aa119523ad2136bed5f3de",
+    "oid-census.txt": "60ec3f586f81a08aa25adcb8ba7eb5082ad75c5b4b007aec59662990a292aa88",
+    "postgres-array-contract.txt": "4485a1e30e4ad764fcaf13f0c2cfe78b94a17c0669564a2aaef182254e7b0fa9",
+    "postgres-full-integration.txt": "8f4077dea884fa0c2fe77bb5c9474ea1613cb005337f6c99e737b4783a7a9060",
+    "remaining-refusal.txt": "0be06b03d287c6c50fddc10a53e27e3c54b87c0463dc00c8fa0ca87d39684412"
+  },
+  "remaining": [
+    "Other unlisted built-in and custom PostgreSQL array families remain open.",
+    "The broader B3 engine, type, consumer and configuration matrix remains open."
+  ]
+}
