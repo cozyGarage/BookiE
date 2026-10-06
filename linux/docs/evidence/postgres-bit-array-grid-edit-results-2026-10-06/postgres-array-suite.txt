@@ -1,0 +1,59 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
+
+running 52 tests
+test array_contract::value_contract_array_grid_edit_preserves_array_elements ... ok
+test array_contract::value_contract_bit_arrays_roundtrip_wire_and_csv ... ok
+test array_contract::value_contract_boolean_array_file_exports_preserve_values_for_calc_reimport ... ok
+test array_contract::value_contract_builtin_array_families_survive_typed_csv_insert ... ok
+test array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist ... ok
+test array_contract::value_contract_citext_array_is_visible_undecodable ... ok
+test array_contract::value_contract_custom_enum_array_accepts_maximum_utf8_label_length ... ok
+test array_contract::value_contract_custom_enum_array_agg_distinct_filter_preserves_native_order_and_nulls ... ok
+test array_contract::value_contract_custom_enum_array_agg_keeps_target_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_custom_enum_array_agg_preserves_order_and_nulls ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_preserves_labels_and_siblings ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_preserves_nulls_and_shape ... ok
+test array_contract::value_contract_custom_enum_array_csv_import_uses_target_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_custom_enum_array_file_exports_preserve_labels ... ok
+test array_contract::value_contract_custom_enum_array_grid_edit_preserves_labels_and_siblings ... ok
+test array_contract::value_contract_custom_enum_array_multidimensional_lower_bounds_export_as_spreadsheet_text ... ok
+test array_contract::value_contract_custom_enum_array_preserves_boundary_whitespace_labels ... ok
+test array_contract::value_contract_custom_enum_array_projection_preserves_literal_null_and_sql_null ... ok
+test array_contract::value_contract_date_array_csv_and_sql_replay_preserve_sql_dmy_style ... ok
+test array_contract::value_contract_date_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_enum_drop_and_recreate_refreshes_a_warm_session_type_oid ... ok
+test array_contract::value_contract_enum_first_and_last_use_qualified_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_min_max_keep_target_type_and_order_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_range_bounds_preserve_inclusive_and_null_boundaries_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_range_observes_added_label_order_in_same_session ... ok
+test array_contract::value_contract_enum_range_observes_renamed_label_in_same_session ... ok
+test array_contract::value_contract_enum_range_refreshes_labels_changed_by_another_session ... ok
+test array_contract::value_contract_enum_range_uses_qualified_type_under_shadowed_search_path ... ok
+test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_other_session_metadata ... ok
+test array_contract::value_contract_enum_type_rename_and_schema_move_refresh_session_metadata ... ok
+test array_contract::value_contract_float4_array_file_exports_preserve_values_for_calc_reimport ... ok
+test array_contract::value_contract_float8_array_file_exports_preserve_bits ... ok
+test array_contract::value_contract_float8_array_grid_edit_preserves_special_and_adjacent_values ... ok
+test array_contract::value_contract_int8_array_file_exports_preserve_precision_for_calc_reimport ... ok
+test array_contract::value_contract_integer_arrays_file_exports_preserve_bounds_for_calc_reimport ... ok
+test array_contract::value_contract_interval_array_csv_and_sql_replay_survive_intervalstyle_change ... ok
+test array_contract::value_contract_interval_array_file_exports_preserve_values_under_intervalstyle ... ok
+test array_contract::value_contract_json_array_elements_are_explicitly_unsupported ... ok
+test array_contract::value_contract_json_text_array_is_explicitly_unsupported ... ok
+test array_contract::value_contract_numeric_array_file_exports_preserve_exact_text ... ok
+test array_contract::value_contract_numeric_array_grid_edit_preserves_elements ... ok
+test array_contract::value_contract_text_array_file_exports_preserve_text_and_escape_markup ... ok
+test array_contract::value_contract_time_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_timestamp_array_file_consumers_preserve_values_across_dmy_datestyle ... ok
+test array_contract::value_contract_timestamp_array_file_exports_preserve_boundaries_for_calc_reimport ... ok
+test array_contract::value_contract_timestamptz_array_file_exports_preserve_instants ... ok
+test array_contract::value_contract_timestamptz_array_file_exports_preserve_instants_under_non_utc_session ... ok
+test array_contract::value_contract_timetz_array_file_exports_preserve_offsets_for_calc_reimport ... ok
+test array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles ... ok
+test array_contract::value_contract_uuid_array_file_exports_preserve_values_for_calc_reimport ... ok
+test domain_bytea_array_contract::value_contract_domain_over_bytea_array_preserves_binary_values_and_wire_bytes ... ok
+test domain_uuid_array_contract::value_contract_domain_over_uuid_array_preserves_values_and_wire_bytes ... ok
+
+test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 136 filtered out; finished in 123.97s
+
