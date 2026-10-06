@@ -70,16 +70,7 @@ impl FindBar {
             .sync_create()
             .build();
 
-        let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
-        column.set_margin_top(6);
-        column.set_margin_bottom(6);
-        column.set_margin_start(8);
-        column.set_margin_end(8);
-        column.append(&find_row);
-        column.append(&replace_row);
-        let bar = gtk::SearchBar::new();
-        bar.set_child(Some(&column));
-        bar.connect_entry(&entry);
+        let bar = search_bar(&find_row, &replace_row, &entry);
 
         let find = Self {
             bar,
@@ -259,6 +250,20 @@ fn row_of(widgets: &[&gtk::Widget]) -> gtk::Box {
         row.append(*widget);
     }
     row
+}
+
+fn search_bar(find_row: &gtk::Box, replace_row: &gtk::Box, entry: &gtk::SearchEntry) -> gtk::SearchBar {
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 6);
+    column.set_margin_top(6);
+    column.set_margin_bottom(6);
+    column.set_margin_start(8);
+    column.set_margin_end(8);
+    column.append(find_row);
+    column.append(replace_row);
+    let bar = gtk::SearchBar::new();
+    bar.set_child(Some(&column));
+    bar.connect_entry(entry);
+    bar
 }
 
 fn search_option_toggles() -> (gtk::ToggleButton, gtk::ToggleButton) {
