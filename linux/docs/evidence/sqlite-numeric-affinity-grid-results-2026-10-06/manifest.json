@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/sqlite-numeric-affinity-grid",
+  "source_commit": "4b294e212db74e1a40aa421350eb997b16da6806",
+  "source_sha256": {
+    "crates/app/src/ui/browse_tab/value_parse.rs": "83f5ce30e04cde7f674ab1b944e6316a290aa102c4ba9bc8ce7f906a1591fe86",
+    "crates/app/tests/support/value_parse.rs": "7ec1c35529ea47d0314357e7ea2389e636b0a5f7030d793fcfd9ac2cce63537c"
+  },
+  "engine": "SQLite, in-memory, INTEGER/REAL/NUMERIC affinity",
+  "case": "Grid edits preserve nonnumeric TEXT in numeric-affinity columns",
+  "test": "ui::browse_tab::value_parse::tests::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values",
+  "contract": [
+    "The app grid parser sends nonnumeric input as TEXT for SQLite INTEGER, REAL, and NUMERIC columns; MySQL and SQL Server keep strict numeric rejection for the same input.",
+    "SQLite native typeof() confirms the edited values are TEXT in all three columns, while an untouched sibling row retains its native INTEGER/REAL kinds and exact values."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --manifest-path Cargo.toml -p tablepro-app --all-features --lib ui::browse_tab::value_parse::tests::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values -- --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "app_library_suite": {
+      "command": "rtk proxy cargo test --manifest-path Cargo.toml -p tablepro-app --all-features --lib",
+      "result": "480 passed, 0 failed, 32 ignored",
+      "log": "app-lib.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy --manifest-path Cargo.toml -p tablepro-app --all-features --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --manifest-path Cargo.toml --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk proxy git diff --check passed"
+  },
+  "log_sha256": {
+    "focused.txt": "6c0f65aeaadf9d97497397e6389f035557332b2c9701ab6dae348fea924d1c7a",
+    "app-lib.txt": "38f2cdc9aa094f43efa1f2319c670f2dd05545ab9548e7c367af18b5449a83f4",
+    "clippy.txt": "378b76ae11f6d8dde80993e8caa4fb90ed573d2596c4535bf2d512fc718ec792",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other storage-class and affinity combinations and installed editing remain open; this case does not close B3 or qualify 0.2.0."
+  ]
+}

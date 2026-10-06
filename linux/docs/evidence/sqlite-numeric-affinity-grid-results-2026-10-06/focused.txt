@@ -1,0 +1,9 @@
+   Compiling tablepro-app v0.1.5 (/home/trung/Projects/tablepro/linux/crates/app)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.82s
+     Running unittests src/lib.rs (target/debug/deps/tablepro_app-01b512c66b34be6f)
+
+running 1 test
+test ui::browse_tab::value_parse::tests::sqlite_numeric_affinity_grid_edit_preserves_text_and_sibling_values ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 511 filtered out; finished in 0.00s
+
