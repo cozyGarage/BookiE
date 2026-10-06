@@ -123,8 +123,8 @@ impl RowStore {
 mod tests {
     use super::*;
     use std::cell::Cell;
-    use tablepro_core::Value;
     use std::rc::Rc;
+    use tablepro_core::Value;
 
     fn rows(count: i64) -> Vec<Vec<Value>> {
         (0..count).map(|n| vec![Value::Int(n)]).collect()
