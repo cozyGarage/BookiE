@@ -42,6 +42,8 @@
 
 ### Fixed
 
+- Saving an edited cell in a SQLite or DuckDB table no longer asks for a manual write approval every time.
+
 - Ctrl+/ in the SQL editor now toggles a line comment instead of opening the keyboard shortcuts window.
 
 - Right-clicking an editable result cell opened the cell editor's own menu on top of the grid menu; only the grid menu opens now.

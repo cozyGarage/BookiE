@@ -114,8 +114,7 @@ fn optimistic_predicate(
 ) -> Result<String, BuildSqlError> {
     let placeholder = placeholder_for(driver_id, params.len());
     let predicate = match driver_id {
-        "postgres" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
-        "sqlite" | "duckdb" => format!("{name} IS {placeholder}"),
+        "postgres" | "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
         "mysql" => format!("{name} <=> {placeholder}"),
         "mssql" => {
             let next = placeholder_for(driver_id, params.len() + 1);
@@ -361,7 +360,7 @@ mod tests {
         columns[1].nullable = true;
         for (driver, expected) in [
             ("postgres", "\"payload\" IS NOT DISTINCT FROM $3"),
-            ("sqlite", "\"payload\" IS ?"),
+            ("sqlite", "\"payload\" IS NOT DISTINCT FROM ?"),
             ("mysql", "`payload` <=> ?"),
             ("mssql", "([payload] = @P3 OR ([payload] IS NULL AND @P4 IS NULL))"),
         ] {
