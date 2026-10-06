@@ -175,6 +175,13 @@ move after a warmed table projection; the populated/SQL NULL rows, zero-row
 metadata, catalog order, `enum_send` and typed rebinding all match PostgreSQL
 under a same-named shadow path
 ([cross-session evidence](evidence/postgres-enum-cross-session-type-move-results-2026-10-05/manifest.json)).
+Drop/recreate of a same-named enum now has a warm-cache regression across a
+shadowed `search_path`. It exposed `XX000: cache lookup failed for type` on
+pooled query, controlled session query and execute paths; non-transactional
+paths now clear SQLx's cached statements and retry that specific pre-execution
+error once. Replacement type/array OIDs, qualified metadata, new labels and
+native array wire bytes match PostgreSQL
+([evidence](evidence/postgres-enum-type-recreate-cache-results-2026-10-06/manifest.json)).
 These focused function cases do not close the broader PostgreSQL or B3 matrix.
 See the [ANY evidence](evidence/postgres-domain-enum-any-array-parameter-results-2026-10-04/manifest.json),
 [operator evidence](evidence/postgres-domain-enum-array-operators-results-2026-10-04/manifest.json),

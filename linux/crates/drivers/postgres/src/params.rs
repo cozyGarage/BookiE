@@ -4,7 +4,8 @@ use sqlx::{Encode, Executor, Postgres, SqlSafeStr, Statement, Type};
 use tablepro_core::{ColumnInfo, DriverError, Value};
 
 use crate::array::MAX_ARRAY_TEXT_BYTES;
-use crate::{map_sqlx_error, statement_columns, statement_type_infos};
+use crate::map_sqlx_error;
+use crate::query::{statement_columns, statement_type_infos};
 
 pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,

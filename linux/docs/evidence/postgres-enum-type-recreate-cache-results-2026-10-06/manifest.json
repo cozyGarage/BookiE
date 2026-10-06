@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-06",
+  "case": "PostgreSQL enum drop/recreate with a warm client cache",
+  "source_commit": "9605c213361a70712d403182893d5fe1c74a711f",
+  "source_sha256": {
+    "crates/drivers/postgres/src/lib.rs": "8a318a619c84735a31ecf98a9aa632f7b2a4bcd457718e7f32232e4a3a5e439c",
+    "crates/drivers/postgres/src/query.rs": "e6fba23c749809a204b958e2cd95b9b32f06bba490c10be07f08d158bc3767c9",
+    "crates/drivers/postgres/src/params.rs": "7b4e972837f9be53711820a316555a74a06d82c7190bf8500960d405a860ecc2",
+    "crates/drivers/postgres/src/session.rs": "4ed2788f10b0291a858712f3cd63da5aef3919b4ccde32945d0dde599b95e621",
+    "crates/drivers/postgres/tests/support/array_contract_parts/enum_catalog_changes.rs": "57f259a2c4808500b8928643bfc52c97085fac0934e2f237781b20e76fb2d879"
+  },
+  "initial_behavior": "A previously prepared enum_range query failed after another session dropped and recreated its enum with XX000: cache lookup failed for type.",
+  "contract": [
+    "Warm pooled query, controlled session query and execute statements before replacing a target enum while a same-named shadow enum leads search_path.",
+    "After recreation, verify the prepared query returns the new labels, qualified array metadata, distinct replacement scalar/array OIDs and PostgreSQL array_send bytes.",
+    "Clear cached statements and retry only the matching stale-type-cache error on non-transactional query and execute paths; transaction operations do not retry inside an aborted transaction."
+  ],
+  "checks": [
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --test integration value_contract_enum_drop_and_recreate_refreshes_a_warm_session_type_oid -- --ignored --nocapture",
+      "result": "1 passed; Docker-backed PostgreSQL 16"
+    },
+    {
+      "command": "rtk cargo test --locked -p tablepro-driver-postgres --lib",
+      "result": "44 passed"
+    },
+    {
+      "command": "rtk cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "rtk cargo fmt --check",
+      "result": "passed"
+    },
+    {
+      "command": "rtk bash scripts/ci-local.sh quick",
+      "result": "passed on the refactored query module; 537 core library tests and full sandbox integration tier passed"
+    },
+    {
+      "command": "rtk bash scripts/check-file-size.sh",
+      "result": "passed; postgres lib reduced to 977 lines, below 1200-line soft limit"
+    }
+  ],
+  "status": "Focused enum cache-transition case, PostgreSQL Clippy/fmt, file-size check and workspace quick gate passed; B3 remains open."
+}
