@@ -179,11 +179,22 @@ def scenarios(ui):
         ui.wait_for_node(name="beta", present=False)
         ui.wait_for_node(name="alpha")
 
+    def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
+        ui.set_editor_text("select 1")
+        time.sleep(0.3)
+        ui.press_x11_key("slash", ("Control_L",))
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline and not editor_text().startswith("--"):
+            time.sleep(ui.POLL_SECONDS)
+        assert editor_text().startswith("--"), editor_text()
+        assert ui.find_node(name="Keyboard Shortcuts") is None, "the shortcuts window opened instead"
+
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
         view_value_opens_the_whole_cell_with_pretty_json,
         columns_dialog_hides_a_column_and_keeps_the_last_one,
+        ctrl_slash_toggles_a_comment_in_the_editor,
     ]
     for scenario in result:
         scenario.environment = "local"
