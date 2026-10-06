@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "linux",
+  "source_commit": "52edcade1877fc910d6bfb019fb8582f1ef40537",
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "case": "PostgreSQL boolean[] file exports and SQL replay",
+  "test": "array_contract::value_contract_boolean_array_file_exports_preserve_values_for_calc_reimport",
+  "contract": [
+    "The array contains true, false and SQL NULL values; PostgreSQL array text, array_to_json and array_send provide native oracles, and typed rebinding matches the native values and bytes.",
+    "JSON and CSV decode to the exact array text; XML, HTML, Markdown and XLSX assert text encodings with their escaping rules.",
+    "SQL-file replay retains the boolean[] type, JSON semantics and exact array_send bytes."
+  ],
+  "validation": {
+    "focused_docker_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_boolean_array_file_exports_preserve_values_for_calc_reimport -- --ignored --exact --nocapture --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": {
+      "command": "rtk proxy git diff --check",
+      "result": "passed",
+      "log": "diff-check.txt"
+    }
+  },
+  "sha256": {
+    "source_file": "6ea5e81715bf67a4c7a7bb50e24e41c43eb6722f2768cdcf9a2a5c1edbdd4f94",
+    "focused.txt": "1e95204416f270f868a8c51ec8de1e854959d1ac20b53fd5c2a84c6a24b640f8",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL array families, engine/type/consumer/configuration combinations and installed application re-imports remain open in B3."
+  ]
+}
