@@ -894,32 +894,38 @@ async fn value_contract_boolean_array_file_exports_preserve_values_for_calc_reim
         )
         .unwrap();
         let output = std::fs::read_to_string(path).unwrap();
-        match format {
+        let validated = match format {
             tablepro_core::export::ResultFormat::Json => {
                 let json: serde_json::Value = serde_json::from_str(&output).unwrap();
                 assert_eq!(json[0]["value"], *driver_text);
+                true
             }
             tablepro_core::export::ResultFormat::Csv => {
                 let mut csv = csv::Reader::from_reader(output.as_bytes());
                 assert_eq!(csv.headers().unwrap().iter().collect::<Vec<_>>(), ["value"]);
                 assert_eq!(&csv.records().next().unwrap().unwrap()[0], driver_text);
+                true
             }
             tablepro_core::export::ResultFormat::Xml => {
                 let escaped = driver_text.replace('"', "&quot;");
                 assert!(output.contains(&format!("<value>{escaped}</value>")), "{output}");
+                true
             }
             tablepro_core::export::ResultFormat::Html => {
                 let escaped = driver_text.replace('"', "&quot;");
                 assert!(output.contains(&format!("<td>{escaped}</td>")), "{output}");
+                true
             }
             tablepro_core::export::ResultFormat::Markdown => {
                 let escaped = serde_json::Value::String(driver_text.clone())
                     .to_string()
                     .replace('\\', "&#92;");
                 assert!(output.contains(&format!("| {escaped} |")), "{output}");
+                true
             }
-            _ => unreachable!(),
-        }
+            _ => false,
+        };
+        assert!(validated, "export loop included an unvalidated format");
     }
 
     let xlsx_path = std::env::var_os("BOOKIEE_XLSX_REIMPORT_ARTIFACT")
