@@ -1,0 +1,10 @@
+crates/core/src/sql_lex.rs:69:23: replace += with -= in block_comment_length
+crates/core/src/sql_lex.rs:69:23: replace += with *= in block_comment_length
+crates/core/src/sql_lex.rs:78:24: replace += with -= in block_comment_length
+crates/core/src/sql_lex.rs:78:24: replace += with *= in block_comment_length
+crates/core/src/sql_lex.rs:116:19: replace += with -= in statement_spans
+crates/core/src/sql_lex.rs:116:19: replace += with *= in statement_spans
+crates/core/src/sql_lex.rs:121:19: replace += with -= in statement_spans
+crates/core/src/sql_lex.rs:121:19: replace += with *= in statement_spans
+crates/core/src/sql_lex.rs:125:15: replace += with -= in statement_spans
+crates/core/src/sql_lex.rs:125:15: replace += with *= in statement_spans

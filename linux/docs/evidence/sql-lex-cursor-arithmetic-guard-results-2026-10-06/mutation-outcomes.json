@@ -1,0 +1,716 @@
+{
+  "outcomes": [
+    {
+      "scenario": "Baseline",
+      "summary": "Success",
+      "log_path": "log/baseline.log",
+      "diff_path": null,
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 0.201234786,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.201309481,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:69:23: replace += with -= in block_comment_length",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "block_comment_length",
+            "return_type": "-> usize",
+            "span": {
+              "start": {
+                "line": 61,
+                "column": 1
+              },
+              "end": {
+                "line": 82,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 69,
+              "column": 23
+            },
+            "end": {
+              "line": 69,
+              "column": 25
+            }
+          },
+          "replacement": "-=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_69_col_23.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_69_col_23.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.553558411,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.205209512,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:69:23: replace += with *= in block_comment_length",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "block_comment_length",
+            "return_type": "-> usize",
+            "span": {
+              "start": {
+                "line": 61,
+                "column": 1
+              },
+              "end": {
+                "line": 82,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 69,
+              "column": 23
+            },
+            "end": {
+              "line": 69,
+              "column": 25
+            }
+          },
+          "replacement": "*=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_69_col_23_001.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_69_col_23_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.6034865649999999,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.25190015,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:78:24: replace += with -= in block_comment_length",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "block_comment_length",
+            "return_type": "-> usize",
+            "span": {
+              "start": {
+                "line": 61,
+                "column": 1
+              },
+              "end": {
+                "line": 82,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 78,
+              "column": 24
+            },
+            "end": {
+              "line": 78,
+              "column": 26
+            }
+          },
+          "replacement": "-=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_78_col_24.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_78_col_24.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.30313838,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.204713463,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:78:24: replace += with *= in block_comment_length",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "block_comment_length",
+            "return_type": "-> usize",
+            "span": {
+              "start": {
+                "line": 61,
+                "column": 1
+              },
+              "end": {
+                "line": 82,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 78,
+              "column": 24
+            },
+            "end": {
+              "line": 78,
+              "column": 26
+            }
+          },
+          "replacement": "*=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_78_col_24_001.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_78_col_24_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.6033907269999998,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.254751901,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:116:19: replace += with -= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 116,
+              "column": 19
+            },
+            "end": {
+              "line": 116,
+              "column": 21
+            }
+          },
+          "replacement": "-=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_116_col_19.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_116_col_19.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.264459995,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 0.20143241,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:116:19: replace += with *= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 116,
+              "column": 19
+            },
+            "end": {
+              "line": 116,
+              "column": 21
+            }
+          },
+          "replacement": "*=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_116_col_19_001.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_116_col_19_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.70356847,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.254298281,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:121:19: replace += with -= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 121,
+              "column": 19
+            },
+            "end": {
+              "line": 121,
+              "column": 21
+            }
+          },
+          "replacement": "-=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_121_col_19.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_121_col_19.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 2.055286015,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.204466991,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:121:19: replace += with *= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 121,
+              "column": 19
+            },
+            "end": {
+              "line": 121,
+              "column": 21
+            }
+          },
+          "replacement": "*=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_121_col_19_001.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_121_col_19_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.553523386,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.204979193,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:125:15: replace += with -= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 125,
+              "column": 15
+            },
+            "end": {
+              "line": 125,
+              "column": 17
+            }
+          },
+          "replacement": "-=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_125_col_15.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_125_col_15.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.252991215,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.205150151,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    },
+    {
+      "scenario": {
+        "Mutant": {
+          "name": "crates/core/src/sql_lex.rs:125:15: replace += with *= in statement_spans",
+          "package": "tablepro-core",
+          "file": "crates/core/src/sql_lex.rs",
+          "function": {
+            "function_name": "statement_spans",
+            "return_type": "-> Vec<(usize, usize)>",
+            "span": {
+              "start": {
+                "line": 108,
+                "column": 1
+              },
+              "end": {
+                "line": 129,
+                "column": 2
+              }
+            }
+          },
+          "span": {
+            "start": {
+              "line": 125,
+              "column": 15
+            },
+            "end": {
+              "line": 125,
+              "column": 17
+            }
+          },
+          "replacement": "*=",
+          "genre": "BinaryOperator"
+        }
+      },
+      "summary": "CaughtMutant",
+      "log_path": "log/crates__core__src__sql_lex.rs_line_125_col_15_001.log",
+      "diff_path": "diff/crates__core__src__sql_lex.rs_line_125_col_15_001.diff",
+      "phase_results": [
+        {
+          "phase": "Build",
+          "duration": 1.202802487,
+          "process_status": "Success",
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--no-run",
+            "--verbose",
+            "--package=tablepro-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 2.205481831,
+          "process_status": {
+            "Failure": 101
+          },
+          "argv": [
+            "/home/trung/.rustup/toolchains/1.98-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "--verbose",
+            "--package=tablepro-core@0.1.0",
+            "--lib",
+            "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish"
+          ]
+        }
+      ]
+    }
+  ],
+  "total_mutants": 10,
+  "missed": 0,
+  "caught": 10,
+  "timeout": 0,
+  "unviable": 0,
+  "success": 0,
+  "start_time": "2026-10-06T09:35:35.452007023Z",
+  "end_time": "2026-10-06T09:36:10.178673939Z",
+  "cargo_mutants_version": "27.1.0"
+}

@@ -11,6 +11,7 @@
 
 ### Changed
 
+- B3 SQL lexer mutation evidence now records that the bounded scanner-progress test catches all ten tested cursor-arithmetic mutations; wider mutation and value-contract coverage remains open.
 - Grid context-menu CSV copies encode SQL NULL with a collision-free marker, keeping it distinct from empty text and enum labels; formula sanitization remains enabled.
 - CSV file and MCP exports show the null marker used for SQL NULL cells and choose one that does not collide with exported text values, so the matching import preserves empty text and marker-shaped labels. Turn off spreadsheet-safe text to round-trip formula-shaped values literally.
 - Markdown table exports and copies quote text cells and escape table/inline markup, keeping text labels such as `NULL` distinct from SQL NULL.

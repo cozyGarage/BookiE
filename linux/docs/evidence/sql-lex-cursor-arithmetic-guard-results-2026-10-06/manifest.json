@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/sql-lex-cursor-mutation-followup",
+  "source_commit": "916ed09a42a994f25e42d4fe8590053a3807eb56",
+  "working_tree_note": "The bounded-progress test and SQL lexer source match source_commit; this packet records a local focused mutation run.",
+  "source_sha256": {
+    "crates/core/src/sql_lex.rs": "f4097ac3c97524db2b83210c8787afbcba4f7a7883ad502596f30902d5b5e574"
+  },
+  "case": "SQL scanner cursor arithmetic mutations are caught by the bounded progress test",
+  "test": "sql_lex::tests::scanner_progress_makes_bounded_inputs_finish",
+  "contract": [
+    "The baseline bounded-progress unit test completes successfully for nested and ordinary comments, quotes, bracket identifiers, dollar quotes, separators and Unicode.",
+    "Ten cursor arithmetic mutants at the tested block-comment and statement-scanner positions are all caught when cargo-mutants selects this bounded-progress test directly.",
+    "The broad sql_lex::tests selector previously timed out on seven of these cursor mutants; the focused guard selector has zero timeouts and zero missed mutants."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-core --lib sql_lex::tests::scanner_progress_makes_bounded_inputs_finish -- --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "focused-test.txt"
+    },
+    "mutation_run": {
+      "command": "rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:(69:23|78:24|116:19|121:19|125:15)' --test-tool cargo --output target/quality/20261006-sql-lex-cursor-guard-test-recheck-linux916ed --timeout 20 --in-place -- --lib sql_lex::tests::scanner_progress_makes_bounded_inputs_finish",
+      "result": "10 mutants tested: 10 caught, 0 missed, 0 timeouts, 0 unviable",
+      "log": "mutation-run.txt",
+      "outcomes": "mutation-outcomes.json",
+      "mutants": "mutants.json",
+      "caught": "caught.txt"
+    }
+  },
+  "artifact_sha256": {
+    "mutation-outcomes.json": "6ac8cc4a10c479d4be2a2fffbd05a6a86756aec9b1b4b751a4af1a4fc53782a6",
+    "mutants.json": "149e6c442267cb745861cf94b93ca65c598b03be5a4d6bda6d03e94276339f47",
+    "caught.txt": "7bff0f4e4de767ad20307deb55a4d6f7c3d330c83c9b4a187eca3202d6637078"
+  },
+  "log_sha256": {
+    "focused-test.txt": "4c02285981e7b90e83a9043f59bbccb851e643bec5bc4ad9dc20a2b517d10197",
+    "mutation-run.txt": "82fb63d31037148c28647e9ad832fb95711d15f0b1d34a4966ee5a7375894d25"
+  },
+  "remaining": [
+    "This focused mutation run does not close the wider B3 engine, type, consumer, configuration or mutation matrix."
+  ]
+}
