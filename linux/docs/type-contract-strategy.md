@@ -471,6 +471,11 @@ and Calc XLSX/ODS/XLSX re-import: native `float4send` checks adjacent,
 negative-zero and minimum-subnormal elements; typed rebinding and SQL replay
 match the native array bytes; Calc preserves the full shared-string cell
 ([evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)).
+The `float8[]` file-writer contract now checks JSON, CSV, XML, HTML, Markdown,
+XLSX and SQL replay. Exports preserve the array as text with format escaping;
+SQL replay retains the native array type, JSON semantics and wire bytes, while
+`float8send` pins adjacent, negative-zero and minimum-subnormal bits
+([evidence](evidence/postgres-float8-array-filewriter-results-2026-10-06/manifest.json)).
 
 A PostgreSQL `bytea[]` with non-UTF-8 bytes, an empty element and SQL NULL now
 has JSON, CSV, XLSX and replayed SQL file-writer coverage against native element,
