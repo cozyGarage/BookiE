@@ -394,4 +394,15 @@ unless the CSV provides a NULL marker. See the
 When Oracle is introduced later, require this same applicable conformance suite
 plus Oracle-native cases before claiming support. Define its NUMBER, DATE,
 timestamp/timezone, interval, LOB and empty-string semantics explicitly. Do not
-assume that passing another SQL driver's fixtures proves those contracts.
+
+## PostgreSQL `citext[]` refusal boundary — 2026-10-06
+## PostgreSQL `citext[]` refusal boundary — 2026-10-06
+
+The scalar `citext` contract covers case-preserving text and case-insensitive
+comparison, but the array path does not yet carry qualified custom-array type
+metadata into consumers. `array_contract::value_contract_citext_array_is_visible_undecodable`
+pins the current boundary: non-null and empty `citext[]` results are
+`Undecodable("CITEXT[]")`; SQL NULL stays NULL; native text, type, wire bytes,
+case-insensitive comparison, SQL-literal refusal, parameter refusal, and the
+visible CSV marker are independently asserted. Exact `citext[]` result and
+consumer support remains open B3 work.

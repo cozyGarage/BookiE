@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-06",
+  "source_commit": "8af312faffb08b8b4a64c166e96f2cee9416238d",
+  "branch": "b3/postgres-citext-array-csv-contract",
+  "change": "Add a Docker-backed regression and document PostgreSQL citext[] as open visible-refusal behavior.",
+  "focused_contract": "crates/drivers/postgres/tests/support/array_contract_parts/citext_array_consumers.rs::value_contract_citext_array_is_visible_undecodable",
+  "run": {
+    "command": "cargo test -p tablepro-driver-postgres --test integration value_contract_citext_array_is_visible_undecodable -- --include-ignored --test-threads=1",
+    "result": "passed",
+    "evidence": "focused-test.txt"
+  },
+  "additional_checks": [
+    "cargo fmt --all -- --check: passed",
+    "cargo clippy --locked -p tablepro-driver-postgres --all-targets -- -D warnings: passed",
+    "python3 scripts/inventory-ignored-tests.py --check: passed",
+    "scripts/check-file-size.sh: passed",
+    "git diff --check: passed"
+  ],
+  "proves": [
+    "non-null and empty citext[] results are Undecodable(CITEXT[]), while SQL NULL remains Value::Null",
+    "independent citext[] text, type, and wire-byte oracles are present",
+    "citext element casing is preserved while native comparisons are case-insensitive",
+    "SQL literal and parameter consumers refuse the undecodable value",
+    "CSV renders a visible undecodable marker"
+  ],
+  "scope_limit": "Exact citext[] value decoding, qualified custom-array metadata propagation, and CSV import remain open B3 work. This is refusal evidence, not release qualification.",
+  "checksums": "sha256sums.txt"
+}
