@@ -414,7 +414,9 @@ array elements, and the SQL planner allowlists only PostgreSQL's built-in
 `bit[]` and `varbit[]` casts. The Docker contract checks fixed-width values,
 1/8/9-bit varying values, an empty bit string, SQL NULL arrays/elements, and a
 zero-based lower bound. Native `array_to_json`, `pg_typeof`, and `array_send`
-values are compared after text-parameter rebinding and typed CSV restore. See
+values are compared after text-parameter rebinding and typed CSV restore. The
+built-in OID census includes BIT and VARBIT; remaining-unlisted array families
+continue to require visible refusal. See
 [evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
 
 The app grid contract now parses and writes `bit(5)[]` and `bit varying[]`

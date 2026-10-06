@@ -1,0 +1,14 @@
+GitHub Actions run: https://github.com/cozyGarage/BookiE/actions/runs/37507030797/job/112421170116
+Tested merge result: 8914acac1acfacb7ae13b7f03b72b62f9ca663ba
+
+Driver integration result: 186 passed, 2 failed.
+
+array_contract::value_contract_builtin_array_oid_census_matches_decode_allowlist
+  bit[]: Text("{NULL}")
+
+array_contract::value_contract_unlisted_builtin_arrays_refuse_with_native_oracles
+  bit[]: Text("{\"101\",NULL}")
+
+The decoder returned values for the newly supported bit arrays, while the OID
+census omitted BIT and VARBIT and the unlisted-array test still required
+Undecodable. No production failure was reported.
