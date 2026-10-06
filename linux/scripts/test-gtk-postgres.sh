@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+if [[ "${TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
+  runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-postgres.XXXXXX")"
+  mkdir -p "$runtime/home" "$runtime/config" "$runtime/data" "$runtime/cache" "$runtime/state" "$runtime/runtime"
+  chmod 0700 "$runtime/runtime"
+  trap 'rm -rf -- "$runtime"' EXIT
+  TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE=1 \
+    HOME="$runtime/home" \
+    XDG_CONFIG_HOME="$runtime/config" \
+    XDG_DATA_HOME="$runtime/data" \
+    XDG_CACHE_HOME="$runtime/cache" \
+    XDG_STATE_HOME="$runtime/state" \
+    XDG_RUNTIME_DIR="$runtime/runtime" \
+    CARGO_HOME="${CARGO_HOME:-$(env HOME="$OLDPWD" sh -c 'echo ${CARGO_HOME:-$HOME/.cargo}')}" \
+    RUSTUP_HOME="${RUSTUP_HOME:-$(env HOME="$OLDPWD" sh -c 'echo ${RUSTUP_HOME:-$HOME/.rustup}')}" \
+    dbus-run-session -- "$ROOT/scripts/test-gtk-postgres.sh" "$@"
+  exit $?
+fi
+
+for command_name in docker dbus-run-session gnome-keyring-daemon secret-tool; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "missing required command: $command_name" >&2
+    exit 1
+  fi
+done
+
+container="$(docker run --rm --detach --publish 127.0.0.1::5432 \
+  --env POSTGRES_PASSWORD=tablepro_test --env POSTGRES_DB=bookie_test \
+  postgres:17-alpine)"
+cleanup() {
+  docker rm --force "$container" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+port="$(docker port "$container" 5432/tcp | head -n1)"
+port="${port##*:}"
+attempt=0
+until docker exec "$container" pg_isready --username=postgres --dbname=bookie_test >/dev/null 2>&1 \
+  && docker exec "$container" psql --username=postgres --dbname=bookie_test --command='SELECT 1' >/dev/null 2>&1; do
+  attempt=$((attempt + 1))
+  if (( attempt >= 90 )); then
+    docker logs "$container" >&2
+    echo "PostgreSQL fixture did not become ready" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+docker exec --interactive "$container" psql --username=postgres --dbname=bookie_test --set=ON_ERROR_STOP=1 <<'SQL'
+CREATE TABLE people (id integer PRIMARY KEY, name text NOT NULL, profile jsonb, active boolean NOT NULL);
+INSERT INTO people VALUES
+  (1, 'Ada Lovelace', '{"role":"analyst","langs":["en","fr"]}', true),
+  (2, 'Grace Hopper', NULL, false);
+SQL
+
+eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+printf 'tablepro_test' | secret-tool store --label='BookiE GTK PostgreSQL fixture' \
+  xdg:schema com.tablepro.linux.Password \
+  connection-id 0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11 \
+  kind db_password
+
+TABLEPRO_GTK_KEYRING_READY=1 \
+  TABLEPRO_GTK_DBUS_ACTIVE=1 \
+  TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
+  TABLEPRO_GTK_POSTGRES_PORT="$port" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values}" \
+  bash "$ROOT/scripts/test-gtk-safety.sh"

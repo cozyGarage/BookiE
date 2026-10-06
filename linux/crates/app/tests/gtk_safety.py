@@ -24,6 +24,8 @@ CONNECTION_B_NAME = "Safety SQLite B"
 BROKEN_CONNECTION_NAME = "Broken SQLite"
 MYSQL_CONNECTION_NAME = "Safety MySQL"
 MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
+POSTGRES_CONNECTION_NAME = "Safety PostgreSQL"
+POSTGRES_CONNECTION_ID = "0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -568,6 +570,24 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "port": int(mysql_port),
                 "database": "bookie_test",
                 "username": "root",
+                "use_tls": False,
+                "tls_mode": "disabled",
+                "read_only": False,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
+    postgres_port = os.environ.get("TABLEPRO_GTK_POSTGRES_PORT")
+    if postgres_port:
+        connections["connections"].append(
+            {
+                "id": POSTGRES_CONNECTION_ID,
+                "name": POSTGRES_CONNECTION_NAME,
+                "driver_id": "postgres",
+                "host": os.environ.get("TABLEPRO_GTK_POSTGRES_HOST", "127.0.0.1"),
+                "port": int(postgres_port),
+                "database": "bookie_test",
+                "username": "postgres",
                 "use_tls": False,
                 "tls_mode": "disabled",
                 "read_only": False,

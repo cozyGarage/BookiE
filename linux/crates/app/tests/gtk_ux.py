@@ -1,5 +1,6 @@
 import ctypes
 import json
+import os
 import time
 
 
@@ -191,6 +192,22 @@ def scenarios(ui):
         assert editor_text().startswith("--"), editor_text()
         assert ui.find_node(name="Keyboard Shortcuts") is None, "the shortcuts window opened instead"
 
+    def postgres_saved_connection_browses_rows_and_values(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        ui.wait_for_node(name="people")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("SELECT id, name, profile, active FROM people ORDER BY id")
+        ui.wait_for_node(name="Ada Lovelace", role=pyatspi.ROLE_LABEL)
+        ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
+        open_cell_menu("Ada Lovelace")
+        choose_menu_item(3)
+        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG)
+        ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG, present=False)
+
     result = [
         editing_a_saved_connection_prefills_it_and_saves_the_new_name,
         find_bar_replaces_every_match_in_the_editor,
@@ -198,6 +215,8 @@ def scenarios(ui):
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
     ]
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
+        result.append(postgres_saved_connection_browses_rows_and_values)
     for scenario in result:
         scenario.environment = "local"
     return result
