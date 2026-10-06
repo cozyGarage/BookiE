@@ -12,6 +12,13 @@ open; completed cases and remaining exact-support work are tracked in the
 the [B4 board](docs/b4-task-board.md). Desktop qualification and release gates
 remain in the active sprint.
 
+## After 0.2.0
+
+The [external audit and improvement plan](../external-audit.md) proposes root
+workspace organization, Rust backend ownership checks, GitHub/test tooling,
+docs/examples/evidence synchronization and optional driver reuse. Review it
+after completing 0.2.0; these pending packets do not extend the active sprint.
+
 ## Status rules
 
 - **Implemented**: code and core tests exist.
