@@ -406,3 +406,14 @@ pins the current boundary: non-null and empty `citext[]` results are
 case-insensitive comparison, SQL-literal refusal, parameter refusal, and the
 visible CSV marker are independently asserted. Exact `citext[]` result and
 consumer support remains open B3 work.
+
+## PostgreSQL BIT and VARBIT arrays — 2026-10-06
+
+An uncovered built-in array family failed first as `Undecodable("BIT[]")`.
+The array decoder now uses the existing scalar BIT/VARBIT binary decoder for
+array elements, and the SQL planner allowlists only PostgreSQL's built-in
+`bit[]` and `varbit[]` casts. The Docker contract checks fixed-width values,
+1/8/9-bit varying values, an empty bit string, SQL NULL arrays/elements, and a
+zero-based lower bound. Native `array_to_json`, `pg_typeof`, and `array_send`
+values are compared after text-parameter rebinding and typed CSV restore. See
+[evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).

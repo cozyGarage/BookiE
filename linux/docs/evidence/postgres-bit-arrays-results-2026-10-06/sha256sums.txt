@@ -1,0 +1,2 @@
+350db1d970de44b63900bdfde6beddef92d31df9ca848db301b5733f892dd4ad  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/focused-test.txt
+39eac5c29b77db6f40c55aa5e8a0c8abd2219d7f181f3139a1c3f2e11c043f92  linux/docs/evidence/postgres-bit-arrays-results-2026-10-06/manifest.json

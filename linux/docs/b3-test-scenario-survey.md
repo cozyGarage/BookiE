@@ -85,6 +85,12 @@ does not establish server semantics or satisfy our authorization rules.
 
 Inventory status below comes from current local code/tests, not new executions.
 
+PostgreSQL `bit[]` and `varbit[]` are now covered through binary result decode,
+typed parameter rebinding and CSV import. The fixture includes fixed-width and
+varying bit lengths, empty bit strings, SQL NULL, and non-default array bounds;
+native JSON, type and wire bytes are the oracles. See the [B3 evidence
+packet](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json).
+
 The PostgreSQL enum CSV case now distinguishes raw-text restore from
 spreadsheet-safe output. Formula protection can make two distinct enum labels
 collide after import; the export dialog directs users to turn it off for

@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-06",
+  "source_commit": "2c9857d2db0511353e3224f69ab5d7109c073f92",
+  "branch": "b3/postgres-bit-varbit-array-contract",
+  "change": "Decode PostgreSQL BIT and VARBIT array elements with the existing scalar decoder and allow their static built-in casts for typed updates/imports.",
+  "focused_contract": "crates/drivers/postgres/tests/support/array_contract_parts/bit_array_consumers.rs::value_contract_bit_arrays_roundtrip_wire_and_csv",
+  "baseline": "Failed first because BIT[] returned Undecodable instead of a lossless array value.",
+  "run": {
+    "command": "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-driver-postgres --test integration value_contract_bit_arrays_roundtrip_wire_and_csv -- --include-ignored --test-threads=1",
+    "result": "passed",
+    "evidence": "focused-test.txt"
+  },
+  "additional_checks": [
+    "rtk cargo test --manifest-path linux/Cargo.toml -p tablepro-core postgres_array_update_casts_allowlist_type_metadata: passed",
+    "rtk cargo fmt --manifest-path linux/Cargo.toml --all -- --check: passed",
+    "rtk cargo clippy --manifest-path linux/Cargo.toml --locked -p tablepro-driver-postgres --all-targets -- -D warnings: passed",
+    "rtk bash linux/scripts/check-file-size.sh: passed",
+    "rtk python3 linux/scripts/inventory-ignored-tests.py --check: passed",
+    "rtk git diff --check: passed"
+  ],
+  "proves": [
+    "bit[] and varbit[] decode as text array values",
+    "fixed-width values, 1/8/9-bit varying values, empty bit strings, SQL NULL, and a zero-based lower bound retain native array semantics",
+    "native type and array_to_json values match after text-parameter rebinding",
+    "typed CSV import restores all values, NULL states, native types, and array_send bytes"
+  ],
+  "scope_limit": "This closes the BIT/VARBIT array result, rebind, and CSV path only; other PostgreSQL array families, consumers, session configurations, and B3 acceptance remain open.",
+  "checksums": "sha256sums.txt"
+}
