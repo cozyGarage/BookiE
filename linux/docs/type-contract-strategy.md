@@ -302,6 +302,12 @@ binding remains open; the current Rust prepared-statement API binds through
 microsecond temporal calls, so this path uses exact text with DuckDB's target
 column cast.
 
+DuckDB nested-result refusal now covers a `STRUCT` containing a `UHUGEINT` list
+and a `MAP` containing a `UHUGEINT` struct. Native `typeof()` and JSON oracles
+verify values and SQL NULL elements, while SQL literal rendering and parameter
+rebinding both refuse the undecodable results
+([evidence](evidence/duckdb-nested-collection-refusal-results-2026-10-06/manifest.json)).
+
 SQLite computed `CAST(value AS BLOB)` results now have JSON and XLSX text-cell
 assertions plus typed CSV restore, all checked against native storage classes
 and exact bytes

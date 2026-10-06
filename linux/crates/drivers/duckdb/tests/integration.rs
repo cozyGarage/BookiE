@@ -15,6 +15,8 @@ mod extended_timestamptz;
 mod fixed_uhugeint_array;
 #[path = "support/interval_csv_import.rs"]
 mod interval_csv_import;
+#[path = "support/nested_collection_refusal.rs"]
+mod nested_collection_refusal;
 #[path = "support/rust_decimal_boundaries.rs"]
 mod rust_decimal_boundaries;
 #[path = "support/submicro_parameter_expression.rs"]
