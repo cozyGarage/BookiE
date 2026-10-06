@@ -1,0 +1,13 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.65s
+     Running tests/integration.rs (linux/target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test quoted_enum_identifier_contract::value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 193 filtered out; finished in 4.06s
+

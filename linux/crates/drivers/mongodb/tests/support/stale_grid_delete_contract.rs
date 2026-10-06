@@ -138,3 +138,64 @@ async fn value_contract_stale_grid_delete_preserves_concurrent_document_change()
         &[mongodb::bson::Bson::Null]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_stale_grid_delete_preserves_field_added_after_materialization() {
+    let (_container, host, port) = super::start_mongo().await;
+    let client = mongodb::Client::with_uri_str(format!("mongodb://{host}:{port}/appdb"))
+        .await
+        .expect("connect native fixture client");
+    let collection = client
+        .database("appdb")
+        .collection::<Document>("new_field_stale_delete");
+    let row_id = ObjectId::new();
+    collection
+        .insert_one(doc! { "_id": row_id, "payload": "keep", "sibling": "stable" })
+        .await
+        .expect("seed MongoDB row");
+
+    let connection = MongodbDriver
+        .connect(super::opts(&host, port, "appdb"))
+        .await
+        .expect("connect driver");
+    let before = connection
+        .query("db.new_field_stale_delete.find({})")
+        .await
+        .expect("materialize row before delete");
+    let key_index = before.columns.iter().position(|column| column.name == "_id").unwrap();
+    let row = before.rows.first().expect("one materialized row");
+    assert!(
+        before
+            .columns
+            .iter()
+            .all(|column| column.name != "added_after_grid_read")
+    );
+
+    collection
+        .update_one(
+            doc! { "_id": row_id },
+            doc! { "$set": { "added_after_grid_read": "preserve me" } },
+        )
+        .await
+        .expect("add a field outside the materialized grid columns");
+    let (sql, params) = tablepro_core::sql_dialect::build_mongodb_keyed_delete(
+        Some("appdb"),
+        "new_field_stale_delete",
+        &before.columns,
+        row,
+        &[row[key_index].clone()],
+    )
+    .expect("build guarded delete from the materialized snapshot");
+    let deleted = connection.execute_params(&sql, &params).await.unwrap();
+    assert_eq!(deleted.rows_affected, 0, "a new field makes the snapshot stale");
+
+    let persisted = collection
+        .find_one(doc! { "_id": row_id })
+        .await
+        .expect("read native persisted document")
+        .expect("stale delete must leave row present");
+    assert_eq!(persisted.get_str("payload").unwrap(), "keep");
+    assert_eq!(persisted.get_str("sibling").unwrap(), "stable");
+    assert_eq!(persisted.get_str("added_after_grid_read").unwrap(), "preserve me");
+}
