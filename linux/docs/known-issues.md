@@ -122,7 +122,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
 | TEST-1 | ~~File-size guard failing on the PostgreSQL scalar consumers file~~ | DONE | Guard passes on `linux`; baselines still need lowering | sandbox |
-| TEST-1b | Lower the file-size baselines the guard notes as shrunk | OPEN | `file-size-baselines.txt` | sandbox |
+| TEST-1b | ~~Lower the file-size baselines the guard notes as shrunk~~ | DONE | `file-size-baselines.txt` ratcheted; `result_consumers_temporal.rs` (1,249 lines) now listed, still to be split by B3 | sandbox |
 | TEST-2 | Mutation: core and package survivors untriaged; portable evidence | OPEN | B3-P6 | sandbox |
 | TEST-3 | No line-coverage number | OPEN | `cargo-llvm-cov` on the runner | manual |
 | TEST-4 | Full driver, TLS and SSH matrix not rerun on one candidate tree | OPEN | Run on the runner; see below | driver-docker |
