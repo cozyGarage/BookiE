@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "linux",
+  "baseline_commit": "05e8c77452a3ade86a764665ca6a52271bb9772d",
+  "case": "PostgreSQL enum[] XLSX round-trip with leading/trailing-space labels",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs",
+    "sha256": "34cff266036aac9266968cd82a73fa976191fa351ee16c7a8c8027259a3311c0"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "contract": [
+    "The enum array includes labels with leading and trailing spaces alongside empty text, literal NULL, Unicode, quoted punctuation, markup, formula-shaped text, backslashes and SQL NULL.",
+    "PostgreSQL type, JSON and array_send oracles check the original value and a re-bound value.",
+    "Calc and Gnumeric each re-save XLSX through ODS back to XLSX; all cells remain strings, contain no formulas, and preserve the exact array text including the spaces inside both labels."
+  ],
+  "expected_array_literal": "{\"NULL\",\"\",\" leading\",\"trailing \",\"\u6771\u4eac\",\"a,b\",\"a\\\"b\",\"<tag>&\",\"=1+1\",\"slash\\\\path\",NULL}",
+  "validation": {
+    "native_export_test": {
+      "command": "rtk proxy env BOOKIEE_XLSX_REIMPORT_ARTIFACT=<absolute-evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration array_contract::value_contract_custom_enum_array_file_exports_preserve_labels -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc": {
+      "version": "LibreOffice 26.8.0.3 680(Build:3)",
+      "container_image": "tablepro-lo-calc:26.8.0.3@sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c",
+      "round_trip": "source.xlsx -> source.ods -> recheck/source.xlsx",
+      "log": "calc-roundtrip.txt"
+    },
+    "gnumeric": {
+      "version": "ssconvert 1.12.57",
+      "container_image": "tablepro-gnumeric:1.12.57@sha256:b4e641af0a7a20dba709b3959b24f0d7ff753cb3c37309f112f2aa0537eeb1d1",
+      "round_trip": "source.xlsx -> gnumeric-roundtrip.ods -> gnumeric-roundtrip.xlsx",
+      "log": "gnumeric-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "result": "All five workbook stages preserved the exact enum[] text as string cells without formulas.",
+      "log": "consumer-check.txt"
+    },
+    "diff_check": "passed"
+  },
+  "artifact_sha256": {
+    "source.xlsx": "75b7049a431f21d485bbbf40e85d8b0acb913431ffcc0ea51fb56497ba5181e5",
+    "source.ods": "c29025fc952231bb39eb2b6e71f0abd48fb439ad2a6c9643f7054a4027d7f74f",
+    "recheck/source.xlsx": "a267ad7e5ae5130e79719414598006482859d58068cbb0bb46a191bb40e5a6ae",
+    "gnumeric-roundtrip.ods": "3e5d630c4848b5e508c977b362012742eafce9fe1822176f4eb073f1b2ec9813",
+    "gnumeric-roundtrip.xlsx": "19ac0088192c3e5263bd773bcb9420a0a8dc10528fe61ae8557d4d15b5c16985"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "e69c8bddce685a7e1bc96d413440a88435cc6412ee803ff6927cdca16dd04c3a",
+    "calc-roundtrip.txt": "d69b7d757f1bf0ec67fe17eb924eac234d300260bf60318877f1a02ee7488b1f",
+    "gnumeric-run.txt": "8b9aa02b198ec49c21c8af5cf1782d3b2a85e55d47c5699b08dbc7d6f4c504a8",
+    "consumer-check.txt": "fa306d4400004b8b4b860083a78bb3096144e3420aba1b6ade5354713bd20d04"
+  }
+}

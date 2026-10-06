@@ -1,0 +1,3 @@
+ssconvert version '1.12.57'
+datadir := '/usr/share/gnumeric/1.12.57'
+libdir := '/usr/lib/gnumeric/1.12.57'

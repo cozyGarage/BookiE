@@ -298,7 +298,10 @@ re-save with formula-shaped labels retained as text and SQL NULL left blank
 Gnumeric also re-saves the scalar-enum workbook with `=1+1` retained as a
 string, SQL NULL blank, and no formula
 ([Gnumeric evidence](evidence/postgres-enum-scalar-gnumeric-reimport-results-2026-10-05/manifest.json)).
-Other spreadsheet applications and enum cell shapes remain open.
+Calc and Gnumeric also preserve enum-array labels with leading/trailing spaces
+through XLSX/ODS/XLSX re-save; all five workbook stages retain exact text cells
+without formulas ([whitespace evidence](evidence/postgres-enum-array-whitespace-reimport-results-2026-10-06/manifest.json)).
+Other spreadsheet applications and enum-array shape combinations remain open.
 
 The PostgreSQL enum CSV importer now also has a round trip for double quotes,
 an embedded line break, backslashes and formula-shaped text across four
