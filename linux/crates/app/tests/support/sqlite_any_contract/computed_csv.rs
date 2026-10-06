@@ -814,3 +814,80 @@ async fn sqlite_abs_any_csv_round_trip_preserves_runtime_storage_classes() {
         "overflowing computed expression must not alter source rows"
     );
 }
+
+#[tokio::test]
+async fn sqlite_round_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY, digits INTEGER) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 1.235, 2), (2, -1.235, 2), (3, '2.345', 2), \
+             (4, 'plain', 2), (5, 125.0, -1), (6, NULL, 2)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, round(value, digits) AS result, \
+                    typeof(round(value, digits)) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Float(1.24), Value::Text("real".into())],
+            vec![Value::Int(2), Value::Float(-1.24), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Float(2.35), Value::Text("real".into())],
+            vec![Value::Int(4), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(5), Value::Float(125.0), Value::Text("real".into())],
+            vec![Value::Int(6), Value::Null, Value::Text("null".into())],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+    let restored = connection
+        .query("SELECT position, typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("real".into()), Value::Float(1.24), Value::Text("real".into())],
+            vec![Value::Int(2), Value::Text("real".into()), Value::Float(-1.24), Value::Text("real".into())],
+            vec![Value::Int(3), Value::Text("real".into()), Value::Float(2.35), Value::Text("real".into())],
+            vec![Value::Int(4), Value::Text("real".into()), Value::Float(0.0), Value::Text("real".into())],
+            vec![Value::Int(5), Value::Text("real".into()), Value::Float(125.0), Value::Text("real".into())],
+            vec![Value::Int(6), Value::Text("null".into()), Value::Null, Value::Text("null".into())],
+        ]
+    );
+}
