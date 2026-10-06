@@ -56,6 +56,7 @@ impl tablepro_core::Session for PgSession {
             self.backend_pid,
             sql,
             params,
+            true,
             control,
         )
         .await;

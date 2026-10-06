@@ -431,6 +431,132 @@ async fn value_contract_enum_range_refreshes_labels_changed_by_another_session()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_enum_drop_and_recreate_refreshes_a_warm_session_type_oid() {
+    let (_container, options) = crate::start_pg().await;
+    let setup = crate::connect(options.clone()).await;
+    setup
+        .execute("CREATE SCHEMA value_contract_enum_recreate_target")
+        .await
+        .unwrap();
+    setup
+        .execute("CREATE SCHEMA value_contract_enum_recreate_shadow")
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_recreate_target.state AS ENUM ('old', 'retired')",
+        )
+        .await
+        .unwrap();
+    setup
+        .execute(
+            "CREATE TYPE value_contract_enum_recreate_shadow.state AS ENUM ('shadow-only')",
+        )
+        .await
+        .unwrap();
+
+    let reader = crate::connect(options.clone()).await;
+    let writer = crate::connect(options.clone()).await;
+    let executor = crate::connect(options.clone()).await;
+    let mut reader = reader.open_session().await.unwrap();
+    let mut writer = writer.open_session().await.unwrap();
+    let control = OperationControl::new(CancellationToken::new(), None);
+    reader
+        .query_params_controlled(
+            "SET search_path = value_contract_enum_recreate_shadow, \
+             value_contract_enum_recreate_target, public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+
+    let query = "SELECT enum_range(NULL::value_contract_enum_recreate_target.state) AS value";
+    let pooled_before = setup.query(query).await.unwrap();
+    assert_eq!(pooled_before.rows[0][0], Value::Text(r#"{"old","retired"}"#.into()));
+    let before = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    let array_type = "value_contract_enum_recreate_target.state[]";
+    assert_eq!(before.columns[0].data_type, array_type);
+    assert_eq!(before.rows[0][0], Value::Text(r#"{"old","retired"}"#.into()));
+    executor.execute(query).await.unwrap();
+    let before_oids = reader
+        .query_params_controlled(
+            "SELECT 'value_contract_enum_recreate_target.state'::regtype::oid::bigint, \
+             'value_contract_enum_recreate_target.state[]'::regtype::oid::bigint",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+
+    writer
+        .query_params_controlled(
+            "DROP TYPE value_contract_enum_recreate_target.state",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    writer
+        .query_params_controlled(
+            "CREATE TYPE value_contract_enum_recreate_target.state AS ENUM ('new', 'NULL', '東京')",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert!(reader.is_usable());
+    assert!(writer.is_usable());
+
+    // Reuse the exact SQL text on the already-warm reader so PostgreSQL and
+    // SQLx must refresh the dropped type and array OIDs.
+    let after = reader
+        .query_params_controlled(query, &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(after.columns[0].data_type, array_type);
+    assert_eq!(after.rows[0][0], Value::Text(r#"{"new","NULL","東京"}"#.into()));
+    let pooled_after = setup.query(query).await.unwrap();
+    assert_eq!(pooled_after.rows[0][0], after.rows[0][0]);
+    executor.execute(query).await.unwrap();
+
+    let native = reader
+        .query_params_controlled(
+            "SELECT pg_typeof(enum_range(NULL::value_contract_enum_recreate_target.state))::oid::bigint, \
+             'value_contract_enum_recreate_target.state'::regtype::oid::bigint, \
+             'value_contract_enum_recreate_target.state[]'::regtype::oid::bigint, \
+             array_to_json(enum_range(NULL::value_contract_enum_recreate_target.state))::text, \
+             encode(array_send(enum_range(NULL::value_contract_enum_recreate_target.state)), 'hex'), \
+             (SELECT string_agg(enumlabel::text, ',' ORDER BY enumsortorder) \
+              FROM pg_enum WHERE enumtypid = \
+                'value_contract_enum_recreate_target.state'::regtype)",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], native.rows[0][2]);
+    assert_ne!(native.rows[0][1], before_oids.rows[0][0]);
+    assert_ne!(native.rows[0][2], before_oids.rows[0][1]);
+    assert_eq!(native.rows[0][3], Value::Text(r#"["new","NULL","東京"]"#.into()));
+    assert_eq!(native.rows[0][5], Value::Text("new,NULL,東京".into()));
+
+    let rebound = reader
+        .query_params_controlled(
+            &format!("SELECT encode(array_send($1::text::{array_type}), 'hex')"),
+            std::slice::from_ref(&after.rows[0][0]),
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0][0], native.rows[0][4]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_type_rename_and_schema_move_refresh_session_metadata() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
