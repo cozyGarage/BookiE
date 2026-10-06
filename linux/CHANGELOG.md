@@ -74,6 +74,10 @@
 - Cancelling a connection attempt over the system OpenSSH client now stops its ssh master process and cleans up its private directory, instead of leaving it running in the background.
 - If the app is killed or crashes while using the system OpenSSH client, its ssh master process now exits with it instead of continuing to run in the background until the next launch.
 
+### Security
+
+- Driver panic messages, which can contain query text or credentials, are no longer written to the logs or the terminal; only the location is. Set `TABLEPRO_DEBUG_PANICS=1` to print them while developing.
+
 ## [0.1.5] - 2026-09-27
 - Choosing the system OpenSSH client inside the Flatpak build now stops immediately with a message to use the built-in SSH client.
 - The Debian package now includes the SSH password helper that the system OpenSSH client needs.

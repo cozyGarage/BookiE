@@ -19,6 +19,7 @@ pub fn run() {
         glib::g_critical!("bookie", "{error}");
         return;
     }
+    tablepro_policy::withhold_panic_messages();
     if let Err(error) = gtk4::gio::resources_register_include!("tablepro.gresource") {
         tracing::error!(%error, "could not register application resources");
         return;

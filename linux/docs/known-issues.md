@@ -96,7 +96,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
-| SEC-1 | Panic payload is still logged as `detail` | OPEN | Sentinel tests over tracing, stderr, errors, audit; ADR 0006 | sandbox |
+| SEC-1 | ~~Panic payload was logged as `detail`~~ | DONE | `a_driver_panic_message_never_reaches_the_logs_or_the_error` (fails before); the guard logs only the message length; `withhold_panic_messages` replaces the default stderr hook in the app and agent (opt out with `TABLEPRO_DEBUG_PANICS=1`). Audit and MCP error paths already return the fixed text | sandbox |
 | SEC-2 | U2: Copy as SQL keeps auto-increment values; IDENTITY and GENERATED ALWAYS need an engine-aware default | OPEN | | driver-docker |
 | SEC-3 | U1: SQL Server server-owned columns proven for metadata and two INSERT paths only | OPEN | Grid, CSV import, Copy as SQL, SQL export | driver-docker |
 | SEC-4 | T-SQL batches: `SELECT 1` then UPDATE or DROP; MERGE alone or final | UNVERIFIED | Native verification | driver-docker |

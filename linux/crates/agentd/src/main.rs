@@ -233,6 +233,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .with_writer(std::io::stderr)
         .init();
+    tablepro_policy::withhold_panic_messages();
 
     let args = Args::parse();
     if !args.policy.exists() {
