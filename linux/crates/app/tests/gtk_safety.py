@@ -16,6 +16,7 @@ import pyatspi
 import gtk_workbook
 import gtk_parameters
 import gtk_xml
+import gtk_ux
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -1393,6 +1394,7 @@ def main():
     scenarios.extend(gtk_workbook.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_parameters.scenarios(sys.modules[__name__]))
     scenarios.extend(gtk_xml.scenarios(sys.modules[__name__]))
+    scenarios.extend(gtk_ux.scenarios(sys.modules[__name__]))
     selected = os.environ.get("TABLEPRO_GTK_SCENARIO")
     if selected:
         scenarios = [scenario for scenario in scenarios if scenario.__name__ == selected]
