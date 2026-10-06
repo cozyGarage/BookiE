@@ -4,6 +4,7 @@ use tablepro_core::{FilterOp, FilterRule, FilterSet, FilterValue};
 use crate::{connect, start_pg};
 
 include!("enum_contract_parts/scalar_consumers.rs");
+include!("enum_contract_parts/scalar_csv.rs");
 
 include!("enum_contract_parts/writes_and_shadowing.rs");
 
