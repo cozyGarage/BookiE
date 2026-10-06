@@ -25,6 +25,7 @@
 
 ### Changed
 
+- B3 documentation and the ignored-test inventory now record PostgreSQL `citext[]` as an open capability with explicit visible-refusal coverage; exact typed support remains unfinished.
 - The SQLite B3 summary removes duplicate `quote()`/`instr()` evidence links and links both typed-CSV packets directly.
 - DuckDB nested-result coverage now compares STRUCT and MAP values containing UHUGEINT against native type/value oracles, then verifies explicit decoder refusal plus refusal by SQL literal and parameter consumers.
 - SQLite STRICT ANY typed CSV coverage now checks `hex()` results for mixed native inputs, including empty text and SQL NULL results that both produce empty TEXT.

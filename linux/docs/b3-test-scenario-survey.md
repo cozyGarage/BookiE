@@ -25,6 +25,11 @@ No external source code or fixtures were copied.
 
 ## Focus to carry forward
 
+- PostgreSQL scalar `citext` is covered, but `citext[]` remains an open result
+  and import case. The regression pins current behavior: non-null and empty
+  arrays become visible `Undecodable("CITEXT[]")`, SQL NULL stays NULL, and
+  typed consumers refuse the value. Exact support requires qualified array
+  type metadata in the consumer path; see the B3 board.
 - Finish B3 lossless values and consumer contracts before B4–B6 acceptance.
 - Use upstream tests, issues and fix commits as bug hypotheses. Reproduce locally
   before changing production behavior; keep the reproducer as a permanent regression.

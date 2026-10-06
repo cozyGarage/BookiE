@@ -1,0 +1,2 @@
+54672c9b2d1564bc895508e185d1f3db0d5a1ca35d9679a9a5517b1790f4d37d  linux/docs/evidence/postgres-citext-array-refusal-results-2026-10-06/focused-test.txt
+30e1f487af67b0f4367e82af129d75e5b6d0bca1e49d4f60dbbc5468574f0490  linux/docs/evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json
