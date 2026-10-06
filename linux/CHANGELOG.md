@@ -21,6 +21,8 @@
 - MySQL multi-statement saves refuse non-DML statements before dispatch and distinguish rollback failure; successful rollback requests no longer imply that non-transactional table writes were reversed.
 - SQL Server rowversion and temporal period columns are read-only and omitted from generated INSERT statements, so copying or inserting rows does not try to overwrite server-owned values.
 - CSV imports accept the `\x` hexadecimal blob format written by exports, preserving empty blobs and NULL separately.
+- Malformed DuckDB script tails fail closed instead of executing a valid prefix and silently ignoring the remainder.
+- DuckDB SQL literals preserve exact `rust_decimal` values with explicit precision and scale casts, including the crate's mantissa and scale limits.
 - Formula-safe decimal CSV imports reject excess precision instead of rounding it.
 - CSV imports preserve ClickHouse `Int128` and `UInt128` values exactly, including values prefixed by formula-safe apostrophes, instead of rejecting them as i64.
 - Editing PostgreSQL array cells now casts their text value to the matching built-in array type instead of failing with a type mismatch.
