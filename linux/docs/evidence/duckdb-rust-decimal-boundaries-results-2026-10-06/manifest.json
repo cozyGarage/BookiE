@@ -36,6 +36,11 @@
       "result": "passed; exit_code 0",
       "report": "target/quality/20261006T072628605649Z-quick/report.json",
       "working_tree_at_run": "Only the already-tested Decimal integration contract was being moved from integration.rs to the support module; both resulting files are source-hashed above."
+    },
+    "duckdb_integration_suite": {
+      "command": "rtk cargo test --locked -p tablepro-driver-duckdb --test integration",
+      "result": "38 passed",
+      "log": "duckdb-integration-suite.txt"
     }
   },
   "limits": [
@@ -50,6 +55,7 @@
     "core-test.txt": "86eddb859767af7ba5653fce8f5e93d92c0de57a0b5ea2f1fe76978a06693a24",
     "duckdb-test.txt": "0d8e0687744525920f32cc1065c0c27ce490633c0890f97601fd4649dfdfad37",
     "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc"
+    "clippy.txt": "caa636ec9c7cba2c4f265005f356629e3a1e8fe35395de581375a782de9931bc",
+    "duckdb-integration-suite.txt": "59ad6e4c5d6b5965d782a660944d23782fa7fbfc72cbb2b676814f00dc6a87c4"
   }
 }
