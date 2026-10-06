@@ -211,6 +211,26 @@ def scenarios(ui):
             return int(fields["VmRSS"].split()[0]), int(fields["VmHWM"].split()[0])
         raise AssertionError("application process not found")
 
+    def a_second_launch_raises_the_window_and_exits_cleanly(database, base):
+        import glob
+        import subprocess
+        for status in glob.glob("/proc/[0-9]*/status"):
+            try:
+                executable = os.readlink(status.replace("status", "exe"))
+                raw_environment = open(status.replace("status", "environ"), "rb").read()
+            except OSError:
+                continue
+            if executable.endswith("/usr/bin/tablepro"):
+                break
+        else:
+            raise AssertionError("application process not found")
+        environment = dict(item.split("=", 1) for item in raw_environment.decode().split("\0") if "=" in item)
+        result = subprocess.run([executable], env=environment, capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, (result.returncode, result.stderr)
+        assert "did not unregister" not in result.stderr, result.stderr
+        assert "asked it to show its window" in result.stderr, result.stderr
+        ui.wait_for_frame_containing(" — BookiE")
+
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
         sql = (
@@ -400,6 +420,7 @@ def scenarios(ui):
         test_connection_reports_success_in_the_dialog,
         test_connection_reports_failure_in_the_dialog,
         connect_dialog_cancel_stops_a_hanging_connection,
+        a_second_launch_raises_the_window_and_exits_cleanly,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
