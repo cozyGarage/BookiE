@@ -74,7 +74,7 @@ const MIN_COLUMN_WIDTH_PX: i32 = 120;
 
 #[allow(clippy::too_many_arguments)]
 pub fn build_column_view(
-    result: &QueryResult,
+    shared: &std::sync::Arc<QueryResult>,
     schema_columns: &[ColumnInfo],
     table: &str,
     edit_sender: Option<relm4::Sender<GridMsg>>,
@@ -86,7 +86,8 @@ pub fn build_column_view(
     column_widths: Option<crate::services::column_widths::ColumnWidthStore>,
     database: std::sync::Arc<DatabaseService>,
 ) -> (gtk4::ColumnView, gtk4::MultiSelection) {
-    let store = RowStore::from_rows(result.rows.clone());
+    let result: &QueryResult = shared;
+    let store = RowStore::from_shared(shared.clone());
     let selection = gtk4::MultiSelection::new(Some(store));
     let column_view = gtk4::ColumnView::builder()
         .model(&selection)

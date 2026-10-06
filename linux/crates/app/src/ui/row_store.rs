@@ -5,12 +5,14 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::subclass::prelude::*;
 
-use tablepro_core::Value;
+use std::sync::Arc;
+
+use tablepro_core::QueryResult;
 
 use super::row_object::RowObject;
 
 pub(super) enum Slot {
-    Raw(Vec<Value>),
+    Shared(usize),
     Object(RowObject),
 }
 
@@ -20,6 +22,7 @@ mod imp {
     #[derive(Default)]
     pub struct RowStore {
         pub(in crate::ui) slots: RefCell<Vec<Slot>>,
+        pub(in crate::ui) source: RefCell<Option<Arc<QueryResult>>>,
     }
 
     #[glib::object_subclass]
@@ -43,12 +46,17 @@ mod imp {
         fn item(&self, position: u32) -> Option<glib::Object> {
             let mut slots = self.slots.borrow_mut();
             let slot = slots.get_mut(position as usize)?;
-            if let Slot::Raw(cells) = slot {
-                *slot = Slot::Object(RowObject::new(std::mem::take(cells)));
+            match slot {
+                Slot::Shared(index) => {
+                    let source = self.source.borrow();
+                    let cells = source.as_ref()?.rows.get(*index)?.clone();
+                    *slot = Slot::Object(RowObject::new(cells));
+                }
+                Slot::Object(_) => {}
             }
             match slot {
                 Slot::Object(object) => Some(object.clone().upcast()),
-                Slot::Raw(_) => None,
+                _ => None,
             }
         }
     }
@@ -59,21 +67,21 @@ glib::wrapper! {
 }
 
 impl RowStore {
-    pub fn from_rows(rows: Vec<Vec<Value>>) -> Self {
+    pub fn from_shared(result: Arc<QueryResult>) -> Self {
         let store: Self = glib::Object::new();
-        *store.imp().slots.borrow_mut() = rows.into_iter().map(Slot::Raw).collect();
+        store.install_shared(result);
         store
     }
 
-    pub fn replace_rows(&self, rows: Vec<Vec<Value>>) {
-        let removed = {
-            let mut slots = self.imp().slots.borrow_mut();
-            let removed = slots.len() as u32;
-            *slots = rows.into_iter().map(Slot::Raw).collect();
-            removed
-        };
-        let added = self.imp().slots.borrow().len() as u32;
-        self.items_changed(0, removed, added);
+    pub fn replace_shared(&self, result: Arc<QueryResult>) {
+        let removed = self.n_items();
+        self.install_shared(result);
+        self.items_changed(0, removed, self.n_items());
+    }
+
+    fn install_shared(&self, result: Arc<QueryResult>) {
+        *self.imp().slots.borrow_mut() = (0..result.rows.len()).map(Slot::Shared).collect();
+        *self.imp().source.borrow_mut() = Some(result);
     }
 
     pub fn insert(&self, position: u32, row: &RowObject) {
@@ -115,6 +123,7 @@ impl RowStore {
 mod tests {
     use super::*;
     use std::cell::Cell;
+    use tablepro_core::Value;
     use std::rc::Rc;
 
     fn rows(count: i64) -> Vec<Vec<Value>> {
@@ -128,7 +137,7 @@ mod tests {
 
     #[test]
     fn no_row_object_exists_until_a_row_is_requested() {
-        let store = RowStore::from_rows(rows(1000));
+        let store = RowStore::from_shared(shared(1000));
         assert_eq!(store.n_items(), 1000);
         assert_eq!(store.materialized(), 0);
         assert_eq!(first_cell(&store, 41), Value::Int(41));
@@ -137,7 +146,7 @@ mod tests {
 
     #[test]
     fn a_requested_row_keeps_its_identity_and_its_edits() {
-        let store = RowStore::from_rows(rows(3));
+        let store = RowStore::from_shared(shared(3));
         let first = store.item(1).and_downcast::<RowObject>().unwrap();
         first.set_cell(0, Value::Int(99));
         let again = store.item(1).and_downcast::<RowObject>().unwrap();
@@ -148,13 +157,13 @@ mod tests {
 
     #[test]
     fn an_out_of_range_position_yields_nothing() {
-        let store = RowStore::from_rows(rows(2));
+        let store = RowStore::from_shared(shared(2));
         assert!(store.item(2).is_none());
     }
 
     #[test]
     fn insert_remove_and_splice_move_rows_and_report_the_change() {
-        let store = RowStore::from_rows(rows(3));
+        let store = RowStore::from_shared(shared(3));
         let changes = Rc::new(Cell::new((0, 0, 0)));
         let seen = changes.clone();
         store.connect_items_changed(move |_, position, removed, added| seen.set((position, removed, added)));
@@ -177,13 +186,13 @@ mod tests {
 
     #[test]
     fn replacing_the_rows_reports_one_change_and_drops_old_objects() {
-        let store = RowStore::from_rows(rows(4));
+        let store = RowStore::from_shared(shared(4));
         let held = store.item(0).and_downcast::<RowObject>().unwrap();
         let changes = Rc::new(Cell::new((0, 0, 0)));
         let seen = changes.clone();
         store.connect_items_changed(move |_, position, removed, added| seen.set((position, removed, added)));
 
-        store.replace_rows(rows(2));
+        store.replace_shared(shared(2));
         assert_eq!(changes.get(), (0, 4, 2));
         assert_eq!(store.n_items(), 2);
         assert_eq!(store.materialized(), 0);
@@ -192,13 +201,51 @@ mod tests {
 
     #[test]
     fn a_handler_may_read_the_model_while_it_is_changing() {
-        let store = RowStore::from_rows(rows(2));
+        let store = RowStore::from_shared(shared(2));
         let reader = store.clone();
         store.connect_items_changed(move |_, _, _, _| {
             let _ = reader.item(0);
         });
-        store.replace_rows(rows(3));
+        store.replace_shared(shared(3));
         store.remove(0);
+        assert_eq!(store.n_items(), 2);
+    }
+
+    fn shared(count: i64) -> Arc<QueryResult> {
+        Arc::new(QueryResult {
+            columns: Vec::new(),
+            rows: rows(count),
+            truncated: false,
+        })
+    }
+
+    #[test]
+    fn a_shared_result_is_read_in_place_and_never_copied_up_front() {
+        let result = shared(500);
+        let store = RowStore::from_shared(result.clone());
+        assert_eq!(store.n_items(), 500);
+        assert_eq!(store.materialized(), 0);
+        assert_eq!(Arc::strong_count(&result), 2);
+        assert_eq!(first_cell(&store, 499), Value::Int(499));
+        assert_eq!(store.materialized(), 1);
+    }
+
+    #[test]
+    fn shared_rows_survive_a_draft_inserted_above_them() {
+        let store = RowStore::from_shared(shared(3));
+        store.insert(0, &RowObject::new_draft(1, vec![Value::Int(-1)]));
+        assert_eq!(first_cell(&store, 0), Value::Int(-1));
+        assert_eq!(first_cell(&store, 3), Value::Int(2));
+        store.remove(0);
+        assert_eq!(first_cell(&store, 0), Value::Int(0));
+    }
+
+    #[test]
+    fn replacing_a_shared_result_releases_the_old_one() {
+        let old = shared(10);
+        let store = RowStore::from_shared(old.clone());
+        store.replace_shared(shared(2));
+        assert_eq!(Arc::strong_count(&old), 1);
         assert_eq!(store.n_items(), 2);
     }
 }

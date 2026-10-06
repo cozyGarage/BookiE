@@ -304,8 +304,12 @@ impl BrowseTab {
     /// Replace the rows in the existing `ListStore` without touching
     /// the columns / factories / selection model. Drafts are
     /// re-prepended so they survive the swap.
-    pub(super) fn refresh_grid_data(&self, result: &QueryResult, store: &crate::ui::row_store::RowStore) {
-        store.replace_rows(result.rows.clone());
+    pub(super) fn refresh_grid_data(
+        &self,
+        result: &std::sync::Arc<QueryResult>,
+        store: &crate::ui::row_store::RowStore,
+    ) {
+        store.replace_shared(result.clone());
         self.reprepend_drafts();
     }
 

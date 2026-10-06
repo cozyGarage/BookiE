@@ -59,7 +59,7 @@ pub(crate) async fn run_statements(
         let kind = match target.query(&bound.sql, &bound.values, control).await {
             Ok(qr) => {
                 succeeded(&sql);
-                StatementOutcomeKind::Rows(qr)
+                StatementOutcomeKind::Rows(std::sync::Arc::new(qr))
             }
             Err(DriverError::Cancelled) => return ScriptRunResult::Cancelled,
             Err(DriverError::TimedOut) => return ScriptRunResult::TimedOut,

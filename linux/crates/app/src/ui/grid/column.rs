@@ -486,7 +486,7 @@ mod tests {
         };
         let (sender, receiver) = relm4::channel::<GridMsg>();
         let (view, selection) = crate::ui::grid::build_column_view(
-            &result,
+            &std::sync::Arc::new(result),
             &columns,
             "flags",
             Some(sender),
@@ -500,7 +500,11 @@ mod tests {
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
-        let store = selection.model().unwrap().downcast::<crate::ui::row_store::RowStore>().unwrap();
+        let store = selection
+            .model()
+            .unwrap()
+            .downcast::<crate::ui::row_store::RowStore>()
+            .unwrap();
         for (value, allowed) in [
             (Value::Bytes(vec![1]), false),
             (Value::Text("true".into()), false),
@@ -561,7 +565,7 @@ mod tests {
         };
         let (sender, receiver) = relm4::channel::<GridMsg>();
         let (view, selection) = crate::ui::grid::build_column_view(
-            &result,
+            &std::sync::Arc::new(result),
             &columns,
             "flags",
             Some(sender),
@@ -575,7 +579,11 @@ mod tests {
         );
         let window = gtk4::Window::builder().child(&view).build();
         window.present();
-        let store = selection.model().unwrap().downcast::<crate::ui::row_store::RowStore>().unwrap();
+        let store = selection
+            .model()
+            .unwrap()
+            .downcast::<crate::ui::row_store::RowStore>()
+            .unwrap();
         let context = gtk4::glib::MainContext::default();
         for (value, active, edit) in [(Value::Int(0), false, "true"), (Value::Int(1), true, "false")] {
             store.splice(0, 1, &[crate::ui::row_object::RowObject::new(vec![value])]);
@@ -618,7 +626,7 @@ mod tests {
         };
         let (sender, _receiver) = relm4::channel::<GridMsg>();
         let (view, selection) = crate::ui::grid::build_column_view(
-            &result,
+            &std::sync::Arc::new(result),
             &columns,
             "notes",
             Some(sender),
@@ -744,7 +752,7 @@ mod tests {
         };
         let (sender, receiver) = relm4::channel::<GridMsg>();
         let (view, _) = crate::ui::grid::build_column_view(
-            &result,
+            &std::sync::Arc::new(result),
             &columns,
             "spatial_values",
             Some(sender),
@@ -794,7 +802,7 @@ mod tests {
         };
         let (sender, _receiver) = relm4::channel::<GridMsg>();
         let (view, _selection) = crate::ui::grid::build_column_view(
-            &result,
+            &std::sync::Arc::new(result),
             &columns,
             "notes",
             Some(sender),
