@@ -8,14 +8,16 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-06
 
-Current source baseline: `10f47a06589626ebee5d1e5d4055854cd1a72ee5` on
-`linux`, pushed to `origin/linux`. The October 6 merges (#65–#67) add
-fail-closed handling for malformed DuckDB script tails, exact DuckDB decimal
-SQL literals, and a refreshed ignored-test inventory. Their implementation,
-consumer coverage, and source-pinned evidence are linked from the
-[B3 board](type-contract-strategy.md) and [value evidence index](value-contracts.md).
-These cases do not close B3 or qualify the release; the broader matrix, mutation
-triage, and installed grid acceptance remain open.
+Current source baseline: `5cdb3660bfb56131551489ecbb8584e472019f24` on
+`linux`, pushed to `origin/linux`. October 6 merges #65–#67 retain the DuckDB
+malformed-tail and decimal literal fixes plus the ignored-test inventory;
+merges #81 and #82 add SQLite STRICT `ANY` `length()` typed-CSV coverage and a
+ClickHouse nested `Map → Array → Tuple → UInt128` contract with native consumer
+oracles and safe write refusals. Their implementation, tests, and source-pinned
+evidence are linked from the [B3 board](type-contract-strategy.md) and
+[value evidence index](value-contracts.md). B3 remains open: the broader
+engine/type/consumer/configuration matrix, mutation triage, and installed grid
+acceptance still need work. These merges do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -48,7 +50,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. The October 6 merges add DuckDB malformed-tail refusal, exact decimal literal coverage, and nested STRUCT/MAP UHUGEINT refusal with native oracles; B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; prior DuckDB malformed-tail and decimal fixes remain covered. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
 | B4 transport/sessions | Policy, daemon cache refusal, editor callback/retirement and awaited cleanup patches, built-in host consent and GUI uncertainty split merged through `6346a431c` | [Current B4 board](b4-task-board.md#b4-continuation-status-october-3): F4/F9, F6 and GUI F8 implementation are merged; MySQL DDL refusal, honest rollback reporting and the MyISAM-trigger rollback boundary have local regressions; headless generation/retirement parity, TLS/daemon/route/audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
