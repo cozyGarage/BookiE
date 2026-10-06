@@ -26,8 +26,8 @@
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL scalar enum CSV export and typed restore preserve leading and trailing label spaces.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
-- PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` with a same-named shadow enum in `search_path`, including SQL NULL, target-only values and native invalid-label refusal.
-- PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured `search_path` places a same-named shadow enum first; target-only/NULL values and native invalid-label refusal are covered.
+- PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` when a same-named shadow enum leads `search_path` and the target schema is absent; target-only values and native invalid-label refusal are covered.
+- PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured default `search_path` places a same-named shadow enum first and omits the target schema; target-only/NULL values and native invalid-label refusal are covered.
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
