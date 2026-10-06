@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-06; each new case links to its source-fingerprinted
+and acceptance. Updated 2026-10-07; each new case links to its source-fingerprinted
 evidence packet, and this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
