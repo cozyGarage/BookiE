@@ -2,11 +2,10 @@
 import re
 import sys
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE = re.compile(r"^\s*(```|~~~)")
-SKIP_SCHEMES = ("http://", "https://", "mailto:", "tel:")
 GENERATED = re.compile(r"(^|/)target/")
 
 
@@ -23,7 +22,7 @@ def targets(text):
 
 
 def file_part(target):
-    if target.startswith(SKIP_SCHEMES) or target.startswith("#"):
+    if urlparse(target).scheme or target.startswith("#"):
         return None
     path = unquote(target.split("#", 1)[0].split("?", 1)[0])
     if not path or GENERATED.search(path):
