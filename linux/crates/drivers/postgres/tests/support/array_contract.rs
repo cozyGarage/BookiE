@@ -71,6 +71,11 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
             "pg_lsn[]",
             "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
         ),
+        ("inet[]", "'[0:3]={192.0.2.1/24,NULL,2001:db8::1/64,192.0.2.1}'::inet[]"),
+        (
+            "cidr[]",
+            "'[0:3]={0.0.0.0/0,192.0.2.0/24,2001:db8::/32,2001:db8::1/128}'::cidr[]",
+        ),
         (
             "macaddr[]",
             "'[0:2]={08:00:2b:01:02:03,NULL,AA:BB:CC:DD:EE:FF}'::macaddr[]",
@@ -601,6 +606,11 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         (
             "pg_lsn[]",
             "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
+        ),
+        ("inet[]", "'[0:3]={192.0.2.1/24,NULL,2001:db8::1/64,192.0.2.1}'::inet[]"),
+        (
+            "cidr[]",
+            "'[0:3]={0.0.0.0/0,192.0.2.0/24,2001:db8::/32,2001:db8::1/128}'::cidr[]",
         ),
         (
             "macaddr[]",
