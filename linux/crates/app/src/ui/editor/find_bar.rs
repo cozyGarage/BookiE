@@ -47,8 +47,7 @@ impl FindBar {
         let next = flat_button("go-down-symbolic", &crate::tr!("Next match"));
         let count = gtk::Label::builder().xalign(1.0).width_chars(12).build();
         count.add_css_class("dim-label");
-        let match_case = flat_toggle("Aa", &crate::tr!("Match case"));
-        let regex = flat_toggle(".*", &crate::tr!("Regular expression"));
+        let (match_case, regex) = search_option_toggles();
         let replace_toggle = gtk::ToggleButton::builder()
             .icon_name("edit-find-replace-symbolic")
             .tooltip_text(crate::tr!("Replace"))
@@ -260,6 +259,13 @@ fn row_of(widgets: &[&gtk::Widget]) -> gtk::Box {
         row.append(*widget);
     }
     row
+}
+
+fn search_option_toggles() -> (gtk::ToggleButton, gtk::ToggleButton) {
+    (
+        flat_toggle("Aa", &crate::tr!("Match case")),
+        flat_toggle(".*", &crate::tr!("Regular expression")),
+    )
 }
 
 fn flat_toggle(label: &str, tooltip: &str) -> gtk::ToggleButton {
