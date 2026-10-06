@@ -100,6 +100,81 @@ async fn sqlite_group_concat_any_csv_round_trip_preserves_text_and_null() {
 }
 
 #[tokio::test]
+async fn sqlite_printf_any_csv_round_trip_preserves_text_and_null_semantics() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 42), (2, 1.25), (3, 'plain'), (4, 'NULL'), \
+             (5, '=1+1'), (6, ''), (7, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT id AS position, printf('%s', value) AS result, \
+                    typeof(printf('%s', value)) AS storage_class \
+             FROM flexible ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("42".into()), Value::Text("text".into())],
+            vec![Value::Int(2), Value::Text("1.25".into()), Value::Text("text".into())],
+            vec![Value::Int(3), Value::Text("plain".into()), Value::Text("text".into())],
+            vec![Value::Int(4), Value::Text("NULL".into()), Value::Text("text".into())],
+            vec![Value::Int(5), Value::Text("=1+1".into()), Value::Text("text".into())],
+            vec![Value::Int(6), Value::Text(String::new()), Value::Text("text".into())],
+            vec![Value::Int(7), Value::Text(String::new()), Value::Text("text".into())],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone(), row[2].clone()])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn sqlite_sum_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
