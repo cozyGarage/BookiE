@@ -725,13 +725,6 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
             "{0/16B6C50,NULL}",
             "[\"0/16B6C50\",null]",
         ),
-        ("bit[]", "ARRAY[B'101'::bit(3), NULL]", "{101,NULL}", "[\"101\",null]"),
-        (
-            "bit varying[]",
-            "ARRAY[B'101'::varbit, NULL]",
-            "{101,NULL}",
-            "[\"101\",null]",
-        ),
     ];
 
     for (expected_type, expression, expected_text, expected_json) in cases {
@@ -779,7 +772,8 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         .await
         .expect("enumerate built-in array element OIDs");
     let supported_oids = [
-        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1700, 2950,
+        16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1560, 1562,
+        1700, 2950,
     ];
     let mut seen_supported = Vec::new();
     let mut refused = 0;
