@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "linux",
+  "source_commit": "76b63f6ab426885129ccf6157cce0d06c594219d",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs": "e070d3174f6f484c721dc6700bdae0a55e5f2288c689f65d1e2e6a7c1e0e1456"
+  },
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "Mixed-case quoted enum identifiers under transaction-local shadowed search_path",
+  "test": "quoted_enum_identifier_contract::value_contract_mixed_case_enum_identifiers_survive_local_shadowed_search_path",
+  "contract": [
+    "A mixed-case quoted schema and enum type remain selected when lowercase-folded schema/type names lead transaction-local search_path.",
+    "Metadata lookup, keyed update, and typed filtering address the intended enum and row; native catalog checks confirm the target changed while sibling and shadow rows did not.",
+    "A label present only in the shadow enum is refused with native SQLSTATE 22P02.",
+    "Committing the transaction restores the connection's original session search_path."
+  ],
+  "validation": {
+    "identifier_suite": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration quoted_enum_identifier_contract -- --include-ignored --test-threads=1",
+      "result": "5 passed, 0 failed",
+      "log": "identifier-suite.txt"
+    },
+    "clippy": {
+      "command": "rtk proxy cargo clippy -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all -- --check",
+      "result": "passed",
+      "log": "fmt.txt"
+    },
+    "diff_check": "rtk git diff --check passed",
+    "documentation": "scripts/check-doc-links.py and scripts/check-known-issues.py passed"
+  },
+  "log_sha256": {
+    "identifier-suite.txt": "3e3651f6cbf157de5606515e024e38018d550decbf8bbc59645b77000df19a55",
+    "clippy.txt": "6b744d4979ad992869ffdce26fe780f77ff9928df6e876cb7b578cc8c58dd602",
+    "fmt.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "remaining": [
+    "Other PostgreSQL identifier forms and session/search_path permutations remain open; this focused case does not close the PostgreSQL enum or broader B3 matrix."
+  ]
+}

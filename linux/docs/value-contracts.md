@@ -3,7 +3,7 @@
 The shared standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 [The B3 board](type-contract-strategy.md) owns remaining tasks. This page is a
 bounded entry into case evidence, not another conversion policy or aggregate
-support claim. Updated 2026-10-06; this index links evidence but does not run tests.
+support claim. Updated 2026-10-07; this index links evidence but does not run tests.
 
 Recent PostgreSQL enum-function evidence covers both `enum_range(NULL::type)`
 and bounded `enum_range(start, end)` semantics under a same-named leading

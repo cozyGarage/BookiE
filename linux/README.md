@@ -13,7 +13,7 @@ The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHou
 
 Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
 
-The Linux client remains under development. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance; the September audits retain their dated verification. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4). Wayland soak remains an operator check after install.
+The Linux client remains under development toward 0.2.0. B3 type/value consumer coverage is still expanding; B4 and installed desktop qualification remain open. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4); they do not qualify the 0.2.0 source. Wayland soak remains an operator check after install.
 
 ## Linux versions
 
@@ -54,11 +54,14 @@ Running the statement asks for one value per name and sends them as driver-bound
 | GUI | GTK4 4.14+, GLib 2.80+, libadwaita 1.5+, GtkSourceView 5.12+ |
 | Components | Relm4 |
 | Async work | Tokio for database and service work, GLib main context for GTK |
-| Drivers | sqlx, tiberius, clickhouse, and engine-specific Rust crates |
+| Drivers | SQLx for PostgreSQL, MySQL, and SQLite; Tiberius for SQL Server; engine-specific crates for ClickHouse, Redis, MongoDB, and DuckDB |
+| Decimal values | `rust_decimal` carrier with precision/scale validation at each supported consumer |
 | Storage | XDG JSON files, SQLite FTS5, JSONL audit journal, Secret Service through `oo7` |
 | Packaging | GitHub Release `.deb` (required native libraries below) and Arch `.pkg`; no AUR or Flathub yet |
 
 Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
+
+Browse results share an in-memory query result, with GTK row objects created when the view requests them. This reduces eager per-row UI object creation; it does not page rows from the database or bound result memory.
 
 ## Build requirements
 

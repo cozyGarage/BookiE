@@ -565,6 +565,154 @@ async fn value_contract_mixed_case_enum_identifiers_resist_folded_shadow_names()
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_search_path() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let schema = "EnumCaseLocal";
+    let type_name = "StateKind";
+    connection.execute("CREATE SCHEMA \"EnumCaseLocal\"").await.unwrap();
+    connection.execute("CREATE SCHEMA enumcaselocal").await.unwrap();
+    connection
+        .execute("CREATE TYPE \"EnumCaseLocal\".\"StateKind\" AS ENUM ('ready', 'target-only')")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TYPE enumcaselocal.statekind AS ENUM ('ready', 'shadow-only')")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE \"EnumCaseLocal\".\"Rows\" \
+             (id INT PRIMARY KEY, state \"EnumCaseLocal\".\"StateKind\", sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE enumcaselocal.rows \
+             (id INT PRIMARY KEY, state enumcaselocal.statekind, sibling TEXT NOT NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO \"EnumCaseLocal\".\"Rows\" VALUES \
+             (1, 'ready', 'target-one'), (2, 'ready', 'target-two')",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO enumcaselocal.rows VALUES (1, 'ready', 'shadow-one')")
+        .await
+        .unwrap();
+
+    let original_path = connection.query("SHOW search_path").await.unwrap().rows;
+    let columns = connection.fetch_columns(Some(schema), "Rows").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: type_name.into(),
+        })
+    );
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(schema),
+        "Rows",
+        &columns,
+        &[(1, Value::Text("target-only".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("\"EnumCaseLocal\".\"StateKind\""), "{update_sql}");
+    let (where_sql, filter_params) = tablepro_core::build_filter_where(
+        "postgres",
+        &columns,
+        &FilterSet {
+            rules: vec![FilterRule {
+                column: "state".into(),
+                op: FilterOp::Eq,
+                value: Some(FilterValue::Single("target-only".into())),
+            }],
+            ..Default::default()
+        },
+    )
+    .unwrap()
+    .unwrap();
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction
+        .execute("SET LOCAL search_path TO enumcaselocal, \"EnumCaseLocal\", public")
+        .await
+        .unwrap();
+    transaction.execute_params(&update_sql, &update_params).await.unwrap();
+    let filtered = transaction
+        .query_params(
+            &format!("SELECT id FROM \"EnumCaseLocal\".\"Rows\" WHERE {where_sql}"),
+            &filter_params,
+        )
+        .await
+        .unwrap();
+    assert_eq!(filtered.rows, vec![vec![Value::Int(1)]]);
+
+    transaction.execute("SAVEPOINT before_invalid_label").await.unwrap();
+    let invalid = transaction
+        .execute_params(&update_sql, &[Value::Text("shadow-only".into()), Value::Int(1)])
+        .await
+        .expect_err("a shadow-only label is invalid for the target enum");
+    assert!(
+        matches!(&invalid, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "22P02"),
+        "expected native enum SQLSTATE 22P02, got {invalid:?}"
+    );
+    transaction
+        .execute("ROLLBACK TO SAVEPOINT before_invalid_label")
+        .await
+        .unwrap();
+    transaction.commit().await.unwrap();
+
+    assert_eq!(connection.query("SHOW search_path").await.unwrap().rows, original_path);
+    let native = connection
+        .query(
+            "SELECT n.nspname, t.typname, r.state::text, r.sibling \
+             FROM \"EnumCaseLocal\".\"Rows\" r \
+             JOIN pg_type t ON t.oid = pg_typeof(r.state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace \
+             UNION ALL \
+             SELECT n.nspname, t.typname, r.state::text, r.sibling \
+             FROM enumcaselocal.rows r \
+             JOIN pg_type t ON t.oid = pg_typeof(r.state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace \
+             ORDER BY 1, 2, 4",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        native.rows,
+        vec![
+            vec![
+                Value::Text("EnumCaseLocal".into()),
+                Value::Text("StateKind".into()),
+                Value::Text("target-only".into()),
+                Value::Text("target-one".into()),
+            ],
+            vec![
+                Value::Text("EnumCaseLocal".into()),
+                Value::Text("StateKind".into()),
+                Value::Text("ready".into()),
+                Value::Text("target-two".into()),
+            ],
+            vec![
+                Value::Text("enumcaselocal".into()),
+                Value::Text("statekind".into()),
+                Value::Text("ready".into()),
+                Value::Text("shadow-one".into()),
+            ],
+        ]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_unicode_enum_identifiers_survive_metadata_and_typed_writes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
