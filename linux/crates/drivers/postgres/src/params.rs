@@ -7,6 +7,8 @@ use crate::array::MAX_ARRAY_TEXT_BYTES;
 use crate::map_sqlx_error;
 use crate::query::{statement_columns, statement_type_infos};
 
+const PG_LSN_OID: u32 = 3220;
+
 pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
     pub(super) columns: Vec<ColumnInfo>,
@@ -100,6 +102,14 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
             }
             Ok(true)
         }
+        PgTypeKind::Simple if type_info.oid().is_some_and(|oid| oid.0 == PG_LSN_OID) => {
+            if domain_depth >= 64 {
+                return Err(DriverError::Unsupported(
+                    "PostgreSQL array element domain hierarchy exceeds the driver's resolvable depth".into(),
+                ));
+            }
+            Ok(true)
+        }
         PgTypeKind::Domain(base) => is_inferred_text_element(base, domain_depth + 1),
         _ => Ok(false),
     }
@@ -169,9 +179,15 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
             for element in &elements.elements {
                 match element {
                     Some(value) => {
-                        let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
-                        buffer.extend(&length.to_be_bytes());
-                        buffer.extend(value.as_bytes());
+                        if is_pg_lsn_type(element_type) {
+                            let encoded = encode_pg_lsn(value).ok_or("invalid PostgreSQL pg_lsn array element")?;
+                            buffer.extend(&8_i32.to_be_bytes());
+                            buffer.extend(&encoded);
+                        } else {
+                            let length = i32::try_from(value.len()).map_err(|_| "array element is too large")?;
+                            buffer.extend(&length.to_be_bytes());
+                            buffer.extend(value.as_bytes());
+                        }
                     }
                     None => buffer.extend(&(-1_i32).to_be_bytes()),
                 }
@@ -194,6 +210,27 @@ impl Encode<'_, Postgres> for PgInferredTextParameter<'_> {
     fn size_hint(&self) -> usize {
         self.value.map_or(0, str::len)
     }
+}
+
+fn is_pg_lsn_type(type_info: &PgTypeInfo) -> bool {
+    let mut current = type_info;
+    loop {
+        match current.kind() {
+            PgTypeKind::Domain(base) => current = base,
+            PgTypeKind::Simple => return current.oid().is_some_and(|oid| oid.0 == PG_LSN_OID),
+            _ => return false,
+        }
+    }
+}
+
+fn encode_pg_lsn(value: &str) -> Option<[u8; 8]> {
+    let (high, low) = value.split_once('/')?;
+    if high.is_empty() || low.is_empty() || value.matches('/').count() != 1 {
+        return None;
+    }
+    let high = u32::from_str_radix(high, 16).ok()?;
+    let low = u32::from_str_radix(low, 16).ok()?;
+    Some((u64::from(high) << 32 | u64::from(low)).to_be_bytes())
 }
 
 struct PgArrayText {
@@ -487,7 +524,7 @@ pub(super) fn pg_parameter_type_infos(params: &[Value]) -> Vec<PgTypeInfo> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_text_array_text;
+    use super::{encode_pg_lsn, parse_text_array_text};
     use tablepro_core::DriverError;
 
     #[test]
@@ -539,6 +576,21 @@ mod tests {
                 matches!(parse_text_array_text(text), Err(DriverError::Unsupported(_))),
                 "malformed array text should be refused: {text:?}"
             );
+        }
+    }
+
+    #[test]
+    fn value_contract_pg_lsn_array_elements_encode_full_unsigned_words() {
+        for (text, expected) in [
+            ("0/0", 0_u64),
+            ("0/FFFFFFFF", u32::MAX as u64),
+            ("1/0", 1_u64 << 32),
+            ("FFFFFFFF/FFFFFFFF", u64::MAX),
+        ] {
+            assert_eq!(encode_pg_lsn(text), Some(expected.to_be_bytes()), "{text}");
+        }
+        for malformed in ["", "0", "/1", "1/", "1/2/3", "100000000/0", "0/100000000", "x/y"] {
+            assert_eq!(encode_pg_lsn(malformed), None, "{malformed}");
         }
     }
 }

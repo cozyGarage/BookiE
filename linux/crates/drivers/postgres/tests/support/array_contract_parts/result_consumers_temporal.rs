@@ -719,12 +719,6 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
             "{08:00:2b:01:02:03:04:05,NULL}",
             "[\"08:00:2b:01:02:03:04:05\",null]",
         ),
-        (
-            "pg_lsn[]",
-            "ARRAY['0/16B6C50'::pg_lsn, NULL]",
-            "{0/16B6C50,NULL}",
-            "[\"0/16B6C50\",null]",
-        ),
     ];
 
     for (expected_type, expression, expected_text, expected_json) in cases {
@@ -757,6 +751,124 @@ async fn value_contract_unlisted_builtin_arrays_refuse_with_native_oracles() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    let expression = "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]";
+    let source = connection
+        .query(&format!(
+            "SELECT {expression} AS value, pg_typeof({expression})::text, \
+             {expression}::text, array_to_json({expression})::text, \
+             encode(array_send({expression}), 'hex')"
+        ))
+        .await
+        .unwrap();
+    let expected = &source.rows[0][0];
+    assert_eq!(expected, &Value::Text("[0:4]={\"0/0\",\"0/FFFFFFFF\",\"1/0\",\"FFFFFFFF/FFFFFFFF\",NULL}".into()));
+    assert_eq!(source.rows[0][1], Value::Text("pg_lsn[]".into()));
+    assert_eq!(source.rows[0][2], Value::Text("[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}".into()));
+    assert_eq!(source.rows[0][3], Value::Text("[\"0/0\",\"0/FFFFFFFF\",\"1/0\",\"FFFFFFFF/FFFFFFFF\",null]".into()));
+
+    connection
+        .execute("CREATE TABLE pg_lsn_array_grid (id integer PRIMARY KEY, value pg_lsn[], sibling text)")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO pg_lsn_array_grid VALUES (1, ARRAY['1/1'::pg_lsn], 'target'), (2, ARRAY['2/2'::pg_lsn], 'sibling')")
+        .await
+        .unwrap();
+    connection
+        .execute_params(
+            "UPDATE pg_lsn_array_grid SET value = $1 WHERE id = $2",
+            &[expected.clone(), Value::Int(1)],
+        )
+        .await
+        .expect("assignment context infers pg_lsn[] for the binary array parameter");
+    let bound = connection
+        .query("SELECT pg_typeof(value)::text, encode(array_send(value), 'hex') FROM pg_lsn_array_grid WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(bound.rows[0][0], Value::Text("pg_lsn[]".into()));
+    assert_eq!(bound.rows[0][1], source.rows[0][4]);
+    let sibling_before = connection
+        .query(
+            "SELECT id, pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM pg_lsn_array_grid WHERE id = 2",
+        )
+        .await
+        .unwrap();
+    let mut columns = connection.fetch_columns(None, "pg_lsn_array_grid").await.unwrap();
+    columns[0].primary_key = true;
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "pg_lsn_array_grid",
+        &columns,
+        &[(1, expected.clone())],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
+    let grid = connection
+        .query(
+            "SELECT id, pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM pg_lsn_array_grid ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(grid.rows[0][0], Value::Int(1));
+    assert_eq!(grid.rows[0][1], Value::Text("pg_lsn[]".into()));
+    assert_eq!(grid.rows[0][2], source.rows[0][2]);
+    assert_eq!(grid.rows[0][3], source.rows[0][4]);
+    assert_eq!(grid.rows[0][4], Value::Text("target".into()));
+    assert_eq!(grid.rows[1], sibling_before.rows[0]);
+
+    let invalid = connection
+        .execute_params(
+            "UPDATE pg_lsn_array_grid SET value = $1 WHERE id = $2",
+            &[Value::Text("{0/1,not-an-lsn}".into()), Value::Int(1)],
+        )
+        .await;
+    assert!(invalid.is_err(), "malformed LSN text must be rejected before the update");
+    let after_invalid = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM pg_lsn_array_grid WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(after_invalid.rows[0][0], source.rows[0][4]);
+
+    connection.execute("CREATE TABLE pg_lsn_csv_target (value pg_lsn[])").await.unwrap();
+    let csv = tablepro_core::export::render_csv(
+        &source.columns[..1],
+        &[source.rows[0][..1].to_vec()],
+        &tablepro_core::export::CsvOptions::default(),
+    );
+    let options = tablepro_core::import::CsvImportOptions::default();
+    let sheet = tablepro_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
+    let columns = connection.fetch_columns(None, "pg_lsn_csv_target").await.unwrap();
+    let plan = tablepro_core::import::build_insert_plan(
+        &tablepro_core::import::ImportTarget {
+            driver_id: "postgres",
+            schema: None,
+            table: "pg_lsn_csv_target",
+            columns: &columns,
+            mapping: &[Some(0)],
+        },
+        &sheet,
+        &options,
+    )
+    .expect("pg_lsn[] CSV value builds a typed INSERT plan");
+    connection.execute_params(&plan.statement, &plan.rows[0]).await.unwrap();
+    let restored = connection
+        .query("SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex') FROM pg_lsn_csv_target")
+        .await
+        .unwrap();
+    assert_eq!(restored.rows[0][0], source.rows[0][1]);
+    assert_eq!(restored.rows[0][1], source.rows[0][2]);
+    assert_eq!(restored.rows[0][2], source.rows[0][4]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
@@ -773,7 +885,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         .expect("enumerate built-in array element OIDs");
     let supported_oids = [
         16, 17, 19, 20, 21, 23, 25, 26, 700, 701, 1042, 1043, 1082, 1083, 1114, 1184, 1186, 1266, 1560, 1562,
-        1700, 2950,
+        1700, 2950, 3220,
     ];
     let mut seen_supported = Vec::new();
     let mut refused = 0;
