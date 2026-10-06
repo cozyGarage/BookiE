@@ -10,7 +10,13 @@ impl App {
         // Welcome lives outside the ViewStack — it's the disconnected mode.
         // The ViewSwitcherBar is hidden via on_disconnect so the welcome
         // view occupies the full toolbar surface.
-        self.content_holder.set_content(Some(self.welcome_view.widget()));
+        self.show_in_content_holder(self.welcome_view.widget());
+    }
+
+    pub(super) fn show_in_content_holder(&self, widget: &impl IsA<gtk::Widget>) {
+        if self.content_holder.content().as_ref() != Some(widget.upcast_ref()) {
+            self.content_holder.set_content(Some(widget));
+        }
     }
 
     /// Used during connect to convey "Connecting…". Persistent toast

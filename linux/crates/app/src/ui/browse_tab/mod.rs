@@ -1041,7 +1041,7 @@ impl SimpleComponent for BrowseTab {
                 // until next RowCountLoaded.
                 self.current_result = None;
                 self.current_total_rows = None;
-                self.paginator_label.set_label("");
+                self.set_paginator_text("");
                 self.first_button.set_sensitive(false);
                 self.prev_button.set_sensitive(false);
                 self.next_button.set_sensitive(false);

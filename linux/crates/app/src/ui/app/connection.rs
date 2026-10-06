@@ -101,7 +101,7 @@ impl App {
         // strip). Empty state shows "Select a table" until the user opens
         // a tab via sidebar click or Ctrl+T.
         self.ensure_workspace_root(sender.clone());
-        self.content_holder.set_content(Some(&self.workspace_outer_stack));
+        self.show_in_content_holder(&self.workspace_outer_stack);
         self.table_names = tables.iter().chain(views.iter()).map(|t| t.name.clone()).collect();
         tracing::info!(
             driver = %driver_id,

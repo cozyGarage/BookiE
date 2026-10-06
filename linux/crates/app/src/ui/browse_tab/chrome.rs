@@ -363,9 +363,15 @@ impl BrowseTab {
         }
     }
 
+    pub(super) fn set_paginator_text(&self, text: &str) {
+        self.paginator_label.set_label(text);
+        self.paginator_label
+            .update_property(&[gtk::accessible::Property::Label(text)]);
+    }
+
     pub(super) fn update_paginator_label(&self) {
         let Some(result) = self.current_result.as_ref() else {
-            self.paginator_label.set_label("");
+            self.set_paginator_text("");
             return;
         };
         let n_rows = result.rows.len();
@@ -375,7 +381,7 @@ impl BrowseTab {
             // RowCountLoaded clamps the offset back. Human
             // wording — the previous "No rows at offset N" read as
             // a bug message.
-            self.paginator_label.set_label(&crate::tr!("No rows on this page"));
+            self.set_paginator_text(&crate::tr!("No rows on this page"));
             return;
         }
         let start = self.current_offset + 1;
@@ -395,7 +401,7 @@ impl BrowseTab {
                 .replace("{start}", &start_s)
                 .replace("{end}", &end_s),
         };
-        self.paginator_label.set_label(&label);
+        self.set_paginator_text(&label);
     }
 
     pub(super) fn replace_status_child(&self, name: &str, child: &impl IsA<gtk::Widget>) {
