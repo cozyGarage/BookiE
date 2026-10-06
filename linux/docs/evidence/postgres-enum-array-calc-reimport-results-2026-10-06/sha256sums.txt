@@ -1,0 +1,12 @@
+487e94f2ff5965e566ff545e27b52ba8b137e97a8f858fca077fb23be687b55d  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/manifest.json
+98efa3de21883f07ae5d0f3120df6ab199cadeb71895e92fa4cdf28b170e08f6  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/source.xlsx
+29271b2165e323cc2317c8e477bf58a93478231c7364890d2676dbc1a846d5ac  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/calc-roundtrip.ods
+df2da1e295829d444012de45015b5040b79022916795f1539667f23f6f805f4e  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/calc-roundtrip.xlsx
+efbea3e465eb7886c135371919311389e46f001dde1703d5656d947f84faa288  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/bookiee-export-test.txt
+141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/libreoffice-version.txt
+0ea394e838054cca973e159ee4acc2890bbfb41a6c61fad50d0b76c9d6985454  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/calc-run.txt
+f3d921cbf602237a2ba7d42792ece6119824a0dd48901c3fdab7f6e49caf0932  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/consumer-check.txt
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/diff-check.txt
+438806528692e127f2612ac34774888a364ddd5838d1d1f8d58cf77662080f5f  docs/evidence/postgres-enum-array-calc-reimport-results-2026-10-06/verify_roundtrip.py
+b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a  scripts/xlsx_roundtrip.py
+2cfdda0f63badd5e3a5577bd7493072edba9bcffa6a4efc675df0cbcd9333b32  crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs

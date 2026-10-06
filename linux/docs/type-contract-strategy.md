@@ -340,6 +340,9 @@ full escaped array text and formula-shaped enum label unchanged
 A PostgreSQL custom `enum[]` with literal `NULL`, empty, Unicode, escaped,
 formula-shaped and SQL NULL elements also survives Gnumeric's XLSX/ODS/XLSX
 re-save with exact text and no formulas ([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-06/manifest.json)).
+The same custom `enum[]` shape survives LibreOffice Calc's XLSX/ODS/XLSX
+re-save with its exact escaped array text and no formulas
+([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-06/manifest.json)).
 A UUID-domain array now decodes by its base OID, with a typed keyed edit, CHECK
 refusal and sibling preservation ([evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
 Text, numeric and timestamptz domain arrays also pass qualified binding and

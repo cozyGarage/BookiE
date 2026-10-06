@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-enum-array-calc",
+  "baseline_commit": "c3ef8914b16f6881bae012a9fa3a5ea7e5a470be",
+  "case": "PostgreSQL custom enum-array XLSX re-import through LibreOffice Calc",
+  "test": "array_contract::value_contract_custom_enum_array_file_exports_preserve_labels",
+  "source": {
+    "path": "crates/drivers/postgres/tests/support/array_contract_parts/enum_array_file_consumers.rs",
+    "sha256": "2cfdda0f63badd5e3a5577bd7493072edba9bcffa6a4efc675df0cbcd9333b32"
+  },
+  "engine": "PostgreSQL 16 Docker integration fixture",
+  "application": {
+    "name": "LibreOffice Calc",
+    "version": "26.8.0.3",
+    "container_image": "tablepro-lo-calc@sha256:a4f6ba1a4300dc4e30ebb54a266c95ca6f14496ec0c4e97d41c363472db2682c"
+  },
+  "contract": [
+    "The PostgreSQL integration test exports a custom enum[] containing literal NULL, empty text, Unicode, comma and quote labels, markup, a formula-shaped label, a backslash label and a SQL NULL element as a string cell without formulas.",
+    "Native enum type, array_to_json and array_send oracles pass; SQL replay preserves a pre-existing sibling row.",
+    "LibreOffice Calc re-saves XLSX as ODS and back to XLSX; the complete escaped array literal remains identical, a string cell, and formula-free in both saved formats."
+  ],
+  "validation": {
+    "native_export_test": {
+      "command": "BOOKIEE_XLSX_REIMPORT_ARTIFACT=<evidence-dir>/source.xlsx cargo test --locked -p tablepro-driver-postgres --test integration custom_enum_array_file_exports_preserve_labels -- --include-ignored --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "bookiee-export-test.txt"
+    },
+    "calc_round_trip": {
+      "steps": [
+        "soffice --headless --convert-to ods --outdir <evidence-dir> source.xlsx",
+        "soffice --headless --convert-to xlsx --outdir <evidence-dir> calc-roundtrip.ods"
+      ],
+      "version_log": "libreoffice-version.txt",
+      "log": "calc-run.txt"
+    },
+    "consumer_assertions": {
+      "checker": "verify_roundtrip.py",
+      "checker_sha256": "438806528692e127f2612ac34774888a364ddd5838d1d1f8d58cf77662080f5f",
+      "shared_checker": "scripts/xlsx_roundtrip.py",
+      "shared_checker_sha256": "b71693c3c37b426ec8d132717aeca72b9814cef23034530781e2363e387e714a",
+      "log": "consumer-check.txt",
+      "result": "Exact array text, string-cell type, and no-formula assertions pass on source XLSX, Calc-saved ODS, and Calc-saved XLSX."
+    }
+  },
+  "artifact_sha256": {
+    "source.xlsx": "98efa3de21883f07ae5d0f3120df6ab199cadeb71895e92fa4cdf28b170e08f6",
+    "calc-roundtrip.ods": "29271b2165e323cc2317c8e477bf58a93478231c7364890d2676dbc1a846d5ac",
+    "calc-roundtrip.xlsx": "df2da1e295829d444012de45015b5040b79022916795f1539667f23f6f805f4e"
+  },
+  "log_sha256": {
+    "bookiee-export-test.txt": "efbea3e465eb7886c135371919311389e46f001dde1703d5656d947f84faa288",
+    "libreoffice-version.txt": "141d62e73b80f274423dfdc659267ae120bfade9db2030c025646aff8919a44e",
+    "calc-run.txt": "0ea394e838054cca973e159ee4acc2890bbfb41a6c61fad50d0b76c9d6985454",
+    "consumer-check.txt": "f3d921cbf602237a2ba7d42792ece6119824a0dd48901c3fdab7f6e49caf0932"
+  },
+  "remaining": [
+    "Other workbook types, spreadsheet applications, installed GTK editing, and the broader B3 matrix remain open."
+  ]
+}

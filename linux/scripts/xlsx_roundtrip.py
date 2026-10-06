@@ -37,13 +37,20 @@ def _ods_cell(path):
 
 
 def verify_xlsx_ods_xlsx(directory, expected, description):
+    return verify_spreadsheet_roundtrip(
+        directory, expected, description, "Gnumeric",
+        "gnumeric-roundtrip.ods", "gnumeric-roundtrip.xlsx",
+    )
+
+
+def verify_spreadsheet_roundtrip(directory, expected, description, application, ods_filename, xlsx_filename):
     directory = Path(directory)
     for name, reader in (
         ("source.xlsx", _xlsx_cell),
-        ("gnumeric-roundtrip.ods", _ods_cell),
-        ("gnumeric-roundtrip.xlsx", _xlsx_cell),
+        (ods_filename, _ods_cell),
+        (xlsx_filename, _xlsx_cell),
     ):
         actual = reader(directory / name)
         assert actual == expected, f"{name}: {actual!r} != {expected!r}"
     assert '"=1+1"' in expected and ",NULL}" in expected
-    return f"Gnumeric preserved {description}, formula-shaped text, NULL distinctions, and string cells across XLSX/ODS/XLSX"
+    return f"{application} preserved {description}, formula-shaped text, NULL distinctions, and string cells across XLSX/ODS/XLSX"
