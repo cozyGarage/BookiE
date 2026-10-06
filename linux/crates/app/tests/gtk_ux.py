@@ -143,7 +143,7 @@ def scenarios(ui):
     def view_value_opens_the_whole_cell_with_pretty_json(database, base):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
-        choose_menu_item(4)
+        choose_menu_item(3)
         ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
         ui.wait_for_node_containing('"a": 1')
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -152,7 +152,7 @@ def scenarios(ui):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         ui.wait_for_node(name="beta")
         open_cell_menu("1")
-        choose_menu_item(7)
+        choose_menu_item(6)
         ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG)
         switches = [
             node for node in ui.descendants(ui.application_node())
