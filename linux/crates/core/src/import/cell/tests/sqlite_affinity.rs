@@ -28,12 +28,13 @@ fn sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers() {
     for (data_type, text, expected_error) in [
         ("INTEGER", "9223372036854775808", CellError::NotAnInteger),
         ("REAL", "1e999", CellError::NotANumber),
+        ("REAL", "1e-400", CellError::NotANumber),
         ("NUMERIC", "0.123456789012345678901234567890123", CellError::NotANumber),
     ] {
         assert_eq!(
             value_for(text, &column("value", data_type), &options, "sqlite").unwrap_err(),
             expected_error,
-            "numeric-looking input must not fall back to lossy SQLite text for {data_type}"
+            "numeric-looking overflow, underflow or excess precision must not fall back for {data_type}"
         );
     }
 }
