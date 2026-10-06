@@ -40,6 +40,7 @@
 
 ### Changed
 
+- The app builds and runs its tests on Ubuntu 24.04 and Debian 13 (GTK 4.14, libadwaita 1.5 or newer); the shortcuts window uses the standard GTK layout.
 - Large results use about 45% less memory in the grid because rows are built only when they scroll into view.
 - The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]`, `macaddr8[]`, `inet[]` and `cidr[]` result, typed binding, keyed update and CSV round-trip contracts; other array families remain open.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.

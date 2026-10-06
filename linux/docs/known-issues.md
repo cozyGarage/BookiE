@@ -110,7 +110,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
 | PKG-1 | Arch installed pass on native Wayland: install, upgrade, rollback, askpass, GSettings, profile isolation | OPEN | Xvfb does not qualify | gtk-installed |
-| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | After PKG-1 | gtk-installed |
+| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | Build, unit and widget tiers now pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`scripts/test-distro-floor.sh`, CI job `distro-floor`). Still missing: the installed AT-SPI pass on those distros | gtk-installed |
 | PKG-3 | B7 soak: frozen SHA, 30 consecutive retry-free GTK attempts over six runs | OPEN | | gtk-installed |
 | PKG-4 | Real Flatpak build and install; Flathub submission; screenshots | OPEN | | manual |
 | PKG-5 | `dpkg-deb` contract skipped in harness; validators tested, installation not | OPEN | Debian runner | sandbox |
@@ -211,7 +211,7 @@ text values (about 0.6 KB each).
 ## Test environment
 
 The Arch runner `bookie-ci` on the office testlab builds and tests this tree:
-GTK 4.22, libadwaita 1.9, Rust 1.98, Docker, Xvfb, D-Bus, AT-SPI. Run any
+GTK 4.22, libadwaita 1.9 (the code builds against the Ubuntu 24.04 floor), Rust 1.98, Docker, Xvfb, D-Bus, AT-SPI. Run any
 command at a checkout's HEAD with the helper in the lab repository,
 `scripts/bookie-ci-run.sh <checkout> '<command>'`. Tiers that pass there are
 recorded per PR; none of them replaces the installed Wayland pass (PKG-1).

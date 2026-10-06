@@ -59,3 +59,17 @@ jobs:
         run: cd src/linux && bash scripts/test-gtk-postgres.sh
       - name: MySQL end-to-end
         run: cd src/linux && bash scripts/test-gtk-mysql.sh
+  distro-floor:
+    runs-on: arch
+    needs: gtk
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Ubuntu 24.04 and Debian 13
+        run: cd src/linux && bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
