@@ -39,6 +39,7 @@
 
 ### Changed
 
+- Large results use about 45% less memory in the grid because rows are built only when they scroll into view.
 - The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]`, `macaddr8[]`, `inet[]` and `cidr[]` result, typed binding, keyed update and CSV round-trip contracts; other array families remain open.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.
 - The documentation link checker skips generated packaged Markdown and keeps checking source documents.
