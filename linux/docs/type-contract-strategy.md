@@ -653,6 +653,12 @@ invalid-label refusal and rollback with a same-named shadow enum in
 This is a tested boundary case, not a maximum-depth claim; deeper chains remain
 open.
 
+A restricted PostgreSQL session now verifies enum parameter inference after
+`SET ROLE` with a same-named shadow enum first in `search_path`. The target-only
+label and SQL NULL retain the qualified target enum type; a shadow-only label
+matches PostgreSQL's native `22P02` refusal, and target/shadow siblings remain
+unchanged ([evidence](evidence/postgres-enum-set-role-shadow-results-2026-10-06/manifest.json)).
+
 PostgreSQL custom-enum results now cover accepted 63-byte ASCII and multibyte
 UTF-8 scalar and array labels plus refusal of a 64-byte label without partial type creation; see
 the [accepted boundary](evidence/postgres-enum-label-byte-boundary-results-2026-10-04/manifest.json)
