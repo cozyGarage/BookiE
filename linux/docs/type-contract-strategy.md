@@ -433,6 +433,9 @@ Other workbook cases, spreadsheet applications and installed editing remain open
 One PostgreSQL `text[]` result now has XML, HTML, Markdown and XLSX file-writer
 coverage plus a replayed SQL export, checked against native array JSON and wire
 oracles; see the [array export evidence](evidence/postgres-array-filewriter-results-2026-10-04/manifest.json).
+PostgreSQL `numeric[]` now also preserves exact text through XML, HTML and
+Markdown alongside its JSON, CSV, XLSX and native SQL replay checks
+([evidence](evidence/postgres-numeric-array-markup-export-results-2026-10-06/manifest.json)).
 Other array families remain open; spreadsheet-application re-import is covered
 for `text[]`, `uuid[]`, `date[]`, `timestamp[]`, `time[]`, `timetz[]`, `boolean[]`, `int8[]`, `smallint[]`, `integer[]`, `enum[]`, domain-over-enum `[]`, `bytea[]`,
 `timestamptz[]`, `interval[]`, `numeric[]`, `float8[]` and `float4[]` XLSX cells ([text[] Calc evidence](evidence/postgres-text-array-calc-reimport-results-2026-10-05/manifest.json), [uuid[] Calc evidence](evidence/postgres-uuid-array-calc-reimport-results-2026-10-05/manifest.json), [numeric[] Calc evidence](evidence/postgres-numeric-array-calc-reimport-results-2026-10-04/manifest.json), [float8[] Calc evidence](evidence/postgres-float8-array-calc-reimport-results-2026-10-04/manifest.json), [float4[] Calc evidence](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json)), with other shapes unverified (see the [enum[] evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-04/manifest.json),
