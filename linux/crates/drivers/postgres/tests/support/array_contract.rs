@@ -67,6 +67,10 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
             "interval[]",
             "ARRAY['-1 month +2 days +0.000001 seconds','+1 month -2 days -0.000001 seconds','-9223372036854.775808 seconds',NULL]::interval[]",
         ),
+        (
+            "pg_lsn[]",
+            "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
+        ),
     ] {
         let sql = format!("SELECT ({expression}) AS value, encode(array_send({expression}), 'hex') AS wire");
         let result = connection.query(&sql).await.unwrap();
@@ -585,6 +589,10 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         (
             "interval[]",
             "ARRAY['-1 month +2 days +0.000001 seconds','+1 month -2 days -0.000001 seconds',NULL]::interval[]",
+        ),
+        (
+            "pg_lsn[]",
+            "'[0:4]={0/0,0/FFFFFFFF,1/0,FFFFFFFF/FFFFFFFF,NULL}'::pg_lsn[]",
         ),
     ];
     let definitions = cases

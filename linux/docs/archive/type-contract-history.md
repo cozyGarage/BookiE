@@ -425,3 +425,13 @@ through the fixed built-in casts. PostgreSQL 16 confirms edited types and
 `array_send` bytes match native literals for zero-based arrays, empty bit
 strings and SQL NULL elements. Malformed input returns SQLSTATE `22P02` and
 leaves the edited and sibling rows unchanged ([grid evidence](../evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
+
+## PostgreSQL `pg_lsn[]` refusal baseline superseded — October 6
+
+The earlier built-in array census recorded `pg_lsn[]` as explicitly undecodable.
+That result is superseded by `value_contract_pg_lsn_array_result_bind_keyed_edit_and_csv_are_exact`:
+the binary decoder and inferred binding preserve the full LSN range and SQL
+NULL; the keyed-update builder and typed CSV import restore the native type and
+`array_send` bytes, with malformed input refused before mutation and the sibling
+row unchanged. Other unlisted array families remain open
+([current evidence](../evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).

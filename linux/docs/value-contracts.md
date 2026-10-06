@@ -64,6 +64,12 @@ and rows, including UUID result metadata in populated and zero-row results
 ([scalar evidence](evidence/value-uuid-multidriver-results-2026-10-05/manifest.json),
 [mixed projection evidence](evidence/duckdb-uuid-mixed-projection-results-2026-10-06/manifest.json)).
 
+PostgreSQL `pg_lsn[]` preserves all 64 LSN bits, its non-default lower bound
+and SQL NULL through result decoding, assignment-inferred binary binding,
+keyed updates and typed CSV import. Native type/text/JSON and `array_send`
+comparisons cover both successful paths and malformed-input refusal with target
+and sibling rows unchanged ([evidence](evidence/postgres-pg-lsn-array-results-2026-10-06/manifest.json)).
+
 A PostgreSQL `bytea[]` file-writer case preserves binary, empty and NULL array
 elements across JSON, CSV, XLSX and SQL replay ([evidence](evidence/postgres-bytea-array-filewriter-results-2026-10-04/manifest.json)).
 
