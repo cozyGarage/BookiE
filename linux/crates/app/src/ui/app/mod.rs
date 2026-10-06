@@ -901,7 +901,6 @@ impl SimpleComponent for App {
             AppMsg::ConnectionCancelled => self.on_connection_cancelled(),
             AppMsg::EditConnection(saved) => self.on_edit_connection(saved, sender),
             AppMsg::EditConnectionLoaded(prefill) => self.open_connect_dialog(Some(*prefill), sender),
-            AppMsg::EditConnectionFailed(message) => self.show_toast(&message),
             AppMsg::DuplicateConnection(id) => self.on_duplicate_connection(id, sender),
             AppMsg::ExportConnections => self.on_export_connections(sender),
             AppMsg::ExportConnectionsTo(choice) => self.on_export_connections_to(choice, sender),

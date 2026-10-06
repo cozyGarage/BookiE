@@ -3,7 +3,9 @@ use relm4::adw::prelude::*;
 use secrecy::{ExposeSecret, SecretString};
 
 use tablepro_core::{AuthMode, Environment};
-use tablepro_storage::{SavedConnection, SavedSshAuth, load_password, load_ssh_passphrase, load_ssh_password};
+use tablepro_storage::{
+    SavedConnection, SavedSshAuth, StorageError, load_password, load_ssh_passphrase, load_ssh_password,
+};
 
 use super::{AUTH_MODE_ROWS, ConnectDialog, DriverEntry};
 
@@ -13,33 +15,53 @@ pub struct ConnectionPrefill {
     pub password: Option<SecretString>,
     pub ssh_password: Option<SecretString>,
     pub ssh_passphrase: Option<SecretString>,
+    pub unreadable_secrets: bool,
 }
 
 pub fn has_jump_chain(saved: &SavedConnection) -> bool {
     saved.ssh.as_ref().is_some_and(|ssh| ssh.jump.is_some())
 }
 
-pub async fn load_prefill(saved: SavedConnection) -> Result<ConnectionPrefill, String> {
+pub fn readable(result: Result<Option<SecretString>, StorageError>, unreadable: &mut bool) -> Option<SecretString> {
+    match result {
+        Ok(secret) => secret,
+        Err(error) => {
+            tracing::warn!(%error, "a saved secret could not be read for editing");
+            *unreadable = true;
+            None
+        }
+    }
+}
+
+pub async fn load_prefill(saved: SavedConnection) -> ConnectionPrefill {
+    let mut unreadable_secrets = false;
     let password = match saved.auth_mode {
-        AuthMode::Password => load_password(saved.id).await.map_err(|e| e.to_string())?,
+        AuthMode::Password => readable(load_password(saved.id).await, &mut unreadable_secrets),
         AuthMode::Kerberos => None,
     };
     let (ssh_password, ssh_passphrase) = match saved.ssh.as_ref().map(|ssh| (&ssh.auth, ssh.agent)) {
-        Some((SavedSshAuth::Password, false)) => (load_ssh_password(saved.id).await.map_err(|e| e.to_string())?, None),
+        Some((SavedSshAuth::Password, false)) => (
+            readable(load_ssh_password(saved.id).await, &mut unreadable_secrets),
+            None,
+        ),
         Some((
             SavedSshAuth::PrivateKey {
                 has_passphrase: true, ..
             },
             false,
-        )) => (None, load_ssh_passphrase(saved.id).await.map_err(|e| e.to_string())?),
+        )) => (
+            None,
+            readable(load_ssh_passphrase(saved.id).await, &mut unreadable_secrets),
+        ),
         _ => (None, None),
     };
-    Ok(ConnectionPrefill {
+    ConnectionPrefill {
         saved,
         password,
         ssh_password,
         ssh_passphrase,
-    })
+        unreadable_secrets,
+    }
 }
 
 pub(super) fn environment_row(environment: Environment) -> u32 {
@@ -101,6 +123,11 @@ impl ConnectDialog {
         let title = crate::tr!("Edit {name}").replace("{name}", &saved.name);
         root.set_title(&title);
         self.header_title.set_text(&title);
+        if prefill.unreadable_secrets {
+            self.show_toast(&crate::tr!(
+                "The saved password could not be read from the keyring. Enter it again to keep password sign-in."
+            ));
+        }
         self.refresh_validity();
     }
 }
@@ -109,7 +136,7 @@ impl ConnectDialog {
 mod tests {
     use super::*;
     use tablepro_core::DriverMaturity;
-    use tablepro_storage::SavedSshConfig;
+    use tablepro_storage::{KeyringFailure, SavedSshConfig};
     use uuid::Uuid;
 
     fn entry(id: &str) -> DriverEntry {
@@ -188,6 +215,20 @@ mod tests {
         assert!(!has_jump_chain(&saved_with_ssh(None)));
         assert!(!has_jump_chain(&saved_with_ssh(Some(hop(None)))));
         assert!(has_jump_chain(&saved_with_ssh(Some(hop(Some(hop(None)))))));
+    }
+
+    #[test]
+    fn a_secret_that_cannot_be_read_is_flagged_instead_of_failing_the_edit() {
+        let mut unreadable = false;
+        let kept = readable(Ok(Some(SecretString::new("pw".into()))), &mut unreadable);
+        assert_eq!(kept.map(|s| s.expose_secret().to_string()), Some("pw".to_string()));
+        assert!(!unreadable);
+
+        assert!(readable(Ok(None), &mut unreadable).is_none());
+        assert!(!unreadable);
+
+        assert!(readable(Err(StorageError::Keyring(KeyringFailure::Unavailable)), &mut unreadable).is_none());
+        assert!(unreadable);
     }
 
     #[test]

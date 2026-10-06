@@ -1,5 +1,28 @@
+import ctypes
 import json
 import time
+
+
+def x11_click(x, y, button=3):
+    x11 = ctypes.CDLL("libX11.so.6")
+    xtst = ctypes.CDLL("libXtst.so.6")
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XFlush.argtypes = [ctypes.c_void_p]
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    xtst.XTestFakeMotionEvent.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_ulong]
+    xtst.XTestFakeButtonEvent.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_int, ctypes.c_ulong]
+    display = x11.XOpenDisplay(None)
+    assert display, "X11 display is unavailable"
+    try:
+        xtst.XTestFakeMotionEvent(display, -1, int(x), int(y), 0)
+        x11.XFlush(display)
+        time.sleep(0.2)
+        xtst.XTestFakeButtonEvent(display, button, 1, 0)
+        xtst.XTestFakeButtonEvent(display, button, 0, 0)
+        x11.XFlush(display)
+    finally:
+        x11.XCloseDisplay(display)
 
 
 def scenarios(ui):
@@ -28,12 +51,9 @@ def scenarios(ui):
         return json.loads(files[0].read_text())["connections"]
 
     def open_cell_menu(cell_text):
-        cell = ui.wait_for_node(name=cell_text)
-        for index in range(cell.queryAction().nActions):
-            if cell.queryAction().getName(index) == "menu.popup":
-                cell.queryAction().doAction(index)
-                return
-        raise AssertionError(f"cell {cell_text!r} has no context menu:\n{ui.accessible_snapshot()}")
+        cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_LABEL)
+        extents = cell.queryComponent().getExtents(pyatspi.DESKTOP_COORDS)
+        x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
 
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)

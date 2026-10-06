@@ -30,7 +30,6 @@ pub enum AppMsg {
     DeleteConnection(Uuid),
     EditConnection(SavedConnection),
     EditConnectionLoaded(Box<crate::ui::connect_dialog::ConnectionPrefill>),
-    EditConnectionFailed(String),
     DuplicateConnection(Uuid),
     ExportConnections,
     ExportConnectionsTo(crate::ui::connection_bundle::ExportChoice),
