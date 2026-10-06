@@ -180,7 +180,9 @@ def scenarios(ui):
         ui.wait_for_node(name="alpha")
 
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
-        ui.set_editor_text("select 1")
+        editor = ui.set_editor_text("select 1")
+        extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + 60, extents.y + 10, button=1)
         time.sleep(0.3)
         ui.press_x11_key("slash", ("Control_L",))
         deadline = time.monotonic() + ui.WAIT_SECONDS
