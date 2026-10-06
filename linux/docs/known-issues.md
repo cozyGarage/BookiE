@@ -44,6 +44,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-28 | ~~The grid cell menu had no standard keyboard shortcut~~ | DONE | Shift+F10 added beside the Menu key | gtk-installed |
 | UI-29 | ~~Editing a connection failed outright when the keyring was unavailable or its unlock was cancelled~~ | DONE | `prefill.rs` `readable` test; scenario `editing_a_saved_connection_*` | unit + gtk-installed |
 | UI-30 | ~~Find and replace fields had no accessible name~~ | DONE | Labels added; scenario `find_bar_replaces_every_match_in_the_editor` | gtk-installed |
+| UI-31 | ~~Every cell edit on a SQLite or DuckDB table asked for a manual write approval~~ | DONE | `policy/tests/generated_updates_classify.rs` across five engines; scenario `browse_edit_cell_and_save_persists_to_the_database` | unit + gtk-installed |
 | UI-10 | Multi-statement results use one switcher button per statement | OPEN | Named, pinnable result tabs in `outcomes.rs` | gtk-widget |
 | UI-11 | Sidebar is a flat tables and views list; other objects only in the Catalog window | OPEN | `GtkTreeListModel` tree | gtk-widget |
 | UI-12 | No database or schema switcher | OPEN | Core has no `list_databases`; plan with B4 | driver-docker |
@@ -138,6 +139,9 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-16 | Mongo hostile-server handshake not run end to end | OPEN | | driver-docker |
 | TEST-18 | ~~The installed GTK suite had no scenarios for connection edit, find, value viewer or columns~~ | DONE | `gtk_ux.py`: four scenarios pass on the Arch runner | gtk-installed |
 | TEST-19 | ~~The installed GTK suite assumed no keyring and the old default driver~~ | DONE | Fixed in this change: isolated unlocked keyring in `test-gtk-safety.sh`, PostgreSQL title; keep both | gtk-installed |
+| TEST-20 | ~~No scenario proved the browse edit-and-save loop against a database with an independent oracle~~ | DONE | `browse_edit_cell_and_save_persists_to_the_database` (SQLite, real key presses, `sqlite3` read-back) | gtk-installed |
+| TEST-21 | ~~No installed-GTK scenario against a real PostgreSQL server~~ | DONE | `scripts/test-gtk-postgres.sh`: saved connection, keyring password, live rows, value viewer | gtk-installed |
+| TEST-22 | ~~The runner's default virtual CPU hid AVX, so MongoDB 7 containers exited and 29 driver tests failed~~ | DONE | `--cpu host`; MongoDB suite 31 of 31 on the runner | driver-docker |
 | TEST-17 | ~~No check that documentation links resolve~~ | DONE | `scripts/check-doc-links.py` in the harness | sandbox |
 
 ## Documentation and other
@@ -162,3 +166,7 @@ GTK 4.22, libadwaita 1.9, Rust 1.98, Docker, Xvfb, D-Bus, AT-SPI. Run any
 command at a checkout's HEAD with the helper in the lab repository,
 `scripts/bookie-ci-run.sh <checkout> '<command>'`. Tiers that pass there are
 recorded per PR; none of them replaces the installed Wayland pass (PKG-1).
+
+The VM must use the `host` CPU type: the default virtual CPU hides AVX and
+MongoDB 5 and later will not start. `scripts/test-gtk-postgres.sh` and the
+Docker driver suites (`scripts/ci-local.sh integration`) run there.
