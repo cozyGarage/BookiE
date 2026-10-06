@@ -238,11 +238,17 @@ replay under both MariaDB mode combinations, against native bytes and NULL state
 
 The SQL statement scanner now has focused cases for exact byte spans across
 comments, escaped strings, bracket identifiers and tagged dollar quotes, plus
-MySQL's non-nested block-comment boundary and empty/cursor-at-end inputs.
+MySQL's non-nested block-comment boundary, dollar text that is not a quoted
+span, and empty/cursor-at-end inputs.
 Targeted mutations for ClickHouse backtick escapes and invalid PostgreSQL
-dollar-tag characters are now killed. The nested-comment case also kills a
-bad doubled-index mutation; backward-index mutants still time out. See the
+dollar-tag characters are now killed. The new MySQL dollar-boundary test kills
+a missed guard mutation. Direct span-length assertions now kill five
+zero-span mutations that previously timed out in the full test set; seven
+index-progress mutations still time out in the narrowed recheck. The
+nested-comment case also kills a bad doubled-index mutation. See the
 [mutation report](evidence/sql-lex-mutation-results-2026-10-06/README.md).
+The regression and targeted mutation evidence is retained in
+[its case packet](evidence/sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json).
 
 SQLite `substr()` over STRICT `ANY` now round-trips INTEGER/REAL-derived text,
 ordinary and empty TEXT, UTF-8 and binary BLOBs, and SQL NULL through typed CSV.

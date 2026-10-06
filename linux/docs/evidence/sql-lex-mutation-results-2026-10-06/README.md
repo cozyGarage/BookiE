@@ -18,6 +18,19 @@ The fixture now uses a shorter inner comment; the final check catches that
 mutation, while the backward-index mutation still times out as expected.
 The focused unit selector passed 12 tests.
 
+## Follow-up triage, October 6
+
+An exact-span selector was run against the five function-body replacements that
+returned zero/empty spans and had timed out in the full suite. It caught those
+mutants without timing out. That focused run also missed a guard mutation in
+`dollar_quote_length`: with the guard changed from `||` to `&&`, MySQL dollar
+text was incorrectly treated as a dollar-quoted body. The permanent regression
+`a_mysql_dollar_delimiter_is_not_a_quoted_span` now kills that mutation. Seven
+index-progress mutations still timed out in the narrowed recheck; one other
+mutation from the original full run was caught in follow-up. Keep scanner
+mutation triage open until those timeouts are individually classified. See the
+[MySQL dollar-boundary packet](../sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json).
+
 The latest tested `sql_lex.rs` SHA-256 was
 `90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148`.
 
