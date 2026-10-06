@@ -1,0 +1,4 @@
+Command:
+rtk cargo mutants --package tablepro-core --file crates/core/src/sql_lex.rs --re 'sql_lex.rs:(69:23|78:24|116:19|121:19|125:15)' --test-tool cargo --output target/quality/20261006-sql-lex-cursor-guard-test-recheck-linux916ed --timeout 20 --in-place -- --lib sql_lex::tests::scanner_progress_makes_bounded_inputs_finish
+
+10 mutants tested in 34s: 10 caught

@@ -33,6 +33,13 @@ and related guards reports 24 caught, 0 missed and 0 timed out. The 13 original
 timeout-classified mutations are all included and caught. Full results are in
 the [MySQL dollar-boundary packet](../sql-lex-mysql-dollar-boundary-results-2026-10-06/manifest.json).
 
+The separate 24-mutant recheck using the whole `sql_lex::tests` module is
+retained in `timeout-recheck-outcomes.json`: 16 were caught and 7 timed out.
+Selecting only `scanner_progress_makes_bounded_inputs_finish` avoids running
+other scanner tests without the subprocess deadline. That exact selector caught
+all ten generated cursor-arithmetic variants in 34 seconds, with no misses or
+timeouts ([cursor mutation packet](../sql-lex-cursor-arithmetic-guard-results-2026-10-06/manifest.json)).
+
 The five zero-length-span timeout mutants also exposed two consumers that
 trusted `skip_span` to return a positive length. The named-parameter rewriter
 and SQL diagnostics scanner now ignore zero-length spans, matching
@@ -40,8 +47,8 @@ and SQL diagnostics scanner now ignore zero-length spans, matching
 timeout; the [zero-progress guard packet](../sql-lex-zero-progress-guards-results-2026-10-06/manifest.json)
 records the regression and its test results.
 
-The latest tested `sql_lex.rs` SHA-256 was
-`90de78b764df0fddc7369bef7b95c08b6838fd6b44b0b4750d4c3aacd325f148`.
+The cursor mutation packet records the tested `sql_lex.rs` SHA-256
+`f4097ac3c97524db2b83210c8787afbcba4f7a7883ad502596f30902d5b5e574`.
 
 Commands, from `linux/`:
 
