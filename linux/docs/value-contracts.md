@@ -286,6 +286,8 @@ The same workbook's formula-shaped enum label and escaped array text also surviv
 A separate PostgreSQL custom `enum[]` workbook preserves literal `NULL`, empty,
 Unicode, escaped, formula-shaped and SQL NULL elements through Gnumeric's
 XLSX/ODS/XLSX re-save ([evidence](evidence/postgres-enum-array-gnumeric-reimport-results-2026-10-06/manifest.json)).
+LibreOffice Calc also preserves that custom `enum[]` workbook through its
+XLSX/ODS/XLSX re-save ([evidence](evidence/postgres-enum-array-calc-reimport-results-2026-10-06/manifest.json)).
 A UUID-domain array now decodes using its base OID and preserves NULL versus empty arrays, bound round trips, keyed edits, domain CHECK refusal and sibling rows ([UUID-domain array evidence](evidence/postgres-domain-uuid-array-results-2026-10-04/manifest.json)).
 Domain arrays over text, numeric and timestamptz also preserve NULL elements through qualified binding under an Asia/Kathmandu session, checked against native JSON and wire bytes ([base-type matrix evidence](evidence/postgres-domain-array-family-results-2026-10-04/manifest.json)).
 
