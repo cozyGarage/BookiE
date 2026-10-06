@@ -153,7 +153,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
-| DOC-1 | `po/tablepro.pot` is stale | OPEN | Run `update-translations.py` in its own commit | manual |
+| DOC-1 | ~~`po/tablepro.pot` is stale~~ | DONE | Regenerated 2026-10-07 with `scripts/update-translations.py` in its own commit; 24 more source files are now listed in `POTFILES.in` | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
 | DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
