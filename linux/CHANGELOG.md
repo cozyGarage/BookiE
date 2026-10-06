@@ -9,6 +9,7 @@
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
 - PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` with a same-named shadow enum in `search_path`, including SQL NULL, target-only values and native invalid-label refusal.
+- PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured `search_path` places a same-named shadow enum first; target-only/NULL values and native invalid-label refusal are covered.
 
 ### Changed
 

@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test enum_role_context_contract::value_contract_enum_parameter_stays_with_target_type_after_role_login ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 185 filtered out; finished in 2.14s
+
