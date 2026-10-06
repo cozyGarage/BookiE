@@ -5,6 +5,7 @@
 ### Added
 
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
+- PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
@@ -27,7 +28,7 @@
 
 ### Changed
 
-- B3 documentation and the ignored-test inventory now record PostgreSQL `citext[]` as an open capability with explicit visible-refusal coverage; exact typed support remains unfinished.
+- The B3 board and ignored-test inventory now record the completed PostgreSQL `citext[]` result, typed binding, grid-edit and CSV round-trip contract, while other custom PostgreSQL array families remain open.
 - The SQLite B3 summary removes duplicate `quote()`/`instr()` evidence links and links both typed-CSV packets directly.
 - DuckDB nested-result coverage now compares STRUCT and MAP values containing UHUGEINT against native type/value oracles, then verifies explicit decoder refusal plus refusal by SQL literal and parameter consumers.
 - SQLite STRICT ANY typed CSV coverage now checks `hex()` results for mixed native inputs, including empty text and SQL NULL results that both produce empty TEXT.

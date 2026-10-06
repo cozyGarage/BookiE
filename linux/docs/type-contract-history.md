@@ -395,16 +395,17 @@ When Oracle is introduced later, require this same applicable conformance suite
 plus Oracle-native cases before claiming support. Define its NUMBER, DATE,
 timestamp/timezone, interval, LOB and empty-string semantics explicitly. Do not
 
-## PostgreSQL `citext[]` refusal boundary — 2026-10-06
+## PostgreSQL `citext[]` refusal baseline — 2026-10-06
 
 The scalar `citext` contract covers case-preserving text and case-insensitive
-comparison, but the array path does not yet carry qualified custom-array type
-metadata into consumers. `array_contract::value_contract_citext_array_is_visible_undecodable`
-pins the current boundary: non-null and empty `citext[]` results are
-`Undecodable("CITEXT[]")`; SQL NULL stays NULL; native text, type, wire bytes,
-case-insensitive comparison, SQL-literal refusal, parameter refusal, and the
-visible CSV marker are independently asserted. Exact `citext[]` result and
-consumer support remains open B3 work.
+comparison. This original test and evidence packet recorded a then-current
+refusal boundary: non-null and empty arrays displayed as
+`Undecodable("CITEXT[]")`, with SQL NULL distinct. That status was superseded
+by `value_contract_citext_array_decodes_and_rebinds_exact_values` and
+`value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling`,
+which now cover result, parameter, grid and CSV round-trips against native wire
+oracles ([current evidence](evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json),
+[original refusal evidence](evidence/postgres-citext-array-refusal-results-2026-10-06/manifest.json)).
 
 ## PostgreSQL BIT and VARBIT arrays — 2026-10-06
 

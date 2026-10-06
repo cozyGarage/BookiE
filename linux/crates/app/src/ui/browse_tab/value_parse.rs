@@ -888,6 +888,10 @@ mod postgres_array_contract;
 mod postgres_bit_array_grid;
 
 #[cfg(test)]
+#[path = "../../../tests/support/postgres_citext_array_grid.rs"]
+mod postgres_citext_array_grid;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mongodb_nested_edit_contract.rs"]
 mod mongodb_nested_edit_contract;
 

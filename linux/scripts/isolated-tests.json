@@ -38,6 +38,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::postgres_citext_array_grid::value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "services::approval_router::tests::value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution"
     ],
     [

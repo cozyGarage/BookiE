@@ -22,7 +22,7 @@ mod session;
 mod temporal;
 mod transaction;
 
-use params::{bind_pg_params, describe_query_parameters, needs_enum_type_inference};
+use params::{bind_pg_params, describe_query_parameters, needs_text_type_inference};
 use query::{execute_connection, execute_connection_once, query_connection, query_connection_once, stream_into_result};
 
 pub struct PgDriver;

@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "branch": "b3/postgres-citext-array-roundtrip",
+  "source_commit": "6c9ce663f7b360f38c7c97d50891c34d4a37f25b",
+  "engine": "PostgreSQL 16 in Docker via testcontainers",
+  "case": "citext[] result, typed binding, grid edit, and CSV round trip",
+  "tests": [
+    "array_contract::value_contract_citext_array_decodes_and_rebinds_exact_values",
+    "domain_depth_boundary_contract::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary",
+    "ui::browse_tab::value_parse::postgres_citext_array_grid::value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling"
+  ],
+  "contract": [
+    "Binary result decoding preserves exact citext[] labels, multidimensional shape, zero-based lower bounds, empty elements, literal NULL text, escaped quotes, Unicode, SQL NULL, and empty arrays.",
+    "Inferred bound reads and writes preserve the native citext[] type and array_send bytes; citext case-insensitive comparison semantics remain PostgreSQL-owned.",
+    "Keyed grid editing and CSV export/import preserve native type, text, JSON values, and array_send bytes while leaving the sibling row unchanged.",
+    "Malformed array text is refused before changing the target row; a same-named composite type remains visibly undecodable.",
+    "The existing 64-level enum-array parameter inference refusal boundary remains intact."
+  ],
+  "validation": {
+    "driver_focused": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration array_contract::value_contract_citext_array_decodes_and_rebinds_exact_values -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "driver-focused.txt"
+    },
+    "app_grid_focused": {
+      "command": "rtk proxy cargo test -p tablepro-app --lib ui::browse_tab::value_parse::postgres_citext_array_grid::value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "app-grid-focused.txt"
+    },
+    "enum_array_depth_boundary": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration domain_depth_boundary_contract::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary -- --include-ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed",
+      "log": "domain-array-depth.txt"
+    },
+    "postgres_array_contract_suite": {
+      "command": "rtk proxy cargo test -p tablepro-driver-postgres --test integration array_contract:: -- --include-ignored --test-threads=1",
+      "result": "52 passed, 0 failed",
+      "log": "postgres-array-suite.txt"
+    },
+    "postgres_driver_clippy": {
+      "command": "rtk proxy cargo clippy -p tablepro-driver-postgres --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "driver-clippy.txt"
+    },
+    "app_clippy": {
+      "command": "rtk proxy cargo clippy -p tablepro-app --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "app-clippy.txt"
+    },
+    "format": {
+      "command": "rtk proxy cargo fmt --all --check",
+      "result": "passed",
+      "log": "format.txt"
+    },
+    "local_harness": {
+      "command": "rtk proxy bash scripts/test-harness.sh",
+      "result": "70 Python checks, ignored-test inventory, package checks, and function-size check passed",
+      "log": "harness.txt"
+    }
+  },
+  "log_sha256": {
+    "app-clippy.txt": "a606015189aa2dbffc1aa0a3615add8d98a4d9f970afdbb662ec548a92477e1e",
+    "app-grid-focused.txt": "7f195a02b5556e54a6d23f05fbba03063c28f25f433e513bcdcd27acb44bc693",
+    "domain-array-depth.txt": "1143319f41bcd734100749800dcd1287ebec9ea2626c9e6a627a8419f568b58f",
+    "driver-clippy.txt": "c70d9a0f5288a626ef2ae6722e2dc315c380cc93d649bed95a96ec15171578d9",
+    "driver-focused.txt": "724c9188455ed0a346d60bdb4b235f4abc4cb25196587b8a52b2670005622bce",
+    "format.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "harness.txt": "41e5b5d3191df50433c3ea2cf09aa54abbbe77e986c241167cafbfacd2a999bb",
+    "postgres-array-suite.txt": "fef2b8bc152808b9703df314f59662fb95506a7be506a10ebe5a78bed788aa8d"
+  },
+  "remaining": [
+    "Other custom PostgreSQL array families remain open in B3.",
+    "PgTypeInfo exposes custom type name and kind but not namespace; a non-extension simple base type named citext is not distinguished by this decoder. The code marks the boundary and OID-based extension membership is the upgrade path if that collision is in scope."
+  ]
+}

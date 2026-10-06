@@ -8,7 +8,7 @@ pub(super) async fn execute_in_transaction_checked(
     let mut tx = pool.begin().await.map_err(map_sqlx_error)?;
     let mut affected = Vec::with_capacity(statements.len());
     for (index, (sql, params)) in statements.iter().enumerate() {
-        let inferred_text_types = if needs_enum_type_inference(params) {
+        let inferred_text_types = if needs_text_type_inference(params) {
             match describe_query_parameters(&mut tx, sql, params).await {
                 Ok(description) => description.inferred_text_types,
                 Err(error) => return Err(transaction_failure(tx, index, error).await),

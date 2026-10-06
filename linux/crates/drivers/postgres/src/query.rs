@@ -6,7 +6,7 @@ use sqlx::postgres::{PgRow, PgTypeInfo, PgTypeKind};
 use sqlx::{Column, Connection, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
 use tablepro_core::{ColumnInfo, DriverError, ExecResult, MAX_QUERY_ROWS, QueryResult, QueryResultBudget, Value};
 
-use super::params::{bind_pg_params, describe_query_parameters, needs_enum_type_inference, pg_parameter_type_infos};
+use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
 
 pub(super) async fn query_connection(
@@ -30,7 +30,7 @@ pub(super) async fn query_connection_once(
     sql: &str,
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
-    let description = if needs_enum_type_inference(params) {
+    let description = if needs_text_type_inference(params) {
         Some(describe_query_parameters(connection, sql, params).await?)
     } else {
         None
@@ -78,7 +78,7 @@ pub(super) async fn execute_connection_once(
     sql: &str,
     params: &[Value],
 ) -> Result<ExecResult, DriverError> {
-    let inferred_text_types = if needs_enum_type_inference(params) {
+    let inferred_text_types = if needs_text_type_inference(params) {
         describe_query_parameters(connection, sql, params)
             .await?
             .inferred_text_types

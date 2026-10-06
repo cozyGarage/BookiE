@@ -1,0 +1,9 @@
+   Compiling tablepro-driver-postgres v0.1.0 (/home/trung/Projects/tablepro/linux/crates/drivers/postgres)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.70s
+     Running tests/integration.rs (target/debug/deps/integration-ed30049cf07994c0)
+
+running 1 test
+test domain_depth_boundary_contract::value_contract_inferred_enum_array_parameter_respects_domain_depth_boundary ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 187 filtered out; finished in 2.31s
+
