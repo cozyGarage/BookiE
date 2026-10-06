@@ -103,6 +103,13 @@ def scenarios(ui):
         cell = ui.wait_for_node(name=cell_text, role=pyatspi.ROLE_LABEL)
         extents = cell.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
         x11_click(extents.x + min(extents.width, 40) // 2, extents.y + extents.height // 2)
+        time.sleep(0.4)
+
+    def choose_menu_item(position):
+        for _ in range(position):
+            ui.press_x11_key("Down")
+            time.sleep(0.1)
+        ui.press_x11_key("Return")
 
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
@@ -136,7 +143,7 @@ def scenarios(ui):
     def view_value_opens_the_whole_cell_with_pretty_json(database, base):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
-        ui.invoke(ui.wait_for_node(name="View Value…"))
+        choose_menu_item(4)
         ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
         ui.wait_for_node_containing('"a": 1')
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
@@ -145,7 +152,7 @@ def scenarios(ui):
         ui.run_sql("SELECT 1 AS alpha, 2 AS beta")
         ui.wait_for_node(name="beta")
         open_cell_menu("1")
-        ui.invoke(ui.wait_for_node(name="Columns…"))
+        choose_menu_item(7)
         ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG)
         switches = [
             node for node in ui.descendants(ui.application_node())

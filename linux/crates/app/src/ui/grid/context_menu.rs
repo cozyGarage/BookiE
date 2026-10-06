@@ -456,7 +456,10 @@ pub(super) fn attach_cell_gesture(
     let edit_action = menus.edit_action.clone();
     let gesture_popover = popover.clone();
     let gesture_name = column_name.clone();
-    let gesture = gtk::GestureClick::builder().button(3).build();
+    let gesture = gtk::GestureClick::builder()
+        .button(3)
+        .propagation_phase(gtk::PropagationPhase::Capture)
+        .build();
     gesture.connect_pressed(move |gesture, _, x, y| {
         gesture.set_state(gtk::EventSequenceState::Claimed);
         select_row_for_menu(&view, POSITION_SLOT.get(&gesture_widget).unwrap_or(0));
