@@ -63,6 +63,13 @@ pub(super) fn resolved_socket_path(directory: &str, port: u16) -> std::path::Pat
     std::path::Path::new(directory).join(format!(".s.PGSQL.{port}"))
 }
 
+pub(super) fn test_result_text(result: &Result<usize, String>) -> String {
+    match result {
+        Ok(tables) => crate::tr!("Connection ok · {n} table(s) visible").replace("{n}", &tables.to_string()),
+        Err(error) => crate::tr!("Test failed: {error}").replace("{error}", error),
+    }
+}
+
 pub(super) fn default_driver_row(drivers: &[super::DriverEntry]) -> u32 {
     drivers.iter().position(|d| d.id == "postgres").unwrap_or(0) as u32
 }
@@ -221,5 +228,14 @@ mod tests {
     fn the_default_driver_falls_back_to_the_first_row() {
         assert_eq!(default_driver_row(&[driver("clickhouse"), driver("sqlite")]), 0);
         assert_eq!(default_driver_row(&[]), 0);
+    }
+
+    #[test]
+    fn a_test_result_names_the_table_count_or_the_failure() {
+        assert_eq!(test_result_text(&Ok(3)), "Connection ok · 3 table(s) visible");
+        assert_eq!(
+            test_result_text(&Err("password rejected".into())),
+            "Test failed: password rejected"
+        );
     }
 }

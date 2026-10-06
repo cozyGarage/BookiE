@@ -43,6 +43,7 @@ pub struct ConnectDialog {
     test_button: gtk::Button,
     submit: gtk::Button,
     toast_overlay: adw::ToastOverlay,
+    test_banner: adw::Banner,
     header_title: gtk::Label,
     header_actions: gtk::Box,
     form: AuthFormState,
@@ -77,7 +78,10 @@ mod form;
 mod identity;
 mod prefill;
 
-use form::{AuthFormState, EndpointFormState, default_driver_row, resolved_socket_path, socket_directory_is_valid};
+use form::{
+    AuthFormState, EndpointFormState, default_driver_row, resolved_socket_path, socket_directory_is_valid,
+    test_result_text,
+};
 use identity::{ConnectionIdentity, find_existing, saved_connection_name};
 pub use prefill::{ConnectionPrefill, has_jump_chain, load_prefill};
 
@@ -334,8 +338,13 @@ impl Component for ConnectDialog {
         page.add(&auth_group);
         page.add(&options_group);
         page.add(&ssh.group);
+        let test_banner = adw::Banner::new("");
+        let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        page.set_vexpand(true);
+        body.append(&test_banner);
+        body.append(&page);
         let toast_overlay = adw::ToastOverlay::new();
-        toast_overlay.set_child(Some(&page));
+        toast_overlay.set_child(Some(&body));
 
         let mut model = ConnectDialog {
             registry: init.registry,
@@ -363,6 +372,7 @@ impl Component for ConnectDialog {
             test_button,
             submit,
             toast_overlay,
+            test_banner,
             header_title,
             header_actions,
             form: AuthFormState::default(),
@@ -419,6 +429,7 @@ impl Component for ConnectDialog {
             }
 
             ConnectDialogInput::InputChanged => {
+                self.test_banner.set_revealed(false);
                 self.refresh_validity();
             }
 
@@ -490,6 +501,7 @@ impl Component for ConnectDialog {
             }
 
             ConnectDialogInput::TestConnection => {
+                self.test_banner.set_revealed(false);
                 self.set_busy(BusyKind::Testing);
 
                 let idx = self.driver_combo.selected() as usize;
@@ -563,13 +575,9 @@ impl Component for ConnectDialog {
                 tracing::warn!(error = %e, "connect failed");
                 self.show_toast(&e);
             }
-            ConnectDialogCmd::TestResult(Ok(table_count)) => {
-                self.show_toast(
-                    &crate::tr!("Connection ok · {n} table(s) visible").replace("{n}", &table_count.to_string()),
-                );
-            }
-            ConnectDialogCmd::TestResult(Err(e)) => {
-                self.show_toast(&crate::tr!("Test failed: {error}").replace("{error}", &e));
+            ConnectDialogCmd::TestResult(result) => {
+                self.test_banner.set_title(&test_result_text(&result));
+                self.test_banner.set_revealed(true);
             }
         }
     }

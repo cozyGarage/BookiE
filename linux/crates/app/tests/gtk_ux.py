@@ -159,6 +159,22 @@ def scenarios(ui):
         assert "Renamed B" in [connection["name"] for connection in after], after
         assert ui.CONNECTION_B_NAME not in [connection["name"] for connection in after], after
 
+    def open_edit_dialog_for(name):
+        ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.invoke_named_action_within(name, "Edit connection")
+        ui.wait_for_node(name=f"Edit {name}")
+
+    def test_connection_reports_success_in_the_dialog(database, base):
+        open_edit_dialog_for(ui.CONNECTION_B_NAME)
+        ui.invoke(ui.wait_for_node(name="Test", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Connection ok")
+
+    def test_connection_reports_failure_in_the_dialog(database, base):
+        open_edit_dialog_for(ui.BROKEN_CONNECTION_NAME)
+        ui.invoke(ui.wait_for_node(name="Test", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node_containing("Test failed")
+        assert ui.find_node_containing("Connection ok") is None
+
     def find_bar_replaces_every_match_in_the_editor(database, base):
         ui.set_editor_text("select a, a from t where a = 1")
         time.sleep(0.3)
@@ -286,6 +302,8 @@ def scenarios(ui):
         columns_dialog_hides_a_column_and_keeps_the_last_one,
         ctrl_slash_toggles_a_comment_in_the_editor,
         browse_edit_cell_and_save_persists_to_the_database,
+        test_connection_reports_success_in_the_dialog,
+        test_connection_reports_failure_in_the_dialog,
     ]
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
         result.append(postgres_saved_connection_browses_rows_and_values)

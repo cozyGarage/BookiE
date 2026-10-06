@@ -29,6 +29,7 @@
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
+- Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
 
 ### Changed
 
