@@ -39,7 +39,8 @@
       "checker": "verify_roundtrip.py",
       "result": "Exact array string, string cell type, and no-formula assertions pass in source XLSX, re-saved ODS, and re-saved XLSX.",
       "log": "consumer-check.txt",
-      "checker_sha256": "bc5566e4437c52dc364dc0129dce08016f7be3fd16c8679a73f2a6035ce53264"
+      "checker_sha256": "e183eb9dc415e94dc46f471f20c0772e7e32ae6a003a9be84f48096f54dd1858",
+      "shared_checker_sha256": "a152f7e9932ac9782acd780a9a64fb89a6ee4faa37b6174b5affc8e5a8f7de07"
     }
   },
   "artifact_sha256": {
@@ -51,7 +52,7 @@
     "bookiee-export-test.txt": "a1663f1b156bccae7989a6c1e8120889d7c6aa5ae02874dc1c7181eddc680337",
     "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
     "gnumeric-run.txt": "8b9aa02b198ec49c21c8af5cf1782d3b2a85e55d47c5699b08dbc7d6f4c504a8",
-    "consumer-check.txt": "3da9b16e37ba02be2d1757df9dee10ebe626e880805576cdc106b899b3eec06b",
+    "consumer-check.txt": "460062358028f8a283452734ff73e6c490dc5ca80299c0226be266c8875b2258",
     "diff-check.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
   },
   "remaining": [

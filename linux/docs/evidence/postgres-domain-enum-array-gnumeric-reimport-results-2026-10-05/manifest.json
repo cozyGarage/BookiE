@@ -58,8 +58,9 @@
     "bookiee-export-test.txt": "165f9da0beb46b4384fc25e78cfac92d5eff4f360ef73023efbe3bf75b5a6ffa",
     "gnumeric-version.txt": "bac72f73bd90c57996fd8c2b2b206629064c7d804a284511adbac2776ae6c5e6",
     "gnumeric-run.txt": "4a81d1d52534330b9e5db1ccfee0f827e58968c83077613ea4c272a393f7d1ed",
-    "consumer-check.txt": "b1f7e3da329c053720a48373fc34ef00fd1403eb99050f0246643739edb3daf0",
-    "verify_roundtrip.py": "ac0bf7903f830073bbb0e95991ecf98bac88aa63e8775ce8ea8b8d8543e2df08",
+    "consumer-check.txt": "8128d5e2ec5ecbd421b172d6cc85a2ffeb4299b6fef2ba46de40124f3298afae",
+    "verify_roundtrip.py": "dbbb5ae42df61a17c9e75470edf0f7f2c884c028e3853381db129176a39ef0b1",
+    "shared_checker_sha256": "a152f7e9932ac9782acd780a9a64fb89a6ee4faa37b6174b5affc8e5a8f7de07",
     "ignored-inventory.txt": "a838fb732deaa504c898f2d9d00642e6d7c354035b1857ba10e7110bbcaccbe7",
     "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   }

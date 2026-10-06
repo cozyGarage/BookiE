@@ -1,1 +1,1 @@
-Gnumeric preserved domain-over-enum array text, formula-shaped label, empty/literal NULL distinctions and no-formula string cell across XLSX/ODS/XLSX
+Gnumeric preserved domain-over-enum array text, formula-shaped text, NULL distinctions, and string cells across XLSX/ODS/XLSX
