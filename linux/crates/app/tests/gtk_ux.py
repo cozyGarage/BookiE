@@ -271,10 +271,8 @@ def scenarios(ui):
         assert ui.find_node(name="Approve once") is None, "a plain grid edit asked for approval"
         ui.wait_for_node(name="1 unsaved change", present=False)
 
-        click_cell("2")
-        ui.press_x11_key("Return")
-        time.sleep(0.2)
-        ui.press_x11_key("Delete")
+        open_cell_menu("gracey")
+        choose_menu_item(13)
         ui.wait_for_node(name="1 unsaved change")
         assert psql("SELECT count(*) FROM people") == "2", "an unsaved delete reached the server"
         ui.press_x11_key("s", ("Control_L",))
