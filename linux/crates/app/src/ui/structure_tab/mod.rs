@@ -445,10 +445,8 @@ fn clear_box(b: &gtk::Box) {
 /// Foreign Key) is the only thing that varies between the columns,
 /// indexes, and FKs views.
 fn append_add_button(list: &gtk::ListBox, label: &str, on_activate: impl Fn() + 'static) {
-    let row = adw::ButtonRow::builder()
-        .title(label)
-        .start_icon_name("list-add-symbolic")
-        .build();
+    let row = adw::ActionRow::builder().title(label).activatable(true).build();
+    row.add_prefix(&gtk::Image::from_icon_name("list-add-symbolic"));
     row.connect_activated(move |_| on_activate());
     list.append(&row);
 }
@@ -624,7 +622,11 @@ impl SimpleComponent for StructureTab {
         // centred vertical box with spinner + title + dim subtitle
         // is the same pattern GNOME Software / Console use for
         // in-flight load states.
-        let loading_spinner = adw::Spinner::builder().width_request(48).height_request(48).build();
+        let loading_spinner = gtk::Spinner::builder()
+            .spinning(true)
+            .width_request(48)
+            .height_request(48)
+            .build();
         let loading_title = gtk::Label::builder().label(crate::tr!("Loading structure…")).build();
         loading_title.add_css_class("title-2");
         let loading_subtitle = gtk::Label::builder()

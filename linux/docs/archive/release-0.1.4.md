@@ -41,7 +41,7 @@ Wayland install, rollback, and soak remain operator checks after downloading the
 
 ## Install and verify on Omarchy
 
-Follow [omarchy.md](../omarchy.md). Close BookiE and privately back up existing
+Follow [omarchy.md](../platforms.md#arch-and-omarchy-package). Close BookiE and privately back up existing
 `~/.config/tablepro` and `~/.local/share/tablepro` before upgrading. The package
 replaces the currently installed `tablepro` package but retains its application ID,
 XDG paths, keyring schema and compatibility commands.

@@ -910,14 +910,15 @@ mod tests {
 
         assert_eq!(
             statements[0].0,
-            "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ?"
+            "DELETE FROM \"appdb\".\"records\" WHERE \"_id\" = ? AND \"nullable\" = ? AND \"missing\" = ? AND tablepro_mongodb_exact_field_set(?)"
         );
         assert_eq!(
             statements[0].1,
             vec![
                 Value::Text("id-1".into()),
                 Value::Null,
-                Value::Undecodable("missing BSON field".into())
+                Value::Undecodable("missing BSON field".into()),
+                Value::Json(serde_json::json!(["_id", "nullable"]))
             ]
         );
     }

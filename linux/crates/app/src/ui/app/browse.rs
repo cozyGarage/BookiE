@@ -326,8 +326,64 @@ impl App {
             &self.window,
             &self.toast_overlay,
             crate::ui::export_dialog::ExportRequest {
+                paged: None,
                 result,
                 suggested_name: table_label,
+                driver_id: self.driver_id().to_string(),
+            },
+            matches!(format, ExportFormat::Json),
+            &self.preferences,
+        );
+    }
+
+    fn export_page_plan(&self, tab_id: Uuid) -> Option<(crate::services::export_pages::PagePlan, Option<usize>)> {
+        let tabs = self.workspace_tabs.borrow();
+        let model = tabs.get(&tab_id)?.browse_controller()?.model();
+        let plan = crate::services::export_pages::PagePlan {
+            driver_id: model.driver_id().to_string(),
+            schema: model.schema().map(str::to_owned),
+            table: model.table().to_string(),
+            columns: model.columns().to_vec(),
+            filter: model.current_filter().clone(),
+            sort: model.current_sort(),
+            timeout_secs: crate::services::operation_control::timeout_for(
+                &self.preferences,
+                &self.database,
+                self.connection_id,
+            ),
+        };
+        let total = model.total_rows().and_then(|total| usize::try_from(total).ok());
+        Some((plan, total))
+    }
+
+    pub(super) fn on_export_all(&self, format: ExportFormat) {
+        let planned = self
+            .selected_browse_tab_id()
+            .and_then(|id| self.export_page_plan(id))
+            .zip(self.window_connection());
+        let Some(((plan, total_rows), conn)) = planned else {
+            self.show_toast(&crate::tr!("Nothing to export"));
+            return;
+        };
+        let label = match &plan.schema {
+            Some(schema) => format!("{schema}.{}", plan.table),
+            None => plan.table.clone(),
+        };
+        let columns_only = QueryResult {
+            columns: plan.columns.clone(),
+            rows: Vec::new(),
+            truncated: false,
+        };
+        crate::ui::export_dialog::present_with_format(
+            &self.window,
+            &self.toast_overlay,
+            crate::ui::export_dialog::ExportRequest {
+                paged: Some(crate::ui::export_dialog::PagedExport {
+                    total_rows,
+                    open: page_fetcher_factory(conn, plan),
+                }),
+                result: columns_only,
+                suggested_name: label,
                 driver_id: self.driver_id().to_string(),
             },
             matches!(format, ExportFormat::Json),
@@ -392,6 +448,31 @@ fn row_count_from_result(result: &QueryResult) -> Option<u64> {
         tablepro_core::Value::Decimal(d) => d.to_string().parse::<u64>().ok(),
         _ => None,
     }
+}
+
+fn page_fetcher_factory(
+    conn: std::sync::Arc<dyn tablepro_core::Connection>,
+    plan: crate::services::export_pages::PagePlan,
+) -> crate::ui::export_dialog::PageFetcherFactory {
+    let run: crate::services::export_pages::PageRunner = std::sync::Arc::new(|future| {
+        let (reply, answer) = async_channel::bounded(1);
+        relm4::spawn(async move {
+            let _ = reply.send(future.await).await;
+        });
+        answer.recv_blocking().unwrap_or_else(|_| {
+            Err(tablepro_core::export::ExportError::Source(
+                "the export was interrupted".into(),
+            ))
+        })
+    });
+    std::sync::Arc::new(move |cancel| {
+        Box::new(crate::services::export_pages::page_fetcher(
+            conn.clone(),
+            plan.clone(),
+            run.clone(),
+            cancel,
+        ))
+    })
 }
 
 #[cfg(test)]

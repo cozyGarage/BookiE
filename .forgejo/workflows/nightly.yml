@@ -1,0 +1,25 @@
+name: nightly
+on:
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+env:
+  GITHUB_STEP_SUMMARY: /dev/null
+
+jobs:
+  coverage:
+    runs-on: arch
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Line coverage of the unit tier
+        run: |
+          cd src/linux
+          cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins --json --summary-only --output-path /tmp/coverage.json
+          python3 scripts/check-coverage-floor.py /tmp/coverage.json

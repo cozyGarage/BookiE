@@ -109,7 +109,7 @@ records panic privacy and headless retirement gaps alongside these owners.
 ## Arch / Omarchy / Wayland UI packets
 
 Use [manual acceptance](manual-verification-0.2-features.md) and
-[the package guide](omarchy.md). This is application work; no desktop/system
+[the platform guide](platforms.md#arch-and-omarchy-package). This is application work; no desktop/system
 configuration changes are requested by the sprint.
 
 | Packet | Acceptance |
@@ -143,7 +143,7 @@ Use the [agent task template](validation-playbook.md#agent-task-template): one
 invariant/case, allowed files, exact baseline, selected layers and reserved build/
 fixture resources. Return initial behavior, patch, selectors/results, report
 paths, source fingerprints, unresolved gaps and resulting SHA. Serialize shared
-Cargo/Docker work; preserve warm build reuse per [toolchains](toolchains.md).
+Cargo/Docker work; preserve warm build reuse per [toolchains](platforms.md#rust-toolchain).
 Do not infer new passes from test-source inspection. Documentation packets use
 diff/link checks; runtime/package claims require their actual owning checks.
 

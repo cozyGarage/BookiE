@@ -735,6 +735,7 @@ impl SimpleComponent for App {
                 &self.window,
                 &self.toast_overlay,
                 super::export_dialog::ExportRequest {
+                    paged: None,
                     result,
                     suggested_name: name,
                     driver_id: self.driver_id().to_string(),
@@ -912,6 +913,8 @@ impl SimpleComponent for App {
             }
             AppMsg::ExportCsv => self.on_export(ExportFormat::Csv),
             AppMsg::ExportJson => self.on_export(ExportFormat::Json),
+            AppMsg::ExportAllCsv => self.on_export_all(ExportFormat::Csv),
+            AppMsg::ExportAllJson => self.on_export_all(ExportFormat::Json),
             AppMsg::CopyToClipboard(text) => self.on_copy_to_clipboard(text),
             AppMsg::CopyRowAsInsert { tab_id, row_position } => self.on_copy_row_as_insert(tab_id, row_position),
             AppMsg::DeleteConnection(id) => self.on_delete_connection(id, sender),

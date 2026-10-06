@@ -42,7 +42,7 @@ These are the dependencies used by the current drivers:
 | MongoDB | `mongodb`, including the workspace's vendored patch |
 | DuckDB | `duckdb`, behind the optional `duckdb` feature |
 
-Review engine/library proposals against [driver priority](driver-priority.md),
+Review engine/library proposals against [driver maturity](driver-maturity.md#order-the-engines-were-added),
 dependency policy and license requirements. Upstream macOS plugins are behavior
 references; they do not introduce a Linux runtime plugin ABI.
 

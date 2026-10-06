@@ -91,7 +91,9 @@ impl App {
     }
 
     pub(super) fn on_show_shortcuts(&self) {
-        shortcuts::build_shortcuts_dialog().present(Some(&self.window));
+        let shortcuts = shortcuts::build_shortcuts_dialog();
+        shortcuts.set_transient_for(Some(&self.window));
+        shortcuts.present();
     }
 
     pub(super) fn on_show_about(&self) {

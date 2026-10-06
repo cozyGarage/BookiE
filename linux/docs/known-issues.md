@@ -49,7 +49,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-10 | Multi-statement results use one switcher button per statement | OPEN | Named, pinnable result tabs in `outcomes.rs` | gtk-widget |
 | UI-11 | Sidebar is a flat tables and views list; other objects only in the Catalog window | OPEN | `GtkTreeListModel` tree | gtk-widget |
 | UI-12 | ~~No database or schema switcher~~ | DONE | `Connection::list_databases` plus guard audit test; five driver tests against real servers; scenario `postgres_database_switcher_reconnects_to_the_chosen_database` | unit + driver-docker + gtk-installed |
-| UI-13 | Export covers loaded rows or the current page only | OPEN | Full-table streaming export, progress, snapshot semantics | driver-docker |
+| UI-13 | ~~Export covers loaded rows or the current page only~~ | DONE | The browse export menu has Export all rows as CSV or JSON: pages of 5,000 rows through the same connection guard, a background job with progress and cancel that publishes the file only when complete, a CSV null-marker collision refused. Tests `export::paged` and `services::export_pages` (12,003 rows over SQLite, filter, error). Snapshot consistency is UI-13b | unit + sqlite |
+| UI-13b | A full export is not a snapshot: rows changed during the export can be missed or repeated | OPEN | Read all pages inside one session transaction (ADR 0008); the dialog says so until then | driver-docker |
 | UI-14 | ~~No way to hide grid columns~~ | DONE | `column_widths.rs` and `column_visibility.rs` tests | unit + gtk-widget |
 | UI-14b | Hidden columns are still fetched; column order is not saved; no find in loaded rows | OPEN | Reorder, then grid search bar | gtk-widget |
 | UI-15 | Preferences lack theme override, null style, editor font family, vim mode | OPEN | `preferences.rs`, `AdwStyleManager` | gtk-widget |
@@ -110,7 +111,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
 | PKG-1 | Arch installed pass on native Wayland: install, upgrade, rollback, askpass, GSettings, profile isolation | OPEN | Xvfb does not qualify | gtk-installed |
-| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | After PKG-1 | gtk-installed |
+| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | Build, unit and widget tiers now pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`scripts/test-distro-floor.sh`, CI job `distro-floor`). Still missing: the installed AT-SPI pass on those distros | gtk-installed |
 | PKG-3 | B7 soak: frozen SHA, 30 consecutive retry-free GTK attempts over six runs | OPEN | | gtk-installed |
 | PKG-4 | Real Flatpak build and install; Flathub submission; screenshots | OPEN | | manual |
 | PKG-5 | `dpkg-deb` contract skipped in harness; validators tested, installation not | OPEN | Debian runner | sandbox |
@@ -124,7 +125,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | TEST-1 | ~~File-size guard failing on the PostgreSQL scalar consumers file~~ | DONE | Guard passes on `linux`; baselines still need lowering | sandbox |
 | TEST-1b | ~~Lower the file-size baselines the guard notes as shrunk~~ | DONE | `file-size-baselines.txt` ratcheted; B3 has since split `result_consumers_temporal.rs` under the limit, so its baseline entry is removed | sandbox |
 | TEST-2 | Mutation: core and package survivors untriaged; portable evidence | OPEN | B3-P6 | sandbox |
-| TEST-3 | No line-coverage number | OPEN | `cargo-llvm-cov` on the runner | manual |
+| TEST-3 | ~~No line-coverage number~~ | DONE | 2026-10-07 on the runner: `cargo llvm-cov --workspace --exclude tablepro-driver-duckdb --lib --bins` reports 58.1% of lines (47,493 of 112,706 uncovered), 58.7% of functions. Unit tier only: driver integration, GTK and installed tiers are not counted. Examples: storage `connections.rs` 94%, `secrets.rs` 55%, ssh `supervisor.rs` 0% | manual |
+| TEST-3b | Coverage is measured by hand, with no trend or floor | OPEN | The nightly Forgejo workflow runs `cargo llvm-cov` and fails below `coverage-floor.txt` (57). Not yet run on the schedule; trend storage still missing | sandbox |
 | TEST-4 | Full driver, TLS and SSH matrix not rerun on one candidate tree | OPEN | Run on the runner; see below | driver-docker |
 | TEST-5 | Hosted DuckDB container ownership fix not confirmed | UNVERIFIED | | manual |
 | TEST-6 | 117 unchecked items in [manual verification](manual-verification-0.2-features.md) | OPEN | Automate what GTK automation can reach | gtk-installed |
@@ -153,7 +155,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | --- | --- | --- | --- | --- |
 | DOC-1 | `po/tablepro.pot` is stale | OPEN | Run `update-translations.py` in its own commit | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
-| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [accessibility](accessibility.md) | gtk-installed |
+| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
 | DOC-5 | Cross-client value comparison (DBeaver, dbx) on lab VMs | OPEN | Seeded multi-engine VMs, ADR 0007 as oracle | manual |
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
@@ -211,7 +213,7 @@ text values (about 0.6 KB each).
 ## Test environment
 
 The Arch runner `bookie-ci` on the office testlab builds and tests this tree:
-GTK 4.22, libadwaita 1.9, Rust 1.98, Docker, Xvfb, D-Bus, AT-SPI. Run any
+GTK 4.22, libadwaita 1.9 (the code builds against the Ubuntu 24.04 floor), Rust 1.98, Docker, Xvfb, D-Bus, AT-SPI. Run any
 command at a checkout's HEAD with the helper in the lab repository,
 `scripts/bookie-ci-run.sh <checkout> '<command>'`. Tiers that pass there are
 recorded per PR; none of them replaces the installed Wayland pass (PKG-1).

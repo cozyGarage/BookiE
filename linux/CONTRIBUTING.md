@@ -4,7 +4,7 @@ This repository is a Linux-only Rust and GTK project. The Cargo workspace starts
 
 ## Development environment
 
-Install the native packages listed in [README.md](README.md). Rust 1.98 is the minimum supported version and is pinned in `rust-toolchain.toml`. Arch may also provide a newer `/usr/bin/cargo`; see [docs/toolchains.md](docs/toolchains.md) when comparing toolchain results.
+Install the native packages listed in [README.md](README.md). Rust 1.98 is the minimum supported version and is pinned in `rust-toolchain.toml`. Arch may also provide a newer `/usr/bin/cargo`; see [docs/platforms.md#rust-toolchain](docs/platforms.md#rust-toolchain) when comparing toolchain results.
 
 Use the fast checks while iterating:
 

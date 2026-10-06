@@ -44,7 +44,7 @@ fn render(format: ResultFormat, output: &mut dyn Write) -> Result<(), ExportErro
             table: "items",
         }),
     };
-    let mut writer = writer_for(&export, &data)?;
+    let mut writer = writer_for(&export, data.rows.len())?;
     writer.begin(output, &data.columns)?;
     writer.write_row(output, 0, &data.rows[0])?;
     writer.finish(output)
@@ -100,7 +100,7 @@ fn value_contract_streamed_csv_matches_renderer_with_and_without_header() {
             csv: &options,
             sql: None,
         };
-        let mut writer = writer_for(&export, &data).unwrap();
+        let mut writer = writer_for(&export, data.rows.len()).unwrap();
         let mut actual = Vec::new();
         writer.begin(&mut actual, &data.columns).unwrap();
         for (index, row) in data.rows.iter().enumerate() {
