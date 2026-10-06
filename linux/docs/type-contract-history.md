@@ -299,6 +299,13 @@ SQL literals, parameter binding and keyed edits refuse without changing the
 stored row. The focused case and all 33 ClickHouse integration tests passed
 ([evidence](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
 
+The October 6 XLSX follow-up checks all 16 nested shapes from the same Docker
+contract. Each result is written as an XLSX text cell and its shared-string
+entry equals ClickHouse's native `toJSONString()` oracle; type-less write
+refusals remain unchanged. The focused contract and full 33-test ClickHouse
+integration suite passed
+([evidence](evidence/clickhouse-nested-xlsx-consumers-2026-10-06/manifest.json)).
+
 Two small MongoDB edit gaps identified in this audit now have native-server
 contracts: a non-key ObjectId edit preserves `_id` and BSON kind, and an RFC3339
 BSON DateTime edit preserves millisecond UTC instants while refusing sub-ms
