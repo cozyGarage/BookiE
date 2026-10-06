@@ -1,0 +1,1 @@
+All 5 workbook stages preserved exact scalar enum labels, blank SQL NULL, and no formulas.
