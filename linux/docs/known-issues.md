@@ -158,9 +158,36 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | DOC-5 | Cross-client value comparison (DBeaver, dbx) on lab VMs | OPEN | Seeded multi-engine VMs, ADR 0007 as oracle | manual |
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
 | PERF-1 | PostgreSQL capped result about 12% slower, 58% lower RSS | OPEN | Profile release binaries | manual |
-| PERF-2 | Arbitrary results are materialized to caps, not streamed | OPEN | | driver-docker |
+| PERF-2 | Arbitrary results are materialized up to three caps (1M rows, 10M cells, 64 MiB estimated bytes), not streamed | OPEN | Baseline 2026-10-07 below: the byte cap binds first; GUI memory is about 2.5x the driver result; no streaming yet | driver-docker |
+| PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | OPEN | Measure on real GPU rendering and with fewer drivers; see baseline below | manual |
+| PERF-6 | Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols); largest crates are `tablepro_app`, `std`, `mongodb`, `sqlparser`, `zbus` | OPEN | Decide on stripping and the MongoDB cost | manual |
 | PERF-3 | MongoDB census cost per browse not measured | OPEN | | driver-docker |
 | PERF-4 | Timing shows elapsed only, never server time | OPEN | With UI-20 | driver-docker |
+
+### Performance baseline, 2026-10-07
+
+Measured on the Arch runner (10 vCPU, host CPU type) with release builds, from
+`scripts/profile-baseline.sh`. Rows have six columns of mixed integer, real and
+text values (about 0.6 KB each).
+
+| Level | Rows requested | Rows shown | Time | Memory |
+| --- | ---: | ---: | ---: | ---: |
+| Driver `query` (SQLite) | 10,000 | 10,000 | 0.12 s | +7 MB |
+| | 100,000 | 100,000 | 0.8 s | +61 MB |
+| | 500,000 | 120,019 (capped) | 0.95 s | +73 MB |
+| | 1,000,000 | 120,019 (capped) | 1.5 s | +73 MB |
+| App, result in the grid | 10,000 | 10,000 | 1.1 s to show | 194 MB resident (158 idle) |
+| | 100,000 | 100,000 | 2.5 s | 308 MB |
+| | 300,000 | 120,019 (capped) | 3.2 s | 339 MB |
+| | 1,000,000 | 120,019 (capped) | 3.3 s | 334 MB |
+
+- Allocation profile at 100,000 rows: 4.44 million allocations (about 44 per
+  row), 59 MB peak heap.
+- The 64 MiB byte budget binds long before 1,000,000 rows for text-heavy rows,
+  so memory is bounded, but each shown row costs about 1.5 KB in the app against
+  0.6 KB in the driver result: the grid holds a second copy.
+- The Xvfb run uses software rendering; resident size on a real GPU session
+  will differ and still needs a measurement.
 
 ## Test environment
 
