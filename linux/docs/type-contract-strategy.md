@@ -333,6 +333,12 @@ formula-shaped text, Unicode code-point positions, byte-oriented BLOB matches,
 and SQL NULL. Native `typeof()`/`hex()` assertions verify integer/NULL result
 kinds, and typed CSV restore keeps the integer results as INTEGER and SQL NULL
 as NULL ([evidence](evidence/sqlite-instr-any-csv-results-2026-10-06/manifest.json)).
+SQLite `length(value)` over STRICT `ANY` now checks numeric coercion, Unicode
+code-point counts, empty text, BLOB byte counts including embedded NUL, text
+termination at embedded NUL, formula-shaped text and SQL NULL. Native
+`typeof()`/`hex()` assertions and typed CSV restore preserve integer results
+and SQL NULL as their distinct storage classes
+([evidence](evidence/sqlite-length-any-csv-results-2026-10-06/manifest.json)).
 
 PostgreSQL scalar custom-enum XLSX values now survive LibreOffice Calc ODS/XLSX
 re-save with formula-shaped labels retained as text and SQL NULL left blank
