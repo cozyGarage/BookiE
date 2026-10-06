@@ -27,6 +27,18 @@ Sources nominate designs or reproductions; they are not proof of a BookiE bug,
 runtime pass or permission to redistribute unreviewed dependencies. Refresh
 chosen dependencies and source versions when implementation begins.
 
+### Follow-up: other clients and current BookiE code
+
+[The client lessons and Linux source review](external-audit-client-review.md)
+adds DBeaver, pgAdmin, Beekeeper Studio and DB Browser for SQLite examples,
+an explicit BookiE-core versus dbx-core comparison, and bounded current-code
+verification. Its priority findings are relational stale-write protection,
+evidence-selector/source validation and shared result-memory budgets. It also
+records the strengths and limits of the recent SQLite fixes: 530 core and two
+native SQLite app-library tests passed locally; release/hosted/installed gates
+remain separate. Use that review for detailed evidence and proposed packets;
+the sections below remain the deferred post-0.2.0 restructuring plan.
+
 ## 1. Root workspace, preserving existing ownership
 
 The `linux` branch already contains the Linux product. Move the workspace
