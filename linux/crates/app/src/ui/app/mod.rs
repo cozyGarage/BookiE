@@ -1,6 +1,7 @@
 mod browse;
 mod bundle;
 mod connection;
+mod database_switcher;
 mod editor_files;
 mod favorites;
 pub(crate) mod import;
@@ -118,6 +119,9 @@ pub struct App {
     reconnect_banner: adw::Banner,
     connections_factory: FactoryVecDeque<ConnectionRow>,
     connections_popover: gtk::Popover,
+    databases_button: gtk::MenuButton,
+    databases_list: gtk::ListBox,
+    pending_database_switch: Option<(Uuid, String)>,
     health_state: Option<ConnectionHealth>,
     row_op_spinner: gtk::Spinner,
     read_only_badge: gtk::Label,
@@ -311,6 +315,17 @@ impl SimpleComponent for App {
                         set_popover = &gtk::Popover {},
                     },
 
+                    #[name = "databases_button"]
+                    pack_start = &gtk::MenuButton {
+                        set_icon_name: "network-server-symbolic",
+                        set_tooltip_text: Some(crate::tr!("Switch database").as_str()),
+                        set_visible: false,
+
+                        #[wrap(Some)]
+                        #[name = "databases_popover"]
+                        set_popover = &gtk::Popover {},
+                    },
+
                     #[name = "read_only_badge"]
                     pack_end = &gtk::Label {
                         set_visible: false,
@@ -490,6 +505,9 @@ impl SimpleComponent for App {
             reconnect_banner: widgets.reconnect_banner.clone(),
             connections_factory: workspace_chrome.connections_factory,
             connections_popover: widgets.connections_popover.clone(),
+            databases_button: widgets.databases_button.clone(),
+            databases_list: database_switcher::build_database_popover(&widgets.databases_popover, &sender),
+            pending_database_switch: None,
             health_state: None,
             row_op_spinner: widgets.row_op_spinner.clone(),
             read_only_badge: widgets.read_only_badge.clone(),
@@ -927,6 +945,11 @@ impl SimpleComponent for App {
             AppMsg::ImportConnectionUrlSucceeded(name) => self.on_import_connection_url_succeeded(name),
             AppMsg::ImportConnectionUrlFailed => self.on_import_connection_url_failed(),
             AppMsg::OpenSaved(saved) => self.on_open_saved(saved, sender),
+            AppMsg::LoadDatabases => self.on_load_databases(sender),
+            AppMsg::DatabasesLoaded { connection_id, result } => {
+                self.on_databases_loaded(connection_id, result, sender)
+            }
+            AppMsg::SwitchDatabase(name) => self.on_switch_database(name, sender),
             AppMsg::ReopenClosedTab => self.on_reopen_closed_tab(sender),
             AppMsg::ImportCsvIntoTable { schema, table } => self.on_import_csv_into_table(schema, table, sender),
             AppMsg::CreateTableFromCsv { schema } => self.on_create_table_from_csv(schema, sender),

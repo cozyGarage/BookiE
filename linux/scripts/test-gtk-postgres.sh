@@ -8,7 +8,15 @@ if [[ "${TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE:-0}" != "1" ]]; then
   runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-postgres.XXXXXX")"
   mkdir -p "$runtime/home" "$runtime/config" "$runtime/data" "$runtime/cache" "$runtime/state" "$runtime/runtime"
   chmod 0700 "$runtime/runtime"
-  trap 'rm -rf -- "$runtime"' EXIT
+  cleanup_runtime() {
+    if command -v fusermount3 >/dev/null 2>&1; then
+      for mount in "$runtime/runtime/doc" "$runtime/runtime/gvfs"; do
+        fusermount3 -uz -- "$mount" >/dev/null 2>&1 || true
+      done
+    fi
+    rm -rf -- "$runtime" 2>/dev/null || true
+  }
+  trap cleanup_runtime EXIT
   TABLEPRO_GTK_POSTGRES_DBUS_ACTIVE=1 \
     HOME="$runtime/home" \
     XDG_CONFIG_HOME="$runtime/config" \
@@ -51,6 +59,9 @@ until docker exec "$container" pg_isready --username=postgres --dbname=bookie_te
   sleep 1
 done
 
+docker exec "$container" psql --username=postgres --dbname=bookie_test --set=ON_ERROR_STOP=1 --command='CREATE DATABASE bookie_other'
+docker exec --interactive "$container" psql --username=postgres --dbname=bookie_other --set=ON_ERROR_STOP=1 \
+  --command='CREATE TABLE other_things (id integer PRIMARY KEY, label text)' --command="INSERT INTO other_things VALUES (1, 'switched')"
 docker exec --interactive "$container" psql --username=postgres --dbname=bookie_test --set=ON_ERROR_STOP=1 <<'SQL'
 CREATE TABLE people (id integer PRIMARY KEY, name text NOT NULL, profile jsonb, active boolean NOT NULL);
 INSERT INTO people VALUES
@@ -69,5 +80,5 @@ TABLEPRO_GTK_POSTGRES_CONTAINER="$container" \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
   TABLEPRO_GTK_POSTGRES_HOST=127.0.0.1 \
   TABLEPRO_GTK_POSTGRES_PORT="$port" \
-  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_grid_edit_and_delete_commit_to_the_server}" \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-postgres_saved_connection_browses_rows_and_values,postgres_grid_edit_and_delete_commit_to_the_server,postgres_database_switcher_reconnects_to_the_chosen_database}" \
   bash "$ROOT/scripts/test-gtk-safety.sh"

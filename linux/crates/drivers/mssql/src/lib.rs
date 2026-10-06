@@ -49,6 +49,10 @@ pub struct MssqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MssqlDriver {
+    fn supports_database_listing(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "mssql"
     }
@@ -265,6 +269,13 @@ impl Connection for MssqlConnection {
 
     async fn open_session(&self) -> Result<Box<dyn tablepro_core::Session>, DriverError> {
         session::open(&self.session_options).await
+    }
+
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        let sql = "SELECT name FROM sys.databases WHERE database_id > 4 AND HAS_DBACCESS(name) = 1 ORDER BY name";
+        let mut client = self.client().await?;
+        let result = self.query_result(&mut client, sql, &[], MAX_QUERY_ROWS).await?;
+        Ok(result.rows.iter().filter_map(|row| as_text(row.first())).collect())
     }
 
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {

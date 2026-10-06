@@ -68,6 +68,13 @@ pub trait DatabaseDriver: Send + Sync {
         true
     }
 
+    /// Whether `Connection::list_databases` answers with the databases the
+    /// connected account can open. Engines with a single database per
+    /// connection, such as the file-based ones, declare false.
+    fn supports_database_listing(&self) -> bool {
+        false
+    }
+
     /// Whether this driver can enumerate the indexes on a table.
     /// `Connection::fetch_indexes` answers with an empty list when it
     /// cannot, and the structure tab has no way to tell that apart from
@@ -173,6 +180,7 @@ mod tests {
     #[test]
     fn a_driver_that_declares_nothing_claims_no_structure_metadata() {
         let driver = BareDriver;
+        assert!(!driver.supports_database_listing());
         assert!(!driver.supports_index_metadata());
         assert!(!driver.supports_foreign_key_metadata());
         assert!(!driver.supports_view_metadata());

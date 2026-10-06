@@ -53,6 +53,10 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
+    fn supports_database_listing(&self) -> bool {
+        true
+    }
+
     fn supports_index_metadata(&self) -> bool {
         true
     }
@@ -140,6 +144,18 @@ struct PgConnection {
 
 #[async_trait]
 impl Connection for PgConnection {
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT datname FROM pg_database
+             WHERE datallowconn AND NOT datistemplate AND has_database_privilege(datname, 'CONNECT')
+             ORDER BY datname",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows.into_iter().map(|row| row.get::<String, _>(0)).collect())
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT schemaname, tablename

@@ -1164,6 +1164,9 @@ async fn decimal_results_preserve_all_fractional_digits() {
 #[path = "support/value_contracts.rs"]
 mod value_contracts;
 
+#[path = "support/database_listing.rs"]
+mod database_listing;
+
 #[path = "support/enum_sql_mode_contract.rs"]
 mod enum_sql_mode_contract;
 #[path = "support/wide_decimal_csv.rs"]

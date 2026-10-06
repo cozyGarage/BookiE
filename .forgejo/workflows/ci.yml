@@ -1,0 +1,61 @@
+name: lab-ci
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  checks:
+    runs-on: arch
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Quick layer (guards, formatting, harness, packaging contracts)
+        run: cd src/linux && python3 scripts/run-test-layer.py quick
+      - name: Clippy
+        run: cd src/linux && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+      - name: Unit tests
+        run: cd src/linux && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
+
+  gtk:
+    runs-on: arch
+    needs: checks
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: GTK widget tests
+        run: cd src/linux && bash scripts/test-gtk-widgets.sh
+      - name: Installed GTK end-to-end suite
+        run: cd src/linux && bash scripts/test-gtk-safety.sh
+
+  servers:
+    runs-on: arch
+    needs: gtk
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: PostgreSQL end-to-end
+        run: cd src/linux && bash scripts/test-gtk-postgres.sh
+      - name: MySQL end-to-end
+        run: cd src/linux && bash scripts/test-gtk-mysql.sh

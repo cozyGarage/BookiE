@@ -7,6 +7,9 @@ mod connect_refusal;
 
 #[path = "support/clickhouse.rs"]
 mod clickhouse;
+
+#[path = "support/database_listing.rs"]
+mod database_listing;
 #[path = "support/disconnection.rs"]
 mod disconnection;
 #[path = "support/nested_values.rs"]

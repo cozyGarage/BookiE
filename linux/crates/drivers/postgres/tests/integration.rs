@@ -18,6 +18,9 @@ use tokio_util::sync::CancellationToken;
 #[path = "support/wire_round_trip.rs"]
 mod wire_round_trip;
 
+#[path = "support/database_listing.rs"]
+mod database_listing;
+
 #[path = "support/vector_contract.rs"]
 mod vector_contract;
 

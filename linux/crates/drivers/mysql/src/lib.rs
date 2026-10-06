@@ -31,6 +31,10 @@ pub struct MysqlDriver;
 
 #[async_trait]
 impl DatabaseDriver for MysqlDriver {
+    fn supports_database_listing(&self) -> bool {
+        true
+    }
+
     fn id(&self) -> &'static str {
         "mysql"
     }
@@ -104,6 +108,18 @@ struct MysqlConnection {
 
 #[async_trait]
 impl Connection for MysqlConnection {
+    async fn list_databases(&self) -> Result<Vec<String>, DriverError> {
+        let rows = sqlx::query(
+            "SELECT CAST(schema_name AS CHAR) FROM information_schema.schemata
+             WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+             ORDER BY schema_name",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_sqlx_error)?;
+        Ok(rows.into_iter().map(|row| row.get::<String, _>(0)).collect())
+    }
+
     async fn list_tables(&self) -> Result<Vec<TableInfo>, DriverError> {
         let rows = sqlx::query(
             "SELECT CAST(table_schema AS CHAR), CAST(table_name AS CHAR)

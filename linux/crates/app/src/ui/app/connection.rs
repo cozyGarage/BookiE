@@ -93,6 +93,7 @@ impl App {
         self.current_driver_id = Some(driver_id.clone());
         self.read_only = self.window_metadata().map(|m| m.read_only).unwrap_or(false);
         self.read_only_badge.set_visible(self.read_only);
+        self.show_database_switcher(&driver_id, id, &sender);
         self.split_view.set_show_sidebar(true);
         self.disconnect_action.set_enabled(true);
         self.table_search.set_text("");
@@ -222,6 +223,7 @@ impl App {
         self.current_driver_id = None;
         self.read_only = false;
         self.read_only_badge.set_visible(false);
+        self.databases_button.set_visible(false);
         self.connected = false;
         self.split_view.set_show_sidebar(false);
         self.disconnect_action.set_enabled(false);
@@ -389,6 +391,7 @@ impl App {
 
     pub(super) fn on_connection_cancelled(&mut self) {
         self.connect_cancel = None;
+        self.pending_database_switch = None;
         if self.connection_transition != ConnectionTransition::Connecting || self.prepared_connection.is_some() {
             return;
         }
@@ -429,6 +432,7 @@ impl App {
             return;
         }
         self.connect_cancel = None;
+        self.pending_database_switch = None;
         self.connection_transition = ConnectionTransition::Idle;
         self.prepared_connection = None;
         self.switch_cancel_audit_was_disabled = None;

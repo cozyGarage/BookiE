@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
+if [[ "${TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE:-0}" != "1" ]]; then
   runtime="$(mktemp -d "${TMPDIR:-/tmp}/tablepro-gtk-mysql.XXXXXX")"
   mkdir -p "$runtime"/{home,config,data,cache,state,runtime}
   chmod 0700 "$runtime/runtime"
@@ -19,7 +19,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
   trap cleanup_runtime EXIT
   cargo_home="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
-  TABLEPRO_GTK_MYSQL_DBUS_ACTIVE=1 \
+  TABLEPRO_GTK_MYSQL_E2E_DBUS_ACTIVE=1 \
     CARGO_HOME="$cargo_home" \
     RUSTUP_HOME="$rustup_home" \
     HOME="$runtime/home" \
@@ -28,7 +28,7 @@ if [[ "${TABLEPRO_GTK_MYSQL_DBUS_ACTIVE:-0}" != "1" ]]; then
     XDG_CACHE_HOME="$runtime/cache" \
     XDG_STATE_HOME="$runtime/state" \
     XDG_RUNTIME_DIR="$runtime/runtime" \
-    dbus-run-session -- "$ROOT/scripts/test-gtk-mysql-approval.sh"
+    dbus-run-session -- "$ROOT/scripts/test-gtk-mysql.sh"
   exit $?
 fi
 
@@ -63,6 +63,13 @@ until docker exec "$container" mysql --user=root --password=tablepro_test --batc
   sleep 1
 done
 
+docker exec --interactive "$container" mysql --user=root --password=tablepro_test bookie_test <<'SQL'
+CREATE TABLE people (id INT PRIMARY KEY, name VARCHAR(100) NOT NULL, profile JSON NULL, active BOOLEAN NOT NULL);
+INSERT INTO people VALUES
+  (1, 'Ada Lovelace', '{"role": "analyst"}', 1),
+  (2, 'Grace Hopper', NULL, 0);
+SQL
+
 eval "$(printf 'tablepro-test' | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
 printf 'tablepro_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
   xdg:schema com.tablepro.linux.Password \
@@ -70,7 +77,7 @@ printf 'tablepro_test' | secret-tool store --label='BookiE GTK MySQL fixture' \
   kind db_password
 TABLEPRO_GTK_KEYRING_READY=1 \
   TABLEPRO_GTK_DBUS_ACTIVE=1 \
-  TABLEPRO_GTK_SCENARIO=mysql_unparseable_routine_dialog_denial_preserves_database \
+  TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-mysql_grid_edit_and_delete_commit_to_the_server}" \
   TABLEPRO_GTK_MYSQL_CONTAINER="$container" \
   TABLEPRO_GTK_MYSQL_HOST=127.0.0.1 \
   TABLEPRO_GTK_MYSQL_PORT="$port" \
