@@ -1346,9 +1346,9 @@ committed_editor_ddl_refreshes_sidebar.environment = "local"
 
 def new_connection_form_keeps_title_and_help_text_visible(_database, _base):
     invoke(wait_for_node(name="New connection", role=pyatspi.ROLE_PUSH_BUTTON))
-    wait_for_node(name="Connect to ClickHouse")
-    # Keep the complete help strings visible in the rendered form. The
-    # endpoint row is driver-specific and hidden for the first sorted driver.
+    wait_for_node(name="Connect to PostgreSQL")
+    # PostgreSQL is the documented default. Keep the complete help strings
+    # visible in the rendered form; this driver also exposes the socket row.
     tls_help = wait_for_node(name="How the client encrypts and verifies the server")
     wait_for_node(name="Block writes at the policy layer")
     help_width = tls_help.queryComponent().getExtents(pyatspi.DESKTOP_COORDS).width
