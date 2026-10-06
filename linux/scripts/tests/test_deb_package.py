@@ -11,7 +11,9 @@ def _write_executable(path: Path, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
-def _stage_package(source: Path, root: Path, *, include_aliases: bool, include_schema: bool = True) -> Path:
+def _stage_package(
+    source: Path, root: Path, *, include_aliases: bool, include_schema: bool = True, include_askpass: bool = True
+) -> Path:
     stage = root / "stage"
     for directory in (
         stage / "usr/bin",
@@ -28,6 +30,8 @@ def _stage_package(source: Path, root: Path, *, include_aliases: bool, include_s
         stage / "usr/bin/bookie-agentd",
         "#!/bin/sh\necho 'usage: bookie-agentd --policy PATH'\n",
     )
+    if include_askpass:
+        _write_executable(stage / "usr/bin/tablepro-askpass", "#!/bin/sh\nexit 0\n")
     if include_aliases:
         (stage / "usr/bin/tablepro").symlink_to("bookie")
         (stage / "usr/bin/tablepro-agentd").symlink_to("bookie-agentd")
@@ -74,7 +78,14 @@ def _listing_last_fields(package: Path) -> set[str]:
     return {line.split()[-1] for line in listing.splitlines() if line.strip()}
 
 
+def check_rules_build_and_install_the_askpass_helper(source: Path) -> None:
+    rules = (source / "packaging/debian/rules").read_text()
+    assert "--bin tablepro-askpass" in rules, "debian/rules does not build the SSH askpass helper"
+    assert "usr/bin/tablepro-askpass" in rules, "debian/rules does not install the SSH askpass helper"
+
+
 def main() -> None:
+    check_rules_build_and_install_the_askpass_helper(Path(__file__).resolve().parents[2])
     if shutil.which("dpkg-deb") is None:
         print("Debian package validation skipped: dpkg-deb is unavailable")
         return
@@ -95,6 +106,10 @@ def main() -> None:
         )
         assert result.returncode != 0
         assert "package is missing /usr/bin/tablepro" in result.stderr, result.stderr
+        missing_askpass = _stage_package(source, root / "missing-askpass", include_aliases=True, include_askpass=False)
+        result = subprocess.run(["bash", str(validator), str(missing_askpass)], capture_output=True, text=True)
+        assert result.returncode != 0
+        assert "package is missing /usr/bin/tablepro-askpass" in result.stderr, result.stderr
         missing_schema = _stage_package(source, root / "missing-schema", include_aliases=True, include_schema=False)
         result = subprocess.run(["bash", str(validator), str(missing_schema)], capture_output=True, text=True)
         assert result.returncode != 0

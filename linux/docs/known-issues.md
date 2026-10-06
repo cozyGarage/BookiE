@@ -74,11 +74,11 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-3 | G5: daemon provider through system OpenSSH; unknown host key declines without learning | OPEN | | driver-docker |
 | B4-4 | F8 headless: agentd shares one `AuditState`; needs per-connection generations | OPEN | `agentd/src/lib.rs` | sandbox |
 | B4-5 | Retire the daemon handle after panic or disconnect even when ping succeeds | OPEN | Small patch before G5 | sandbox |
-| B4-6 | I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch | OPEN | No refusal code found | sandbox |
+| B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
 | B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | | sandbox |
 | B4-8 | F7: isolated GTK Session, BEGIN, label, toggle-off confirm | OPEN | Register in `isolated-tests.json` | gtk-widget |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
-| B4-10 | I1: `packaging/debian/rules` has no askpass build or install | OPEN | Validator must reject its absence | sandbox |
+| B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
 | B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
 | B4-12 | PostgreSQL rollback-failure acceptance | OPEN | Native fixture | driver-docker |
 | B4-13 | U4: reconnect retries every error forever | OPEN | Typed permanent versus transient, recoverable action, redaction review | unit |
