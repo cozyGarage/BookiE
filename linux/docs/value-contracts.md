@@ -16,9 +16,8 @@ shadow type, plus `enum_first`/`enum_last` and scalar `min`/`max` results
 [same-session label rename](evidence/postgres-enum-rename-value-session-results-2026-10-05/manifest.json),
 [same-session type rename/schema move](evidence/postgres-enum-type-rename-schema-move-results-2026-10-05/manifest.json)).
 
-The October 6 strict GTK + DuckDB value tier passed 363 selected tests across
-all 11 suites with no missing suites. It records a dirty worktree at
-`fe46ae8`; see the [complete run packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-06/manifest.json).
+The October 6 strict GTK + DuckDB value tier passed 364 selected tests across
+all 11 suites with no missing suites on clean source `cfc99dd1`; see the [complete run packet](evidence/local-gtk-duckdb-value-tier-results-2026-10-06-cfc99dd1/manifest.json).
 
 The PostgreSQL `timestamp[]` evidence now covers typed rebinding, canonical
 CSV export and SQL replay across a `DateStyle` change, with native array JSON
