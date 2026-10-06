@@ -480,7 +480,7 @@ pub(super) fn attach_cell_gesture(
     let key_context = menus.context.clone();
     let key_action = menus.edit_action.clone();
     let shortcut = gtk::Shortcut::builder()
-        .trigger(&crate::ui::shortcut::parse("Menu"))
+        .trigger(&crate::ui::shortcut::parse("Menu|<Shift>F10"))
         .action(&gtk::CallbackAction::new(move |_, _| {
             select_row_for_menu(&key_view, POSITION_SLOT.get(&key_widget).unwrap_or(0));
             *key_context.borrow_mut() = Some(CellContext {
