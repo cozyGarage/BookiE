@@ -2,7 +2,7 @@
      Running unittests src/lib.rs (target/debug/deps/tablepro_core-cfcfb5702e5943f9)
 
 running 1 test
-test import::cell::tests::sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers ... ok
+test import::cell::tests::sqlite_affinity_tests::sqlite_numeric_affinity_text_fallback_does_not_apply_to_other_drivers ... ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 529 filtered out; finished in 0.00s
 
