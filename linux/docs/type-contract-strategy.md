@@ -315,10 +315,12 @@ rebinding both refuse the undecodable results
 ClickHouse's nested consumer contract adds
 `Map(UInt8, Array(Tuple(String, Nullable(UInt128))))`, including a UInt128 above
 `u64::MAX`, a NULL tuple field and an empty nested array. Native type/JSON oracles
-match JSON and CSV output; type-less SQL, parameter and grid-edit consumers
-refuse without changing the stored row. The full ClickHouse Docker integration
-suite passes 33 tests
-([evidence](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json)).
+match JSON, CSV and XLSX output; XLSX stores the nested result as text matching
+the native JSON oracle. Type-less SQL, parameter and grid-edit consumers refuse
+without changing the stored row. The full ClickHouse Docker integration suite
+passes 33 tests
+([nested contract](evidence/clickhouse-nested-map-array-tuple-results-2026-10-06/manifest.json),
+[XLSX follow-up](evidence/clickhouse-nested-xlsx-consumers-2026-10-06/manifest.json)).
 
 SQLite STRICT `ANY` computed-result contracts now cover `CASE`, `COALESCE`,
 `NULLIF`, `MIN`/`MAX`, `SUBSTR`, `ABS`, `ROUND`, `hex`, `quote`, `instr`,
