@@ -17,7 +17,7 @@ class XWindowAttributes(ctypes.Structure):
     ]
 
 
-ATSPI_WINDOW_Y_OFFSET = 19
+ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
 
 
 def x11_click(window_x, window_y, button=3, clicks=1):
@@ -66,6 +66,11 @@ def x11_click(window_x, window_y, button=3, clicks=1):
 
 def scenarios(ui):
     pyatspi = ui.pyatspi
+
+    def wait_for_adw_dialog(name, present=True):
+        if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
+            return None
+        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
 
     def text_of(node):
         text = node.queryText()
@@ -350,7 +355,7 @@ def scenarios(ui):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
         choose_menu_item(3)
-        ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             if any(
@@ -368,11 +373,12 @@ def scenarios(ui):
         ui.wait_for_node(name="beta")
         open_cell_menu("1")
         choose_menu_item(6)
-        ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("Columns")
+        switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
             node for node in ui.descendants(ui.application_node())
             if ui.node_name(node) in ("alpha", "beta")
-            and ui.node_role(node) == pyatspi.ROLE_SWITCH
+            and ui.node_role(node) in switch_roles
             and node.queryAction().nActions > 0
         ]
         assert len(switches) == 2, ui.accessible_snapshot()
@@ -381,9 +387,111 @@ def scenarios(ui):
         ui.invoke(by_name["alpha"])
         time.sleep(0.3)
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG, present=False)
+        wait_for_adw_dialog("Columns", present=False)
         ui.wait_for_node(name="beta", present=False)
         ui.wait_for_node(name="alpha")
+
+    def session_transaction_label_and_toggle_off_confirmation(database, base):
+        def session_toggle(name):
+            return ui.wait_for_node(name=name, role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.invoke(session_toggle("Session"))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        session_toggle("Session \u00b7 transaction open")
+        ui.invoke(session_toggle("Session \u00b7 transaction open"))
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        session_toggle("Session \u00b7 transaction open")
+        ui.invoke(session_toggle("Session \u00b7 transaction open"))
+        ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
+        session_toggle("Session")
+
+    def ctrl_tab_returns_to_the_most_recently_used_tab(database, base):
+        def wait_for_editor_text(expected):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if editor_text() == expected:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
+
+        ui.set_editor_text("-- one")
+        for label in ("-- two", "-- three"):
+            ui.press_x11_key("t", ("Control_L",))
+            time.sleep(0.5)
+            ui.set_editor_text(label)
+        wait_for_editor_text("-- three")
+        ui.press_x11_key("Tab", ("Control_L",))
+        wait_for_editor_text("-- two")
+        ui.press_x11_key("Tab", ("Control_L",))
+        wait_for_editor_text("-- three")
+
+    def interactive_controls_have_accessible_names(database, base):
+        ui.run_sql("SELECT 1 AS alpha")
+        ui.wait_for_node(name="alpha")
+        roles = {
+            pyatspi.ROLE_PUSH_BUTTON: "push button",
+            pyatspi.ROLE_TOGGLE_BUTTON: "toggle button",
+            pyatspi.ROLE_CHECK_BOX: "check box",
+            pyatspi.ROLE_COMBO_BOX: "combo box",
+            pyatspi.ROLE_ENTRY: "entry",
+        }
+        unnamed = [
+            f"{roles[ui.node_role(node)]} {node.getRoleName()!r} at {node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).x},"
+            f"{node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).y}"
+            for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) in roles and not ui.node_name(node).strip()
+        ]
+        assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
+
+    def alt_arrows_jump_between_statements(database, base):
+        sql = "select 1;\nselect 2;\nselect 3"
+        editor = ui.set_editor_text(sql)
+
+        def caret():
+            return editor.queryText().caretOffset
+
+        def wait_for_caret(expected):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if caret() == expected:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected the caret at {expected}, it is at {caret()}")
+
+        extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + 60, extents.y + 10, button=1)
+        time.sleep(0.3)
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_caret(len(sql))
+        second, third = sql.index("select 2"), sql.index("select 3")
+        ui.press_x11_key("Up", ("Alt_L", "Shift_L"))
+        wait_for_caret(third)
+        ui.press_x11_key("Up", ("Alt_L", "Shift_L"))
+        wait_for_caret(second)
+        ui.press_x11_key("Down", ("Alt_L", "Shift_L"))
+        wait_for_caret(third)
+
+    def row_inspector_lists_every_column_of_the_selected_row(database, base):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        ui.invoke(ui.wait_for_node(name="Row inspector", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="No row selected")
+        click_cell("beta")
+        ui.wait_for_node(name="No row selected", present=False)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            names = {ui.node_name(node) for node in ui.descendants(ui.application_node())}
+            titles = [name for name in names if "\u00b7" in name and name.split(" ")[0] in ("id", "note")]
+            if len(titles) >= 2 and "beta" in names:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError(f"the inspector did not list the row:\n{ui.accessible_snapshot()}")
 
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
@@ -408,10 +516,10 @@ def scenarios(ui):
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         open_cell_menu("Ada Lovelace")
         choose_menu_item(3)
-        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("name")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG, present=False)
+        wait_for_adw_dialog("name", present=False)
 
     def psql(sql):
         import subprocess
@@ -500,6 +608,11 @@ def scenarios(ui):
         test_connection_reports_failure_in_the_dialog,
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
+        session_transaction_label_and_toggle_off_confirmation,
+        ctrl_tab_returns_to_the_most_recently_used_tab,
+        interactive_controls_have_accessible_names,
+        alt_arrows_jump_between_statements,
+        row_inspector_lists_every_column_of_the_selected_row,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

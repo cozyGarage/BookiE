@@ -135,6 +135,16 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::row_inspector::tests::the_inspector_lists_a_row_and_returns_to_its_placeholder"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::statement_band::tests::moving_the_cursor_moves_the_band_between_statements"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::shortcuts::dialog_tests::the_shortcuts_window_lists_keys_and_describes_mouse_gestures"
     ],
     [

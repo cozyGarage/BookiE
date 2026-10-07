@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use gtk4::gio;
 use gtk4::gio::prelude::*;
+use relm4::adw;
 use serde::{Deserialize, Serialize};
 
 use super::config_io::{atomic_write_bytes, atomic_write_json, xdg_config_path};
@@ -30,6 +31,52 @@ pub struct Preferences {
     pub query_timeout_secs: u32,
     #[serde(default = "default_csv_include_header")]
     pub csv_include_header: bool,
+    #[serde(default)]
+    pub color_scheme: ColorSchemePref,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ColorSchemePref {
+    #[default]
+    System,
+    Light,
+    Dark,
+}
+
+impl ColorSchemePref {
+    pub const ALL: [Self; 3] = [Self::System, Self::Light, Self::Dark];
+
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Light => "light",
+            Self::Dark => "dark",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|scheme| scheme.key() == key)
+            .unwrap_or_default()
+    }
+
+    pub fn index(self) -> u32 {
+        Self::ALL.iter().position(|scheme| *scheme == self).unwrap_or(0) as u32
+    }
+
+    pub fn from_index(index: u32) -> Self {
+        Self::ALL.get(index as usize).copied().unwrap_or_default()
+    }
+
+    pub fn style(self) -> adw::ColorScheme {
+        match self {
+            Self::System => adw::ColorScheme::Default,
+            Self::Light => adw::ColorScheme::ForceLight,
+            Self::Dark => adw::ColorScheme::ForceDark,
+        }
+    }
 }
 
 fn default_history_retention_days() -> u32 {
@@ -53,6 +100,7 @@ impl Default for Preferences {
             history_retention_days: default_history_retention_days(),
             query_timeout_secs: default_query_timeout_secs(),
             csv_include_header: default_csv_include_header(),
+            color_scheme: ColorSchemePref::default(),
         }
     }
 }
@@ -209,6 +257,7 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         history_retention_days: settings.uint("history-retention-days"),
         query_timeout_secs: settings.uint("query-timeout-secs"),
         csv_include_header: settings.boolean("csv-include-header"),
+        color_scheme: ColorSchemePref::from_key(settings.string("color-scheme").as_str()),
     }
 }
 
@@ -221,6 +270,7 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_uint("history-retention-days", prefs.history_retention_days),
         settings.set_uint("query-timeout-secs", prefs.query_timeout_secs),
         settings.set_boolean("csv-include-header", prefs.csv_include_header),
+        settings.set_string("color-scheme", prefs.color_scheme.key()),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {
         settings.revert();
@@ -629,5 +679,41 @@ mod tests {
         .unwrap();
         let schema = source.lookup(SETTINGS_SCHEMA, true).unwrap();
         gio::Settings::new_full(&schema, Some(&backend), None)
+    }
+
+    #[test]
+    fn the_color_scheme_survives_a_gsettings_round_trip_and_defaults_to_the_system() {
+        let (settings, backend) = make_test_settings("/com/tablepro/linux/scheme/");
+        let store = PreferencesStore::from_settings(settings, None);
+        assert_eq!(store.load().color_scheme, ColorSchemePref::System);
+        store
+            .update(|prefs| prefs.color_scheme = ColorSchemePref::Dark)
+            .unwrap();
+        store.flush().unwrap();
+        let reopened = test_settings_with_backend("/com/tablepro/linux/scheme/", backend);
+        let reopened = PreferencesStore::from_settings(reopened, None);
+        assert_eq!(reopened.load().color_scheme, ColorSchemePref::Dark);
+    }
+
+    #[test]
+    fn color_scheme_rows_keys_and_styles_agree() {
+        for (position, scheme) in ColorSchemePref::ALL.into_iter().enumerate() {
+            assert_eq!(scheme.index() as usize, position);
+            assert_eq!(ColorSchemePref::from_index(position as u32), scheme);
+            assert_eq!(ColorSchemePref::from_key(scheme.key()), scheme);
+        }
+        assert_eq!(ColorSchemePref::from_key("sepia"), ColorSchemePref::System);
+        assert_eq!(ColorSchemePref::from_index(9), ColorSchemePref::System);
+        assert_eq!(ColorSchemePref::Light.style(), adw::ColorScheme::ForceLight);
+        assert_eq!(ColorSchemePref::Dark.style(), adw::ColorScheme::ForceDark);
+        assert_eq!(ColorSchemePref::System.style(), adw::ColorScheme::Default);
+    }
+
+    #[test]
+    fn an_old_preferences_file_without_a_color_scheme_loads_with_the_system_default() {
+        let parsed: Preferences =
+            serde_json::from_str(r#"{"default_page_size":50,"confirm_destructive":true,"editor_font_size":12}"#)
+                .unwrap();
+        assert_eq!(parsed.color_scheme, ColorSchemePref::System);
     }
 }

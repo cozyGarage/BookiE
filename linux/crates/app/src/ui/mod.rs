@@ -18,6 +18,7 @@ mod mcp_preferences;
 mod parameters_dialog;
 mod preferences;
 mod quick_switcher_dialog;
+mod row_inspector;
 mod row_object;
 mod row_store;
 mod saved_queries_dialog;
