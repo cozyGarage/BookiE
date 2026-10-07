@@ -391,6 +391,22 @@ def scenarios(ui):
         ui.wait_for_node(name="beta", present=False)
         ui.wait_for_node(name="alpha")
 
+    def session_transaction_label_and_toggle_off_confirmation(database, base):
+        def session_toggle(name):
+            return ui.wait_for_node(name=name, role=pyatspi.ROLE_TOGGLE_BUTTON)
+
+        ui.invoke(session_toggle("Session"))
+        time.sleep(0.5)
+        ui.run_sql("BEGIN")
+        session_toggle("Session \u00b7 transaction open")
+        ui.invoke(session_toggle("Session \u00b7 transaction open"))
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON, present=False)
+        session_toggle("Session \u00b7 transaction open")
+        ui.invoke(session_toggle("Session \u00b7 transaction open"))
+        ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
+        session_toggle("Session")
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -506,6 +522,7 @@ def scenarios(ui):
         test_connection_reports_failure_in_the_dialog,
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
+        session_transaction_label_and_toggle_off_confirmation,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
