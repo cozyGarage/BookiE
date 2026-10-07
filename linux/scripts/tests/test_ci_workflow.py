@@ -126,6 +126,14 @@ class CiWorkflowTests(unittest.TestCase):
         for required in ["set -euo pipefail", "--test agent_auth", "--test openssh_session", "--include-ignored", "--test-threads=1"]:
             self.assertIn(required, script)
 
+    def test_postgres_release_openssh_test_is_listed_in_its_actual_tier(self):
+        ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
+        self.assertIn(
+            "agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust](../crates/agentd/tests/g5_system_openssh.rs) | Release",
+            ledger,
+        )
+        self.assertIn("scripts/test-postgres-release.sh", ledger)
+
 
 if __name__ == "__main__":
     unittest.main()

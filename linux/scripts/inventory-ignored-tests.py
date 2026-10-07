@@ -89,6 +89,8 @@ for path in sorted((root / "crates").rglob("*.rs")):
             tier, enable = "TLS", "scripts/test-driver-tls.sh"
         elif "release-tests" in relative:
             tier, enable = "Release", "scripts/test-postgres-release.sh"
+        elif "postgres release fixture" in reason.lower():
+            tier, enable = "Release", "scripts/test-postgres-release.sh"
         elif "socket" in relative:
             tier, enable = "Socket", "scripts/test-postgres-socket.sh"
         elif "smoke_local" in relative:
