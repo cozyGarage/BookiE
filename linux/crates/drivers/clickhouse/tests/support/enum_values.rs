@@ -10,7 +10,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .execute(
             "CREATE TABLE enum_values (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
@@ -34,6 +34,18 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         vec![
             Value::Int(3),
             Value::Text("東京".into()),
+            Value::Text("low".into()),
+            Value::Text("present".into()),
+        ],
+        vec![
+            Value::Int(4),
+            Value::Text("minimum".into()),
+            Value::Text("high".into()),
+            Value::Null,
+        ],
+        vec![
+            Value::Int(5),
+            Value::Text("maximum".into()),
             Value::Text("low".into()),
             Value::Text("present".into()),
         ],
@@ -64,7 +76,8 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .query(
             "SELECT toTypeName(narrow), toTypeName(wide), toTypeName(optional), \
              CAST(narrow AS String), CAST(wide AS String), \
-             CAST(optional AS Nullable(String)), isNull(optional) \
+             CAST(optional AS Nullable(String)), isNull(optional), \
+             CAST(narrow AS Int8), CAST(wide AS Int16) \
              FROM enum_values ORDER BY id",
         )
         .await
@@ -83,6 +96,8 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             row[6],
             Value::Int(if expected[index][3] == Value::Null { 1 } else { 0 })
         );
+        assert_eq!(row[7], Value::Int([1, 2, -1, -128, 127][index]));
+        assert_eq!(row[8], Value::Int(if index % 2 == 0 { -32768 } else { 32767 }));
     }
 
     let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
@@ -118,7 +133,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .execute(
             "CREATE TABLE enum_csv_copy (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
@@ -134,29 +149,26 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .unwrap();
     assert_eq!(imported.rows, expected, "CSV import preserves native enum values");
 
-    let copy_sql = tablepro_core::sql_literal::build_insert_literal(
-        "clickhouse",
-        None,
-        "enum_sql_copy",
-        &result.columns,
-        &result.rows[0],
-    )
-    .unwrap();
     connection
         .execute(
             "CREATE TABLE enum_sql_copy (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
         )
         .await
         .unwrap();
-    connection.execute(&copy_sql).await.unwrap();
+    for row in &result.rows {
+        let copy_sql =
+            tablepro_core::sql_literal::build_insert_literal("clickhouse", None, "enum_sql_copy", &result.columns, row)
+                .unwrap();
+        connection.execute(&copy_sql).await.unwrap();
+    }
     let copied = connection
-        .query("SELECT id, narrow, wide, optional FROM enum_sql_copy")
+        .query("SELECT id, narrow, wide, optional FROM enum_sql_copy ORDER BY id")
         .await
         .unwrap();
-    assert_eq!(copied.rows, vec![expected[0].clone()], "Copy as SQL preserves enums");
+    assert_eq!(copied.rows, expected, "Copy as SQL preserves enum bounds");
 }
