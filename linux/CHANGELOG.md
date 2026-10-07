@@ -5,6 +5,7 @@
 ### Added
 
 - PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
+- PostgreSQL enum contract coverage combines restricted `SET ROLE`, transaction-local `search_path`, a same-named shadow enum, and target-schema omission through typed update, filtering, invalid-label refusal, and commit/path restoration.
 - SQL Server result contracts now verify row- and byte-budget truncation, first-result-set metadata even when it is empty, later-set draining, and connection reuse.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
@@ -18,6 +19,7 @@
 - PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 addresses, prefixes, SQL NULL and array bounds through results, inferred typed bindings, keyed updates and typed CSV import; invalid prefixes and non-network CIDR host bits are refused without changing target or sibling rows.
 - PostgreSQL `xml[]` preserves XML fragments, SQL NULL, native array text and wire bytes through results, inferred bindings, keyed grid edits, typed CSV restore and JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports; malformed XML retains native `2200N` refusal without changing target or sibling rows.
 - PostgreSQL custom enum identifiers preserve metadata, keyed edits, and typed filters when a mixed-case quoted schema/type collides with lowercase names earlier in session or transaction-local `search_path`; native catalog and shadow-row checks verify the selected type, and shadow-only labels retain native `22P02` refusal.
+- PostgreSQL custom composite arrays and unlisted built-in `money[]` and `point[]` arrays report explicit unsupported results and refuse literal/bound writes without changing target or sibling rows.
 - PostgreSQL mixed-case enum contracts also verify that transaction rollback restores target rows and the original `search_path` after typed writes under a shadow schema.
 - PostgreSQL custom enum metadata and keyed edits preserve schema and type identifiers at PostgreSQL's 63-byte catalog limit, including a multibyte UTF-8 character at the final type-name boundary.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.

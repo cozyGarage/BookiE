@@ -2,8 +2,8 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-07; each new case links to its source-fingerprinted
-evidence packet, and this summary is not itself runtime evidence.
+and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
+validation comments, while this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
 
@@ -66,6 +66,21 @@ The same XML array now also survives JSON, CSV, XML, HTML, Markdown, XLSX and
 SQL file exports with its native array text, NULL element, and wire bytes
 preserved on SQL replay (`value_contract_xml_array_file_exports_preserve_native_text`
 in `crates/drivers/postgres/tests/support/array_contract_parts/xml_array_file_exports.rs`).
+
+Custom composite arrays now have a named explicit-refusal contract. The test
+checks the undecodable value against PostgreSQL's native composite type, JSON,
+text and wire output, then verifies literal/bind refusal leaves target and
+sibling rows unchanged (`value_contract_custom_composite_array_refusal_preserves_rows`
+in `crates/drivers/postgres/tests/support/custom_array_contract.rs`). Other
+custom array families and their consumers remain open. The unlisted built-in
+The unlisted built-in `money[]` refusal covers populated values, SQL NULL
+elements, native text/JSON/wire snapshots, literal/bind refusal and
+target/sibling preservation (`value_contract_money_array_refusal_preserves_target_and_sibling_rows`).
+The same explicit-refusal contract now covers `point[]` with native type, text,
+JSON and wire oracles plus target/sibling preservation
+(`value_contract_point_array_refusal_preserves_target_and_sibling_rows`). Both
+tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
+see the [PR validation comments](https://github.com/cozyGarage/BookiE/pull/126).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
@@ -805,6 +820,13 @@ the same-name target/shadow type collision also passes keyed edit and filtering
 with the role's default `search_path` aimed at the shadow schema ([shadow-path evidence](evidence/postgres-enum-shadowed-quoted-search-path-results-2026-10-04/manifest.json));
 quoted-identifier CSV import also preserves the target enum under a transaction-local shadowed `search_path`, distinguishes SQL NULL from the literal `NULL`, and leaves the same-named shadow table unchanged ([CSV evidence](evidence/postgres-enum-quoted-csv-shadow-results-2026-10-06/manifest.json));
 mixed-case quoted schema/type names now also survive metadata lookup, keyed edits and structured filtering when lowercase-folded schema/type collisions appear earlier in `search_path`, with native catalog and untouched shadow-row checks ([case-fold collision evidence](evidence/postgres-enum-mixed-case-identifiers-results-2026-10-07/manifest.json)); the same collision survives transaction-local `SET LOCAL search_path`: metadata, keyed update and typed filtering still target the quoted enum; a shadow-only label is refused with native `22P02`, target and shadow rows are checked, and commit restores the original session path ([transaction-local evidence and validation logs on PR #108](https://github.com/cozyGarage/BookiE/pull/108#issuecomment-6027211913)). The transaction-local contract now also passes when the target schema is omitted from `search_path`, reusing metadata fetched beforehand ([validation on PR #112](https://github.com/cozyGarage/BookiE/pull/112#issuecomment-6027345843)). Restricted-role session and login-default paths also omit the target schema: inferred query parameters, keyed updates, and filters stay bound to the qualified target type while shadow-only labels are refused ([validation on PR #114](https://github.com/cozyGarage/BookiE/pull/114#issuecomment-6027426272)). The mixed-case quoted target also stays bound under a restricted `SET ROLE` session when a lowercase folded shadow leads `search_path` and the target schema is absent, with native row/type equality and `22P02` refusal ([latest validation on PR #117](https://github.com/cozyGarage/BookiE/pull/117#issuecomment-6027700412)). Other identifier forms and transaction/session `search_path` permutations remain open.
+
+The restricted-role enum case now combines `SET ROLE` with transaction-local
+`SET LOCAL search_path`, a same-named shadow enum first in path, and an omitted
+target schema. A typed keyed update and filter retain the qualified target OID,
+a shadow-only label is refused with native `22P02`, a savepoint restores the
+transaction, commit preserves the update, and the original session path returns
+([test](../crates/drivers/postgres/tests/support/enum_role_context_contract.rs)).
 
 The mixed-case transaction-local enum contract now also verifies rollback: a
 typed update and filter run with the lowercase shadow first in `search_path`,
