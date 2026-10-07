@@ -56,6 +56,7 @@ crates/app/src/ui/grid/column_visibility.rs
 crates/app/src/ui/grid/context_menu.rs
 crates/app/src/ui/grid/display.rs
 crates/app/src/ui/grid/editing.rs
+crates/app/src/ui/grid/row_find.rs
 crates/app/src/ui/grid/value_viewer.rs
 crates/app/src/ui/history_dialog.rs
 crates/app/src/ui/import_dialog.rs

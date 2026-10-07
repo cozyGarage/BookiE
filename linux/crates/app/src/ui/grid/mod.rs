@@ -6,6 +6,7 @@ mod display;
 mod editing;
 mod export;
 mod presentation;
+mod row_find;
 mod types;
 mod value_viewer;
 pub(crate) use presentation::cell_allows_inline_edit;
@@ -152,6 +153,11 @@ pub fn build_column_view(
         result.columns.iter().map(|column| column.name.clone()).collect(),
         connection_id,
         database,
+    );
+    row_find::install(
+        &column_view,
+        &grid_actions,
+        result.columns.iter().map(|column| column.name.clone()).collect(),
     );
     column_view.insert_action_group("grid", Some(&grid_actions));
 
