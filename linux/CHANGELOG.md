@@ -10,7 +10,7 @@
 - MongoDB's hostile SCRAM handshake now has a local wire-protocol regression for malformed nonces and excessive iterations, proving the driver refuses before sending a client proof.
 - MongoDB metadata census cancellation now has a Docker regression that blocks the census `find`, verifies prompt cancellation, and checks the same client and native rows afterward.
 - ClickHouse Enum8/Enum16 values now have native label, metadata, parameter, CSV import and Copy-as-SQL coverage, including literal `NULL`, SQL NULL, quoted labels and Unicode.
-- SQLite's `json_group_object` CSV round-trip contract passes on Ubuntu 24.04 (SQLite 3.45.1) and Debian 13 (SQLite 3.46.1), checking native output on both sides of the 3.50.0 NULL-label fix without skipping distro versions or bundling a different engine.
+- SQLite's `json_group_object` CSV round-trip contract passes on Ubuntu 24.04 (SQLite 3.45.1), Debian 13 (SQLite 3.46.1), and the Arch-based development host (SQLite 3.53.4), checking native output on both sides of the 3.50.0 NULL-label fix without skipping distro versions or bundling a different engine.
 - PostgreSQL built-in multirange scalar and array projections now resolve to named `Undecodable` values, with literal and parameter refusal and SQL NULL distinction covered by Docker-backed contracts.
 - MariaDB now has the non-UTC TIMESTAMP refusal contract already used for MySQL, covering dedicated sessions, pooled queries, transaction-local changes, session-local text, and the native UTC epoch.
 - MySQL and MariaDB unsigned subtraction now has Docker-backed `NO_UNSIGNED_SUBTRACTION` session contracts for native underflow/overflow refusal, engine-specific signed result metadata, and negative/positive `BIGINT` boundaries.
