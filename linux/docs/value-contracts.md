@@ -49,7 +49,9 @@ SQL Server CSV import maps all table columns, including supplied identity,
 computed and rowversion values, but the native INSERT includes only the
 writable column. `value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server`
 checks the planned SQL and native generated values for two imported rows while
-preserving the pre-existing row.
+preserving the pre-existing row. It also passes fetched SQL Server metadata to
+the production grid edit gate: server-owned columns refuse editing and the
+ordinary text column remains editable.
 
 The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
 32-bit maximum and SQL NULL, using native type/text/`array_send` equality and
