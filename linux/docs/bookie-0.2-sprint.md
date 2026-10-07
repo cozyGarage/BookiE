@@ -5,8 +5,8 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `4e145e1f0` on `linux` (PR #273; PRs #266, #268, #270
-and #272 are docs-only).
+Integrated baseline: `93bcb8396` on `linux` (PR #276; PRs #266, #268, #270,
+#272, #274, #275 and #276 are docs-only).
 Recent B3 merges cover SQL Server server-owned values and mutation batches
 (#224–#225), multiple result sets (#228), MongoDB census cost/cancellation and
 nested filters (#229, #231, #234, #247), ClickHouse enum values (#242),
@@ -19,6 +19,10 @@ and undeclared-label refusal coverage for both widths, plus nullable Enum16
 consumer coverage (#260–#263, #267, #269).
 Nested `Array(Enum8)` and `Array(Nullable(Enum8))` result/export and
 write-refusal cases are covered in #271 and #273.
+`Array(Enum16)` and `Array(Nullable(Enum16))` now extend that matrix with the
+signed endpoints, SQL NULL versus the literal `NULL` label where nullable,
+native JSON, JSON/CSV/XLSX consumers, and type-less SQL, bind and grid-write
+refusal.
 PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
 coverage across engines. These are focused cases, not milestone closure.
 

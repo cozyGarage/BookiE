@@ -856,6 +856,10 @@ mod sqlite_any_contract;
 mod duckdb_enum_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/clickhouse_enum_contract.rs"]
+mod clickhouse_enum_contract;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mysql_integer_contract.rs"]
 mod mysql_integer_contract;
 

@@ -296,9 +296,20 @@ re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manife
 ClickHouse `Enum8` and `Enum16` use label text in result values while retaining
 the native enum type in result and table metadata. A Docker contract checks
 parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
-CSV import with an explicit collision-free null marker, and Copy as SQL replay
-against the native server
+empty-string labels versus SQL NULL, CSV import with an explicit collision-free
+null marker, and Copy as SQL replay against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
+The app's keyed-grid path also edits nullable Enum16 labels against native type
+and signed-code oracles, keeps blank SQL NULL distinct from the literal `NULL`
+label, and proves an undeclared label leaves all rows unchanged
+([test](../crates/app/tests/support/clickhouse_enum_contract.rs)).
+Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)`,
+`Array(Nullable(Enum16))`, `Tuple(Enum8, Nullable(Enum8), Enum8)` and
+`Tuple(Enum16, Nullable(Enum16), Enum16)` use native `toJSONString` as the
+value oracle and check JSON/CSV/XLSX export plus refusal by type-less SQL,
+binding and keyed grid writes. Tuple shapes include nullable values and a
+literal `NULL` label; nullable shapes distinguish SQL NULL from that label
+([test](../crates/drivers/clickhouse/tests/support/nested_values.rs)).
 
 The compound-result and direct table-projection XLSX workbooks both keep `=1+1`
 and `'=1+1` as text through the Calc ODS/XLSX round trip, without creating

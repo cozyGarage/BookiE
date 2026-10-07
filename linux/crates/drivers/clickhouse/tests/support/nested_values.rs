@@ -16,6 +16,22 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
             "Array(Nullable(Enum8('zero' = 0, 'NULL' = 1, 'O\\'Brien' = 2)))",
         ),
         (
+            "CAST(['low', 'NULL', 'high'] AS Array(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+            "Array(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))",
+        ),
+        (
+            "CAST(['low', CAST(NULL AS Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))), 'NULL', 'high'] AS Array(Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))))",
+            "Array(Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+        ),
+        (
+            "tuple(CAST('low' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), CAST(NULL AS Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127))), CAST('NULL' AS Enum8('low' = -128, 'NULL' = 0, 'high' = 127)))",
+            "Tuple(Enum8('low' = -128, 'NULL' = 0, 'high' = 127), Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127)), Enum8('low' = -128, 'NULL' = 0, 'high' = 127))",
+        ),
+        (
+            "tuple(CAST('low' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), CAST(NULL AS Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))), CAST('NULL' AS Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)))",
+            "Tuple(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767), Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767)), Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))",
+        ),
+        (
             "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
             "Array(Nullable(UInt128))",
         ),
