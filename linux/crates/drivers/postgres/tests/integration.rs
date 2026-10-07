@@ -655,7 +655,7 @@ async fn pagination_and_truncated_flag() {
     assert!(!q.truncated);
 }
 
-async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: QueryResultProbe) {
+async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: QueryResultProbe, tag: &str) {
     let QueryResultProbe {
         truncated,
         rows,
@@ -667,10 +667,12 @@ async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: Que
         elapsed < std::time::Duration::from_secs(30),
         "{rows} rows in {elapsed:?}"
     );
-    let still_running = "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%generate_series(1::bigint%' AND query NOT LIKE '%pg_stat_activity%' AND pid <> pg_backend_pid()";
+    let still_running = format!(
+        "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%{tag}%' AND pid <> pg_backend_pid()"
+    );
     let mut running = i64::MAX;
     for _ in 0..30 {
-        running = match observer.query(still_running).await.unwrap().rows[0][0] {
+        running = match observer.query(&still_running).await.unwrap().rows[0][0] {
             Value::Int(count) => count,
             ref other => panic!("{other:?}"),
         };
@@ -688,8 +690,7 @@ struct QueryResultProbe {
     elapsed: std::time::Duration,
 }
 
-const UNBOUNDED_SQL: &str =
-    "SELECT i, repeat('x', 8) AS pad FROM (SELECT generate_series(1::bigint, 4000000000::bigint) AS i) AS g";
+const UNBOUNDED_SQL: &str = "SELECT i, repeat('x', 8) AS pad FROM (SELECT generate_series(1::bigint, 4000000000::bigint) AS i) AS g /* bookie_pg_row_cap */";
 
 #[tokio::test]
 #[ignore = "requires docker"]
@@ -704,7 +705,7 @@ async fn an_unbounded_query_is_cut_at_the_cap_and_the_server_stops_producing() {
         rows: result.rows.len(),
         elapsed: started.elapsed(),
     };
-    assert_capped_and_server_stopped(observer.as_ref(), probe).await;
+    assert_capped_and_server_stopped(observer.as_ref(), probe, "bookie_pg_row_cap").await;
 }
 
 #[tokio::test]
@@ -723,7 +724,7 @@ async fn a_controlled_unbounded_query_returns_the_capped_rows_instead_of_timing_
         rows: result.rows.len(),
         elapsed,
     };
-    assert_capped_and_server_stopped(observer.as_ref(), probe).await;
+    assert_capped_and_server_stopped(observer.as_ref(), probe, "bookie_pg_row_cap").await;
 }
 
 #[tokio::test]

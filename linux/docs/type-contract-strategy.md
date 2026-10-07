@@ -71,10 +71,15 @@ malformed-prefix refusal, CIDR host-bit refusal and target/sibling preservation.
 The built-in OID census includes element OIDs 869 (`inet`) and 650 (`cidr`)
 ([evidence](evidence/postgres-network-array-roundtrip-results-2026-10-06/manifest.json)).
 
-PostgreSQL arbitrary query results now have a Docker regression that crosses the
-shared 64 MiB decoded-result budget, verifies retained row order and payloads,
-asserts `truncated`, and reuses the pooled connection for a following query
-([test](../crates/drivers/postgres/tests/support/query_budget_contract.rs)).
+PostgreSQL arbitrary query results have Docker regressions that cross the shared
+64 MiB decoded-result budget, verify retained row order and payloads, assert
+server cancellation, and reuse the pooled connection. A byte-capped query in an
+explicit transaction also verifies PostgreSQL's aborted state (`25P02`),
+rollback, and connection reuse
+([tests](../crates/drivers/postgres/tests/support/query_budget_contract.rs)).
+The core unit test separately checks the `MAX_QUERY_ROWS` guard; byte accounting
+reaches its limit first for current materialized rows, so an exact one-million
+row driver result is not reachable under the present 64 MiB limit.
 
 Other unlisted built-in and custom array families remain explicitly open
 ([macaddr[] evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json),

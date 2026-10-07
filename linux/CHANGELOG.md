@@ -24,7 +24,7 @@
 - The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
 - MySQL and SQL Server tunneled TLS contracts now cover valid server identity, wrong CA and hostname refusal, and no plaintext fallback through SSH forwarding. The fixture creates its SSH host key at container startup rather than baking it into the image.
 - MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
-- PostgreSQL query results now have Docker coverage for shared byte-budget truncation, row order and payloads, plus pooled connection reuse.
+- PostgreSQL byte-budget caps now have Docker coverage for server cancellation, transaction abort/rollback semantics, and connection reuse; the core unit test separately checks the row-limit guard.
 - SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
 - MongoDB `find` and `aggregate` queries now have Docker regression coverage for 64 MiB result-budget truncation, exact admitted payloads, and a usable connection afterward.
 - SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
