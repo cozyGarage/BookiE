@@ -101,6 +101,35 @@ async fn mysql_transaction_queries_are_bounded_and_mark_truncation() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_transaction_queries_obey_result_byte_budget_and_remain_usable() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts).await;
+    let mut transaction = conn.begin().await.unwrap();
+    let payload_len = 4 * 1024 * 1024;
+    let payload = "x".repeat(payload_len);
+    let result = transaction
+        .query(&format!(
+            "SELECT REPEAT('x', {payload_len}) AS payload \
+             FROM information_schema.columns a CROSS JOIN information_schema.columns b LIMIT 20"
+        ))
+        .await
+        .unwrap();
+
+    assert!(result.truncated, "omitted rows must be reported");
+    assert!(!result.rows.is_empty());
+    assert!(result.rows.len() < 20);
+    assert!(result.rows.len() * payload_len <= tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert!(result.rows.iter().all(|row| {
+        matches!(row.first(), Some(Value::Text(value)) if value.len() == payload_len && value == &payload)
+    }));
+
+    let next = transaction.query("SELECT 42 AS usable").await.unwrap();
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn implicit_commit_batch_is_refused_before_mysql_dispatch() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts).await;
