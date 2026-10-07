@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "source_commit": "c6f25973ddd661a196a03538ba6d943de94c6d24",
+  "source_tree": "4827663d5f934432a5fb350e290d1ddb07fcf524",
+  "worktree_state": "clean source checkout; evidence files added after the run",
+  "source_sha256": {
+    "crates/drivers/postgres/tests/integration.rs": "5d06b36718739577595542c71fd8a1000a4974331277867f6be79c617a288d68",
+    "crates/drivers/postgres/tests/support/rollback_failure.rs": "6bd69e560aaee54a04fc02c4ec6b2ac8b84b49b7dca17d8ee5783c684cdb4811"
+  },
+  "engine": "PostgreSQL 16-alpine testcontainers fixture via local Docker",
+  "test": "rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend",
+  "command": "cargo test --locked -p tablepro-driver-postgres --test integration rollback_failure::a_batch_reports_rollback_failure_after_postgres_terminates_its_backend -- --ignored --exact --test-threads=1",
+  "result": "1 passed, 0 failed, 0 ignored; 215 filtered out; 2.39 seconds",
+  "assertions": [
+    "Backend termination during statement 1 reports TransactionRollbackFailed with both statement and rollback errors classified as disconnected.",
+    "A new connection confirms the parent row and transactional trigger-table row were rolled back.",
+    "The identity sequence and trigger sequence each remain advanced after rollback."
+  ],
+  "test_binary_sha256": "b6969066165a9201a91c3a38f27593ecd5c9ac0629a81f49786b4855366e30a9",
+  "log": {
+    "path": "focused.txt",
+    "sha256": "89774b06613c9245339310b742752e46786224ee7cbdb2602902d0d63989b244"
+  },
+  "not_established": [
+    "Frozen B3+B4 candidate acceptance",
+    "Hosted acceptance",
+    "Distribution-package installation and native Wayland acceptance",
+    "Other PostgreSQL side-effect classes beyond rows and sequence allocations"
+  ]
+}
