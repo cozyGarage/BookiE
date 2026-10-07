@@ -81,8 +81,9 @@ a separate zero-row projection retains UUID metadata too ([scalar evidence](evid
 
 The PostgreSQL `timestamp[]` DateStyle case now extends typed rebinding to
 canonical CSV output and SQL replay after switching from `SQL, DMY` to
-`ISO, MDY`; native JSON/wire oracles and sibling preservation pass
-([evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
+`ISO, MDY`; typed CSV import now restores the same source after that session
+change, with native type/JSON/wire checks and an untouched sibling
+([test](../crates/drivers/postgres/tests/support/array_contract_parts/result_consumers_timestamp_dmy.rs)).
 The `timetz[]` case also preserves explicit offsets through an `America/New_York`
 to UTC transition and the JSON/CSV/XLSX/SQL consumer paths
 ([evidence](evidence/postgres-timetz-array-file-consumers-timezone-results-2026-10-05/manifest.json)).

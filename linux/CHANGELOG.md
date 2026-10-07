@@ -4,6 +4,7 @@
 
 ### Added
 
+- PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
 - SQL Server result contracts now verify row- and byte-budget truncation, first-result-set metadata even when it is empty, later-set draining, and connection reuse.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
