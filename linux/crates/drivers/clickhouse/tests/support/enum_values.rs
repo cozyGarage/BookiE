@@ -11,7 +11,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             "CREATE TABLE enum_values (
                 id UInt8,
                 narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
-                wide Enum16('low' = -32768, 'high' = 32767),
+                wide Enum16('low' = -32768, 'high' = 32767, 'zero' = 0),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
         )
@@ -55,6 +55,12 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             Value::Text("high".into()),
             Value::Null,
         ],
+        vec![
+            Value::Int(7),
+            Value::Text("NULL".into()),
+            Value::Text("zero".into()),
+            Value::Null,
+        ],
     ];
     for row in &expected {
         connection
@@ -81,6 +87,28 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .await
         .unwrap();
     assert_eq!(after_refusal.rows, expected, "refused enum write leaves rows unchanged");
+
+    let invalid_wide_label = [
+        Value::Int(8),
+        Value::Text("NULL".into()),
+        Value::Text("undeclared".into()),
+        Value::Null,
+    ];
+    assert!(
+        connection
+            .execute_params("INSERT INTO enum_values VALUES (?, ?, ?, ?)", &invalid_wide_label)
+            .await
+            .is_err(),
+        "an undeclared Enum16 label must be refused"
+    );
+    let after_wide_refusal = connection
+        .query("SELECT id, narrow, wide, optional FROM enum_values ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        after_wide_refusal.rows, expected,
+        "refused Enum16 write leaves rows unchanged"
+    );
 
     let columns = connection.fetch_columns(None, "enum_values").await.unwrap();
     assert!(columns[1].data_type.starts_with("Enum8("));
@@ -121,8 +149,11 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             row[6],
             Value::Int(if expected[index][3] == Value::Null { 1 } else { 0 })
         );
-        assert_eq!(row[7], Value::Int([1, 2, -1, -128, 127, 0][index]));
-        assert_eq!(row[8], Value::Int(if index % 2 == 0 { -32768 } else { 32767 }));
+        assert_eq!(row[7], Value::Int([1, 2, -1, -128, 127, 0, 1][index]));
+        assert_eq!(
+            row[8],
+            Value::Int([-32768, 32767, -32768, 32767, -32768, 32767, 0][index])
+        );
     }
 
     let null_marker = tablepro_core::export::unique_csv_null_marker(&result.rows);
@@ -159,7 +190,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             "CREATE TABLE enum_csv_copy (
                 id UInt8,
                 narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
-                wide Enum16('low' = -32768, 'high' = 32767),
+                wide Enum16('low' = -32768, 'high' = 32767, 'zero' = 0),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
         )
@@ -179,7 +210,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             "CREATE TABLE enum_sql_copy (
                 id UInt8,
                 narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
-                wide Enum16('low' = -32768, 'high' = 32767),
+                wide Enum16('low' = -32768, 'high' = 32767, 'zero' = 0),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
         )
