@@ -23,9 +23,11 @@ for base in "${images[@]}"; do
     mkdir -p ~/.config/tablepro ~/.local/share/tablepro
     echo keep > ~/.config/tablepro/connections.json
     echo keep > ~/.local/share/tablepro/history.db
-    DEB_SKIP_BUILD=1 DEB_VERSION=0.1.5-2 DEB_OUT=/work/out bash scripts/build-deb.sh >/tmp/build2.log 2>&1 || { tail -40 /tmp/build2.log; exit 1; }
-    newer=$(ls /work/out/tablepro_0.1.5-2_*.deb)
-    older=$(ls /work/out/tablepro_0.1.5-1_*.deb)
+    older=$deb
+    dpkg-deb -R "$older" /work/repack
+    sed -i "s/^Version: .*/Version: 0.1.5-2/" /work/repack/DEBIAN/control
+    newer=/work/out/tablepro_0.1.5-2_amd64.deb
+    dpkg-deb --root-owner-group --build /work/repack "$newer" >/dev/null
     installed_version() { dpkg-query -W -f="\${Version}" tablepro; }
     keeps_user_data() {
       test "$(cat ~/.config/tablepro/connections.json)" = keep
