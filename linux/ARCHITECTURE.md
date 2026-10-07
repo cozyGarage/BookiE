@@ -105,7 +105,7 @@ Table tabs combine data browsing and structure views. Pending row changes and pe
 
 Workspace state is persisted per connection. Unknown persisted tab kinds deserialize to an `Unknown` variant and are dropped during restore instead of failing the whole file.
 
-Browse results use a custom `gio::ListModel` (`RowStore`) behind GTK's list and selection models. It retains the shared `QueryResult` and creates GTK `RowObject`s when the view requests items; edited and inserted draft rows become live objects in that model. This avoids eagerly allocating one GObject per result row, but query rows and cell values remain fully materialized in memory. It is not database paging or constant-memory handling of large results.
+Browse results use a custom `gio::ListModel` (`RowStore`) behind GTK's list and selection models. It retains the shared `QueryResult` and weakly caches GTK `RowObject`s for shared rows, preserving identity while consumers hold references and recreating a clean object after they release it. Draft and replacement rows remain strongly owned by the model. This bounds retained row objects around active consumers, but query rows and cell values remain fully materialized in memory. It is not database paging or constant-memory handling of large results.
 
 ## Driver contract
 

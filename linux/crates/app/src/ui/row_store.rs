@@ -12,7 +12,16 @@ use tablepro_core::QueryResult;
 use super::row_object::RowObject;
 
 pub(super) enum Slot {
+    /// A row that has not yet been requested from the shared result.
     Shared(usize),
+    /// A weak cache for a shared row. The source index recreates it after
+    /// the view and every other consumer release the current RowObject.
+    Cached {
+        source_index: usize,
+        object: glib::WeakRef<RowObject>,
+    },
+    /// Drafts and replacement rows have no immutable source row to rebuild
+    /// from, so the model remains their owner.
     Object(RowObject),
 }
 
@@ -48,15 +57,28 @@ mod imp {
             let slot = slots.get_mut(position as usize)?;
             match slot {
                 Slot::Shared(index) => {
+                    let source_index = *index;
                     let source = self.source.borrow();
-                    let cells = source.as_ref()?.rows.get(*index)?.clone();
-                    *slot = Slot::Object(RowObject::new(cells));
+                    let cells = source.as_ref()?.rows.get(source_index)?.clone();
+                    let row = RowObject::new(cells);
+                    let object = glib::WeakRef::new();
+                    object.set(Some(&row));
+                    *slot = Slot::Cached { source_index, object };
+                    Some(row.upcast())
                 }
-                Slot::Object(_) => {}
-            }
-            match slot {
+                Slot::Cached { source_index, object } => {
+                    if let Some(row) = object.upgrade() {
+                        Some(row.upcast())
+                    } else {
+                        let source_index = *source_index;
+                        let source = self.source.borrow();
+                        let cells = source.as_ref()?.rows.get(source_index)?.clone();
+                        let row = RowObject::new(cells);
+                        object.set(Some(&row));
+                        Some(row.upcast())
+                    }
+                }
                 Slot::Object(object) => Some(object.clone().upcast()),
-                _ => None,
             }
         }
     }
@@ -106,16 +128,25 @@ impl RowStore {
 
     pub fn find(&self, row: &RowObject) -> Option<u32> {
         let slots = self.imp().slots.borrow();
-        let position = slots
-            .iter()
-            .position(|slot| matches!(slot, Slot::Object(object) if object == row))?;
+        let position = slots.iter().position(|slot| match slot {
+            Slot::Object(object) => object == row,
+            Slot::Cached { object, .. } => object.upgrade().is_some_and(|cached| cached == *row),
+            Slot::Shared(_) => false,
+        })?;
         Some(position as u32)
     }
 
     #[cfg(test)]
     fn materialized(&self) -> usize {
         let slots = self.imp().slots.borrow();
-        slots.iter().filter(|slot| matches!(slot, Slot::Object(_))).count()
+        slots
+            .iter()
+            .filter(|slot| match slot {
+                Slot::Object(_) => true,
+                Slot::Cached { object, .. } => object.upgrade().is_some(),
+                Slot::Shared(_) => false,
+            })
+            .count()
     }
 }
 
@@ -140,8 +171,13 @@ mod tests {
         let store = RowStore::from_shared(shared(1000));
         assert_eq!(store.n_items(), 1000);
         assert_eq!(store.materialized(), 0);
-        assert_eq!(first_cell(&store, 41), Value::Int(41));
+        let row = store.item(41).and_downcast::<RowObject>().unwrap();
+        assert_eq!(row.cell_value(0), Value::Int(41));
         assert_eq!(store.materialized(), 1);
+        drop(row);
+        assert_eq!(store.materialized(), 0);
+        assert_eq!(first_cell(&store, 41), Value::Int(41));
+        assert_eq!(store.materialized(), 0);
     }
 
     #[test]
@@ -153,6 +189,41 @@ mod tests {
         assert_eq!(first, again);
         assert_eq!(again.cell_value(0), Value::Int(99));
         assert_eq!(store.find(&again), Some(1));
+    }
+
+    #[test]
+    fn a_released_clean_row_can_be_recreated_from_the_shared_result() {
+        let store = RowStore::from_shared(shared(3));
+        let first = store.item(1).and_downcast::<RowObject>().unwrap();
+        let held_identity = first.clone();
+        assert_eq!(store.materialized(), 1);
+        drop(first);
+
+        let again = store.item(1).and_downcast::<RowObject>().unwrap();
+        assert_eq!(again, held_identity);
+        assert_eq!(again.cell_value(0), Value::Int(1));
+        assert_eq!(store.materialized(), 1);
+        drop(held_identity);
+        assert_eq!(store.materialized(), 1);
+        drop(again);
+        assert_eq!(store.materialized(), 0);
+
+        let recreated = store.item(1).and_downcast::<RowObject>().unwrap();
+        assert_eq!(recreated.cell_value(0), Value::Int(1));
+        assert_eq!(store.materialized(), 1);
+    }
+
+    #[test]
+    fn draft_rows_remain_owned_by_the_store() {
+        let store = RowStore::from_shared(shared(1));
+        let draft = RowObject::new_draft(7, vec![Value::Int(-1)]);
+        store.insert(0, &draft);
+        drop(draft);
+
+        assert_eq!(store.materialized(), 1);
+        let again = store.item(0).and_downcast::<RowObject>().unwrap();
+        assert_eq!(again.draft_id(), Some(7));
+        assert_eq!(again.cell_value(0), Value::Int(-1));
     }
 
     #[test]
@@ -226,7 +297,8 @@ mod tests {
         assert_eq!(store.n_items(), 500);
         assert_eq!(store.materialized(), 0);
         assert_eq!(Arc::strong_count(&result), 2);
-        assert_eq!(first_cell(&store, 499), Value::Int(499));
+        let row = store.item(499).and_downcast::<RowObject>().unwrap();
+        assert_eq!(row.cell_value(0), Value::Int(499));
         assert_eq!(store.materialized(), 1);
     }
 
