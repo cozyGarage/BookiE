@@ -14,6 +14,7 @@
     <key name="query-timeout-secs" type="u"><default>60</default></key>
     <key name="csv-include-header" type="b"><default>true</default></key>
     <key name="color-scheme" type="s"><default>'system'</default></key>
+    <key name="editor-font-family" type="s"><default>''</default></key>
   </schema>
   <schema id="com.tablepro.linux.Devel" path="/com/tablepro/linux/Devel/">
     <key name="migration-version" type="u"><default>0</default></key>
@@ -29,5 +30,6 @@
     <key name="query-timeout-secs" type="u"><default>60</default></key>
     <key name="csv-include-header" type="b"><default>true</default></key>
     <key name="color-scheme" type="s"><default>'system'</default></key>
+    <key name="editor-font-family" type="s"><default>''</default></key>
   </schema>
 </schemalist>

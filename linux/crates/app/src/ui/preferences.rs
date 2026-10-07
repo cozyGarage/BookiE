@@ -203,6 +203,12 @@ pub fn present(
     font_size_row.set_value(current.editor_font_size as f64);
     editor_group.add(&font_size_row);
 
+    let font_family_row = adw::EntryRow::builder()
+        .title(crate::tr!("Editor font family"))
+        .text(current.editor_font_family.as_str())
+        .build();
+    editor_group.add(&font_family_row);
+
     // 0 disables, 1..=3600s allowed range. Subtitle exposes the
     // disable-via-zero contract so power users editing long-running
     // analytical queries can opt out without spelunking the JSON.
@@ -228,6 +234,7 @@ pub fn present(
         let page_size = page_size_row.clone();
         let confirm = confirm_row.clone();
         let font = font_size_row.clone();
+        let family = font_family_row.clone();
         let retention = retention_row.clone();
         let timeout = timeout_row.clone();
         let preferences = preferences.clone();
@@ -240,6 +247,7 @@ pub fn present(
                 prefs.default_page_size = default_page_size;
                 prefs.confirm_destructive = confirm.is_active();
                 prefs.editor_font_size = font.value() as u32;
+                prefs.editor_font_family = family.text().trim().to_string();
                 prefs.history_retention_days = retention.value() as u32;
                 prefs.query_timeout_secs = timeout.value() as u32;
             }) {
@@ -252,6 +260,10 @@ pub fn present(
         move |_| s()
     });
     font_size_row.connect_value_notify({
+        let s = save_all.clone();
+        move |_| s()
+    });
+    font_family_row.connect_changed({
         let s = save_all.clone();
         move |_| s()
     });

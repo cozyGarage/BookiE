@@ -33,6 +33,8 @@ pub struct Preferences {
     pub csv_include_header: bool,
     #[serde(default)]
     pub color_scheme: ColorSchemePref,
+    #[serde(default)]
+    pub editor_font_family: String,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,6 +103,7 @@ impl Default for Preferences {
             query_timeout_secs: default_query_timeout_secs(),
             csv_include_header: default_csv_include_header(),
             color_scheme: ColorSchemePref::default(),
+            editor_font_family: String::new(),
         }
     }
 }
@@ -258,6 +261,7 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         query_timeout_secs: settings.uint("query-timeout-secs"),
         csv_include_header: settings.boolean("csv-include-header"),
         color_scheme: ColorSchemePref::from_key(settings.string("color-scheme").as_str()),
+        editor_font_family: settings.string("editor-font-family").to_string(),
     }
 }
 
@@ -271,6 +275,7 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_uint("query-timeout-secs", prefs.query_timeout_secs),
         settings.set_boolean("csv-include-header", prefs.csv_include_header),
         settings.set_string("color-scheme", prefs.color_scheme.key()),
+        settings.set_string("editor-font-family", &prefs.editor_font_family),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {
         settings.revert();
@@ -693,6 +698,20 @@ mod tests {
         let reopened = test_settings_with_backend("/com/tablepro/linux/scheme/", backend);
         let reopened = PreferencesStore::from_settings(reopened, None);
         assert_eq!(reopened.load().color_scheme, ColorSchemePref::Dark);
+    }
+
+    #[test]
+    fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty() {
+        let (settings, backend) = make_test_settings("/com/tablepro/linux/font-family/");
+        let store = PreferencesStore::from_settings(settings, None);
+        assert_eq!(store.load().editor_font_family, "");
+        store
+            .update(|prefs| prefs.editor_font_family = "Iosevka".into())
+            .unwrap();
+        store.flush().unwrap();
+        let reopened = test_settings_with_backend("/com/tablepro/linux/font-family/", backend);
+        let reopened = PreferencesStore::from_settings(reopened, None);
+        assert_eq!(reopened.load().editor_font_family, "Iosevka");
     }
 
     #[test]

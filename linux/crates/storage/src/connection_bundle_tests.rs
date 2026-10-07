@@ -324,6 +324,37 @@ fn a_fresh_id_is_imported_unchanged() {
 }
 
 #[test]
+fn a_second_profile_receives_every_exported_connection_unchanged() {
+    let mut tunnelled = saved("tunnelled");
+    tunnelled.ssh = Some(ssh_chain(2));
+    tunnelled.read_only = true;
+    tunnelled.environment = Environment::Prod;
+    tunnelled.tls_mode = Some(TlsMode::VerifyFull);
+    let mut socket = saved("socket");
+    socket.driver_id = "mysql".into();
+    socket.port = 3306;
+    socket.tls_mode = Some(TlsMode::Disabled);
+    socket.use_tls = false;
+    let source = vec![saved("sales"), tunnelled, socket];
+    let secrets = source.iter().map(|connection| secrets_for(connection.id)).collect();
+
+    let bytes = export_encrypted(&export_of(source.clone(), secrets), PASSPHRASE).expect("export");
+    let body = encrypted_body(&bytes, PASSPHRASE).expect("unlock");
+    let plan = plan_import(&[], &body).expect("plan");
+
+    assert_eq!(body.secrets.len(), source.len());
+    assert_eq!(plan.items.len(), source.len());
+    for (item, original) in plan.items.iter().zip(&source) {
+        assert_eq!(item.disposition, ImportDisposition::New);
+        let received = SavedConnection {
+            last_opened_at: original.last_opened_at,
+            ..item.connection.clone()
+        };
+        assert_eq!(&received, original);
+    }
+}
+
+#[test]
 fn the_same_id_on_the_same_endpoint_updates_in_place() {
     let local = saved("sales");
     let mut incoming = local.clone();

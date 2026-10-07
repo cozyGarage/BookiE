@@ -60,7 +60,20 @@ pub(crate) fn apply_editor_scheme(view: &sourceview5::View) {
 /// EXPLAIN dialog and the JSON popover's text views too.
 const EDITOR_FONT_CSS_CLASS: &str = "tp-sql-editor-font";
 
-pub(crate) fn apply_editor_font_size(view: &sourceview5::View, font_size: u32) {
+fn safe_font_family(family: &str) -> Option<&str> {
+    let family = family.trim();
+    let allowed = |c: char| c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.');
+    (!family.is_empty() && family.len() <= 64 && family.chars().all(allowed)).then_some(family)
+}
+
+fn editor_font_css(font_size: u32, family: &str) -> String {
+    let family = safe_font_family(family)
+        .map(|family| format!(" font-family: \"{family}\", monospace;"))
+        .unwrap_or_default();
+    format!(".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt;{family} }}")
+}
+
+pub(crate) fn apply_editor_font(view: &sourceview5::View, font_size: u32, family: &str) {
     view.add_css_class(EDITOR_FONT_CSS_CLASS);
     thread_local! {
         static EDITOR_FONT_PROVIDER: std::cell::RefCell<Option<gtk::CssProvider>> =
@@ -73,10 +86,35 @@ pub(crate) fn apply_editor_font_size(view: &sourceview5::View, font_size: u32) {
         if let Some(prev) = cell.borrow_mut().take() {
             gtk::style_context_remove_provider_for_display(&display, &prev);
         }
-        let css = format!(".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt; }}");
+        let css = editor_font_css(font_size, family);
         let provider = gtk::CssProvider::new();
         provider.load_from_string(&css);
         gtk::style_context_add_provider_for_display(&display, &provider, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
         *cell.borrow_mut() = Some(provider);
     });
+}
+
+#[cfg(test)]
+mod font_tests {
+    use super::*;
+
+    #[test]
+    fn an_empty_family_keeps_the_system_monospace_font() {
+        assert_eq!(
+            editor_font_css(12, "  "),
+            ".tp-sql-editor-font, .tp-sql-editor-font text { font-size: 12pt; }"
+        );
+    }
+
+    #[test]
+    fn a_plain_family_name_is_quoted_with_a_monospace_fallback() {
+        assert!(editor_font_css(14, "Iosevka Term").contains("font-family: \"Iosevka Term\", monospace;"));
+    }
+
+    #[test]
+    fn a_family_that_could_break_out_of_the_rule_is_ignored() {
+        for hostile in ["x\"; } * { color: red", "a{b}", "a;b", "\\9"] {
+            assert!(!editor_font_css(12, hostile).contains("font-family"), "{hostile}");
+        }
+    }
 }
