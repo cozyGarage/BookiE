@@ -427,6 +427,24 @@ def scenarios(ui):
         ui.press_x11_key("Tab", ("Control_L",))
         wait_for_editor_text("-- three")
 
+    def interactive_controls_have_accessible_names(database, base):
+        ui.run_sql("SELECT 1 AS alpha")
+        ui.wait_for_node(name="alpha")
+        roles = {
+            pyatspi.ROLE_PUSH_BUTTON: "push button",
+            pyatspi.ROLE_TOGGLE_BUTTON: "toggle button",
+            pyatspi.ROLE_CHECK_BOX: "check box",
+            pyatspi.ROLE_COMBO_BOX: "combo box",
+            pyatspi.ROLE_ENTRY: "entry",
+        }
+        unnamed = [
+            f"{roles[ui.node_role(node)]} {node.getRoleName()!r} at {node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).x},"
+            f"{node.queryComponent().getExtents(pyatspi.WINDOW_COORDS).y}"
+            for node in ui.descendants(ui.application_node())
+            if ui.node_role(node) in roles and not ui.node_name(node).strip()
+        ]
+        assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -544,6 +562,7 @@ def scenarios(ui):
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
         ctrl_tab_returns_to_the_most_recently_used_tab,
+        interactive_controls_have_accessible_names,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)
