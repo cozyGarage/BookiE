@@ -686,32 +686,32 @@ mod tests {
         gio::Settings::new_full(&schema, Some(&backend), None)
     }
 
+    fn after_a_round_trip(path: &str, change: impl FnOnce(&mut Preferences)) -> (Preferences, Preferences) {
+        let (settings, backend) = make_test_settings(path);
+        let store = PreferencesStore::from_settings(settings, None);
+        let before = store.load();
+        store.update(change).unwrap();
+        store.flush().unwrap();
+        let reopened = PreferencesStore::from_settings(test_settings_with_backend(path, backend), None);
+        (before, reopened.load())
+    }
+
     #[test]
     fn the_color_scheme_survives_a_gsettings_round_trip_and_defaults_to_the_system() {
-        let (settings, backend) = make_test_settings("/com/tablepro/linux/scheme/");
-        let store = PreferencesStore::from_settings(settings, None);
-        assert_eq!(store.load().color_scheme, ColorSchemePref::System);
-        store
-            .update(|prefs| prefs.color_scheme = ColorSchemePref::Dark)
-            .unwrap();
-        store.flush().unwrap();
-        let reopened = test_settings_with_backend("/com/tablepro/linux/scheme/", backend);
-        let reopened = PreferencesStore::from_settings(reopened, None);
-        assert_eq!(reopened.load().color_scheme, ColorSchemePref::Dark);
+        let (before, after) = after_a_round_trip("/com/tablepro/linux/scheme/", |prefs| {
+            prefs.color_scheme = ColorSchemePref::Dark;
+        });
+        assert_eq!(before.color_scheme, ColorSchemePref::System);
+        assert_eq!(after.color_scheme, ColorSchemePref::Dark);
     }
 
     #[test]
     fn the_editor_font_family_survives_a_gsettings_round_trip_and_defaults_to_empty() {
-        let (settings, backend) = make_test_settings("/com/tablepro/linux/font-family/");
-        let store = PreferencesStore::from_settings(settings, None);
-        assert_eq!(store.load().editor_font_family, "");
-        store
-            .update(|prefs| prefs.editor_font_family = "Iosevka".into())
-            .unwrap();
-        store.flush().unwrap();
-        let reopened = test_settings_with_backend("/com/tablepro/linux/font-family/", backend);
-        let reopened = PreferencesStore::from_settings(reopened, None);
-        assert_eq!(reopened.load().editor_font_family, "Iosevka");
+        let (before, after) = after_a_round_trip("/com/tablepro/linux/font-family/", |prefs| {
+            prefs.editor_font_family = "Iosevka".into();
+        });
+        assert_eq!(before.editor_font_family, "");
+        assert_eq!(after.editor_font_family, "Iosevka");
     }
 
     #[test]

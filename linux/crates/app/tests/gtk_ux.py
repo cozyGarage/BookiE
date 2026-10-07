@@ -452,41 +452,31 @@ def scenarios(ui):
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
 
-    def ctrl_tab_returns_to_the_most_recently_used_tab(database, base):
-        def wait_for_editor_text(expected):
-            deadline = time.monotonic() + ui.WAIT_SECONDS
-            while time.monotonic() < deadline:
-                if editor_text() == expected:
-                    return
-                time.sleep(ui.POLL_SECONDS)
-            raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
+    def wait_for_editor_text(expected):
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            if editor_text() == expected:
+                return
+            time.sleep(ui.POLL_SECONDS)
+        raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
 
+    def open_three_editor_tabs():
         ui.set_editor_text("-- one")
         for label in ("-- two", "-- three"):
             ui.press_x11_key("t", ("Control_L",))
             time.sleep(0.5)
             ui.set_editor_text(label)
         wait_for_editor_text("-- three")
+
+    def ctrl_tab_returns_to_the_most_recently_used_tab(database, base):
+        open_three_editor_tabs()
         ui.press_x11_key("Tab", ("Control_L",))
         wait_for_editor_text("-- two")
         ui.press_x11_key("Tab", ("Control_L",))
         wait_for_editor_text("-- three")
 
     def holding_ctrl_while_pressing_tab_walks_deeper_into_the_history(database, base):
-        def wait_for_editor_text(expected):
-            deadline = time.monotonic() + ui.WAIT_SECONDS
-            while time.monotonic() < deadline:
-                if editor_text() == expected:
-                    return
-                time.sleep(ui.POLL_SECONDS)
-            raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
-
-        ui.set_editor_text("-- one")
-        for label in ("-- two", "-- three"):
-            ui.press_x11_key("t", ("Control_L",))
-            time.sleep(0.5)
-            ui.set_editor_text(label)
-        wait_for_editor_text("-- three")
+        open_three_editor_tabs()
         ui.press_x11_key("Tab", ("Control_L",), presses=2)
         wait_for_editor_text("-- one")
         ui.press_x11_key("Tab", ("Control_L",))
