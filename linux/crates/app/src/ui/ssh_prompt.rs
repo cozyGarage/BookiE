@@ -116,15 +116,21 @@ fn ask(
         dialog.set_extra_child(Some(&entry));
         entry
     });
-    let sender = std::cell::RefCell::new(Some(sender));
+    let sender = std::rc::Rc::new(std::cell::RefCell::new(Some(sender)));
+    let response_sender = sender.clone();
     dialog.connect_response(None, move |_, response| {
         let answer = match (response, &entry) {
             ("accept", Some(entry)) => PromptAnswer::Secret(SecretString::new(entry.text().to_string().into())),
             ("accept", None) => PromptAnswer::Accept,
             _ => PromptAnswer::Decline,
         };
-        if let Some(sender) = sender.borrow_mut().take() {
+        if let Some(sender) = response_sender.borrow_mut().take() {
             let _ = sender.send(answer);
+        }
+    });
+    dialog.connect_closed(move |_| {
+        if let Some(sender) = sender.borrow_mut().take() {
+            let _ = sender.send(PromptAnswer::Decline);
         }
     });
     let parent = gtk::Application::default().active_window();
