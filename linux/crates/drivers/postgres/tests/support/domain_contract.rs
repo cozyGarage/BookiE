@@ -321,6 +321,13 @@ async fn value_contract_domain_over_enum_csv_round_trip_preserves_values_and_typ
             name: "status".into(),
         })
     );
+    assert_eq!(
+        target_columns[1].domain_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: "value_contract_domain_csv".into(),
+            name: "status_domain".into(),
+        })
+    );
     let target = tablepro_core::import::ImportTarget {
         driver_id: "postgres",
         schema: Some("value_contract_domain_csv"),
@@ -353,7 +360,7 @@ async fn value_contract_domain_over_enum_csv_round_trip_preserves_values_and_typ
     let plan = tablepro_core::import::build_insert_plan(&target, &sheet, &options).unwrap();
     assert!(
         plan.statement
-            .contains("$2::text::\"value_contract_domain_csv\".\"status\"")
+            .contains("$2::text::\"value_contract_domain_csv\".\"status_domain\"")
     );
     for row in &plan.rows {
         connection.execute_params(&plan.statement, row).await.unwrap();
