@@ -8,7 +8,8 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `3b9909443` (PR #156) on `fork/linux`.
+Current integrated source baseline: `4f819f912` (PR #159) on `linux`, pushed to
+`origin/linux`.
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
@@ -27,8 +28,15 @@ now split into its own included file and the ignored-test inventory updated in
 PR #156, which also adds range-array refusal contracts. At the 2026-10-07 check,
 PR #156 preflight, security, package, TLS, PostgreSQL release, and SonarCloud
 checks passed; driver integration, GTK, and DuckDB checks were still running. The
-scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
-coverage remains open. These changes do not qualify the release.
+PR #157 adds B4 SSH audit, rollback-failure, and Kerberos slices; PR #159 removes
+the relay's unnecessary exposed port, hardens fixture configuration, and
+reconciles the Sonar and PostgreSQL release findings. Its preflight, security
+policy, Sonar, harness, and workflow-lint checks passed; driver, GTK, TLS,
+PostgreSQL release, supply-chain, DuckDB, and Flatpak checks were pending at the
+last check. PR #158 is rebased onto this baseline; local quick checks pass and
+its hosted checks are rerunning. The scoped XLSX writer mutation run caught
+41/41 mutants; broad core/package coverage remains open. These changes do not
+qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
