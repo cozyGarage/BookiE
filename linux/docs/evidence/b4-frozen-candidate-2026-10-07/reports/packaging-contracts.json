@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "commit": "0d22bfe9ddd9d1c66478fa55b751e3a887a992ca",
+  "working_tree": "",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-07T22:33:30.510937+00:00",
+  "status": "failed",
+  "layers": {
+    "packaging-contracts": {
+      "status": "failed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_arch_candidate.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "git",
+            "tar"
+          ],
+          "status": "passed",
+          "log": "packaging-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 0.115
+        },
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_deb_package.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "dpkg-deb"
+          ],
+          "status": "blocked",
+          "log": "packaging-contracts-2.log",
+          "reason": "required tools unavailable: dpkg-deb",
+          "seconds": 0.0
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T22:33:30.626842+00:00"
+}
