@@ -87,7 +87,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-12 | PostgreSQL rollback-failure acceptance | OPEN | The native Docker regression now covers backend termination during statement 1, `TransactionRollbackFailed`, and absence of the earlier insert; focused local pass is recorded on the B4 board. Re-run on the frozen candidate and extend side-effect coverage | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
 | B4-14 | U5: no client certificate or key in transport or storage | OPEN | Scope drivers and routes first | driver-docker |
-| B4-15 | O1: connect A, cancel, switch to B, namespace ownership races | OPEN | | gtk-widget |
+| B4-15 | ~~O1: cancel a pending connection attempt, switch to B, and preserve connection ownership~~ | DONE | [GTK evidence](evidence/b4-connection-cancel-switch-2026-10-07/manifest.json): after cancelling a hanging attempt, the original database stays untouched and writes reach saved B; a second-window regression preserves its pending edit during another window's switch | gtk-widget |
 | B4-16 | F4/F9 stale-session invalidation merged but not accepted | UNVERIFIED | Installed acceptance | gtk-installed |
 | B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | | driver-docker |
 | B4-18 | Connect and Test Connection read tables on a raw connection before hand-out, with no audit record | OPEN | A decision for ADR 0008, not a bypass | sandbox |
