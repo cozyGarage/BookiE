@@ -241,6 +241,23 @@ async fn value_contract_enum_parameters_in_coalesce_array_append_and_nullif() {
         );
     }
 
+    for parameter in [Value::Int(7), Value::Bool(true)] {
+        for sql in [
+            "SELECT id FROM value_contract_enum_parameter_context.rows \
+             WHERE state IS NOT DISTINCT FROM $1",
+            "UPDATE value_contract_enum_parameter_context.rows SET state = $1 WHERE id = 1",
+        ] {
+            let error = connection
+                .query_params(sql, std::slice::from_ref(&parameter))
+                .await
+                .expect_err("non-text values must not be coerced into a custom enum");
+            assert!(
+                matches!(&error, DriverError::Query { sqlstate: Some(code), .. } if code == "42883" || code == "42804"),
+                "expected PostgreSQL's native type-mismatch refusal for {parameter:?}: {error:?}"
+            );
+        }
+    }
+
     let unchanged = connection
         .query(
             "SELECT id, state::text, pg_typeof(state)::text \
