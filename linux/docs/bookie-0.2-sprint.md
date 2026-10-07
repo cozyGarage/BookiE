@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `11672cbe6` (PR #151) on `linux`, pushed to
+Current integrated source baseline: `b43af2030` (PR #154) on `linux`, pushed to
 `origin/linux`. Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
@@ -18,10 +18,15 @@ case details and evidence are linked from the [B3 board](type-contract-strategy.
 [B4 board](b4-task-board.md), [value evidence index](value-contracts.md), and
 relevant test files. B3 remains open: the broader
 engine/type/consumer/configuration matrix, mutation triage and installed grid
-acceptance still need work. The scoped XLSX writer mutation run caught 41/41
-mutants; broad core/package coverage remains open. PR #153 reconciles failed
-hosted preflight/harness checks and the Sonar finding from the merged B4 fixtures.
-These changes do not qualify the release.
+acceptance still need work. PR #153 reconciles the hosted preflight and harness
+findings from #150/#151, corrects the ignored-test inventory and duplicate B4
+ledger rows, and moves SSH host-key generation to container startup. PR #154
+added a PostgreSQL enum-array slice consumer case. Its hosted quick gate exposed
+the PostgreSQL contract source exceeding the file-size limit; the regression is
+now split into its own included file and the ignored-test inventory updated.
+The follow-up is in progress. The scoped XLSX writer mutation run caught 41/41
+mutants; broad core/package coverage remains open. These changes do not qualify
+the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
