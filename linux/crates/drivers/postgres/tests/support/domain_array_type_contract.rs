@@ -86,21 +86,53 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     assert_eq!(direct_update.rows[0][0], Value::Text("[0:2]={2,4,NULL}".into()));
 
     let columns = connection.fetch_columns(Some(schema), "rows").await.unwrap();
-    let edit = tablepro_core::sql_dialect::build_keyed_update(
+    let edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(schema),
         "rows",
         &columns,
-        &[(1, Value::Text("[0:2]={2,4,NULL}".into()))],
+        &[(1, result.rows[0][0].clone(), Value::Text("[0:2]={2,4,NULL}".into()))],
         &[Value::Int(1)],
     )
     .unwrap();
     assert_eq!(
         edit.0,
-        format!("UPDATE \"{schema}\".\"rows\" SET \"items\" = $1::text::\"{schema}\".\"small_ints\" WHERE \"id\" = $2")
+        format!(
+            "UPDATE \"{schema}\".\"rows\" SET \"items\" = $1::text::\"{schema}\".\"small_ints\" WHERE \"id\" = $2 AND \"items\" IS NOT DISTINCT FROM $3::text::\"{schema}\".\"small_ints\""
+        )
     );
-    assert_eq!(edit.1, vec![Value::Text("[0:2]={2,4,NULL}".into()), Value::Int(1)]);
+    assert_eq!(
+        edit.1,
+        vec![
+            Value::Text("[0:2]={2,4,NULL}".into()),
+            Value::Int(1),
+            result.rows[0][0].clone(),
+        ]
+    );
     connection.execute_params(&edit.0, &edit.1).await.unwrap();
+    let null_to_empty = tablepro_core::sql_dialect::build_optimistic_keyed_update(
+        "postgres",
+        Some(schema),
+        "rows",
+        &columns,
+        &[(1, Value::Null, Value::Text("{}".into()))],
+        &[Value::Int(2)],
+    )
+    .unwrap();
+    assert_eq!(
+        null_to_empty.0,
+        format!(
+            "UPDATE \"{schema}\".\"rows\" SET \"items\" = $1::text::\"{schema}\".\"small_ints\" WHERE \"id\" = $2 AND \"items\" IS NOT DISTINCT FROM $3::text::\"{schema}\".\"small_ints\""
+        )
+    );
+    assert_eq!(
+        null_to_empty.1,
+        vec![Value::Text("{}".into()), Value::Int(2), Value::Null]
+    );
+    connection
+        .execute_params(&null_to_empty.0, &null_to_empty.1)
+        .await
+        .unwrap();
     let stored = connection
         .query(&format!(
             "SELECT id, pg_typeof(items)::text, items::text, array_to_json(items)::text, \
@@ -113,15 +145,21 @@ async fn value_contract_domain_over_array_preserves_native_values_and_wire_bytes
     assert_eq!(stored.rows[0][2], Value::Text("[0:2]={2,4,NULL}".into()));
     assert_eq!(stored.rows[0][3], Value::Text("[2,4,null]".into()));
     assert_eq!(stored.rows[1][1], Value::Text(format!("{schema}.small_ints")));
-    assert_eq!(stored.rows[1][2], Value::Null);
+    assert_eq!(stored.rows[1][2], Value::Text("{}".into()));
+    assert_eq!(stored.rows[1][3], Value::Text("[]".into()));
     assert_eq!(stored.rows[2][2], Value::Text("{}".into()));
+    assert_eq!(stored.rows[1][4], stored.rows[2][4]);
 
-    let invalid = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(schema),
         "rows",
         &columns,
-        &[(1, Value::Text("{1,2,3,4,5}".into()))],
+        &[(
+            1,
+            Value::Text("[0:2]={2,4,NULL}".into()),
+            Value::Text("{1,2,3,4,5}".into()),
+        )],
         &[Value::Int(1)],
     )
     .unwrap();

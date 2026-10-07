@@ -497,7 +497,12 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
     )
     .unwrap();
     assert!(edit.0.contains(&format!("::text::{target_type_sql}")), "{}", edit.0);
-    assert!(edit.0.contains("state\" IS NOT DISTINCT FROM $3"), "{}", edit.0);
+    assert!(
+        edit.0
+            .contains(&format!("state\" IS NOT DISTINCT FROM $3::text::{target_type_sql}")),
+        "{}",
+        edit.0
+    );
 
     let mut session = connection.open_session().await.unwrap();
     let control = crate::no_timeout();

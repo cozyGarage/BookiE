@@ -1064,17 +1064,26 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         })
     );
     columns[id_index].primary_key = true;
+    let original = connection
+        .query("SELECT labels::text FROM enum_array_grid.items WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
     let edited = r#"{"NULL","",東京,"a,b",NULL}"#;
-    let update = tablepro_core::sql_dialect::build_keyed_update(
+    let update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
         &columns,
-        &[(labels_index, Value::Text(edited.into()))],
+        &[(labels_index, original, Value::Text(edited.into()))],
         &[Value::Int(2)],
     )
     .unwrap();
     assert!(update.0.contains("$1::text::\"enum_array_grid\".\"label\"[]"));
+    assert!(update
+        .0
+        .contains("labels\" IS NOT DISTINCT FROM $3::text::\"enum_array_grid\".\"label\"[]"));
     assert_eq!(connection.execute_in_transaction(&[update]).await.unwrap(), vec![1]);
 
     let native = connection
@@ -1099,12 +1108,16 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .unwrap();
     assert_eq!(saved.rows, native.rows);
 
-    let invalid = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
         &columns,
-        &[(labels_index, Value::Text("{not-a-label}".into()))],
+        &[(
+            labels_index,
+            Value::Text(edited.into()),
+            Value::Text("{not-a-label}".into()),
+        )],
         &[Value::Int(2)],
     )
     .unwrap();
@@ -1119,12 +1132,12 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         .unwrap();
     assert_eq!(unchanged.rows, native.rows);
 
-    let null_update = tablepro_core::sql_dialect::build_keyed_update(
+    let null_update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
         &columns,
-        &[(labels_index, Value::Null)],
+        &[(labels_index, Value::Text(edited.into()), Value::Null)],
         &[Value::Int(2)],
     )
     .unwrap();
@@ -1148,12 +1161,12 @@ async fn value_contract_custom_enum_array_grid_edit_preserves_labels_and_sibling
         ]]
     );
 
-    let empty_update = tablepro_core::sql_dialect::build_keyed_update(
+    let empty_update = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some("enum_array_grid"),
         "items",
         &columns,
-        &[(labels_index, Value::Text("{}".into()))],
+        &[(labels_index, Value::Null, Value::Text("{}".into()))],
         &[Value::Int(2)],
     )
     .unwrap();
