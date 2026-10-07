@@ -106,7 +106,7 @@ first column says which area owns them.
 | SEC-3 | U1: SQL Server server-owned columns proven for metadata and two INSERT paths only | OPEN | Grid, CSV import, Copy as SQL, SQL export | driver-docker |
 | SEC-4 | T-SQL batches: `SELECT 1` then UPDATE or DROP; MERGE alone or final | UNVERIFIED | Native verification | driver-docker |
 | SEC-5 | ~~`cargo-audit` and `cargo deny` not run locally; RUSTSEC-2023-0071 ignored~~ | DONE | `cargo deny check` on the Arch runner: advisories, bans, licenses and sources ok; the RUSTSEC-2023-0071 ignore stays documented in `deny.toml` | manual |
-| SEC-6 | PostgreSQL result cap is client side only | OPEN | Never append LIMIT blindly | driver-docker |
+| SEC-6 | ~~PostgreSQL result cap is client side only~~ | DONE | The driver cancels the server query when a result reaches its row or byte cap and drains the stream, without appending a LIMIT. `an_unbounded_query_is_cut_at_the_cap_and_the_server_stops_producing`, `a_controlled_unbounded_query_returns_the_capped_rows_instead_of_timing_out` and `a_session_stays_usable_after_a_capped_result` pass on the runner (25 s for all three). Before the change a 4-billion-row query ran past 20 minutes of CPU on the runner and a controlled one hit its 30 s timeout | driver-docker |
 | SEC-7 | Durable audit filesystem work can outlive the MCP deadline | ACCEPTED | Fails closed by design | n/a |
 | SEC-8 | Trusted production mutations, unattended MCP writes and a public package are not approved | ACCEPTED | Decision, not work | n/a |
 

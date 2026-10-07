@@ -655,6 +655,96 @@ async fn pagination_and_truncated_flag() {
     assert!(!q.truncated);
 }
 
+async fn assert_capped_and_server_stopped(observer: &dyn Connection, result: QueryResultProbe) {
+    let QueryResultProbe {
+        truncated,
+        rows,
+        elapsed,
+    } = result;
+    assert!(truncated, "{rows} rows in {elapsed:?}");
+    assert!(rows <= tablepro_core::MAX_QUERY_ROWS);
+    assert!(
+        elapsed < std::time::Duration::from_secs(30),
+        "{rows} rows in {elapsed:?}"
+    );
+    let still_running = "SELECT count(*) FROM pg_stat_activity WHERE state = 'active' AND query LIKE '%generate_series(1::bigint%' AND query NOT LIKE '%pg_stat_activity%' AND pid <> pg_backend_pid()";
+    let mut running = i64::MAX;
+    for _ in 0..30 {
+        running = match observer.query(still_running).await.unwrap().rows[0][0] {
+            Value::Int(count) => count,
+            ref other => panic!("{other:?}"),
+        };
+        if running == 0 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    assert_eq!(running, 0, "the server kept producing rows after the cap");
+}
+
+struct QueryResultProbe {
+    truncated: bool,
+    rows: usize,
+    elapsed: std::time::Duration,
+}
+
+const UNBOUNDED_SQL: &str =
+    "SELECT i, repeat('x', 8) AS pad FROM (SELECT generate_series(1::bigint, 4000000000::bigint) AS i) AS g";
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn an_unbounded_query_is_cut_at_the_cap_and_the_server_stops_producing() {
+    let (_c, opts) = start_pg().await;
+    let observer = connect(opts.clone()).await;
+    let conn = connect(opts).await;
+    let started = std::time::Instant::now();
+    let result = conn.query(UNBOUNDED_SQL).await.unwrap();
+    let probe = QueryResultProbe {
+        truncated: result.truncated,
+        rows: result.rows.len(),
+        elapsed: started.elapsed(),
+    };
+    assert_capped_and_server_stopped(observer.as_ref(), probe).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_controlled_unbounded_query_returns_the_capped_rows_instead_of_timing_out() {
+    let (_c, opts) = start_pg().await;
+    let observer = connect(opts.clone()).await;
+    let conn = connect(opts).await;
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let started = std::time::Instant::now();
+    let result = conn.query_params_controlled(UNBOUNDED_SQL, &[], &control).await;
+    let elapsed = started.elapsed();
+    let result = result.unwrap_or_else(|error| panic!("{error:?} after {elapsed:?}"));
+    let probe = QueryResultProbe {
+        truncated: result.truncated,
+        rows: result.rows.len(),
+        elapsed,
+    };
+    assert_capped_and_server_stopped(observer.as_ref(), probe).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_session_stays_usable_after_a_capped_result() {
+    let (_c, opts) = start_pg().await;
+    let conn = connect(opts).await;
+    let mut session = conn.open_session().await.unwrap();
+    session
+        .query_params_controlled("CREATE TEMP TABLE kept AS SELECT 7 AS n", &[], &no_timeout())
+        .await
+        .ok();
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let capped = session
+        .query_params_controlled(UNBOUNDED_SQL, &[], &control)
+        .await
+        .unwrap();
+    assert!(capped.truncated);
+    assert_eq!(session_value(&mut session, "SELECT n FROM kept").await, Value::Int(7));
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn value_contract_result_delivery_keeps_zero_row_metadata_duplicate_names_and_order() {

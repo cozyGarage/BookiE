@@ -11,18 +11,39 @@ use tablepro_core::{
 use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
 
+#[derive(Clone, Copy)]
+pub(super) struct QueryStop<'a> {
+    pub pool: &'a Pool<Postgres>,
+    pub backend_pid: i32,
+}
+
+async fn stop_server_query<S>(stop: Option<QueryStop<'_>>, stream: &mut S)
+where
+    S: futures::Stream<Item = Result<PgRow, sqlx::Error>> + Unpin,
+{
+    let Some(stop) = stop else {
+        return;
+    };
+    if let Err(error) = super::request_cancellation(stop.pool, stop.backend_pid).await {
+        tracing::warn!(%error, "the server was not told to stop a capped query");
+        return;
+    }
+    while stream.next().await.is_some() {}
+}
+
 pub(super) async fn query_connection(
     connection: &mut PoolConnection<Postgres>,
     sql: &str,
     params: &[Value],
+    stop: Option<QueryStop<'_>>,
 ) -> Result<QueryResult, DriverError> {
-    let result = query_connection_once(connection, sql, params).await;
+    let result = query_connection_once(connection, sql, params, stop).await;
     // A concurrent DROP/CREATE can leave a cached plan pointing at the old
     // OID. PostgreSQL raises this before executing the statement, so clear
     // SQLx's per-connection caches and retry the same operation once.
     if result.as_ref().is_err_and(is_stale_type_cache_error) {
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
-        return query_connection_once(connection, sql, params).await;
+        return query_connection_once(connection, sql, params, stop).await;
     }
     result
 }
@@ -31,6 +52,7 @@ pub(super) async fn query_connection_once(
     connection: &mut PoolConnection<Postgres>,
     sql: &str,
     params: &[Value],
+    stop: Option<QueryStop<'_>>,
 ) -> Result<QueryResult, DriverError> {
     let description = if needs_text_type_inference(params) {
         Some(describe_query_parameters(connection, sql, params).await?)
@@ -43,6 +65,9 @@ pub(super) async fn query_connection_once(
     let query = bind_pg_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params, inferred_text_types)?;
     let mut stream = query.fetch(&mut **connection);
     let (mut result, mut type_infos, mut column_origins) = collect_query_rows(&mut stream, MAX_QUERY_ROWS).await?;
+    if result.truncated {
+        stop_server_query(stop, &mut stream).await;
+    }
     drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
         if let Some(description) = description {
@@ -113,10 +138,12 @@ pub(super) async fn stream_into_result(
     limit: usize,
 ) -> Result<QueryResult, DriverError> {
     let mut connection = pool.acquire().await.map_err(map_sqlx_error)?;
-    let result = stream_into_result_once(&mut connection, sql, limit).await;
+    let backend_pid = super::backend_pid(&mut connection).await?;
+    let stop = Some(QueryStop { pool, backend_pid });
+    let result = stream_into_result_once(&mut connection, sql, limit, stop).await;
     if result.as_ref().is_err_and(is_stale_type_cache_error) {
         connection.clear_cached_statements().await.map_err(map_sqlx_error)?;
-        return stream_into_result_once(&mut connection, sql, limit).await;
+        return stream_into_result_once(&mut connection, sql, limit, stop).await;
     }
     result
 }
@@ -125,9 +152,13 @@ async fn stream_into_result_once(
     connection: &mut PoolConnection<Postgres>,
     sql: &str,
     limit: usize,
+    stop: Option<QueryStop<'_>>,
 ) -> Result<QueryResult, DriverError> {
     let mut stream = sqlx::query(sqlx::AssertSqlSafe(sql)).fetch(&mut **connection);
     let (mut result, mut type_infos, mut column_origins) = collect_query_rows(&mut stream, limit).await?;
+    if result.truncated {
+        stop_server_query(stop, &mut stream).await;
+    }
     drop(stream);
     if result.columns.is_empty() && result.rows.is_empty() {
         let statement = connection
