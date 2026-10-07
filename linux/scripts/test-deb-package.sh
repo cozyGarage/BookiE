@@ -13,11 +13,12 @@ for base in "${images[@]}"; do
   docker build -q -t "$tag" --build-arg "BASE=$base" scripts/distro-floor >/dev/null
   docker run --rm -v "$PWD:/src:ro" -v "${tag}-target:/target" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu '
     apt-get update -qq
-    apt-get install -y -qq --no-install-recommends debhelper dpkg-dev fakeroot desktop-file-utils appstream >/dev/null
+    apt-get install -y -qq --no-install-recommends desktop-file-utils >/dev/null
     rm -rf /work && mkdir /work && cp -a /src/. /work/
-    cd /work/packaging
-    DEB_BUILD_OPTIONS=nocheck dpkg-buildpackage -b -us -uc -d >/tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
-    deb=$(ls /work/tablepro_*.deb)
+    cd /work
+    DEB_OUT=/work/out bash scripts/build-deb.sh >/tmp/build.log 2>&1 || { tail -40 /tmp/build.log; exit 1; }
+    tail -3 /tmp/build.log
+    deb=$(ls /work/out/tablepro_*.deb)
     dpkg-deb --info "$deb" | sed -n "1,12p"
     apt-get install -y -qq "$deb" >/dev/null
     bash /src/scripts/check-installed-deb.sh
