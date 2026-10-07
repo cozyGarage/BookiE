@@ -229,6 +229,20 @@ def scenarios(ui):
         finally:
             server.close()
 
+        # A cancelled candidate must not take ownership of the workspace or
+        # prevent a subsequent saved-connection switch from using its own DB.
+        ui.invoke(ui.wait_for_node(name="Close", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Connect to PostgreSQL", present=False)
+        ui.open_saved_connection(ui.CONNECTION_B_NAME)
+        ui.wait_for_frame_containing(f"{ui.CONNECTION_B_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("INSERT INTO safety_items(id) VALUES (55)")
+        database_b = base / "safety-b.sqlite"
+        ui.wait_for_database_count(database_b, 1)
+        assert ui.database_ids(database) == [], "cancelled connection changed the original database"
+        assert ui.database_ids(database_b) == [55], "switch after cancellation used the wrong database"
+
     def app_memory_kb():
         import glob
         for status in glob.glob("/proc/[0-9]*/status"):
