@@ -45,13 +45,14 @@ The SQL export writer pins the same per-engine output in
 `sql_export_uses_engine_generated_identity_values`. Explicit identity-value
 preservation is not supported by these copy/export paths.
 
-SQL Server CSV import maps all table columns, including supplied identity,
-computed and rowversion values, but the native INSERT includes only the
-writable column. `value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server`
-checks the planned SQL and native generated values for two imported rows while
-preserving the pre-existing row. It also passes fetched SQL Server metadata to
-the production grid edit gate: server-owned columns refuse editing and the
-ordinary text column remains editable.
+`value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`
+checks SQL Server identity, computed and rowversion columns across all four
+consumers. Native metadata makes the grid edit gate reject these columns while
+leaving a normal text column editable. CSV mapping includes hostile values for
+server-owned fields, but the plan inserts only the writable note. Copy as SQL
+omits owned fields, and SQL export replays into a second native table; SQL
+Server generates fresh identities, computed values and rowversions there. The
+test checks both target and source rows.
 
 The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
 32-bit maximum and SQL NULL, using native type/text/`array_send` equality and

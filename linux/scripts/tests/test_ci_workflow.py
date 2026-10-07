@@ -58,7 +58,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
                 "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
                 "value_contract_mssql_max_values_survive_connection_session_and_consumers",
-                "value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server",
+                "value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
