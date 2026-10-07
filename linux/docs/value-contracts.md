@@ -31,6 +31,12 @@ just outside the crate's range are rejected by explicit Decimal and grid input;
 Auto retains wide integers as text rather than guessing their type
 ([evidence](evidence/rust-decimal-boundary-contract-results-2026-10-06/manifest.json)).
 
+PostgreSQL `xml[]` is covered through result decoding, inferred rebinding, keyed
+grid writes and typed CSV restore. Native `pg_typeof`, array text and
+`array_send` checks include XML fragments, SQL NULL, and a malformed XML
+assignment refused with SQLSTATE `2200N` without changing either row
+([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+
 ## Run
 
 From `linux/`, use the existing value runner:
