@@ -387,7 +387,8 @@ SQLite STRICT `ANY` computed-result contracts now cover `CASE`, `COALESCE`,
 [tests](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs)) check
 numeric and text values, JSON null versus SQL NULL, empty arrays/objects,
 duplicate object keys, omitted NULL keys, and typed CSV restore against
-SQLite's native result and `typeof()`.
+SQLite's native result and `typeof()`. JSON export retains each aggregate's
+exact result text as a string.
 Typed CSV restore checks native storage classes and exact values or bytes; BLOB
 casts also have JSON and XLSX text-cell assertions. Representative evidence:
 [CASE](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),

@@ -63,7 +63,6 @@ async fn sqlite_group_concat_any_csv_round_trip_preserves_text_and_null() {
             ],
         ]
     );
-
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
@@ -152,7 +151,6 @@ async fn sqlite_printf_any_csv_round_trip_preserves_text_and_null_semantics() {
             vec![Value::Int(7), Value::Text(String::new()), Value::Text("text".into())],
         ]
     );
-
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
@@ -643,6 +641,14 @@ async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text
             ],
         ]
     );
+    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+        &result.columns,
+        &result.rows,
+    ))
+    .unwrap();
+    assert_eq!(json[0]["result"], r#"[42,1.5,"42","NULL",null,"","=1+1","<tag>&amp;","東京"]"#);
+    assert_eq!(json[1]["result"], "[null,null]");
+    assert_eq!(json[2]["result"], "[]");
 
     sqlite_result_csv_round_trip(
         connection.as_ref(),
@@ -734,6 +740,14 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() 
             vec![Value::Int(3), Value::Text("{}".into()), Value::Text("text".into())],
         ]
     );
+    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+        &result.columns,
+        &result.rows,
+    ))
+    .unwrap();
+    assert_eq!(json[0]["result"], r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#);
+    assert_eq!(json[1]["result"], r#"{"nil":null}"#);
+    assert_eq!(json[2]["result"], "{}");
 
     sqlite_result_csv_round_trip(
         connection.as_ref(),
