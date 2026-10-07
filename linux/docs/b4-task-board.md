@@ -43,8 +43,9 @@ layer evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-20
 PR #162's first hosted run passed preflight, security, TLS, DuckDB, supply
 chain, Sonar, harness, workflow lint, and Flatpak builds. Fast checks hit a
 Debian mirror-sync package-size mismatch; PostgreSQL release exposed a GTK
-AT-SPI role mismatch in the SSH trust prompt, now fixed locally and passing all
-five PostgreSQL GTK scenarios. Fresh hosted validation and installed
+AT-SPI role mismatch and missing second-hop trust handling in PostgreSQL GTK
+tests. Both are fixed locally; all five default PostgreSQL GTK scenarios and
+the tunnel-loss/reconnect scenario pass. Fresh hosted validation and installed
 acceptance remain open; see the [candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
 
 ## Remaining tasks

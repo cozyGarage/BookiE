@@ -64,17 +64,17 @@
     "note": "GTK safety and PostgreSQL release jobs had not started when recorded."
   },
   "postgres_release_rerun": {
-    "commit": "2a81746c35aef7f8d2855690d952f145590048b7",
+    "commit": "2feb42c1706a22bfe0c834ce6ef9f59d256a65e8",
     "working_tree": "M linux/crates/app/tests/gtk_ux.py",
-    "tracked_diff_sha256": "d34ade2cdedcb9a5de84c0a4c0a557f427a9bfb0a52ff79ca989683a41cf31c9",
+    "tracked_diff_sha256": "8c3f7180c21bc4771c1391f690531f54472f9bd83f9d29fd1616b0b1e7022eca",
     "command": "python scripts/run-test-layer.py postgres-release",
     "status": "passed",
     "gtk_scenarios": 5,
-    "seconds": 51.505,
-    "report": "postgres-release-rerun-report.json",
-    "log": "postgres-release-rerun.log",
-    "report_sha256": "da6d40c38c11a3a0e398ca07f3cfcfbfb1bc51bb51bdd66bef2db70c40e83652",
-    "log_sha256": "e5f36617e7764af5bc9412dd5032a885e515f8a1ee853f843c0357ce0ff3eed0"
+    "seconds": 50.203,
+    "report": "postgres-release-final-report.json",
+    "log": "postgres-release-final.log",
+    "report_sha256": "d8eee3acb3f303b46815c0a89f78d910fe6fa7d5fc2bab73ab3e2296531c74fb",
+    "log_sha256": "0a227eeb830b02748f92070fc8776ead7b1538e4ddf1ee8e7ee0b0ef423a9197"
   },
   "hosted_pr_162_initial_run": {
     "tested_sha": "301b05926418eddd7cf895781de56dea77c87c77",
@@ -98,7 +98,19 @@
       "Flatpak development"
     ],
     "driver_integration": "in progress at evidence capture",
-    "fix": "trust prompt selectors now accept ROLE_ALERT or ROLE_FRAME; all five PostgreSQL GTK scenarios passed locally after the change.",
+    "fix": "GTK trust prompt selectors accept ROLE_ALERT or ROLE_FRAME. Shared trust helper handles the configured two-hop chain in both normal SSH acceptance and tunnel-loss/reconnect scenarios. All five default PostgreSQL GTK scenarios and the tunnel-loss/reconnect GTK scenario passed locally after these fixes.",
     "postgres_failure_log_sha256": "aa1aaa4a825493358547dd85fd0bf6381c3dfeee634ff33bd58d46719aec3f97"
+  },
+  "postgres_tunnel_loss_rerun": {
+    "commit": "2feb42c1706a22bfe0c834ce6ef9f59d256a65e8",
+    "working_tree": "M linux/crates/app/tests/gtk_ux.py",
+    "tracked_diff_sha256": "8c3f7180c21bc4771c1391f690531f54472f9bd83f9d29fd1616b0b1e7022eca",
+    "command": "TABLEPRO_GTK_SCENARIO=postgres_ssh_tunnel_loss_retires_session_and_reconnects python scripts/run-test-layer.py postgres-release",
+    "status": "passed",
+    "seconds": 46.963,
+    "report": "postgres-tunnel-loss-report.json",
+    "log": "postgres-tunnel-loss.log",
+    "report_sha256": "acbfefa0f153f9ab19f4e9dc361b9a053a079ced4388b8e4a1ec9afef48aca54",
+    "log_sha256": "280b4b405d31da747b9c7d8026961e5327687efc72dcf88a52a119fa88eef506"
   }
 }

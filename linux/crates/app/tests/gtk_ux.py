@@ -607,18 +607,23 @@ def scenarios(ui):
             "declining the host key must not learn it"
         )
 
-    def postgres_ssh_unknown_host_key_accepts_and_queries(database, base):
-        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
-        ui.open_saved_connection(name)
+    def trust_postgres_ssh_chain():
         prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
         ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
-        if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
+        jump_host = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST")
+        if jump_host:
+            jump_port = os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT", "22")
             second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-            ui.wait_for_node_containing("relay:22")
+            ui.wait_for_node_containing(f"{jump_host}:{jump_port}")
             ui.invoke(ui.wait_within(second_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
             ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+
+    def postgres_ssh_unknown_host_key_accepts_and_queries(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        ui.open_saved_connection(name)
+        trust_postgres_ssh_chain()
         ui.wait_for_frame_containing(f"{name} — BookiE")
 
         known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
@@ -775,9 +780,7 @@ def scenarios(ui):
         )
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         ui.open_saved_connection(name)
-        prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
-        ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
+        trust_postgres_ssh_chain()
         ui.wait_for_frame_containing(f"{name} — BookiE")
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)

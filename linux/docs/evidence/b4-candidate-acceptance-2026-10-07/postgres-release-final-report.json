@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "2feb42c1706a22bfe0c834ce6ef9f59d256a65e8",
+  "working_tree": "M linux/crates/app/tests/gtk_ux.py",
+  "tracked_diff_sha256": "8c3f7180c21bc4771c1391f690531f54472f9bd83f9d29fd1616b0b1e7022eca",
+  "started_utc": "2026-10-07T08:52:30.140295+00:00",
+  "status": "passed",
+  "layers": {
+    "postgres-release": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-postgres-release.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "postgres-release-1.log",
+          "exit_code": 0,
+          "seconds": 50.203
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T08:53:20.344168+00:00"
+}

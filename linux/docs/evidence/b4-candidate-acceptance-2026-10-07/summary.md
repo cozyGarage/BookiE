@@ -8,26 +8,27 @@ contract passed. The Debian package step lacked `dpkg-deb` on the host; its
 validator passed in a disposable Debian testing container.
 
 PR #162 fixes the GTK safety setup and adds Xvfb/AT-SPI runtime packages to
-the PostgreSQL release job. PR #161 had already added the GTK build dependencies.
+the PostgreSQL release job. PR #161 had already added GTK build dependencies.
 On PR #162 SHA `301b05926418eddd7cf895781de56dea77c87c77`, the full local UI
 layer passed all 47 scenarios in 268.396 seconds.
 
 The first hosted PR #162 run exposed a GTK accessibility role mismatch: Debian
 reported the visible SSH trust prompt as a frame, while the test required an
-alert. The attempted connection then timed out. The trust prompt selectors now
-accept either role. The focused scenario and the complete PostgreSQL release
-layer, including all five PostgreSQL GTK scenarios, passed locally after this
-fix; see the rerun report and log. The first hosted run's PostgreSQL failure
-report/log are retained here. Its Fast checks also failed before building when
-a Debian mirror served a package at a size inconsistent with the package index;
-installed GTK smoke was skipped as a consequence. This is distinct from the
-GTK role failure.
+alert. It also exposed that the tunnel-loss GTK scenario trusted the bastion
+but not the configured second hop. The prompt selector now accepts either
+AT-SPI role, and a shared helper trusts each configured SSH hop. After these
+changes, the full PostgreSQL release layer passed all five default GTK
+scenarios, and the tunnel-loss/reconnect scenario passed separately. The
+original hosted PostgreSQL failure report and log are retained here.
 
-At the last first-run status check, preflight, driver TLS, DuckDB, security,
-supply chain, SonarCloud, harness, ref resolution, workflow lint and both
-Flatpak builds passed. General driver integration was still running. The exact
-hosted status is recorded in the manifest; the final follow-up commit needs
-fresh hosted validation.
+Hosted Fast checks failed before building when Debian's mirror served
+`media-types_14.0.0_all.deb` at a size inconsistent with the package index;
+installed GTK smoke was skipped as a consequence. This is independent of the
+GTK role and two-hop test corrections. In that first hosted run, preflight,
+driver TLS, DuckDB, security, supply chain, SonarCloud, harness, ref resolution,
+workflow lint and both Flatpak builds passed; driver integration was still
+running at the last observation. See the manifest for exact statuses and
+hashes. Fresh hosted validation is required on the final follow-up commit.
 
 Installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
 Debian/GNOME Wayland acceptance, B3 completion and frozen-candidate acceptance
