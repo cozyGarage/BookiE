@@ -8,7 +8,7 @@ use crate::error::DriverError;
 /// `Stable` drivers support browse, SQL (or the engine's query dialect),
 /// and the common write paths. `Experimental` drivers connect and browse
 /// but may lack parameter binding, interactive transactions, or full
-/// write coverage. See `docs/driver-maturity.md`.
+/// write coverage. See `docs/adding-drivers.md`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DriverMaturity {
     #[default]

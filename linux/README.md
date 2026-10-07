@@ -11,7 +11,7 @@ BookiE is a Linux-only database client built with Rust, GTK4, libadwaita, and Re
 
 The GTK application supports PostgreSQL, MySQL, SQLite, SQL Server, and ClickHouse. Redis and MongoDB are experimental, and DuckDB is an optional build feature.
 
-Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/driver-maturity.md](docs/driver-maturity.md), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
+Current workflows include saved connections, SSH tunnels, browse and SQL tabs, structure editing, inline row changes, query history, policy checks, MCP access, and the headless `bookie-agentd` process. See [ROADMAP.md](ROADMAP.md), [docs/connections.md](docs/connections.md), [docs/adding-drivers.md#driver-maturity](docs/adding-drivers.md#driver-maturity), and [docs/production-audit.md](docs/archive/production-audit.md) for current limits.
 
 The Linux client remains under development toward 0.2.0. B3 type/value consumer coverage is still expanding; B4 and installed desktop qualification remain open. The [active sprint](docs/bookie-0.2-sprint.md) records current implementation and acceptance. Installable 0.1.4 packages are on the [linux-v0.1.4 GitHub Release](https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.4); they do not qualify the 0.2.0 source. Wayland soak remains an operator check after install.
 
@@ -161,7 +161,7 @@ Start with [the documentation entry point](docs/README.md), then the active spri
 | Whole-app macOS 0.72 gaps | [docs/upstream-adoption.md](docs/archive/upstream-adoption.md) |
 | Optional upstream reference review | [docs/upstream-sync.md](docs/upstream-sync.md) |
 | Adding a database driver | [docs/adding-drivers.md](docs/adding-drivers.md) |
-| Driver maturity | [docs/driver-maturity.md](docs/driver-maturity.md) |
+| Driver maturity | [docs/adding-drivers.md#driver-maturity](docs/adding-drivers.md#driver-maturity) |
 | State management | [docs/state-management.md](docs/state-management.md) |
 | Connection handling | [docs/connections.md](docs/connections.md) |
 | Capability evidence | [docs/capability-evidence.md](docs/capability-evidence.md) |

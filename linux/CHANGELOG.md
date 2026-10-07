@@ -362,7 +362,7 @@
 - Flathub submission notes and screenshot capture guide
 - Rust file-size guardrail in preflight: soft 1200 / hard 1800 lines, with ratchet ceilings in `file-size-baselines.txt`
 - Driver maturity labels in the Connect dialog (Experimental subtitle for Redis, MongoDB, and DuckDB)
-- Driver maturity matrix in `docs/driver-maturity.md`
+- Driver maturity matrix in `docs/adding-drivers.md#driver-maturity`
 - Drivers declare whether they can report indexes and foreign keys, so an engine that has none is no longer indistinguishable from a table that has none
 - Windows integrated authentication for SQL Server through the current Kerberos ticket cache
 - Principal-aware GUI approval routing with fail-closed behavior when no active window exists
