@@ -39,10 +39,12 @@ The PR #150 hosted Build run did not execute the TLS fixture: preflight failed
 because the ignored-test inventory was stale, and the regression gate correctly
 rejected the dependent skipped jobs. PR #151's hosted harness then found two
 follow-up defects: its new G5 case was misclassified by the inventory generator,
-and `known-issues.md` retained duplicate B4-1 through B4-4 rows. This PR fixes
-both. SonarCloud also reported SSH host keys being generated in the bastion
-image build; this follow-up moves key generation to container startup. Hosted
-C6 acceptance remains pending a green rerun.
+and `known-issues.md` retained duplicate B4-1 through B4-4 rows. PR #153 merged
+those fixes and moved SSH host-key generation from the bastion image build to
+container startup after SonarCloud reported image-build generation. The
+follow-up establishes the hosted fixture and inventory checks; C6 still needs a
+successful hosted execution of the fixture itself and frozen-candidate
+acceptance.
 
 The tests exercise BookiE's built-in SSH route; the OpenSSH route and installed
 acceptance remain unproven. The fixture correction also replaces ineffective
