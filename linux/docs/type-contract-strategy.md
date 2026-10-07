@@ -62,6 +62,10 @@ edits. XML fragments with commas, quoted attributes, Unicode, entities and SQL
 NULL are checked against `pg_typeof` and `array_send`; malformed XML retains the
 native `2200N` refusal, with the target and sibling rows unchanged
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+The same XML array now also survives JSON, CSV, XML, HTML, Markdown, XLSX and
+SQL file exports with its native array text, NULL element, and wire bytes
+preserved on SQL replay (`value_contract_xml_array_file_exports_preserve_native_text`
+in `crates/drivers/postgres/tests/support/array_contract_parts/xml_array_file_exports.rs`).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
@@ -787,6 +791,16 @@ typed update and filter run with the lowercase shadow first in `search_path`,
 then rollback must restore both target rows and the original session path. The
 same contract still checks committed writes and native shadow/type identity
 ([validation comment on PR #127](https://github.com/cozyGarage/BookiE/pull/127#issuecomment-6029039984)).
+
+The PostgreSQL identifier boundary now has a focused regression at the 63-byte
+catalog limit: a maximum-length schema and a maximum-length type ending in a
+two-byte UTF-8 character must survive metadata discovery and a keyed enum edit,
+with the stored catalog identity and sibling value checked natively. The
+contract is `value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve_typed_edits`
+in `crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs`.
+Its Docker and local CI results are recorded in the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
+This closes only that identifier boundary; other identifier forms and
+transaction/session `search_path` permutations remain open.
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
