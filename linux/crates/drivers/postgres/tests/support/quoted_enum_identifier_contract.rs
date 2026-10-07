@@ -873,6 +873,60 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
 
         assert_eq!(connection.query("SHOW search_path").await.unwrap().rows, original_path);
     }
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = crate::no_timeout();
+    let session_path = session
+        .query_params_controlled("SHOW search_path", &[], &control)
+        .await
+        .unwrap()
+        .rows;
+    session.query_params_controlled("BEGIN", &[], &control).await.unwrap();
+    session
+        .query_params_controlled(
+            "SET LOCAL search_path TO enumcaselocal, \"EnumCaseLocal\", public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let update = format!("{update_sql} RETURNING id");
+    assert_eq!(
+        session
+            .query_params_controlled(&update, &[Value::Text("ready".into()), Value::Int(2)], &control)
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(2)]]
+    );
+    assert_eq!(
+        session
+            .query_params_controlled(
+                &format!("SELECT id FROM \"EnumCaseLocal\".\"Rows\" WHERE {where_sql}"),
+                &filter_params,
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "typed filtering should still identify the target enum under the shadow path"
+    );
+    session
+        .query_params_controlled("ROLLBACK", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled("SHOW search_path", &[], &control)
+            .await
+            .unwrap()
+            .rows,
+        session_path,
+        "rollback must restore the original path on the same backend"
+    );
+    session.close().await.unwrap();
+
     let native = connection
         .query(
             "SELECT n.nspname, t.typname, r.state::text, r.sibling \
