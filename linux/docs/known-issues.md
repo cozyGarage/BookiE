@@ -73,6 +73,10 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
+| B4-1 | C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback | OPEN | `driver-tls` fixture | driver-docker |
+| B4-2 | C6 SQL Server: same, needs a usable control connection | OPEN | | driver-docker |
+| B4-3 | ~~G5: daemon provider through system OpenSSH; unknown host key declines without learning~~ | DONE | `agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust`; `bash scripts/test-postgres-release.sh` | postgres-release |
+| B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` covers A/B isolation, replacement, late cancellation and journal-failure sharing | sandbox |
 | B4-1 | ~~C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`, wrong/local identity and untrusted authority refusals; `bash scripts/test-driver-tls.sh` (43 tests) | driver-tls |
 | B4-2 | ~~C6 SQL Server: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`, wrong/local identity and untrusted authority refusals; native `encrypt_option`; `bash scripts/test-driver-tls.sh` (43 tests) | driver-tls |
 | B4-3 | G5: daemon provider through system OpenSSH; unknown host key declines without learning | OPEN | | driver-docker |

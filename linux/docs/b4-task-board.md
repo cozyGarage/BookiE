@@ -16,7 +16,7 @@ execution and installed acceptance are separate states.
 | F5 | Merged as `4b7814f5e` (#19) | Installed retirement/toggle flow |
 | F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and installed stale-session acceptance |
 | F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter; decline/accept SSH fixtures exist. Native multi-hop, cancellation and installed trust flow remain candidate gates |
-| F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Complete headless race coverage, frozen-candidate and installed restart acceptance remain |
+| F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Agentd regressions cover isolation, replacement, late cancellation and shared journal failure; frozen-candidate and installed restart acceptance remain |
 
 Source integration above was checked locally. No fresh hosted result is inferred
 from a merge. Historical local/hosted reports and original packets are preserved
@@ -50,6 +50,8 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Small task and required assertion | Local layers |
 | --- | --- | --- |
+| C6-MySQL | TLS through real SSH socket forwarding: valid identity succeeds; wrong CA/host fails without plaintext fallback. Assert the original service hostname | `tls`, `ssh` |
+| C6-SQLServer | TLS through real SSH TCP forwarding: same positive and negative identities, with usable control connection | `tls`, `ssh` |
 | G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
 | F8-headless | Extend headless acceptance for late cancellation after replacement and journal-failure propagation across cached and replacement generations | `security-policy`, agentd units, `postgres-release` |
 | I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
@@ -64,6 +66,8 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Local evidence | Scope remaining |
 | --- | --- | --- |
+| G5 | `bash scripts/test-postgres-release.sh` on the BookiE `b4/g5-daemon-openssh` worktree, 2026-10-07: actual agentd provider refuses an unattended unknown system OpenSSH key without writing it, then reaches a guarded PostgreSQL query with a pretrusted key. The command also passed the existing PostgreSQL release integration suite | Re-run on the frozen B3+B4 candidate SHA; hosted and installed acceptance remain separate |
+| F8-headless | `agentd::audit_isolation_tests`: connection A uncertainty leaves B writable; replacement recovers; cancellation of an old write after replacement does not poison the new generation; outcome journal failure blocks other sessions and replacement generations | Re-run on the frozen B3+B4 candidate SHA; hosted and installed restart acceptance remain separate |
 | C6-MySQL / C6-SQLServer | Commit `0ecb5bc4f`; `bash scripts/test-driver-tls.sh` passed all 43 tests on 2026-10-07, including MySQL 11 and SQL Server 9. Both engine fixtures execute queries through built-in SSH forwarding with valid TLS identity and refuse invalid CA/hostname cases without plaintext fallback | Re-run on frozen candidate SHA; hosted results, system OpenSSH route and installed acceptance remain separate |
 
 Headless panic retirement is covered by `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy`;

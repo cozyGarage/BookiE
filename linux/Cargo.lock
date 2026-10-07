@@ -6125,6 +6125,7 @@ dependencies = [
  "tablepro-driver-sqlite",
  "tablepro-mcp",
  "tablepro-policy",
+ "tablepro-release-tests",
  "tablepro-ssh",
  "tablepro-storage",
  "tablepro-transport",

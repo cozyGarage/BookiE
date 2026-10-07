@@ -64,6 +64,7 @@ mkdir -p "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_r
 chmod 0700 "$secret_root/runtime"
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
+target_dir="${CARGO_TARGET_DIR:-$ROOT/target}"
 CARGO_HOME="$cargo_home" \
 RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   HOME="$secret_root/home" \
@@ -74,8 +75,11 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   XDG_RUNTIME_DIR="$secret_root/runtime" \
   TABLEPRO_FIXTURE_POSTGRES_RELEASE=1 \
   TABLEPRO_FIXTURE_MATERIALS="$FIXTURE/materials" \
+  TABLEPRO_TARGET_DIR="$target_dir" \
   dbus-run-session -- bash -c '
     set -euo pipefail
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo build --locked -p tablepro-ssh --bin tablepro-askpass
+    PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo test --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
     cargo test --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
   '
