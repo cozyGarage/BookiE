@@ -8,14 +8,15 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `6e056fe96` (PR #144) on `linux`, pushed to
+Current integrated source baseline: `f589892b2` (PR #146) on `linux`, pushed to
 `origin/linux`. Recent merges #138–#140 cover PostgreSQL, SQLite and MySQL result
 byte budgets; #141–#143 add PostgreSQL enum role/search-path and array-dimension
 contracts; #144 verifies timestamp-array rebinding and consumers across a
 `DateStyle` change. PR #145 improves the GTK AT-SPI row-action wait. Their case
 details and evidence are linked from the [B3 board](type-contract-strategy.md),
-[value evidence index](value-contracts.md), and relevant test files. PR #146 is
-open for the `name[]` array value contract. B3 remains open: the broader
+[value evidence index](value-contracts.md), and relevant test files. PR #146
+adds the built-in `name[]` pooled decode and typed session-rebind contract; PR
+#147 adds keyed grid-edit coverage for that array type. B3 remains open: the broader
 engine/type/consumer/configuration matrix, mutation triage and installed grid
 acceptance still need work. These changes do not qualify the release.
 
