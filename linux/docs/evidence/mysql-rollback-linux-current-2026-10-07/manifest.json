@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "BookiE B4-11 MySQL failed-batch rollback and side effects on current linux",
+  "source_commit": "3a00ecc2687cce1334fc0600d5d3529573ea65d6",
+  "source_tree": "03393a52d2aeb4d3bae7692f11cda4c268ee89d8",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "5883fb2d988ac862cb52eee91d6a4aac7df34f40d94b9ed55f98ed8d413b093f"
+  },
+  "environment": {
+    "fixture": "testcontainers-modules MySQL 8.1",
+    "rustc": "1.98.1 (48a229cea 2026-09-01)",
+    "docker": "29.7.2 client and server"
+  },
+  "command": "rtk proxy cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1",
+  "result": "8 passed, 0 failed, 0 ignored; 63 filtered out; 97.16 seconds",
+  "log": {
+    "path": "atomic-group.txt",
+    "sha256": "1ede47b663ee097a4b6485b91c9b830fca6c1efb7b65f6dacd9df318b950cdc9"
+  },
+  "covered_contracts": [
+    "Failed InnoDB DML batches restore parent and transactional trigger rows.",
+    "INSERT trigger writes to MyISAM, MEMORY, CSV, and ARCHIVE tables survive rollback.",
+    "MyISAM UPDATE and DELETE trigger effects survive while the InnoDB parent and transactional trigger effects roll back.",
+    "InnoDB AUTO_INCREMENT allocation is not restored by rollback.",
+    "A lost connection during a batch reports rollback failure."
+  ],
+  "remaining": [
+    "Storage engines outside this fixture and side-effect patterns beyond the covered triggers and AUTO_INCREMENT behavior are not established.",
+    "Frozen-candidate and hosted acceptance remain open."
+  ]
+}
