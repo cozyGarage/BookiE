@@ -91,7 +91,7 @@ text and wire output, then verifies literal/bind refusal leaves target and
 sibling rows unchanged (`value_contract_custom_composite_array_refusal_preserves_rows`
 in `crates/drivers/postgres/tests/support/custom_array_contract.rs`). Other
 custom array families and their consumers remain open. The unlisted built-in
-The unlisted built-in `money[]` refusal covers populated values, SQL NULL
+`money[]` refusal covers populated values, SQL NULL
 elements, native text/JSON/wire snapshots, literal/bind refusal and
 target/sibling preservation (`value_contract_money_array_refusal_preserves_target_and_sibling_rows`).
 The same explicit-refusal contract now covers `point[]` with native type, text,
