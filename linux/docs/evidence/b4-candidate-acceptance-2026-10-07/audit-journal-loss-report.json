@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "236aaff49125349124d3faf2658d5d58012e0de9",
+  "working_tree": "M linux/crates/app/tests/gtk_safety.py",
+  "tracked_diff_sha256": "b7d2d22fc865aa0716139f69145265587db388c7501b7a610d4d930389f1c15c",
+  "started_utc": "2026-10-07T08:59:33.416876+00:00",
+  "status": "passed",
+  "layers": {
+    "ui": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-safety.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "ui-1.log",
+          "exit_code": 0,
+          "seconds": 8.192
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T08:59:41.609504+00:00"
+}

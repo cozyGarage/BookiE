@@ -112,5 +112,24 @@
     "log": "postgres-tunnel-loss.log",
     "report_sha256": "acbfefa0f153f9ab19f4e9dc361b9a053a079ced4388b8e4a1ec9afef48aca54",
     "log_sha256": "280b4b405d31da747b9c7d8026961e5327687efc72dcf88a52a119fa88eef506"
+  },
+  "audit_journal_loss_scenario": {
+    "scenario": "audit_journal_loss_after_connection_denies_mutation",
+    "commit": "236aaff49125349124d3faf2658d5d58012e0de9",
+    "working_tree": "M linux/crates/app/tests/gtk_safety.py",
+    "tracked_diff_sha256": "b7d2d22fc865aa0716139f69145265587db388c7501b7a610d4d930389f1c15c",
+    "command": "TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/debug/tablepro-app TABLEPRO_GTK_SCENARIO=audit_journal_loss_after_connection_denies_mutation python scripts/run-test-layer.py ui",
+    "status": "passed",
+    "seconds": 8.192,
+    "report": "audit-journal-loss-report.json",
+    "log": "audit-journal-loss.log",
+    "report_sha256": "3a5f87ab7c02f4cf38cc539316522018898a55e39fa0b08b7f2aed3eee841b84",
+    "log_sha256": "d5e2ecea1b91b8e02368c44dabbeab1187175e9069df248f60394dac333fa743",
+    "coverage": "An already-open editor fails closed when audit journal storage becomes unavailable before a mutation."
+  },
+  "reviewed_pr_163": {
+    "state_at_2026_10_07": "open with merge conflicts against current linux",
+    "unique_regression": "Post-connect audit journal loss now included and locally tested in this branch",
+    "xdotool": "not adopted; AT-SPI show_location path is already tested and avoids adding an external tool dependency"
   }
 }

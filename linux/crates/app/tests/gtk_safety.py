@@ -1018,6 +1018,17 @@ audit_failure_denies.audit_available = False
 audit_failure_denies.requires_editor = False
 
 
+def audit_journal_loss_after_connection_denies_mutation(database, base):
+    journal = base / "data" / storage_dir_name() / "audit.jsonl"
+    assert journal.is_file(), "the audit journal must start available"
+    journal.unlink()
+    journal.mkdir()
+
+    run_sql("INSERT INTO safety_items(id) VALUES (1)")
+    wait_for_node(name="Approve once", present=False, timeout=2)
+    assert_database_count_stable(database, 0)
+
+
 def bundle_export_records_sanitized_audit_outcome(_database, base):
     export_path = base / "home" / "review-only.bundle"
     invoke_accessible_action("win.disconnect")
@@ -1784,6 +1795,7 @@ def main():
         dismissed_approval_denies,
         approve_once_prompts_again,
         audit_failure_denies,
+        audit_journal_loss_after_connection_denies_mutation,
         bundle_export_records_sanitized_audit_outcome,
         bundle_import_records_sanitized_audit_outcome,
         encrypted_bundle_round_trip_restores_credentials,
