@@ -49,6 +49,15 @@ single read statement and returns pages of at most 5,000 rows.
   retained-page budget decides what the user can scroll back to.
 - Engines without a cursor keep the current caps and the truncated banner.
 
+## Prerequisite
+
+A cursor needs a read-only transaction on the session. Today a guarded session
+records `BEGIN` as a write batch (`PolicySession::begin`), so a cursor opened
+through it would be audited as a write and could be refused on a read-only
+connection. The guard needs a read-snapshot start first: a read-only `BEGIN`
+audited as a read. The same change unblocks a snapshot export (UI-13b). It is
+a guard and audit decision and lands before any cursor code.
+
 ## Open questions
 
 - Whether MySQL and SQL Server can use their native streaming without holding
