@@ -284,9 +284,7 @@ impl WelcomeView {
         let arranged = arrange_connections(&self.connections, &self.organization, &self.filter);
         let sections = group_sections(&arranged, &self.organization);
 
-        for factory in self.sections.drain(..) {
-            self.sections_box.remove(factory.widget());
-        }
+        self.sections.clear();
         while let Some(child) = self.sections_box.first_child() {
             self.sections_box.remove(&child);
         }

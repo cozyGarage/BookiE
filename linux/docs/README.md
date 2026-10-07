@@ -41,8 +41,8 @@ histories (sprint, B3, B4, connections, validation, value contracts). They are
 source-pinned evidence, not current instructions: open items from them live in
 the [ledger](known-issues.md). Use the
 [changelog engineering history index](../CHANGELOG.md#historical-engineering-records)
-to locate a dated record, and the current boards and evidence manifests for
-active decisions and case proof. Useful starting points:
+to locate a dated record, and the current boards and linked PR discussions or
+CI artifacts for active decisions and case proof. Useful starting points:
 
 - [Release audit, October 3](archive/release-audit-2026-10-03.md): a dated broad source audit pinned to its then-current baseline; use the live ledger and boards for current status.
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md): source risks and unavailable raw proof.
@@ -52,9 +52,9 @@ active decisions and case proof. Useful starting points:
 
 ## Keep context bounded
 
-Record a rule once in an ADR, a task once on its board, and a runtime result once
-in its case evidence. Link those from the sprint and changelog. Do not copy old
-test counts into a current acceptance claim.
-Link each checked-in evidence manifest from its owning case index or audit. Keep
-ignored `target/quality` paths as plain text; when the output is unavailable,
-mark it unavailable instead of leaving a dead link.
+Record a rule once in an ADR and a task once on its board. Put run-specific
+manifests and logs in the PR discussion or CI artifacts, then link them from the
+owning board and changelog; do not add per-run evidence directories to source.
+Do not copy old test counts into a current acceptance claim. Keep ignored
+`target/quality` paths as plain text; when output is unavailable, say so instead
+of leaving a dead link.
