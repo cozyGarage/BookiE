@@ -4,6 +4,7 @@
 
 ### Added
 
+- MariaDB now has the non-UTC TIMESTAMP refusal contract already used for MySQL, covering dedicated sessions, pooled queries, transaction-local changes, session-local text, and the native UTC epoch.
 - MySQL and MariaDB unsigned subtraction now has Docker-backed `NO_UNSIGNED_SUBTRACTION` session contracts for native underflow/overflow refusal, engine-specific signed result metadata, and negative/positive `BIGINT` boundaries.
 - PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
 - PostgreSQL name[] array coverage now checks empty/NULL distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact wire preservation through typed session rebinding and keyed grid edits.

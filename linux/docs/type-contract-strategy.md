@@ -362,6 +362,13 @@ advance the next generated value (`mysql_sql_copy_export_preserves_auto_incremen
 and `mysql_copy_as_insert_preserves_auto_increment_id_and_next_value` in
 `crates/drivers/mysql/tests/support/mysql_identity_copy_contract.rs`).
 
+The non-UTC TIMESTAMP contract now runs on both MySQL and MariaDB. It proves
+dedicated-session refusal, pooled UTC reads, transaction-local refusal,
+session-local text and the native UTC epoch
+(`session_non_utc_time_zone_refuses_mysql_timestamp_instant` and
+`mariadb_session_non_utc_time_zone_refuses_timestamp_instant` in
+`crates/drivers/mysql/tests/support/timezone_contract.rs`).
+
 MySQL and MariaDB unsigned subtraction now have session-pinned contracts for
 `NO_UNSIGNED_SUBTRACTION`: default unsigned underflow and signed overflow retain
 native SQLSTATE `22003`, while the mode returns -1, 41 and `i64::MAX`. Native
