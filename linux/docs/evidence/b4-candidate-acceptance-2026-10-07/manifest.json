@@ -62,5 +62,43 @@
       "Flatpak default build"
     ],
     "note": "GTK safety and PostgreSQL release jobs had not started when recorded."
+  },
+  "postgres_release_rerun": {
+    "commit": "2a81746c35aef7f8d2855690d952f145590048b7",
+    "working_tree": "M linux/crates/app/tests/gtk_ux.py",
+    "tracked_diff_sha256": "d34ade2cdedcb9a5de84c0a4c0a557f427a9bfb0a52ff79ca989683a41cf31c9",
+    "command": "python scripts/run-test-layer.py postgres-release",
+    "status": "passed",
+    "gtk_scenarios": 5,
+    "seconds": 51.505,
+    "report": "postgres-release-rerun-report.json",
+    "log": "postgres-release-rerun.log",
+    "report_sha256": "da6d40c38c11a3a0e398ca07f3cfcfbfb1bc51bb51bdd66bef2db70c40e83652",
+    "log_sha256": "e5f36617e7764af5bc9412dd5032a885e515f8a1ee853f843c0357ce0ff3eed0"
+  },
+  "hosted_pr_162_initial_run": {
+    "tested_sha": "301b05926418eddd7cf895781de56dea77c87c77",
+    "fast_checks": "failed_before_build",
+    "fast_failure": "apt-get install received media-types_14.0.0_all.deb with unexpected size (25272 expected 30760); Debian reports mirror sync in progress.",
+    "installed_gtk_safety": "skipped because fast checks failed",
+    "postgres_release": "failed in postgres_ssh_unknown_host_key_decline_is_durably_audited; on Debian GTK the prompt was a ROLE_FRAME, while the test searched only ROLE_ALERT. Prompt was visible in snapshot; handshake then timed out after 10 seconds.",
+    "postgres_failure_report": "hosted-postgres-failure-report.json",
+    "postgres_failure_log": "hosted-postgres-failure.log",
+    "passing_checks": [
+      "preflight",
+      "driver TLS",
+      "DuckDB",
+      "security policy",
+      "supply chain",
+      "SonarCloud",
+      "harness",
+      "resolve-ref",
+      "workflow-lint",
+      "Flatpak default",
+      "Flatpak development"
+    ],
+    "driver_integration": "in progress at evidence capture",
+    "fix": "trust prompt selectors now accept ROLE_ALERT or ROLE_FRAME; all five PostgreSQL GTK scenarios passed locally after the change.",
+    "postgres_failure_log_sha256": "aa1aaa4a825493358547dd85fd0bf6381c3dfeee634ff33bd58d46719aec3f97"
   }
 }

@@ -40,8 +40,12 @@ PostgreSQL release check failed because the job lacked GTK development
 libraries; PR #161 adds those build dependencies. Installed GTK safety smoke
 also exposed stale scenario setup, fixed locally and recorded with candidate
 layer evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
-Fresh hosted validation of that harness fix and installed acceptance remain
-open.
+PR #162's first hosted run passed preflight, security, TLS, DuckDB, supply
+chain, Sonar, harness, workflow lint, and Flatpak builds. Fast checks hit a
+Debian mirror-sync package-size mismatch; PostgreSQL release exposed a GTK
+AT-SPI role mismatch in the SSH trust prompt, now fixed locally and passing all
+five PostgreSQL GTK scenarios. Fresh hosted validation and installed
+acceptance remain open; see the [candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
 
 ## Remaining tasks
 

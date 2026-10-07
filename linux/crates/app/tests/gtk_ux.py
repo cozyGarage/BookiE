@@ -67,6 +67,7 @@ def x11_click(window_x, window_y, button=3, clicks=1):
 
 def scenarios(ui):
     pyatspi = ui.pyatspi
+    ssh_trust_prompt_roles = (pyatspi.ROLE_ALERT, pyatspi.ROLE_FRAME)
 
     def wait_for_adw_dialog(name, present=True):
         if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
@@ -577,10 +578,10 @@ def scenarios(ui):
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         connection_id = ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
         ui.open_saved_connection(name)
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
 
         journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
@@ -609,15 +610,15 @@ def scenarios(ui):
     def postgres_ssh_unknown_host_key_accepts_and_queries(database, base):
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         ui.open_saved_connection(name)
-        prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST"):
-            second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+            second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
             ui.wait_for_node_containing("relay:22")
             ui.invoke(ui.wait_within(second_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-            ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+            ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_frame_containing(f"{name} — BookiE")
 
         known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
@@ -660,15 +661,15 @@ def scenarios(ui):
     def postgres_ssh_second_hop_decline_does_not_learn_key(database, base):
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         ui.open_saved_connection(name)
-        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
 
-        second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        second_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("relay:22")
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
 
         known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
@@ -703,12 +704,12 @@ def scenarios(ui):
         known_hosts.write_text(relay_record, encoding="utf-8")
 
         ui.open_saved_connection(name)
-        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        first_prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.wait_for_node_containing("127.0.0.1:2223")
         ui.invoke(ui.wait_within(first_prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node(name="Connection failed")
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_node_containing("changed")
 
         records_in_file = [line for line in known_hosts.read_text().splitlines() if line.strip()]
@@ -774,9 +775,9 @@ def scenarios(ui):
         )
         name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
         ui.open_saved_connection(name)
-        prompt = ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        prompt = ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles)
         ui.invoke(ui.wait_within(prompt, name="Trust", role=pyatspi.ROLE_PUSH_BUTTON))
-        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Trust this SSH host?", role=ssh_trust_prompt_roles, present=False)
         ui.wait_for_frame_containing(f"{name} — BookiE")
         ui.invoke(ui.wait_for_node(name="Open SQL editor"))
         ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
