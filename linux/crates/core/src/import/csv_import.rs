@@ -12,7 +12,9 @@ pub const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 
 pub const MAX_COLUMNS: usize = 512;
 
-pub const MAX_FIELD_BYTES: usize = 1024 * 1024;
+// Hex-escaped binary doubles in CSV and adds its `\\x` prefix, so this admits
+// a 1 MiB binary value while keeping each untrusted field bounded.
+pub const MAX_FIELD_BYTES: usize = 2 * 1024 * 1024 + 2;
 
 pub const MAX_IMPORT_ROWS: usize = 1_000_000;
 
@@ -335,7 +337,7 @@ mod tests {
     fn public_import_limits_keep_their_documented_units() {
         assert_eq!(MAX_FILE_BYTES, 67_108_864);
         assert_eq!(MAX_COLUMNS, 512);
-        assert_eq!(MAX_FIELD_BYTES, 1_048_576);
+        assert_eq!(MAX_FIELD_BYTES, 2_097_154);
         assert_eq!(MAX_IMPORT_ROWS, 1_000_000);
         assert_eq!(MAX_PREVIEW_ROWS, 50);
     }
