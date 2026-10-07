@@ -890,6 +890,9 @@ mod census_cost;
 #[path = "support/run_find_late_type_contract.rs"]
 mod run_find_late_type_contract;
 
+#[path = "support/query_budget_contract.rs"]
+mod query_budget_contract;
+
 #[path = "support/database_listing.rs"]
 mod database_listing;
 #[path = "support/value_contracts.rs"]
