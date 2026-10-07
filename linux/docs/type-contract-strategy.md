@@ -116,6 +116,9 @@ The built-in `tsvector[]` and `tsquery[]` now have separate explicit-refusal
 assertions with native text-search JSON and wire oracles; refused literals and
 bindings leave target and sibling rows unchanged
 ([test](../crates/drivers/postgres/tests/support/unsupported_builtin_array_contract.rs)).
+The same explicit-refusal and preservation contract now covers built-in
+`json[]` and `jsonb[]`, with native array text, JSON, and wire snapshots in the
+same test file.
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
