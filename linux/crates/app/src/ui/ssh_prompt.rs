@@ -117,6 +117,16 @@ fn ask(
         entry
     });
     let sender = std::rc::Rc::new(std::cell::RefCell::new(Some(sender)));
+    connect_prompt_responses(&dialog, sender.clone(), entry);
+    let parent = gtk::Application::default().active_window();
+    dialog.present(parent.as_ref());
+}
+
+fn connect_prompt_responses(
+    dialog: &adw::AlertDialog,
+    sender: std::rc::Rc<std::cell::RefCell<Option<tokio::sync::oneshot::Sender<PromptAnswer>>>>,
+    entry: Option<gtk::PasswordEntry>,
+) {
     let escape_sender = sender.clone();
     let response_sender = sender.clone();
     dialog.connect_response(None, move |_, response| {
@@ -140,11 +150,18 @@ fn ask(
             let _ = sender.send(PromptAnswer::Decline);
         }
     });
+    connect_escape_key(dialog, escape_sender);
+}
+
+fn connect_escape_key(
+    dialog: &adw::AlertDialog,
+    sender: std::rc::Rc<std::cell::RefCell<Option<tokio::sync::oneshot::Sender<PromptAnswer>>>>,
+) {
     let escape_dialog = dialog.downgrade();
     let key_controller = gtk::EventControllerKey::new();
     key_controller.connect_key_pressed(move |_, key, _, _| {
         if key == gtk::gdk::Key::Escape {
-            if let Some(sender) = escape_sender.borrow_mut().take() {
+            if let Some(sender) = sender.borrow_mut().take() {
                 let _ = sender.send(PromptAnswer::Decline);
             }
             if let Some(dialog) = escape_dialog.upgrade() {
@@ -156,8 +173,6 @@ fn ask(
         }
     });
     dialog.add_controller(key_controller);
-    let parent = gtk::Application::default().active_window();
-    dialog.present(parent.as_ref());
 }
 
 #[cfg(test)]
