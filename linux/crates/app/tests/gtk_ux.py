@@ -407,6 +407,26 @@ def scenarios(ui):
         ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
         session_toggle("Session")
 
+    def ctrl_tab_returns_to_the_most_recently_used_tab(database, base):
+        def wait_for_editor_text(expected):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if editor_text() == expected:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
+
+        ui.set_editor_text("-- one")
+        for label in ("-- two", "-- three"):
+            ui.press_x11_key("t", ("Control_L",))
+            time.sleep(0.5)
+            ui.set_editor_text(label)
+        wait_for_editor_text("-- three")
+        ui.press_x11_key("Tab", ("Control_L",))
+        wait_for_editor_text("-- two")
+        ui.press_x11_key("Tab", ("Control_L",))
+        wait_for_editor_text("-- three")
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -523,6 +543,7 @@ def scenarios(ui):
         connect_dialog_cancel_stops_a_hanging_connection,
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
+        ctrl_tab_returns_to_the_most_recently_used_tab,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

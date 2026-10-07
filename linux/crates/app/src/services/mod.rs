@@ -15,6 +15,7 @@ pub mod persistence_stores;
 pub mod preferences;
 pub mod query_parameters;
 pub mod quick_switcher;
+pub mod recent_tabs;
 pub mod request_generation;
 pub mod single_instance;
 mod state_file;
