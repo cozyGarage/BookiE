@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-07",
+  "baseline_commit": "4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4",
+  "purpose": "Local candidate and CI failure follow-up evidence; not a B4 completion claim.",
+  "initial_broad_layer_report": "initial-layer-report.json",
+  "ui_rerun_report": "ui-rerun-report.json",
+  "ui_rerun_log": "ui-rerun.log",
+  "ui_rerun_command": "python scripts/run-test-layer.py ui",
+  "ui_status": "passed",
+  "ui_scenarios": 47,
+  "ui_seconds": 238.348,
+  "debian_package_contract": {
+    "status": "passed",
+    "environment": "disposable debian:testing container",
+    "image_digest": "sha256:f35963177a0584848d5222b3d2b4f4ebcc6434d39db0a709c3088237ef619cbf"
+  },
+  "workflow_checks": {
+    "actionlint": "passed",
+    "python3 -m unittest discover -s linux/scripts/tests -p test_ci_workflow.py": "passed (9 tests)",
+    "python bytecode compilation": "passed"
+  },
+  "hosted_pr_159_failures": [
+    "PostgreSQL release job lacked GTK/GLib development dependencies required to build app and run PostgreSQL AT-SPI scenarios.",
+    "Installed GTK safety smoke opened editor before the audit fail-closed scenario, making its setup incompatible with expected refusal."
+  ],
+  "working_tree_fixes": [
+    ".github/workflows/build-linux.yml",
+    "linux/crates/app/tests/gtk_safety.py"
+  ],
+  "remaining": [
+    "fresh hosted checks on follow-up PR",
+    "installed Arch/Omarchy/Hyprland Wayland",
+    "upgrade/rollback",
+    "Debian/GNOME Wayland",
+    "B3 completion"
+  ]
+}

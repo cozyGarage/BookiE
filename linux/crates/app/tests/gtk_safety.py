@@ -489,6 +489,29 @@ def set_visible_editable_within(anchor_name, anchor_role, text, action_name="Sav
     raise AssertionError(f"no visible editable control within {anchor_name!r}:\n{accessible_snapshot()}")
 
 
+def show_file_chooser_location(chooser):
+    for node in descendants(chooser):
+        try:
+            actions = node.queryAction()
+        except Exception:
+            continue
+        for index in range(actions.nActions):
+            if actions.getName(index) == "show_location" and actions.doAction(index):
+                return
+    raise AssertionError(f"file chooser has no working show_location action:\n{accessible_snapshot()}")
+
+
+def choose_import_bundle(path):
+    invoke_accessible_action("welcome.import-bundle")
+    chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
+    show_file_chooser_location(chooser)
+    set_visible_editable_within(
+        "Import connections", FILE_CHOOSER_ROLES, str(path), action_name="Open",
+    )
+    press_x11_key("Return")
+    invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+
+
 def database_ids(path):
     with sqlite3.connect(path) as connection:
         return [row[0] for row in connection.execute("SELECT id FROM safety_items ORDER BY id")]
@@ -832,7 +855,8 @@ def run_scenario(binary, scenario):
             environment=getattr(scenario, "environment", "prod"),
         )
         process = start_application(binary, environment)
-        open_editor()
+        if getattr(scenario, "requires_editor", True):
+            open_editor()
         def restart():
             nonlocal process, stderr
             invoke_accessible_action("win.quit")
@@ -983,12 +1007,15 @@ def approve_once_prompts_again(database, _base):
 
 
 def audit_failure_denies(database, _base):
-    run_sql("INSERT INTO safety_items(id) VALUES (1)")
-    wait_for_node(name="Approve once", present=False, timeout=2)
+    invoke_named_action_within(CONNECTION_NAME, "Open connection")
+    wait_for_node(name="Connection failed")
+    wait_for_node_containing("audit intent could not be persisted")
+    wait_for_node(name="Open SQL editor", present=False)
     assert_database_count_stable(database, 0)
 
 
 audit_failure_denies.audit_available = False
+audit_failure_denies.requires_editor = False
 
 
 def bundle_export_records_sanitized_audit_outcome(_database, base):
@@ -1063,22 +1090,7 @@ def bundle_import_records_sanitized_audit_outcome(_database, base):
     import_path.write_text(json.dumps(bundle), encoding="utf-8")
 
     invoke_accessible_action("win.disconnect")
-    invoke_accessible_action("welcome.import-bundle")
-    chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
-    if shutil.which("xdotool"):
-        subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+l"], check=True)
-        time.sleep(0.2)
-        subprocess.run(
-            ["xdotool", "type", "--clearmodifiers", "--delay", "10", str(import_path)],
-            check=True,
-        )
-        subprocess.run(["xdotool", "key", "Return"], check=True)
-    else:
-        press_x11_key("l", ("Control_L",))
-        time.sleep(0.2)
-        press_x11_text(str(import_path))
-    press_x11_key("Return")
-    invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+    choose_import_bundle(import_path)
     wait_for_node(name="Imported SQLite Review")
 
     config_path = base / "config" / storage_dir_name() / "connections.json"
@@ -1177,19 +1189,7 @@ def encrypted_bundle_round_trip_restores_credentials(_database, base):
     store_secret(changed_secret)
 
     def open_import_dialog():
-        invoke_accessible_action("welcome.import-bundle")
-        chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
-        if shutil.which("xdotool"):
-            subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+l"], check=True)
-            time.sleep(0.2)
-            subprocess.run(["xdotool", "type", "--clearmodifiers", "--delay", "10", str(bundle_path)], check=True)
-            subprocess.run(["xdotool", "key", "Return"], check=True)
-        else:
-            press_x11_key("l", ("Control_L",))
-            time.sleep(0.2)
-            press_x11_text(str(bundle_path))
-        press_x11_key("Return")
-        invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+        choose_import_bundle(bundle_path)
 
     open_import_dialog()
     wait_for_node(name="Passphrase", role=pyatspi.ROLE_PASSWORD_TEXT)
