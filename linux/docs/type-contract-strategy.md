@@ -44,6 +44,9 @@ from the literal `NULL` enum label. The same contract proves type-less SQL
 literals, bindings and keyed grid edits refuse both nested values while the
 stored row remains unchanged
 ([test](../crates/drivers/clickhouse/tests/support/nested_values.rs)).
+`Array(Nullable(Enum16))` now covers its signed endpoints, SQL NULL versus the
+literal `NULL` label, the same native JSON and export oracles, and lossy SQL,
+binding and grid-write refusal in that contract.
 
 PostgreSQL `citext` scalar and array values preserve exact label text while
 comparisons remain case-insensitive. `citext[]` now round-trips SQL NULL, empty

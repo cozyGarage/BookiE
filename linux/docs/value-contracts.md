@@ -299,6 +299,12 @@ parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
 CSV import with an explicit collision-free null marker, and Copy as SQL replay
 against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
+Nested `Array(Enum8)`, `Array(Nullable(Enum8))` and
+`Array(Nullable(Enum16))` use native `toJSONString` as the value oracle and
+check JSON/CSV/XLSX export plus refusal by type-less SQL, binding and keyed
+grid writes. The nullable arrays distinguish SQL NULL elements from an enum
+label literally named `NULL`
+([test](../crates/drivers/clickhouse/tests/support/nested_values.rs)).
 
 The compound-result and direct table-projection XLSX workbooks both keep `=1+1`
 and `'=1+1` as text through the Calc ODS/XLSX round trip, without creating
