@@ -629,11 +629,7 @@ impl SimpleComponent for BrowseTab {
         root.add_top_bar(&read_only_banner);
         root.add_top_bar(&no_pk_banner);
         root.add_top_bar(&filter_strip.widget);
-        let inspector = crate::ui::row_inspector::RowInspector::new(&inner_stack);
-        paginator.inspector_button.connect_toggled({
-            let inspector = inspector.clone();
-            move |button| inspector.set_visible(button.is_active())
-        });
+        let inspector = bind_inspector(&inner_stack, &paginator.inspector_button);
         root.set_content(Some(inspector.widget()));
 
         let sync_top_bar_slot: std::rc::Rc<dyn Fn()> = {
