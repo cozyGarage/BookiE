@@ -9,6 +9,7 @@
 - PostgreSQL oid[] keyed grid edits now preserve zero, the UINT32 maximum and SQL NULL against native type/text/wire oracles while leaving sibling rows unchanged.
 - PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
 - PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
+- PostgreSQL enum parameter tests now prove integer and boolean inputs keep their native types, fail safely in enum comparisons and updates, and leave target rows unchanged.
 - PostgreSQL `int4range[]` now has an explicit unsupported-value contract with native range text/JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `tsvector[]` and `tsquery[]` now have explicit unsupported-value contracts with native text-search JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.

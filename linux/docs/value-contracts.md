@@ -351,6 +351,9 @@ also checked against native target-enum casts after warming metadata and
 switching to a same-named shadow `search_path` on the same backend, for
 empty/literal-`NULL` labels, SQL NULL and invalid shadow-only labels
 ([evidence](evidence/postgres-shadowed-enum-parameter-context-results-2026-10-05/manifest.json)).
+Integer and boolean parameters remain their native types and are refused by
+PostgreSQL in enum comparisons and updates; the same fixture verifies the
+target rows remain unchanged.
 
 MySQL/MariaDB typed CSV import now also preserves an empty VARCHAR under
 `EMPTY_STRING_IS_NULL`, separately from SQL NULL, with native text-byte
