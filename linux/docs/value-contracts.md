@@ -59,6 +59,10 @@ and parameter paths refuse it without changing either row. Other custom array
 families remain untested. The unlisted built-in `money[]` refusal covers
 populated and NULL elements, native text/JSON/wire snapshots, literal/bind
 refusal, and target/sibling preservation ([validation comment on PR #126](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028961640)).
+Built-in geometric arrays `point[]`, `line[]`, `lseg[]`, `box[]`, `path[]`,
+`polygon[]`, and `circle[]` have the same visible-refusal, native oracle, and
+write-preservation contract in
+`value_contract_geometric_array_refusals_preserve_target_and_sibling_rows`.
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 

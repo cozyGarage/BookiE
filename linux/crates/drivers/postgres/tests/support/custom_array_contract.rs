@@ -229,3 +229,99 @@ async fn value_contract_point_array_refusal_preserves_target_and_sibling_rows() 
     assert_eq!(after.rows[0][4], Value::Text("target".into()));
     assert_eq!(after.rows[1][4], Value::Text("sibling".into()));
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_geometric_array_refusals_preserve_target_and_sibling_rows() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    let cases = [
+        ("point", "point '(1,2)'", "point '(-3.5,4)'"),
+        ("line", "'{1,2,3}'::line", "'{-2,0,1}'::line"),
+        ("lseg", "'[(1,2),(3,4)]'::lseg", "'[(-2,0),(1,5)]'::lseg"),
+        ("box", "'(3,4),(1,2)'::box", "'(0,5),(-2,1)'::box"),
+        ("path", "'((1,2),(3,4))'::path", "'((-2,0),(1,5))'::path"),
+        (
+            "polygon",
+            "'((1,2),(3,4),(5,6))'::polygon",
+            "'((-2,0),(1,5),(3,1))'::polygon",
+        ),
+        ("circle", "'<(1,2),3>'::circle", "'<(-2,0),1.5>'::circle"),
+    ];
+
+    for (native_type, first, second) in cases {
+        let table = format!("geometry_array_refusal_{native_type}");
+        connection
+            .execute(&format!(
+                "CREATE TABLE {table} \
+                 (id integer PRIMARY KEY, value {native_type}[], sibling text NOT NULL)"
+            ))
+            .await
+            .unwrap();
+        connection
+            .execute(&format!(
+                "INSERT INTO {table} VALUES \
+                 (1, ARRAY[{first}, NULL, {second}]::{native_type}[], 'target'), \
+                 (2, ARRAY[{second}]::{native_type}[], 'sibling')"
+            ))
+            .await
+            .unwrap();
+
+        let source = connection
+            .query(&format!(
+                "SELECT value, pg_typeof(value)::text, value::text, \
+                 array_to_json(value)::text, encode(array_send(value), 'hex') \
+                 FROM {table} WHERE id = 1"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            source.rows[0][1],
+            Value::Text(format!("{native_type}[]")),
+            "native geometry array type changed"
+        );
+        let refusal = source.rows[0][0].clone();
+        assert!(
+            matches!(&refusal, Value::Undecodable(name) if name.eq_ignore_ascii_case(&format!("{native_type}[]"))),
+            "{native_type}[] must remain visibly undecodable: {refusal:?}"
+        );
+        assert_ne!(source.rows[0][2], Value::Text("{}".into()));
+        let before = connection
+            .query(&format!(
+                "SELECT id, value::text, array_to_json(value)::text, \
+                 encode(array_send(value), 'hex'), sibling \
+                 FROM {table} ORDER BY id"
+            ))
+            .await
+            .unwrap();
+
+        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(&refusal))
+                .await
+                .is_err()
+        );
+        assert!(
+            connection
+                .execute_params(&format!("UPDATE {table} SET value = $1 WHERE id = 1"), &[refusal])
+                .await
+                .is_err()
+        );
+
+        let after = connection
+            .query(&format!(
+                "SELECT id, value::text, array_to_json(value)::text, \
+                 encode(array_send(value), 'hex'), sibling \
+                 FROM {table} ORDER BY id"
+            ))
+            .await
+            .unwrap();
+        assert_eq!(after.rows, before.rows, "{native_type}[] refusal changed stored values");
+        assert_eq!(after.rows[0][1], source.rows[0][2]);
+        assert_eq!(after.rows[0][2], source.rows[0][3]);
+        assert_eq!(after.rows[0][3], source.rows[0][4]);
+        assert_eq!(after.rows[0][4], Value::Text("target".into()));
+        assert_eq!(after.rows[1][4], Value::Text("sibling".into()));
+    }
+}
