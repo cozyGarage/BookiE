@@ -26,5 +26,4 @@ RUN chmod 600 /etc/ssh/ssh_host_ed25519_key \
         'AllowAgentForwarding no' \
         > /etc/ssh/sshd_config
 
-EXPOSE 22
 CMD ["/usr/sbin/sshd", "-D", "-e"]
