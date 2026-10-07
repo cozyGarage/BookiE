@@ -105,6 +105,7 @@
 
 ### Fixed
 
+- A PostgreSQL query that returns more rows than the result cap now returns the capped rows promptly and stops the server query, instead of waiting for the server to finish or timing out.
 - Connection-list rebuilds no longer remove a nested row list from the wrong GTK parent; GTK safety runs now fail on criticals.
 - SSH Docker integration fixtures now allow up to 180 seconds for container startup; host-key mismatch assertions remain unchanged.
 - GTK installed-flow smoke re-queries rows while AT-SPI makes their named actions available, avoiding a transient accessibility-tree race.

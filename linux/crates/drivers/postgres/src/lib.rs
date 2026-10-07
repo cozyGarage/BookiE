@@ -23,7 +23,9 @@ mod temporal;
 mod transaction;
 
 use params::{bind_pg_params, describe_query_parameters, needs_text_type_inference};
-use query::{execute_connection, execute_connection_once, query_connection, query_connection_once, stream_into_result};
+use query::{
+    QueryStop, execute_connection, execute_connection_once, query_connection, query_connection_once, stream_into_result,
+};
 
 pub struct PgDriver;
 
@@ -389,7 +391,12 @@ impl Connection for PgConnection {
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        query_connection(&mut connection, sql, params).await
+        let backend_pid = backend_pid(&mut connection).await?;
+        let stop = Some(QueryStop {
+            pool: &self.cancellation_pool,
+            backend_pid,
+        });
+        query_connection(&mut connection, sql, params, stop).await
     }
 
     async fn query_params_controlled(
@@ -656,8 +663,13 @@ impl Drop for PgTransaction {
 #[async_trait]
 impl tablepro_core::Transaction for PgTransaction {
     async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
+        let (pool, backend_pid) = (self.cancellation_pool.clone(), self.backend_pid);
+        let stop = Some(QueryStop {
+            pool: &pool,
+            backend_pid,
+        });
         let connection = self.connection_mut()?;
-        query_connection_once(connection, sql, &[]).await
+        query_connection_once(connection, sql, &[], stop).await
     }
 
     async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
@@ -665,8 +677,13 @@ impl tablepro_core::Transaction for PgTransaction {
     }
 
     async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        let (pool, backend_pid) = (self.cancellation_pool.clone(), self.backend_pid);
+        let stop = Some(QueryStop {
+            pool: &pool,
+            backend_pid,
+        });
         let connection = self.connection_mut()?;
-        query_connection_once(connection, sql, params).await
+        query_connection_once(connection, sql, params, stop).await
     }
 
     async fn query_params_controlled(
@@ -780,7 +797,7 @@ async fn backend_pid_controlled(
     run_controlled_setup(backend_pid(connection), control).await?
 }
 
-async fn backend_pid(connection: &mut PoolConnection<Postgres>) -> Result<i32, DriverError> {
+pub(crate) async fn backend_pid(connection: &mut PoolConnection<Postgres>) -> Result<i32, DriverError> {
     sqlx::query_scalar("SELECT pg_backend_pid()")
         .fetch_one(&mut **connection)
         .await
@@ -796,12 +813,16 @@ async fn controlled_query(
     retry_stale_type_cache: bool,
     control: &OperationControl,
 ) -> (Option<PoolConnection<Postgres>>, Result<QueryResult, DriverError>) {
+    let stop = Some(QueryStop {
+        pool: cancellation_pool,
+        backend_pid,
+    });
     let result = run_server_cancellable(
         async {
             if retry_stale_type_cache {
-                query_connection(&mut connection, sql, params).await
+                query_connection(&mut connection, sql, params, stop).await
             } else {
-                query_connection_once(&mut connection, sql, params).await
+                query_connection_once(&mut connection, sql, params, stop).await
             }
         },
         request_cancellation(cancellation_pool, backend_pid),
@@ -866,7 +887,7 @@ async fn finish_connection<T>(
 /// connection to the single-slot cancellation pool -- the task always
 /// finishes and explicitly closes the connection on failure rather than
 /// trusting an implicit pool return.
-async fn request_cancellation(pool: &Pool<Postgres>, backend_pid: i32) -> Result<(), DriverError> {
+pub(crate) async fn request_cancellation(pool: &Pool<Postgres>, backend_pid: i32) -> Result<(), DriverError> {
     let pool = pool.clone();
     let task = tokio::spawn(async move {
         let mut conn = pool.acquire().await.map_err(map_sqlx_error)?;
