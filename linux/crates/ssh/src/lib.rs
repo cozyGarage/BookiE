@@ -7,7 +7,6 @@ use secrecy::{ExposeSecret, SecretString};
 use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UnixListener};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_util::sync::CancellationToken;
 
 use russh::ChannelMsg;
@@ -17,7 +16,9 @@ use russh::keys::{PrivateKeyWithHashAlg, load_secret_key};
 
 use crate::openssh::Prompter;
 
+mod handshake;
 mod known_hosts;
+use handshake::{HandshakeWaitError, HostKeyPromptEvent, wait_for_handshake};
 use known_hosts::HostKeyOutcome;
 pub mod openssh;
 pub use known_hosts::default_known_hosts_path;
@@ -363,14 +364,8 @@ struct ClientHandler {
     known_hosts_path: PathBuf,
     unknown: UnknownHostKey,
     prompter: Option<Arc<dyn Prompter>>,
-    prompt_events: UnboundedSender<HostKeyPromptEvent>,
+    prompt_events: tokio::sync::mpsc::UnboundedSender<HostKeyPromptEvent>,
     outcome: Arc<Mutex<Option<known_hosts::HostKeyOutcome>>>,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum HostKeyPromptEvent {
-    WaitingForUser,
-    UserResponded,
 }
 
 impl client::Handler for ClientHandler {
@@ -609,49 +604,6 @@ async fn connect_and_auth(
         return Err(auth_failure_error(&auth));
     }
     Ok(session)
-}
-
-enum HandshakeWaitError<E> {
-    Timeout,
-    Handshake(E),
-}
-
-async fn wait_for_handshake<F, T, E>(
-    handshake: F,
-    mut prompt_events: UnboundedReceiver<HostKeyPromptEvent>,
-    timeout: Duration,
-) -> Result<T, HandshakeWaitError<E>>
-where
-    F: std::future::Future<Output = Result<T, E>>,
-{
-    let mut handshake = std::pin::pin!(handshake);
-    let mut deadline_at = tokio::time::Instant::now() + timeout;
-    let deadline = tokio::time::sleep_until(deadline_at);
-    tokio::pin!(deadline);
-    let mut waiting_for_user = false;
-    let mut remaining = timeout;
-
-    loop {
-        tokio::select! {
-            biased;
-            Some(event) = prompt_events.recv() => match event {
-                HostKeyPromptEvent::WaitingForUser if !waiting_for_user => {
-                    remaining = deadline_at.saturating_duration_since(tokio::time::Instant::now());
-                    waiting_for_user = true;
-                }
-                HostKeyPromptEvent::UserResponded => {
-                    if waiting_for_user {
-                        waiting_for_user = false;
-                        deadline_at = tokio::time::Instant::now() + remaining;
-                        deadline.as_mut().reset(deadline_at);
-                    }
-                }
-                HostKeyPromptEvent::WaitingForUser => {}
-            },
-            result = &mut handshake => return result.map_err(HandshakeWaitError::Handshake),
-            _ = &mut deadline, if !waiting_for_user => return Err(HandshakeWaitError::Timeout),
-        }
-    }
 }
 
 fn auth_failure_error(auth: &client::AuthResult) -> SshError {
