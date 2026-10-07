@@ -93,7 +93,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::value_parse::mssql_server_owned_csv::value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server"
+      "ui::browse_tab::value_parse::mssql_server_owned_columns::value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers"
     ],
     [
       "tablepro-app",

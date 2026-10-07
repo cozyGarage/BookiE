@@ -10,14 +10,15 @@ Docker suite now also checks the decoded-byte limit, exact retained payloads,
 the `truncated` flag, and continued use of the same transaction
 ([test](../crates/drivers/mysql/tests/shared/mysql_atomic.rs)).
 
-SQL Server CSV import now builds and executes its real core import plan against
-a native table with an identity, computed column and rowversion. The CSV maps
-all four fields, including hostile supplied values for the three server-owned
-columns; the plan omits them, and native rows prove SQL Server generated each
-value. The same fetched native metadata drives the grid's production edit gate:
-identity, computed and rowversion cells are not editable, while the ordinary
-column is (`value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server`).
-SEC-3 remains open for Copy as SQL and SQL export.
+SQL Server server-owned columns now have native consumer coverage across grid,
+CSV import, Copy as SQL and SQL export. Fetched metadata makes identity,
+computed and rowversion columns read-only while a normal text column stays
+editable. CSV input maps hostile supplied values for all three server-owned
+columns, yet the core plan inserts only the ordinary value. Copy as SQL omits
+them too, and an exported SQL file replays into a second native table with new
+identity values and server-generated computed and rowversion values; both
+tables' rows are checked in
+`value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers`.
 
 ## Current evidence and next targets
 
