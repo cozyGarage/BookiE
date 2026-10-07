@@ -35,9 +35,42 @@ def problems(text):
     return found
 
 
+OWNERS_HEADING = "## Owners and handoff"
+ID = re.compile(r"\b[A-Z0-9]+-[0-9]+[a-z]?\b")
+
+
+def owner_problems(text):
+    ledger = {}
+    for line in text.splitlines():
+        match = ROW.match(line)
+        if match:
+            cells = [cell.strip() for cell in match.group(2).split("|")]
+            if len(cells) == 4:
+                ledger[match.group(1)] = cells[1]
+    if OWNERS_HEADING not in text:
+        return ["the ledger has no owners section"]
+    section = text.split(OWNERS_HEADING, 1)[1].split("\n## ", 1)[0]
+    listed = []
+    for line in section.splitlines():
+        if line.startswith("|"):
+            columns = line.split("|")
+            if len(columns) > 3:
+                listed.extend(ID.findall(columns[2]))
+    found = []
+    for ident in sorted({ident for ident in listed if listed.count(ident) > 1}):
+        found.append(f"{ident} has more than one owner")
+    for ident in sorted(set(listed) - ledger.keys()):
+        found.append(f"{ident} is listed as owned but is not in the ledger")
+    for ident, status in sorted(ledger.items()):
+        if status in {"OPEN", "UNVERIFIED"} and ident not in listed:
+            found.append(f"{ident} is {status} and has no owner")
+    return found
+
+
 def main():
     path = Path(__file__).resolve().parents[1] / "docs/known-issues.md"
-    found = problems(path.read_text())
+    text = path.read_text()
+    found = problems(text) + owner_problems(text)
     for problem in found:
         print(f"known-issues.md: {problem}", file=sys.stderr)
     if not found:

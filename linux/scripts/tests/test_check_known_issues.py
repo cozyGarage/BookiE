@@ -35,9 +35,17 @@ class KnownIssuesTests(unittest.TestCase):
     def test_a_done_row_needs_evidence(self):
         self.assertEqual(len(problems("| UI-1 | ~~Done~~ | DONE |  | unit |\n")), 1)
 
+    def test_every_open_row_needs_exactly_one_owner(self):
+        rows = "| UI-1 | Open | OPEN | n | unit |\n| UI-2 | ~~Done~~ | DONE | PR | unit |\n"
+        owners = "\n## Owners and handoff\n\n| Owner | Open rows | Next |\n| --- | --- | --- |\n"
+        self.assertEqual(checker.owner_problems(HEADER + rows + owners + "| A | UI-1 | x |\n"), [])
+        self.assertEqual(checker.owner_problems(HEADER + rows + owners + "| A | UI-3 | x |\n").__len__(), 2)
+        self.assertEqual(len(checker.owner_problems(HEADER + rows + owners + "| A | UI-1 | x |\n| B | UI-1 | y |\n")), 1)
+        self.assertEqual(checker.owner_problems(HEADER + rows), ["the ledger has no owners section"])
+
     def test_the_real_ledger_is_consistent(self):
         text = (ROOT / "docs/known-issues.md").read_text()
-        self.assertEqual(checker.problems(text), [])
+        self.assertEqual(checker.problems(text) + checker.owner_problems(text), [])
 
 
 if __name__ == "__main__":
