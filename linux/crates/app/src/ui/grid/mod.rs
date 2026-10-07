@@ -1,5 +1,6 @@
 mod column;
 mod column_jump;
+mod column_order;
 mod column_visibility;
 mod context_menu;
 mod display;
@@ -140,6 +141,14 @@ pub fn build_column_view(
     column_visibility::install(
         &column_view,
         &grid_actions,
+        &columns,
+        result.columns.iter().map(|column| column.name.clone()).collect(),
+        connection_id
+            .zip(column_widths.clone())
+            .map(|(id, store)| (id, table.to_string(), store)),
+    );
+    column_order::install(
+        &column_view,
         &columns,
         result.columns.iter().map(|column| column.name.clone()).collect(),
         connection_id
