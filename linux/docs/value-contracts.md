@@ -32,6 +32,10 @@ checked against native `array_send` bytes in
 edits use the qualified built-in cast and preserve the sibling row in
 `value_contract_array_grid_edit_preserves_array_elements`.
 
+The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
+32-bit maximum and SQL NULL, using native type/text/`array_send` equality and
+sibling preservation in `value_contract_array_grid_edit_preserves_array_elements`.
+
 The exact Rust Decimal positive/negative mantissa limit and 28-place scale now
 have parser, parameter, PostgreSQL typed-binding and SQL-literal checks. Values
 just outside the crate's range are rejected by explicit Decimal and grid input;

@@ -40,6 +40,11 @@ edit casts to `pg_catalog.name[]` and preserves its sibling row
 `value_contract_array_grid_edit_preserves_array_elements` in
 `crates/drivers/postgres/tests/support/array_contract.rs`).
 
+The `oid[]` keyed grid edit preserves zero, `4294967295` and SQL NULL through
+the qualified `pg_catalog.oid[]` cast. Native type, text and `array_send` bytes
+match, and the sibling row is unchanged (`value_contract_array_grid_edit_preserves_array_elements`
+in `crates/drivers/postgres/tests/support/array_contract.rs`).
+
 The built-in PostgreSQL `pg_lsn[]` now preserves full-width LSNs and SQL NULL
 through binary result decoding, inferred typed binding, the keyed-update builder
 and typed CSV import. Tests compare native type, text, JSON and `array_send`
