@@ -131,5 +131,17 @@
     "state_at_2026_10_07": "open with merge conflicts against current linux",
     "unique_regression": "Post-connect audit journal loss now included and locally tested in this branch",
     "xdotool": "not adopted; AT-SPI show_location path is already tested and avoids adding an external tool dependency"
+  },
+  "ui_safety_rerun": {
+    "commit": "b7362ee1360b64ffde7867143ad7df3945fab7d5",
+    "status": "passed",
+    "layer": "ui",
+    "scenario": "audit_journal_loss_after_connection_denies_mutation",
+    "scenario_result": "passed",
+    "seconds": 205.639,
+    "report": "ui-rerun-20261007T090139-report.json",
+    "log": "ui-rerun-20261007T090139.log",
+    "report_sha256": "329a193248abedccbb9b33555ea58a575e7e35fa57a05a47d998fb03b2a3765e",
+    "log_sha256": "48f0b6e2db2d959e2e6be036b0a639858f0577e3b3393e7b2a945457db3d7a36"
   }
 }
