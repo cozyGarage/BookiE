@@ -57,6 +57,11 @@ malformed-prefix refusal, CIDR host-bit refusal and target/sibling preservation.
 The built-in OID census includes element OIDs 869 (`inet`) and 650 (`cidr`)
 ([evidence](evidence/postgres-network-array-roundtrip-results-2026-10-06/manifest.json)).
 
+PostgreSQL arbitrary query results now have a Docker regression that crosses the
+shared 64 MiB decoded-result budget, verifies retained row order and payloads,
+asserts `truncated`, and reuses the pooled connection for a following query
+([test](../crates/drivers/postgres/tests/support/query_budget_contract.rs)).
+
 Other unlisted built-in and custom array families remain explicitly open
 ([macaddr[] evidence](evidence/postgres-macaddr-array-roundtrip-results-2026-10-06/manifest.json),
 [macaddr8[] evidence](evidence/postgres-macaddr8-array-roundtrip-results-2026-10-06/manifest.json)).
