@@ -123,6 +123,7 @@ pub(crate) mod test_support {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 }

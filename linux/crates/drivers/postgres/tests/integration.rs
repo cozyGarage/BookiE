@@ -72,6 +72,9 @@ mod domain_uuid_array_contract;
 #[path = "support/domain_array_family_contract.rs"]
 mod domain_array_family_contract;
 
+#[path = "support/domain_array_type_contract.rs"]
+mod domain_array_type_contract;
+
 #[path = "support/domain_bytea_array_contract.rs"]
 mod domain_bytea_array_contract;
 

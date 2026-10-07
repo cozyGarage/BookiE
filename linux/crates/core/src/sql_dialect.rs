@@ -72,6 +72,15 @@ pub fn placeholder_for(driver_id: &str, index: usize) -> String {
 }
 
 fn postgres_text_cast_type(column: &ColumnInfo, value: &Value) -> Option<String> {
+    if let Some(domain_type) = &column.domain_type
+        && matches!(value, Value::Text(_) | Value::Null)
+    {
+        return Some(format!(
+            "{}.{}",
+            quote_ident("postgres", &domain_type.schema),
+            quote_ident("postgres", &domain_type.name)
+        ));
+    }
     if let Some(enum_type) = &column.enum_type
         && matches!(value, Value::Text(_) | Value::Null)
     {
@@ -491,6 +500,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
@@ -739,6 +749,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
@@ -754,6 +765,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
@@ -769,6 +781,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 

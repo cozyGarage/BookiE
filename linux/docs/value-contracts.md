@@ -37,6 +37,8 @@ grid writes and typed CSV restore. Native `pg_typeof`, array text and
 assignment refused with SQLSTATE `2200N` without changing either row
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
 
+A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
+
 ## Run
 
 From `linux/`, use the existing value runner:

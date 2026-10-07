@@ -18,6 +18,7 @@ fn pk(name: &str) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 
@@ -33,6 +34,7 @@ fn data(name: &str) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

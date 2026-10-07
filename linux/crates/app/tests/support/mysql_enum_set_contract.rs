@@ -14,6 +14,7 @@ fn value_contract_mysql_enum_and_set_parser_preserves_labels() {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     };
     for (data_type, input) in [
         ("enum('happy','it''s ok','back\\\\slash')", "it's ok"),

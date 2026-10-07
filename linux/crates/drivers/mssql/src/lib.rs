@@ -744,6 +744,7 @@ fn row_to_column_info(row: &[Value]) -> ColumnInfo {
         comment: as_text(row.get(10)).filter(|c| !c.is_empty()),
         collation: as_text(row.get(11)).filter(|c| !c.is_empty()),
         enum_type: None,
+        domain_type: None,
     }
 }
 

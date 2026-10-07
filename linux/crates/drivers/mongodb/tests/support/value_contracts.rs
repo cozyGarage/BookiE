@@ -281,6 +281,7 @@ fn json_column(name: &str) -> tablepro_core::ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

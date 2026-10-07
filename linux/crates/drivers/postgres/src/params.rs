@@ -5,7 +5,7 @@ use tablepro_core::{ColumnInfo, DriverError, Value};
 
 use crate::array::MAX_ARRAY_TEXT_BYTES;
 use crate::map_sqlx_error;
-use crate::query::{statement_columns, statement_type_infos};
+use crate::query::{statement_column_origins, statement_columns, statement_type_infos};
 
 const PG_LSN_OID: u32 = 3220;
 const XML_OID: u32 = 142;
@@ -18,6 +18,7 @@ pub(super) struct PgParameterDescription {
     pub(super) inferred_text_types: Vec<Option<PgTypeInfo>>,
     pub(super) columns: Vec<ColumnInfo>,
     pub(super) column_type_infos: Vec<PgTypeInfo>,
+    pub(super) column_origins: Vec<Option<(i64, i16)>>,
 }
 
 pub(super) async fn describe_query_parameters(
@@ -66,6 +67,7 @@ pub(super) async fn describe_query_parameters(
         inferred_text_types,
         columns: statement_columns(statement.columns()),
         column_type_infos: statement_type_infos(statement.columns()),
+        column_origins: statement_column_origins(statement.columns()),
     })
 }
 

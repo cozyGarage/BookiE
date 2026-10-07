@@ -14,6 +14,7 @@ fn collated(data_type: &str, collation: Option<&str>) -> DraftColumn {
         comment: None,
         collation: collation.map(str::to_string),
         enum_type: None,
+        domain_type: None,
     })
 }
 

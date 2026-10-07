@@ -43,6 +43,7 @@ mod tests {
                 schema: "sample_schema".into(),
                 name: "status_kind".into(),
             }),
+            domain_type: None,
         }];
         let rows = vec![
             vec![Value::Text("NULL".into())],
@@ -81,6 +82,7 @@ mod tests {
                 schema: "sample_schema".into(),
                 name: "status_kind".into(),
             }),
+            domain_type: None,
         }];
         let rows = vec![
             vec![Value::Text("NULL".into())],
@@ -148,6 +150,7 @@ mod tests {
                 schema: "sample_schema".into(),
                 name: "status_kind".into(),
             }),
+            domain_type: None,
         }];
         let rows = vec![
             vec![Value::Text("NULL".into())],

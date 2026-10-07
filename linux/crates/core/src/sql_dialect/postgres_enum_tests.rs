@@ -15,6 +15,7 @@ fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "status".into(),
@@ -30,6 +31,7 @@ fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
                 schema: "odd schema".into(),
                 name: "status\"type".into(),
             }),
+            domain_type: None,
         },
     ];
 
@@ -70,6 +72,7 @@ fn postgres_enum_array_writes_cast_text_to_the_qualified_array_type() {
             schema: "odd schema".into(),
             name: "status\"type".into(),
         }),
+        domain_type: None,
     };
     let (sql, params) = build_insert_from_draft(
         "postgres",

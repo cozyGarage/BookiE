@@ -723,6 +723,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
@@ -738,6 +739,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
@@ -941,6 +943,7 @@ mod tests {
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             },
             ColumnInfo {
                 name: "b".into(),
@@ -953,6 +956,7 @@ mod tests {
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             },
             data_col("name"),
         ];
@@ -985,6 +989,7 @@ mod tests {
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             },
             data_col("name"),
         ];

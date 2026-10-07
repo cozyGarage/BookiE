@@ -240,7 +240,9 @@ impl Connection for PgConnection {
                 CASE WHEN a.attcollation <> 0 AND a.attcollation <> ty.typcollation
                     THEN co.collname::text END AS collation,
                 type_ns.nspname AS enum_schema,
-                enum_ty.typname AS enum_name
+                enum_ty.typname AS enum_name,
+                CASE WHEN ty.typtype = 'd' THEN domain_ns.nspname END AS domain_schema,
+                CASE WHEN ty.typtype = 'd' THEN ty.typname END AS domain_name
              FROM pg_catalog.pg_attribute a
              JOIN pg_catalog.pg_class t ON a.attrelid = t.oid
              JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
@@ -275,6 +277,7 @@ impl Connection for PgConnection {
                  LIMIT 1
              ) enum_ty ON TRUE
              LEFT JOIN pg_catalog.pg_namespace type_ns ON type_ns.oid = enum_ty.typnamespace
+             LEFT JOIN pg_catalog.pg_namespace domain_ns ON domain_ns.oid = ty.typnamespace
              LEFT JOIN pg_catalog.pg_collation co ON co.oid = a.attcollation
              LEFT JOIN pg_catalog.pg_attrdef d
                  ON d.adrelid = a.attrelid AND d.adnum = a.attnum
@@ -313,6 +316,8 @@ impl Connection for PgConnection {
                 };
                 let enum_schema = r.try_get::<Option<String>, _>(9).map_err(map_sqlx_error)?;
                 let enum_name = r.try_get::<Option<String>, _>(10).map_err(map_sqlx_error)?;
+                let domain_schema = r.try_get::<Option<String>, _>(11).map_err(map_sqlx_error)?;
+                let domain_name = r.try_get::<Option<String>, _>(12).map_err(map_sqlx_error)?;
                 Ok(ColumnInfo {
                     name: r.get::<String, _>(0),
                     data_type: r.get::<String, _>(1),
@@ -328,6 +333,9 @@ impl Connection for PgConnection {
                     collation: r.try_get::<Option<String>, _>(8).unwrap_or(None),
                     enum_type: enum_schema
                         .zip(enum_name)
+                        .map(|(schema, name)| QualifiedTypeName { schema, name }),
+                    domain_type: domain_schema
+                        .zip(domain_name)
                         .map(|(schema, name)| QualifiedTypeName { schema, name }),
                 })
             })

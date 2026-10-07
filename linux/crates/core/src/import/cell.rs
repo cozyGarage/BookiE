@@ -644,6 +644,7 @@ mod tests {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         }
     }
 
