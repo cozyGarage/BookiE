@@ -50,7 +50,7 @@ fi
 gnome-shell --headless --wayland --virtual-monitor "${TABLEPRO_GTK_MONITOR:-1280x1024}" \
   --wayland-display "$WAYLAND_DISPLAY" >"$XDG_RUNTIME_DIR/gnome-shell.log" 2>&1 &
 shell_pid=$!
-trap 'kill "$shell_pid" 2>/dev/null || true' EXIT
+trap 'kill -KILL "$shell_pid" 2>/dev/null || true' EXIT
 for _ in $(seq 30); do
   [[ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]] && break
   sleep 1

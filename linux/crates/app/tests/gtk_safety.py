@@ -805,6 +805,7 @@ def write_fixture(base, audit_available=True, environment="prod"):
             "XDG_RUNTIME_DIR": str(runtime),
             "GSETTINGS_BACKEND": "keyfile",
             "RUST_LOG": "tablepro_app=debug",
+            **gtk_input.display_environment(),
         }
     )
     return database, environment

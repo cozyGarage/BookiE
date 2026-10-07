@@ -39,3 +39,10 @@ def click(x, y, button=3, clicks=1):
     for _ in range(clicks):
         registry.generateMouseEvent(int(x), int(y), f"b{button}c")
         time.sleep(0.08)
+
+
+def display_environment():
+    display = os.environ.get("WAYLAND_DISPLAY")
+    if not display or os.path.isabs(display):
+        return {}
+    return {"WAYLAND_DISPLAY": os.path.join(os.environ["XDG_RUNTIME_DIR"], display)}
