@@ -483,7 +483,7 @@ def set_visible_editable_within(anchor_name, anchor_role, text, action_name="Sav
                         continue
                     editable = node.queryEditableText()
                     editable.setTextContents(text)
-                    return
+                    return node
                 except Exception:
                     continue
         time.sleep(POLL_SECONDS)
@@ -512,11 +512,17 @@ def choose_import_bundle(path):
     invoke_accessible_action("welcome.import-bundle")
     chooser = wait_for_node(name="Import connections", role=FILE_CHOOSER_ROLES)
     show_file_chooser_location(chooser)
-    set_visible_editable_within(
+    location = set_visible_editable_within(
         "Import connections", FILE_CHOOSER_ROLES, str(path), action_name="Open",
     )
-    press_x11_key("Return")
-    invoke(wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(location)
+    open_button = wait_within(chooser, name="Open", role=pyatspi.ROLE_PUSH_BUTTON)
+    deadline = time.monotonic() + WAIT_SECONDS
+    while not open_button.getState().contains(pyatspi.STATE_SENSITIVE) and time.monotonic() < deadline:
+        time.sleep(POLL_SECONDS)
+    if not open_button.getState().contains(pyatspi.STATE_SENSITIVE):
+        raise AssertionError(f"GTK chooser did not resolve the bundle path {str(path)!r}")
+    invoke(open_button)
 
 
 def database_ids(path):
@@ -801,6 +807,7 @@ def write_fixture(base, audit_available=True, environment="prod"):
 
 
 def start_application(binary, environment, restored=False):
+    environment["G_DEBUG"] = "fatal-criticals"
     process = subprocess.Popen(
         [str(binary)],
         env=environment,

@@ -1,2 +1,0 @@
-SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
-passed: encrypted_bundle_round_trip_restores_credentials
