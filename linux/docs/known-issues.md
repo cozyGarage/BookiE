@@ -18,7 +18,8 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `linux` at `3a00ecc26` (PR #225), checked 2026-10-07. The
+Reconciled against BookiE `linux` at `7c85cfff6` (PR #228), with the TEST-13 update
+on open PR #231, checked 2026-10-07. The
 B4-* rows summarize the [B4 board](b4-task-board.md); when they differ, the board
 and its evidence folders win. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
