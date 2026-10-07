@@ -35,6 +35,8 @@ pub struct Preferences {
     pub color_scheme: ColorSchemePref,
     #[serde(default)]
     pub editor_font_family: String,
+    #[serde(default)]
+    pub editor_vim_mode: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,6 +106,7 @@ impl Default for Preferences {
             csv_include_header: default_csv_include_header(),
             color_scheme: ColorSchemePref::default(),
             editor_font_family: String::new(),
+            editor_vim_mode: false,
         }
     }
 }
@@ -262,6 +265,7 @@ fn read_settings(settings: &gio::Settings) -> Preferences {
         csv_include_header: settings.boolean("csv-include-header"),
         color_scheme: ColorSchemePref::from_key(settings.string("color-scheme").as_str()),
         editor_font_family: settings.string("editor-font-family").to_string(),
+        editor_vim_mode: settings.boolean("editor-vim-mode"),
     }
 }
 
@@ -276,6 +280,7 @@ fn write_settings(settings: &gio::Settings, prefs: &Preferences) -> Result<(), S
         settings.set_boolean("csv-include-header", prefs.csv_include_header),
         settings.set_string("color-scheme", prefs.color_scheme.key()),
         settings.set_string("editor-font-family", &prefs.editor_font_family),
+        settings.set_boolean("editor-vim-mode", prefs.editor_vim_mode),
     ];
     if let Some(error) = writes.into_iter().find_map(Result::err) {
         settings.revert();
@@ -712,6 +717,15 @@ mod tests {
         });
         assert_eq!(before.editor_font_family, "");
         assert_eq!(after.editor_font_family, "Iosevka");
+    }
+
+    #[test]
+    fn vim_mode_is_off_by_default_and_survives_a_gsettings_round_trip() {
+        let (before, after) = after_a_round_trip("/com/tablepro/linux/vim-mode/", |prefs| {
+            prefs.editor_vim_mode = true;
+        });
+        assert!(!before.editor_vim_mode);
+        assert!(after.editor_vim_mode);
     }
 
     #[test]

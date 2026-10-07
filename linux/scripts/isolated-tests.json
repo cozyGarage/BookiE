@@ -216,6 +216,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::column_order::tests::a_saved_order_is_shown_and_a_new_drag_is_saved"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::schema::vim_tests::vim_keys_are_attached_only_when_enabled"
     ]
   ],
   "keyring": [

@@ -209,6 +209,13 @@ pub fn present(
         .build();
     editor_group.add(&font_family_row);
 
+    let vim_row = adw::SwitchRow::builder()
+        .title(crate::tr!("Vim keys in the SQL editor"))
+        .subtitle(crate::tr!("Applies to editors opened after the change."))
+        .active(current.editor_vim_mode)
+        .build();
+    editor_group.add(&vim_row);
+
     // 0 disables, 1..=3600s allowed range. Subtitle exposes the
     // disable-via-zero contract so power users editing long-running
     // analytical queries can opt out without spelunking the JSON.
@@ -235,6 +242,7 @@ pub fn present(
         let confirm = confirm_row.clone();
         let font = font_size_row.clone();
         let family = font_family_row.clone();
+        let vim = vim_row.clone();
         let retention = retention_row.clone();
         let timeout = timeout_row.clone();
         let preferences = preferences.clone();
@@ -248,6 +256,7 @@ pub fn present(
                 prefs.confirm_destructive = confirm.is_active();
                 prefs.editor_font_size = font.value() as u32;
                 prefs.editor_font_family = family.text().trim().to_string();
+                prefs.editor_vim_mode = vim.is_active();
                 prefs.history_retention_days = retention.value() as u32;
                 prefs.query_timeout_secs = timeout.value() as u32;
             }) {
@@ -260,6 +269,10 @@ pub fn present(
         move |_| s()
     });
     font_size_row.connect_value_notify({
+        let s = save_all.clone();
+        move |_| s()
+    });
+    vim_row.connect_active_notify({
         let s = save_all.clone();
         move |_| s()
     });

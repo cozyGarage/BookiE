@@ -31,7 +31,7 @@ pub use completion::{SchemaIndex, SchemaRequest, candidate_words, referenced_tab
 pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_schema_buffer};
 
 use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements, summary_label};
-use schema::{apply_editor_font, apply_editor_scheme};
+use schema::{apply_editor_preferences, apply_editor_scheme};
 use sql_text::toggle_line_comment;
 use statement_cursor::{adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor};
 
@@ -411,11 +411,7 @@ impl SimpleComponent for SqlEditor {
         });
 
         let preferences = init.preferences.load();
-        apply_editor_font(
-            &widgets.source_view,
-            preferences.editor_font_size,
-            &preferences.editor_font_family,
-        );
+        apply_editor_preferences(&widgets.source_view, &preferences);
 
         let provider = sourceview5::CompletionWords::new(Some("SQL"));
         provider.register(&init.schema_buffer);
