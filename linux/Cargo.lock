@@ -6378,6 +6378,7 @@ dependencies = [
  "tablepro-driver-mssql",
  "tablepro-driver-mysql",
  "tablepro-driver-redis",
+ "tablepro-ssh",
  "tablepro-transport",
  "tokio",
 ]

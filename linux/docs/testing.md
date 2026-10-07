@@ -105,6 +105,11 @@ certificates retain the TLS classification. Wrong-authority cases exercise both
 verifying modes across all five TLS fixture drivers; fixture outages and authentication
 errors cannot stand in for certificate rejection.
 
+Run the driver TLS fixtures with `bash scripts/test-driver-tls.sh`. The MySQL
+and SQL Server fixtures also expose TLS-only servers behind the built-in SSH
+tunnel, so the same tier checks service identity through forwarding and refuses
+invalid certificates without plaintext fallback.
+
 ## Real-driver integration tests
 
 Run all configured Docker suites with:

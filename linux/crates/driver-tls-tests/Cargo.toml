@@ -12,6 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 tablepro-core = { path = "../core" }
+tablepro-ssh = { path = "../ssh" }
 tablepro-transport = { path = "../transport" }
 secrecy.workspace = true
 
