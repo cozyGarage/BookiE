@@ -89,11 +89,7 @@ async fn nested_json_and_mql_filters_match_dotted_fields_and_array_elements() {
             .iter()
             .position(|column| column.name == "_id")
             .expect("_id metadata");
-        let ids = result
-            .rows
-            .iter()
-            .map(|row| row[id_index].clone())
-            .collect::<Vec<_>>();
+        let ids = result.rows.iter().map(|row| row[id_index].clone()).collect::<Vec<_>>();
         assert_eq!(ids, vec![Value::Int(1), Value::Int(4)], "query: {query}");
     }
 }
