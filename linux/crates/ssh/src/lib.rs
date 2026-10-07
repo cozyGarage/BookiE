@@ -625,19 +625,28 @@ where
     F: std::future::Future<Output = Result<T, E>>,
 {
     let mut handshake = std::pin::pin!(handshake);
-    let deadline = tokio::time::sleep(timeout);
+    let mut deadline_at = tokio::time::Instant::now() + timeout;
+    let deadline = tokio::time::sleep_until(deadline_at);
     tokio::pin!(deadline);
     let mut waiting_for_user = false;
+    let mut remaining = timeout;
 
     loop {
         tokio::select! {
             biased;
             Some(event) = prompt_events.recv() => match event {
-                HostKeyPromptEvent::WaitingForUser => waiting_for_user = true,
-                HostKeyPromptEvent::UserResponded => {
-                    waiting_for_user = false;
-                    deadline.as_mut().reset(tokio::time::Instant::now() + timeout);
+                HostKeyPromptEvent::WaitingForUser if !waiting_for_user => {
+                    remaining = deadline_at.saturating_duration_since(tokio::time::Instant::now());
+                    waiting_for_user = true;
                 }
+                HostKeyPromptEvent::UserResponded => {
+                    if waiting_for_user {
+                        waiting_for_user = false;
+                        deadline_at = tokio::time::Instant::now() + remaining;
+                        deadline.as_mut().reset(deadline_at);
+                    }
+                }
+                HostKeyPromptEvent::WaitingForUser => {}
             },
             result = &mut handshake => return result.map_err(HandshakeWaitError::Handshake),
             _ = &mut deadline, if !waiting_for_user => return Err(HandshakeWaitError::Timeout),
@@ -889,6 +898,31 @@ mod tests {
             wait_for_reply.await.unwrap();
             events.send(HostKeyPromptEvent::UserResponded).unwrap();
             tokio::time::sleep(Duration::from_secs(11)).await;
+            Ok::<_, ()>("connected")
+        };
+
+        let result = wait_for_handshake(handshake, receiver, Duration::from_secs(10)).await;
+        prompt.await.unwrap();
+        assert!(matches!(result, Err(HandshakeWaitError::Timeout)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn host_key_prompt_resumes_only_the_remaining_handshake_budget() {
+        let (events, receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (prompt_started, wait_for_prompt) = tokio::sync::oneshot::channel();
+        let (reply, wait_for_reply) = tokio::sync::oneshot::channel();
+        let prompt = tokio::spawn(async move {
+            wait_for_prompt.await.unwrap();
+            tokio::time::advance(Duration::from_secs(60)).await;
+            reply.send(()).unwrap();
+        });
+        let handshake = async move {
+            tokio::time::sleep(Duration::from_secs(8)).await;
+            events.send(HostKeyPromptEvent::WaitingForUser).unwrap();
+            prompt_started.send(()).unwrap();
+            wait_for_reply.await.unwrap();
+            events.send(HostKeyPromptEvent::UserResponded).unwrap();
+            tokio::time::sleep(Duration::from_secs(3)).await;
             Ok::<_, ()>("connected")
         };
 
