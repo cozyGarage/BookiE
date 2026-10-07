@@ -9,6 +9,7 @@
 - SQL Server policy coverage now proves that UPDATE, DROP, and MERGE batches are classified as writes, denied on a read-only connection, audited, and leave native table state unchanged.
 - MongoDB's hostile SCRAM handshake now has a local wire-protocol regression for malformed nonces and excessive iterations, proving the driver refuses before sending a client proof.
 - MongoDB metadata census cancellation now has a Docker regression that blocks the census `find`, verifies prompt cancellation, and checks the same client and native rows afterward.
+- ClickHouse Enum8/Enum16 values now have native label, metadata, parameter, CSV import and Copy-as-SQL coverage, including literal `NULL`, SQL NULL, quoted labels and Unicode.
 - SQLite's `json_group_object` CSV round-trip contract now checks native output on both sides of the 3.50.0 NULL-label fix without skipping distro SQLite versions or bundling a different engine.
 - PostgreSQL built-in multirange scalar and array projections now resolve to named `Undecodable` values, with literal and parameter refusal and SQL NULL distinction covered by Docker-backed contracts.
 - MariaDB now has the non-UTC TIMESTAMP refusal contract already used for MySQL, covering dedicated sessions, pooled queries, transaction-local changes, session-local text, and the native UTC epoch.
