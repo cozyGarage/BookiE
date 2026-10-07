@@ -39,7 +39,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-8 | ~~Second launch exits silently~~ | DONE | PR #87, verified with D-Bus on the runner | gtk-installed |
 | UI-8b | ~~Second launch logged a GLib "did not unregister" warning~~ | DONE | Second launch runs through `Application::run`; scenario `a_second_launch_raises_the_window_and_exits_cleanly` | gtk-installed |
 | UI-9 | ~~No read-only viewer for long, JSON or binary cell values~~ | DONE | PR #91, `value_viewer` tests | unit + gtk-widget |
-| UI-9b | No row inspector side pane | OPEN | `AdwOverlaySplitView` trailing pane | gtk-widget |
+| UI-9b | ~~No row inspector side pane~~ | DONE | Table tabs have a Row inspector toggle in the footer. It opens a trailing pane listing every column of the one selected row with its type and full value, selectable, NULL dimmed, and a hint when no single row is selected. Tests `row_inspector` (unit and isolated GTK widget test) and AT-SPI scenario `row_inspector_lists_every_column_of_the_selected_row`. Editing from the pane is not offered | unit + gtk-installed |
 | UI-27 | ~~Editable result cells opened two menus on right-click~~ | DONE | Capture-phase gesture; end-to-end scenarios `view_value_*` and `columns_dialog_*` | gtk-installed |
 | UI-28 | ~~The grid cell menu had no standard keyboard shortcut~~ | DONE | Shift+F10 added beside the Menu key | gtk-installed |
 | UI-29 | ~~Editing a connection failed outright when the keyring was unavailable or its unlock was cancelled~~ | DONE | `prefill.rs` `readable` test; scenario `editing_a_saved_connection_*` | unit + gtk-installed |
@@ -53,9 +53,12 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-13b | A full export is not a snapshot: rows changed during the export can be missed or repeated | OPEN | Read all pages inside one session transaction (ADR 0008); the dialog says so until then | driver-docker |
 | UI-14 | ~~No way to hide grid columns~~ | DONE | `column_widths.rs` and `column_visibility.rs` tests | unit + gtk-widget |
 | UI-14b | Hidden columns are still fetched; column order is not saved; no find in loaded rows | OPEN | Reorder, then grid search bar | gtk-widget |
-| UI-15 | Preferences lack theme override, null style, editor font family, vim mode | OPEN | `preferences.rs`, `AdwStyleManager` | gtk-widget |
-| UI-16 | No statement navigation or current-statement band in the editor | OPEN | `statement_cursor.rs` boundaries | gtk-widget |
-| UI-17 | No preview tabs; `Ctrl+Tab` is not most-recent-first | OPEN | `workspace_tabs.rs` | gtk-widget |
+| UI-15 | ~~Preferences lack a theme override~~ | DONE | Preferences has an Appearance row (System, Light, Dark) stored in GSettings and applied at startup and live. Tests: GSettings round trip, defaults for old files, row mapping | unit |
+| UI-15b | Preferences lack null display style, editor font family and vim mode | OPEN | `preferences.rs`, editor and grid display | gtk-widget |
+| UI-16 | ~~No statement navigation in the editor~~ | DONE | Alt+Shift+Down and Alt+Shift+Up jump to the start of the next and previous statement (not Alt+Up, which GtkSourceView uses to move lines). Tests `statement_cursor` and AT-SPI scenario `alt_arrows_jump_between_statements` | unit + gtk-installed |
+| UI-16b | ~~No current-statement band in the editor~~ | DONE | The statement under the cursor gets a soft background in the SQL editor, refreshed on edits and cursor moves, skipped above 200 KB. Tests `statement_cursor`, `statement_band` (unit and an isolated GTK widget test) | unit + gtk-widget |
+| UI-17 | ~~`Ctrl+Tab` is not most-recent-first~~ | DONE | Ctrl+Tab switches to the most recently used tab and back (window-level key capture, the tab view's own Ctrl+Tab is off). Tests `recent_tabs` and AT-SPI scenario `ctrl_tab_returns_to_the_most_recently_used_tab`. Holding Ctrl to walk deeper is UI-17b | unit + gtk-installed |
+| UI-17b | No preview tabs; Ctrl+Tab does not walk deeper into the history while Ctrl is held | OPEN | `workspace_tabs.rs`, key-release tracking | gtk-widget |
 | UI-18 | History is a dialog; Open Quickly has no scopes or commands; no single action table | OPEN | `shortcuts.rs` action table | gtk-widget |
 | UI-19 | FK picker and navigation, enum and set pickers, paste TSV, page-size menu, estimated counts | OPEN | B3-hot files; schedule with B3 | gtk-widget |
 | UI-20 | No server output (NOTICE, PRINT) and no timing breakdown | OPEN | Needs a core trait hook | driver-docker |
@@ -77,7 +80,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
 | B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | | sandbox |
-| B4-8 | F7: isolated GTK Session, BEGIN, label, toggle-off confirm | OPEN | Register in `isolated-tests.json` | gtk-widget |
+| B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
 | B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
 | B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
@@ -111,7 +114,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
 | PKG-1 | Arch installed pass on native Wayland: install, upgrade, rollback, askpass, GSettings, profile isolation | OPEN | Xvfb does not qualify | gtk-installed |
-| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | Build, unit and widget tiers pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`scripts/test-distro-floor.sh`, CI job `distro-floor`). The installed AT-SPI suite on Ubuntu 24.04 (`DISTRO_FLOOR_INSTALLED=1`) now passes its first 30-odd scenarios and renders correctly (screenshot checked). It found and fixed two older-stack gaps: a Status-role label that GTK 4.14 does not list, and a repeated toolbar content swap. It stops at `view_value_opens_the_whole_cell_with_pretty_json`: the grid cell context menu does not open there. Debian 13 installed run not done | gtk-installed |
+| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | The build, unit, widget and full installed AT-SPI suites (39 scenarios) pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`DISTRO_FLOOR_INSTALLED=1 scripts/test-distro-floor.sh`, run by the Forgejo job `distro-floor`). Per-stack harness settings: pointer offset (`TABLEPRO_GTK_Y_OFFSET`, 5 on Ubuntu, 19 elsewhere), no dialog-role check on libadwaita below 1.6. Product fixes it forced: a Status-role label GTK 4.14 does not list, a repeated toolbar content swap. Still missing: D1, a real `.deb` build and install (PKG-5), and a native Wayland pass (PKG-1) | gtk-installed |
 | PKG-3 | B7 soak: frozen SHA, 30 consecutive retry-free GTK attempts over six runs | OPEN | | gtk-installed |
 | PKG-4 | Real Flatpak build and install; Flathub submission; screenshots | OPEN | | manual |
 | PKG-5 | `dpkg-deb` contract skipped in harness; validators tested, installation not | OPEN | Debian runner | sandbox |
@@ -155,7 +158,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | --- | --- | --- | --- | --- |
 | DOC-1 | ~~`po/tablepro.pot` is stale~~ | DONE | Regenerated 2026-10-07 with `scripts/update-translations.py` in its own commit; 24 more source files are now listed in `POTFILES.in` | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
-| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [platforms](platforms.md#accessibility) | gtk-installed |
+| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | Automated so far: scenario `interactive_controls_have_accessible_names` finds no unnamed button, toggle, check box, combo or entry in the main window with a result open; the whole installed suite (43 scenarios) passes at double text size (`GDK_DPI_SCALE=2`), which proves function, not that nothing clips. Still manual: Orca pass, tab order, high contrast (needs the portal contrast setting), custom grid cells and popovers. See [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
 | DOC-5 | Cross-client value comparison (DBeaver, dbx) on lab VMs | OPEN | Seeded multi-engine VMs, ADR 0007 as oracle | manual |
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |

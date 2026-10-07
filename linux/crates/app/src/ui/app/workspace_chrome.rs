@@ -5,7 +5,30 @@ use crate::services::database_service::ConnectionMetadata;
 use super::{App, qualified_label};
 
 impl App {
+    pub(super) fn on_switch_to_recent_tab(&self) {
+        let Some(view) = self.workspace_tab_view.as_ref() else {
+            return;
+        };
+        let Some(current) = view.selected_page() else {
+            return;
+        };
+        loop {
+            let Some(page) = self.recent_pages.borrow().previous(&current) else {
+                return;
+            };
+            if view.page_position(&page) < 0 {
+                self.recent_pages.borrow_mut().forget(&page);
+                continue;
+            }
+            view.set_selected_page(&page);
+            return;
+        }
+    }
+
     pub(super) fn on_workspace_tabs_changed(&self) {
+        if let Some(page) = self.workspace_tab_view.as_ref().and_then(|view| view.selected_page()) {
+            self.recent_pages.borrow_mut().touch(&page);
+        }
         self.persist_workspace_state();
         self.refresh_window_title();
         self.sync_sidebar_selection();

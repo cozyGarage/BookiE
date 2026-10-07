@@ -5,6 +5,10 @@
 ### Added
 
 - SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
+- Table tabs have a Row inspector pane that shows every column of the selected row with its type and full value.
+- The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
+- The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
+- Preferences has an Appearance setting to follow the system or always use the light or dark style.
 - PostgreSQL enum contract coverage combines restricted `SET ROLE`, transaction-local `search_path`, a same-named shadow enum, and target-schema omission through typed update, filtering, invalid-label refusal, and commit/path restoration.
 - SQL Server result contracts now verify row- and byte-budget truncation, first-result-set metadata even when it is empty, later-set draining, and connection reuse.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
@@ -53,6 +57,7 @@
 
 ### Changed
 
+- Ctrl+Tab switches to the most recently used tab, and back again, instead of the next tab in the strip.
 - MongoDB B3 coverage pins a BSON String-to-Decimal128 change between `run_find` metadata census and page retrieval; the returned column is `mixed` and preserves canonical Extended JSON.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
 - The app builds and runs its tests on Ubuntu 24.04 and Debian 13 (GTK 4.14, libadwaita 1.5 or newer); the shortcuts window uses the standard GTK layout.
@@ -73,6 +78,7 @@
 
 ### Fixed
 
+- GTK installed-flow smoke re-queries rows while AT-SPI makes their named actions available, avoiding a transient accessibility-tree race.
 - Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 - MongoDB stale grid deletes now compare the document's full top-level field set as well as materialized values, so a field added after the read prevents deleting that changed document.
 
