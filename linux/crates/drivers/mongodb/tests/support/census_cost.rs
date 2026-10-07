@@ -13,7 +13,7 @@ async fn value_contract_mongodb_census_scan_cost_profile() {
     let database = client.database("appdb");
     let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
 
-    for size in [1_000_i32, 10_000_i32] {
+    for size in [1_000_i32, 10_000_i32, 100_000_i32] {
         let collection_name = format!("census_cost_{size}");
         let collection = database.collection::<Document>(&collection_name);
         let documents = (0..size)
@@ -24,10 +24,18 @@ async fn value_contract_mongodb_census_scan_cost_profile() {
             .await
             .expect("seed census cost fixture");
 
-        let started = Instant::now();
-        let page = connection.fetch_rows(None, &collection_name, 0, 50).await.unwrap();
-        let elapsed = started.elapsed();
-        assert_eq!(page.rows.len(), 50);
-        println!("census rows={size} page_rows=50 elapsed_ms={}", elapsed.as_millis());
+        let mut samples = Vec::with_capacity(5);
+        for _ in 0..5 {
+            let started = Instant::now();
+            let page = connection.fetch_rows(None, &collection_name, 0, 50).await.unwrap();
+            samples.push(started.elapsed());
+            assert_eq!(page.rows.len(), 50);
+        }
+        samples.sort_unstable();
+        println!(
+            "census rows={size} page_rows=50 samples_us={:?} median_us={}",
+            samples.iter().map(|sample| sample.as_micros()).collect::<Vec<_>>(),
+            samples[2].as_micros()
+        );
     }
 }
