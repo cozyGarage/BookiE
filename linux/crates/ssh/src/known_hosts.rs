@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use russh::keys::known_hosts::{check_known_hosts_path, known_host_keys_path, learn_known_hosts_path};
 use russh::keys::ssh_key::PublicKey;
 
-use crate::HostKeyPromptEvent;
 use crate::UnknownHostKey;
+use crate::handshake::HostKeyPromptEvent;
 use crate::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 
 #[derive(Debug, Clone)]
