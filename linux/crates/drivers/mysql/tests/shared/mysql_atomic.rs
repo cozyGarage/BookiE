@@ -207,7 +207,7 @@ async fn a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows(
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger_effects() {
+async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects() {
     let (_container, opts) = start_mysql().await;
     let conn = connect(opts.clone()).await;
     conn.execute("CREATE TABLE atomic_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
@@ -217,6 +217,9 @@ async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger
         .await
         .unwrap();
     conn.execute("CREATE TABLE atomic_memory_effects (id INT PRIMARY KEY) ENGINE=MEMORY")
+        .await
+        .unwrap();
+    conn.execute("CREATE TABLE atomic_csv_effects (id INT NOT NULL) ENGINE=CSV")
         .await
         .unwrap();
     let fixture = sqlx::mysql::MySqlPoolOptions::new()
@@ -233,6 +236,13 @@ async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger
     sqlx::raw_sql(
         "CREATE TRIGGER atomic_parent_after_insert AFTER INSERT ON atomic_parent \
          FOR EACH ROW INSERT INTO atomic_effects VALUES (NEW.id)",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER atomic_parent_after_insert_csv AFTER INSERT ON atomic_parent \
+         FOR EACH ROW INSERT INTO atomic_csv_effects VALUES (NEW.id)",
     )
     .execute(&fixture)
     .await
@@ -283,6 +293,14 @@ async fn mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_trigger
             .rows,
         vec![vec![Value::Int(1)], vec![Value::Int(2)]],
         "the trigger's MEMORY side effect survives rollback"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM atomic_csv_effects ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)], vec![Value::Int(2)]],
+        "the trigger's CSV side effect survives rollback"
     );
 }
 
