@@ -67,6 +67,11 @@ def x11_click(window_x, window_y, button=3, clicks=1):
 def scenarios(ui):
     pyatspi = ui.pyatspi
 
+    def wait_for_adw_dialog(name, present=True):
+        if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
+            return None
+        return ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+
     def text_of(node):
         text = node.queryText()
         return text.getText(0, text.characterCount)
@@ -271,8 +276,7 @@ def scenarios(ui):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
         choose_menu_item(3)
-        if os.environ.get("TABLEPRO_GTK_OLD_ADW") != "1":
-            ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("payload")
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             if any(
@@ -290,7 +294,7 @@ def scenarios(ui):
         ui.wait_for_node(name="beta")
         open_cell_menu("1")
         choose_menu_item(6)
-        ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("Columns")
         switches = [
             node for node in ui.descendants(ui.application_node())
             if ui.node_name(node) in ("alpha", "beta")
@@ -303,7 +307,7 @@ def scenarios(ui):
         ui.invoke(by_name["alpha"])
         time.sleep(0.3)
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="Columns", role=pyatspi.ROLE_DIALOG, present=False)
+        wait_for_adw_dialog("Columns", present=False)
         ui.wait_for_node(name="beta", present=False)
         ui.wait_for_node(name="alpha")
 
@@ -330,10 +334,10 @@ def scenarios(ui):
         ui.wait_for_node(name="Grace Hopper", role=pyatspi.ROLE_LABEL)
         open_cell_menu("Ada Lovelace")
         choose_menu_item(3)
-        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG)
+        wait_for_adw_dialog("name")
         ui.wait_for_node(name="Copy value", role=pyatspi.ROLE_PUSH_BUTTON)
         ui.press_x11_key("Escape")
-        ui.wait_for_node(name="name", role=pyatspi.ROLE_DIALOG, present=False)
+        wait_for_adw_dialog("name", present=False)
 
     def psql(sql):
         import subprocess
