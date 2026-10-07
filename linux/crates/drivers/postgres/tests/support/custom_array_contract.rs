@@ -161,3 +161,71 @@ async fn value_contract_money_array_refusal_preserves_target_and_sibling_rows() 
         .unwrap();
     assert_eq!(after.rows, before.rows, "refused binding changed stored values");
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_point_array_refusal_preserves_target_and_sibling_rows() {
+    let (_container, options) = start_pg().await;
+    let connection = connect(options).await;
+    connection
+        .execute("CREATE TABLE point_array_refusal (id integer PRIMARY KEY, value point[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO point_array_refusal VALUES \
+             (1, ARRAY[point '(1,2)', NULL, point '(-3.5,4)'], 'target'), \
+             (2, ARRAY[point '(9,9)'], 'sibling')",
+        )
+        .await
+        .unwrap();
+
+    let source = connection
+        .query(
+            "SELECT value, pg_typeof(value)::text, value::text, \
+             array_to_json(value)::text, encode(array_send(value), 'hex') \
+             FROM point_array_refusal WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(source.rows[0][1], Value::Text("point[]".into()));
+    assert!(matches!(&source.rows[0][0], Value::Undecodable(name) if !name.is_empty()));
+    assert_ne!(source.rows[0][2], Value::Text("{}".into()));
+    let refusal = source.rows[0][0].clone();
+    let before = connection
+        .query(
+            "SELECT id, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex'), sibling \
+             FROM point_array_refusal ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(&refusal))
+            .await
+            .is_err()
+    );
+    assert!(
+        connection
+            .execute_params("UPDATE point_array_refusal SET value = $1 WHERE id = 1", &[refusal],)
+            .await
+            .is_err()
+    );
+
+    let after = connection
+        .query(
+            "SELECT id, value::text, array_to_json(value)::text, \
+             encode(array_send(value), 'hex'), sibling \
+             FROM point_array_refusal ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(after.rows, before.rows, "refused binding changed stored values");
+    assert_eq!(after.rows[0][1], source.rows[0][2]);
+    assert_eq!(after.rows[0][2], source.rows[0][3]);
+    assert_eq!(after.rows[0][3], source.rows[0][4]);
+    assert_eq!(after.rows[0][4], Value::Text("target".into()));
+    assert_eq!(after.rows[1][4], Value::Text("sibling".into()));
+}
