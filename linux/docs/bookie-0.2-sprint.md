@@ -8,20 +8,22 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `400e09bb9453c343162a6e017adf52db131f8405`
+Current integrated source baseline: `8a6d0b8ce856c01c651b60957606dc78f6cac5e0`
 on `linux`, pushed to `origin/linux`. Merges #103/#105 added mixed-case enum
 shadow-name and MongoDB stale-field delete coverage; #106/#107 refined Rust
 formatting and full-suite determinism. Merges #109/#111 made panic log capture
 safe under forced-color CI; #110 moved the transaction-local enum evidence to
-the merged PR #108 comment; #112 checks mixed-case enum operations while the
-target schema is absent from transaction-local `search_path`. Earlier October 6
-merges #65–#67, #81 and #82 retain the DuckDB, SQLite and ClickHouse cases
-described below. Their implementations and source-pinned evidence are linked
-from the [B3 board](type-contract-strategy.md) and [value evidence
-index](value-contracts.md). B3 remains open: the broader
+the merged PR #108 comment; #112 covers a missing target schema in transaction
+`search_path`; #113 records the B3 docs and evidence comments; #114 covers the
+same missing-schema case under restricted session and login roles; #115 advances
+the GUI phase 2 work. Earlier October 6 merges #65–#67, #81 and #82 retain the
+DuckDB, SQLite and ClickHouse cases described below. Their implementations and
+source-pinned evidence are linked from the [B3 board](type-contract-strategy.md)
+and [value evidence index](value-contracts.md). B3 remains open: the broader
 engine/type/consumer/configuration matrix, mutation triage and installed grid
-acceptance still need work. PR #114 adds restricted-role session/login path
-coverage and remains under review. These merges do not qualify the release.
+acceptance still need work. PR #117 adds mixed-case quoted identifiers under a
+restricted role with the target schema omitted from `search_path`. These merges
+do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
