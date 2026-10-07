@@ -1,6 +1,6 @@
 # 0012: Show database objects in a collapsible sidebar tree
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-10-07
 
 ## Context
