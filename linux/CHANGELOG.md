@@ -4,6 +4,7 @@
 
 ### Added
 
+- PostgreSQL optimistic grid edits now prove custom enum values keep their schema-qualified type cast under a restricted role and shadowed transaction-local `search_path`.
 - MongoDB stale-grid tests now pin ABA behavior: value-based edits and deletes proceed after a field changes and returns to its materialized value, matching the documented last-write-wins contract.
 - PostgreSQL enum grid-edit coverage combines mixed-case quoted identifiers with restricted roles and a shadowed transaction-local `search_path`, including invalid-label and SQL NULL sibling checks.
 - PostgreSQL release profiling now compares the buffer-all collector with the streaming decoder on one-million-row results: median elapsed fell 20.4% and process peak RSS fell 58.3% under the same compiler, dependencies, and database fixture.

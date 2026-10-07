@@ -1,5 +1,5 @@
 use crate::query::{ColumnInfo, QualifiedTypeName, Value};
-use crate::sql_dialect::{build_insert_from_draft, build_keyed_update};
+use crate::sql_dialect::{build_insert_from_draft, build_keyed_update, build_optimistic_keyed_update};
 
 #[test]
 fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
@@ -47,6 +47,24 @@ fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
     assert_eq!(
         sql,
         r#"UPDATE "t" SET "status" = $1::text::"odd schema"."status""type" WHERE "id" = $2"#
+    );
+
+    let (sql, params) = build_optimistic_keyed_update(
+        "postgres",
+        None,
+        "t",
+        &columns,
+        &[(1, Value::Text("old".into()), Value::Text("ready".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(
+        sql,
+        r#"UPDATE "t" SET "status" = $1::text::"odd schema"."status""type" WHERE "id" = $2 AND "status" IS NOT DISTINCT FROM $3"#
+    );
+    assert_eq!(
+        params,
+        vec![Value::Text("ready".into()), Value::Int(1), Value::Text("old".into())]
     );
 
     let (sql, _) = build_insert_from_draft("postgres", None, "t", &columns[1..], &[Value::Null]).unwrap();
