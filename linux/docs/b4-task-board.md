@@ -23,6 +23,25 @@ from a merge. Historical local/hosted reports and original packets are preserved
 in [B4 history](archive/b4-history.md); missing worktree/cache paths remain unavailable
 evidence. Fresh audit results are in [the release audit](archive/release-audit-2026-10-03.md).
 
+## C6 tunneled TLS local fixture evidence (October 7)
+
+The working tree based on `5f7e80145` adds unpublished TLS-only MySQL and SQL
+Server endpoints behind an SSH bastion restricted to those two services. The
+ignored per-engine cases exercise BookiE's built-in SSH forwarding and preserve
+the original service identity for TLS verification. Local command
+`bash scripts/test-driver-tls.sh` passed the complete driver TLS tier: 43 tests,
+including 11 MySQL and 9 SQL Server cases. Both drivers execute a native query
+through the tunnel with a valid CA and hostname, reject an unrelated CA, reject
+wrong and local-dial identities, and clean up the local forward. MySQL refuses
+plaintext on its TLS-only endpoint; SQL Server's native `encrypt_option` proves
+the server forces encrypted sessions.
+
+This is local working-tree evidence, not a merged or hosted result. Both C6
+engine subtasks still need integration and source-pinned evidence. The tests
+exercise BookiE's built-in SSH route; the OpenSSH route and installed acceptance
+remain unproven. The fixture correction also replaces ineffective SQL Server
+TLS environment variables with the documented `mssql-conf` TLS settings.
+
 ## Remaining tasks
 
 Each row is a bounded task; implement engines and route variants separately.
