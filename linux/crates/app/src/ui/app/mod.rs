@@ -479,6 +479,7 @@ impl SimpleComponent for App {
                     WelcomeViewOutput::Delete(id) => AppMsg::DeleteConnection(id),
                 });
 
+        adw::StyleManager::default().set_color_scheme(preferences.load().color_scheme.style());
         let default_page_size = preferences.load().default_page_size;
         let mut model = App {
             registry,

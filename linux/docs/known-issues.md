@@ -53,7 +53,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-13b | A full export is not a snapshot: rows changed during the export can be missed or repeated | OPEN | Read all pages inside one session transaction (ADR 0008); the dialog says so until then | driver-docker |
 | UI-14 | ~~No way to hide grid columns~~ | DONE | `column_widths.rs` and `column_visibility.rs` tests | unit + gtk-widget |
 | UI-14b | Hidden columns are still fetched; column order is not saved; no find in loaded rows | OPEN | Reorder, then grid search bar | gtk-widget |
-| UI-15 | Preferences lack theme override, null style, editor font family, vim mode | OPEN | `preferences.rs`, `AdwStyleManager` | gtk-widget |
+| UI-15 | ~~Preferences lack a theme override~~ | DONE | Preferences has an Appearance row (System, Light, Dark) stored in GSettings and applied at startup and live. Tests: GSettings round trip, defaults for old files, row mapping | unit |
+| UI-15b | Preferences lack null display style, editor font family and vim mode | OPEN | `preferences.rs`, editor and grid display | gtk-widget |
 | UI-16 | No statement navigation or current-statement band in the editor | OPEN | `statement_cursor.rs` boundaries | gtk-widget |
 | UI-17 | ~~`Ctrl+Tab` is not most-recent-first~~ | DONE | Ctrl+Tab switches to the most recently used tab and back (window-level key capture, the tab view's own Ctrl+Tab is off). Tests `recent_tabs` and AT-SPI scenario `ctrl_tab_returns_to_the_most_recently_used_tab`. Holding Ctrl to walk deeper is UI-17b | unit + gtk-installed |
 | UI-17b | No preview tabs; Ctrl+Tab does not walk deeper into the history while Ctrl is held | OPEN | `workspace_tabs.rs`, key-release tracking | gtk-widget |
