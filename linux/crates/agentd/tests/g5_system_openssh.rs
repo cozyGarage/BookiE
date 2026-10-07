@@ -7,7 +7,7 @@ use drivers_postgres::PgDriver;
 use tablepro_agentd::DaemonProvider;
 use tablepro_core::{AuthMode, DriverRegistry, Environment, TlsMode};
 use tablepro_mcp::ConnectionProvider;
-use tablepro_policy::{AuditState, DenyApprovalSink, PolicyConfig, Principal};
+use tablepro_policy::{AuditEvent, AuditState, AuditTransportOutcome, DenyApprovalSink, PolicyConfig, Principal};
 use tablepro_release_tests::Fixture;
 use tablepro_ssh::openssh::UnattendedPrompter;
 use tablepro_storage::{
@@ -93,6 +93,16 @@ fn pretrust_fixture_host(fixture: &Fixture, known_hosts: &std::path::Path) {
     );
 }
 
+async fn transport_events(journal: &AuditJournal) -> Vec<AuditEvent> {
+    journal
+        .recent(10_000)
+        .await
+        .expect("read audit events")
+        .into_iter()
+        .filter(|event| event.transport_attempt.is_some())
+        .collect()
+}
+
 #[tokio::test]
 #[ignore = "requires the postgres release fixture, Secret Service, system OpenSSH, and tablepro-askpass"]
 async fn agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust() {
@@ -117,10 +127,9 @@ async fn agentd_refuses_without_learning_an_unknown_system_openssh_key_then_quer
         ),
     )
     .expect("write isolated system OpenSSH config");
-    let journal = Arc::new(
-        AuditJournal::open_validated(journal_dir.path().join("agentd-g5.jsonl"))
-            .expect("open isolated agent audit journal"),
-    );
+    let journal_path = journal_dir.path().join("agentd-g5.jsonl");
+    let journal =
+        Arc::new(AuditJournal::open_validated(journal_path.clone()).expect("open isolated agent audit journal"));
     let mut registry = DriverRegistry::new();
     registry.register(Arc::new(PgDriver));
     let mut openssh = tablepro_transport::system_openssh(Arc::new(UnattendedPrompter))
@@ -148,7 +157,7 @@ async fn agentd_refuses_without_learning_an_unknown_system_openssh_key_then_quer
     let provider = DaemonProvider::new(
         Arc::new(registry),
         Arc::new(PolicyConfig::default()),
-        journal,
+        journal.clone(),
         Arc::new(AuditState::new()),
         Arc::new(DenyApprovalSink),
     )
@@ -175,6 +184,60 @@ async fn agentd_refuses_without_learning_an_unknown_system_openssh_key_then_quer
         !known_hosts.exists(),
         "the unattended refusal must not learn the SSH host key"
     );
+    let first_attempt = transport_events(&journal).await;
+    assert_eq!(
+        first_attempt.len(),
+        1,
+        "one terminal event for the refused connection attempt"
+    );
+    assert_eq!(
+        first_attempt[0].transport_attempt.expect("transport metadata").outcome,
+        AuditTransportOutcome::HostKeyRefused
+    );
+    assert_eq!(
+        first_attempt[0].terminal_status,
+        tablepro_policy::AuditTerminalStatus::Denied
+    );
+
+    let mismatch_key = journal_dir.path().join("mismatch_key");
+    let generated = Command::new("ssh-keygen")
+        .args(["-q", "-t", "ed25519", "-N", ""])
+        .arg("-f")
+        .arg(&mismatch_key)
+        .output()
+        .expect("ssh-keygen is available");
+    assert!(
+        generated.status.success(),
+        "could not create a disposable wrong host key"
+    );
+    let public_key = std::fs::read_to_string(mismatch_key.with_extension("pub")).expect("read generated public key");
+    std::fs::write(
+        &known_hosts,
+        format!("[{}]:{} {}", fixture.ssh_host, fixture.ssh_port, public_key),
+    )
+    .expect("write wrong key to isolated known_hosts");
+    let changed = provider
+        .connection(
+            id,
+            Principal::Agent {
+                token: "g5-fixture-token".into(),
+                client: Some("g5-test".into()),
+                model: None,
+            },
+        )
+        .await
+        .err()
+        .expect("a changed system OpenSSH host key must be refused");
+    assert!(
+        changed.contains("changed"),
+        "expected changed host-key refusal, got: {changed}"
+    );
+    let attempts = transport_events(&journal).await;
+    assert_eq!(attempts.len(), 2, "each refused attempt gets one terminal event");
+    assert_eq!(
+        attempts[1].transport_attempt.expect("transport metadata").outcome,
+        AuditTransportOutcome::HostKeyChanged
+    );
 
     pretrust_fixture_host(&fixture, &known_hosts);
     let trusted_key = std::fs::read(&known_hosts).expect("read the pretrusted fixture key");
@@ -199,6 +262,18 @@ async fn agentd_refuses_without_learning_an_unknown_system_openssh_key_then_quer
         trusted_key,
         "the trusted connection must not rewrite the host-key file"
     );
+    let attempts = transport_events(&journal).await;
+    assert_eq!(attempts.len(), 3, "one transport event for each connect attempt");
+    assert_eq!(
+        attempts[2].transport_attempt.expect("transport metadata").outcome,
+        AuditTransportOutcome::Connected
+    );
+    for event in &attempts {
+        match &event.principal {
+            Principal::Agent { token, .. } => assert_ne!(token, "g5-fixture-token"),
+            Principal::Human { .. } => panic!("the daemon must retain the caller principal kind"),
+        }
+    }
 
     drop(connection);
     delete_connection(id).await.expect("remove disposable saved connection");

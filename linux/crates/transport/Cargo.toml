@@ -12,6 +12,7 @@ path = "src/lib.rs"
 
 [dependencies]
 tablepro-core = { path = "../core" }
+tablepro-policy = { path = "../policy" }
 tablepro-ssh = { path = "../ssh" }
 tablepro-storage = { path = "../storage" }
 rustls = { version = "0.23", default-features = false, features = ["aws-lc-rs", "std"] }

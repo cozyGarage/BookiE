@@ -737,6 +737,7 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         error: None,
         rows_affected: Some(1),
         duration_ms: Some(1),
+        transport_attempt: None,
     }
 }
 

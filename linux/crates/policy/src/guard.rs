@@ -463,7 +463,7 @@ impl PolicyGuard {
         duration_ms: Option<u64>,
     ) -> Result<(), AuditError> {
         let sql_hash = hex::encode(Sha256::digest(operation.sql.as_bytes()));
-        let principal = sanitized_principal(&self.ctx.principal);
+        let principal = self.ctx.principal.sanitized();
         let error = error_category.map(sanitized_error_detail);
         self.ctx
             .audit
@@ -490,6 +490,7 @@ impl PolicyGuard {
                 error,
                 rows_affected,
                 duration_ms,
+                transport_attempt: None,
             })
             .await
     }
@@ -768,19 +769,6 @@ fn catalog_target(kind: tablepro_core::CatalogObjectKind, schema: Option<&str>) 
     match schema.filter(|_| kind.is_schema_scoped()) {
         Some(schema) => vec![format!("{}:{schema}", kind.as_str())],
         None => vec![kind.as_str().to_string()],
-    }
-}
-
-fn sanitized_principal(principal: &Principal) -> Principal {
-    match principal {
-        Principal::Human { session } => Principal::Human {
-            session: session.clone(),
-        },
-        Principal::Agent { token, client, model } => Principal::Agent {
-            token: format!("sha256:{}", &hex::encode(Sha256::digest(token.as_bytes()))[..16]),
-            client: client.clone(),
-            model: model.clone(),
-        },
     }
 }
 

@@ -275,7 +275,7 @@ impl ConnectionProvider for DaemonProvider {
             .find(|c| c.id == connection_id)
             .ok_or_else(|| format!("connection {connection_id} not found"))?;
 
-        let raw = self.open_session(&saved).await?;
+        let raw = self.open_session_for(&saved, principal.clone()).await?;
         Ok(self.guarded(&saved, principal, raw))
     }
 }
@@ -359,7 +359,16 @@ impl DaemonProvider {
         self
     }
 
+    #[cfg(test)]
     async fn open_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
+        self.open_session_for(saved, Principal::human_gui()).await
+    }
+
+    async fn open_session_for(
+        &self,
+        saved: &SavedConnection,
+        principal: Principal,
+    ) -> Result<Arc<dyn Connection>, String> {
         let session_lock = self.session_lock(saved.id)?;
         let _open = session_lock.lock_owned().await;
         let material = match tablepro_transport::session_material_digest(saved).await {
@@ -379,7 +388,7 @@ impl DaemonProvider {
             self.remove_session(saved.id, &key, &connection)?;
         }
 
-        let connection = self.connect_session(saved).await?;
+        let connection = self.connect_session(saved, principal).await?;
         let material = match tablepro_transport::session_material_digest(saved).await {
             Ok(material) => material,
             Err(error) => {
@@ -395,7 +404,11 @@ impl DaemonProvider {
         Ok(connection)
     }
 
-    async fn connect_session(&self, saved: &SavedConnection) -> Result<Arc<dyn Connection>, String> {
+    async fn connect_session(
+        &self,
+        saved: &SavedConnection,
+        principal: Principal,
+    ) -> Result<Arc<dyn Connection>, String> {
         let driver = self
             .registry
             .get(&saved.driver_id)
@@ -407,7 +420,19 @@ impl DaemonProvider {
             .await
             .map_err(|e| e.to_string())?;
         opts.application_name = Some("BookiE agent".into());
-        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, &self.ssh)
+        let ssh_environment = self
+            .ssh
+            .clone()
+            .with_audit(tablepro_transport::TransportAuditContext::new(
+                self.audit.clone(),
+                self.audit_state.clone(),
+                principal,
+                saved.id,
+                saved.name.clone(),
+                saved.environment,
+                saved.driver_id.clone(),
+            ));
+        let (raw, tunnel) = tablepro_transport::establish(driver.as_ref(), opts, ssh, &ssh_environment)
             .await
             .map_err(|e| e.to_string())?;
         Ok(Arc::new(SessionConnection {

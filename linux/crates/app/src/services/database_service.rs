@@ -243,6 +243,27 @@ impl DatabaseService {
         self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
+    pub fn ssh_environment_for_connection(
+        &self,
+        saved: &tablepro_storage::SavedConnection,
+        principal: tablepro_policy::Principal,
+    ) -> SshEnvironment {
+        self.ssh_environment()
+            .with_audit(tablepro_transport::TransportAuditContext::new(
+                self.audit.clone(),
+                self.audit_state.clone(),
+                principal,
+                saved.id,
+                saved.name.clone(),
+                saved.environment,
+                saved.driver_id.clone(),
+            ))
+    }
+
+    pub fn transport_audit_factory(&self) -> tablepro_transport::TransportAuditFactory {
+        tablepro_transport::TransportAuditFactory::new(self.audit.clone(), self.audit_state.clone())
+    }
+
     pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
         self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
     }

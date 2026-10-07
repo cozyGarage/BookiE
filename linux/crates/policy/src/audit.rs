@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tablepro_core::Environment;
 use thiserror::Error;
 use uuid::Uuid;
@@ -115,6 +116,34 @@ pub enum AuditErrorCategory {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditTransportClient {
+    BuiltinSsh,
+    SystemOpenSsh,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditTransportOutcome {
+    Connected,
+    HostKeyRefused,
+    HostKeyChanged,
+    HostKeyRevoked,
+    AuthenticationFailed,
+    Cancelled,
+    TimedOut,
+    TlsFailed,
+    ConnectionFailed,
+    OtherFailure,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditTransportMetadata {
+    pub client: AuditTransportClient,
+    pub outcome: AuditTransportOutcome,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEvent {
     pub timestamp: DateTime<Utc>,
@@ -139,6 +168,67 @@ pub struct AuditEvent {
     pub error: Option<String>,
     pub rows_affected: Option<u64>,
     pub duration_ms: Option<u64>,
+    /// Present only for a terminal SSH connection-attempt record. Missing on
+    /// older journals; ignored by older readers, so the journal wire format
+    /// remains forward compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transport_attempt: Option<AuditTransportMetadata>,
+}
+
+impl AuditEvent {
+    #[allow(clippy::too_many_arguments)]
+    pub fn transport_attempt(
+        operation_id: Uuid,
+        principal: Principal,
+        connection_id: Uuid,
+        connection_name: String,
+        environment: Environment,
+        driver_id: String,
+        client: AuditTransportClient,
+        outcome: AuditTransportOutcome,
+        terminal_status: AuditTerminalStatus,
+        error_category: Option<AuditErrorCategory>,
+        duration_ms: u64,
+    ) -> Self {
+        Self {
+            timestamp: chrono::Utc::now(),
+            operation_id,
+            batch_id: None,
+            phase: AuditRecordPhase::Outcome,
+            principal: principal.sanitized(),
+            connection_id,
+            connection_name,
+            environment,
+            driver_id,
+            operation_class: AuditOperationClass::Administrative,
+            redacted_sql: "[NOT_APPLICABLE]".into(),
+            sql_hash: hex::encode(Sha256::digest(b"transport_attempt")),
+            targets: Vec::new(),
+            decision_rule: "transport_attempt".into(),
+            approval_outcome: AuditApprovalOutcome::NotRequired,
+            preview_state: AuditPreviewState::NotRequested,
+            terminal_status,
+            transaction_outcome: AuditTransactionOutcome::NotApplicable,
+            error_category,
+            error: error_category.map(sanitized_transport_error),
+            rows_affected: None,
+            duration_ms: Some(duration_ms),
+            transport_attempt: Some(AuditTransportMetadata { client, outcome }),
+        }
+    }
+}
+
+fn sanitized_transport_error(category: AuditErrorCategory) -> String {
+    match category {
+        AuditErrorCategory::Authentication => "ssh_host_key_or_authentication_refused",
+        AuditErrorCategory::Cancelled => "connection_attempt_cancelled",
+        AuditErrorCategory::Timeout => "connection_attempt_timed_out",
+        AuditErrorCategory::Tls => "tls_verification_failed",
+        AuditErrorCategory::Connection => "transport_connection_failed",
+        AuditErrorCategory::Unsupported => "transport_unsupported",
+        _ => "transport_attempt_failed",
+    }
+    .into()
 }
 
 #[async_trait]
@@ -182,6 +272,11 @@ impl AuditState {
 
     pub(crate) fn disable_globally(&self) {
         self.globally_disabled.store(true, Ordering::Release);
+    }
+
+    /// Fail closed after an audit record cannot be persisted outside a guarded operation.
+    pub fn disable_after_audit_failure(&self) {
+        self.disable_globally();
     }
 
     /// Share journal-wide failure state with a clean connection generation.
@@ -242,5 +337,50 @@ mod tests {
         journal.disable_globally();
         assert!(connection_b.governed_writes_disabled());
         assert!(replacement_a.governed_writes_disabled());
+    }
+
+    #[test]
+    fn transport_records_are_terminal_and_older_records_without_transport_metadata_load() {
+        let event = AuditEvent::transport_attempt(
+            Uuid::new_v4(),
+            Principal::human_gui(),
+            Uuid::new_v4(),
+            "local db".into(),
+            Environment::Local,
+            "postgres".into(),
+            AuditTransportClient::BuiltinSsh,
+            AuditTransportOutcome::Connected,
+            AuditTerminalStatus::Succeeded,
+            None,
+            4,
+        );
+        assert_eq!(event.phase, AuditRecordPhase::Outcome);
+        assert_eq!(
+            event.transport_attempt.unwrap().client,
+            AuditTransportClient::BuiltinSsh
+        );
+        let mut old_record = serde_json::to_value(event).expect("serialize event");
+        old_record
+            .as_object_mut()
+            .expect("event object")
+            .remove("transport_attempt");
+        let decoded: AuditEvent = serde_json::from_value(old_record).expect("load old journal record");
+        assert!(decoded.transport_attempt.is_none());
+    }
+
+    #[test]
+    fn sanitized_agent_principal_does_not_retain_its_token() {
+        let secret = "agent-token-do-not-log";
+        let principal = Principal::Agent {
+            token: secret.into(),
+            client: None,
+            model: None,
+        }
+        .sanitized();
+        assert!(
+            !serde_json::to_string(&principal)
+                .expect("serialize principal")
+                .contains(secret)
+        );
     }
 }

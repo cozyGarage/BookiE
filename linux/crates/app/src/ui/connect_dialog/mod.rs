@@ -50,6 +50,7 @@ pub struct ConnectDialog {
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
+    audit_factory: tablepro_transport::TransportAuditFactory,
     applied_driver: Option<u32>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
 }
@@ -95,6 +96,7 @@ pub struct ConnectDialogInit {
     pub bound_connection_id: Option<Uuid>,
     pub prefill: Option<ConnectionPrefill>,
     pub ssh_environment: tablepro_transport::SshEnvironment,
+    pub audit_factory: tablepro_transport::TransportAuditFactory,
 }
 
 #[derive(Debug)]
@@ -381,6 +383,7 @@ impl Component for ConnectDialog {
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
+            audit_factory: init.audit_factory,
             applied_driver: None,
             connect_cancel: None,
         };
@@ -482,6 +485,7 @@ impl Component for ConnectDialog {
                 let timeout_secs = query_timeout_secs
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
+                let audit_factory = self.audit_factory.clone();
 
                 let bound_id = self.bound_connection_id;
                 let cancel = tokio_util::sync::CancellationToken::new();
@@ -497,6 +501,7 @@ impl Component for ConnectDialog {
                                 opts,
                                 ssh: ssh_inputs,
                                 ssh_environment,
+                                audit_factory,
                                 read_only,
                                 environment,
                                 timeout_secs,
@@ -532,8 +537,8 @@ impl Component for ConnectDialog {
                 };
                 let opts = self.collect_options(driver.as_ref());
                 let ssh_inputs = if self.ssh.is_enabled() {
-                    match self.ssh.collect().and_then(|inputs| inputs.route()) {
-                        Ok(route) => Some(route),
+                    match self.ssh.collect() {
+                        Ok(inputs) => Some(inputs),
                         Err(e) => {
                             self.set_busy(BusyKind::None);
                             self.show_toast(&e);
@@ -548,23 +553,55 @@ impl Component for ConnectDialog {
                 let timeout_secs = query_timeout_secs
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
+                let audit_factory = self.audit_factory.clone();
+                let name = saved_connection_name(self.name.text().as_str(), &entry.id, &opts);
+                let bound_id = self.bound_connection_id;
+                let environment = self.selected_environment();
+                let cancellation = tokio_util::sync::CancellationToken::new();
+                self.connect_cancel = Some(cancellation.clone());
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
                             let control = crate::services::operation_control::bounded(timeout_secs);
-                            let result = match connection_service::establish(
-                                driver.as_ref(),
-                                opts,
-                                ssh_inputs,
-                                &ssh_environment,
-                            )
-                            .await
-                            {
-                                Ok((conn, _tunnel)) => match conn.list_tables_controlled(&control).await {
-                                    Ok(tables) => Ok(tables.len()),
-                                    Err(e) => Err(format!("list_tables: {e}")),
-                                },
-                                Err(e) => Err(e),
+                            let ssh = ssh_inputs.as_ref().map(SshInputs::route).transpose();
+                            let result = match ssh {
+                                Err(error) => Err(error),
+                                Ok(ssh) => {
+                                    let identity = ConnectionIdentity {
+                                        bound_id,
+                                        driver_id: &entry.id,
+                                        opts: &opts,
+                                        file_based: driver.is_file_based(),
+                                        ssh: ssh_inputs.as_ref(),
+                                    };
+                                    let existing = find_existing(&identity).await;
+                                    let id = existing
+                                        .as_ref()
+                                        .map_or_else(|| bound_id.unwrap_or_else(Uuid::new_v4), |saved| saved.id);
+                                    let audit = audit_factory.context(
+                                        tablepro_policy::Principal::human_gui(),
+                                        id,
+                                        name,
+                                        environment,
+                                        entry.id.clone(),
+                                    );
+                                    let ssh_environment = ssh_environment.with_audit(audit);
+                                    match tablepro_transport::establish_with_cancellation(
+                                        driver.as_ref(),
+                                        opts,
+                                        ssh,
+                                        &ssh_environment,
+                                        cancellation,
+                                    )
+                                    .await
+                                    {
+                                        Ok((conn, _tunnel)) => match conn.list_tables_controlled(&control).await {
+                                            Ok(tables) => Ok(tables.len()),
+                                            Err(e) => Err(format!("list_tables: {e}")),
+                                        },
+                                        Err(e) => Err(e.to_string()),
+                                    }
+                                }
                             };
                             out.send(ConnectDialogCmd::TestResult(result)).ok();
                         })
@@ -573,6 +610,9 @@ impl Component for ConnectDialog {
             }
 
             ConnectDialogInput::Closed => {
+                if let Some(cancel) = self.connect_cancel.take() {
+                    cancel.cancel();
+                }
                 let _ = sender.output(ConnectDialogOutput::Closed);
             }
         }
@@ -851,6 +891,7 @@ struct ConnectRequest {
     opts: ConnectOptions,
     ssh: Option<SshInputs>,
     ssh_environment: tablepro_transport::SshEnvironment,
+    audit_factory: tablepro_transport::TransportAuditFactory,
     read_only: bool,
     environment: Environment,
     timeout_secs: u32,
@@ -872,8 +913,12 @@ async fn open_candidate(
     ssh: Option<tablepro_transport::SshRoute>,
     ssh_environment: &tablepro_transport::SshEnvironment,
     timeout_secs: u32,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<OpenedCandidate, String> {
-    let (conn, tunnel) = connection_service::establish(driver, opts, ssh, ssh_environment).await?;
+    let (conn, tunnel) =
+        tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
+            .await
+            .map_err(|error| error.to_string())?;
     let server_version = conn.server_version().await.ok().flatten();
     let control = crate::services::operation_control::bounded(timeout_secs);
     let tables = conn
@@ -902,6 +947,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         opts,
         ssh,
         ssh_environment,
+        audit_factory,
         read_only,
         environment,
         timeout_secs,
@@ -911,24 +957,6 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
-
-    let opening = open_candidate(
-        driver.as_ref(),
-        opts.clone(),
-        ssh_for_establish.clone(),
-        &ssh_environment,
-        timeout_secs,
-    );
-    let Some(opened) = connection_service::until_cancelled(&cancel, opening).await else {
-        return Ok(None);
-    };
-    let OpenedCandidate {
-        conn,
-        tunnel,
-        server_version,
-        tables,
-        views,
-    } = opened?;
 
     let identity = ConnectionIdentity {
         bound_id,
@@ -943,6 +971,34 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         .map(|connection| connection.id)
         .or(bound_id)
         .unwrap_or_else(Uuid::new_v4);
+    let ssh_environment = ssh_environment.with_audit(audit_factory.context(
+        tablepro_policy::Principal::human_gui(),
+        id,
+        label.clone(),
+        environment,
+        driver_id.clone(),
+    ));
+
+    let opening = open_candidate(
+        driver.as_ref(),
+        opts.clone(),
+        ssh_for_establish.clone(),
+        &ssh_environment,
+        timeout_secs,
+        cancel.clone(),
+    );
+    let opened = match opening.await {
+        Ok(opened) => opened,
+        Err(_) if cancel.is_cancelled() => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let OpenedCandidate {
+        conn,
+        tunnel,
+        server_version,
+        tables,
+        views,
+    } = opened;
 
     let tls_mode = opts_clone.tls.mode;
     let saved = SavedConnection {

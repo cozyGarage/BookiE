@@ -107,6 +107,7 @@ pub async fn open_saved(
     saved: SavedConnection,
     timeout_secs: u32,
     ssh_environment: SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<PreparedConnection, String> {
     let driver = registry
         .get(&saved.driver_id)
@@ -119,7 +120,15 @@ pub async fn open_saved(
     let mut opts = tablepro_transport::connect_options_for(&saved).await.map_err(message)?;
     opts.application_name = Some("BookiE".into());
 
-    let (conn, tunnel) = establish(&*driver, opts.clone(), ssh_hops.clone(), &ssh_environment).await?;
+    let (conn, tunnel) = tablepro_transport::establish_with_cancellation(
+        &*driver,
+        opts.clone(),
+        ssh_hops.clone(),
+        &ssh_environment,
+        cancellation,
+    )
+    .await
+    .map_err(message)?;
     let server_version = conn.server_version().await.ok().flatten();
     let control = crate::services::operation_control::bounded(timeout_secs);
     let tables = conn
@@ -156,45 +165,24 @@ pub async fn open_saved(
     ))
 }
 
-pub async fn until_cancelled<T>(
-    token: &tokio_util::sync::CancellationToken,
-    work: impl std::future::Future<Output = T>,
-) -> Option<T> {
-    tokio::select! {
-        biased;
-        () = token.cancelled() => None,
-        value = work => Some(value),
-    }
-}
-
 pub struct EstablishFailure {
     pub message: String,
     pub permanent: bool,
 }
 
-pub async fn establish_classified(
+pub async fn establish_classified_with_cancellation(
     driver: &dyn tablepro_core::DatabaseDriver,
     opts: ConnectOptions,
     ssh: Option<SshRoute>,
     environment: &SshEnvironment,
+    cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), EstablishFailure> {
-    tablepro_transport::establish(driver, opts, ssh, environment)
+    tablepro_transport::establish_with_cancellation(driver, opts, ssh, environment, cancellation)
         .await
         .map_err(|error| EstablishFailure {
             permanent: is_permanent_failure(&error),
             message: message(error),
         })
-}
-
-pub async fn establish(
-    driver: &dyn tablepro_core::DatabaseDriver,
-    opts: ConnectOptions,
-    ssh: Option<SshRoute>,
-    environment: &SshEnvironment,
-) -> Result<(Box<dyn Connection>, Option<Tunnel>), String> {
-    establish_classified(driver, opts, ssh, environment)
-        .await
-        .map_err(|failure| failure.message)
 }
 
 pub fn is_permanent_failure(error: &TransportError) -> bool {
@@ -216,7 +204,14 @@ pub fn is_permanent_failure(error: &TransportError) -> bool {
         | TransportError::LocalSocketWithTls
         | TransportError::InvalidLocalSocket(_)
         | TransportError::SystemSshUnavailableInSandbox => true,
-        TransportError::Ssh(_) | TransportError::DatabaseTimeout { .. } => false,
+        TransportError::HostKeyRefused(_) | TransportError::HostKeyChanged(_) | TransportError::HostKeyRevoked(_) => {
+            true
+        }
+        TransportError::AuditWriteFailed(_) => true,
+        TransportError::Ssh(_)
+        | TransportError::SshTimeout(_)
+        | TransportError::Cancelled
+        | TransportError::DatabaseTimeout { .. } => false,
     }
 }
 
@@ -229,32 +224,6 @@ fn message(error: TransportError) -> String {
                 .replace("{driver}", &driver_name)
         }
         other => other.to_string(),
-    }
-}
-
-#[cfg(test)]
-mod cancellation_tests {
-    use super::*;
-    use tokio_util::sync::CancellationToken;
-
-    #[tokio::test]
-    async fn a_cancelled_token_abandons_work_that_never_finishes() {
-        let token = CancellationToken::new();
-        token.cancel();
-        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
-    }
-
-    #[tokio::test]
-    async fn finished_work_is_returned_when_nothing_cancels() {
-        assert_eq!(until_cancelled(&CancellationToken::new(), async { 7 }).await, Some(7));
-    }
-
-    #[tokio::test]
-    async fn cancelling_during_the_work_drops_it() {
-        let token = CancellationToken::new();
-        let canceller = token.clone();
-        tokio::spawn(async move { canceller.cancel() });
-        assert_eq!(until_cancelled(&token, std::future::pending::<u8>()).await, None);
     }
 }
 
@@ -274,6 +243,10 @@ mod failure_tests {
             TransportError::Keyring(KeyringFailure::Locked),
             TransportError::IntegratedAuthUnsupported("sqlite".into()),
             TransportError::LocalSocketWithSsh,
+            TransportError::HostKeyRefused("unknown".into()),
+            TransportError::HostKeyChanged("changed".into()),
+            TransportError::HostKeyRevoked("revoked".into()),
+            TransportError::AuditWriteFailed("journal unavailable".into()),
         ] {
             assert!(is_permanent_failure(&error), "{error} should stop a reconnect");
         }
@@ -286,6 +259,8 @@ mod failure_tests {
             TransportError::Driver(DriverError::Disconnected),
             TransportError::Driver(DriverError::TimedOut),
             TransportError::Ssh("connection reset".into()),
+            TransportError::SshTimeout("connection timeout".into()),
+            TransportError::Cancelled,
             TransportError::DatabaseTimeout { seconds: 30 },
         ] {
             assert!(!is_permanent_failure(&error), "{error} should keep retrying");

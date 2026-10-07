@@ -65,6 +65,7 @@ impl App {
                 bound_connection_id: prefill.as_ref().map(|prefill| prefill.saved.id),
                 prefill,
                 ssh_environment: self.database.ssh_environment(),
+                audit_factory: self.database.transport_audit_factory(),
             })
             .forward(sender.input_sender(), |out| match out {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
@@ -366,17 +367,20 @@ impl App {
         let registry = self.registry.clone();
         let timeout_secs =
             crate::services::operation_control::timeout_for(&self.preferences, &self.database, self.connection_id);
-        let ssh_environment = self.database.ssh_environment();
+        let ssh_environment = self
+            .database
+            .ssh_environment_for_connection(&saved, tablepro_policy::Principal::human_gui());
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let attempted = saved.clone();
-                    let work = connection_service::open_saved(registry, saved, timeout_secs, ssh_environment);
-                    match connection_service::until_cancelled(&cancel, work).await {
-                        Some(Ok(prepared)) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
-                        Some(Err(e)) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
-                        None => sender_clone.input(AppMsg::ConnectionCancelled),
+                    match connection_service::open_saved(registry, saved, timeout_secs, ssh_environment, cancel.clone())
+                        .await
+                    {
+                        Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
+                        Err(_) if cancel.is_cancelled() => sender_clone.input(AppMsg::ConnectionCancelled),
+                        Err(e) => sender_clone.input(AppMsg::ConnectionPrepareFailed(e, Box::new(attempted))),
                     }
                 })
                 .drop_on_shutdown()
