@@ -1,6 +1,6 @@
 # 0011: Page large editor results through a cursor
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-10-07
 
 ## Context
