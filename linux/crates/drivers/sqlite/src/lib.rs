@@ -449,17 +449,7 @@ impl tablepro_core::Transaction for SqliteTransaction {
             .tx
             .as_mut()
             .ok_or_else(|| DriverError::Internal("transaction closed".into()))?;
-        let statement = tx
-            .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
-            .await
-            .map_err(map_sqlx_error)?;
-        let columns = result_columns(tx, statement.columns(), sql).await;
-        drop(statement);
-        let rows = sqlx::query(sqlx::AssertSqlSafe(sql))
-            .fetch_all(&mut **tx)
-            .await
-            .map_err(map_sqlx_error)?;
-        Ok(rows_into_result(columns, &rows, false))
+        stream_into_result(tx, sql, MAX_QUERY_ROWS).await
     }
 
     async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
@@ -662,18 +652,6 @@ fn table_factor_has_compound_output(table: &TableFactor) -> bool {
     match table {
         TableFactor::Derived { subquery, .. } => query_has_compound_output(subquery),
         _ => false,
-    }
-}
-
-fn rows_into_result(columns: Vec<ColumnInfo>, collected: &[SqliteRow], truncated: bool) -> QueryResult {
-    let rows: Vec<Vec<Value>> = collected
-        .iter()
-        .map(|r| (0..columns.len()).map(|i| extract_value(r, i)).collect())
-        .collect();
-    QueryResult {
-        columns,
-        rows,
-        truncated,
     }
 }
 
