@@ -14,7 +14,11 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
         ("int4[]", "NULL::int4[]"),
         ("int4[]", "ARRAY[]::int4[]"),
         ("int4[]", "'{{{{{{1,NULL}}}}}}'::int4[]"),
-        ("name[]", "ARRAY['alpha','',NULL]::name[]"),
+        (
+            "name[]",
+            "ARRAY['alpha'::name, ''::name, NULL::name, 'NULL'::name, 'a,b'::name, \
+             'a\"b'::name, E'slash\\\\path'::name, '東京'::name, (repeat('x',61) || 'é')::name]",
+        ),
         ("oid[]", "ARRAY[0,4294967295,NULL]::oid[]"),
         ("int4[]", "ARRAY[1,NULL,-2147483648,2147483647]"),
         ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),

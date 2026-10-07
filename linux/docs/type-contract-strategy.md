@@ -32,6 +32,12 @@ preservation and SQLSTATE `22P02` refusal for malformed bits
 ([result evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json),
 [grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
 
+The built-in name[] array contract now covers empty text, SQL NULL, the
+literal NULL, commas, quotes, backslashes, Unicode and a 63-byte UTF-8 name.
+Pooled decoding and session typed rebinding preserve the array's exact server
+wire bytes (value_contract_arrays_preserve_elements_dimensions_and_exports in
+crates/drivers/postgres/tests/support/array_contract.rs).
+
 The built-in PostgreSQL `pg_lsn[]` now preserves full-width LSNs and SQL NULL
 through binary result decoding, inferred typed binding, the keyed-update builder
 and typed CSV import. Tests compare native type, text, JSON and `array_send`

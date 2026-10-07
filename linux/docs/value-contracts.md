@@ -25,6 +25,11 @@ and wire-byte checks plus sibling preservation
 ([rebind evidence](evidence/postgres-timestamp-array-datestyle-results-2026-10-05/manifest.json),
 [file-consumer evidence](evidence/postgres-timestamp-array-file-consumers-dmy-results-2026-10-05/manifest.json)).
 
+PostgreSQL name[] result decoding and session rebinding now cover SQL NULL,
+empty and literal NULL, escaped labels, Unicode and the 63-byte UTF-8 name
+boundary, checked against native array_send bytes in
+value_contract_arrays_preserve_elements_dimensions_and_exports.
+
 The exact Rust Decimal positive/negative mantissa limit and 28-place scale now
 have parser, parameter, PostgreSQL typed-binding and SQL-literal checks. Values
 just outside the crate's range are rejected by explicit Decimal and grid input;
