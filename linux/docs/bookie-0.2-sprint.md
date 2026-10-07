@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `3a3d742fe` on `linux` (PR #185).
+Current integrated source baseline: `38f67484d` on `linux` (PR #193).
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
 and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
 and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
@@ -50,7 +50,14 @@ and GTK connection-list rebuild after the prior audit run exposed a GTK critical
 The export, plaintext import and encrypted retry/credential round-trip selectors
 pass locally on `3a3d742fe` with GTK criticals configured as fatal. PR #185's
 hosted checks were still in progress at this checkpoint. Installed and
-frozen-candidate evidence remains distinct from these local runs.
+frozen-candidate evidence remains distinct from these local runs. Since #185,
+#186 adds MySQL/MariaDB unsigned-subtraction mode contracts; #187 records the
+B4 bundle rerun; #188 adds PostgreSQL server-side cancellation at the query cap;
+#189 covers MariaDB non-UTC TIMESTAMP refusal; #190 and #191 reconcile the
+known-issues ledger and ignored-test inventory; #192 records the native Wayland
+guest setup and remaining blockers; and #193 adds PostgreSQL byte-cap
+cancellation, transaction abort/rollback and connection-reuse coverage. These
+merges advance specific contracts but do not close B3 or qualify the release.
 Case details and evidence belong in the [B3
 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
 index](value-contracts.md), test sources and relevant PR comments. B3 remains
