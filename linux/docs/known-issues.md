@@ -44,7 +44,7 @@ table in the same commit.
 | ID | Issue | Status | Evidence / next | Layer |
 | --- | --- | --- | --- | --- |
 | UI-1 | ~~Saved connections cannot be edited~~ | DONE | PR #87, `prefill.rs` tests | unit |
-| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | Keep the refusal until the editor has a chain editor and explicit secrets-per-hop design, including how credentials are selected and stored for each hop | gtk-widget |
+| UI-1b | SSH jump chains cannot be edited in the form; such connections are refused for editing | OPEN | [Per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md): use stable hop IDs and separate keyring references; current transport refuses password auth after hop 0 and reuses one key passphrase for every hop. Retain the refusal until storage, transport, bundles and GTK editing are implemented and tested together | gtk-widget |
 | UI-2 | ~~Failed connect has no Retry or Edit~~ | DONE | PR #87, `recovery_tests` | unit |
 | UI-3 | ~~Saved connection cannot be cancelled while connecting~~ | DONE | PR #87, `cancellation_tests` | unit |
 | UI-3b | ~~The connect dialog's own Connect button has no cancel~~ | DONE | `open_candidate` cancelled before anything is saved; scenario `connect_dialog_cancel_stops_a_hanging_connection` | gtk-installed |
