@@ -33,24 +33,20 @@ unavailable evidence. The broad release audit is dated
 | --- | --- | --- | --- |
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
-| I5 | PR #165, merge commit `b33a0f903` | GTK trust prompt handles `alert` and `frame`; tunnel-loss fixture trusts both hops; full local GTK safety layer passes, including post-connect audit-journal-loss write denial. See the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) | PR-head security-policy, workflow-lint, harness, resolve-ref and Sonar passed; preflight, supply-chain and Flatpak were running at merge. On the merge commit, CI contracts and security passed; Build Linux and Flatpak were in progress at 09:13 UTC on 2026-10-07 ([CI contracts](https://github.com/cozyGarage/BookiE/actions/runs/37598295671), [Build Linux](https://github.com/cozyGarage/BookiE/actions/runs/37598295665), [Flatpak](https://github.com/cozyGarage/BookiE/actions/runs/37598295682), [Security](https://github.com/cozyGarage/BookiE/actions/runs/37598295748)). Frozen-candidate and installed acceptance remain |
 
-PRs #153–#162 and #164–#166 have merged into `fork/linux`; PR #163 remains open
-with conflicts against current `linux`. Its distinct post-connect journal-loss
-regression is covered by merged PR #165; the passing local GTK safety run does
-not require `xdotool`.
-Current baseline is `b33a0f903`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
-PostgreSQL release check lacked GTK development libraries; PR #161 added them.
-PR #162 merged the first local GTK safety setup fix. Follow-up hosted runs
-exposed Debian GTK role and two-hop test assumptions; merged PR #165 fixes
-those and records local rerun evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
-PR #162's first hosted run passed preflight, security, TLS, DuckDB, supply
-chain, Sonar, harness, workflow lint, and Flatpak builds. Fast checks hit a
-Debian mirror-sync package-size mismatch; PostgreSQL release exposed a GTK
-AT-SPI role mismatch and missing second-hop trust handling in PostgreSQL GTK
-tests. Both are fixed locally; all five default PostgreSQL GTK scenarios and
-the tunnel-loss/reconnect scenario pass. Fresh hosted validation and installed
-acceptance remain open; see the [candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+PRs #153–#167 have merged into `linux`; the current baseline is `548bec84e`.
+PR #159 adds SSH audit, rollback, and Kerberos slices. PRs #161 and #162 fix
+PostgreSQL release GTK dependencies and safety fixture setup. PR #165 hardens
+GTK SSH trust-prompt role detection and two-hop tunnel-loss setup; its local UI
+and PostgreSQL release layers passed, while fresh hosted validation remained
+pending at that checkpoint. The PostgreSQL release fixture subsequently
+failed because an SSH host-key prompt consumed the handshake timeout; PR #163
+is being updated to pause that timeout while awaiting the user's decision.
+The PR's audit-journal-loss case is already covered by #165, and its `xdotool`
+chooser change is not required by the passing local GTK run. Local evidence
+and correction history are in the [October 7
+candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+Fresh hosted validation and installed acceptance remain open.
 
 ## Remaining tasks
 
@@ -86,7 +82,7 @@ additional privacy, value and evidence tasks without duplicating this board.
 | F7 | The rollback action sends `ROLLBACK`, awaits its result, then closes the dedicated session; Session stays active and controls stay disabled until both steps finish. Unit coverage gates delayed rollback/close and close-after-rollback-error; isolated GTK dialog coverage checks Cancel, Roll Back and Commit semantics. The `widgets` layer passed 13 selectors, `postgres-release` passed, and the full app library suite passed (537 passed, 39 ignored). The focused PostgreSQL 17 GTK flow passed: Cancel kept the same transaction open, later writes remained uncommitted, and Roll Back closed the session with zero persisted rows. See [GTK session evidence](evidence/gtk-postgres-session-confirmation-2026-10-07/manifest.json) | Re-run on the frozen B3+B4 candidate; hosted CI and installed acceptance remain |
 | B4-16 | [Release-binary GTK evidence](evidence/ssh-reconnect-session-gtk-2026-10-07/manifest.json): Toxiproxy cuts the saved SSH route during an editor transaction; the transaction remains absent, a stale-session write is refused, and after recovery a new Session successfully runs `SELECT 42` | Distribution-package/native Wayland, frozen-candidate and hosted acceptance remain |
 | B4-21 | [SQL Server Kerberos evidence](evidence/mssql-kerberos-2026-10-07/manifest.json): the driver used a valid AD ticket over VerifyFull TLS, queried `SYSTEM_USER` as `DOMAIN1\bookiekerb`, and refused an unregistered SPN. The [hardened-container rerun](evidence/mssql-kerberos-hardening-2026-10-07/manifest.json) passes with a non-root client and pinned digest-only image references. Generated keytabs are removed by default | Real Windows AD interoperability and frozen-candidate/hosted acceptance remain separate |
-| B4-12 | [Native PostgreSQL evidence](evidence/postgres-rollback-failure-results-2026-10-07/manifest.json) plus [identity-sequence side-effect evidence](evidence/postgres-rollback-sequence-side-effect-2026-10-07/manifest.json): a monitor terminates PostgreSQL 16 during statement 1; the driver reports `TransactionRollbackFailed`, the parent and trigger rows are absent, and identity/trigger sequence allocations remain advanced. The [current `linux` rerun](evidence/postgres-rollback-linux-2026-10-07/manifest.json) passes with the module-qualified exact selector; older branch packets preserve their original source and command. [Current B4 worktree rerun](evidence/postgres-rollback-current-branch-2026-10-07/manifest.json) and [trigger-effects rerun](evidence/postgres-rollback-trigger-effects-2026-10-07/manifest.json) also passed | Frozen-candidate SHA, broader side-effect patterns and hosted acceptance remain |
+| B4-12 | [Native PostgreSQL evidence](evidence/postgres-rollback-failure-results-2026-10-07/manifest.json) plus [identity-sequence side-effect evidence](evidence/postgres-rollback-sequence-side-effect-2026-10-07/manifest.json): `a_batch_reports_rollback_failure_after_postgres_terminates_its_backend` runs on PostgreSQL 16 in Docker. A monitor terminates the backend during statement 1; the driver reports `TransactionRollbackFailed`, the parent and trigger rows are absent, and identity/trigger sequence allocations remain advanced. [Current `linux` rerun](evidence/postgres-rollback-linux-2026-10-07/manifest.json) passed on source `b33a0f903` with the module-qualified exact selector; [current B4 worktree rerun](evidence/postgres-rollback-current-branch-2026-10-07/manifest.json) and [trigger-effects rerun](evidence/postgres-rollback-trigger-effects-2026-10-07/manifest.json) also passed | Frozen-candidate SHA, broader side-effect patterns and hosted acceptance remain |
 | B4-18 | Candidate `SERVER VERSION`, `LIST TABLES`, and `LIST VIEWS` reads for saved connect and connect-dialog submit now use `CandidateGuardFactory`; Test Connection table listing uses the same guard. `candidate_catalog_reads_use_the_durable_policy_audit_journal` verifies intent/outcome entries; `candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written` verifies fail-closed behavior. Both passed in `cargo test -p tablepro-app --lib candidate_ -- --nocapture` | Local app tests only; frozen-candidate, hosted, and installed acceptance remain |
 | B4-19 | The vendored PostgreSQL SCRAM client rejects server nonces that fail to extend the client nonce or contain non-ASCII/non-printable bytes, before deriving a proof. A local wire fixture sends an echoed nonce, a non-ASCII suffix, and 100,001 iterations; all three cases reject before a client proof is sent. `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | Local driver tests only; frozen-candidate and hosted acceptance remain |
 

@@ -18,7 +18,7 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `fork/linux` at `b33a0f903` (PR #165) and the current
+Reconciled against BookiE `fork/linux` at `548bec84e` (PR #167) and the current
 [B4 board](b4-task-board.md), checked 2026-10-07. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
 first column says which area owns them.

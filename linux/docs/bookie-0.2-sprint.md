@@ -8,38 +8,32 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `b33a0f903` (PR #165) on `fork/linux`;
-PRs #158, #160, #162, #164, #165 and #166 merged after the earlier PR #161 checkpoint.
-Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
-grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
-for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
-headless audit-generation regressions. Earlier merges #138–#145 cover result
-budgets, PostgreSQL enum/array cases and the GTK AT-SPI row-action wait. Their
-case details and evidence are linked from the [B3 board](type-contract-strategy.md),
-[B4 board](b4-task-board.md), [value evidence index](value-contracts.md), and
-relevant test files. B3 remains open: the broader
-engine/type/consumer/configuration matrix, mutation triage and installed grid
-acceptance still need work. PR #153 reconciles the hosted preflight and harness
-findings from #150/#151, corrects the ignored-test inventory and duplicate B4
-ledger rows, and moves SSH host-key generation to container startup. PR #154
-added a PostgreSQL enum-array slice consumer case. Its hosted quick gate exposed
-the PostgreSQL contract source exceeding the file-size limit; the regression is
-now split into its own included file and the ignored-test inventory updated in
-PR #156, which also adds range-array refusal contracts. PR #157 adds B4 SSH
-audit, rollback-failure, and Kerberos slices; PR #159 reconciles hosted CI
-findings. PR #158 and #160 add PostgreSQL text-search and JSON array refusal
-contracts. PR #161 adds GTK build dependencies to the PostgreSQL release job.
-The installed GTK safety smoke still needs candidate-level and installed
-acceptance beyond the local setup correction recorded in the [B4 candidate
-acceptance checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
-PR #165 fixes GTK SSH trust prompt discovery across GTK roles, trusts each hop
-in the tunnel-loss/reconnect fixture, and adds a post-connect audit-journal-loss
-write-denial scenario. Its full GTK safety layer passed locally on PR head
-`551c6a9`; hosted CI was still running after merge. PR #163 remains open with
-conflicts; its distinct journal-loss case is covered by #165, while its
-`xdotool` dependency was unnecessary in the passing local run.
-The scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
-coverage remains open. These changes do not qualify the release.
+Current integrated source baseline: `548bec84e` on `linux` (PR #167).
+Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
+and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
+and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
+audit-generation regressions. Earlier merges #138–#145 cover result budgets,
+PostgreSQL enum/array cases and the GTK AT-SPI row-action wait. PR #153
+reconciles hosted preflight/harness findings and SSH fixture setup; #154 and
+#156 add PostgreSQL enum-array slice and range-array coverage. PR #157 adds B4
+SSH audit, rollback-failure and Kerberos cases; #159 reconciles its hosted CI
+findings. PRs #158 and #160 add text-search and JSON array refusal contracts;
+#164 covers all six built-in range arrays; #166 adds seven geometric array
+families. PRs #161 and #162 fix PostgreSQL release GTK dependencies and the
+safety fixture setup. PR #165 hardens GTK SSH trust role detection and the
+two-hop tunnel-loss setup. Its local GTK safety layer passed; hosted
+PostgreSQL release checks exposed that the built-in SSH handshake timeout
+includes time spent waiting for an unknown-host-key decision, producing a
+timeout instead of a durably audited refusal on slower runners. PR #163 is
+being updated with a timeout fix. Its audit-journal-loss scenario is already
+covered by #165, and the local GTK run navigates bundle choosers without
+`xdotool`. Case details and evidence belong in the [B3
+board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
+index](value-contracts.md), test sources and relevant PR comments. B3 remains
+open: the broader engine/type/consumer/configuration matrix, mutation triage and
+installed grid acceptance still need work. The scoped XLSX writer mutation run
+caught 41/41 mutants; broad core/package coverage remains open. These changes
+do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -72,8 +66,8 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines, including the recent PostgreSQL `name[]` and `oid[]` paths. The scoped core XLSX mutation run caught 41/41 generated mutants; wider core/package mutation coverage remains open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | C6/G5, SSH audit, rollback-failure, Kerberos and recent PostgreSQL refusal slices are merged through #166. PR #165 makes SSH trust-prompt role detection portable across GTK stacks, fixes two-hop trust handling in the tunnel-loss test, and adds a GTK regression for post-connect audit-journal loss. The local UI, PostgreSQL release and full GTK safety layers pass. At 09:13 UTC on 2026-10-07, CI contracts and security passed on merge commit `b33a0f903`; Build Linux and Flatpak were still running. | [Current B4 board](b4-task-board.md): local implementation is substantially complete; frozen B3+B4 candidate, remaining hosted/installed acceptance and specific rollback side-effect coverage remain open |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Recent PostgreSQL additions include text-search and JSON array refusals, six built-in range-array refusals, and seven geometric array refusals. The scoped core XLSX mutation run caught 41/41 generated mutants; wider core/package mutation coverage remains open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B4 transport/sessions | C6/G5, SSH audit, rollback-failure, Kerberos and GTK trust-flow contracts are merged through #166. PR #165 adds portable GTK trust-prompt detection, two-hop fixture trust and post-connect audit-journal-loss coverage. PR #163 is being updated to fix the built-in SSH timeout while an unknown host-key prompt awaits user input. | [Current B4 board](b4-task-board.md): frozen B3+B4 candidate, hosted/installed acceptance, I2/I5 audit and rollback side-effect acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |
