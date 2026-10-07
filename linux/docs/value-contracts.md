@@ -40,7 +40,9 @@ assignment refused with SQLSTATE `2200N` without changing either row
 Custom composite arrays have a focused unsupported-value contract: native
 PostgreSQL type, text, JSON and wire oracles confirm the value while SQL literal
 and parameter paths refuse it without changing either row. Other custom array
-families remain untested.
+families remain untested. The unlisted built-in `money[]` refusal covers
+populated and NULL elements, native text/JSON/wire snapshots, literal/bind
+refusal, and target/sibling preservation.
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 
