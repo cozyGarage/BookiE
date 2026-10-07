@@ -290,6 +290,7 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | PostgreSQL enum `array_agg` under shadowed `search_path` | [Target enum array type, JSON and wire identity with same-named shadow type](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json) |
 | PostgreSQL `float4[]` Calc re-import | [Adjacent float4, negative zero, minimum subnormal, special values and SQL NULL through XLSX/ODS/XLSX](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json) |
 | DuckDB nanosecond keyed edit | [Native `TIME_NS`/`TIMESTAMP_NS` values and sibling preservation](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json) |
+| DuckDB nanosecond expression | `epoch_ns()` preserves the exact pre-epoch nanoseconds; interval arithmetic returns the native `TIMESTAMP` rounded to microseconds; `TIME_NS` interval binding refuses ([test](../crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs)) |
 | XLSX/XML/other formats | [Workbook precision](archive/value-contract-history.md#xlsx-float-precision-and-excel-safe-cell-types-2026-10-02), [temporal workbook](archive/value-contract-history.md#xlsx-temporal-consumer-checkpoint-2026-09-27), [XML text](archive/value-contract-history.md#xml-text-consumer-checkpoint-2026-09-27) |
 | Mutation and infrastructure | [Scoped re-audit](archive/value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](archive/regression-audit-2026-09-29.md), [B3 review](archive/b3-review-2026-10-01.md) |
 | Local integration gate | [Six-driver, MCP, session, socket and SSH run (315 passed)](evidence/local-integration-tier-results-2026-10-04/manifest.json) |
@@ -532,6 +533,18 @@ overflow. Typed CSV re-import preserves every f64 result and native REAL class
 SQLite grouped `AVG()` over STRICT `ANY` returns REAL for non-NULL groups,
 including near-`i64::MAX` values, while all-NULL groups remain SQL NULL. Typed
 CSV re-import preserves computed values and runtime classes ([evidence](evidence/sqlite-avg-any-results-2026-10-04/manifest.json)).
+
+SQLite `json_group_array()` over STRICT `ANY` preserves numeric and text
+elements, formula-shaped text, Unicode, JSON null, and empty-group output (`[]`)
+as exact JSON text through typed CSV re-import. The native `typeof()` oracle
+checks the restored value remains TEXT; see
+[`sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+
+SQLite `json_group_object()` over STRICT `ANY` preserves ordered duplicate keys,
+omits NULL keys, retains NULL values as JSON `null`, and returns `{}` for an
+empty group. Exact JSON text and restored TEXT storage are checked through typed
+CSV; see
+[`sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
 
 SQLite arithmetic expressions over STRICT `ANY` verify numeric coercion,
 integer division, overflow promotion to REAL, divide-by-zero NULL and typed CSV

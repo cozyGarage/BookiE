@@ -38,8 +38,10 @@
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
+- SQLite JSON aggregates over STRICT `ANY` preserve `json_group_array()` null/empty semantics and `json_group_object()` duplicate-key, NULL-key omission, and NULL-value semantics through typed CSV; JSON export retains exact result strings, and XLSX keeps object aggregates in text cells.
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
+- DuckDB `TIMESTAMP_NS` expression tests verify exact pre-epoch nanoseconds with `epoch_ns()` and the native `TIMESTAMP` result and microsecond rounding after interval arithmetic on an exact text-bound input.
 - Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
 - The editor find bar has Match case and Regular expression toggles.
 - A Switch database button in the window header lists the databases the account can open on PostgreSQL, MySQL, SQL Server, ClickHouse and MongoDB, reconnects to the one you pick and remembers it for that saved connection.
@@ -47,6 +49,7 @@
 
 ### Changed
 
+- MongoDB B3 coverage pins a BSON String-to-Decimal128 change between `run_find` metadata census and page retrieval; the returned column is `mixed` and preserves canonical Extended JSON.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
 - The app builds and runs its tests on Ubuntu 24.04 and Debian 13 (GTK 4.14, libadwaita 1.5 or newer); the shortcuts window uses the standard GTK layout.
 - Large results use about 45% less memory in the grid because rows are built only when they scroll into view.

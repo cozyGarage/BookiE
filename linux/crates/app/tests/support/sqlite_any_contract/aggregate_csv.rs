@@ -63,7 +63,6 @@ async fn sqlite_group_concat_any_csv_round_trip_preserves_text_and_null() {
             ],
         ]
     );
-
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
@@ -152,7 +151,6 @@ async fn sqlite_printf_any_csv_round_trip_preserves_text_and_null_semantics() {
             vec![Value::Int(7), Value::Text(String::new()), Value::Text("text".into())],
         ]
     );
-
     sqlite_result_csv_round_trip(
         connection.as_ref(),
         &result,
@@ -565,6 +563,239 @@ async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes(
                 row[5].clone(),
                 row[6].clone(),
             ])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE groups (id INTEGER PRIMARY KEY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO groups VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, position INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 1, 42), (1, 2, 1.5), (1, 3, '42'), (1, 4, 'NULL'), \
+             (1, 5, NULL), (1, 6, ''), (1, 7, '=1+1'), (1, 8, '<tag>&amp;'), \
+             (1, 9, '東京'), (2, 1, NULL), (2, 2, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT groups.id AS position, \
+                    json_group_array(flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL) AS result, \
+                    typeof(json_group_array(flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL)) AS storage_class \
+             FROM groups LEFT JOIN flexible ON flexible.group_id = groups.id \
+             GROUP BY groups.id ORDER BY groups.id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text(r#"[42,1.5,"42","NULL",null,"","=1+1","<tag>&amp;","東京"]"#.into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("[null,null]".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("[]".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+        &result.columns,
+        &result.rows,
+    ))
+    .unwrap();
+    assert_eq!(json[0]["result"], r#"[42,1.5,"42","NULL",null,"","=1+1","<tag>&amp;","東京"]"#);
+    assert_eq!(json[1]["result"], "[null,null]");
+    assert_eq!(json[2]["result"], "[]");
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone(), Value::Text("text".into())])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
+async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE groups (id INTEGER PRIMARY KEY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO groups VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE flexible (group_id INTEGER, position INTEGER, key ANY, value ANY) STRICT",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 1, 'a', 42), (1, 2, 'a', NULL), (1, 3, NULL, 2), \
+             (1, 4, '', '=1+1'), (1, 5, '東京', 'NULL'), (1, 6, 'sqlnull', NULL), \
+             (2, 1, 'nil', NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT groups.id AS position, \
+                    json_group_object(flexible.key, flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL) AS result, \
+                    typeof(json_group_object(flexible.key, flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL)) AS storage_class \
+             FROM groups LEFT JOIN flexible ON flexible.group_id = groups.id \
+             GROUP BY groups.id ORDER BY groups.id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text(r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#.into()),
+                Value::Text("text".into()),
+            ],
+            vec![Value::Int(2), Value::Text(r#"{"nil":null}"#.into()), Value::Text("text".into())],
+            vec![Value::Int(3), Value::Text("{}".into()), Value::Text("text".into())],
+        ]
+    );
+    let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
+        &result.columns,
+        &result.rows,
+    ))
+    .unwrap();
+    assert_eq!(json[0]["result"], r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#);
+    assert_eq!(json[1]["result"], r#"{"nil":null}"#);
+    assert_eq!(json[2]["result"], "{}");
+
+    let directory = tempfile::tempdir().unwrap();
+    let workbook_path = directory.path().join("sqlite-json-object-any.xlsx");
+    tablepro_core::export::write_result_file(
+        &workbook_path,
+        &result,
+        &tablepro_core::export::ResultExport {
+            format: tablepro_core::export::ResultFormat::Xlsx,
+            csv: &tablepro_core::export::CsvOptions::default(),
+            sql: None,
+        },
+        || false,
+        |_| {},
+    )
+    .unwrap();
+    let mut archive = zip::ZipArchive::new(std::fs::File::open(workbook_path).unwrap()).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(), &mut sheet)
+        .unwrap();
+    let mut shared_strings = String::new();
+    std::io::Read::read_to_string(&mut archive.by_name("xl/sharedStrings.xml").unwrap(), &mut shared_strings)
+        .unwrap();
+    for row in 2..=4 {
+        assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
+    }
+    assert!(shared_strings.contains(r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#));
+    assert!(shared_strings.contains(r#"{"nil":null}"#));
+    assert!(shared_strings.contains("{}"));
+    assert!(!sheet.contains("<f>"), "{sheet}");
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone(), Value::Text("text".into())])
             .collect::<Vec<_>>()
     );
 }

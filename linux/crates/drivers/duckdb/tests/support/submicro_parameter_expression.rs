@@ -50,6 +50,44 @@ async fn value_contract_submicro_text_parameters_keep_precision_after_explicit_c
             Value::Text("2026-09-27T07:04:56.123456789+00:00".into()),
         ]]
     );
+
+    let arithmetic = connection
+        .query_params(
+            "SELECT typeof(CAST(? AS TIMESTAMP_NS) + INTERVAL '1 microsecond'), \
+             (CAST(? AS TIMESTAMP_NS) + INTERVAL '1 microsecond')::VARCHAR, \
+             (CAST(? AS TIMESTAMP_NS) + INTERVAL '1 microsecond')::VARCHAR = \
+                 (TIMESTAMP_NS '1969-12-31 23:59:59.123456789' + INTERVAL '1 microsecond')::VARCHAR",
+            &[
+                Value::DateTime(timestamp),
+                Value::DateTime(timestamp),
+                Value::DateTime(timestamp),
+            ],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        arithmetic.rows,
+        vec![vec![
+            Value::Text("TIMESTAMP".into()),
+            Value::Text("1969-12-31 23:59:59.123458".into()),
+            Value::Bool(true),
+        ]],
+        "TIMESTAMP_NS arithmetic must retain DuckDB's native result type and precision"
+    );
+
+    let epoch = connection
+        .query_params(
+            "SELECT epoch_ns(CAST(? AS TIMESTAMP_NS)), \
+             epoch_ns(CAST(? AS TIMESTAMP_NS)) = epoch_ns(TIMESTAMP_NS '1969-12-31 23:59:59.123456789')",
+            &[Value::DateTime(timestamp), Value::DateTime(timestamp)],
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        epoch.rows,
+        vec![vec![Value::Int(-876_543_211), Value::Bool(true)]],
+        "epoch_ns must observe all nine digits on a text-bound TIMESTAMP_NS expression"
+    );
 }
 
 #[tokio::test]
