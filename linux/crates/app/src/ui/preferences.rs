@@ -2,7 +2,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk::gio;
 use relm4::{adw, gtk};
 
-use crate::services::preferences::PreferencesStore;
+use crate::services::preferences::{ColorSchemePref, PreferencesStore};
 
 /// Must match `browse_tab`'s own `PAGE_SIZE_OPTIONS` (duplicated there and
 /// in `workspace_state.rs`, the same way those two already duplicate each
@@ -68,6 +68,27 @@ pub fn present(
         .build();
     confirm_row.set_active(current.confirm_destructive);
 
+    let scheme_row = adw::ComboRow::new();
+    scheme_row.set_title(&crate::tr!("Appearance"));
+    scheme_row.set_subtitle(&crate::tr!("Follow the system, or always use the light or dark style"));
+    scheme_row.set_model(Some(&gtk::StringList::new(&[
+        &crate::tr!("System"),
+        &crate::tr!("Light"),
+        &crate::tr!("Dark"),
+    ])));
+    scheme_row.set_selected(current.color_scheme.index());
+    scheme_row.connect_selected_notify({
+        let preferences = preferences.clone();
+        move |row| {
+            let scheme = ColorSchemePref::from_index(row.selected());
+            adw::StyleManager::default().set_color_scheme(scheme.style());
+            if let Err(error) = preferences.update(|prefs| prefs.color_scheme = scheme) {
+                tracing::warn!(%error, "preferences: color scheme rejected");
+            }
+        }
+    });
+
+    browse_group.add(&scheme_row);
     browse_group.add(&page_size_row);
     browse_group.add(&confirm_row);
     general.add(&browse_group);
