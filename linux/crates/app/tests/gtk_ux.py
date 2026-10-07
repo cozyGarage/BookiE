@@ -109,7 +109,6 @@ def scenarios(ui):
         time.sleep(0.4)
 
     def choose_menu_item(position):
-        position += int(os.environ.get("TABLEPRO_GTK_MENU_OFFSET", "0"))
         for _ in range(position):
             ui.press_x11_key("Down")
             time.sleep(0.1)
