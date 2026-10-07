@@ -188,7 +188,7 @@ table in the same commit.
 | PERF-10 | Long cell values are shipped whole to the grid (dbx sends a preview with the byte count and fetches the full value on demand) | OPEN | Preview plus on-demand full value through View Value, behind the guard | driver-docker |
 | PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | ACCEPTED | Accepted on 2026-10-07: eight statically linked drivers is the design (see [adding drivers](adding-drivers.md)). Baseline below stays the reference for regressions | manual |
 | PERF-6 | Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols) | ACCEPTED | Accepted on 2026-10-07: packages may strip symbols; the code size follows from compile-time drivers | manual |
-| PERF-3 | MongoDB census cost per browse not measured | OPEN | | driver-docker |
+| PERF-3 | MongoDB performs a full type census on every browse page; performance acceptance is open | OPEN | Ignored diagnostic `value_contract_mongodb_census_scan_cost_profile` now takes five samples per collection size and reports the median for a 50-row browse: 5.834 ms at 1,000 documents, 52.484 ms at 10,000, and 515.076 ms at 100,000. Measured 2026-10-07 with debug `cargo test`, MongoDB 7 container (`sha256:b6421fd6d1c5ded6377b397d8983e2f82e2100dc5123332dcfda2065a472be5b`), Docker 29.7.2, AMD Ryzen 7 5800U/16 CPUs. Keep open: establish the acceptable browse budget and verify on installed targets before choosing a cache or census change | driver-docker |
 | PERF-4 | Timing shows elapsed only, never server time | OPEN | With UI-20 | driver-docker |
 
 ### What the reference client does differently
