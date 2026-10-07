@@ -134,7 +134,7 @@ table in the same commit.
 | PKG-3 | B7 soak: frozen SHA, 30 consecutive retry-free GTK attempts over six runs | OPEN | | gtk-installed |
 | PKG-4 | Real Flatpak build and install; Flathub submission; screenshots | OPEN | | manual |
 | PKG-5 | ~~`dpkg-deb` contract skipped in harness; validators tested, installation not~~ | DONE | `scripts/test-deb-package.sh` builds the package with `scripts/build-deb.sh`, installs it with apt, runs `scripts/check-installed-deb.sh` (binaries, aliases, askpass, desktop file, GSettings schema compiled, no unresolved libraries) and removes it, on Debian 13 and Ubuntu 24.04 in containers on the runner (2026-10-07) | sandbox |
-| PKG-6 | `bookie` replaces `tablepro`: install, upgrade, removal must keep XDG data | UNVERIFIED | `scripts/test-deb-package.sh` installs, reinstalls and purges the package on Debian 13 and Ubuntu 24.04 with data under `~/.config/tablepro` and `~/.local/share/tablepro` and finds it intact. Missing: an upgrade from an older released `tablepro` package, the Arch package, and rollback | manual |
+| PKG-6 | `bookie` replaces `tablepro`: install, upgrade, removal must keep XDG data | UNVERIFIED | `scripts/test-deb-package.sh` installs, reinstalls and purges the package on Debian 13 and Ubuntu 24.04 with data under `~/.config/tablepro` and `~/.local/share/tablepro` and finds it intact. The same script upgrades the package to a newer version and downgrades it back (repacked as 0.1.5-2) and checks the installed package and the user data after each step on both distros. Missing: an upgrade from a previously released `.deb`, and the Arch package | manual |
 | PKG-7 | Oracle ODPI build is unsupported and not shippable | ACCEPTED | Out of scope | n/a |
 
 ## Tests and evidence
