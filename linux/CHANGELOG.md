@@ -35,6 +35,7 @@
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
+- SQLite attached-schema STRICT `ANY` results preserve INTEGER, REAL, TEXT, BLOB and SQL NULL storage classes through app-level typed CSV restore.
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
 - Test in the connection form shows its result at the top of the form until you change a field, instead of a notice that disappears.
