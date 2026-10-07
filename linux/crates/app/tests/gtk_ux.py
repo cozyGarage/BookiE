@@ -572,6 +572,39 @@ def scenarios(ui):
         ui.run_sql("SELECT count(*) AS row_count FROM release_items")
         ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
 
+    def postgres_ssh_unknown_host_key_decline_is_durably_audited(database, base):
+        name = ui.POSTGRES_SSH_AUDIT_CONNECTION_NAME
+        connection_id = ui.POSTGRES_SSH_AUDIT_CONNECTION_ID
+        ui.open_saved_connection(name)
+        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+        ui.wait_for_node_containing("127.0.0.1:2223")
+        ui.press_x11_key("Escape")
+        ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT, present=False)
+        ui.wait_for_node(name="Connection failed")
+
+        journal = base / "data" / ui.storage_dir_name() / "audit.jsonl"
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        records = []
+        while time.monotonic() < deadline:
+            if journal.exists():
+                records = [json.loads(line)["event"] for line in journal.read_text().splitlines() if line.strip()]
+                attempts = [event for event in records if event.get("transport_attempt")]
+                if attempts:
+                    break
+            time.sleep(ui.POLL_SECONDS)
+        attempts = [event for event in records if event.get("transport_attempt")]
+        assert len(attempts) == 1, f"expected one durable SSH outcome, found {attempts!r}"
+        event = attempts[0]
+        assert event["connection_id"] == connection_id, event
+        assert event["phase"] == "outcome", event
+        assert event["terminal_status"] == "denied", event
+        assert event["transport_attempt"] == {"client": "builtin_ssh", "outcome": "host_key_refused"}, event
+
+        known_hosts = base / "config" / ui.storage_dir_name() / "known_hosts"
+        assert not known_hosts.exists() or not known_hosts.read_text().strip(), (
+            "declining the host key must not learn it"
+        )
+
     def psql(sql):
         import subprocess
         out = subprocess.run(
@@ -676,6 +709,8 @@ def scenarios(ui):
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
         result.append(postgres_saved_mtls_connection_authenticates_and_queries)
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_SSH_AUDIT_PORT"):
+        result.append(postgres_ssh_unknown_host_key_decline_is_durably_audited)
     for scenario in result:
         scenario.environment = "local"
     return result
