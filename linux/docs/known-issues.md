@@ -158,7 +158,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | --- | --- | --- | --- | --- |
 | DOC-1 | ~~`po/tablepro.pot` is stale~~ | DONE | Regenerated 2026-10-07 with `scripts/update-translations.py` in its own commit; 24 more source files are now listed in `POTFILES.in` | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
-| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | Automated part started: scenario `interactive_controls_have_accessible_names` finds no unnamed button, toggle, check box, combo or entry in the main window with a result open. Still manual: Orca pass, tab order, high contrast, custom grid cells and popovers. See [platforms](platforms.md#accessibility) | gtk-installed |
+| DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | Automated so far: scenario `interactive_controls_have_accessible_names` finds no unnamed button, toggle, check box, combo or entry in the main window with a result open; the whole installed suite (43 scenarios) passes at double text size (`GDK_DPI_SCALE=2`), which proves function, not that nothing clips. Still manual: Orca pass, tab order, high contrast (needs the portal contrast setting), custom grid cells and popovers. See [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
 | DOC-5 | Cross-client value comparison (DBeaver, dbx) on lab VMs | OPEN | Seeded multi-engine VMs, ADR 0007 as oracle | manual |
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
