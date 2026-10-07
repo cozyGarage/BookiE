@@ -8,6 +8,7 @@ pub enum QuickTarget {
     Tab(Uuid),
     Connection(Uuid),
     Relation { schema: Option<String>, name: String },
+    Command(&'static str),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,10 +48,56 @@ pub fn relation_items(tables: &[TableInfo], views: &[TableInfo]) -> Vec<QuickIte
         .collect()
 }
 
+fn commands() -> Vec<(&'static str, String)> {
+    vec![
+        ("open-editor", crate::tr!("New SQL tab")),
+        ("new-window", crate::tr!("New window")),
+        ("show-history", crate::tr!("Query history")),
+        ("show-catalog", crate::tr!("Catalog objects")),
+        ("show-activity", crate::tr!("Server activity")),
+        ("explain-query", crate::tr!("Explain query")),
+        ("jump-column", crate::tr!("Jump to column")),
+        ("open-filter", crate::tr!("Filter rows")),
+        ("refresh-page", crate::tr!("Refresh the current page")),
+        ("save-changes", crate::tr!("Save changes")),
+        ("undo-change", crate::tr!("Undo change")),
+        ("redo-change", crate::tr!("Redo change")),
+        ("reopen-closed-tab", crate::tr!("Reopen closed tab")),
+        ("export-csv", crate::tr!("Export results as CSV")),
+        ("export-json", crate::tr!("Export results as JSON")),
+        ("export-all-csv", crate::tr!("Export all rows as CSV")),
+        ("export-all-json", crate::tr!("Export all rows as JSON")),
+        ("preferences", crate::tr!("Preferences")),
+        ("shortcuts", crate::tr!("Keyboard shortcuts")),
+    ]
+}
+
+pub fn command_items() -> Vec<QuickItem> {
+    commands()
+        .into_iter()
+        .map(|(action, title)| QuickItem {
+            target: QuickTarget::Command(action),
+            title,
+            subtitle: crate::tr!("Command"),
+        })
+        .collect()
+}
+
+fn is_command(item: &QuickItem) -> bool {
+    matches!(item.target, QuickTarget::Command(_))
+}
+
 pub fn filter(items: &[QuickItem], needle: &str) -> Vec<QuickItem> {
     let needle = needle.trim().to_lowercase();
+    if let Some(command_needle) = needle.strip_prefix('>') {
+        let commands: Vec<QuickItem> = items.iter().filter(|item| is_command(item)).cloned().collect();
+        if command_needle.trim().is_empty() {
+            return commands;
+        }
+        return filter(&commands, command_needle);
+    }
     if needle.is_empty() {
-        return items.to_vec();
+        return items.iter().filter(|item| !is_command(item)).cloned().collect();
     }
     let mut scored: Vec<(u32, usize, QuickItem)> = items
         .iter()
@@ -107,6 +154,40 @@ mod tests {
             target: QuickTarget::Favorite(Uuid::new_v4()),
             title: title.to_string(),
             subtitle: subtitle.to_string(),
+        }
+    }
+
+    fn command(action: &'static str, title: &str) -> QuickItem {
+        QuickItem {
+            target: QuickTarget::Command(action),
+            title: title.to_string(),
+            subtitle: "Command".to_string(),
+        }
+    }
+
+    #[test]
+    fn commands_stay_out_of_the_empty_list_and_are_the_only_hits_after_a_prompt_character() {
+        let items = vec![
+            item("daily revenue", ""),
+            command("export-csv", "Export results as CSV"),
+        ];
+        assert_eq!(filter(&items, "").len(), 1);
+        assert_eq!(filter(&items, ">").len(), 1);
+        assert_eq!(filter(&items, ">export")[0].target, QuickTarget::Command("export-csv"));
+        assert!(filter(&items, ">daily").is_empty());
+    }
+
+    #[test]
+    fn a_plain_search_finds_commands_beside_the_other_items() {
+        let items = vec![item("export notes", ""), command("export-csv", "Export results as CSV")];
+        assert_eq!(filter(&items, "export").len(), 2);
+    }
+
+    #[test]
+    fn every_command_names_an_action_the_window_registers() {
+        let registered = include_str!("../ui/app/shortcuts.rs");
+        for (action, _) in commands() {
+            assert!(registered.contains(&format!("\"{action}\"")), "{action}");
         }
     }
 

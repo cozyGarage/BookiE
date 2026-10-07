@@ -300,6 +300,38 @@ mod window_shortcut_tests {
         }
     }
 
+    fn registered(action: &str) -> bool {
+        let source = include_str!("shortcuts.rs");
+        let name = action.trim_start_matches("win.");
+        source.contains(&format!("input_action!(\"{name}\"")) || source.contains(&format!("builder(\"{name}\")"))
+    }
+
+    #[test]
+    fn every_window_shortcut_names_an_action_the_window_registers() {
+        for (trigger, action) in WINDOW_SHORTCUTS {
+            assert!(
+                registered(action),
+                "{trigger} is bound to {action}, which is never registered"
+            );
+        }
+    }
+
+    #[test]
+    fn every_window_shortcut_is_listed_in_the_shortcuts_window() {
+        let source = include_str!("shortcuts.rs");
+        let dialog = source
+            .split("pub(super) fn build_shortcuts_dialog")
+            .nth(1)
+            .unwrap_or_default();
+        let dialog = dialog.split("fn add_shortcut_group").next().unwrap_or_default();
+        for (trigger, action) in WINDOW_SHORTCUTS {
+            assert!(
+                dialog.contains(&format!("\"{trigger}\"")),
+                "{trigger} ({action}) is not documented in the shortcuts window"
+            );
+        }
+    }
+
     #[test]
     fn window_shortcuts_never_take_a_key_the_editor_owns() {
         for (trigger, action) in WINDOW_SHORTCUTS {

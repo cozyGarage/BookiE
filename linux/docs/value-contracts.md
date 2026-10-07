@@ -576,10 +576,11 @@ checks the restored value remains TEXT; see
 [`sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
 
 SQLite `json_group_object()` over STRICT `ANY` preserves ordered duplicate keys,
-omits NULL keys, retains NULL values as JSON `null`, and returns `{}` for an
-empty group. Exact JSON text and restored TEXT storage are checked through typed
-CSV; see
-[`sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+retains NULL values as JSON `null`, and returns `{}` for an empty group. It
+checks version-specific NULL-label behavior: SQLite 3.50.0+ omits NULL keys,
+while older system libraries' malformed native output is preserved exactly.
+Exact output text and restored TEXT storage are checked through typed CSV; see
+[`sqlite_json_group_object_any_csv_round_trip_preserves_native_text`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
 
 SQLite arithmetic expressions over STRICT `ANY` verify numeric coercion,
 integer division, overflow promotion to REAL, divide-by-zero NULL and typed CSV

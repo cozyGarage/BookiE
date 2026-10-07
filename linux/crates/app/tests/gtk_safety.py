@@ -17,6 +17,7 @@ import gtk_workbook
 import gtk_parameters
 import gtk_xml
 import gtk_ux
+import gtk_input
 
 APP_NAME = "BookiE"
 CONNECTION_NAME = "Safety SQLite"
@@ -303,6 +304,9 @@ def invoke_accessible_action(action_name):
 
 
 def press_x11_key(name, modifiers=(), presses=1):
+    if gtk_input.uses_atspi_input():
+        gtk_input.press_key(name, modifiers, presses)
+        return
     class XWindowAttributes(ctypes.Structure):
         _fields_ = [
             ("x", ctypes.c_int),
@@ -801,6 +805,7 @@ def write_fixture(base, audit_available=True, environment="prod"):
             "XDG_RUNTIME_DIR": str(runtime),
             "GSETTINGS_BACKEND": "keyfile",
             "RUST_LOG": "tablepro_app=debug",
+            **gtk_input.display_environment(),
         }
     )
     return database, environment

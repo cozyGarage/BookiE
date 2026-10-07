@@ -211,6 +211,16 @@
       "tablepro-app",
       "--lib",
       "ui::editor::session_mode::tests::session_end_dialog_keeps_the_toggle_active_until_the_selected_action_finishes"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::grid::column_order::tests::a_saved_order_is_shown_and_a_new_drag_is_saved"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::schema::vim_tests::vim_keys_are_attached_only_when_enabled"
     ]
   ],
   "keyring": [

@@ -490,13 +490,15 @@ SQLite STRICT `ANY` computed-result contracts now cover `CASE`, `COALESCE`,
 `length`, `CAST(value AS BLOB)`, `json_group_array()` and
 `json_group_object()`. The JSON aggregate cases
 (`sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text` and
-`sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls`,
+`sqlite_json_group_object_any_csv_round_trip_preserves_native_text`,
 [tests](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs)) check
 numeric and text values, JSON null versus SQL NULL, empty arrays/objects,
-duplicate object keys, omitted NULL keys, and typed CSV restore against
-SQLite's native result and `typeof()`. JSON export retains each aggregate's
-exact result text as a string, and XLSX keeps the duplicate-key object text in
-string cells without formulas.
+duplicate object keys, NULL-label behavior, and typed CSV restore against
+SQLite's native result and `typeof()`. The object test checks version-specific
+NULL-label behavior: SQLite 3.50.0+ omits the entry, while older system
+libraries' malformed native text is preserved exactly. JSON export retains
+each aggregate's exact result text as a string, and XLSX keeps the duplicate-key
+object text in string cells without formulas.
 Typed CSV restore checks native storage classes and exact values or bytes; BLOB
 casts also have JSON and XLSX text-cell assertions. Representative evidence:
 [CASE](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),

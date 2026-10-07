@@ -25,13 +25,14 @@ on:
 permissions:
   contents: read
 
-# A newer push supersedes an in-flight run for the same ref: the older
-# one can no longer gate anything. Scheduled and dispatched runs keep
-# their own group so a release-candidate soak is never cancelled by
-# ordinary branch traffic.
+# A newer pull request push supersedes its in-flight run. A run on
+# linux or main is the merge-tier gate, so it is never cancelled: GitHub
+# keeps the running one and the newest pending one. Scheduled and
+# dispatched runs keep their own group so a release-candidate soak is
+# never cancelled by ordinary branch traffic.
 concurrency:
   group: build-linux-${{ github.event_name }}-${{ github.ref }}-${{ inputs.ref || 'auto' }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   preflight:

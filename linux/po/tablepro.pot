@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 17:24+0200\n"
+"POT-Creation-Date: 2026-10-07 17:52+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -32,13 +32,100 @@ msgstr ""
 msgid "{name}: {reason}"
 msgstr ""
 
-#: crates/app/src/services/quick_switcher.rs:32
+#: crates/app/src/services/quick_switcher.rs:33
 #: crates/app/src/ui/structure_tab_dialogs.rs:205
 msgid "Table"
 msgstr ""
 
-#: crates/app/src/services/quick_switcher.rs:33
+#: crates/app/src/services/quick_switcher.rs:34
 msgid "View"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:53
+msgid "New SQL tab"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:54
+msgid "New window"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:55
+#: crates/app/src/ui/preferences.rs:97
+msgid "Query history"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:56
+msgid "Catalog objects"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:57
+#: crates/app/src/ui/activity_dialog.rs:43
+#: crates/app/src/ui/app/shortcuts.rs:21
+msgid "Server activity"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:58
+#: crates/app/src/ui/app/shortcuts.rs:23 crates/app/src/ui/explain_dialog.rs:24
+#: crates/app/src/ui/explain_dialog.rs:52
+msgid "Explain query"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:59
+msgid "Jump to column"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:60
+#: crates/app/src/ui/app/shortcuts.rs:200
+msgid "Filter rows"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:61
+msgid "Refresh the current page"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:62
+msgid "Save changes"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:63
+msgid "Undo change"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:64
+msgid "Redo change"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:65
+msgid "Reopen closed tab"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:66
+msgid "Export results as CSV"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:67
+msgid "Export results as JSON"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:68
+msgid "Export all rows as CSV"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:69
+msgid "Export all rows as JSON"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:70
+#: crates/app/src/ui/app/shortcuts.rs:26 crates/app/src/ui/preferences.rs:36
+msgid "Preferences"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:71
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:81
+msgid "Command"
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:26
@@ -61,11 +148,6 @@ msgstr ""
 msgid "OK"
 msgstr ""
 
-#: crates/app/src/ui/activity_dialog.rs:43
-#: crates/app/src/ui/app/shortcuts.rs:21
-msgid "Server activity"
-msgstr ""
-
 #: crates/app/src/ui/activity_dialog.rs:70
 msgid "Choose a query above."
 msgstr ""
@@ -76,7 +158,7 @@ msgid "Connection closed."
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:111
-#: crates/app/src/ui/editor/mod.rs:1013
+#: crates/app/src/ui/editor/mod.rs:1009
 msgid "Running…"
 msgstr ""
 
@@ -501,11 +583,11 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: crates/app/src/ui/app/favorites.rs:169
+#: crates/app/src/ui/app/favorites.rs:173
 msgid "Open tab"
 msgstr ""
 
-#: crates/app/src/ui/app/favorites.rs:181
+#: crates/app/src/ui/app/favorites.rs:185
 msgid "Saved connection"
 msgstr ""
 
@@ -851,15 +933,6 @@ msgstr ""
 msgid "Catalog"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:23 crates/app/src/ui/explain_dialog.rs:24
-#: crates/app/src/ui/explain_dialog.rs:52
-msgid "Explain query"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:26 crates/app/src/ui/preferences.rs:36
-msgid "Preferences"
-msgstr ""
-
 #: crates/app/src/ui/app/shortcuts.rs:27
 msgid "New Window"
 msgstr ""
@@ -970,10 +1043,6 @@ msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:199
 msgid "Set focused cell to NULL"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:200
-msgid "Filter rows"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:201
@@ -1292,7 +1361,7 @@ msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
 #: crates/app/src/ui/app/workspace_tabs.rs:987
-#: crates/app/src/ui/editor/outcomes.rs:243
+#: crates/app/src/ui/editor/outcomes.rs:293
 #: crates/app/src/ui/editor/schema.rs:42
 #: crates/app/src/ui/history_dialog.rs:1021
 msgid "Empty query"
@@ -1897,7 +1966,7 @@ msgid "0 uses the default of 30 seconds"
 msgstr ""
 
 #: crates/app/src/ui/connect_dialog/mod.rs:1231
-#: crates/app/src/ui/preferences.rs:216
+#: crates/app/src/ui/preferences.rs:223
 msgid "Query timeout (seconds)"
 msgstr ""
 
@@ -2158,57 +2227,57 @@ msgstr ""
 msgid "Run query (Ctrl+Return)"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:679
+#: crates/app/src/ui/editor/mod.rs:675
 msgid "empty query"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:741
+#: crates/app/src/ui/editor/mod.rs:737
 msgid "No statement at cursor"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:815 crates/app/src/ui/history_dialog.rs:1034
+#: crates/app/src/ui/editor/mod.rs:811 crates/app/src/ui/history_dialog.rs:1034
 msgid "cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:818
+#: crates/app/src/ui/editor/mod.rs:814
 msgid "Query cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:819
+#: crates/app/src/ui/editor/mod.rs:815
 msgid "The running query was stopped."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:836
+#: crates/app/src/ui/editor/mod.rs:832
 #, rust-format
 msgid "Query exceeded the {n}s timeout configured in Preferences."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:842
+#: crates/app/src/ui/editor/mod.rs:838
 msgid "timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:845
+#: crates/app/src/ui/editor/mod.rs:841
 msgid "Query timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:894
+#: crates/app/src/ui/editor/mod.rs:890
 msgid "Formatting is unavailable for this connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:960
+#: crates/app/src/ui/editor/mod.rs:956
 msgid "Cannot ask for parameter values without a window"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:987
+#: crates/app/src/ui/editor/mod.rs:983
 msgid "Waiting for session to finish"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:994 crates/app/src/ui/editor/mod.rs:999
+#: crates/app/src/ui/editor/mod.rs:990 crates/app/src/ui/editor/mod.rs:995
 #: crates/app/src/ui/editor/session_mode.rs:206
 msgid "no active connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:1152 crates/app/src/ui/editor/mod.rs:1165
+#: crates/app/src/ui/editor/mod.rs:1148 crates/app/src/ui/editor/mod.rs:1161
 msgid "query-results"
 msgstr ""
 
@@ -2289,26 +2358,41 @@ msgstr ""
 msgid "Skipped because an earlier statement failed."
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:175
+#: crates/app/src/ui/editor/outcomes.rs:213
 #, rust-format
 msgid "Result {n} ({rows})"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:179
+#: crates/app/src/ui/editor/outcomes.rs:216
 #, rust-format
 msgid "Result {n} (error)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:180
+#: crates/app/src/ui/editor/outcomes.rs:217
 #, rust-format
 msgid "Result {n} (skipped)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:217
+#: crates/app/src/ui/editor/outcomes.rs:221
+#, rust-format
+msgid "{n} · {statement} ({rows})"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:225
+#, rust-format
+msgid "{n} · {statement} (error)"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:228
+#, rust-format
+msgid "{n} · {statement} (skipped)"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:267
 msgid "Statement result"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:244
+#: crates/app/src/ui/editor/outcomes.rs:294
 msgid "Type a SQL statement and press Run."
 msgstr ""
 
@@ -3271,10 +3355,6 @@ msgstr ""
 msgid "Dark"
 msgstr ""
 
-#: crates/app/src/ui/preferences.rs:97
-msgid "Query history"
-msgstr ""
-
 #: crates/app/src/ui/preferences.rs:98
 msgid "Persistent record of every SQL query you run."
 msgstr ""
@@ -3319,7 +3399,15 @@ msgstr ""
 msgid "Editor font family"
 msgstr ""
 
-#: crates/app/src/ui/preferences.rs:218
+#: crates/app/src/ui/preferences.rs:213
+msgid "Vim keys in the SQL editor"
+msgstr ""
+
+#: crates/app/src/ui/preferences.rs:214
+msgid "Applies to editors opened after the change."
+msgstr ""
+
+#: crates/app/src/ui/preferences.rs:225
 msgid "Cancel long-running queries automatically. Set to 0 to disable."
 msgstr ""
 
@@ -3327,19 +3415,19 @@ msgstr ""
 msgid "Open quickly"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:25
-msgid "Search favorites, open tabs, and saved connections"
+#: crates/app/src/ui/quick_switcher_dialog.rs:26
+msgid "Search favorites, tabs, connections and tables. Type > for commands"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:41
+#: crates/app/src/ui/quick_switcher_dialog.rs:43
 msgid "Nothing matches"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:42
+#: crates/app/src/ui/quick_switcher_dialog.rs:44
 msgid "Save a query as a favorite, or open a tab to switch to it."
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:104
+#: crates/app/src/ui/quick_switcher_dialog.rs:107
 #: crates/app/src/ui/sidebar_row.rs:153
 #, rust-format
 msgid "Open {name}"
