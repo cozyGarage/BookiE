@@ -91,12 +91,14 @@ is necessary for server/protocol cleanup; it does not provide multi-result UX.
 The editor splits scripts, which does not solve one stored procedure returning
 several sets. Current `QueryResult` carries one set.
 
-Reproduce independent capped SELECTs and a stored procedure returning multiple
-sets, including a late server error and loss during drain. Verify truncation
-labels, headers, row counts, terminal audit and later connection usability.
-Keep late-error/retirement tests. Any multi-set API needs core, driver, guard,
-MCP and GUI consumer design together; do not change one driver return type or
-silently apply an aggregate cap across unrelated statements.
+Docker regressions cover later result sets being discarded while the first
+set's columns remain authoritative (including an empty first set), late errors
+after the first set, row- and byte-budget truncation, draining, and later
+connection usability. Follow-up work remains for independent capped SELECTs in
+the editor, stored procedures returning several sets, and connection loss
+during drain. Any multi-set API needs core, driver, guard, MCP and GUI consumer
+design together; do not change one driver return type or silently apply an
+aggregate cap across unrelated statements.
 
 ## Changes deliberately excluded
 
