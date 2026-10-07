@@ -27,6 +27,7 @@ on historical statements such as “next”, “current” or “pending”.
 | Milestones, order and acceptance | [Active sprint](bookie-0.2-sprint.md) | Keep current instructions compact; archive dated progress |
 | B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
 | B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
+| UI-1b SSH jump-chain editor | [Per-hop credential proposal](proposals/ui-1b-ssh-jump-chain-editor.md) | Proposal only; retain edit refusal until storage, transport, bundle, and GTK work land together |
 | Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
 | Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [Platforms](platforms.md) | Keep one section per concern; the build floor is stated here |
 | Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
