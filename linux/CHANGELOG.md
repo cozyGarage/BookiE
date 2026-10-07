@@ -4,6 +4,7 @@
 
 ### Added
 
+- Redis 0.2.0 support remains scoped to a single host/port endpoint; Sentinel and Cluster topologies are explicitly deferred.
 - The MongoDB census diagnostic now profiles one million documents; this host measured a five-sample release median of 772 ms per 50-row browse, so the 100 ms budget remains scoped to 100k documents.
 - PostgreSQL optimistic update coverage asserts schema-qualified casts for custom enums and array domains; a restricted-role grid edit exercises the enum path under a shadowed transaction-local `search_path`.
 - MongoDB stale-grid tests now pin ABA behavior: value-based edits and deletes proceed after a field changes and returns to its materialized value, matching the documented last-write-wins contract.
