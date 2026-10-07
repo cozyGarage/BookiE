@@ -77,6 +77,15 @@ impl SshEnvironment {
 }
 
 pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<OpenSshConfig, TransportError> {
+    openssh_config_in_sandbox(id, saved, running_in_flatpak()).await
+}
+
+pub(crate) async fn openssh_config_in_sandbox(
+    id: Uuid,
+    saved: &SavedSshConfig,
+    sandboxed: bool,
+) -> Result<OpenSshConfig, TransportError> {
+    ensure_system_ssh_available(sandboxed)?;
     if saved.jump.is_some() {
         return Err(TransportError::Ssh(
             "the system OpenSSH client takes jump hosts from ~/.ssh/config (ProxyJump); remove the saved jump \
@@ -84,7 +93,7 @@ pub(crate) async fn openssh_config(id: Uuid, saved: &SavedSshConfig) -> Result<O
                 .into(),
         ));
     }
-    openssh_config_for(&crate::resolve_saved_ssh_hop(id, saved, 0).await?)
+    build_openssh_config(&crate::resolve_saved_ssh_hop(id, saved, 0).await?, sandboxed)
 }
 
 pub fn openssh_config_for(config: &SshConfig) -> Result<OpenSshConfig, TransportError> {
@@ -296,7 +305,7 @@ exec sleep 300
     }
 }
 
-fn running_in_flatpak() -> bool {
+pub(crate) fn running_in_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some() || std::path::Path::new("/.flatpak-info").exists()
 }
 

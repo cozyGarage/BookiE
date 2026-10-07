@@ -175,6 +175,13 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
 }
 
 pub async fn saved_ssh_route(saved: &SavedConnection) -> Result<Option<SshRoute>, TransportError> {
+    saved_ssh_route_with_sandbox_override(saved, None).await
+}
+
+async fn saved_ssh_route_with_sandbox_override(
+    saved: &SavedConnection,
+    sandboxed: Option<bool>,
+) -> Result<Option<SshRoute>, TransportError> {
     let Some(ssh) = &saved.ssh else {
         return Ok(None);
     };
@@ -182,9 +189,13 @@ pub async fn saved_ssh_route(saved: &SavedConnection) -> Result<Option<SshRoute>
         SshClient::Builtin => resolve_saved_ssh_chain(saved.id, ssh)
             .await
             .map(|hops| Some(SshRoute::Builtin(hops))),
-        SshClient::OpenSsh => route::openssh_config(saved.id, ssh)
-            .await
-            .map(|config| Some(SshRoute::OpenSsh(config))),
+        SshClient::OpenSsh => {
+            let config = match sandboxed {
+                Some(sandboxed) => route::openssh_config_in_sandbox(saved.id, ssh, sandboxed).await,
+                None => route::openssh_config(saved.id, ssh).await,
+            }?;
+            Ok(Some(SshRoute::OpenSsh(config)))
+        }
     }
 }
 
@@ -594,6 +605,62 @@ mod tests {
             Environment::Local,
             "postgres",
         ))
+    }
+
+    fn saved_ssh_connection(client: SshClient) -> SavedConnection {
+        SavedConnection {
+            id: Uuid::new_v4(),
+            name: "sandbox routing test".into(),
+            driver_id: "postgres".into(),
+            host: "db.example".into(),
+            port: 5432,
+            socket_dir: None,
+            database: "db".into(),
+            username: "user".into(),
+            use_tls: false,
+            tls_mode: None,
+            tls_root_cert: None,
+            auth_mode: AuthMode::Password,
+            read_only: false,
+            environment: Environment::Local,
+            ssh: Some(SavedSshConfig {
+                host: "bastion.example".into(),
+                port: 22,
+                username: "user".into(),
+                auth: SavedSshAuth::Password,
+                jump: None,
+                client,
+                agent: false,
+            }),
+            last_opened_at: None,
+            connect_timeout_secs: None,
+            query_timeout_secs: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn saved_system_openssh_refuses_deterministically_in_flatpak_without_fallback() {
+        let saved = saved_ssh_connection(SshClient::OpenSsh);
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&saved, Some(true)).await,
+            Err(TransportError::SystemSshUnavailableInSandbox)
+        ));
+
+        let mut builtin = saved.clone();
+        let builtin_ssh = builtin.ssh.as_mut().expect("ssh config");
+        builtin_ssh.client = SshClient::Builtin;
+        builtin_ssh.agent = true;
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&builtin, Some(true)).await,
+            Ok(Some(SshRoute::Builtin(_)))
+        ));
+
+        let mut native = builtin;
+        native.ssh.as_mut().expect("ssh config").client = SshClient::OpenSsh;
+        assert!(matches!(
+            saved_ssh_route_with_sandbox_override(&native, Some(false)).await,
+            Ok(Some(SshRoute::OpenSsh(_)))
+        ));
     }
 
     #[tokio::test]

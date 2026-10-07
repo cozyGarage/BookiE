@@ -64,11 +64,14 @@ Saved passwords/passphrases answer only a matching destination/key prompt.
 Jump routing comes from `~/.ssh/config`/`ProxyJump`; saved per-hop chains are
 refused for this backend. Built-in SSH supports saved chains and ssh-agent.
 
-The executable `tablepro-askpass` helper must be installed beside the app or on
-PATH. Current discovery checks executable availability; explicit Flatpak route
-refusal needs I2's sandbox regression. The Debian standalone builder includes
-the helper, but debhelper rules and package validation need I1. An unavailable
-selected route must fail without switching backend or weakening authentication.
+Inside Flatpak, selecting system OpenSSH fails with an explicit message before
+resolving saved SSH credentials or dispatching the database driver. The client
+does not switch to built-in SSH; select that backend explicitly if it is wanted.
+Native system OpenSSH remains available outside Flatpak. The executable
+`tablepro-askpass` helper must be installed beside the app or on PATH. The Debian
+standalone builder includes the helper, but debhelper rules and package
+validation need I1. Flatpak package/runtime behavior remains a separate
+acceptance check.
 
 ## Remaining evidence
 
