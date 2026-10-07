@@ -673,7 +673,7 @@ async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text
 }
 
 #[tokio::test]
-async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() {
+async fn sqlite_json_group_object_any_csv_round_trip_preserves_native_text() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
@@ -715,6 +715,25 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() 
         .await
         .unwrap();
 
+    let version = connection.query("SELECT sqlite_version()").await.unwrap();
+    let Value::Text(version) = &version.rows[0][0] else {
+        panic!("SQLite version must be text: {:?}", version.rows[0][0]);
+    };
+    let mut parts = version.split('.').map(|part| part.parse::<u32>().unwrap());
+    let version = (
+        parts.next().expect("SQLite major version"),
+        parts.next().expect("SQLite minor version"),
+        parts.next().expect("SQLite patch version"),
+    );
+    assert!(parts.next().is_none(), "unexpected SQLite version format");
+    // SQLite 3.50.0 fixed NULL labels. Earlier system versions emit malformed
+    // JSON for that row; as a database client, BookiE must preserve that text.
+    let expected_first_result = if version >= (3, 50, 0) {
+        r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#
+    } else {
+        r#"{"a":42,"a":null,:2,"":"=1+1","東京":"NULL","sqlnull":null}"#
+    };
+
     let result = connection
         .query(
             "SELECT groups.id AS position, \
@@ -733,19 +752,20 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() 
         vec![
             vec![
                 Value::Int(1),
-                Value::Text(r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#.into()),
+                Value::Text(expected_first_result.into()),
                 Value::Text("text".into()),
             ],
             vec![Value::Int(2), Value::Text(r#"{"nil":null}"#.into()), Value::Text("text".into())],
             vec![Value::Int(3), Value::Text("{}".into()), Value::Text("text".into())],
-        ]
+        ],
+        "SQLite {version:?} native aggregate output must be preserved"
     );
     let json: serde_json::Value = serde_json::from_str(&tablepro_core::export::render_json(
         &result.columns,
         &result.rows,
     ))
     .unwrap();
-    assert_eq!(json[0]["result"], r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#);
+    assert_eq!(json[0]["result"], expected_first_result);
     assert_eq!(json[1]["result"], r#"{"nil":null}"#);
     assert_eq!(json[2]["result"], "{}");
 
@@ -773,7 +793,7 @@ async fn sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls() 
     for row in 2..=4 {
         assert!(sheet.contains(&format!("<c r=\"B{row}\" t=\"s\">")), "{sheet}");
     }
-    assert!(shared_strings.contains(r#"{"a":42,"a":null,"":"=1+1","東京":"NULL","sqlnull":null}"#));
+    assert!(shared_strings.contains(expected_first_result));
     assert!(shared_strings.contains(r#"{"nil":null}"#));
     assert!(shared_strings.contains("{}"));
     assert!(!sheet.contains("<f>"), "{sheet}");
