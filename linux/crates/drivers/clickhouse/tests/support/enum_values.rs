@@ -63,6 +63,25 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             .expect("insert enum labels through parameters");
     }
 
+    let invalid_label = [
+        Value::Int(7),
+        Value::Text("undeclared".into()),
+        Value::Text("low".into()),
+        Value::Null,
+    ];
+    assert!(
+        connection
+            .execute_params("INSERT INTO enum_values VALUES (?, ?, ?, ?)", &invalid_label)
+            .await
+            .is_err(),
+        "an undeclared Enum8 label must be refused"
+    );
+    let after_refusal = connection
+        .query("SELECT id, narrow, wide, optional FROM enum_values ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(after_refusal.rows, expected, "refused enum write leaves rows unchanged");
+
     let columns = connection.fetch_columns(None, "enum_values").await.unwrap();
     assert!(columns[1].data_type.starts_with("Enum8("));
     assert!(columns[2].data_type.starts_with("Enum16("));
