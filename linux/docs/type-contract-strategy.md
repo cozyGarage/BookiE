@@ -363,7 +363,7 @@ DuckDB returns a `TIMESTAMP` rounded to microseconds, matching its native litera
 expression. `TIME_NS` plus interval remains a native binder refusal. Both
 outcomes are asserted in
 `value_contract_submicro_text_parameters_keep_precision_after_explicit_casts`
-(`crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs`). Other
+(`crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs`; see the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/128#issuecomment-6029090575)). Other
 expression contexts and native sub-microsecond parameter bindings remain open;
 the text fallback is not native typed binding.
 
