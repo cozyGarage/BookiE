@@ -112,9 +112,9 @@ before value decoding with SQLx's internal `unknown type code 109`. SQLx 0.9's
 PostgreSQL type resolver does not recognize `pg_type.typtype = 'm'`, so BookiE
 cannot currently return either a decoded value or a visible `Value::Undecodable`
 for this type ([resolver](https://github.com/launchbadge/sqlx/blob/main/sqlx-postgres/src/connection/resolve.rs#L546-L575)).
-The built-in `tsvector[]` now has a separate explicit-refusal contract with
-native text-search JSON and wire oracles; refused literals and bindings leave
-target and sibling rows unchanged
+The built-in `tsvector[]` and `tsquery[]` now have separate explicit-refusal
+assertions with native text-search JSON and wire oracles; refused literals and
+bindings leave target and sibling rows unchanged
 ([test](../crates/drivers/postgres/tests/support/unsupported_builtin_array_contract.rs)).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
