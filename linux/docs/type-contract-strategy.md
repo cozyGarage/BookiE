@@ -112,11 +112,13 @@ tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
 all six built-in range arrays now receive the same explicit refusal, native
 JSON, exact type and post-refusal row/wire preservation checks in
 `crates/drivers/postgres/tests/support/range_array_contract.rs`.
-PostgreSQL `int4multirange[]` remains open: a native projection currently fails
-before value decoding with SQLx's internal `unknown type code 109`. SQLx 0.9's
-PostgreSQL type resolver does not recognize `pg_type.typtype = 'm'`, so BookiE
-cannot currently return either a decoded value or a visible `Value::Undecodable`
-for this type ([resolver](https://github.com/launchbadge/sqlx/blob/main/sqlx-postgres/src/connection/resolve.rs#L546-L575)).
+PostgreSQL built-in multirange scalars and arrays resolve through SQLx's type
+metadata and reach BookiE's value decoder. BookiE returns a named
+`Value::Undecodable` for non-NULL values; SQL literal rendering and parameter
+binding refuse them, while SQL NULL remains `Value::Null`. Docker-backed scalar
+tests compare native type, text, range hull and component count; the built-in
+array OID census compares native type, text and JSON and verifies explicit
+consumer refusal. This is a safe refusal contract, not multirange support.
 The built-in `tsvector[]` and `tsquery[]` now have separate explicit-refusal
 assertions with native text-search JSON and wire oracles; refused literals and
 bindings leave target and sibling rows unchanged
