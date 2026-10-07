@@ -72,7 +72,7 @@ custom array families and their consumers remain open. The unlisted built-in
 `money[]` refusal also now covers populated values, SQL NULL elements, native
 text/JSON/wire snapshots, literal/bind refusal and target/sibling preservation
 (`value_contract_money_array_refusal_preserves_target_and_sibling_rows` in
-`crates/drivers/postgres/tests/support/custom_array_contract.rs`; see the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028902397)).
+`crates/drivers/postgres/tests/support/custom_array_contract.rs`; see the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028961640)).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
