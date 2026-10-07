@@ -23,10 +23,10 @@ findings from #150/#151, corrects the ignored-test inventory and duplicate B4
 ledger rows, and moves SSH host-key generation to container startup. PR #154
 added a PostgreSQL enum-array slice consumer case. Its hosted quick gate exposed
 the PostgreSQL contract source exceeding the file-size limit; the regression is
-now split into its own included file and the ignored-test inventory updated.
-The follow-up is in progress. The scoped XLSX writer mutation run caught 41/41
-mutants; broad core/package coverage remains open. These changes do not qualify
-the release.
+now split into its own included file and the ignored-test inventory updated in
+PR #156. Local quick checks pass; the PR's hosted checks remain pending. The
+scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
+coverage remains open. These changes do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -60,7 +60,7 @@ this existing-eight-driver stabilization scope.
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
 | B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines, including the recent PostgreSQL `name[]` and `oid[]` paths. The scoped core XLSX mutation run caught 41/41 generated mutants; wider core/package mutation coverage remains open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | C6 tunneled MySQL/SQL Server TLS and G5 system OpenSSH trust-flow contracts are merged; agentd generation-isolation, late-cancellation and shared journal-failure regressions are merged. Local TLS (43 tests) and PostgreSQL release (G5 plus 54 tests) suites pass on `11672cbe6`. | [Current B4 board](b4-task-board.md): hosted preflight/harness repair is in PR #153; I5 audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
+| B4 transport/sessions | C6 tunneled MySQL/SQL Server TLS and G5 system OpenSSH trust-flow contracts are merged; agentd generation-isolation, late-cancellation and shared journal-failure regressions are merged. PR #153 merged the preflight/harness inventory reconciliation and SSH fixture correction. | [Current B4 board](b4-task-board.md): I2, I5 audit, PostgreSQL rollback-failure acceptance and frozen-candidate/installed acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |
