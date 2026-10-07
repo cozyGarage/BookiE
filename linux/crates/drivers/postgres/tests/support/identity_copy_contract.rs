@@ -1,5 +1,5 @@
 use crate::{connect, start_pg};
-use tablepro_core::{Connection, Value};
+use tablepro_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
