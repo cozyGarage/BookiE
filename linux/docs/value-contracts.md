@@ -36,6 +36,9 @@ grid writes and typed CSV restore. Native `pg_typeof`, array text and
 `array_send` checks include XML fragments, SQL NULL, and a malformed XML
 assignment refused with SQLSTATE `2200N` without changing either row
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports now also preserve exact array
+text; SQL replay is checked against native JSON and wire bytes in
+`value_contract_xml_array_file_exports_preserve_native_text`.
 
 Custom composite arrays have a focused unsupported-value contract: native
 PostgreSQL type, text, JSON and wire oracles confirm the value while SQL literal

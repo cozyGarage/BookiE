@@ -62,6 +62,10 @@ edits. XML fragments with commas, quoted attributes, Unicode, entities and SQL
 NULL are checked against `pg_typeof` and `array_send`; malformed XML retains the
 native `2200N` refusal, with the target and sibling rows unchanged
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+The same XML array now also survives JSON, CSV, XML, HTML, Markdown, XLSX and
+SQL file exports with its native array text, NULL element, and wire bytes
+preserved on SQL replay (`value_contract_xml_array_file_exports_preserve_native_text`
+in `crates/drivers/postgres/tests/support/array_contract_parts/xml_array_file_exports.rs`).
 
 Custom composite arrays now have a named explicit-refusal contract. The test
 checks the undecodable value against PostgreSQL's native composite type, JSON,
