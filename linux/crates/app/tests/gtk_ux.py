@@ -18,7 +18,6 @@ class XWindowAttributes(ctypes.Structure):
 
 
 ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
-MENU_FIRST_DOWN_EXTRA = int(os.environ.get("TABLEPRO_GTK_MENU_EXTRA_DOWN", "0"))
 
 
 def x11_click(window_x, window_y, button=3, clicks=1):
@@ -110,7 +109,7 @@ def scenarios(ui):
         time.sleep(0.4)
 
     def choose_menu_item(position):
-        for _ in range(position + MENU_FIRST_DOWN_EXTRA):
+        for _ in range(position):
             ui.press_x11_key("Down")
             time.sleep(0.1)
         ui.press_x11_key("Return")
@@ -272,7 +271,8 @@ def scenarios(ui):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
         choose_menu_item(3)
-        ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
+        if os.environ.get("TABLEPRO_GTK_OLD_ADW") != "1":
+            ui.wait_for_node(name="payload", role=pyatspi.ROLE_DIALOG)
         deadline = time.monotonic() + ui.WAIT_SECONDS
         while time.monotonic() < deadline:
             if any(

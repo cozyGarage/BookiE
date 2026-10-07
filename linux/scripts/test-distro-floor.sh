@@ -11,7 +11,7 @@ for base in "${images[@]}"; do
   tag="bookie-floor-${base//[:\/]/-}"
   echo "== $base"
   docker build -q -t "$tag" --build-arg "BASE=$base" scripts/distro-floor >/dev/null
-  docker run --rm -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" -v "$PWD:/src:ro" -v "${tag}-target:/target" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu '
+  docker run --rm -e DISTRO_FLOOR_INSTALLED="${DISTRO_FLOOR_INSTALLED:-0}" -e TABLEPRO_GTK_Y_OFFSET="${TABLEPRO_GTK_Y_OFFSET:-5}" -e TABLEPRO_GTK_OLD_ADW=1 -v "$PWD:/src:ro" -v "${tag}-target:/target" -e CARGO_TARGET_DIR=/target "$tag" bash -ceu '
     pkg-config --modversion gtk4 libadwaita-1 gtksourceview-5
     cargo test --manifest-path /src/Cargo.toml -p tablepro-app --lib 2>&1 | grep -E "^test result|FAILED|failed|panicked" | head
     bash /src/scripts/test-gtk-widgets.sh 2>&1 | tail -4
