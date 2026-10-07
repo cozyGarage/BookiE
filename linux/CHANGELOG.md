@@ -14,6 +14,7 @@
 - PostgreSQL `macaddr[]` preserves canonical six-octet values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - PostgreSQL `macaddr8[]` preserves canonical eight-octet EUI-64 values and SQL NULL through results, inferred typed bindings, keyed updates and typed CSV import; native type/text/JSON/wire checks cover malformed-input refusal and sibling preservation.
 - PostgreSQL `inet[]` and `cidr[]` preserve IPv4/IPv6 addresses, prefixes, SQL NULL and array bounds through results, inferred typed bindings, keyed updates and typed CSV import; invalid prefixes and non-network CIDR host bits are refused without changing target or sibling rows.
+- PostgreSQL `xml[]` preserves XML fragments, SQL NULL, native array text and wire bytes through results, inferred bindings, keyed grid edits and typed CSV restore; malformed XML retains native `2200N` refusal without changing target or sibling rows.
 - PostgreSQL custom enum identifiers preserve metadata, keyed edits, and typed filters when a mixed-case quoted schema/type collides with lowercase names earlier in session or transaction-local `search_path`; native catalog and shadow-row checks verify the selected type, and shadow-only labels retain native `22P02` refusal.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
@@ -27,8 +28,9 @@
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL scalar enum CSV export and typed restore preserve leading and trailing label spaces.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.
-- PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` with a same-named shadow enum in `search_path`, including SQL NULL, target-only values and native invalid-label refusal.
-- PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured `search_path` places a same-named shadow enum first; target-only/NULL values and native invalid-label refusal are covered.
+- PostgreSQL enum parameter inference stays bound to a qualified target type after `SET ROLE` when a same-named shadow enum leads `search_path` and the target schema is absent; target-only values and native invalid-label refusal are covered.
+- PostgreSQL enum parameter inference also stays bound to a qualified target when a login role's configured default `search_path` places a same-named shadow enum first and omits the target schema; target-only/NULL values and native invalid-label refusal are covered.
+- PostgreSQL keyed enum edits and inferred query parameters stay bound to a mixed-case quoted target when a restricted role's `search_path` leads with a lowercase shadow and omits the target schema; shadow-only labels retain native `22P02` refusal.
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.

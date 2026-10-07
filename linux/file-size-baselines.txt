@@ -5,7 +5,7 @@
 # Empty means every crates/**/*.rs file is currently under the soft limit.
 
 crates/core/src/import/cell.rs 1243
-crates/core/src/sql_dialect.rs 1168
+crates/core/src/sql_dialect.rs 1100
 crates/drivers/mssql/tests/integration.rs 1351
 crates/drivers/mysql/tests/support/value_contracts.rs 1264
 crates/drivers/postgres/tests/support/domain_contract_parts/array_functions.rs 1461

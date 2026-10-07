@@ -68,6 +68,16 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
         .query_params_controlled("SET ROLE enum_role_contract", &[], &control)
         .await
         .unwrap();
+    let original_search_path = match session
+        .query_params_controlled("SHOW search_path", &[], &control)
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone()
+    {
+        Value::Text(path) => path,
+        other => panic!("search_path is not text: {other:?}"),
+    };
     session
         .query_params_controlled(
             "SET search_path TO enum_role_shadow, enum_role_target, public",
@@ -179,6 +189,86 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
     );
     assert_eq!(error_code(&invalid_shadow_label), error_code(&native_invalid_label));
 
+    session
+        .query_params_controlled("SET search_path TO enum_role_shadow, public", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled(
+                "SELECT current_user::text, current_setting('search_path')::text",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![
+            Value::Text("enum_role_contract".into()),
+            Value::Text("enum_role_shadow, public".into()),
+        ]]
+    );
+
+    let hidden_schema_update = session
+        .query_params_controlled(
+            "UPDATE enum_role_target.rows SET state = $1 WHERE id = 2 \
+             RETURNING id, state::text, pg_typeof(state)::text, sibling",
+            &[Value::Text("target-only".into())],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        hidden_schema_update.rows,
+        vec![vec![
+            Value::Int(2),
+            Value::Text("target-only".into()),
+            Value::Text(target_type.into()),
+            Value::Text("common sibling".into()),
+        ]]
+    );
+    let hidden_schema_query = session
+        .query_params_controlled(
+            "SELECT id, state::text, pg_typeof(state)::text \
+             FROM enum_role_target.rows \
+             WHERE state IS NOT DISTINCT FROM $1 ORDER BY id",
+            &[Value::Text("target-only".into())],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        hidden_schema_query.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text("target-only".into()),
+                Value::Text(target_type.into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("target-only".into()),
+                Value::Text(target_type.into()),
+            ],
+        ]
+    );
+    session
+        .query_params_controlled(
+            "SELECT set_config('search_path', $1, false)",
+            &[Value::Text(original_search_path.clone())],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled("SHOW search_path", &[], &control)
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text(original_search_path)]]
+    );
+
     let target_rows = session
         .query_params_controlled(
             "SELECT id, state::text, pg_typeof(state)::text, sibling \
@@ -193,6 +283,14 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
         .await
         .unwrap();
     session.close().await.unwrap();
+    let native_target_rows = connection
+        .query(
+            "SELECT id, state::text, pg_typeof(state)::text, sibling \
+             FROM enum_role_target.rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(target_rows.rows, native_target_rows.rows);
     assert_eq!(
         target_rows.rows,
         vec![
@@ -204,7 +302,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
             ],
             vec![
                 Value::Int(2),
-                Value::Text("common".into()),
+                Value::Text("target-only".into()),
                 Value::Text(target_type.into()),
                 Value::Text("common sibling".into()),
             ],
@@ -267,7 +365,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
     admin
         .execute(
             "ALTER ROLE enum_role_login_contract SET search_path \
-             TO enum_role_login_shadow, enum_role_login_target, public",
+             TO enum_role_login_shadow, public",
         )
         .await
         .unwrap();
@@ -304,7 +402,7 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_role_login()
         identity.rows,
         vec![vec![
             Value::Text("enum_role_login_contract".into()),
-            Value::Text("enum_role_login_shadow, enum_role_login_target, public".into()),
+            Value::Text("enum_role_login_shadow, public".into()),
         ]]
     );
 
