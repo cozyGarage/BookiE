@@ -19,6 +19,8 @@ services:
     build:
       context: .
       dockerfile: mssql/Dockerfile
+    # The entrypoint copies the generated keytab, then drops to mssql before sqlservr starts.
+    user: "0:0"
     depends_on:
       ad:
         condition: service_healthy
@@ -53,6 +55,7 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
+    user: "${BOOKIE_UID:?set by test-mssql-kerberos.sh}:${BOOKIE_GID:?set by test-mssql-kerberos.sh}"
     depends_on:
       mssql:
         condition: service_healthy

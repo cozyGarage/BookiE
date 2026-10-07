@@ -10,6 +10,7 @@ from collections import Counter
 
 root = Path(__file__).resolve().parents[1]
 registry = json.loads((root / "scripts/isolated-tests.json").read_text())
+POSTGRES_RELEASE_RUNNER = "scripts/test-postgres-release.sh"
 
 
 def workspace_packages():
@@ -90,11 +91,11 @@ for path in sorted((root / "crates").rglob("*.rs")):
         elif "driver-tls-tests" in relative:
             tier, enable = "TLS", "scripts/test-driver-tls.sh"
         elif "release-tests" in relative:
-            tier, enable = "Release", "scripts/test-postgres-release.sh"
+            tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif "postgres release fixture" in reason.lower():
-            tier, enable = "Release", "scripts/test-postgres-release.sh"
+            tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif relative == "crates/agentd/tests/mtls.rs":
-            tier, enable = "Release", "scripts/test-postgres-release.sh"
+            tier, enable = "Release", POSTGRES_RELEASE_RUNNER
         elif "socket" in relative:
             tier, enable = "Socket", "scripts/test-postgres-socket.sh"
         elif "smoke_local" in relative:

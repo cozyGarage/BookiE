@@ -19,9 +19,12 @@ fi
 
 TARGET_DIR="${CARGO_TARGET_DIR:-$ROOT/target}"
 export BOOKIE_TEST_DEPS="$TARGET_DIR/debug/deps"
+export BOOKIE_UID="$(id -u)"
+export BOOKIE_GID="$(id -g)"
 export BOOKIE_TEST_BINARY=placeholder
 COMPOSE=(docker compose --project-directory "$FIXTURE" -f "$FIXTURE/docker-compose.yml")
 KEEP_UP="${BOOKIE_MSSQL_KERBEROS_KEEP_UP:-0}"
+AD_ADMIN_CREDENTIAL='Administrator%Passw0rd'
 
 teardown() {
   if [[ "$KEEP_UP" == "1" ]]; then
@@ -45,13 +48,13 @@ bash "$FIXTURE/generate-materials.sh"
 "${COMPOSE[@]}" exec -T ad samba-tool spn add \
   MSSQLSvc/mssql.domain1.sink.test:1433 mssqlsvc
 "${COMPOSE[@]}" exec -T ad samba-tool dns add 127.0.0.1 domain1.sink.test \
-  mssql A 172.30.50.3 -U 'Administrator%Passw0rd'
+  mssql A 172.30.50.3 -U "$AD_ADMIN_CREDENTIAL"
 "${COMPOSE[@]}" exec -T ad samba-tool dns add 127.0.0.1 domain1.sink.test \
-  DOMAIN1 A 172.30.50.2 -U 'Administrator%Passw0rd'
+  DOMAIN1 A 172.30.50.2 -U "$AD_ADMIN_CREDENTIAL"
 "${COMPOSE[@]}" exec -T ad samba-tool dns zonecreate 127.0.0.1 \
-  50.30.172.in-addr.arpa -U 'Administrator%Passw0rd'
+  50.30.172.in-addr.arpa -U "$AD_ADMIN_CREDENTIAL"
 "${COMPOSE[@]}" exec -T ad samba-tool dns add 127.0.0.1 50.30.172.in-addr.arpa \
-  2 PTR dc1.domain1.sink.test. -U 'Administrator%Passw0rd'
+  2 PTR dc1.domain1.sink.test. -U "$AD_ADMIN_CREDENTIAL"
 
 "${COMPOSE[@]}" exec -T ad samba-tool domain exportkeytab \
   /tmp/mssql-spn.keytab --principal=MSSQLSvc/mssql.domain1.sink.test:1433
