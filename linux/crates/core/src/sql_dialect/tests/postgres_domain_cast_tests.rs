@@ -80,7 +80,7 @@ fn postgres_domain_text_updates_cast_to_the_qualified_type() {
     .unwrap();
     assert_eq!(
         sql,
-        r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2 AND "items" IS NOT DISTINCT FROM $3"#
+        r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2 AND "items" IS NOT DISTINCT FROM $3::text::"domain_over_array"."small_ints""#
     );
     assert_eq!(
         params,

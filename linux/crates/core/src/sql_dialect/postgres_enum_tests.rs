@@ -60,7 +60,7 @@ fn postgres_enum_write_casts_quote_catalog_schema_and_type_names() {
     .unwrap();
     assert_eq!(
         sql,
-        r#"UPDATE "t" SET "status" = $1::text::"odd schema"."status""type" WHERE "id" = $2 AND "status" IS NOT DISTINCT FROM $3"#
+        r#"UPDATE "t" SET "status" = $1::text::"odd schema"."status""type" WHERE "id" = $2 AND "status" IS NOT DISTINCT FROM $3::text::"odd schema"."status""type""#
     );
     assert_eq!(
         params,

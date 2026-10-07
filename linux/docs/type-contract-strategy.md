@@ -2,7 +2,7 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
+and acceptance. Updated 2026-10-08; new cases link to their source tests and PR
 validation comments, while this summary is not itself runtime evidence.
 
 MySQL transaction queries already shared the production result collector; the
@@ -29,7 +29,7 @@ through result decoding, typed parameter binding, keyed grid edits and CSV
 export/import. Native `array_send`, JSON, type and sibling-row checks are the
 oracles; malformed array text and same-named composite types are refused without
 data loss ([evidence](evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json)).
-Domain-over-array columns now retain their declared PostgreSQL domain metadata in query results and table metadata, so keyed grid edits cast through the qualified domain. The Docker regression checks non-default lower bounds, NULL/empty arrays, JSON and wire bytes, plus CHECK refusal ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)). Other custom PostgreSQL array families remain open.
+Domain-over-array columns retain their declared PostgreSQL domain metadata in query and table metadata. Optimistic grid edits cast both the submitted and previously read values to the qualified domain, so PostgreSQL can perform both assignment and stale-row comparison. The Docker regression checks non-default lower bounds, NULL/empty arrays, JSON and wire bytes, sibling preservation and domain CHECK refusal ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)). Custom-enum optimistic edits use the same qualified cast for the old-value comparison under restricted roles and shadowed `search_path` ([test](../crates/drivers/postgres/tests/support/enum_role_context_contract.rs)). Other custom PostgreSQL array families remain open.
 
 PostgreSQL `bit[]` and `varbit[]` now decode from their native array wire
 format. Fixed-width values, varying lengths, empty bit strings, SQL NULL,

@@ -92,7 +92,13 @@ pub fn build_optimistic_keyed_update(
             continue;
         }
         let name = quote_ident(driver_id, &columns[*col_idx].name);
-        predicates.push(optimistic_predicate(driver_id, &name, old_value, &mut params)?);
+        predicates.push(optimistic_predicate(
+            driver_id,
+            &name,
+            &columns[*col_idx],
+            old_value,
+            &mut params,
+        )?);
     }
     let qualified = qualified_table(driver_id, schema, table);
     Ok((
@@ -109,12 +115,19 @@ pub fn build_optimistic_keyed_update(
 fn optimistic_predicate(
     driver_id: &str,
     name: &str,
+    column: &crate::ColumnInfo,
     old_value: &Value,
     params: &mut Vec<Value>,
 ) -> Result<String, BuildSqlError> {
     let placeholder = placeholder_for(driver_id, params.len());
     let predicate = match driver_id {
-        "postgres" | "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
+        "postgres" => {
+            let value_sql = postgres_text_cast_type(column, old_value)
+                .map(|type_name| format!("{placeholder}::text::{type_name}"))
+                .unwrap_or(placeholder);
+            format!("{name} IS NOT DISTINCT FROM {value_sql}")
+        }
+        "sqlite" | "duckdb" => format!("{name} IS NOT DISTINCT FROM {placeholder}"),
         "mysql" => format!("{name} <=> {placeholder}"),
         "mssql" => {
             let next = placeholder_for(driver_id, params.len() + 1);
