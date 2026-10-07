@@ -1,29 +1,35 @@
-B4 candidate acceptance checkpoint — 2026-10-07
+# B4 candidate acceptance checkpoint — 2026-10-07
 
-Baseline: fork/linux 4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4 (PR #159 merge).
+The broad candidate layer report records local work based on `fork/linux`
+`4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4` (PR #159). It passed the full,
+security-policy, drivers, TLS, SSH, PostgreSQL release, widgets, keyring,
+app-server, supply-chain and SQL Server Kerberos layers. The Arch packaging
+contract passed. The Debian package step lacked `dpkg-deb` on the host; its
+validator passed in a disposable Debian testing container.
 
-Initial broad local layer run: full, security-policy, drivers, TLS, SSH,
-PostgreSQL release, widgets, keyring, app-server, packaging contracts,
-supply-chain and SQL Server Kerberos passed. UI initially exposed a stale GTK
-setup in audit_failure_denies and a flaky file chooser interaction in the
-bundle-import scenarios. Host Debian package-contract step was blocked because
-dpkg-deb is absent on this host.
+PR #162 fixes the GTK safety setup and adds Xvfb/AT-SPI runtime packages to
+the PostgreSQL release job. PR #161 had already added GTK build dependencies.
+On PR #162 SHA `301b05926418eddd7cf895781de56dea77c87c77`, the full local UI
+layer passed all 47 scenarios in 268.396 seconds.
 
-Local follow-up fixes: audit_failure_denies now exercises a saved connection
-without opening the editor and verifies denial/audit behavior; bundle import
-uses the AT-SPI location action. The complete UI layer then passed (47 GTK
-scenarios; 238.348 seconds). The Debian package symlink validator passed in a
-disposable debian:testing container (image digest recorded in the manifest).
-Workflow actionlint and the 9-test workflow unit suite passed. Python bytecode
-compilation passed.
+The first hosted PR #162 run exposed a GTK accessibility role mismatch: Debian
+reported the visible SSH trust prompt as a frame, while the test required an
+alert. It also exposed that the tunnel-loss GTK scenario trusted the bastion
+but not the configured second hop. The prompt selector now accepts either
+AT-SPI role, and a shared helper trusts each configured SSH hop. After these
+changes, the full PostgreSQL release layer passed all five default GTK
+scenarios, and the tunnel-loss/reconnect scenario passed separately. The
+original hosted PostgreSQL failure report and log are retained here.
 
-Hosted PR #159 at merge: PostgreSQL release job failed before tests because
-GTK/GLib development pkg-config dependencies were missing. Installed GTK
-safety smoke failed because its setup opened the editor before testing the
-expected audit fail-closed path. The PostgreSQL workflow now installs the GTK
-build and AT-SPI runtime dependencies; the GTK test corrections are local.
-These hosted fixes still require a follow-up PR and fresh hosted checks.
+Hosted Fast checks failed before building when Debian's mirror served
+`media-types_14.0.0_all.deb` at a size inconsistent with the package index;
+installed GTK smoke was skipped as a consequence. This is independent of the
+GTK role and two-hop test corrections. In that first hosted run, preflight,
+driver TLS, DuckDB, security, supply chain, SonarCloud, harness, ref resolution,
+workflow lint and both Flatpak builds passed; driver integration was still
+running at the last observation. See the manifest for exact statuses and
+hashes. Fresh hosted validation is required on the final follow-up commit.
 
-Not established here: installed Arch/Omarchy/Hyprland Wayland acceptance,
-upgrade/rollback, Debian/GNOME Wayland acceptance, or B3 completion. This
-checkpoint does not close B4 or qualify a release.
+Installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
+Debian/GNOME Wayland acceptance, B3 completion and frozen-candidate acceptance
+are not established here. This evidence does not close B4 or qualify a release.

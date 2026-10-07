@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "commit": "43c0576b1b7d993767c9a99bf4ffa023a80b3378",
+  "working_tree": "",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-07T08:40:46.798658+00:00",
+  "status": "failed",
+  "layers": {
+    "postgres-release": {
+      "status": "failed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-postgres-release.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "failed",
+          "log": "postgres-release-1.log",
+          "exit_code": 1,
+          "seconds": 376.194
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T08:47:02.993676+00:00"
+}

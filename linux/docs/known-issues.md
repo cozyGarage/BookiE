@@ -18,9 +18,10 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
-2026-10-07. Items come from the archived audits of 2026-09-17 to 2026-10-06 and the
-[sprint](bookie-0.2-sprint.md); the first column says which area owns them.
+Reconciled against BookiE `fork/linux` at `c2fa01c08` (PR #164) and the current
+[B4 board](b4-task-board.md), checked 2026-10-07. Items come from the archived
+audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
+first column says which area owns them.
 
 ## UI (app layer)
 
@@ -79,11 +80,11 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` covers A/B isolation, replacement, late cancellation and journal-failure sharing | sandbox |
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
-| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | | sandbox |
+| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | UNVERIFIED | Shared transport, GTK and PostgreSQL fixtures verify one terminal audit outcome on success, refusal, cancellation and setup failure; a separate UI case denies mutations after live journal loss. See [B4 I5 evidence](b4-task-board.md#in-progress-local-slices). Frozen-candidate, hosted and installed acceptance remain | sandbox |
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
-| B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
+| B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | UNVERIFIED | Source evidence matrix is complete on the B4 board; frozen-candidate, hosted and installed acceptance remain | manual |
 | B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
-| B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
+| B4-11 | MySQL failed-batch rollback: remaining storage engines and side effects | UNVERIFIED | InnoDB parent/trigger rollback, MyISAM/MEMORY/CSV/ARCHIVE surviving trigger writes, UPDATE/DELETE effects and AUTO_INCREMENT behavior have local Docker evidence linked from [the B4 board](b4-task-board.md#remaining-tasks); other engine classes and side-effect patterns still need bounded proof | driver-docker |
 | B4-12 | PostgreSQL rollback-failure acceptance | OPEN | The native Docker regression now covers backend termination during statement 1, `TransactionRollbackFailed`, and absence of the earlier insert; focused local pass is recorded on the B4 board. Re-run on the frozen candidate and extend side-effect coverage | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
 | B4-14 | ~~U5: saved mTLS transport and consumer support~~ | DONE | PostgreSQL server requiring client cert: direct/SSH shared transport, missing/untrusted/rotated identities, GTK saved-connection query, agentd direct + saved SSH and untrusted-cert refusal. MySQL driver fixture: direct/SSH, missing/untrusted/rotated identities. `scripts/test-postgres-release.sh` and `scripts/test-driver-tls.sh` pass locally; installed/package/hosted acceptance remains separate | driver-docker + gtk-widget |
@@ -94,7 +95,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-19 | ~~Hostile-server SCRAM challenges: short or non-ASCII nonces and excessive iterations~~ | DONE | Vendored SQLx rejects a server nonce that does not extend the client nonce, includes a non-printable/non-ASCII byte, or has no server suffix. A local PostgreSQL wire fixture verifies short, non-ASCII, and 100,001-iteration challenges are rejected before the client sends its proof; `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | unit |
 | B4-20 | ~~Credential rotation during connect: fingerprint and assembly load material separately~~ | DONE | Daemon: `a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest` and `a_material_lookup_failure_*` tests; the GUI reconnect reuses the options captured at connect, so it has no second lookup | sandbox |
 | B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | [Local Samba AD fixture](evidence/mssql-kerberos-2026-10-07/manifest.json) and [hardened-container rerun](evidence/mssql-kerberos-hardening-2026-10-07/manifest.json): ticket-based VerifyFull query and unregistered-SPN refusal pass; Windows AD interoperability and candidate/hosted acceptance remain | driver-docker |
-| B4-22 | Bundle export and import write no audit entries | OPEN | ADR 0010; durable intent/outcome implementation, interrupted-intent recovery, fail-closed, and paired-event checks pass. Plaintext export/import and encrypted round-trip GTK evidence is linked from [the B4 board](b4-task-board.md#in-progress-local-slices); frozen-candidate, hosted and installed acceptance remain | sandbox |
+| B4-22 | Bundle export and import write no audit entries | UNVERIFIED | ADR 0010; durable intent/outcome implementation, interrupted-intent recovery, fail-closed, and paired-event checks pass. Plaintext export/import and encrypted round-trip GTK evidence is linked from [the B4 board](b4-task-board.md#in-progress-local-slices); frozen-candidate, hosted and installed acceptance remain | sandbox |
 
 ## Security
 

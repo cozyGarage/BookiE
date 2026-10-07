@@ -8,8 +8,8 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `b586f6b43` (PR #161) on `fork/linux`;
-PR #158 and #160 also merged afterward.
+Current integrated source baseline: `c2fa01c08` (PR #164) on `fork/linux`;
+PRs #158, #160, #162 and #164 merged after the earlier PR #161 checkpoint.
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
@@ -66,7 +66,7 @@ this existing-eight-driver stabilization scope.
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
 | B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines, including the recent PostgreSQL `name[]` and `oid[]` paths. The scoped core XLSX mutation run caught 41/41 generated mutants; wider core/package mutation coverage remains open. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
-| B4 transport/sessions | C6 tunneled MySQL/SQL Server TLS and G5 system OpenSSH trust-flow contracts are merged; agentd generation-isolation, late-cancellation and shared journal-failure regressions are merged. PR #153 merged the preflight/harness inventory reconciliation and SSH fixture correction. | [Current B4 board](b4-task-board.md): I2, I5 audit, PostgreSQL rollback-failure acceptance and frozen-candidate/installed acceptance remain open |
+| B4 transport/sessions | C6/G5, SSH audit, rollback-failure, Kerberos and recent PostgreSQL refusal slices are merged through #164. PR #162 merged the first GTK safety setup correction. This follow-up makes SSH trust-prompt role detection portable across GTK stacks and fixes two-hop trust handling in the tunnel-loss test; local UI and PostgreSQL release layers pass, while fresh hosted validation is pending. | [Current B4 board](b4-task-board.md): local implementation is substantially complete; frozen B3+B4 candidate, remaining hosted/installed acceptance and specific rollback side-effect coverage remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
 | B7 qualification | Open | Frozen SHA, affected automated gates, both installed desktop targets and retry-free soak; publication separate |

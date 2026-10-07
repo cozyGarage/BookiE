@@ -1,0 +1,1850 @@
+wrote fixture materials to /home/runner/work/BookiE/BookiE/linux/tests/fixtures/postgres-release/materials
+the SSH host key changed; the release script uses a fixture-local known_hosts file
+ toxiproxy Pulling
+ 115ddf12879d Pulling fs layer
+ db1cf8f01afb Pulling fs layer
+ db1cf8f01afb Downloading [>                                                  ]  49.15kB/4.015MB
+ 115ddf12879d Downloading [>                                                  ]  35.68kB/3.536MB
+ 115ddf12879d Verifying Checksum
+ 115ddf12879d Download complete
+ 115ddf12879d Extracting [>                                                  ]  65.54kB/3.536MB
+ db1cf8f01afb Verifying Checksum
+ db1cf8f01afb Download complete
+ 115ddf12879d Extracting [==================================================>]  3.536MB/3.536MB
+ 115ddf12879d Extracting [==================================================>]  3.536MB/3.536MB
+ 115ddf12879d Pull complete
+ db1cf8f01afb Extracting [>                                                  ]  65.54kB/4.015MB
+ db1cf8f01afb Extracting [==================================================>]  4.015MB/4.015MB
+ db1cf8f01afb Pull complete
+ toxiproxy Pulled
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.21kB done
+#1 DONE 0.0s
+
+#2 [db internal] load build definition from Dockerfile
+#2 transferring dockerfile: 354B 0.0s done
+#2 DONE 0.0s
+
+#3 [bastion internal] load build definition from Dockerfile
+#3 transferring dockerfile: 1.03kB 0.0s done
+#3 DONE 0.0s
+
+#4 [relay internal] load build definition from Dockerfile
+#4 transferring dockerfile: 1.02kB 0.0s done
+#4 DONE 0.0s
+
+#5 [relay internal] load metadata for docker.io/library/alpine:3.21
+#5 ...
+
+#6 [auth] library/alpine:pull token for registry-1.docker.io
+#6 DONE 0.0s
+
+#7 [auth] library/postgres:pull token for registry-1.docker.io
+#7 DONE 0.0s
+
+#8 [db internal] load metadata for docker.io/library/postgres:16-alpine
+#8 DONE 0.9s
+
+#5 [bastion internal] load metadata for docker.io/library/alpine:3.21
+#5 DONE 0.9s
+
+#9 [bastion internal] load .dockerignore
+#9 transferring context: 2B done
+#9 DONE 0.0s
+
+#10 [db internal] load build context
+#10 transferring context: 4.70kB done
+#10 DONE 0.0s
+
+#11 [relay internal] load build context
+#11 transferring context: 683B done
+#11 DONE 0.0s
+
+#12 [bastion internal] load build context
+#12 transferring context: 669B done
+#12 DONE 0.0s
+
+#13 [relay 1/5] FROM docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+#13 resolve docker.io/library/alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507 done
+#13 sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507 9.22kB / 9.22kB done
+#13 sha256:3c81aa9a3d770b316568f4499e30461a5cd3fbd7180bd89e28e34894c7845832 1.02kB / 1.02kB done
+#13 sha256:9cb701c20b595f4442ba074b2ec924f396f4c474084608116901ce3098ebfe3d 611B / 611B done
+#13 sha256:16333ee0c00fc65e025a2a4f839703ad37a74728832977fbdf080984de1b8e5a 0B / 3.63MB 0.1s
+#13 extracting sha256:16333ee0c00fc65e025a2a4f839703ad37a74728832977fbdf080984de1b8e5a
+#13 sha256:16333ee0c00fc65e025a2a4f839703ad37a74728832977fbdf080984de1b8e5a 3.63MB / 3.63MB 0.2s done
+#13 extracting sha256:16333ee0c00fc65e025a2a4f839703ad37a74728832977fbdf080984de1b8e5a 0.1s done
+#13 DONE 0.3s
+
+#14 [bastion 2/5] RUN apk add --no-cache openssh-server     && adduser -D -s /bin/sh tunnel     && sed -i 's/^tunnel:!:/tunnel:*:/' /etc/shadow     && mkdir -p /home/tunnel/.ssh
+#14 0.149 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/APKINDEX.tar.gz
+#14 0.262 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/APKINDEX.tar.gz
+#14 0.671 (1/3) Installing openssh-keygen (9.9_p2-r0)
+#14 0.691 (2/3) Installing openssh-server-common (9.9_p2-r0)
+#14 0.697 (3/3) Installing openssh-server (9.9_p2-r0)
+#14 0.723 Executing busybox-1.37.0-r14.trigger
+#14 0.731 OK: 9 MiB in 18 packages
+#14 DONE 0.9s
+
+#15 [bastion 3/5] COPY materials/ssh_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#15 DONE 0.0s
+
+#16 [relay 3/5] COPY materials/ssh_relay_host_ed25519_key /etc/ssh/ssh_host_ed25519_key
+#16 DONE 0.0s
+
+#17 [bastion 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#17 DONE 0.0s
+
+#18 [relay 4/5] COPY materials/client_ed25519_key.pub /home/tunnel/.ssh/authorized_keys
+#18 DONE 0.0s
+
+#19 [db 1/6] FROM docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+#19 resolve docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea done
+#19 extracting sha256:1b7f9cd581eeedab1ccc397162662ee9238b4c4e074cc00429b8404fcf2219af done
+#19 sha256:210b280f9556440a6475a3d20cb52baac3ed21a482dbc5889005d9da5ec612f4 0B / 901.41kB 0.2s
+#19 sha256:1b7f9cd581eeedab1ccc397162662ee9238b4c4e074cc00429b8404fcf2219af 969B / 969B 0.1s done
+#19 sha256:1a66d744c1b459e13b05a8fca341da84cb63383e99ce262210efee5a319d4551 3.05kB / 3.05kB done
+#19 sha256:81717818649a9c77cf8c6f954d4d1cf744961a39e95756bc9cbf0f1f63f750f8 0B / 172B 0.2s
+#19 sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea 10.30kB / 10.30kB done
+#19 sha256:81bd698b4594e751a3269e4dcd3e03a4a0ec0daf7b72e7aa1abd43cce9887542 9.06kB / 9.06kB done
+#19 sha256:3ae6141cfd99b452b6681c53b7ad98794795232fd103f21aff66d2551310b767 0B / 116B 0.2s
+#19 extracting sha256:210b280f9556440a6475a3d20cb52baac3ed21a482dbc5889005d9da5ec612f4 0.0s done
+#19 extracting sha256:81717818649a9c77cf8c6f954d4d1cf744961a39e95756bc9cbf0f1f63f750f8 done
+#19 extracting sha256:3ae6141cfd99b452b6681c53b7ad98794795232fd103f21aff66d2551310b767 done
+#19 sha256:6c25da34e03ff0b3cfff79692019fae820b89a50db84537f15168a4d538c337b 9.67kB / 9.67kB 0.3s done
+#19 sha256:25b77f59fd950b831b1d657ac02b3f928f53fd09180c59ebed1ffd697838c31a 111.29MB / 111.29MB 0.6s done
+#19 sha256:a88782f9280681a31f5d2cac17c4942587a302d42f0a4b3cd9faf9643f5b5270 128B / 128B 0.3s done
+#19 sha256:d8d21be4bf02dc58e3f0d02f32d50d42e349f0a27b895716a1dc3224e7ea3c7c 169B / 169B 0.4s done
+#19 sha256:509688edf37bf62fcdb59297fd894b2b5ae4fc0beb79d98ad2e9ff06a26a939c 185B / 185B 0.5s done
+#19 sha256:6117bd39f23f25487117cad6c2a1cdda0ec0e4652de068ae90b8ce4ef8647aaa 6.11kB / 6.11kB 0.4s done
+#19 extracting sha256:25b77f59fd950b831b1d657ac02b3f928f53fd09180c59ebed1ffd697838c31a 0.8s
+#19 ...
+
+#20 [bastion 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#20 DONE 0.2s
+
+#21 [relay 5/5] RUN chmod 600 /etc/ssh/ssh_host_ed25519_key     && chown -R tunnel:tunnel /home/tunnel/.ssh     && chmod 700 /home/tunnel/.ssh     && chmod 600 /home/tunnel/.ssh/authorized_keys     && printf '%s\n'         'Port 22'         'HostKey /etc/ssh/ssh_host_ed25519_key'         'PermitRootLogin no'         'PasswordAuthentication no'         'KbdInteractiveAuthentication no'         'PubkeyAuthentication yes'         'AllowTcpForwarding yes'         'AllowUsers tunnel'         'PermitOpen any'         'X11Forwarding no'         'AllowAgentForwarding no'         > /etc/ssh/sshd_config
+#21 DONE 0.3s
+
+#22 [relay] exporting to image
+#22 exporting layers
+#22 exporting layers 0.9s done
+#22 writing image sha256:379f91e086a26dfc08905bd05aa69ca070e5217004a30f49599fdb5c73d35c04 done
+#22 naming to docker.io/library/tablepro-postgres-release-relay done
+#22 DONE 0.9s
+
+#23 [bastion] exporting to image
+#23 exporting layers 1.0s done
+#23 writing image sha256:9284f65c69bb4690b9c87a9c3abe67bca10a4a83d74ff00364fbdf2267370169 done
+#23 naming to docker.io/library/tablepro-postgres-release-bastion done
+#23 DONE 1.0s
+
+#24 [bastion] resolving provenance for metadata file
+#24 DONE 0.0s
+
+#25 [relay] resolving provenance for metadata file
+#25 DONE 0.0s
+
+#19 [db 1/6] FROM docker.io/library/postgres:16-alpine@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea
+#19 extracting sha256:25b77f59fd950b831b1d657ac02b3f928f53fd09180c59ebed1ffd697838c31a 2.3s done
+#19 extracting sha256:6c25da34e03ff0b3cfff79692019fae820b89a50db84537f15168a4d538c337b
+#19 extracting sha256:6c25da34e03ff0b3cfff79692019fae820b89a50db84537f15168a4d538c337b done
+#19 extracting sha256:a88782f9280681a31f5d2cac17c4942587a302d42f0a4b3cd9faf9643f5b5270 done
+#19 extracting sha256:d8d21be4bf02dc58e3f0d02f32d50d42e349f0a27b895716a1dc3224e7ea3c7c done
+#19 extracting sha256:6117bd39f23f25487117cad6c2a1cdda0ec0e4652de068ae90b8ce4ef8647aaa done
+#19 extracting sha256:509688edf37bf62fcdb59297fd894b2b5ae4fc0beb79d98ad2e9ff06a26a939c done
+#19 DONE 3.2s
+
+#26 [db 2/6] COPY materials/server.crt /certs/server.crt
+#26 DONE 0.0s
+
+#27 [db 3/6] COPY materials/server.key /certs/server.key
+#27 DONE 0.0s
+
+#28 [db 4/6] COPY materials/ca.crt /certs/ca.crt
+#28 DONE 0.0s
+
+#29 [db 5/6] COPY db/pg_hba.conf /certs/pg_hba.conf
+#29 DONE 0.0s
+
+#30 [db 6/6] RUN chown -R postgres:postgres /certs     && chmod 600 /certs/server.key     && chmod 644 /certs/server.crt /certs/ca.crt
+#30 DONE 0.2s
+
+#31 [db] exporting to image
+#31 exporting layers 1.0s done
+#31 writing image sha256:42d2800202721655da6f91e11072a2387179aeb41f6d5579bb6d4d6b2e0c5937 done
+#31 naming to docker.io/library/tablepro-postgres-release-db done
+#31 DONE 1.0s
+
+#32 [db] resolving provenance for metadata file
+#32 DONE 0.0s
+ relay  Built
+ db  Built
+ bastion  Built
+ Network tablepro-postgres-release_fixture  Creating
+ Network tablepro-postgres-release_fixture  Created
+ Container tablepro-postgres-release-relay-1  Creating
+ Container tablepro-postgres-release-db-1  Creating
+ Container tablepro-postgres-release-relay-1  Created
+ Container tablepro-postgres-release-db-1  Created
+ Container tablepro-postgres-release-bastion-1  Creating
+ Container tablepro-postgres-release-bastion-1  Created
+ Container tablepro-postgres-release-toxiproxy-1  Creating
+ Container tablepro-postgres-release-toxiproxy-1  Created
+ Container tablepro-postgres-release-db-1  Starting
+ Container tablepro-postgres-release-relay-1  Starting
+ Container tablepro-postgres-release-db-1  Started
+ Container tablepro-postgres-release-db-1  Waiting
+ Container tablepro-postgres-release-relay-1  Started
+ Container tablepro-postgres-release-db-1  Healthy
+ Container tablepro-postgres-release-bastion-1  Starting
+ Container tablepro-postgres-release-bastion-1  Started
+ Container tablepro-postgres-release-bastion-1  Waiting
+ Container tablepro-postgres-release-bastion-1  Healthy
+ Container tablepro-postgres-release-toxiproxy-1  Starting
+ Container tablepro-postgres-release-toxiproxy-1  Started
+ Container tablepro-postgres-release-toxiproxy-1  Waiting
+ Container tablepro-postgres-release-db-1  Waiting
+ Container tablepro-postgres-release-bastion-1  Waiting
+ Container tablepro-postgres-release-relay-1  Waiting
+ Container tablepro-postgres-release-db-1  Healthy
+ Container tablepro-postgres-release-toxiproxy-1  Healthy
+ Container tablepro-postgres-release-relay-1  Healthy
+ Container tablepro-postgres-release-bastion-1  Healthy
+[1m[92m    Updating[0m git repository `https://github.com/tiberius-rs/tiberius`
+[1m[92m    Updating[0m crates.io index
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m adler2 v2.0.1
+[1m[92m  Downloaded[0m aead v0.6.1
+[1m[92m  Downloaded[0m argon2 v0.6.0
+[1m[92m  Downloaded[0m cfg_aliases v0.2.2
+[1m[92m  Downloaded[0m block-padding v0.4.2
+[1m[92m  Downloaded[0m cpufeatures v0.3.1
+[1m[92m  Downloaded[0m bcrypt-pbkdf v0.11.0
+[1m[92m  Downloaded[0m block-buffer v0.12.1
+[1m[92m  Downloaded[0m primeorder v0.14.0
+[1m[92m  Downloaded[0m async-trait v0.1.92
+[1m[92m  Downloaded[0m autocfg v1.5.1
+[1m[92m  Downloaded[0m blowfish v0.10.0
+[1m[92m  Downloaded[0m cfg-if v1.0.5
+[1m[92m  Downloaded[0m cmake v0.1.58
+[1m[92m  Downloaded[0m base64ct v1.8.3
+[1m[92m  Downloaded[0m cbc v0.2.1
+[1m[92m  Downloaded[0m chacha20 v0.10.2
+[1m[92m  Downloaded[0m cmov v0.5.4
+[1m[92m  Downloaded[0m fs_extra v1.3.0
+[1m[92m  Downloaded[0m byteorder v1.5.0
+[1m[92m  Downloaded[0m cipher v0.5.2
+[1m[92m  Downloaded[0m crypto-common v0.2.2
+[1m[92m  Downloaded[0m cpubits v0.1.1
+[1m[92m  Downloaded[0m proc-macro2 v1.0.107
+[1m[92m  Downloaded[0m quote v1.0.47
+[1m[92m  Downloaded[0m const-oid v0.10.2
+[1m[92m  Downloaded[0m crc32fast v1.5.2
+[1m[92m  Downloaded[0m pkcs8 v0.11.0
+[1m[92m  Downloaded[0m blake2 v0.11.0
+[1m[92m  Downloaded[0m rand v0.10.2
+[1m[92m  Downloaded[0m errno v0.3.14
+[1m[92m  Downloaded[0m futures-core v0.3.34
+[1m[92m  Downloaded[0m futures-task v0.3.34
+[1m[92m  Downloaded[0m generic-array v0.14.7
+[1m[92m  Downloaded[0m md5 v0.8.1
+[1m[92m  Downloaded[0m secrecy v0.10.3
+[1m[92m  Downloaded[0m serde_derive v1.0.229
+[1m[92m  Downloaded[0m hex v0.4.3
+[1m[92m  Downloaded[0m russh-util v0.52.0
+[1m[92m  Downloaded[0m rustversion v1.0.23
+[1m[92m  Downloaded[0m sha2 v0.11.0
+[1m[92m  Downloaded[0m signal-hook-registry v1.4.8
+[1m[92m  Downloaded[0m simd-adler32 v0.3.10
+[1m[92m  Downloaded[0m find-msvc-tools v0.1.12
+[1m[92m  Downloaded[0m futures-sink v0.3.34
+[1m[92m  Downloaded[0m aes v0.9.3
+[1m[92m  Downloaded[0m curve25519-dalek-derive v0.1.1
+[1m[92m  Downloaded[0m ghash v0.6.0
+[1m[92m  Downloaded[0m dunce v1.0.5
+[1m[92m  Downloaded[0m semver v1.0.28
+[1m[92m  Downloaded[0m delegate v0.13.5
+[1m[92m  Downloaded[0m futures-io v0.3.34
+[1m[92m  Downloaded[0m futures-macro v0.3.34
+[1m[92m  Downloaded[0m hex-literal v1.1.0
+[1m[92m  Downloaded[0m once_cell v1.21.4
+[1m[92m  Downloaded[0m password-hash v0.6.1
+[1m[92m  Downloaded[0m pbkdf2 v0.13.0
+[1m[92m  Downloaded[0m signature v3.0.0
+[1m[92m  Downloaded[0m wnaf v0.14.1
+[1m[92m  Downloaded[0m base16ct v1.0.0
+[1m[92m  Downloaded[0m bytes v1.12.1
+[1m[92m  Downloaded[0m ctr v0.10.1
+[1m[92m  Downloaded[0m enum_dispatch v0.3.13
+[1m[92m  Downloaded[0m ff v0.14.0
+[1m[92m  Downloaded[0m futures-executor v0.3.34
+[1m[92m  Downloaded[0m inout v0.2.2
+[1m[92m  Downloaded[0m module-lattice v0.2.3
+[1m[92m  Downloaded[0m num-integer v0.1.47
+[1m[92m  Downloaded[0m pem-rfc7468 v1.0.0
+[1m[92m  Downloaded[0m data-encoding v2.11.1
+[1m[92m  Downloaded[0m keccak v0.2.2
+[1m[92m  Downloaded[0m kem v0.3.0
+[1m[92m  Downloaded[0m ml-kem v0.3.2
+[1m[92m  Downloaded[0m pkg-config v0.3.34
+[1m[92m  Downloaded[0m russh-cryptovec v0.62.0
+[1m[92m  Downloaded[0m cc v1.4.6
+[1m[92m  Downloaded[0m ctutils v0.4.2
+[1m[92m  Downloaded[0m digest v0.11.3
+[1m[92m  Downloaded[0m ed25519 v3.0.0
+[1m[92m  Downloaded[0m group v0.14.0
+[1m[92m  Downloaded[0m hybrid-array v0.4.15
+[1m[92m  Downloaded[0m phc v0.6.1
+[1m[92m  Downloaded[0m pin-project-lite v0.2.17
+[1m[92m  Downloaded[0m pkcs5 v0.8.1
+[1m[92m  Downloaded[0m aes-gcm v0.11.1
+[1m[92m  Downloaded[0m des v0.9.0
+[1m[92m  Downloaded[0m ecdsa v0.17.0
+[1m[92m  Downloaded[0m jobserver v0.1.35
+[1m[92m  Downloaded[0m pkcs1 v0.8.0-rc.4
+[1m[92m  Downloaded[0m shlex v2.0.1
+[1m[92m  Downloaded[0m futures-channel v0.3.34
+[1m[92m  Downloaded[0m p256 v0.14.0
+[1m[92m  Downloaded[0m bitflags v2.13.2
+[1m[92m  Downloaded[0m elliptic-curve v0.14.1
+[1m[92m  Downloaded[0m getrandom v0.4.3
+[1m[92m  Downloaded[0m log v0.4.34
+[1m[92m  Downloaded[0m num-traits v0.2.19
+[1m[92m  Downloaded[0m slab v0.4.12
+[1m[92m  Downloaded[0m futures v0.3.34
+[1m[92m  Downloaded[0m generic-array v1.4.5
+[1m[92m  Downloaded[0m hmac v0.13.0
+[1m[92m  Downloaded[0m miniz_oxide v0.9.1
+[1m[92m  Downloaded[0m p384 v0.14.0
+[1m[92m  Downloaded[0m serde v1.0.229
+[1m[92m  Downloaded[0m socket2 v0.6.5
+[1m[92m  Downloaded[0m version_check v0.9.5
+[1m[92m  Downloaded[0m ed25519-dalek v3.0.0
+[1m[92m  Downloaded[0m flate2 v1.1.10
+[1m[92m  Downloaded[0m num-bigint v0.5.1
+[1m[92m  Downloaded[0m p521 v0.14.0
+[1m[92m  Downloaded[0m memchr v2.8.3
+[1m[92m  Downloaded[0m mio v1.2.3
+[1m[92m  Downloaded[0m der v0.8.2
+[1m[92m  Downloaded[0m sha1 v0.11.0
+[1m[92m  Downloaded[0m universal-hash v0.6.1
+[1m[92m  Downloaded[0m futures-util v0.3.34
+[1m[92m  Downloaded[0m hkdf v0.13.0
+[1m[92m  Downloaded[0m untrusted v0.7.1
+[1m[92m  Downloaded[0m crypto-primes v0.7.2
+[1m[92m  Downloaded[0m aws-lc-rs v1.18.1
+[1m[92m  Downloaded[0m crypto-bigint v0.7.5
+[1m[92m  Downloaded[0m scrypt v0.12.0
+[1m[92m  Downloaded[0m rustc_version v0.4.1
+[1m[92m  Downloaded[0m sponge-cursor v0.1.0
+[1m[92m  Downloaded[0m subtle v2.6.1
+[1m[92m  Downloaded[0m curve25519-dalek v5.0.0
+[1m[92m  Downloaded[0m rand_core v0.10.1
+[1m[92m  Downloaded[0m rfc6979 v0.6.0
+[1m[92m  Downloaded[0m nix v0.31.3
+[1m[92m  Downloaded[0m polyval v0.7.3
+[1m[92m  Downloaded[0m ssh-encoding v0.3.0
+[1m[92m  Downloaded[0m thiserror v2.0.20
+[1m[92m  Downloaded[0m thiserror-impl v2.0.20
+[1m[92m  Downloaded[0m tokio-macros v2.7.2
+[1m[92m  Downloaded[0m zeroize v1.9.0
+[1m[92m  Downloaded[0m primefield v0.14.0
+[1m[92m  Downloaded[0m sec1 v0.8.1
+[1m[92m  Downloaded[0m spki v0.8.0
+[1m[92m  Downloaded[0m tracing-attributes v0.1.31
+[1m[92m  Downloaded[0m poly1305 v0.9.1
+[1m[92m  Downloaded[0m ssh-cipher v0.3.0
+[1m[92m  Downloaded[0m salsa20 v0.11.0
+[1m[92m  Downloaded[0m serde_core v1.0.229
+[1m[92m  Downloaded[0m serdect v0.4.3
+[1m[92m  Downloaded[0m libc v0.2.189
+[1m[92m  Downloaded[0m tracing-core v0.1.36
+[1m[92m  Downloaded[0m unicode-ident v1.0.25
+[1m[92m  Downloaded[0m uuid v1.26.1
+[1m[92m  Downloaded[0m typenum v1.20.1
+[1m[92m  Downloaded[0m rsa v0.10.0-rc.18
+[1m[92m  Downloaded[0m russh v0.63.3
+[1m[92m  Downloaded[0m ssh-key v0.7.0-rc.11
+[1m[92m  Downloaded[0m sha3 v0.12.0
+[1m[92m  Downloaded[0m tokio-util v0.7.19
+[1m[92m  Downloaded[0m zlib-rs v0.6.8
+[1m[92m  Downloaded[0m syn v2.0.119
+[1m[92m  Downloaded[0m sha3 v0.11.0
+[1m[92m  Downloaded[0m syn v3.0.6
+[1m[92m  Downloaded[0m tracing v0.1.44
+[1m[92m  Downloaded[0m tokio v1.53.1
+[1m[92m  Downloaded[0m aws-lc-sys v0.45.0
+[1m[92m   Compiling[0m libc v0.2.189
+[1m[92m   Compiling[0m zeroize v1.9.0
+[1m[92m   Compiling[0m subtle v2.6.1
+[1m[92m   Compiling[0m typenum v1.20.1
+[1m[92m   Compiling[0m cmov v0.5.4
+[1m[92m   Compiling[0m cfg-if v1.0.5
+[1m[92m   Compiling[0m rand_core v0.10.1
+[1m[92m   Compiling[0m getrandom v0.4.3
+[1m[92m   Compiling[0m ctutils v0.4.2
+[1m[92m   Compiling[0m const-oid v0.10.2
+[1m[92m   Compiling[0m cpufeatures v0.3.1
+[1m[92m   Compiling[0m proc-macro2 v1.0.107
+[1m[92m   Compiling[0m quote v1.0.47
+[1m[92m   Compiling[0m unicode-ident v1.0.25
+[1m[92m   Compiling[0m cpubits v0.1.1
+[1m[92m   Compiling[0m hybrid-array v0.4.15
+[1m[92m   Compiling[0m autocfg v1.5.1
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m base64ct v1.8.3
+[1m[92m   Compiling[0m pem-rfc7468 v1.0.0
+[1m[92m   Compiling[0m der v0.8.2
+[1m[92m   Compiling[0m block-buffer v0.12.1
+[1m[92m   Compiling[0m block-padding v0.4.2
+[1m[92m   Compiling[0m inout v0.2.2
+[1m[92m   Compiling[0m crypto-common v0.2.2
+[1m[92m   Compiling[0m crypto-bigint v0.7.5
+[1m[92m   Compiling[0m syn v3.0.6
+[1m[92m   Compiling[0m digest v0.11.3
+[1m[92m   Compiling[0m cipher v0.5.2
+[1m[92m   Compiling[0m hmac v0.13.0
+[1m[92m   Compiling[0m universal-hash v0.6.1
+[1m[92m   Compiling[0m ctr v0.10.1
+[1m[92m   Compiling[0m polyval v0.7.3
+[1m[92m   Compiling[0m aes v0.9.3
+[1m[92m   Compiling[0m ghash v0.6.0
+[1m[92m   Compiling[0m pbkdf2 v0.13.0
+[1m[92m   Compiling[0m sha2 v0.11.0
+[1m[92m   Compiling[0m aead v0.6.1
+[1m[92m   Compiling[0m aes-gcm v0.11.1
+[1m[92m   Compiling[0m salsa20 v0.11.0
+[1m[92m   Compiling[0m spki v0.8.0
+[1m[92m   Compiling[0m scrypt v0.12.0
+[1m[92m   Compiling[0m cbc v0.2.1
+[1m[92m   Compiling[0m pkcs5 v0.8.1
+[1m[92m   Compiling[0m ff v0.14.0
+[1m[92m   Compiling[0m pkcs8 v0.11.0
+[1m[92m   Compiling[0m group v0.14.0
+[1m[92m   Compiling[0m signature v3.0.0
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m   Compiling[0m base16ct v1.0.0
+[1m[92m   Compiling[0m sec1 v0.8.1
+[1m[92m   Compiling[0m hkdf v0.13.0
+[1m[92m   Compiling[0m jobserver v0.1.35
+[1m[92m   Compiling[0m pin-project-lite v0.2.17
+[1m[92m   Compiling[0m bytes v1.12.1
+[1m[92m   Compiling[0m shlex v2.0.1
+[1m[92m   Compiling[0m find-msvc-tools v0.1.12
+[1m[92m   Compiling[0m elliptic-curve v0.14.1
+[1m[92m   Compiling[0m cc v1.4.6
+[1m[92m   Compiling[0m primefield v0.14.0
+[1m[92m   Compiling[0m semver v1.0.28
+[1m[92m   Compiling[0m wnaf v0.14.1
+[1m[92m   Compiling[0m rfc6979 v0.6.0
+[1m[92m   Compiling[0m rustc_version v0.4.1
+[1m[92m   Compiling[0m pkg-config v0.3.34
+[1m[92m   Compiling[0m futures-core v0.3.34
+[1m[92m   Compiling[0m fs_extra v1.3.0
+[1m[92m   Compiling[0m cmake v0.1.58
+[1m[92m   Compiling[0m futures-sink v0.3.34
+[1m[92m   Compiling[0m dunce v1.0.5
+[1m[92m   Compiling[0m curve25519-dalek v5.0.0
+[1m[92m   Compiling[0m ecdsa v0.17.0
+[1m[92m   Compiling[0m primeorder v0.14.0
+[1m[92m   Compiling[0m aws-lc-sys v0.45.0
+[1m[92m   Compiling[0m chacha20 v0.10.2
+[1m[92m   Compiling[0m errno v0.3.14
+[1m[92m   Compiling[0m cfg_aliases v0.2.2
+[1m[92m   Compiling[0m version_check v0.9.5
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m generic-array v0.14.7
+[1m[92m   Compiling[0m nix v0.31.3
+[1m[92m   Compiling[0m signal-hook-registry v1.4.8
+[1m[92m   Compiling[0m futures-channel v0.3.34
+[1m[92m   Compiling[0m ssh-encoding v0.3.0
+[1m[92m   Compiling[0m tokio-macros v2.7.2
+[1m[92m   Compiling[0m futures-macro v0.3.34
+[1m[92m   Compiling[0m socket2 v0.6.5
+[1m[92m   Compiling[0m mio v1.2.3
+[1m[92m   Compiling[0m keccak v0.2.2
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m futures-io v0.3.34
+[1m[92m   Compiling[0m curve25519-dalek-derive v0.1.1
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m rustversion v1.0.23
+[1m[92m   Compiling[0m byteorder v1.5.0
+[1m[92m   Compiling[0m futures-task v0.3.34
+[1m[92m   Compiling[0m slab v0.4.12
+[1m[92m   Compiling[0m crc32fast v1.5.2
+[1m[92m   Compiling[0m blowfish v0.10.0
+[1m[92m   Compiling[0m futures-util v0.3.34
+[1m[92m   Compiling[0m tokio v1.53.1
+[1m[92m   Compiling[0m ed25519 v3.0.0
+[1m[92m   Compiling[0m crypto-primes v0.7.2
+[1m[92m   Compiling[0m pkcs1 v0.8.0-rc.4
+[1m[92m   Compiling[0m poly1305 v0.9.1
+[1m[92m   Compiling[0m blake2 v0.11.0
+[1m[92m   Compiling[0m thiserror v2.0.20
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m bitflags v2.13.2
+[1m[92m   Compiling[0m adler2 v2.0.1
+[1m[92m   Compiling[0m simd-adler32 v0.3.10
+[1m[92m   Compiling[0m aws-lc-rs v1.18.1
+[1m[92m   Compiling[0m miniz_oxide v0.9.1
+[1m[92m   Compiling[0m rsa v0.10.0-rc.18
+[1m[92m   Compiling[0m argon2 v0.6.0
+[1m[92m   Compiling[0m ssh-cipher v0.3.0
+[1m[92m   Compiling[0m ed25519-dalek v3.0.0
+[1m[92m   Compiling[0m futures-executor v0.3.34
+[1m[92m   Compiling[0m bcrypt-pbkdf v0.11.0
+[1m[92m   Compiling[0m sha3 v0.11.0
+[1m[92m   Compiling[0m rand v0.10.2
+[1m[92m   Compiling[0m p384 v0.14.0
+[1m[92m   Compiling[0m p256 v0.14.0
+[1m[92m   Compiling[0m p521 v0.14.0
+[1m[92m   Compiling[0m thiserror-impl v2.0.20
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m   Compiling[0m sha1 v0.11.0
+[1m[92m   Compiling[0m kem v0.3.0
+[1m[92m   Compiling[0m module-lattice v0.2.3
+[1m[92m   Compiling[0m num-integer v0.1.47
+[1m[92m   Compiling[0m untrusted v0.7.1
+[1m[92m   Compiling[0m sponge-cursor v0.1.0
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m log v0.4.34
+[1m[92m   Compiling[0m russh-cryptovec v0.62.0
+[1m[92m   Compiling[0m sha3 v0.12.0
+[1m[92m   Compiling[0m num-bigint v0.5.1
+[1m[92m   Compiling[0m ssh-key v0.7.0-rc.11
+[1m[92m   Compiling[0m ml-kem v0.3.2
+[1m[92m   Compiling[0m generic-array v1.4.5
+[1m[92m   Compiling[0m flate2 v1.1.10
+[1m[92m   Compiling[0m futures v0.3.34
+[1m[92m   Compiling[0m russh-util v0.52.0
+[1m[92m   Compiling[0m enum_dispatch v0.3.13
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m delegate v0.13.5
+[1m[92m   Compiling[0m tracing-attributes v0.1.31
+[1m[92m   Compiling[0m md5 v0.8.1
+[1m[92m   Compiling[0m data-encoding v2.11.1
+[1m[92m   Compiling[0m hex-literal v1.1.0
+[1m[92m   Compiling[0m secrecy v0.10.3
+[1m[92m   Compiling[0m tokio-util v0.7.19
+[1m[92m   Compiling[0m uuid v1.26.1
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m async-trait v0.1.92
+[1m[92m   Compiling[0m russh v0.63.3
+[1m[92m   Compiling[0m tablepro-ssh v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/ssh)
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 53.61s
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m anstyle-query v1.1.5
+[1m[92m  Downloaded[0m async-recursion v1.1.1
+[1m[92m  Downloaded[0m asynchronous-codec v0.6.2
+[1m[92m  Downloaded[0m anstream v1.0.0
+[1m[92m  Downloaded[0m recursive v0.1.1
+[1m[92m  Downloaded[0m atomic-waker v1.1.2
+[1m[92m  Downloaded[0m block-buffer v0.10.4
+[1m[92m  Downloaded[0m atoi v2.0.0
+[1m[92m  Downloaded[0m ahash v0.8.12
+[1m[92m  Downloaded[0m rand_chacha v0.9.0
+[1m[92m  Downloaded[0m rand_core v0.6.4
+[1m[92m  Downloaded[0m rand_core v0.9.5
+[1m[92m  Downloaded[0m bitflags v1.3.2
+[1m[92m  Downloaded[0m defmt-parser v1.0.0
+[1m[92m  Downloaded[0m getrandom v0.2.17
+[1m[92m  Downloaded[0m anstyle v1.0.14
+[1m[92m  Downloaded[0m axum-core v0.5.6
+[1m[92m  Downloaded[0m block-padding v0.3.3
+[1m[92m  Downloaded[0m arcstr v1.2.0
+[1m[92m  Downloaded[0m allocator-api2 v0.2.21
+[1m[92m  Downloaded[0m argon2 v0.5.3
+[1m[92m  Downloaded[0m arrayvec v0.7.8
+[1m[92m  Downloaded[0m backon v1.6.0
+[1m[92m  Downloaded[0m blake2 v0.10.6
+[1m[92m  Downloaded[0m foreign-types-shared v0.1.1
+[1m[92m  Downloaded[0m resolv-conf v0.7.6
+[1m[92m  Downloaded[0m rustc-hash v2.1.3
+[1m[92m  Downloaded[0m serde_bytes v0.11.19
+[1m[92m  Downloaded[0m base64 v0.22.1
+[1m[92m  Downloaded[0m const-random v0.1.18
+[1m[92m  Downloaded[0m equivalent v1.0.2
+[1m[92m  Downloaded[0m clickhouse-macros v0.3.0
+[1m[92m  Downloaded[0m endi v1.1.1
+[1m[92m  Downloaded[0m enumflags2_derive v0.7.12
+[1m[92m  Downloaded[0m foldhash v0.2.0
+[1m[92m  Downloaded[0m foreign-types v0.3.2
+[1m[92m  Downloaded[0m funty v2.0.0
+[1m[92m  Downloaded[0m recursive-proc-macro-impl v0.1.1
+[1m[92m  Downloaded[0m serde_spanned v0.6.9
+[1m[92m  Downloaded[0m const-random-macro v0.1.16
+[1m[92m  Downloaded[0m cpufeatures v0.2.17
+[1m[92m  Downloaded[0m csv-core v0.1.13
+[1m[92m  Downloaded[0m darling_macro v0.24.1
+[1m[92m  Downloaded[0m deranged v0.5.8
+[1m[92m  Downloaded[0m either v1.18.0
+[1m[92m  Downloaded[0m event-listener-strategy v0.5.4
+[1m[92m  Downloaded[0m form_urlencoded v1.2.2
+[1m[92m  Downloaded[0m rustc_version_runtime v0.3.0
+[1m[92m  Downloaded[0m scopeguard v1.2.0
+[1m[92m  Downloaded[0m serde_repr v0.1.21
+[1m[92m  Downloaded[0m clap_lex v1.1.1
+[1m[92m  Downloaded[0m colorchoice v1.0.5
+[1m[92m  Downloaded[0m crc v3.4.0
+[1m[92m  Downloaded[0m crunchy v0.2.4
+[1m[92m  Downloaded[0m crypto-common v0.1.7
+[1m[92m  Downloaded[0m pbkdf2 v0.12.2
+[1m[92m  Downloaded[0m pretty-hex v0.3.0
+[1m[92m  Downloaded[0m rustls-native-certs v0.8.4
+[1m[92m  Downloaded[0m rustls-pki-types v1.15.1
+[1m[92m  Downloaded[0m serde_derive_internals v0.29.1
+[1m[92m  Downloaded[0m anstyle-parse v1.0.0
+[1m[92m  Downloaded[0m ar_archive_writer v0.5.3
+[1m[92m  Downloaded[0m async-lock v3.4.2
+[1m[92m  Downloaded[0m cbc v0.1.2
+[1m[92m  Downloaded[0m cexpr v0.6.0
+[1m[92m  Downloaded[0m cipher v0.4.4
+[1m[92m  Downloaded[0m connection-string v0.2.0
+[1m[92m  Downloaded[0m convert_case v0.10.0
+[1m[92m  Downloaded[0m core_detect v1.0.0
+[1m[92m  Downloaded[0m crc-catalog v2.5.0
+[1m[92m  Downloaded[0m critical-section v1.2.0
+[1m[92m  Downloaded[0m crossbeam-queue v0.3.14
+[1m[92m  Downloaded[0m defmt-macros v1.1.1
+[1m[92m  Downloaded[0m derive-syn-parse v0.2.0
+[1m[92m  Downloaded[0m digest v0.10.7
+[1m[92m  Downloaded[0m displaydoc v0.2.7
+[1m[92m  Downloaded[0m dotenvy v0.15.7
+[1m[92m  Downloaded[0m fastrand v2.5.0
+[1m[92m  Downloaded[0m futures-lite v2.6.1
+[1m[92m  Downloaded[0m ordered-stream v0.2.0
+[1m[92m  Downloaded[0m password-hash v0.5.0
+[1m[92m  Downloaded[0m radium v0.7.0
+[1m[92m  Downloaded[0m serde_path_to_error v0.1.20
+[1m[92m  Downloaded[0m arc-swap v1.9.2
+[1m[92m  Downloaded[0m async-broadcast v0.7.2
+[1m[92m  Downloaded[0m async-native-tls v0.4.0
+[1m[92m  Downloaded[0m borsh-derive v1.8.1
+[1m[92m  Downloaded[0m clang-sys v1.9.1
+[1m[92m  Downloaded[0m clap_derive v4.6.7
+[1m[92m  Downloaded[0m clickhouse-types v0.1.3
+[1m[92m  Downloaded[0m crossbeam-epoch v0.9.21
+[1m[92m  Downloaded[0m crossbeam-utils v0.8.23
+[1m[92m  Downloaded[0m darling v0.24.1
+[1m[92m  Downloaded[0m darling_core v0.24.1
+[1m[92m  Downloaded[0m defmt v1.1.1
+[1m[92m  Downloaded[0m derive-where v1.7.0
+[1m[92m  Downloaded[0m enumflags2 v0.7.12
+[1m[92m  Downloaded[0m event-listener v5.4.2
+[1m[92m  Downloaded[0m aes v0.8.4
+[1m[92m  Downloaded[0m borsh v1.8.1
+[1m[92m  Downloaded[0m clap v4.6.7
+[1m[92m  Downloaded[0m crossbeam-channel v0.5.17
+[1m[92m  Downloaded[0m flume v0.12.0
+[1m[92m  Downloaded[0m hyper-rustls v0.27.9
+[1m[92m  Downloaded[0m iana-time-zone v0.1.65
+[1m[92m  Downloaded[0m lazy_static v1.5.0
+[1m[92m  Downloaded[0m bnum v0.13.0
+[1m[92m  Downloaded[0m derive_more-impl v2.1.1
+[1m[92m  Downloaded[0m futures-intrusive v0.5.0
+[1m[92m  Downloaded[0m itoa v1.0.18
+[1m[92m  Downloaded[0m bumpalo v3.20.3
+[1m[92m  Downloaded[0m derive_more v2.1.1
+[1m[92m  Downloaded[0m getrandom v0.3.4
+[1m[92m  Downloaded[0m hmac v0.12.1
+[1m[92m  Downloaded[0m jiff-static v0.2.37
+[1m[92m  Downloaded[0m md-5 v0.10.6
+[1m[92m  Downloaded[0m rand v0.8.8
+[1m[92m  Downloaded[0m serde_with_macros v3.23.0
+[1m[92m  Downloaded[0m stringprep v0.1.5
+[1m[92m  Downloaded[0m synstructure v0.14.0
+[1m[92m  Downloaded[0m aho-corasick v1.1.5
+[1m[92m  Downloaded[0m ashpd v0.13.13
+[1m[92m  Downloaded[0m axum v0.8.9
+[1m[92m  Downloaded[0m bson v2.15.0
+[1m[92m  Downloaded[0m combine v4.6.8
+[1m[92m  Downloaded[0m matchit v0.8.4
+[1m[92m  Downloaded[0m md-5 v0.11.0
+[1m[92m  Downloaded[0m parking v2.2.1
+[1m[92m  Downloaded[0m parking_lot v0.12.5
+[1m[92m  Downloaded[0m percent-encoding v2.3.2
+[1m[92m  Downloaded[0m utf8parse v0.2.2
+[1m[92m  Downloaded[0m zerotrie v0.2.5
+[1m[92m  Downloaded[0m bindgen v0.71.1
+[1m[92m  Downloaded[0m bindgen v0.72.1
+[1m[92m  Downloaded[0m bitvec v1.1.1
+[1m[92m  Downloaded[0m chrono v0.4.45
+[1m[92m  Downloaded[0m clap_builder v4.6.7
+[1m[92m  Downloaded[0m hyper-util v0.1.20
+[1m[92m  Downloaded[0m idna v1.1.0
+[1m[92m  Downloaded[0m itertools v0.13.0
+[1m[92m  Downloaded[0m jiff-core v0.1.1
+[1m[92m  Downloaded[0m openssl-sys v0.9.117
+[1m[92m  Downloaded[0m parking_lot_core v0.9.12
+[1m[92m  Downloaded[0m rustls-webpki v0.103.15
+[1m[92m  Downloaded[0m ryu v1.0.23
+[1m[92m  Downloaded[0m tagptr v0.2.0
+[1m[92m  Downloaded[0m tower-layer v0.3.3
+[1m[92m  Downloaded[0m try-lock v0.2.5
+[1m[92m  Downloaded[0m glob v0.3.4
+[1m[92m  Downloaded[0m portable-atomic v1.15.0
+[1m[92m  Downloaded[0m zerocopy v0.8.57
+[1m[92m  Downloaded[0m bstr v1.13.1
+[1m[92m  Downloaded[0m clickhouse v0.15.2
+[1m[92m  Downloaded[0m half v2.7.1
+[1m[92m  Downloaded[0m heck v0.5.0
+[1m[92m  Downloaded[0m toml_write v0.1.2
+[1m[92m  Downloaded[0m hashbrown v0.17.1
+[1m[92m  Downloaded[0m libloading v0.8.9
+[1m[92m  Downloaded[0m litemap v0.8.3
+[1m[92m  Downloaded[0m potential_utf v0.1.6
+[1m[92m  Downloaded[0m prettyplease v0.2.37
+[1m[92m  Downloaded[0m strsim v0.11.1
+[1m[92m  Downloaded[0m hashbrown v0.16.1
+[1m[92m  Downloaded[0m hashlink v0.11.1
+[1m[92m  Downloaded[0m hickory-net v0.26.3
+[1m[92m  Downloaded[0m http-body v1.1.0
+[1m[92m  Downloaded[0m powerfmt v0.2.0
+[1m[92m  Downloaded[0m ppv-lite86 v0.2.21
+[1m[92m  Downloaded[0m sync_wrapper v1.0.2
+[1m[92m  Downloaded[0m tap v1.0.1
+[1m[92m  Downloaded[0m thread_local v1.1.10
+[1m[92m  Downloaded[0m time-core v0.1.9
+[1m[92m  Downloaded[0m tower-service v0.3.3
+[1m[92m  Downloaded[0m unicode-xid v0.2.6
+[1m[92m  Downloaded[0m want v0.3.1
+[1m[92m  Downloaded[0m encoding_rs v0.8.41
+[1m[92m  Downloaded[0m hickory-proto v0.26.3
+[1m[92m  Downloaded[0m hickory-resolver v0.26.3
+[1m[92m  Downloaded[0m http-body-util v0.1.5
+[1m[92m  Downloaded[0m httparse v1.10.1
+[1m[92m  Downloaded[0m httpdate v1.0.3
+[1m[92m  Downloaded[0m icu_collections v2.3.0
+[1m[92m  Downloaded[0m icu_normalizer_data v2.3.0
+[1m[92m  Downloaded[0m icu_properties v2.3.0
+[1m[92m  Downloaded[0m icu_provider v2.3.1
+[1m[92m  Downloaded[0m ident_case v1.0.1
+[1m[92m  Downloaded[0m idna_adapter v1.2.2
+[1m[92m  Downloaded[0m ipnet v2.12.2
+[1m[92m  Downloaded[0m libm v0.2.16
+[1m[92m  Downloaded[0m rand_chacha v0.3.1
+[1m[92m  Downloaded[0m take_mut v0.2.2
+[1m[92m  Downloaded[0m untrusted v0.9.0
+[1m[92m  Downloaded[0m utf8_iter v1.0.4
+[1m[92m  Downloaded[0m hkdf v0.12.4
+[1m[92m  Downloaded[0m hyper v1.11.1
+[1m[92m  Downloaded[0m icu_locale_core v2.3.0
+[1m[92m  Downloaded[0m icu_properties_data v2.3.0
+[1m[92m  Downloaded[0m indexmap v2.14.2
+[1m[92m  Downloaded[0m inout v0.1.4
+[1m[92m  Downloaded[0m jiff v0.2.37
+[1m[92m  Downloaded[0m multiversion_no_op v1.0.0
+[1m[92m  Downloaded[0m simdutf8 v0.1.5
+[1m[92m  Downloaded[0m sqlx-macros v0.9.0
+[1m[92m  Downloaded[0m is_terminal_polyfill v1.70.2
+[1m[92m  Downloaded[0m libgssapi v0.8.3
+[1m[92m  Downloaded[0m macro_magic v0.5.1
+[1m[92m  Downloaded[0m macro_magic_core v0.5.1
+[1m[92m  Downloaded[0m macro_magic_core_macros v0.5.1
+[1m[92m  Downloaded[0m mongocrypt v0.4.0
+[1m[92m  Downloaded[0m mongocrypt-sys v0.1.6+1.18.2
+[1m[92m  Downloaded[0m mongodb-internal-macros v3.9.1
+[1m[92m  Downloaded[0m multiversion v0.9.0
+[1m[92m  Downloaded[0m multiversion-macros v0.9.0
+[1m[92m  Downloaded[0m num-iter v0.1.46
+[1m[92m  Downloaded[0m yoke-derive v0.8.3
+[1m[92m  Downloaded[0m zvariant_derive v5.15.0
+[1m[92m  Downloaded[0m csv v1.4.0
+[1m[92m  Downloaded[0m libgssapi-sys v0.3.4
+[1m[92m  Downloaded[0m matchers v0.2.0
+[1m[92m  Downloaded[0m mime v0.3.17
+[1m[92m  Downloaded[0m nom v7.1.3
+[1m[92m  Downloaded[0m smallvec v1.16.1
+[1m[92m  Downloaded[0m stacker v0.1.25
+[1m[92m  Downloaded[0m thiserror-impl v1.0.69
+[1m[92m  Downloaded[0m tinystr v0.8.4
+[1m[92m  Downloaded[0m toml_datetime v0.6.11
+[1m[92m  Downloaded[0m tracing-serde v0.2.0
+[1m[92m  Downloaded[0m zcheapstr v1.1.0
+[1m[92m  Downloaded[0m icu_normalizer v2.3.0
+[1m[92m  Downloaded[0m num-conv v0.2.2
+[1m[92m  Downloaded[0m tiny-keccak v2.0.2
+[1m[92m  Downloaded[0m tracing-log v0.2.0
+[1m[92m  Downloaded[0m typed-builder v0.22.0
+[1m[92m  Downloaded[0m xxhash-rust v0.8.18
+[1m[92m  Downloaded[0m zerofrom v0.1.8
+[1m[92m  Downloaded[0m macro_magic_macros v0.5.1
+[1m[92m  Downloaded[0m num-bigint-dig v0.9.1
+[1m[92m  Downloaded[0m openssl-macros v0.1.1
+[1m[92m  Downloaded[0m native-tls v0.2.18
+[1m[92m  Downloaded[0m nu-ansi-term v0.50.3
+[1m[92m  Downloaded[0m num v0.4.3
+[1m[92m  Downloaded[0m num-complex v0.4.6
+[1m[92m  Downloaded[0m openssl-probe v0.2.1
+[1m[92m  Downloaded[0m sqlformat v0.5.0
+[1m[92m  Downloaded[0m stable_deref_trait v1.2.1
+[1m[92m  Downloaded[0m toml_parser v1.1.3+spec-1.1.0
+[1m[92m  Downloaded[0m typed-builder-macro v0.22.0
+[1m[92m  Downloaded[0m unicode-properties v0.1.4
+[1m[92m  Downloaded[0m whoami v2.1.3
+[1m[92m  Downloaded[0m writeable v0.6.4
+[1m[92m  Downloaded[0m wyz v0.5.1
+[1m[92m  Downloaded[0m zerofrom-derive v0.1.8
+[1m[92m  Downloaded[0m proc-macro-crate v3.5.0
+[1m[92m  Downloaded[0m shlex v1.3.0
+[1m[92m  Downloaded[0m zvariant_utils v4.2.0
+[1m[92m  Downloaded[0m num-rational v0.4.2
+[1m[92m  Downloaded[0m psm v0.1.32
+[1m[92m  Downloaded[0m oo7 v0.6.0
+[1m[92m  Downloaded[0m serde_with v3.23.0
+[1m[92m  Downloaded[0m zbus_names v4.3.4
+[1m[92m  Downloaded[0m zeroize_derive v1.5.0
+[1m[92m  Downloaded[0m num-bigint v0.4.8
+[1m[92m  Downloaded[0m prefix-trie v0.8.4
+[1m[92m  Downloaded[0m time-macros v0.2.32
+[1m[92m  Downloaded[0m spin v0.9.9
+[1m[92m  Downloaded[0m tempfile v3.27.0
+[1m[92m  Downloaded[0m thiserror v1.0.69
+[1m[92m  Downloaded[0m tokio-stream v0.1.19
+[1m[92m  Downloaded[0m toml v0.8.23
+[1m[92m  Downloaded[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m  Downloaded[0m zerocopy-derive v0.8.57
+[1m[92m  Downloaded[0m sha2 v0.10.9
+[1m[92m  Downloaded[0m sharded-slab v0.1.7
+[1m[92m  Downloaded[0m zip v8.6.0
+[1m[92m  Downloaded[0m zmij v1.0.23
+[1m[92m  Downloaded[0m yoke v0.8.3
+[1m[92m  Downloaded[0m zbus_macros v5.19.0
+[1m[92m  Downloaded[0m lock_api v0.4.14
+[1m[92m  Downloaded[0m tokio-rustls v0.26.5
+[1m[92m  Downloaded[0m unicode-bidi v0.3.18
+[1m[92m  Downloaded[0m openssl v0.10.81
+[1m[92m  Downloaded[0m serde_json v1.0.151
+[1m[92m  Downloaded[0m tinyvec v1.13.3
+[1m[92m  Downloaded[0m toml_edit v0.22.27
+[1m[92m  Downloaded[0m zopfli v0.8.3
+[1m[92m  Downloaded[0m object v0.39.1
+[1m[92m  Downloaded[0m sqlx-macros-core v0.9.0
+[1m[92m  Downloaded[0m toml_edit v0.25.15+spec-1.1.0
+[1m[92m  Downloaded[0m unicode_categories v0.1.1
+[1m[92m  Downloaded[0m url v2.5.8
+[1m[92m  Downloaded[0m sqlx-sqlite v0.9.0
+[1m[92m  Downloaded[0m minimal-lexical v0.2.1
+[1m[92m  Downloaded[0m typed-path v0.12.3
+[1m[92m  Downloaded[0m unicode-segmentation v1.13.3
+[1m[92m  Downloaded[0m http v1.5.0
+[1m[92m  Downloaded[0m rand v0.9.5
+[1m[92m  Downloaded[0m tower v0.5.3
+[1m[92m  Downloaded[0m zvariant v5.15.0
+[1m[92m  Downloaded[0m regex v1.13.1
+[1m[92m  Downloaded[0m rust_decimal v1.43.0
+[1m[92m  Downloaded[0m unicode-normalization v0.1.25
+[1m[92m  Downloaded[0m sqlx-core v0.9.0
+[1m[92m  Downloaded[0m zerovec v0.11.8
+[1m[92m  Downloaded[0m winnow v0.7.15
+[1m[92m  Downloaded[0m winnow v1.0.4
+[1m[92m  Downloaded[0m zbus v5.19.0
+[1m[92m  Downloaded[0m webpki-roots v1.0.9
+[1m[92m  Downloaded[0m sqlx v0.9.0
+[1m[92m  Downloaded[0m tracing-subscriber v0.3.23
+[1m[92m  Downloaded[0m zerovec-derive v0.11.6
+[1m[92m  Downloaded[0m vcpkg v0.2.15
+[1m[92m  Downloaded[0m moka v0.12.16
+[1m[92m  Downloaded[0m time v0.3.55
+[1m[92m  Downloaded[0m rustls v0.23.45
+[1m[92m  Downloaded[0m sqlparser v0.58.0
+[1m[92m  Downloaded[0m regex-syntax v0.8.11
+[1m[92m  Downloaded[0m rustix v1.1.5
+[1m[92m  Downloaded[0m regex-automata v0.4.18
+[1m[92m  Downloaded[0m rust_xlsxwriter v0.99.1
+[1m[92m  Downloaded[0m linux-raw-sys v0.12.1
+[1m[92m  Downloaded[0m ring v0.17.14
+[1m[92m  Downloaded[0m libsqlite3-sys v0.37.0
+[1m[92m   Compiling[0m syn v2.0.119
+[1m[92m   Compiling[0m syn v3.0.6
+[1m[92m   Compiling[0m serde_core v1.0.229
+[1m[92m   Compiling[0m serde v1.0.229
+[1m[92m   Compiling[0m num-traits v0.2.19
+[1m[92m   Compiling[0m portable-atomic v1.15.0
+[1m[92m   Compiling[0m equivalent v1.0.2
+[1m[92m   Compiling[0m log v0.4.34
+[1m[92m   Compiling[0m critical-section v1.2.0
+[1m[92m   Compiling[0m once_cell v1.21.4
+[1m[92m   Compiling[0m futures-io v0.3.34
+[1m[92m   Compiling[0m futures-channel v0.3.34
+[1m[92m   Compiling[0m smallvec v1.16.1
+[1m[92m   Compiling[0m stable_deref_trait v1.2.1
+[1m[92m   Compiling[0m generic-array v0.14.7
+[1m[92m   Compiling[0m itoa v1.0.18
+[1m[92m   Compiling[0m tracing-core v0.1.36
+[1m[92m   Compiling[0m allocator-api2 v0.2.21
+[1m[92m   Compiling[0m memchr v2.8.3
+[1m[92m   Compiling[0m foldhash v0.2.0
+[1m[92m   Compiling[0m synstructure v0.14.0
+[1m[92m   Compiling[0m litemap v0.8.3
+[1m[92m   Compiling[0m bitflags v2.13.2
+[1m[92m   Compiling[0m writeable v0.6.4
+[1m[92m   Compiling[0m icu_normalizer_data v2.3.0
+[1m[92m   Compiling[0m icu_properties_data v2.3.0
+[1m[92m   Compiling[0m utf8_iter v1.0.4
+[1m[92m   Compiling[0m aws-lc-sys v0.45.0
+[1m[92m   Compiling[0m hashbrown v0.17.1
+[1m[92m   Compiling[0m zeroize_derive v1.5.0
+[1m[92m   Compiling[0m tracing-attributes v0.1.31
+[1m[92m   Compiling[0m serde_derive v1.0.229
+[1m[92m   Compiling[0m zeroize v1.9.0
+[1m[92m   Compiling[0m hybrid-array v0.4.15
+[1m[92m   Compiling[0m tokio-macros v2.7.2
+[1m[92m   Compiling[0m futures-macro v0.3.34
+[1m[92m   Compiling[0m zerofrom-derive v0.1.8
+[1m[92m   Compiling[0m crypto-common v0.2.2
+[1m[92m   Compiling[0m block-buffer v0.12.1
+[1m[92m   Compiling[0m block-padding v0.4.2
+[1m[92m   Compiling[0m inout v0.2.2
+[1m[92m   Compiling[0m futures-util v0.3.34
+[1m[92m   Compiling[0m digest v0.11.3
+[1m[92m   Compiling[0m cipher v0.5.2
+[1m[92m   Compiling[0m zerofrom v0.1.8
+[1m[92m   Compiling[0m yoke-derive v0.8.3
+[1m[92m   Compiling[0m zerovec-derive v0.11.6
+[1m[92m   Compiling[0m yoke v0.8.3
+[1m[92m   Compiling[0m displaydoc v0.2.7
+[1m[92m   Compiling[0m zerovec v0.11.8
+[1m[92m   Compiling[0m bytes v1.12.1
+[1m[92m   Compiling[0m hmac v0.13.0
+[1m[92m   Compiling[0m tinystr v0.8.4
+[1m[92m   Compiling[0m potential_utf v0.1.6
+[1m[92m   Compiling[0m tokio v1.53.1
+[1m[92m   Compiling[0m icu_locale_core v2.3.0
+[1m[92m   Compiling[0m zerotrie v0.2.5
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m icu_collections v2.3.0
+[1m[92m   Compiling[0m sha2 v0.11.0
+[1m[92m   Compiling[0m universal-hash v0.6.1
+[1m[92m   Compiling[0m icu_provider v2.3.1
+[1m[92m   Compiling[0m indexmap v2.14.2
+[1m[92m   Compiling[0m icu_properties v2.3.0
+[1m[92m   Compiling[0m icu_normalizer v2.3.0
+[1m[92m   Compiling[0m pbkdf2 v0.13.0
+[1m[92m   Compiling[0m thiserror-impl v2.0.20
+[1m[92m   Compiling[0m uuid v1.26.1
+[1m[92m   Compiling[0m aws-lc-rs v1.18.1
+[1m[92m   Compiling[0m percent-encoding v2.3.2
+[1m[92m   Compiling[0m idna_adapter v1.2.2
+[1m[92m   Compiling[0m polyval v0.7.3
+[1m[92m   Compiling[0m crypto-bigint v0.7.5
+[1m[92m   Compiling[0m thiserror v2.0.20
+[1m[92m   Compiling[0m der v0.8.2
+[1m[92m   Compiling[0m glob v0.3.4
+[1m[92m   Compiling[0m zmij v1.0.23
+[1m[92m   Compiling[0m ghash v0.6.0
+[1m[92m   Compiling[0m idna v1.1.0
+[1m[92m   Compiling[0m form_urlencoded v1.2.2
+[1m[92m   Compiling[0m ctr v0.10.1
+[1m[92m   Compiling[0m aes v0.9.3
+[1m[92m   Compiling[0m aead v0.6.1
+[1m[92m   Compiling[0m crypto-common v0.1.7
+[1m[92m   Compiling[0m ring v0.17.14
+[1m[92m   Compiling[0m serde_json v1.0.151
+[1m[92m   Compiling[0m aes-gcm v0.11.1
+[1m[92m   Compiling[0m url v2.5.8
+[1m[92m   Compiling[0m clang-sys v1.9.1
+[1m[92m   Compiling[0m spki v0.8.0
+[1m[92m   Compiling[0m salsa20 v0.11.0
+[1m[92m   Compiling[0m rustls-pki-types v1.15.1
+[1m[92m   Compiling[0m scopeguard v1.2.0
+[1m[92m   Compiling[0m scrypt v0.12.0
+[1m[92m   Compiling[0m chacha20 v0.10.2
+[1m[92m   Compiling[0m cbc v0.2.1
+[1m[92m   Compiling[0m getrandom v0.2.17
+[1m[92m   Compiling[0m untrusted v0.9.0
+[1m[92m   Compiling[0m pkcs5 v0.8.1
+[1m[92m   Compiling[0m block-buffer v0.10.4
+[1m[92m   Compiling[0m parking v2.2.1
+[1m[92m   Compiling[0m regex-syntax v0.8.11
+[1m[92m   Compiling[0m minimal-lexical v0.2.1
+[1m[92m   Compiling[0m rustls v0.23.45
+[1m[92m   Compiling[0m vcpkg v0.2.15
+[1m[92m   Compiling[0m nom v7.1.3
+[1m[92m   Compiling[0m regex-automata v0.4.18
+[1m[92m   Compiling[0m digest v0.10.7
+[1m[92m   Compiling[0m pkcs8 v0.11.0
+[1m[92m   Compiling[0m async-trait v0.1.92
+[1m[92m   Compiling[0m libloading v0.8.9
+[1m[92m   Compiling[0m crc32fast v1.5.2
+[1m[92m   Compiling[0m rust_decimal v1.43.0
+[1m[92m   Compiling[0m either v1.18.0
+[1m[92m   Compiling[0m crossbeam-utils v0.8.23
+[1m[92m   Compiling[0m iana-time-zone v0.1.65
+[1m[92m   Compiling[0m chrono v0.4.45
+[1m[92m   Compiling[0m itertools v0.13.0
+[1m[92m   Compiling[0m regex v1.13.1
+[1m[92m   Compiling[0m cexpr v0.6.0
+[1m[92m   Compiling[0m event-listener v5.4.2
+[1m[92m   Compiling[0m rand v0.10.2
+[1m[92m   Compiling[0m lock_api v0.4.14
+[1m[92m   Compiling[0m rustc-hash v2.1.3
+[1m[92m   Compiling[0m fastrand v2.5.0
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m simd-adler32 v0.3.10
+[1m[92m   Compiling[0m shlex v1.3.0
+[1m[92m   Compiling[0m arrayvec v0.7.8
+[1m[92m   Compiling[0m signature v3.0.0
+[1m[92m   Compiling[0m hex v0.4.3
+[1m[92m   Compiling[0m rustix v1.1.5
+[1m[92m   Compiling[0m miniz_oxide v0.9.1
+[1m[92m   Compiling[0m hkdf v0.13.0
+[1m[92m   Compiling[0m winnow v1.0.4
+[1m[92m   Compiling[0m linux-raw-sys v0.12.1
+[1m[92m   Compiling[0m zlib-rs v0.6.8
+[1m[92m   Compiling[0m zerocopy v0.8.57
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m webpki-roots v1.0.9
+[1m[92m   Compiling[0m tokio-util v0.7.19
+[1m[92m   Compiling[0m flate2 v1.1.10
+[1m[92m   Compiling[0m zerocopy-derive v0.8.57
+[1m[92m   Compiling[0m object v0.39.1
+[1m[92m   Compiling[0m cpufeatures v0.2.17
+[1m[92m   Compiling[0m enumflags2_derive v0.7.12
+[1m[92m   Compiling[0m winnow v0.7.15
+[1m[92m   Compiling[0m tinyvec v1.13.3
+[1m[92m   Compiling[0m bumpalo v3.20.3
+[1m[92m   Compiling[0m zopfli v0.8.3
+[1m[92m   Compiling[0m toml_parser v1.1.3+spec-1.1.0
+[1m[92m   Compiling[0m futures-executor v0.3.34
+[1m[92m   Compiling[0m num-integer v0.1.47
+[1m[92m   Compiling[0m ryu v1.0.23
+[1m[92m   Compiling[0m base64 v0.22.1
+[1m[92m   Compiling[0m toml_datetime v1.1.1+spec-1.1.0
+[1m[92m   Compiling[0m getrandom v0.3.4
+[1m[92m   Compiling[0m typed-path v0.12.3
+[1m[92m   Compiling[0m toml_edit v0.25.15+spec-1.1.0
+[1m[92m   Compiling[0m zip v8.6.0
+[1m[92m   Compiling[0m ar_archive_writer v0.5.3
+[1m[92m   Compiling[0m sha2 v0.10.9
+[1m[92m   Compiling[0m secrecy v0.10.3
+[1m[92m   Compiling[0m sha1 v0.11.0
+[1m[92m   Compiling[0m csv-core v0.1.13
+[1m[92m   Compiling[0m bindgen v0.72.1
+[1m[92m   Compiling[0m unicode_categories v0.1.1
+[1m[92m   Compiling[0m sec1 v0.8.1
+[1m[92m   Compiling[0m sqlformat v0.5.0
+[1m[92m   Compiling[0m psm v0.1.32
+[1m[92m   Compiling[0m csv v1.4.0
+[1m[92m   Compiling[0m rust_xlsxwriter v0.99.1
+[1m[92m   Compiling[0m proc-macro-crate v3.5.0
+[1m[92m   Compiling[0m zvariant_utils v4.2.0
+[1m[92m   Compiling[0m tempfile v3.27.0
+[1m[92m   Compiling[0m pkcs1 v0.8.0-rc.4
+[1m[92m   Compiling[0m crypto-primes v0.7.2
+[1m[92m   Compiling[0m hashbrown v0.16.1
+[1m[92m   Compiling[0m crc-catalog v2.5.0
+[1m[92m   Compiling[0m crc v3.4.0
+[1m[92m   Compiling[0m tablepro-core v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/core)
+[1m[92m   Compiling[0m rsa v0.10.0-rc.18
+[1m[92m   Compiling[0m hashlink v0.11.1
+[1m[92m   Compiling[0m zvariant_derive v5.15.0
+[1m[92m   Compiling[0m elliptic-curve v0.14.1
+[1m[92m   Compiling[0m futures v0.3.34
+[1m[92m   Compiling[0m unicode-normalization v0.1.25
+[1m[92m   Compiling[0m primefield v0.14.0
+[1m[92m   Compiling[0m futures-intrusive v0.5.0
+[1m[92m   Compiling[0m crossbeam-queue v0.3.14
+[1m[92m   Compiling[0m tokio-stream v0.1.19
+[1m[92m   Compiling[0m serde_bytes v0.11.19
+[1m[92m   Compiling[0m stacker v0.1.25
+[1m[92m   Compiling[0m endi v1.1.1
+[1m[92m   Compiling[0m crunchy v0.2.4
+[1m[92m   Compiling[0m unicode-bidi v0.3.18
+[1m[92m   Compiling[0m unicode-properties v0.1.4
+[1m[92m   Compiling[0m wnaf v0.14.1
+[1m[92m   Compiling[0m rand_core v0.9.5
+[1m[92m   Compiling[0m stringprep v0.1.5
+[1m[92m   Compiling[0m ppv-lite86 v0.2.21
+[1m[92m   Compiling[0m enumflags2 v0.7.12
+[1m[92m   Compiling[0m event-listener-strategy v0.5.4
+[1m[92m   Compiling[0m rfc6979 v0.6.0
+[1m[92m   Compiling[0m md-5 v0.11.0
+[1m[92m   Compiling[0m tiny-keccak v2.0.2
+[1m[92m   Compiling[0m ecdsa v0.17.0
+[1m[92m   Compiling[0m rand_chacha v0.9.0
+[1m[92m   Compiling[0m primeorder v0.14.0
+[1m[92m   Compiling[0m zcheapstr v1.1.0
+[1m[92m   Compiling[0m spin v0.9.9
+[1m[92m   Compiling[0m http v1.5.0
+[1m[92m   Compiling[0m recursive-proc-macro-impl v0.1.1
+[1m[92m   Compiling[0m atoi v2.0.0
+[1m[92m   Compiling[0m dotenvy v0.15.7
+[1m[92m   Compiling[0m prettyplease v0.2.37
+[1m[92m   Compiling[0m http-body v1.1.0
+[1m[92m   Compiling[0m recursive v0.1.1
+[1m[92m   Compiling[0m flume v0.12.0
+[1m[92m   Compiling[0m zvariant v5.15.0
+[1m[92m   Compiling[0m libsqlite3-sys v0.37.0
+[1m[92m   Compiling[0m rand v0.9.5
+[1m[92m   Compiling[0m openssl-sys v0.9.117
+[1m[92m   Compiling[0m ssh-encoding v0.3.0
+[1m[92m   Compiling[0m curve25519-dalek-derive v0.1.1
+[1m[92m   Compiling[0m block-padding v0.3.3
+[1m[92m   Compiling[0m strsim v0.11.1
+[1m[92m   Compiling[0m whoami v2.1.3
+[1m[92m   Compiling[0m httparse v1.10.1
+[1m[92m   Compiling[0m curve25519-dalek v5.0.0
+[1m[92m   Compiling[0m const-random-macro v0.1.16
+[1m[92m   Compiling[0m inout v0.1.4
+[1m[92m   Compiling[0m zbus_names v4.3.4
+[1m[92m   Compiling[0m sqlparser v0.58.0
+[1m[92m   Compiling[0m num-bigint v0.5.1
+[1m[92m   Compiling[0m blowfish v0.10.0
+[1m[92m   Compiling[0m ed25519 v3.0.0
+[1m[92m   Compiling[0m poly1305 v0.9.1
+[1m[92m   Compiling[0m blake2 v0.11.0
+[1m[92m   Compiling[0m libm v0.2.16
+[1m[92m   Compiling[0m tower-service v0.3.3
+[1m[92m   Compiling[0m try-lock v0.2.5
+[1m[92m   Compiling[0m bindgen v0.71.1
+[1m[92m   Compiling[0m want v0.3.1
+[1m[92m   Compiling[0m argon2 v0.6.0
+[1m[92m   Compiling[0m ssh-cipher v0.3.0
+[1m[92m   Compiling[0m ed25519-dalek v3.0.0
+[1m[92m   Compiling[0m bcrypt-pbkdf v0.11.0
+[1m[92m   Compiling[0m nix v0.31.3
+[1m[92m   Compiling[0m zbus_macros v5.19.0
+[1m[92m   Compiling[0m cipher v0.4.4
+[1m[92m   Compiling[0m const-random v0.1.18
+[1m[92m   Compiling[0m sha3 v0.11.0
+[1m[92m   Compiling[0m p521 v0.14.0
+[1m[92m   Compiling[0m p256 v0.14.0
+[1m[92m   Compiling[0m p384 v0.14.0
+[1m[92m   Compiling[0m async-broadcast v0.7.2
+[1m[92m   Compiling[0m num-bigint v0.4.8
+[1m[92m   Compiling[0m num-iter v0.1.46
+[1m[92m   Compiling[0m futures-lite v2.6.1
+[1m[92m   Compiling[0m hmac v0.12.1
+[1m[92m   Compiling[0m toml_datetime v0.6.11
+[1m[92m   Compiling[0m serde_spanned v0.6.9
+[1m[92m   Compiling[0m kem v0.3.0
+[1m[92m   Compiling[0m module-lattice v0.2.3
+[1m[92m   Compiling[0m serde_repr v0.1.21
+[1m[92m   Compiling[0m macro_magic_core_macros v0.5.1
+[1m[92m   Compiling[0m async-recursion v1.1.1
+[1m[92m   Compiling[0m derive-syn-parse v0.2.0
+[1m[92m   Compiling[0m ordered-stream v0.2.0
+[1m[92m   Compiling[0m ident_case v1.0.1
+[1m[92m   Compiling[0m openssl-probe v0.2.1
+[1m[92m   Compiling[0m atomic-waker v1.1.2
+[1m[92m   Compiling[0m httpdate v1.0.3
+[1m[92m   Compiling[0m num-bigint-dig v0.9.1
+[1m[92m   Compiling[0m toml_write v0.1.2
+[1m[92m   Compiling[0m macro_magic_core v0.5.1
+[1m[92m   Compiling[0m hyper v1.11.1
+[1m[92m   Compiling[0m toml_edit v0.22.27
+[1m[92m   Compiling[0m darling_core v0.24.1
+[1m[92m   Compiling[0m sha3 v0.12.0
+[1m[92m   Compiling[0m zbus v5.19.0
+[1m[92m   Compiling[0m ml-kem v0.3.2
+[1m[92m   Compiling[0m num-rational v0.4.2
+[1m[92m   Compiling[0m ssh-key v0.7.0-rc.11
+[1m[92m   Compiling[0m russh-cryptovec v0.62.0
+[1m[92m   Compiling[0m enum_dispatch v0.3.13
+[1m[92m   Compiling[0m generic-array v1.4.5
+[1m[92m   Compiling[0m russh-util v0.52.0
+[1m[92m   Compiling[0m ipnet v2.12.2
+[1m[92m   Compiling[0m delegate v0.13.5
+[1m[92m   Compiling[0m num-complex v0.4.6
+[1m[92m   Compiling[0m rand_core v0.6.4
+[1m[92m   Compiling[0m openssl v0.10.81
+[1m[92m   Compiling[0m crossbeam-epoch v0.9.21
+[1m[92m   Compiling[0m radium v0.7.0
+[1m[92m   Compiling[0m foreign-types-shared v0.1.1
+[1m[92m   Compiling[0m foreign-types v0.3.2
+[1m[92m   Compiling[0m password-hash v0.5.0
+[1m[92m   Compiling[0m num v0.4.3
+[1m[92m   Compiling[0m prefix-trie v0.8.4
+[1m[92m   Compiling[0m ashpd v0.13.13
+[1m[92m   Compiling[0m libgssapi-sys v0.3.4
+[1m[92m   Compiling[0m darling_macro v0.24.1
+[1m[92m   Compiling[0m toml v0.8.23
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m macro_magic_macros v0.5.1
+[1m[92m   Compiling[0m hkdf v0.12.4
+[1m[92m   Compiling[0m pbkdf2 v0.12.2
+[1m[92m   Compiling[0m aes v0.8.4
+[1m[92m   Compiling[0m cbc v0.1.2
+[1m[92m   Compiling[0m http-body-util v0.1.5
+[1m[92m   Compiling[0m blake2 v0.10.6
+[1m[92m   Compiling[0m md-5 v0.10.6
+[1m[92m   Compiling[0m openssl-macros v0.1.1
+[1m[92m   Compiling[0m ahash v0.8.12
+[1m[92m   Compiling[0m thiserror v1.0.69
+[1m[92m   Compiling[0m num-conv v0.2.2
+[1m[92m   Compiling[0m unicode-segmentation v1.13.3
+[1m[92m   Compiling[0m native-tls v0.2.18
+[1m[92m   Compiling[0m time-core v0.1.9
+[1m[92m   Compiling[0m tap v1.0.1
+[1m[92m   Compiling[0m lazy_static v1.5.0
+[1m[92m   Compiling[0m wyz v0.5.1
+[1m[92m   Compiling[0m time-macros v0.2.32
+[1m[92m   Compiling[0m convert_case v0.10.0
+[1m[92m   Compiling[0m argon2 v0.5.3
+[1m[92m   Compiling[0m oo7 v0.6.0
+[1m[92m   Compiling[0m tablepro-policy v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/policy)
+[1m[92m   Compiling[0m darling v0.24.1
+[1m[92m   Compiling[0m hickory-proto v0.26.3
+[1m[92m   Compiling[0m rustc_version_runtime v0.3.0
+[1m[92m   Compiling[0m encoding_rs v0.8.41
+[1m[92m   Compiling[0m multiversion-macros v0.9.0
+[1m[92m   Compiling[0m crossbeam-channel v0.5.17
+[1m[92m   Compiling[0m thiserror-impl v1.0.69
+[1m[92m   Compiling[0m utf8parse v0.2.2
+[1m[92m   Compiling[0m deranged v0.5.8
+[1m[92m   Compiling[0m unicode-xid v0.2.6
+[1m[92m   Compiling[0m tagptr v0.2.0
+[1m[92m   Compiling[0m tower-layer v0.3.3
+[1m[92m   Compiling[0m sync_wrapper v1.0.2
+[1m[92m   Compiling[0m powerfmt v0.2.0
+[1m[92m   Compiling[0m funty v2.0.0
+[1m[92m   Compiling[0m moka v0.12.16
+[1m[92m   Compiling[0m time v0.3.55
+[1m[92m   Compiling[0m bitvec v1.1.1
+[1m[92m   Compiling[0m derive_more-impl v2.1.1
+[1m[92m   Compiling[0m anstyle-parse v1.0.0
+[1m[92m   Compiling[0m hickory-net v0.26.3
+[1m[92m   Compiling[0m multiversion v0.9.0
+[1m[92m   Compiling[0m serde_with_macros v3.23.0
+[1m[92m   Compiling[0m rustls-webpki v0.103.15
+[1m[92m   Compiling[0m russh v0.63.3
+[1m[92m   Compiling[0m macro_magic v0.5.1
+[1m[92m   Compiling[0m typed-builder-macro v0.22.0
+[1m[92m   Compiling[0m serde_derive_internals v0.29.1
+[1m[92m   Compiling[0m is_terminal_polyfill v1.70.2
+[1m[92m   Compiling[0m mime v0.3.17
+[1m[92m   Compiling[0m resolv-conf v0.7.6
+[1m[92m   Compiling[0m multiversion_no_op v1.0.0
+[1m[92m   Compiling[0m simdutf8 v0.1.5
+[1m[92m   Compiling[0m core_detect v1.0.0
+[1m[92m   Compiling[0m anstyle v1.0.14
+[1m[92m   Compiling[0m anstyle-query v1.1.5
+[1m[92m   Compiling[0m colorchoice v1.0.5
+[1m[92m   Compiling[0m anstream v1.0.0
+[1m[92m   Compiling[0m sqlx-core v0.9.0
+[1m[92m   Compiling[0m tokio-rustls v0.26.5
+[1m[92m   Compiling[0m tablepro-ssh v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/ssh)
+[1m[92m   Compiling[0m hyper-rustls v0.27.9
+[1m[92m   Compiling[0m hickory-resolver v0.26.3
+[1m[92m   Compiling[0m sqlx-postgres v0.9.0 (/home/runner/work/BookiE/BookiE/linux/vendor/sqlx-postgres)
+[1m[92m   Compiling[0m sqlx-mysql v0.9.0 (/home/runner/work/BookiE/BookiE/linux/vendor/sqlx-mysql)
+[1m[92m   Compiling[0m sqlx-sqlite v0.9.0
+[1m[92m   Compiling[0m axum-core v0.5.6
+[1m[92m   Compiling[0m typed-builder v0.22.0
+[1m[92m   Compiling[0m clickhouse-macros v0.3.0
+[1m[92m   Compiling[0m mongodb-internal-macros v3.9.1
+[1m[92m   Compiling[0m bson v2.15.0
+[1m[92m   Compiling[0m sqlx v0.9.0
+[1m[92m   Compiling[0m tablepro-storage v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/storage)
+[1m[92m   Compiling[0m async-native-tls v0.4.0
+[1m[92m   Compiling[0m serde_with v3.23.0
+[1m[92m   Compiling[0m libgssapi v0.8.3
+[1m[92m   Compiling[0m derive_more v2.1.1
+[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m rustls-native-certs v0.8.4
+[1m[92m   Compiling[0m async-lock v3.4.2
+[1m[92m   Compiling[0m half v2.7.1
+[1m[92m   Compiling[0m combine v4.6.8
+[1m[92m   Compiling[0m arc-swap v1.9.2
+[1m[92m   Compiling[0m backon v1.6.0
+[1m[92m   Compiling[0m clickhouse-types v0.1.3
+[1m[92m   Compiling[0m asynchronous-codec v0.6.2
+[1m[92m   Compiling[0m derive-where v1.7.0
+[1m[92m   Compiling[0m serde_path_to_error v0.1.20
+[1m[92m   Compiling[0m bstr v1.13.1
+[1m[92m   Compiling[0m jiff-core v0.1.1
+[1m[92m   Compiling[0m clap_lex v1.1.1
+[1m[92m   Compiling[0m take_mut v0.2.2
+[1m[92m   Compiling[0m bnum v0.13.0
+[1m[92m   Compiling[0m arcstr v1.2.0
+[1m[92m   Compiling[0m connection-string v0.2.0
+[1m[92m   Compiling[0m xxhash-rust v0.8.18
+[1m[92m   Compiling[0m matchit v0.8.4
+[1m[92m   Compiling[0m heck v0.5.0
+[1m[92m   Compiling[0m pretty-hex v0.3.0
+[1m[92m   Compiling[0m tiberius v0.12.3 (https://github.com/tiberius-rs/tiberius?rev=c1d2e741ee6fe0935091826d91fb5886b6a4082a#c1d2e741)
+[1m[92m   Compiling[0m redis v1.7.0 (/home/runner/work/BookiE/BookiE/linux/vendor/redis)
+[1m[92m   Compiling[0m clap_derive v4.6.7
+[1m[92m   Compiling[0m clickhouse v0.15.2
+[1m[92m   Compiling[0m axum v0.8.9
+[1m[92m   Compiling[0m jiff v0.2.37
+[1m[92m   Compiling[0m mongodb v3.9.1 (/home/runner/work/BookiE/BookiE/linux/vendor/mongodb)
+[1m[92m   Compiling[0m clap_builder v4.6.7
+[1m[92m   Compiling[0m tablepro-transport v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/transport)
+[1m[92m   Compiling[0m tablepro-driver-postgres v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/postgres)
+[1m[92m   Compiling[0m matchers v0.2.0
+[1m[92m   Compiling[0m sharded-slab v0.1.7
+[1m[92m   Compiling[0m tracing-serde v0.2.0
+[1m[92m   Compiling[0m tracing-log v0.2.0
+[1m[92m   Compiling[0m thread_local v1.1.10
+[1m[92m   Compiling[0m nu-ansi-term v0.50.3
+[1m[92m   Compiling[0m tablepro-driver-redis v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/redis)
+[1m[92m   Compiling[0m tracing-subscriber v0.3.23
+[1m[92m   Compiling[0m clap v4.6.7
+[1m[92m   Compiling[0m tablepro-mcp v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/mcp)
+[1m[92m   Compiling[0m tablepro-driver-clickhouse v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/clickhouse)
+[1m[92m   Compiling[0m tablepro-driver-mssql v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mssql)
+[1m[92m   Compiling[0m tablepro-driver-sqlite v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/sqlite)
+[1m[92m   Compiling[0m tablepro-driver-mysql v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mysql)
+[1m[92m   Compiling[0m tablepro-release-tests v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/release-tests)
+[1m[92m   Compiling[0m tablepro-driver-mongodb v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mongodb)
+[1m[92m   Compiling[0m tablepro-agentd v0.1.5 (/home/runner/work/BookiE/BookiE/linux/crates/agentd)
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 2m 17s
+[1m[92m     Running[0m tests/g5_system_openssh.rs (target/debug/deps/g5_system_openssh-ec203e6430992524)
+
+running 1 test
+test agentd_refuses_without_learning_an_unknown_system_openssh_key_then_queries_after_trust ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+[1m[92m   Compiling[0m tablepro-agentd v0.1.5 (/home/runner/work/BookiE/BookiE/linux/crates/agentd)
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 1.11s
+[1m[92m     Running[0m tests/mtls.rs (target/debug/deps/mtls-8f89713da84215c1)
+
+running 3 tests
+test agentd_refuses_a_saved_client_certificate_from_an_untrusted_authority ... ok
+test agentd_uses_a_saved_client_certificate_for_the_database_session ... ok
+test agentd_uses_a_saved_client_certificate_through_its_saved_ssh_route ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+[1m[92m   Compiling[0m tokio v1.53.1
+[1m[92m   Compiling[0m crypto-bigint v0.7.5
+[1m[92m   Compiling[0m tracing v0.1.44
+[1m[92m   Compiling[0m rust_decimal v1.43.0
+[1m[92m   Compiling[0m chrono v0.4.45
+[1m[92m   Compiling[0m serde_json v1.0.151
+[1m[92m   Compiling[0m crossbeam-utils v0.8.23
+[1m[92m   Compiling[0m rustls v0.23.45
+[1m[92m   Compiling[0m rustls-webpki v0.103.15
+[1m[92m   Compiling[0m libsqlite3-sys v0.37.0
+[1m[92m   Compiling[0m elliptic-curve v0.14.1
+[1m[92m   Compiling[0m primefield v0.14.0
+[1m[92m   Compiling[0m wnaf v0.14.1
+[1m[92m   Compiling[0m rfc6979 v0.6.0
+[1m[92m   Compiling[0m primeorder v0.14.0
+[1m[92m   Compiling[0m ecdsa v0.17.0
+[1m[92m   Compiling[0m crossbeam-queue v0.3.14
+[1m[92m   Compiling[0m ssh-encoding v0.3.0
+[1m[92m   Compiling[0m zopfli v0.8.3
+[1m[92m   Compiling[0m tokio-stream v0.1.19
+[1m[92m   Compiling[0m tokio-util v0.7.19
+[1m[92m   Compiling[0m zip v8.6.0
+[1m[92m   Compiling[0m crypto-primes v0.7.2
+[1m[92m   Compiling[0m atoi v2.0.0
+[1m[92m   Compiling[0m ssh-cipher v0.3.0
+[1m[92m   Compiling[0m rust_xlsxwriter v0.99.1
+[1m[92m   Compiling[0m rsa v0.10.0-rc.18
+[1m[92m   Compiling[0m p521 v0.14.0
+[1m[92m   Compiling[0m sqlx-core v0.9.0
+[1m[92m   Compiling[0m p256 v0.14.0
+[1m[92m   Compiling[0m p384 v0.14.0
+[1m[92m   Compiling[0m tempfile v3.27.0
+[1m[92m   Compiling[0m num-bigint v0.4.8
+[1m[92m   Compiling[0m num-iter v0.1.46
+[1m[92m   Compiling[0m http v1.5.0
+[1m[92m   Compiling[0m md-5 v0.11.0
+[1m[92m   Compiling[0m module-lattice v0.2.3
+[1m[92m   Compiling[0m rand_core v0.9.5
+[1m[92m   Compiling[0m sqlx-postgres v0.9.0 (/home/runner/work/BookiE/BookiE/linux/vendor/sqlx-postgres)
+[1m[92m   Compiling[0m toml_edit v0.22.27
+[1m[92m   Compiling[0m rand v0.9.5
+[1m[92m   Compiling[0m zbus v5.19.0
+[1m[92m   Compiling[0m ssh-key v0.7.0-rc.11
+[1m[92m   Compiling[0m ml-kem v0.3.2
+[1m[92m   Compiling[0m num-rational v0.4.2
+[1m[92m   Compiling[0m http-body v1.1.0
+[1m[92m   Compiling[0m tablepro-core v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/core)
+[1m[92m   Compiling[0m sqlx-sqlite v0.9.0
+[1m[92m   Compiling[0m russh-cryptovec v0.62.0
+[1m[92m   Compiling[0m russh-util v0.52.0
+[1m[92m   Compiling[0m num-bigint v0.5.1
+[1m[92m   Compiling[0m num-complex v0.4.6
+[1m[92m   Compiling[0m russh v0.63.3
+[1m[92m   Compiling[0m num v0.4.3
+[1m[92m   Compiling[0m ashpd v0.13.13
+[1m[92m   Compiling[0m sqlx v0.9.0
+[1m[92m   Compiling[0m num-bigint-dig v0.9.1
+[1m[92m   Compiling[0m toml v0.8.23
+[1m[92m   Compiling[0m sqlparser v0.58.0
+[1m[92m   Compiling[0m oo7 v0.6.0
+[1m[92m   Compiling[0m hyper v1.11.1
+[1m[92m   Compiling[0m http-body-util v0.1.5
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m axum-core v0.5.6
+[1m[92m   Compiling[0m tower v0.5.3
+[1m[92m   Compiling[0m tablepro-ssh v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/ssh)
+[1m[92m   Compiling[0m axum v0.8.9
+[1m[92m   Compiling[0m tablepro-driver-postgres v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/postgres)
+[1m[92m   Compiling[0m tablepro-policy v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/policy)
+[1m[92m   Compiling[0m tablepro-storage v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/storage)
+[1m[92m   Compiling[0m tablepro-transport v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/transport)
+[1m[92m   Compiling[0m tablepro-mcp v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/mcp)
+[1m[92m   Compiling[0m tablepro-release-tests v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/release-tests)
+[1m[92m    Finished[0m `test` profile [unoptimized + debuginfo] target(s) in 41.18s
+[1m[92m     Running[0m unittests src/lib.rs (target/debug/deps/tablepro_release_tests-55e6c0aafa75e295)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+[1m[92m     Running[0m tests/activity_locks.rs (target/debug/deps/activity_locks-725aa3171d62e1c5)
+
+running 2 tests
+test activity_templates_run_against_a_verified_session ... ok
+test blocking_lock_query_reports_a_contended_row ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+[1m[92m     Running[0m tests/agent_transport.rs (target/debug/deps/agent_transport-d5e0b951e46afb77)
+
+running 4 tests
+test a_direct_session_and_a_tunnelled_session_reach_the_same_database ... ok
+test a_tunnelled_connection_fails_closed_when_the_bastion_is_unreachable ... ok
+test shared_transport_records_builtin_unknown_and_changed_host_key_refusals ... ok
+test the_shared_transport_verifies_the_database_hostname_through_the_bastion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+[1m[92m     Running[0m tests/browse_filters.rs (target/debug/deps/browse_filters-7e9487793191fb88)
+
+running 8 tests
+test a_composite_keyset_seeks_past_the_last_seen_pair ... ok
+test a_filter_value_carrying_sql_stays_data ... ok
+test an_unknown_filter_column_is_refused_before_reaching_the_database ... ok
+test capped_stream_preserves_columns_values_and_connection_reuse ... ok
+test combinators_and_raw_sql_compose_with_bound_rules ... ok
+test every_filter_operator_selects_the_expected_rows ... ok
+test keyset_paging_walks_the_same_rows_as_offset_paging ... ok
+test postgres_patterns_search_non_text_columns_without_changing_comparisons ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.94s
+
+[1m[92m     Running[0m tests/mcp_tools.rs (target/debug/deps/mcp_tools-cc76cb131db1a3e4)
+
+running 9 tests
+test a_denied_agent_write_is_journalled ... ok
+test a_hostile_table_name_cannot_inject_sql_through_a_metadata_tool ... ok
+test a_metadata_tool_is_refused_for_a_connection_outside_the_allowlist ... ok
+test a_read_scoped_agent_can_read_a_query_plan ... ok
+test a_read_scoped_agent_cannot_run_a_write_through_execute_query ... ok
+test a_read_scoped_agent_reads_table_metadata_a_count_and_a_page ... ok
+test csv_export_escapes_values_read_from_the_database ... ok
+test explain_analyze_is_denied_and_leaves_the_table_intact ... ok
+test explain_analyze_stays_denied_on_a_read_only_connection_with_write_scope ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s
+
+[1m[92m     Running[0m tests/parameters.rs (target/debug/deps/parameters-1f9768fe7a289540)
+
+running 5 tests
+test a_copied_insert_round_trips_a_value_holding_a_backslash_and_a_quote ... ok
+test a_dollar_quoted_function_body_executes_as_one_statement ... ok
+test a_sql_payload_in_a_parameter_stays_data ... ok
+test named_parameters_bind_values_through_the_driver ... ok
+test repeated_parameters_bind_the_same_value_at_every_position ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+[1m[92m     Running[0m tests/policy_transactions.rs (target/debug/deps/policy_transactions-2960d30016549e5d)
+
+running 4 tests
+test batch_rollback_discards_every_statement_after_a_failure ... ok
+test interactive_rollback_discards_uncommitted_writes ... ok
+test read_only_denies_a_data_changing_cte_and_leaves_rows_in_place ... ok
+test read_only_denies_an_administrative_function ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+[1m[92m     Running[0m tests/reconnect.rs (target/debug/deps/reconnect-4d00c625528472c3)
+
+running 2 tests
+test direct_reconnect_restores_a_verified_session ... ok
+test ssh_reconnect_replaces_the_tunnel_and_the_session ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+
+[1m[92m     Running[0m tests/saved_tls.rs (target/debug/deps/saved_tls-0465542c306e7ea4)
+
+running 9 tests
+test a_rotated_valid_client_certificate_is_used_by_the_saved_connection ... ok
+test a_saved_certificate_authority_verifies_a_privately_issued_certificate ... ok
+test a_saved_connection_naming_the_wrong_authority_is_refused ... ok
+test a_saved_connection_without_an_authority_cannot_verify_a_private_certificate ... ok
+test an_unverified_mode_ignores_a_saved_authority ... ok
+test saved_mtls_connection_authenticates_directly_with_client_certificate ... ok
+test saved_mtls_connection_authenticates_through_ssh ... ok
+test server_requiring_client_certificate_rejects_missing_identity ... ok
+test server_requiring_client_certificate_rejects_untrusted_identity ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+
+[1m[92m     Running[0m tests/structure_ddl.rs (target/debug/deps/structure_ddl-ad8f22124b4626b7)
+
+running 8 tests
+test a_created_table_matches_the_drafted_columns_indexes_and_keys ... ok
+test a_drafted_foreign_key_is_created_and_enforced ... ok
+test a_failed_statement_rolls_back_the_whole_ddl_batch ... ok
+test a_renamed_column_keeps_a_comment_edited_in_the_same_save ... ok
+test a_renamed_table_keeps_its_rows ... ok
+test an_edited_draft_applies_the_diffed_column_changes ... ok
+test column_comments_are_created_added_edited_and_cleared ... ok
+test structure_batches_do_not_commit_or_rollback_an_editor_transaction ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
+
+[1m[92m     Running[0m tests/tls_identity.rs (target/debug/deps/tls_identity-f5b39d7fa3c2c2fd)
+
+running 8 tests
+test ssh_tunnel_reaches_a_database_with_no_published_port ... ok
+test verify_ca_rejects_an_unknown_certificate_authority ... ok
+test verify_full_over_a_tcp_tunnel_never_downgrades_to_the_local_dial_address ... ok
+test verify_full_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_rejects_an_unknown_certificate_authority ... ok
+test verify_full_succeeds_against_the_certificate_hostname ... ok
+test verify_full_through_ssh_rejects_a_hostname_outside_the_certificate ... ok
+test verify_full_through_ssh_uses_the_original_database_hostname ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+[1m[92m Downloading[0m crates ...
+[1m[92m  Downloaded[0m anyhow v1.0.104
+[1m[92m  Downloaded[0m fnv v1.0.7
+[1m[92m  Downloaded[0m gdk-pixbuf-sys v0.22.9
+[1m[92m  Downloaded[0m dyn-clone v1.0.20
+[1m[92m  Downloaded[0m field-offset v0.3.6
+[1m[92m  Downloaded[0m async-channel v2.5.0
+[1m[92m  Downloaded[0m bs58 v0.5.1
+[1m[92m  Downloaded[0m glib-build-tools v0.22.8
+[1m[92m  Downloaded[0m cairo-sys-rs v0.22.9
+[1m[92m  Downloaded[0m fragile v2.1.0
+[1m[92m  Downloaded[0m graphene-sys v0.22.9
+[1m[92m  Downloaded[0m concurrent-queue v2.5.0
+[1m[92m  Downloaded[0m gdk-pixbuf v0.22.0
+[1m[92m  Downloaded[0m gettext-rs v0.8.0
+[1m[92m  Downloaded[0m base64 v0.23.1
+[1m[92m  Downloaded[0m gobject-sys v0.22.9
+[1m[92m  Downloaded[0m graphene-rs v0.22.8
+[1m[92m  Downloaded[0m gtk4-macros v0.11.4
+[1m[92m  Downloaded[0m cairo-rs v0.22.9
+[1m[92m  Downloaded[0m cfg-expr v0.20.9
+[1m[92m  Downloaded[0m glib-sys v0.22.9
+[1m[92m  Downloaded[0m gsk4 v0.11.4
+[1m[92m  Downloaded[0m gsk4-sys v0.11.4
+[1m[92m  Downloaded[0m gdk4-sys v0.11.4
+[1m[92m  Downloaded[0m glib-macros v0.22.9
+[1m[92m  Downloaded[0m memoffset v0.9.1
+[1m[92m  Downloaded[0m gio-sys v0.22.9
+[1m[92m  Downloaded[0m libadwaita-sys v0.9.2
+[1m[92m  Downloaded[0m indexmap v1.9.3
+[1m[92m  Downloaded[0m gdk4 v0.11.4
+[1m[92m  Downloaded[0m locale_config v0.3.0
+[1m[92m  Downloaded[0m hashbrown v0.12.3
+[1m[92m  Downloaded[0m gtk4-sys v0.11.4
+[1m[92m  Downloaded[0m libadwaita v0.9.2
+[1m[92m  Downloaded[0m h2 v0.4.19
+[1m[92m  Downloaded[0m pango-sys v0.22.9
+[1m[92m  Downloaded[0m gio v0.22.9
+[1m[92m  Downloaded[0m pango v0.22.9
+[1m[92m  Downloaded[0m glib v0.22.9
+[1m[92m  Downloaded[0m gtk4 v0.11.4
+[1m[92m  Downloaded[0m ref-cast v1.0.27
+[1m[92m  Downloaded[0m ref-cast-impl v1.0.27
+[1m[92m  Downloaded[0m relm4-macros v0.11.0
+[1m[92m  Downloaded[0m relm4 v0.11.0
+[1m[92m  Downloaded[0m schemars v0.9.0
+[1m[92m  Downloaded[0m schemars v1.2.2
+[1m[92m  Downloaded[0m serde_spanned v1.1.1
+[1m[92m  Downloaded[0m sourceview5-sys v0.11.2
+[1m[92m  Downloaded[0m sourceview5 v0.11.2
+[1m[92m  Downloaded[0m system-deps v7.0.8
+[1m[92m  Downloaded[0m temp-dir v0.1.16
+[1m[92m  Downloaded[0m system-deps v9.0.0
+[1m[92m  Downloaded[0m target-lexicon v0.13.5
+[1m[92m  Downloaded[0m gettext-sys v0.27.0
+[1m[92m  Downloaded[0m toml v1.1.6+spec-1.1.0
+[1m[92m  Downloaded[0m toml_writer v1.1.2+spec-1.1.0
+[1m[92m  Downloaded[0m version-compare v0.2.1
+[1m[92m  Downloaded[0m whoami v1.6.1
+[1m[92m   Compiling[0m target-lexicon v0.13.5
+[1m[92m   Compiling[0m serde_spanned v1.1.1
+[1m[92m   Compiling[0m smallvec v1.16.1
+[1m[92m   Compiling[0m version-compare v0.2.1
+[1m[92m   Compiling[0m toml v1.1.6+spec-1.1.0
+[1m[92m   Compiling[0m system-deps v9.0.0
+[1m[92m   Compiling[0m fastrand v2.5.0
+[1m[92m   Compiling[0m icu_normalizer v2.3.0
+[1m[92m   Compiling[0m parking_lot_core v0.9.12
+[1m[92m   Compiling[0m cfg-expr v0.20.9
+[1m[92m   Compiling[0m parking_lot v0.12.5
+[1m[92m   Compiling[0m idna_adapter v1.2.2
+[1m[92m   Compiling[0m idna v1.1.0
+[1m[92m   Compiling[0m tempfile v3.27.0
+[1m[92m   Compiling[0m glib-macros v0.22.9
+[1m[92m   Compiling[0m url v2.5.8
+[1m[92m   Compiling[0m system-deps v7.0.8
+[1m[92m   Compiling[0m tablepro-core v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/core)
+[1m[92m   Compiling[0m glib-sys v0.22.9
+[1m[92m   Compiling[0m gobject-sys v0.22.9
+[1m[92m   Compiling[0m gio-sys v0.22.9
+[1m[92m   Compiling[0m pango-sys v0.22.9
+[1m[92m   Compiling[0m cairo-sys-rs v0.22.9
+[1m[92m   Compiling[0m gdk-pixbuf-sys v0.22.9
+[1m[92m   Compiling[0m gdk4-sys v0.11.4
+[1m[92m   Compiling[0m graphene-sys v0.22.9
+[1m[92m   Compiling[0m futures-intrusive v0.5.0
+[1m[92m   Compiling[0m sqlx-core v0.9.0
+[1m[92m   Compiling[0m glib v0.22.9
+[1m[92m   Compiling[0m gsk4-sys v0.11.4
+[1m[92m   Compiling[0m gtk4-sys v0.11.4
+[1m[92m   Compiling[0m flume v0.12.0
+[1m[92m   Compiling[0m memoffset v0.9.1
+[1m[92m   Compiling[0m hyper v1.11.1
+[1m[92m   Compiling[0m futures-lite v2.6.1
+[1m[92m   Compiling[0m sqlx-postgres v0.9.0 (/home/runner/work/BookiE/BookiE/linux/vendor/sqlx-postgres)
+[1m[92m   Compiling[0m sqlx-mysql v0.9.0 (/home/runner/work/BookiE/BookiE/linux/vendor/sqlx-mysql)
+[1m[92m   Compiling[0m sqlx-sqlite v0.9.0
+[1m[92m   Compiling[0m field-offset v0.3.6
+[1m[92m   Compiling[0m aho-corasick v1.1.5
+[1m[92m   Compiling[0m regex-syntax v0.8.11
+[1m[92m   Compiling[0m gio v0.22.9
+[1m[92m   Compiling[0m cairo-rs v0.22.9
+[1m[92m   Compiling[0m sqlx v0.9.0
+[1m[92m   Compiling[0m regex-automata v0.4.18
+[1m[92m   Compiling[0m graphene-rs v0.22.8
+[1m[92m   Compiling[0m zbus v5.19.0
+[1m[92m   Compiling[0m hyper-util v0.1.20
+[1m[92m   Compiling[0m num-bigint-dig v0.9.1
+[1m[92m   Compiling[0m hickory-proto v0.26.3
+[1m[92m   Compiling[0m libadwaita-sys v0.9.2
+[1m[92m   Compiling[0m gtk4-macros v0.11.4
+[1m[92m   Compiling[0m temp-dir v0.1.16
+[1m[92m   Compiling[0m moka v0.12.16
+[1m[92m   Compiling[0m hickory-net v0.26.3
+[1m[92m   Compiling[0m ashpd v0.13.13
+[1m[92m   Compiling[0m gettext-sys v0.27.0
+[1m[92m   Compiling[0m tablepro-policy v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/policy)
+[1m[92m   Compiling[0m oo7 v0.6.0
+[1m[92m   Compiling[0m sourceview5-sys v0.11.2
+[1m[92m   Compiling[0m hickory-resolver v0.26.3
+[1m[92m   Compiling[0m pango v0.22.9
+[1m[92m   Compiling[0m gdk-pixbuf v0.22.0
+[1m[92m   Compiling[0m tablepro-storage v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/storage)
+[1m[92m   Compiling[0m gdk4 v0.11.4
+[1m[92m   Compiling[0m async-native-tls v0.4.0
+[1m[92m   Compiling[0m regex v1.13.1
+[1m[92m   Compiling[0m hyper-rustls v0.27.9
+[1m[92m   Compiling[0m backon v1.6.0
+[1m[92m   Compiling[0m anyhow v1.0.104
+[1m[92m   Compiling[0m glib-build-tools v0.22.8
+[1m[92m   Compiling[0m axum v0.8.9
+[1m[92m   Compiling[0m clickhouse v0.15.2
+[1m[92m   Compiling[0m gsk4 v0.11.4
+[1m[92m   Compiling[0m tablepro-app v0.1.5 (/home/runner/work/BookiE/BookiE/linux/crates/app)
+[1m[92m   Compiling[0m mongodb v3.9.1 (/home/runner/work/BookiE/BookiE/linux/vendor/mongodb)
+[1m[92m   Compiling[0m redis v1.7.0 (/home/runner/work/BookiE/BookiE/linux/vendor/redis)
+[1m[92m   Compiling[0m tiberius v0.12.3 (https://github.com/tiberius-rs/tiberius?rev=c1d2e741ee6fe0935091826d91fb5886b6a4082a#c1d2e741)
+[1m[92m   Compiling[0m gtk4 v0.11.4
+[1m[92m   Compiling[0m locale_config v0.3.0
+[1m[92m   Compiling[0m matchers v0.2.0
+[1m[92m   Compiling[0m concurrent-queue v2.5.0
+[1m[92m   Compiling[0m fragile v2.1.0
+[1m[92m   Compiling[0m relm4-macros v0.11.0
+[1m[92m   Compiling[0m tracing-subscriber v0.3.23
+[1m[92m   Compiling[0m async-channel v2.5.0
+[1m[92m   Compiling[0m gettext-rs v0.8.0
+[1m[92m   Compiling[0m tablepro-driver-redis v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/redis)
+[1m[92m   Compiling[0m tablepro-driver-clickhouse v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/clickhouse)
+[1m[92m   Compiling[0m tablepro-driver-mssql v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mssql)
+[1m[92m   Compiling[0m tablepro-mcp v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/mcp)
+[1m[92m   Compiling[0m tablepro-transport v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/transport)
+[1m[92m   Compiling[0m tablepro-driver-mysql v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mysql)
+[1m[92m   Compiling[0m tablepro-driver-postgres v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/postgres)
+[1m[92m   Compiling[0m tablepro-driver-mongodb v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/mongodb)
+[1m[92m   Compiling[0m tablepro-driver-sqlite v0.1.0 (/home/runner/work/BookiE/BookiE/linux/crates/drivers/sqlite)
+[1m[92m   Compiling[0m whoami v1.6.1
+[1m[92m   Compiling[0m libadwaita v0.9.2
+[1m[92m   Compiling[0m sourceview5 v0.11.2
+[1m[92m   Compiling[0m relm4 v0.11.0
+[1m[92m    Finished[0m `dev` profile [unoptimized + debuginfo] target(s) in 1m 20s
+dbus-daemon[29636]: [session uid=1001 pid=29636] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1001 pid=29738 comm="gdbus call --session --dest org.a11y.Bus --object-" label="unconfined")
+dbus-daemon[29636]: [session uid=1001 pid=29636] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[29749]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1001 pid=29763 comm="python3 /home/runner/work/BookiE/BookiE/linux/crat" label="unconfined")
+dbus-daemon[29749]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+
+(process:29763): dbind-WARNING **: 08:46:39.412: AT-SPI: Error in GetItems, sender=:1.2, error=Object does not exist at path “/org/a11y/atspi/cache”
+
+(process:29763): dbind-WARNING **: 08:46:44.209: AT-SPI: Error in GetItems, sender=:1.3, error=Object does not exist at path “/org/a11y/atspi/cache”
+passed: postgres_saved_mtls_connection_authenticates_and_queries
+Traceback (most recent call last):
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_safety.py", line 872, in run_scenario
+    scenario(database, base)
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_ux.py", line 580, in postgres_ssh_unknown_host_key_decline_is_durably_audited
+    ui.wait_for_node(name="Trust this SSH host?", role=pyatspi.ROLE_ALERT)
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_safety.py", line 255, in wait_for_node
+    raise AssertionError(f"expected accessible node {name!r} to {expectation}:\n{accessible_snapshot()}")
+AssertionError: expected accessible node 'Trust this SSH host?' to appear:
+application: com.tablepro.linux
+frame: Safety SQLite — BookiE [0,0 1200x760] actions=['win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'window.minimize', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'win.show-saved-queries', 'win.about', 'window.close', 'win.explain-query', 'win.save-file-as', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+page tab: Query 1 [0,0 854x34] actions=[]
+label: Query 1 [0,0 51x26] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Close Tab [0,0 24x24] actions=['click']
+push button: New query (Ctrl+E) [0,0 34x34] actions=['click']
+panel: Query 1 [0,0 910x657]
+label: Ln 1, Col 10 [0,0 96x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Session [0,0 92x34] actions=['click']
+label: Session [0,0 58x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Explain [0,0 90x34] actions=['click']
+label: Explain [0,0 56x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Run [0,0 62x34] actions=['click']
+label: Run [0,0 28x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: safety_items [0,0 268x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: safety_items [0,0 160x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Open safety_items [0,0 36x34] actions=['click']
+label: Tables [0,0 176x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: New Table… [0,0 34x34] actions=['click']
+push button: Table from CSV… [0,0 34x34] actions=['click']
+label: Safety SQLite [0,0 127x17] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+push button: New connection [0,0 34x34] actions=['click']
+push button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+label: BookiE [0,0 271x17] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Safety SQLite · sqlite · Local · SQLite 3.45.1 [0,0 271x14] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+push button: Minimize [0,0 34x34] actions=['click']
+push button: Maximize [0,0 34x34] actions=['click']
+push button: Close [0,0 34x34] actions=['click']
+label: Connection failed [0,0 374x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: ssh operation timed out: ssh handshake to 127.0.0.1:2223 did not complete within 10 seconds [0,0 374x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Close [0,0 145x44] actions=['click']
+label: Close [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Edit Connection [0,0 146x44] actions=['click']
+label: Edit Connection [0,0 118x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Try Again [0,0 145x44] actions=['click']
+label: Try Again [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+frame: Trust this SSH host? [0,0 388x238] actions=['window.close', 'window.minimize', 'default.activate']
+label: Trust this SSH host? [0,0 318x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: This computer has not connected to 127.0.0.1:2223 before. Its ssh-ed25519 key fingerprint is SHA256:0DqyRTfXvSqu/7VvJglOXCWLk5ghyur1+5c7ud1e95c. Compare it with the fingerprint your server administrator gave you before trusting it. [0,0 318x102] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Cancel [0,0 190x44] actions=['click']
+label: Cancel [0,0 162x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Trust [0,0 189x44] actions=['click']
+label: Trust [0,0 161x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_safety.py", line 1822, in <module>
+    main()
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_safety.py", line 1817, in main
+    run_scenario(binary, scenario)
+  File "/home/runner/work/BookiE/BookiE/linux/crates/app/tests/gtk_safety.py", line 899, in run_scenario
+    raise AssertionError(f"{failure}\napplication stderr:\n{stderr}") from failure
+AssertionError: expected accessible node 'Trust this SSH host?' to appear:
+application: com.tablepro.linux
+frame: Safety SQLite — BookiE [0,0 1200x760] actions=['win.new-window', 'win.refresh-page', 'win.open-file', 'win.quit', 'win.undo-change', 'win.disconnect', 'win.show-history', 'win.show-catalog', 'win.recent-tab', 'win.save-changes', 'default.activate', 'win.redo-change', 'win.jump-column', 'window.minimize', 'win.shortcuts', 'win.save-favorite', 'win.open-quickly', 'win.export-all-csv', 'win.export-json', 'win.show-saved-queries', 'win.about', 'window.close', 'win.explain-query', 'win.save-file-as', 'win.export-csv', 'win.export-all-json', 'win.preferences', 'win.open-filter', 'window.toggle-maximized', 'win.reopen-closed-tab', 'win.show-activity', 'win.close-current', 'win.open-editor']
+page tab: Query 1 [0,0 854x34] actions=[]
+label: Query 1 [0,0 51x26] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Close Tab [0,0 24x24] actions=['click']
+push button: New query (Ctrl+E) [0,0 34x34] actions=['click']
+panel: Query 1 [0,0 910x657]
+label: Ln 1, Col 10 [0,0 96x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Session [0,0 92x34] actions=['click']
+label: Session [0,0 58x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Explain [0,0 90x34] actions=['click']
+label: Explain [0,0 56x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Run [0,0 62x34] actions=['click']
+label: Run [0,0 28x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+list item: safety_items [0,0 268x46] actions=['sidebar-row.open-in-new-tab', 'sidebar-row.show-create-table', 'sidebar-row.edit-structure', 'sidebar-row.drop-table', 'sidebar-row.import-csv']
+label: safety_items [0,0 160x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Open safety_items [0,0 36x34] actions=['click']
+label: Tables [0,0 176x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: New Table… [0,0 34x34] actions=['click']
+push button: Table from CSV… [0,0 34x34] actions=['click']
+label: Safety SQLite [0,0 127x17] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+toggle button: Search tables [0,0 34x34] actions=['click']
+push button: New connection [0,0 34x34] actions=['click']
+push button: Open saved connection [0,0 34x34] actions=[]
+toggle button: Open saved connection [0,0 34x34] actions=['click']
+label: BookiE [0,0 271x17] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: Safety SQLite · sqlite · Local · SQLite 3.45.1 [0,0 271x14] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Main menu [0,0 34x34] actions=[]
+toggle button: Main menu [0,0 34x34] actions=['click']
+push button: Minimize [0,0 34x34] actions=['click']
+push button: Maximize [0,0 34x34] actions=['click']
+push button: Close [0,0 34x34] actions=['click']
+label: Connection failed [0,0 374x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: ssh operation timed out: ssh handshake to 127.0.0.1:2223 did not complete within 10 seconds [0,0 374x34] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Close [0,0 145x44] actions=['click']
+label: Close [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Edit Connection [0,0 146x44] actions=['click']
+label: Edit Connection [0,0 118x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Try Again [0,0 145x44] actions=['click']
+label: Try Again [0,0 117x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+frame: Trust this SSH host? [0,0 388x238] actions=['window.close', 'window.minimize', 'default.activate']
+label: Trust this SSH host? [0,0 318x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+label: This computer has not connected to 127.0.0.1:2223 before. Its ssh-ed25519 key fingerprint is SHA256:0DqyRTfXvSqu/7VvJglOXCWLk5ghyur1+5c7ud1e95c. Compare it with the fingerprint your server administrator gave you before trusting it. [0,0 318x102] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Cancel [0,0 190x44] actions=['click']
+label: Cancel [0,0 162x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+push button: Trust [0,0 189x44] actions=['click']
+label: Trust [0,0 161x24] actions=['clipboard.copy', 'selection.delete', 'clipboard.paste', 'link.open', 'clipboard.cut', 'link.copy', 'menu.popup', 'selection.select-all']
+application stderr:
+[2m2026-10-07T08:46:43.987947Z[0m [32m INFO[0m starting tablepro-app [3mdrivers[0m[2m=[0m7
+[2m2026-10-07T08:46:43.988102Z[0m [32m INFO[0m MCP HTTP server starting [3mhost[0m[2m=[0m127.0.0.1 [3mport[0m[2m=[0m17432
+libEGL warning: DRI3 error: Could not get DRI3 device
+libEGL warning: Ensure your X server supports DRI3 to get accelerated rendering
+[2m2026-10-07T08:46:44.104361Z[0m [32m INFO[0m registered win.disconnect [3menabled[0m[2m=[0mfalse
+[2m2026-10-07T08:46:44.114657Z[0m [32m INFO[0m main window activated
+
+(com.tablepro.linux:30025): Gtk-CRITICAL **: 08:46:44.157: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.224: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+[2m2026-10-07T08:46:44.808634Z[0m [32m INFO[0m workspace ready [3mdriver[0m[2m=[0msqlite [3mtable_count[0m[2m=[0m1 [3mview_count[0m[2m=[0m0
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.824: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Gtk-CRITICAL **: 08:46:44.846: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:30025): Gtk-CRITICAL **: 08:46:44.859: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.874: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.886: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.902: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.919: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.936: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.953: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.969: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:44.986: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.003: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.019: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.036: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.104: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.202: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:45.220: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:46.031: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:46.747: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+[2m2026-10-07T08:46:56.770720Z[0m [33m WARN[0m candidate connection failed [3merror[0m[2m=[0mssh operation timed out: ssh handshake to 127.0.0.1:2223 did not complete within 10 seconds
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:56.775: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+(com.tablepro.linux:30025): Adwaita-WARNING **: 08:46:57.080: AdwApplicationWindow 0x5568e6bcbdc0 does not have a minimum size, set the 'width-request' and 'height-request' properties to specify it
+
+X connection to :99 broken (explicit kill or server shutdown).
