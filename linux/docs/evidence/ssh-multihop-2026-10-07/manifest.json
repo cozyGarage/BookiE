@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "8d88f48ec",
+  "engine": "Docker-backed native SSH fixtures",
+  "command": "bash scripts/test-ssh.sh",
+  "result": "passed; 21 tests across agent_auth and openssh_session",
+  "selectors": [
+    "a_two_hop_chain_reaches_the_final_host",
+    "a_changed_key_on_the_second_hop_is_reported_as_a_host_key_mismatch"
+  ],
+  "contract": [
+    "Two built-in SSH hops reach the final SSH server banner, with explicit host-key acceptance for each unknown hop.",
+    "Replacing the second hop key is rejected as a host-key mismatch."
+  ],
+  "remaining": [
+    "In-flight cancellation while opening a multi-hop chain is not separately verified.",
+    "Installed GTK host-key trust flow is not verified.",
+    "This local run is not hosted CI or installed-package acceptance."
+  ]
+}
