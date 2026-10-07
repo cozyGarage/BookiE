@@ -303,7 +303,7 @@ def scenarios(ui):
         switches = [
             node for node in ui.descendants(ui.application_node())
             if ui.node_name(node) in ("alpha", "beta")
-            and ui.node_role(node) == pyatspi.ROLE_SWITCH
+            and ui.node_role(node) == getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON)
             and node.queryAction().nActions > 0
         ]
         assert len(switches) == 2, ui.accessible_snapshot()
