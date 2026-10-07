@@ -36,8 +36,13 @@ grid writes and typed CSV restore. Native `pg_typeof`, array text and
 `array_send` checks include XML fragments, SQL NULL, and a malformed XML
 assignment refused with SQLSTATE `2200N` without changing either row
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports now also preserve exact array
+text; SQL replay is checked against native JSON and wire bytes in
+`value_contract_xml_array_file_exports_preserve_native_text`.
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
+
+PostgreSQL enum schema and type identifiers at the 63-byte catalog limit, including a multibyte final character, retain metadata and keyed edits; see the [Docker/local validation comment on PR #125](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
 
 ## Run
 
@@ -278,6 +283,7 @@ formulas; other spreadsheet applications and workbook shapes remain unverified
 | PostgreSQL enum `array_agg` under shadowed `search_path` | [Target enum array type, JSON and wire identity with same-named shadow type](evidence/postgres-enum-array-agg-shadowed-path-results-2026-10-05/manifest.json) |
 | PostgreSQL `float4[]` Calc re-import | [Adjacent float4, negative zero, minimum subnormal, special values and SQL NULL through XLSX/ODS/XLSX](evidence/postgres-float4-array-calc-reimport-results-2026-10-05/manifest.json) |
 | DuckDB nanosecond keyed edit | [Native `TIME_NS`/`TIMESTAMP_NS` values and sibling preservation](evidence/duckdb-nanosecond-keyed-grid-edit-results-2026-10-05/manifest.json) |
+| DuckDB nanosecond expression | `epoch_ns()` preserves the exact pre-epoch nanoseconds; interval arithmetic returns the native `TIMESTAMP` rounded to microseconds; `TIME_NS` interval binding refuses ([test](../crates/drivers/duckdb/tests/support/submicro_parameter_expression.rs)) |
 | XLSX/XML/other formats | [Workbook precision](archive/value-contract-history.md#xlsx-float-precision-and-excel-safe-cell-types-2026-10-02), [temporal workbook](archive/value-contract-history.md#xlsx-temporal-consumer-checkpoint-2026-09-27), [XML text](archive/value-contract-history.md#xml-text-consumer-checkpoint-2026-09-27) |
 | Mutation and infrastructure | [Scoped re-audit](archive/value-contract-history.md#b3-mutation-survivor-re-audit-2026-10-01), [regression audit](archive/regression-audit-2026-09-29.md), [B3 review](archive/b3-review-2026-10-01.md) |
 | Local integration gate | [Six-driver, MCP, session, socket and SSH run (315 passed)](evidence/local-integration-tier-results-2026-10-04/manifest.json) |
