@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 17:24+0200\n"
+"POT-Creation-Date: 2026-10-07 17:28+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -32,13 +32,100 @@ msgstr ""
 msgid "{name}: {reason}"
 msgstr ""
 
-#: crates/app/src/services/quick_switcher.rs:32
+#: crates/app/src/services/quick_switcher.rs:33
 #: crates/app/src/ui/structure_tab_dialogs.rs:205
 msgid "Table"
 msgstr ""
 
-#: crates/app/src/services/quick_switcher.rs:33
+#: crates/app/src/services/quick_switcher.rs:34
 msgid "View"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:53
+msgid "New SQL tab"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:54
+msgid "New window"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:55
+#: crates/app/src/ui/preferences.rs:97
+msgid "Query history"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:56
+msgid "Catalog objects"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:57
+#: crates/app/src/ui/activity_dialog.rs:43
+#: crates/app/src/ui/app/shortcuts.rs:21
+msgid "Server activity"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:58
+#: crates/app/src/ui/app/shortcuts.rs:23 crates/app/src/ui/explain_dialog.rs:24
+#: crates/app/src/ui/explain_dialog.rs:52
+msgid "Explain query"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:59
+msgid "Jump to column"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:60
+#: crates/app/src/ui/app/shortcuts.rs:200
+msgid "Filter rows"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:61
+msgid "Refresh the current page"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:62
+msgid "Save changes"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:63
+msgid "Undo change"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:64
+msgid "Redo change"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:65
+msgid "Reopen closed tab"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:66
+msgid "Export results as CSV"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:67
+msgid "Export results as JSON"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:68
+msgid "Export all rows as CSV"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:69
+msgid "Export all rows as JSON"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:70
+#: crates/app/src/ui/app/shortcuts.rs:26 crates/app/src/ui/preferences.rs:36
+msgid "Preferences"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:71
+msgid "Keyboard shortcuts"
+msgstr ""
+
+#: crates/app/src/services/quick_switcher.rs:81
+msgid "Command"
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:26
@@ -59,11 +146,6 @@ msgstr ""
 #: crates/app/src/ui/mcp_preferences.rs:117
 #: crates/app/src/ui/mcp_preferences.rs:133
 msgid "OK"
-msgstr ""
-
-#: crates/app/src/ui/activity_dialog.rs:43
-#: crates/app/src/ui/app/shortcuts.rs:21
-msgid "Server activity"
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:70
@@ -501,11 +583,11 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: crates/app/src/ui/app/favorites.rs:169
+#: crates/app/src/ui/app/favorites.rs:173
 msgid "Open tab"
 msgstr ""
 
-#: crates/app/src/ui/app/favorites.rs:181
+#: crates/app/src/ui/app/favorites.rs:185
 msgid "Saved connection"
 msgstr ""
 
@@ -851,15 +933,6 @@ msgstr ""
 msgid "Catalog"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:23 crates/app/src/ui/explain_dialog.rs:24
-#: crates/app/src/ui/explain_dialog.rs:52
-msgid "Explain query"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:26 crates/app/src/ui/preferences.rs:36
-msgid "Preferences"
-msgstr ""
-
 #: crates/app/src/ui/app/shortcuts.rs:27
 msgid "New Window"
 msgstr ""
@@ -970,10 +1043,6 @@ msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:199
 msgid "Set focused cell to NULL"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:200
-msgid "Filter rows"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:201
@@ -3271,10 +3340,6 @@ msgstr ""
 msgid "Dark"
 msgstr ""
 
-#: crates/app/src/ui/preferences.rs:97
-msgid "Query history"
-msgstr ""
-
 #: crates/app/src/ui/preferences.rs:98
 msgid "Persistent record of every SQL query you run."
 msgstr ""
@@ -3327,19 +3392,19 @@ msgstr ""
 msgid "Open quickly"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:25
-msgid "Search favorites, open tabs, and saved connections"
+#: crates/app/src/ui/quick_switcher_dialog.rs:26
+msgid "Search favorites, tabs, connections and tables. Type > for commands"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:41
+#: crates/app/src/ui/quick_switcher_dialog.rs:43
 msgid "Nothing matches"
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:42
+#: crates/app/src/ui/quick_switcher_dialog.rs:44
 msgid "Save a query as a favorite, or open a tab to switch to it."
 msgstr ""
 
-#: crates/app/src/ui/quick_switcher_dialog.rs:104
+#: crates/app/src/ui/quick_switcher_dialog.rs:107
 #: crates/app/src/ui/sidebar_row.rs:153
 #, rust-format
 msgid "Open {name}"
