@@ -3,13 +3,14 @@
 Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 0.2.0. Implementation is authorized; no 0.2 release is approved.
 
-## Current continuation plan: 2026-10-07
+## Current continuation plan: 2026-10-08
 
-Integrated baseline: `16cf6c941` on `linux` (PR #249). The recent B3 merges
+Integrated baseline: `4a171cb78` on `linux` (PR #251). The recent B3 merges
 cover SQL Server server-owned values and mutation batches (#224–#225), multiple
 result sets (#228), MongoDB census cost/cancellation and nested filters
 (#229, #231, #234, #247), ClickHouse enum values (#242), and PostgreSQL quoted
-enum edits under a restricted role and shadowed local `search_path` (#249).
+enum edits under a restricted role and shadowed local `search_path` (#249), and
+MongoDB stale-grid ABA value-based edit/delete behavior (#251).
 PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
 coverage across engines. These are focused cases, not milestone closure.
 

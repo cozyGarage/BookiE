@@ -64,4 +64,30 @@ fn postgres_domain_text_updates_cast_to_the_qualified_type() {
         r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2"#
     );
     assert_eq!(params, vec![Value::Text("[0:2]={2,4,NULL}".into()), Value::Int(1)]);
+
+    let (sql, params) = build_optimistic_keyed_update(
+        "postgres",
+        Some("domain_over_array"),
+        "rows",
+        &columns,
+        &[(
+            1,
+            Value::Text("[0:2]={1,4,NULL}".into()),
+            Value::Text("[0:2]={2,4,NULL}".into()),
+        )],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert_eq!(
+        sql,
+        r#"UPDATE "domain_over_array"."rows" SET "items" = $1::text::"domain_over_array"."small_ints" WHERE "id" = $2 AND "items" IS NOT DISTINCT FROM $3"#
+    );
+    assert_eq!(
+        params,
+        vec![
+            Value::Text("[0:2]={2,4,NULL}".into()),
+            Value::Int(1),
+            Value::Text("[0:2]={1,4,NULL}".into()),
+        ]
+    );
 }

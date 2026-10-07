@@ -487,16 +487,17 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
             name: type_name.into(),
         })
     );
-    let edit = tablepro_core::sql_dialect::build_keyed_update(
+    let edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(target_schema),
         "rows",
         &columns,
-        &[(1, Value::Text("target-only".into()))],
+        &[(1, Value::Text("common".into()), Value::Text("target-only".into()))],
         &[Value::Int(1)],
     )
     .unwrap();
     assert!(edit.0.contains(&format!("::text::{target_type_sql}")), "{}", edit.0);
+    assert!(edit.0.contains("state\" IS NOT DISTINCT FROM $3"), "{}", edit.0);
 
     let mut session = connection.open_session().await.unwrap();
     let control = crate::no_timeout();
@@ -550,12 +551,12 @@ async fn value_contract_quoted_enum_keyed_edit_survives_role_and_shadowed_local_
         .query_params_controlled("SAVEPOINT reject_shadow_label", &[], &control)
         .await
         .unwrap();
-    let invalid_edit = tablepro_core::sql_dialect::build_keyed_update(
+    let invalid_edit = tablepro_core::sql_dialect::build_optimistic_keyed_update(
         "postgres",
         Some(target_schema),
         "rows",
         &columns,
-        &[(1, Value::Text("shadow-only".into()))],
+        &[(1, Value::Text("target-only".into()), Value::Text("shadow-only".into()))],
         &[Value::Int(1)],
     )
     .unwrap();
