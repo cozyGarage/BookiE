@@ -35,7 +35,8 @@ preservation and SQLSTATE `22P02` refusal for malformed bits
 The built-in `name[]` contract covers empty text, SQL NULL, literal `NULL`,
 commas, quotes, backslashes, Unicode and a 63-byte UTF-8 name. Pooled decoding
 and session typed rebinding preserve exact server wire bytes; the keyed grid
-edit casts to `pg_catalog.name[]` and preserves its sibling row
+edit casts to `pg_catalog.name[]` and preserves its sibling row; typed CSV
+import also covers these distinctions against native wire bytes
 (`value_contract_arrays_preserve_elements_dimensions_and_exports` and
 `value_contract_array_grid_edit_preserves_array_elements` in
 `crates/drivers/postgres/tests/support/array_contract.rs`).

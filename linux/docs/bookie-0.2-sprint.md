@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `bbb43b996` (PR #147) on `linux`, pushed to
+Current integrated source baseline: `f309be4cc` (PR #148) on `linux`, pushed to
 `origin/linux`. Recent merges #138–#140 cover PostgreSQL, SQLite and MySQL result
 byte budgets; #141–#143 add PostgreSQL enum role/search-path and array-dimension
 contracts; #144 verifies timestamp-array rebinding and consumers across a
@@ -16,8 +16,9 @@ contracts; #144 verifies timestamp-array rebinding and consumers across a
 details and evidence are linked from the [B3 board](type-contract-strategy.md),
 [value evidence index](value-contracts.md), and relevant test files. PR #146
 adds the built-in `name[]` pooled decode and typed session-rebind contract; PR
-#147 adds keyed grid-edit coverage for that array type. The current follow-up
-adds the `oid[]` unsigned-boundary grid case. B3 remains open: the broader
+#147 adds keyed grid-edit coverage for that array type, and #148 adds `oid[]`
+unsigned-boundary grid coverage. The current follow-up expands the `name[]`
+typed CSV import case to cover escaped and boundary values. B3 remains open: the broader
 engine/type/consumer/configuration matrix, mutation triage and installed grid
 acceptance still need work. These changes do not qualify the release.
 
