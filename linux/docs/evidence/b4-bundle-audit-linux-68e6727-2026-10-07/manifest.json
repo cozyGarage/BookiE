@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "B4-22 current-Linux release-binary GTK flows for bundle export/import audit and encrypted credential round-trip",
+  "source_commit": "68e67274c6f16b68206a6a80447a203cb96c1c15",
+  "source_tree": "3764f3090178f96c49844c410c0df11184504fb2",
+  "tested_source_sha256": {
+    "crates/app/tests/gtk_safety.py": "3f54c08e9964a9cf447c7f1ee21a0dc19cadacb4c5d0de17bdae1b1b5cab46f9",
+    "scripts/test-gtk-safety.sh": "adec0b08de0d0d0d9545a868e858c667259b67eee78417b066f7b33ec0e528d7"
+  },
+  "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/release/tablepro-app TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome,bundle_import_records_sanitized_audit_outcome,encrypted_bundle_round_trip_restores_credentials TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/b4-bundle-audit-linux-68e6727-2026-10-07/artifacts bash scripts/test-gtk-safety.sh",
+  "binary": {
+    "path": "target/release/tablepro-app",
+    "sha256": "3403c2a9b69134984c504de5657121ef4157d0953260f446c14d748eb9a274b3",
+    "execution": "release app binary under isolated D-Bus, Xvfb, and AT-SPI"
+  },
+  "result": "all three selected GTK scenarios passed; script exit status 0",
+  "scenarios": [
+    {
+      "name": "bundle_export_records_sanitized_audit_outcome",
+      "status": "passed",
+      "artifact_sha256": "07172c5439634d9377b1094c188c182e4f420f24fb947ad459f7fdefdde7c971"
+    },
+    {
+      "name": "bundle_import_records_sanitized_audit_outcome",
+      "status": "passed",
+      "artifact_sha256": "44b8f7c94fd7af1a3bfa054129cfcc6abcd91db99c9d40acc6b0fa20ea998926"
+    },
+    {
+      "name": "encrypted_bundle_round_trip_restores_credentials",
+      "status": "passed",
+      "artifact_sha256": "0bfb6ecf9ccc3438c76126f782a5f1b38eedc3877a61a1f99656838040d282c7"
+    }
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "5867add66a9ae3c7d0754ecd44dd3e9c58305cd4c643ebe9c4fc409e83e6aa2c"
+  },
+  "not_established": [
+    "Frozen B3+B4 candidate acceptance",
+    "Hosted rerun of these exact scenarios on source commit 68e67274c",
+    "Distribution-package installed desktop or native Wayland acceptance"
+  ]
+}
