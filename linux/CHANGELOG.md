@@ -8,6 +8,7 @@
 - PostgreSQL name[] array coverage now checks empty/NULL distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact wire preservation through typed session rebinding and keyed grid edits.
 - PostgreSQL oid[] keyed grid edits now preserve zero, the UINT32 maximum and SQL NULL against native type/text/wire oracles while leaving sibling rows unchanged.
 - PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
+- PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
 - The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
 - MySQL and SQL Server tunneled TLS contracts now cover valid server identity, wrong CA and hostname refusal, and no plaintext fallback through SSH forwarding. The fixture creates its SSH host key at container startup rather than baking it into the image.
