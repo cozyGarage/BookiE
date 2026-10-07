@@ -408,8 +408,10 @@ casts also have JSON and XLSX text-cell assertions. Representative evidence:
 [ABS](evidence/sqlite-abs-any-csv-results-2026-10-06/manifest.json),
 [ROUND](evidence/sqlite-round-any-csv-results-2026-10-06/manifest.json),
 [BLOB cast](evidence/sqlite-cast-blob-any-csv-results-2026-10-04/manifest.json).
-Other computed functions and aggregate families, attached-origin metadata,
-non-CSV consumer combinations and installed editing remain open.
+Other computed functions and aggregate families, additional attached-origin
+patterns, non-CSV consumer combinations and installed editing remain open. An
+attached STRICT `ANY` source now has an app-level typed CSV restore contract
+that checks native storage classes and exact values or bytes after import.
 
 SQLite `hex(value)` over STRICT `ANY` now checks integer, real, UTF-8 and empty
 text, BLOB, SQL NULL, formula-shaped text and tag-shaped text. SQLite's native
