@@ -4,6 +4,8 @@ import os
 import time
 from pathlib import Path
 
+import gtk_input
+
 
 class XWindowAttributes(ctypes.Structure):
     _fields_ = [
@@ -22,6 +24,9 @@ ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
 
 
 def x11_click(window_x, window_y, button=3, clicks=1):
+    if gtk_input.uses_atspi_input():
+        gtk_input.click(window_x, int(window_y) + ATSPI_WINDOW_Y_OFFSET, button, clicks)
+        return
     x11 = ctypes.CDLL("libX11.so.6")
     xtst = ctypes.CDLL("libXtst.so.6")
     x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
