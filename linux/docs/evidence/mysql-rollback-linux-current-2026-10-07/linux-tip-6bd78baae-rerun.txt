@@ -1,0 +1,18 @@
+   Compiling sqlx-mysql v0.9.0 (/tmp/bookie-b4-11/linux/vendor/sqlx-mysql)
+   Compiling tablepro-core v0.1.0 (/tmp/bookie-b4-11/linux/crates/core)
+   Compiling sqlx v0.9.0
+   Compiling tablepro-driver-mysql v0.1.0 (/tmp/bookie-b4-11/linux/crates/drivers/mysql)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.24s
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-f0961337c4162ed9)
+
+running 8 tests
+test mysql_atomic::a_failed_mysql_dml_batch_confirms_rollback_and_preserves_neighbor_rows ... ok
+test mysql_atomic::a_lost_connection_during_a_batch_reports_rollback_failure ... ok
+test mysql_atomic::empty_query_results_preserve_mysql_projection_metadata ... ok
+test mysql_atomic::implicit_commit_batch_is_refused_before_mysql_dispatch ... ok
+test mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects ... ok
+test mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects ... ok
+test mysql_atomic::mysql_transaction_queries_are_bounded_and_mark_truncation ... ok
+test mysql_atomic::mysql_transaction_queries_obey_result_byte_budget_and_remain_usable ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 63 filtered out; finished in 109.61s
