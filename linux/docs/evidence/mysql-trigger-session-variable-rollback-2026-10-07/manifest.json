@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/b4-11-multiengine-dml",
+  "source_commit": "a49467a21dbe759b889ec09131df7b9c2c3b0659",
+  "source_file": "crates/drivers/mysql/tests/shared/mysql_atomic.rs",
+  "source_sha256": "4a2d66cd79acad8e61c948d52378726a88d536da4eb3d9253384ccaf22a01314",
+  "source_patch_sha256": "38c4f55316f5127a7cf7ec8e8ad50b8216e28d45838c15ce0bf3c78a9bc90282",
+  "engine": "MySQL Testcontainers fixture",
+  "case": "A trigger session-variable side effect survives rollback of a failed InnoDB batch",
+  "test": "mysql_atomic::mysql_batch_rollback_preserves_trigger_session_variable_effects",
+  "contract": [
+    "An AFTER INSERT trigger increments a connection-scoped MySQL user variable.",
+    "The first batch INSERT fires the trigger; a later duplicate-key INSERT fails and causes rollback.",
+    "The InnoDB row from the failed batch is absent after rollback.",
+    "The trigger's user-variable increment remains visible on the same connection after rollback."
+  ],
+  "validation": {
+    "focused_test": {
+      "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test -p tablepro-driver-mysql --test integration mysql_batch_rollback_preserves_trigger_session_variable_effects -- --ignored --nocapture",
+      "result": "1 passed, 71 filtered out",
+      "log": "focused.txt"
+    },
+    "full_atomicity_group": {
+      "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1",
+      "result": "9 passed, 0 failed, 63 filtered out"
+    },
+    "format_and_diff": {
+      "command": "cargo fmt --all -- --check; git diff --check",
+      "result": "passed"
+    }
+  },
+  "remaining": [
+    "This is one confirmed side-effect type in the MySQL 8.1 fixture; other engines and external side effects remain untested.",
+    "Frozen-candidate and hosted acceptance remain open."
+  ]
+}

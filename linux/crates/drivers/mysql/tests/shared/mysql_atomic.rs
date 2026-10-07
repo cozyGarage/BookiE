@@ -537,6 +537,66 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn mysql_batch_rollback_preserves_trigger_session_variable_effects() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE session_effect_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO session_effect_parent VALUES (1)")
+        .await
+        .unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER session_effect_parent_after_insert AFTER INSERT ON session_effect_parent \
+         FOR EACH ROW SET @rollback_side_effect_count = COALESCE(@rollback_side_effect_count, 0) + 1",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    conn.execute("SET @rollback_side_effect_count = 0").await.unwrap();
+    let batch = vec![
+        ("INSERT INTO session_effect_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO session_effect_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("duplicate key must fail the batch");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM session_effect_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the InnoDB row from the failed batch is rolled back"
+    );
+    assert_eq!(
+        conn.query("SELECT @rollback_side_effect_count").await.unwrap().rows,
+        vec![vec![Value::Int(1)]],
+        "the trigger's session variable side effect survives rollback"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_lost_connection_during_a_batch_reports_rollback_failure() {
     let (_container, opts) = start_mysql().await;
     let connection: std::sync::Arc<dyn Connection> = MysqlDriver.connect(opts.clone()).await.unwrap().into();
