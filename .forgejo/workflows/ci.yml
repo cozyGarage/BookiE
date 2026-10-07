@@ -2,7 +2,9 @@ name: lab-ci
 
 on:
   push:
+    branches: [linux]
   pull_request:
+    branches: [linux]
 
 env:
   CARGO_TERM_COLOR: never
@@ -27,7 +29,7 @@ jobs:
       - name: Unit tests
         run: cd src/linux && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
 
-  gtk:
+  widgets:
     runs-on: arch
     needs: checks
     steps:
@@ -41,10 +43,25 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: GTK widget tests
         run: cd src/linux && bash scripts/test-gtk-widgets.sh
+
+  gtk:
+    if: github.event_name == 'push'
+    runs-on: arch
+    needs: widgets
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
       - name: Installed GTK end-to-end suite
         run: cd src/linux && bash scripts/test-gtk-safety.sh
 
   servers:
+    if: github.event_name == 'push'
     runs-on: arch
     needs: gtk
     steps:
@@ -60,7 +77,9 @@ jobs:
         run: cd src/linux && bash scripts/test-gtk-postgres.sh
       - name: MySQL end-to-end
         run: cd src/linux && bash scripts/test-gtk-mysql.sh
+
   distro-floor:
+    if: github.event_name == 'push'
     runs-on: arch
     needs: gtk
     steps:
@@ -74,3 +93,5 @@ jobs:
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Ubuntu 24.04 and Debian 13
         run: cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
+      - name: Debian package build, install and purge
+        run: cd src/linux && bash scripts/test-deb-package.sh ubuntu:24.04 debian:13

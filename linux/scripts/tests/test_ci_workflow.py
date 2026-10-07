@@ -1,6 +1,7 @@
 from pathlib import Path
 import importlib.util
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -98,6 +99,19 @@ class CiWorkflowTests(unittest.TestCase):
                 results = success | {name: {"result": state}}
                 self.assertEqual(checker.assess(results, "push")[0], [name])
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
+
+    def test_a_pull_request_may_defer_only_the_merge_tier_jobs(self):
+        success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
+        for name in checker.REQUIRED:
+            results = success | {name: {"result": "skipped"}}
+            expected = [] if name in checker.MERGE_ONLY else [name]
+            self.assertEqual(checker.assess(results, "pull_request")[0], expected, name)
+            self.assertEqual(checker.assess(results, "push")[0], [name], name)
+
+    def test_the_workflow_skips_exactly_the_merge_tier_jobs_on_a_pull_request(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        guarded = set(re.findall(r"^  ([a-z0-9-]+):\n    if: github.event_name != 'pull_request'\n", workflow, re.M))
+        self.assertEqual(guarded, checker.MERGE_ONLY)
 
     def test_only_push_and_pr_can_skip_current_stable_clippy(self):
         results = {name: {"result": "success"} for name in checker.REQUIRED}

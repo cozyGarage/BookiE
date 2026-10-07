@@ -20,9 +20,17 @@ for base in "${images[@]}"; do
     tail -3 /tmp/build.log
     deb=$(ls /work/out/tablepro_*.deb)
     dpkg-deb --info "$deb" | sed -n "1,12p"
+    mkdir -p ~/.config/tablepro ~/.local/share/tablepro
+    echo keep > ~/.config/tablepro/connections.json
+    echo keep > ~/.local/share/tablepro/history.db
     apt-get install -y -qq "$deb" >/dev/null
     bash /src/scripts/check-installed-deb.sh
-    apt-get remove -y -qq tablepro >/dev/null
+    apt-get install -y -qq --reinstall "$deb" >/dev/null
+    bash /src/scripts/check-installed-deb.sh
+    apt-get purge -y -qq tablepro >/dev/null
     test ! -e /usr/bin/bookie
+    test "$(cat ~/.config/tablepro/connections.json)" = keep
+    test "$(cat ~/.local/share/tablepro/history.db)" = keep
+    echo "install, reinstall and purge keep the user data under the tablepro paths"
   '
 done

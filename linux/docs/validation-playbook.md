@@ -308,3 +308,7 @@ their status updated in the project dashboard; no source suppression was added.
 - [GTK ColumnView CSS nodes](https://docs.gtk.org/gtk4/class.ColumnView.html)
 - [GTK ListView CSS nodes](https://docs.gtk.org/gtk4/class.ListView.html)
 - [GTK ColumnView cell CSS name in GTK source](https://github.com/GNOME/gtk/blob/main/gtk/gtkcolumnviewcellwidget.c#L282-L299)
+
+## CI tiers
+
+A pull request runs the cheap tier: guards, formatting, Clippy, the unit and sandbox tiers, the GTK widget tier, security, Flatpak (path filtered) and the workflow contracts. A push to `linux` or `main` also runs the merge tier: the installed GTK suite, driver integration, driver TLS, the PostgreSQL release fixture, DuckDB, and on Forgejo the server end-to-end runs, the Ubuntu 24.04 and Debian 13 floor and the Debian package build, install and purge. `scripts/check-ci-jobs.py` accepts a skipped merge-tier job on a pull request only; the merge-tier set is `MERGE_ONLY` in that script, and `test_ci_workflow.py` fails if the workflow and the set disagree. Forgejo runs only for pull requests and pushes that target `linux`, so a feature branch push does not run twice. A red merge run is reconciled on `linux` afterwards.

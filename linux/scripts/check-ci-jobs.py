@@ -6,6 +6,7 @@ import sys
 
 REQUIRED = {"preflight", "fast", "gtk-safety", "integration", "driver-tls", "postgres-release", "duckdb"}
 SCHEDULED = "current-stable-clippy"
+MERGE_ONLY = {"gtk-safety", "integration", "driver-tls", "postgres-release", "duckdb"}
 
 
 def assess(results, event):
@@ -15,10 +16,11 @@ def assess(results, event):
     for name in sorted(expected | results.keys()):
         status = results.get(name, {}).get("result", "missing")
         allowed_skip = name == SCHEDULED and event in {"push", "pull_request"} and status == "skipped"
-        accepted = name in expected and (status == "success" or allowed_skip)
+        deferred = name in MERGE_ONLY and event == "pull_request" and status == "skipped"
+        accepted = name in expected and (status == "success" or allowed_skip or deferred)
         if not accepted:
             failures.append(name)
-        detail = "scheduled/manual only" if allowed_skip else status
+        detail = "scheduled/manual only" if allowed_skip else "runs after merge" if deferred else status
         rows.append(f"| {name} | {detail} | {'accepted' if accepted else 'FAILED'} |")
     return failures, rows
 
