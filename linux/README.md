@@ -61,7 +61,7 @@ Running the statement asks for one value per name and sends them as driver-bound
 
 Drivers are linked at build time. BookiE does not load database drivers as runtime plugins. The UI uses native GTK widgets and does not embed a browser view.
 
-Browse results share an in-memory query result, with GTK row objects created when the view requests them. This reduces eager per-row UI object creation; it does not page rows from the database or bound result memory.
+Table browsing fetches bounded pages from the database, and GTK creates row objects on demand for the loaded page. Arbitrary SQL editor results are still materialized up to configured caps; progressive server-cursor paging is accepted in [ADR 0011](docs/decisions/0011-paged-query-results.md) but not implemented. Row-object reuse does not bound the memory held by a query result.
 
 ## Build requirements
 
