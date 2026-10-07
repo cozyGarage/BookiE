@@ -172,6 +172,13 @@ impl BrowseTab {
         paginator_bar.pack_start(&nav_box);
         paginator_bar.pack_start(&paginator_label);
         paginator_bar.pack_start(&selection_label);
+        let inspector_button = gtk::ToggleButton::builder()
+            .icon_name("sidebar-show-right-symbolic")
+            .tooltip_text(crate::tr!("Row inspector"))
+            .build();
+        inspector_button.add_css_class("flat");
+        inspector_button.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Row inspector"))]);
+        paginator_bar.pack_end(&inspector_button);
         paginator_bar.pack_end(&export_button);
         paginator_bar.pack_end(&filter_button);
         paginator_bar.pack_end(&page_size_combo);
@@ -188,6 +195,7 @@ impl BrowseTab {
             filter_badge,
             paginator_label,
             selection_label,
+            inspector_button,
         }
     }
 
@@ -489,6 +497,7 @@ pub(super) struct Paginator {
     pub(super) filter_badge: gtk::Label,
     pub(super) paginator_label: gtk::Label,
     pub(super) selection_label: gtk::Label,
+    pub(super) inspector_button: gtk::ToggleButton,
 }
 
 /// Bundle of widgets returned by `build_pending_revealer`.
@@ -497,6 +506,18 @@ pub(super) struct PendingRevealer {
     pub(super) save_button: gtk::Button,
     pub(super) discard_button: gtk::Button,
     pub(super) pending_label: gtk::Label,
+}
+
+pub(super) fn bind_inspector(
+    content: &impl IsA<gtk::Widget>,
+    button: &gtk::ToggleButton,
+) -> crate::ui::row_inspector::RowInspector {
+    let inspector = crate::ui::row_inspector::RowInspector::new(content);
+    button.connect_toggled({
+        let inspector = inspector.clone();
+        move |button| inspector.set_visible(button.is_active())
+    });
+    inspector
 }
 
 #[cfg(test)]

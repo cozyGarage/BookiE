@@ -34,6 +34,7 @@ impl App {
 
     fn build_workspace_root(&mut self, sender: ComponentSender<Self>) {
         let tab_view = adw::TabView::new();
+        tab_view.set_shortcuts(adw::TabViewShortcuts::all() - adw::TabViewShortcuts::CONTROL_TAB);
         let tab_bar = adw::TabBar::builder()
             .view(&tab_view)
             .autohide(false)
