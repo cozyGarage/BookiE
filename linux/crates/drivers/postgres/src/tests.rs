@@ -1,6 +1,9 @@
 use super::*;
 use crate::query::undecodable;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 
 #[test]
 fn undecodable_cell_cannot_be_bound_as_null() {
@@ -136,14 +139,111 @@ fn a_pool_startup_timeout_is_not_mapped_as_an_established_disconnect() {
     ));
 }
 
-#[test]
-fn patched_sqlx_postgres_caps_scram_iterations() {
-    let source = include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../../vendor/sqlx-postgres/src/connection/sasl.rs"
-    ));
-    assert!(source.contains("const MAX_SASL_ITERATIONS: u32 = 100_000"));
-    assert!(source.contains("iter_count > MAX_SASL_ITERATIONS"));
+#[derive(Clone, Copy)]
+enum HostileScramChallenge {
+    ShortNonce,
+    NonAsciiNonce,
+    ExcessiveIterations,
+}
+
+async fn assert_hostile_scram_challenge_rejected(challenge: HostileScramChallenge) {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.expect("fixture listener");
+    let port = listener.local_addr().unwrap().port();
+    let server = tokio::spawn(async move {
+        let (mut stream, _) = listener.accept().await.expect("client accepted");
+        let startup_len = stream.read_i32().await.expect("startup length");
+        assert!(startup_len >= 8, "valid PostgreSQL startup frame");
+        let mut startup = vec![0; (startup_len - 4) as usize];
+        stream.read_exact(&mut startup).await.expect("startup body");
+
+        send_authentication(&mut stream, 10, b"SCRAM-SHA-256\0\0").await;
+        let (kind, body) = read_frontend_message(&mut stream).await.expect("SASL initial response");
+        assert_eq!(kind, b'p');
+        let mechanism_end = body
+            .iter()
+            .position(|byte| *byte == 0)
+            .expect("SASL mechanism terminator");
+        assert_eq!(&body[..mechanism_end], b"SCRAM-SHA-256");
+        let response_len = i32::from_be_bytes(
+            body[mechanism_end + 1..mechanism_end + 5]
+                .try_into()
+                .expect("SASL response length"),
+        );
+        let initial = std::str::from_utf8(&body[mechanism_end + 5..mechanism_end + 5 + response_len as usize])
+            .expect("SCRAM client first message");
+        let client_nonce = initial
+            .split(',')
+            .find_map(|attribute| attribute.strip_prefix("r="))
+            .expect("client nonce");
+        let (server_nonce, iterations) = match challenge {
+            HostileScramChallenge::ShortNonce => (client_nonce.to_string(), 4096),
+            HostileScramChallenge::NonAsciiNonce => (format!("{client_nonce}é"), 4096),
+            HostileScramChallenge::ExcessiveIterations => (format!("{client_nonce}fixture"), 100_001),
+        };
+        let response = format!("r={server_nonce},s=c2FsdA==,i={iterations}");
+        send_authentication(&mut stream, 11, response.as_bytes()).await;
+
+        tokio::time::timeout(Duration::from_secs(3), read_frontend_message(&mut stream))
+            .await
+            .map(|message| message.ok())
+            .unwrap_or(None)
+    });
+
+    let options = ConnectOptions {
+        host: "127.0.0.1".into(),
+        port,
+        database: "postgres".into(),
+        username: "bookie".into(),
+        ..Default::default()
+    };
+    let connect = tokio::time::timeout(Duration::from_secs(5), PgDriver.connect(options)).await;
+    assert!(connect.is_ok(), "hostile challenge should be rejected promptly");
+    assert!(connect.unwrap().is_err(), "hostile challenge must not authenticate");
+
+    let client_message = server.await.expect("fixture task");
+    assert!(
+        !matches!(client_message, Some((b'p', _))),
+        "client must reject the SCRAM challenge before sending its proof"
+    );
+}
+
+async fn read_frontend_message(stream: &mut TcpStream) -> std::io::Result<(u8, Vec<u8>)> {
+    let kind = stream.read_u8().await?;
+    let len = stream.read_i32().await?;
+    if len < 4 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid PostgreSQL frame length",
+        ));
+    }
+    let mut body = vec![0; (len - 4) as usize];
+    stream.read_exact(&mut body).await?;
+    Ok((kind, body))
+}
+
+async fn send_authentication(stream: &mut TcpStream, code: i32, payload: &[u8]) {
+    stream.write_u8(b'R').await.expect("authentication tag");
+    stream
+        .write_i32((4 + 4 + payload.len()) as i32)
+        .await
+        .expect("authentication length");
+    stream.write_i32(code).await.expect("authentication code");
+    stream.write_all(payload).await.expect("authentication payload");
+}
+
+#[tokio::test]
+async fn postgres_scram_rejects_short_nonce_before_sending_proof() {
+    assert_hostile_scram_challenge_rejected(HostileScramChallenge::ShortNonce).await;
+}
+
+#[tokio::test]
+async fn postgres_scram_rejects_non_ascii_nonce_before_sending_proof() {
+    assert_hostile_scram_challenge_rejected(HostileScramChallenge::NonAsciiNonce).await;
+}
+
+#[tokio::test]
+async fn postgres_scram_rejects_excessive_iterations_before_sending_proof() {
+    assert_hostile_scram_challenge_rejected(HostileScramChallenge::ExcessiveIterations).await;
 }
 
 #[test]
