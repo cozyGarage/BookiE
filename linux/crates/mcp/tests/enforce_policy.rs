@@ -3,13 +3,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use tablepro_core::{
-    ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, Value,
+    ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult,
+    QueryResultBatch, TableInfo, Value,
 };
 use tablepro_policy::Principal;
 use tablepro_storage::SavedConnection;
 use uuid::Uuid;
 
-use tablepro_mcp::{ConnectionProvider, McpBridge, TokenPermissions, TokenStore};
+use tablepro_mcp::{ConnectionProvider, McpBridge, McpLimits, TokenPermissions, TokenStore};
 
 /// Integration-style test: every tool path that touches a connection must
 /// go through the provider (which in production wraps PolicyGuard) and
@@ -158,6 +159,133 @@ async fn a_write_scoped_token_cannot_use_execute_query_to_skip_the_preview_workf
 }
 
 #[tokio::test]
+async fn execute_query_preserves_additional_result_sets_in_order() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let connection_id = Uuid::nil();
+    let (_metadata, plaintext) = store
+        .issue("reader".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let provider = Arc::new(RecordingProvider::with_result_sets(vec![
+        QueryResult {
+            columns: vec![column("first_set")],
+            rows: vec![vec![Value::Int(1)]],
+            truncated: false,
+        },
+        QueryResult {
+            columns: vec![column("second_set")],
+            rows: vec![vec![Value::Text("later".into())]],
+            truncated: false,
+        },
+    ]));
+    let bridge = McpBridge::new(provider, store);
+    let token = bridge.authenticate(&plaintext).unwrap();
+    let output = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "execute_query",
+        serde_json::json!({"connection_id": connection_id.to_string(), "sql": "SELECT 1"}),
+    )
+    .await
+    .expect("read returns all result sets");
+
+    assert_eq!(output["columns"], serde_json::json!(["first_set"]));
+    assert_eq!(output["rows"], serde_json::json!([[1]]));
+    assert_eq!(
+        output["additional_result_sets"],
+        serde_json::json!([{"columns": ["second_set"], "rows": [["later"]], "truncated": false}])
+    );
+    assert_eq!(output["truncated"], false);
+}
+
+#[tokio::test]
+async fn mcp_row_cap_is_shared_across_result_sets() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let connection_id = Uuid::nil();
+    let (_metadata, plaintext) = store
+        .issue("reader".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let provider = Arc::new(RecordingProvider::with_result_sets(vec![
+        QueryResult {
+            columns: vec![column("first_set")],
+            rows: vec![vec![Value::Int(1)]],
+            truncated: false,
+        },
+        QueryResult {
+            columns: vec![column("second_set")],
+            rows: vec![vec![Value::Int(2)], vec![Value::Int(3)]],
+            truncated: false,
+        },
+    ]));
+    let bridge = McpBridge::with_limits(
+        provider,
+        store,
+        McpLimits {
+            requests_per_minute: 120,
+            max_rows: 2,
+            query_timeout_secs: 30,
+        },
+    );
+    let token = bridge.authenticate(&plaintext).unwrap();
+    let output = tablepro_mcp::dispatch(
+        &bridge,
+        &token,
+        "execute_query",
+        serde_json::json!({"connection_id": connection_id.to_string(), "sql": "SELECT 1"}),
+    )
+    .await
+    .expect("capped read returns its admitted rows");
+
+    assert_eq!(output["rows"], serde_json::json!([[1]]));
+    assert_eq!(
+        output["additional_result_sets"],
+        serde_json::json!([{"columns": ["second_set"], "rows": [[2]], "truncated": true}])
+    );
+    assert_eq!(output["truncated"], true);
+}
+
+#[tokio::test]
+async fn json_export_keeps_multiple_result_sets_and_csv_refuses_them() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let store = Arc::new(TokenStore::open(dir.path().join("tokens.json")).unwrap());
+    let connection_id = Uuid::nil();
+    let (_metadata, plaintext) = store
+        .issue("reader".into(), TokenPermissions::ReadOnly, vec![connection_id], None)
+        .unwrap();
+    let provider = Arc::new(RecordingProvider::with_result_sets(vec![
+        QueryResult {
+            columns: vec![column("first_set")],
+            rows: vec![vec![Value::Int(1)]],
+            truncated: false,
+        },
+        QueryResult {
+            columns: vec![column("second_set")],
+            rows: vec![vec![Value::Int(2)]],
+            truncated: false,
+        },
+    ]));
+    let bridge = McpBridge::new(provider, store);
+    let token = bridge.authenticate(&plaintext).unwrap();
+    let args = |format| {
+        serde_json::json!({
+            "connection_id": connection_id.to_string(),
+            "sql": "SELECT 1",
+            "format": format,
+        })
+    };
+    let json = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("json"))
+        .await
+        .expect("JSON represents every set");
+    assert_eq!(json["additional_result_sets"][0]["rows"], serde_json::json!([[2]]));
+
+    let csv_error = tablepro_mcp::dispatch(&bridge, &token, "export_data", args("csv"))
+        .await
+        .unwrap_err();
+    assert!(csv_error.contains("multiple result sets"), "{csv_error}");
+}
+
+#[tokio::test]
 async fn guarded_tool_path_journals_policy_decision() {
     use tablepro_core::Environment;
     use tablepro_policy::{AuditSink, AuditState, AutoApproveSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
@@ -193,6 +321,7 @@ async fn guarded_tool_path_journals_policy_decision() {
                     rows: vec![vec![Value::Int(1)]],
                     truncated: false,
                 },
+                result_sets: None,
             });
             let ctx = GuardContext {
                 connection_id,
@@ -536,6 +665,7 @@ struct RecordingProvider {
     sql_log: Arc<std::sync::Mutex<Vec<String>>>,
     page_log: Arc<std::sync::Mutex<Vec<(u64, u64)>>>,
     result: QueryResult,
+    result_sets: Option<Vec<QueryResult>>,
 }
 
 impl Default for RecordingProvider {
@@ -550,6 +680,7 @@ impl Default for RecordingProvider {
                 rows: vec![vec![Value::Int(1)]],
                 truncated: false,
             },
+            result_sets: None,
         }
     }
 }
@@ -565,6 +696,13 @@ impl RecordingProvider {
     fn with_result(result: QueryResult) -> Self {
         Self {
             result,
+            ..Self::default()
+        }
+    }
+
+    fn with_result_sets(result_sets: Vec<QueryResult>) -> Self {
+        Self {
+            result_sets: Some(result_sets),
             ..Self::default()
         }
     }
@@ -607,6 +745,7 @@ struct StubConn {
     sql_log: Arc<std::sync::Mutex<Vec<String>>>,
     page_log: Arc<std::sync::Mutex<Vec<(u64, u64)>>>,
     result: QueryResult,
+    result_sets: Option<Vec<QueryResult>>,
 }
 
 #[async_trait]
@@ -631,6 +770,21 @@ impl Connection for StubConn {
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         self.sql_log.lock().unwrap().push(sql.to_string());
         Ok(self.result.clone())
+    }
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        _params: &[Value],
+        _control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        self.sql_log.lock().unwrap().push(sql.to_string());
+        Ok(match &self.result_sets {
+            Some(result_sets) => QueryResultBatch {
+                truncated: result_sets.iter().any(|result| result.truncated),
+                result_sets: result_sets.clone(),
+            },
+            None => QueryResultBatch::single(self.result.clone()),
+        })
     }
     async fn execute(&self, _: &str) -> Result<ExecResult, DriverError> {
         Err(DriverError::PolicyDenied("journalled deny".into()))
@@ -680,6 +834,7 @@ impl ConnectionProvider for RecordingProvider {
             sql_log: self.sql_log.clone(),
             page_log: self.page_log.clone(),
             result: self.result.clone(),
+            result_sets: self.result_sets.clone(),
         }))
     }
 }

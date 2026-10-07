@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use tablepro_core::sql_dialect::{explain_statement, quote_ident};
 use tablepro_core::{
     ColumnInfo, Connection, DriverError, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl, QueryResult,
-    TableInfo, Value, check_pre_dispatch,
+    QueryResultBatch, TableInfo, Value, check_pre_dispatch,
 };
 use tablepro_policy::Principal;
 use tablepro_storage::SavedConnection;
@@ -270,7 +270,12 @@ impl McpBridge {
         .await
     }
 
-    pub async fn execute_query(&self, token: &McpToken, connection_id: Uuid, sql: &str) -> Result<QueryResult, String> {
+    pub async fn execute_query(
+        &self,
+        token: &McpToken,
+        connection_id: Uuid,
+        sql: &str,
+    ) -> Result<QueryResultBatch, String> {
         let control = self.start_connection_operation(token, connection_id)?;
         self.execute_query_controlled(token, connection_id, sql, None, control)
             .await
@@ -283,7 +288,7 @@ impl McpBridge {
         sql: &str,
         driver_id: Option<String>,
         control: OperationControl,
-    ) -> Result<QueryResult, String> {
+    ) -> Result<QueryResultBatch, String> {
         let driver_id = match driver_id {
             Some(driver_id) => driver_id,
             None => self.driver_id_for_controlled(connection_id, &control).await?,
@@ -301,13 +306,21 @@ impl McpBridge {
         self.with_connection_controlled(token, connection_id, control, move |conn, control| {
             Box::pin(async move {
                 let mut result = conn
-                    .query_controlled(&sql, &control)
+                    .query_result_sets_controlled(&sql, &[], &control)
                     .await
                     .map_err(|error| error.to_string())?;
                 check_pre_dispatch(&control).map_err(|error| error.to_string())?;
-                if result.rows.len() as u64 > max_rows {
-                    result.rows.truncate(max_rows as usize);
-                    result.truncated = true;
+                let mut remaining = max_rows;
+                for result_set in &mut result.result_sets {
+                    let rows = u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX);
+                    if rows > remaining {
+                        result_set
+                            .rows
+                            .truncate(usize::try_from(remaining).unwrap_or(usize::MAX));
+                        result_set.truncated = true;
+                        result.truncated = true;
+                    }
+                    remaining = remaining.saturating_sub(u64::try_from(result_set.rows.len()).unwrap_or(u64::MAX));
                 }
                 check_pre_dispatch(&control).map_err(|error| error.to_string())?;
                 Ok(result)
@@ -323,6 +336,7 @@ impl McpBridge {
             .ok_or_else(|| format!("explain is not supported for the {driver_id} driver"))?;
         self.execute_query_controlled(token, connection_id, &explain, Some(driver_id), control)
             .await
+            .map(QueryResultBatch::into_first)
     }
 
     pub async fn table_schema(
@@ -376,8 +390,9 @@ impl McpBridge {
             .await?;
         self.ensure_operation_active(&control)?;
         let value = result
-            .rows
+            .result_sets
             .first()
+            .and_then(|set| set.rows.first())
             .and_then(|row| row.first())
             .ok_or("the engine returned no count row")?;
         let count = count_from_value(value)?;

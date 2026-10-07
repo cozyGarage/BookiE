@@ -12,8 +12,8 @@ use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use tablepro_core::sql_dialect::build_order_and_pagination;
 use tablepro_core::{
     AuthMode, ColumnInfo, ConnectOptions, Connection, DatabaseDriver, DriverError, ExecResult, ForeignKeyInfo,
-    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBudget, TableInfo, Value, check_pre_dispatch,
-    run_server_cancellable,
+    IndexInfo, MAX_QUERY_ROWS, OperationControl, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value,
+    check_pre_dispatch, run_server_cancellable,
 };
 
 mod codec;
@@ -259,6 +259,20 @@ impl MssqlConnection {
         }
         result
     }
+
+    async fn query_result_sets(
+        &self,
+        client: &mut MssqlClient,
+        sql: &str,
+        params: &[Value],
+        limit: usize,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let result = run_query_sets(client, sql, params, limit, true).await;
+        if result.as_ref().is_err_and(variant_guard::is_unsupported_result) {
+            self.retire().await?;
+        }
+        result
+    }
 }
 
 #[async_trait]
@@ -384,6 +398,20 @@ impl Connection for MssqlConnection {
         let mut client = self.client().await?;
         self.run_abandonable(self.query_result(&mut client, sql, params, MAX_QUERY_ROWS), control)
             .await
+    }
+
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let mut client = self.client().await?;
+        self.run_abandonable(
+            self.query_result_sets(&mut client, sql, params, MAX_QUERY_ROWS),
+            control,
+        )
+        .await
     }
 
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
@@ -603,19 +631,25 @@ async fn run_query(
     params: &[Value],
     limit: usize,
 ) -> Result<QueryResult, DriverError> {
-    variant_guard::catch_tiberius_variant_panic(async { run_query_inner(client, sql, params, limit).await }).await
+    run_query_sets(client, sql, params, limit, false)
+        .await
+        .map(QueryResultBatch::into_first)
 }
 
-async fn run_query_inner(
+async fn run_query_sets(
     client: &mut MssqlClient,
     sql: &str,
     params: &[Value],
     limit: usize,
-) -> Result<QueryResult, DriverError> {
-    let boxes = boxed_params(params)?;
-    let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
-    let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
-    collect_result(stream, limit).await
+    retain_additional_sets: bool,
+) -> Result<QueryResultBatch, DriverError> {
+    variant_guard::catch_tiberius_variant_panic(async {
+        let boxes = boxed_params(params)?;
+        let refs: Vec<&dyn ToSql> = boxes.iter().map(|b| &**b as &dyn ToSql).collect();
+        let stream = client.query(sql, &refs).await.map_err(map_tiberius_error)?;
+        collect_result_sets(stream, limit, retain_additional_sets).await
+    })
+    .await
 }
 
 // A parameterized query travels through sp_executesql, whose scope drops a
@@ -624,17 +658,23 @@ async fn run_query_inner(
 async fn run_batch(client: &mut MssqlClient, sql: &str, limit: usize) -> Result<QueryResult, DriverError> {
     variant_guard::catch_tiberius_variant_panic(async {
         let stream = client.simple_query(sql).await.map_err(map_tiberius_error)?;
-        collect_result(stream, limit).await
+        collect_result_sets(stream, limit, false)
+            .await
+            .map(QueryResultBatch::into_first)
     })
     .await
 }
 
-async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> Result<QueryResult, DriverError> {
-    let mut columns: Vec<ColumnInfo> = Vec::new();
-    let mut rows: Vec<Vec<Value>> = Vec::new();
+async fn collect_result_sets(
+    mut stream: tiberius::QueryStream<'_>,
+    limit: usize,
+    retain_additional_sets: bool,
+) -> Result<QueryResultBatch, DriverError> {
+    let mut result_sets: Vec<QueryResult> = Vec::new();
+    let mut current: Option<QueryResult> = None;
     let mut budget = QueryResultBudget::default();
     let mut truncated = false;
-    let mut result_sets = 0usize;
+    let mut retained_rows = 0usize;
     // The stream is read to its end rather than dropped early: tiberius only
     // drains unread tokens at the start of the next call, so an early exit
     // leaves the batch running on the server holding its locks, and discards
@@ -642,13 +682,24 @@ async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> 
     while let Some(item) = stream.try_next().await.map_err(map_tiberius_error)? {
         match item {
             QueryItem::Metadata(meta) => {
-                result_sets += 1;
-                if result_sets == 1 {
-                    columns = meta.columns().iter().map(codec::col_to_info).collect();
+                if let Some(previous) = current.take() {
+                    result_sets.push(previous);
+                }
+                if result_sets.is_empty() || retain_additional_sets {
+                    current = Some(QueryResult {
+                        columns: meta.columns().iter().map(codec::col_to_info).collect(),
+                        rows: Vec::new(),
+                        truncated: false,
+                    });
                 }
             }
-            QueryItem::Row(_) if result_sets > 1 => {}
-            QueryItem::Row(_) if rows.len() >= limit => truncated = true,
+            QueryItem::Row(_) if current.is_none() => {}
+            QueryItem::Row(_) if retained_rows >= limit => {
+                truncated = true;
+                if let Some(result_set) = current.as_mut() {
+                    result_set.truncated = true;
+                }
+            }
             QueryItem::Row(row) => {
                 let types: Vec<ColumnType> = row.columns().iter().map(Column::column_type).collect();
                 let values = row
@@ -656,19 +707,24 @@ async fn collect_result(mut stream: tiberius::QueryStream<'_>, limit: usize) -> 
                     .zip(types)
                     .map(|(data, column_type)| codec::column_data_to_value_for_type(&data, column_type))
                     .collect::<Vec<_>>();
-                if budget.admit(&values) {
-                    rows.push(values);
+                if budget.admit(&values)
+                    && let Some(result_set) = current.as_mut()
+                {
+                    result_set.rows.push(values);
+                    retained_rows += 1;
                 } else {
                     truncated = true;
+                    if let Some(result_set) = current.as_mut() {
+                        result_set.truncated = true;
+                    }
                 }
             }
         }
     }
-    Ok(QueryResult {
-        columns,
-        rows,
-        truncated,
-    })
+    if let Some(last) = current {
+        result_sets.push(last);
+    }
+    Ok(QueryResultBatch { result_sets, truncated })
 }
 
 async fn run_execute(client: &mut MssqlClient, sql: &str, params: &[Value]) -> Result<u64, DriverError> {

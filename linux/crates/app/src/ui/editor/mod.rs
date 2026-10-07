@@ -95,7 +95,7 @@ pub struct StatementOutcome {
 
 #[derive(Debug, Clone)]
 pub enum StatementOutcomeKind {
-    Rows(std::sync::Arc<QueryResult>),
+    Rows(Vec<std::sync::Arc<QueryResult>>),
     Error(String),
     NotRun,
 }
@@ -769,7 +769,9 @@ impl SimpleComponent for SqlEditor {
                 let total_rows: i64 = outcomes
                     .iter()
                     .filter_map(|o| match &o.kind {
-                        StatementOutcomeKind::Rows(qr) => Some(qr.rows.len() as i64),
+                        StatementOutcomeKind::Rows(result_sets) => {
+                            Some(result_sets.iter().map(|result| result.rows.len() as i64).sum::<i64>())
+                        }
                         _ => None,
                     })
                     .sum();
