@@ -32,11 +32,13 @@ preservation and SQLSTATE `22P02` refusal for malformed bits
 ([result evidence](evidence/postgres-bit-arrays-results-2026-10-06/manifest.json),
 [grid evidence](evidence/postgres-bit-array-grid-edit-results-2026-10-06/manifest.json)).
 
-The built-in name[] array contract now covers empty text, SQL NULL, the
-literal NULL, commas, quotes, backslashes, Unicode and a 63-byte UTF-8 name.
-Pooled decoding and session typed rebinding preserve the array's exact server
-wire bytes (value_contract_arrays_preserve_elements_dimensions_and_exports in
-crates/drivers/postgres/tests/support/array_contract.rs).
+The built-in `name[]` contract covers empty text, SQL NULL, literal `NULL`,
+commas, quotes, backslashes, Unicode and a 63-byte UTF-8 name. Pooled decoding
+and session typed rebinding preserve exact server wire bytes; the keyed grid
+edit casts to `pg_catalog.name[]` and preserves its sibling row
+(`value_contract_arrays_preserve_elements_dimensions_and_exports` and
+`value_contract_array_grid_edit_preserves_array_elements` in
+`crates/drivers/postgres/tests/support/array_contract.rs`).
 
 The built-in PostgreSQL `pg_lsn[]` now preserves full-width LSNs and SQL NULL
 through binary result decoding, inferred typed binding, the keyed-update builder
@@ -89,7 +91,7 @@ text and wire output, then verifies literal/bind refusal leaves target and
 sibling rows unchanged (`value_contract_custom_composite_array_refusal_preserves_rows`
 in `crates/drivers/postgres/tests/support/custom_array_contract.rs`). Other
 custom array families and their consumers remain open. The unlisted built-in
-The unlisted built-in `money[]` refusal covers populated values, SQL NULL
+`money[]` refusal covers populated values, SQL NULL
 elements, native text/JSON/wire snapshots, literal/bind refusal and
 target/sibling preservation (`value_contract_money_array_refusal_preserves_target_and_sibling_rows`).
 The same explicit-refusal contract now covers `point[]` with native type, text,

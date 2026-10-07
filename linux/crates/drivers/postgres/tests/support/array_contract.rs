@@ -207,6 +207,77 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
         ]
     );
 
+    const NAME_ARRAY: &str = r#"{"",NULL,"NULL","a,b","a\"b","slash\\path","東京"}"#;
+    connection
+        .execute("CREATE TABLE name_array_grid_edit (id integer PRIMARY KEY, value name[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO name_array_grid_edit VALUES \
+             (1, ARRAY['before']::name[], 'target sibling'), \
+             (2, ARRAY['keep']::name[], 'sibling row')",
+        )
+        .await
+        .unwrap();
+    let mut name_rows = connection
+        .query("SELECT * FROM name_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = name_rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = name_rows
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    name_rows.columns[id_index].primary_key = true;
+    let sibling_wire_before = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM name_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "name_array_grid_edit",
+        &name_rows.columns,
+        &[(value_index, Value::Text(NAME_ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("$1::text::pg_catalog.name[]"), "{update_sql}");
+    assert_eq!(
+        connection
+            .execute_in_transaction(&[(update_sql, update_params)])
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let native = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM name_array_grid_edit WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let oracle = connection
+        .query(
+            r#"SELECT pg_typeof(expected)::text, expected::text, encode(array_send(expected), 'hex'), 'target sibling'
+               FROM (SELECT ARRAY[''::name, NULL, 'NULL'::name, 'a,b'::name, 'a"b'::name,
+                                  'slash\path'::name, '東京'::name]::name[] AS expected) source"#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows, oracle.rows);
+    assert_eq!(native.rows[0][0], Value::Text("name[]".into()));
+    let sibling = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM name_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows[0][1], Value::Text("sibling row".into()));
+    assert_eq!(sibling.rows[0][0], sibling_wire_before);
+
     const XML_ARRAY: &str = r#"{"<a>one,two</a>","<b attr=\"quoted\">東京 &amp; 😀</b>",NULL}"#;
     connection
         .execute("CREATE TABLE xml_array_grid_edit (id integer PRIMARY KEY, value xml[], sibling text NOT NULL)")
