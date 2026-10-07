@@ -6,6 +6,79 @@ use crate::{connect, start_pg};
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve_typed_edits() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    let schema = "s".repeat(63);
+    let type_name = format!("{}é", "t".repeat(61));
+    assert_eq!(schema.len(), 63);
+    assert_eq!(type_name.len(), 63);
+    let quoted_schema = format!("\"{schema}\"");
+    let quoted_type = format!("\"{type_name}\"");
+
+    connection
+        .execute(&format!("CREATE SCHEMA {quoted_schema}"))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TYPE {quoted_schema}.{quoted_type} AS ENUM ('ready', 'updated')"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!(
+            "CREATE TABLE {quoted_schema}.rows \
+             (id INT PRIMARY KEY, state {quoted_schema}.{quoted_type}, sibling TEXT NOT NULL)"
+        ))
+        .await
+        .unwrap();
+    connection
+        .execute(&format!("INSERT INTO {quoted_schema}.rows VALUES (1, 'ready', 'keep')"))
+        .await
+        .unwrap();
+
+    let columns = connection.fetch_columns(Some(&schema), "rows").await.unwrap();
+    assert_eq!(
+        columns[1].enum_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.clone(),
+            name: type_name.clone(),
+        })
+    );
+    let (sql, params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        Some(&schema),
+        "rows",
+        &columns,
+        &[(1, Value::Text("updated".into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    connection.execute_params(&sql, &params).await.unwrap();
+
+    let stored = connection
+        .query(&format!(
+            "SELECT state::text, n.nspname, t.typname, sibling \
+             FROM {quoted_schema}.rows \
+             JOIN pg_type t ON t.oid = pg_typeof(state)::oid \
+             JOIN pg_namespace n ON n.oid = t.typnamespace"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        stored.rows,
+        vec![vec![
+            Value::Text("updated".into()),
+            Value::Text(schema),
+            Value::Text(type_name),
+            Value::Text("keep".into()),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_quoted_enum_identifiers_preserve_metadata_and_typed_writes() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
@@ -873,6 +946,60 @@ async fn value_contract_mixed_case_enum_identifiers_survive_local_shadowed_searc
 
         assert_eq!(connection.query("SHOW search_path").await.unwrap().rows, original_path);
     }
+
+    let mut session = connection.open_session().await.unwrap();
+    let control = crate::no_timeout();
+    let session_path = session
+        .query_params_controlled("SHOW search_path", &[], &control)
+        .await
+        .unwrap()
+        .rows;
+    session.query_params_controlled("BEGIN", &[], &control).await.unwrap();
+    session
+        .query_params_controlled(
+            "SET LOCAL search_path TO enumcaselocal, \"EnumCaseLocal\", public",
+            &[],
+            &control,
+        )
+        .await
+        .unwrap();
+    let update = format!("{update_sql} RETURNING id");
+    assert_eq!(
+        session
+            .query_params_controlled(&update, &[Value::Text("ready".into()), Value::Int(2)], &control)
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(2)]]
+    );
+    assert_eq!(
+        session
+            .query_params_controlled(
+                &format!("SELECT id FROM \"EnumCaseLocal\".\"Rows\" WHERE {where_sql}"),
+                &filter_params,
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "typed filtering should still identify the target enum under the shadow path"
+    );
+    session
+        .query_params_controlled("ROLLBACK", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled("SHOW search_path", &[], &control)
+            .await
+            .unwrap()
+            .rows,
+        session_path,
+        "rollback must restore the original path on the same backend"
+    );
+    session.close().await.unwrap();
+
     let native = connection
         .query(
             "SELECT n.nspname, t.typname, r.state::text, r.sibling \

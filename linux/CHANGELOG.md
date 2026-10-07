@@ -17,6 +17,8 @@
 - PostgreSQL `xml[]` preserves XML fragments, SQL NULL, native array text and wire bytes through results, inferred bindings, keyed grid edits, typed CSV restore and JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports; malformed XML retains native `2200N` refusal without changing target or sibling rows.
 - PostgreSQL custom enum identifiers preserve metadata, keyed edits, and typed filters when a mixed-case quoted schema/type collides with lowercase names earlier in session or transaction-local `search_path`; native catalog and shadow-row checks verify the selected type, and shadow-only labels retain native `22P02` refusal.
 - PostgreSQL custom composite and built-in `money[]` values report explicit unsupported results and refuse literal/bound writes without changing target or sibling rows.
+- PostgreSQL mixed-case enum contracts also verify that transaction rollback restores target rows and the original `search_path` after typed writes under a shadow schema.
+- PostgreSQL custom enum metadata and keyed edits preserve schema and type identifiers at PostgreSQL's 63-byte catalog limit, including a multibyte UTF-8 character at the final type-name boundary.
 - Result grids have View Value…, which opens the whole cell in a read-only window: pretty-printed JSON, a hex dump for binary data, and a Copy value button.
 - A saved connection that is still connecting can be cancelled from the progress notice.
 - Starting BookiE while it is already running now brings the existing window forward instead of exiting silently.
@@ -51,6 +53,7 @@
 - Browse results share their in-memory query result; GTK row objects are created when the view requests them. This avoids eager per-row GObject creation but does not page database rows or bound result memory.
 - The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]`, `macaddr8[]`, `inet[]` and `cidr[]` result, typed binding, keyed update and CSV round-trip contracts; other array families remain open.
 - PostgreSQL integration contracts now classify supported `xml[]` in the built-in array OID census and assert that domain-over-enum CSV and keyed writes cast through the declared domain.
+- The PostgreSQL B3 summary now matches the source-pinned 301-layer domain-over-enum test and evidence; 301 is a tested point, not a maximum-depth claim.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.
 - The documentation link checker skips generated packaged Markdown and keeps checking source documents.
 - The SQLite B3 summary removes duplicate `quote()`/`instr()` evidence links and links both typed-CSV packets directly.

@@ -8,8 +8,8 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `4d0ee77d15cffae799e9a0214d3ca78aefe74df1`
-on `linux`, pushed to `origin/linux`. Merges #103/#105 added mixed-case enum
+Current integrated source baseline: `5f7e80145` (PR #123) on `linux`, pushed to
+`origin/linux`. Merges #103/#105 added mixed-case enum
 shadow-name and MongoDB stale-field delete coverage; #106/#107 refined Rust
 formatting and full-suite determinism. Merges #109/#111 made panic log capture
 safe under forced-color CI; #110 moved the transaction-local enum evidence to
@@ -22,9 +22,9 @@ role with its schema absent from `search_path`. Earlier October 6 merges #65–#
 Their implementations and source-pinned evidence are linked from the [B3 board](type-contract-strategy.md)
 and [value evidence index](value-contracts.md). B3 remains open: the broader
 engine/type/consumer/configuration matrix, mutation triage and installed grid
-acceptance still need work. PR #118 adds PostgreSQL `xml[]` support across
-results, binding, grid edits and CSV restore; hosted checks are pending. These
-changes do not qualify the release.
+acceptance still need work. PR #118 merged PostgreSQL `xml[]` support across
+results, binding, grid edits and CSV restore. These changes do not qualify the
+release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved
@@ -57,7 +57,7 @@ this existing-eight-driver stabilization scope.
 | A1–A4 | Prior correctness, drafts/planning, Jump to Column and BookiE branding implemented | Historical 0.1.x proof does not qualify 0.2; A5 installed candidate work folds into B7 |
 | B1 platform/build | Rust 1.98, GNOME 50, SQLx/system SQLite, resources and dev profiles integrated | Installed Arch then Debian/GNOME qualification; full Flatpak qualification separate |
 | B2 runtime/storage | Owned tasks/stores, migrations, GSettings mirrors and coalesced writers implemented | Installed upgrade/rollback and shutdown acceptance in B7 |
-| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; #112 adds a mixed-case PostgreSQL enum case with its target schema absent from transaction-local `search_path`; prior DuckDB malformed-tail and decimal fixes remain covered. PostgreSQL domains over arrays now retain declared type metadata through results and keyed grid edits. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
+| B3 type/value contracts | Focused native and consumer cases are recorded across the existing engines. Merges #81/#82 add SQLite STRICT `ANY` `length()` typed-CSV round trips and ClickHouse nested `Map → Array → Tuple → UInt128` oracle/refusal coverage; #112 adds a mixed-case PostgreSQL enum case with its target schema absent from transaction-local `search_path`; #122/#123 add PostgreSQL domain-over-array metadata and its regression coverage. Prior DuckDB malformed-tail and decimal fixes remain covered. B3 remains open pending the broader engine/type/consumer/configuration matrix, mutation triage and installed grid acceptance. | [Type/consumer board](type-contract-strategy.md), [B3 findings](archive/b3-review-2026-10-01.md), [value evidence index](value-contracts.md) |
 | B4 transport/sessions | Policy, daemon cache refusal, editor callback/retirement and awaited cleanup patches, built-in host consent and GUI uncertainty split merged through `6346a431c` | [Current B4 board](b4-task-board.md#b4-continuation-status-october-3): F4/F9, F6 and GUI F8 implementation are merged; MySQL DDL refusal, honest rollback reporting and the MyISAM-trigger rollback boundary have local regressions; headless generation/retirement parity, TLS/daemon/route/audit, PostgreSQL rollback-failure acceptance and installed acceptance remain open |
 | B5 editor/files | Open/Save/Save As, changed-on-disk detection and file relinking implemented | Installed file-dialog/recovery/dirty-close flows |
 | B6 PostgreSQL catalog | Guarded read-only catalog/types implemented | Restricted-role, stale-owner and installed catalog flows |
