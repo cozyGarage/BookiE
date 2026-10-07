@@ -34,7 +34,7 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-The current `linux` baseline fetched on 2026-10-07 is `3a3d742fe` (PR #185).
+The current `linux` baseline fetched on 2026-10-07 is `53d08ac99` (PR #195).
 Recent B4 merges include #159 (SSH audit, rollback and Kerberos), #161/#162
 (PostgreSQL GTK fixture setup), #163/#170/#173/#175 (SSH trust-prompt timeout
 and dismissal), #165 (GTK SSH fixture hardening), and #178 (file-chooser
@@ -47,8 +47,14 @@ import and encrypted retry/credential round-trip GTK scenarios were rerun on
 `3a3d742fe` via `TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome,bundle_import_records_sanitized_audit_outcome,encrypted_bundle_round_trip_restores_credentials bash scripts/test-gtk-safety.sh`;
 all three passed on the local host under isolated D-Bus/Xvfb. The harness sets
 `G_DEBUG=fatal-criticals`. The [PR #185 discussion](https://github.com/cozyGarage/BookiE/pull/185)
-records the original failure and fix. Hosted checks on #185 were still in
-progress at this checkpoint. The [October 7 candidate
+records the original failure and fix. Required pull-request checks on #185
+completed successfully; Docker-backed suites and installed GTK safety were
+skipped on the pull-request event. The later push run on #194's merge commit
+([run 37641533809](https://github.com/cozyGarage/BookiE/actions/runs/37641533809))
+was superseded by the #195 push: its installed GTK and driver integration jobs
+were cancelled, and the Linux regression gate reported those cancelled lanes
+as incomplete. This does not establish hosted installed-flow acceptance. The
+[October 7 candidate
 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
 the earlier candidate evidence. These runs do not establish frozen-candidate
 or installed acceptance; those gates remain open.

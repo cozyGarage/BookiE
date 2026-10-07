@@ -644,7 +644,7 @@ async fn value_contract_int4range_is_explicitly_unsupported() {
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_int4multirange_metadata_resolution_failure_is_explicit() {
+async fn value_contract_int4multirange_is_explicitly_undecodable() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let result = connection
@@ -665,18 +665,27 @@ async fn value_contract_int4multirange_metadata_resolution_failure_is_explicit()
     let direct_projection = connection
         .query("SELECT '{[1,3),[5,8)}'::int4multirange")
         .await
-        .expect_err("SQLx currently fails resolving PostgreSQL multirange metadata");
-    let error = format!("{direct_projection:?}");
-    assert!(error.contains("typtype"), "{error}");
-    assert!(error.contains("unknown type code 109"), "{error}");
+        .expect("multirange metadata should resolve to the value decoder");
+    let value = &direct_projection.rows[0][0];
+    assert!(
+        matches!(value, Value::Undecodable(name) if name.eq_ignore_ascii_case("int4multirange")),
+        "{value:?}"
+    );
+    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+    assert!(
+        connection
+            .query_params("SELECT $1", std::slice::from_ref(value))
+            .await
+            .is_err()
+    );
 
-    let null = connection.query("SELECT NULL::int4multirange IS NULL").await.unwrap();
-    assert_eq!(null.rows, vec![vec![Value::Bool(true)]]);
+    let null = connection.query("SELECT NULL::int4multirange").await.unwrap();
+    assert_eq!(null.rows, vec![vec![Value::Null]]);
 }
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_remaining_builtin_multiranges_fail_explicitly_with_native_oracles() {
+async fn value_contract_remaining_builtin_multiranges_are_undecodable_with_native_oracles() {
     let (_container, opts) = start_pg().await;
     let connection = connect(opts).await;
     let cases = [
@@ -732,19 +741,28 @@ async fn value_contract_remaining_builtin_multiranges_fail_explicitly_with_nativ
             "independent PostgreSQL oracle for {expected_type}"
         );
 
-        let error = connection
+        let projection = connection
             .query(&format!("SELECT {expression}"))
             .await
-            .expect_err("unsupported multirange projection must fail, never flatten silently");
-        let error = format!("{error:?}");
-        assert!(error.contains("typtype"), "{expected_type}: {error}");
-        assert!(error.contains("unknown type code 109"), "{expected_type}: {error}");
+            .unwrap_or_else(|error| panic!("{expected_type} must reach the value decoder: {error:?}"));
+        let value = &projection.rows[0][0];
+        assert!(
+            matches!(value, Value::Undecodable(name) if name.eq_ignore_ascii_case(expected_type)),
+            "{expected_type} must remain explicit and lossless: {value:?}"
+        );
+        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(value))
+                .await
+                .is_err()
+        );
 
         let null = connection
-            .query(&format!("SELECT NULL::{expected_type} IS NULL"))
+            .query(&format!("SELECT NULL::{expected_type}"))
             .await
             .unwrap_or_else(|error| panic!("SQL NULL oracle for {expected_type}: {error:?}"));
-        assert_eq!(null.rows, vec![vec![Value::Bool(true)]], "{expected_type}");
+        assert_eq!(null.rows, vec![vec![Value::Null]], "{expected_type}");
     }
 }
 

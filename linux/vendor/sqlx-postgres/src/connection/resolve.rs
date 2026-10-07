@@ -310,6 +310,8 @@ impl PgConnection {
                 PgTypeKind::Composite(attributes.into())
             }
 
+            // SQLx 0.9 has no multirange kind; keep its metadata and let the
+            // caller surface the value as unsupported instead of failing resolution.
             _ => PgTypeKind::Simple,
         };
 
@@ -601,6 +603,7 @@ enum TypType {
     Composite,
     Domain,
     Enum,
+    Multirange,
     Pseudo,
     Range,
 }
@@ -616,6 +619,7 @@ impl TryFrom<i8> for TypType {
             b'c' => Self::Composite,
             b'd' => Self::Domain,
             b'e' => Self::Enum,
+            b'm' => Self::Multirange,
             b'p' => Self::Pseudo,
             b'r' => Self::Range,
             _ => return Err(format!("unknown type code {t}")),

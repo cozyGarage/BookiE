@@ -900,6 +900,7 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
     ];
     let mut seen_supported = Vec::new();
     let mut refused = 0;
+    let mut refused_names = Vec::new();
     let mut blocked = Vec::new();
 
     for row in catalog.rows {
@@ -944,7 +945,14 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
             assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_ok());
         } else {
             refused += 1;
+            refused_names.push(array_type.clone());
             assert!(matches!(value, Value::Undecodable(_)), "{array_type}: {value:?}");
+            if array_type.contains("multirange") {
+                assert!(
+                    matches!(value, Value::Undecodable(name) if name.eq_ignore_ascii_case(array_type)),
+                    "{array_type} must retain its native type name: {value:?}"
+                );
+            }
             assert!(tablepro_core::sql_literal::render_sql_literal("postgres", value).is_err());
             assert!(
                 connection
@@ -970,6 +978,19 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
         refused >= 7,
         "the catalog census should cover the explicit unlisted-array contract set"
     );
+    for array_type in [
+        "int4multirange[]",
+        "nummultirange[]",
+        "tsmultirange[]",
+        "tstzmultirange[]",
+        "datemultirange[]",
+        "int8multirange[]",
+    ] {
+        assert!(
+            refused_names.iter().any(|name| name == array_type),
+            "{array_type} must be explicitly refused"
+        );
+    }
     let blocked_names: Vec<_> = blocked.iter().map(|(name, _)| name.as_str()).collect();
     assert_eq!(
         blocked_names,
@@ -979,12 +1000,6 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
             "pg_class[]",
             "aclitem[]",
             "gtsvector[]",
-            "int4multirange[]",
-            "nummultirange[]",
-            "tsmultirange[]",
-            "tstzmultirange[]",
-            "datemultirange[]",
-            "int8multirange[]",
             "pg_attrdef[]",
             "pg_constraint[]",
             "pg_index[]",
@@ -1011,17 +1026,9 @@ async fn value_contract_builtin_array_oid_census_matches_decode_allowlist() {
             .filter(|(_, error)| error.contains("no binary output function available"))
             .all(|(name, _)| { matches!(name.as_str(), "aclitem[]" | "gtsvector[]") })
     );
-    assert!(
-        blocked
-            .iter()
-            .filter(|(_, error)| error.contains("unknown type code 109"))
-            .all(|(name, _)| { name.contains("multirange") })
-    );
     for (name, error) in &blocked {
         if matches!(name.as_str(), "aclitem[]" | "gtsvector[]") {
             assert!(error.contains("no binary output function available"), "{name}: {error}");
-        } else if name.contains("multirange") {
-            assert!(error.contains("unknown type code 109"), "{name}: {error}");
         } else {
             assert!(
                 error.contains("typcategory") && error.contains("category code 90"),
