@@ -143,7 +143,8 @@ Run the Phase 3 release gate with:
 ```
 
 The script generates fixture certificates and SSH keys, starts PostgreSQL 16 with TLS, an OpenSSH
-bastion, and Toxiproxy, then runs `tablepro-release-tests` with `--include-ignored --test-threads=1`.
+bastion, and Toxiproxy, builds the `tablepro-askpass` helper, runs the agentd system OpenSSH G5
+acceptance test, then runs `tablepro-release-tests` with `--include-ignored --test-threads=1`.
 Only Toxiproxy publishes host ports, so the database is reachable through the proxied path or the
 bastion and either path can be cut during a test.
 

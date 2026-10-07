@@ -33,7 +33,6 @@ additional privacy, value and evidence tasks without duplicating this board.
 | --- | --- | --- |
 | C6-MySQL | TLS through real SSH socket forwarding: valid identity succeeds; wrong CA/host fails without plaintext fallback. Assert the original service hostname | `tls`, `ssh` |
 | C6-SQLServer | TLS through real SSH TCP forwarding: same positive and negative identities, with usable control connection | `tls`, `ssh` |
-| G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
 | F8-headless | Give cached daemon connections separate generations sharing journal failure; A's unknown write blocks A, B still writes, replacement recovers, and late A cannot poison replacement | `security-policy`, agentd units, `postgres-release` |
 | I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
 | I5 | Record tunnel setup and host-key refusal through the approved audit contract; success/denial/cancel/error each has one safe terminal outcome | `security-policy`, `ssh`, `postgres-release` |
@@ -42,6 +41,12 @@ additional privacy, value and evidence tasks without duplicating this board.
 | B4-atomic-batch / B4-rollback-error | MySQL source and native regressions complete locally: non-DML batches are refused before dispatch, failed rollback reports unknown outcome, and a trigger-to-MyISAM side effect is shown to survive InnoDB rollback with an accurate UI warning. PostgreSQL native rollback-failure acceptance and broader engine/side-effect coverage remain open | [Retained MySQL evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); frozen candidate acceptance remains |
 | B4-MySQL-engine-atomicity | **Narrow contract tested locally:** failed InnoDB DML rolls back InnoDB rows, but an AFTER INSERT trigger's MyISAM write survives; the UI warns that non-transactional writes may remain. Other storage engines and side-effect patterns still need scoped proof | [Native trigger regression and evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); broader candidate acceptance remains |
 | I1 | In the Debian phase, build/install executable `tablepro-askpass` in debhelper rules and make validator reject its absence; inspect the rules-built package | `packaging-contracts`, Debian package build |
+
+## Completed local slices
+
+| ID | Local evidence | Scope remaining |
+| --- | --- | --- |
+| G5 | `bash scripts/test-postgres-release.sh` on the BookiE `b4/g5-daemon-openssh` worktree, 2026-10-07: actual agentd provider refuses an unattended unknown system OpenSSH key without writing it, then reaches a guarded PostgreSQL query with a pretrusted key. The command also passed the existing PostgreSQL release integration suite | Re-run on the frozen B3+B4 candidate SHA; hosted and installed acceptance remain separate |
 
 Headless panic retirement belongs with G5 and F8-headless; make it a separate
 small patch before their combined acceptance.
