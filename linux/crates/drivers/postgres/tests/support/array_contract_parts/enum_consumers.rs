@@ -334,10 +334,10 @@ async fn value_contract_custom_enum_array_three_dimensions_round_trip_native_wir
     let rebound = connection
         .query_params(
             &format!(
-                "SELECT pg_typeof($1::text::{enum_type})::text, \
-                        array_dims($1::text::{enum_type}), array_ndims($1::text::{enum_type}), \
-                        array_to_json($1::text::{enum_type})::text, \
-                        encode(array_send($1::text::{enum_type}), 'hex')"
+                "SELECT pg_typeof($1::{enum_type})::text, \
+                        array_dims($1::{enum_type}), array_ndims($1::{enum_type}), \
+                        array_to_json($1::{enum_type})::text, \
+                        encode(array_send($1::{enum_type}), 'hex')"
             ),
             &[Value::Text(array_text.clone())],
         )
@@ -387,10 +387,10 @@ async fn value_contract_custom_enum_array_six_dimension_limit_round_trips() {
     let rebound = connection
         .query_params(
             &format!(
-                "SELECT pg_typeof($1::text::{enum_type})::text, \
-                        array_dims($1::text::{enum_type}), array_ndims($1::text::{enum_type}), \
-                        array_to_json($1::text::{enum_type})::text, \
-                        encode(array_send($1::text::{enum_type}), 'hex')"
+                "SELECT pg_typeof($1::{enum_type})::text, \
+                        array_dims($1::{enum_type}), array_ndims($1::{enum_type}), \
+                        array_to_json($1::{enum_type})::text, \
+                        encode(array_send($1::{enum_type}), 'hex')"
             ),
             &[Value::Text(array_text.clone())],
         )
