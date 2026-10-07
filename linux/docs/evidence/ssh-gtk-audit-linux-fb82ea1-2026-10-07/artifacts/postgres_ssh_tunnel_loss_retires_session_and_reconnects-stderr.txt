@@ -1,0 +1,18 @@
+2026-10-07T19:51:18.665833Z  INFO starting tablepro-app drivers=7
+2026-10-07T19:51:18.665889Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T19:51:18.769535Z  INFO registered win.disconnect enabled=false
+2026-10-07T19:51:18.773022Z  INFO main window activated
+2026-10-07T19:51:19.344075Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+2026-10-07T19:51:22.446096Z  INFO workspace ready driver=postgres table_count=5 view_count=0
+2026-10-07T19:51:23.710246Z  INFO script run complete n_ok=1 n_err=0 total_ms=1
+2026-10-07T19:51:24.350682Z  INFO script run complete n_ok=1 n_err=0 total_ms=2
+2026-10-07T19:51:24.728253Z  INFO script run complete n_ok=1 n_err=0 total_ms=7
+2026-10-07T19:51:25.447046Z  WARN SSH tunnel closed; starting reconnect
+2026-10-07T19:51:30.607585Z  INFO reconnect succeeded attempt=1
+2026-10-07T19:51:31.225920Z  WARN driver stopped mid-operation; replacing the connection connection_id=1c971938-9732-433e-a9bf-ae64e94794da operation="ROLLBACK"
+
+(com.tablepro.linux:3486783): Adwaita-WARNING **: 21:51:31.227: AdwToolbarView 0x5a075baf5350 exceeds AdwApplicationWindow width: requested 1322 px, 1190 px available
+2026-10-07T19:51:32.982490Z  INFO script run complete n_ok=0 n_err=1 total_ms=0
+2026-10-07T19:51:34.388813Z  INFO script run complete n_ok=1 n_err=0 total_ms=1

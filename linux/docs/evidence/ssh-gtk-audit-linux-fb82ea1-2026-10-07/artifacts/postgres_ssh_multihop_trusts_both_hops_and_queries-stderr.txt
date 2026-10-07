@@ -1,0 +1,9 @@
+2026-10-07T19:51:34.547324Z  INFO starting tablepro-app drivers=7
+2026-10-07T19:51:34.547373Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T19:51:34.651712Z  INFO registered win.disconnect enabled=false
+2026-10-07T19:51:34.654965Z  INFO main window activated
+2026-10-07T19:51:35.227159Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+2026-10-07T19:51:38.239322Z  INFO workspace ready driver=postgres table_count=5 view_count=0
+2026-10-07T19:51:39.372455Z  INFO script run complete n_ok=1 n_err=0 total_ms=3

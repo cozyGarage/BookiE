@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "B4-7 transport audit, B4-16 stale-session invalidation, B4-17 SSH multi-hop trust; current-Linux release-binary GTK rerun",
+  "linux_tip": "fb82ea1c7e60e654da54d1fb31791a030524167e",
+  "run_commit": "ae94b9b65328537265f43d323215cf3b2e822f32",
+  "source_tree": "aa587e1b5d88f122feef8163b8b2e21fc62e9e0b",
+  "tested_source_sha256": {
+    "crates/app/src/ui/ssh_prompt.rs": "8b1cbcc61885ee33af770ff78e62ba0e43a5187cadf73464247306b811c52901",
+    "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45",
+    "scripts/tests/test_ci_workflow.py": "f30e56a34df9648a5a79e09c7ba926d80a1a296e96e096b748f7b33777ea748f"
+  },
+  "engine": "PostgreSQL 16 / OpenSSH Docker fixture; GTK under isolated D-Bus, Xvfb, and AT-SPI",
+  "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/release/tablepro-app TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-audit-linux-fb82ea1-2026-10-07/artifacts bash scripts/test-postgres-release.sh",
+  "binary": {
+    "path": "target/release/tablepro-app",
+    "sha256": "3403c2a9b69134984c504de5657121ef4157d0953260f446c14d748eb9a274b3"
+  },
+  "result": "passed; release harness exit status 0; all seven selected default GTK scenarios passed",
+  "scenarios": [
+    {
+      "name": "postgres_saved_mtls_connection_authenticates_and_queries",
+      "status": "passed",
+      "artifact_sha256": "611f1afe4bbf08bdd75276ce412aa179eca465200e7eaaf7566521f270c49bbe"
+    },
+    {
+      "name": "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+      "status": "passed",
+      "artifact_sha256": "2d49e77466b4f126586a1c78ee3e17da806964e1e0b318b96f4ae93f7096be28"
+    },
+    {
+      "name": "postgres_ssh_setup_failure_is_durably_audited",
+      "status": "passed",
+      "artifact_sha256": "c184d497bbad8b17eebfaf54e4437ac7057b1877fc9bb978eb3116da896743a6"
+    },
+    {
+      "name": "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+      "status": "passed",
+      "artifact_sha256": "d553f36438e54c95cf1f15eb11ac6f6a67e5d11187a6dcb4e0116ecbd37f3a9f"
+    },
+    {
+      "name": "postgres_ssh_multihop_trusts_both_hops_and_queries",
+      "status": "passed",
+      "artifact_sha256": "c675bb81e278a638a9bae9244105918a57d32eb5fd7968f10b408054eeb37de0"
+    },
+    {
+      "name": "postgres_ssh_second_hop_decline_does_not_learn_key",
+      "status": "passed",
+      "artifact_sha256": "5cf666034934330d47f58e99b629ce05c16cb06090e135fe0a05d3a4f8045325"
+    },
+    {
+      "name": "postgres_ssh_changed_second_hop_key_is_refused",
+      "status": "passed",
+      "artifact_sha256": "e155e8aeb324df4ce06bd9d19418fce8297aa62cb8384905a520e7adc93bcadb"
+    }
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "5663076f317ec901c791aa4bf88ee19db1754734725f5990139b7c1bd75063be"
+  },
+  "not_established": [
+    "Frozen B3+B4 candidate acceptance",
+    "Hosted execution of this exact seven-scenario release fixture",
+    "Distribution-package installation and native Wayland acceptance"
+  ]
+}
