@@ -371,6 +371,7 @@ fn build_menu(editable: bool, row_operations: bool, insert_copy: bool, filterabl
     actions.append(Some(&crate::tr!("Export Results…")), Some("cell.export"));
     actions.append(Some(&crate::tr!("Columns…")), Some("grid.columns"));
     actions.append(Some(&crate::tr!("Jump to Column…")), Some("grid.jump-column"));
+    actions.append(Some(&crate::tr!("Find in Loaded Rows…")), Some("grid.find-row"));
     if row_operations {
         actions.append(Some(&crate::tr!("Insert row")), Some("cell.insert-row"));
         actions.append(Some(&crate::tr!("Duplicate row")), Some("cell.duplicate-row"));

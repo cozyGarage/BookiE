@@ -199,6 +199,7 @@ pub(super) fn build_shortcuts_dialog() -> gtk::ShortcutsWindow {
             ("<Primary><Shift>n", crate::tr!("Set focused cell to NULL")),
             ("<Primary>f", crate::tr!("Filter rows")),
             ("<Primary><Shift>j", crate::tr!("Jump to Column (focused grid)")),
+            ("<Primary><Alt>f", crate::tr!("Find in loaded rows (focused grid)")),
             ("<Primary>a", crate::tr!("Select all rows")),
             ("Shift-click", crate::tr!("Extend row selection to clicked row")),
             ("Ctrl-click", crate::tr!("Toggle clicked row in selection")),

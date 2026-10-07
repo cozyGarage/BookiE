@@ -548,6 +548,20 @@ def scenarios(ui):
         else:
             raise AssertionError(f"the inspector did not list the row:\n{ui.accessible_snapshot()}")
 
+    def find_in_loaded_rows_lists_matches_and_selects_one(database, base):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        click_cell("alpha")
+        ui.press_x11_key("f", ("Control_L", "Alt_L"))
+        search = ui.wait_for_node(name="Search the loaded rows")
+        search.queryEditableText().setTextContents("bet")
+        ui.wait_for_node(name="2 \u00b7 note: beta")
+        ui.press_x11_key("Return")
+        ui.wait_for_node(name="Search the loaded rows", present=False)
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -923,6 +937,7 @@ def scenarios(ui):
         interactive_controls_have_accessible_names,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,
+        find_in_loaded_rows_lists_matches_and_selects_one,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

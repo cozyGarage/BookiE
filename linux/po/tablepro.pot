@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 14:21+0200\n"
+"POT-Creation-Date: 2026-10-07 15:04+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -447,7 +447,7 @@ msgstr ""
 msgid "A reopened tab is no longer linked to its file: {reason}"
 msgstr ""
 
-#: crates/app/src/ui/app/editor_files.rs:76 crates/app/src/ui/app/mod.rs:669
+#: crates/app/src/ui/app/editor_files.rs:76 crates/app/src/ui/app/mod.rs:672
 msgid "Saved"
 msgstr ""
 
@@ -616,8 +616,8 @@ msgstr ""
 msgid "Views"
 msgstr ""
 
-#: crates/app/src/ui/app/init_sidebar.rs:202 crates/app/src/ui/app/mod.rs:377
-#: crates/app/src/ui/app/workspace_chrome.rs:84
+#: crates/app/src/ui/app/init_sidebar.rs:202 crates/app/src/ui/app/mod.rs:378
+#: crates/app/src/ui/app/workspace_chrome.rs:86
 msgid "Tables"
 msgstr ""
 
@@ -674,7 +674,7 @@ msgid ""
 msgstr ""
 
 #: crates/app/src/ui/app/init_workspace.rs:75
-#: crates/app/src/ui/app/shortcuts.rs:163
+#: crates/app/src/ui/app/shortcuts.rs:170
 msgid "Open SQL editor"
 msgstr ""
 
@@ -686,51 +686,51 @@ msgstr ""
 msgid "Pick a table from the sidebar, or use the button below (Ctrl+T)."
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:305
+#: crates/app/src/ui/app/mod.rs:306
 msgid "New connection"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:312
+#: crates/app/src/ui/app/mod.rs:313
 msgid "Open saved connection"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:322
+#: crates/app/src/ui/app/mod.rs:323
 msgid "Switch database"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:333
+#: crates/app/src/ui/app/mod.rs:334
 msgid "Read-only"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:343
+#: crates/app/src/ui/app/mod.rs:344
 msgid "Saving…"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:349
+#: crates/app/src/ui/app/mod.rs:350
 msgid "Main menu"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:383
+#: crates/app/src/ui/app/mod.rs:384
 msgid "Search tables"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:399
+#: crates/app/src/ui/app/mod.rs:400
 msgid "Filter tables…"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:422
+#: crates/app/src/ui/app/mod.rs:423
 msgid "Retry"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:824
+#: crates/app/src/ui/app/mod.rs:827
 msgid "Saved as favorite"
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:836 crates/app/src/ui/app/mod.rs:843
+#: crates/app/src/ui/app/mod.rs:839 crates/app/src/ui/app/mod.rs:846
 msgid "Connect to a database first to run SQL."
 msgstr ""
 
-#: crates/app/src/ui/app/mod.rs:915
+#: crates/app/src/ui/app/mod.rs:918
 msgid "Open a result grid to jump to a column."
 msgstr ""
 
@@ -864,7 +864,7 @@ msgstr ""
 msgid "New Window"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:30 crates/app/src/ui/app/shortcuts.rs:152
+#: crates/app/src/ui/app/shortcuts.rs:30 crates/app/src/ui/app/shortcuts.rs:159
 msgid "Keyboard Shortcuts"
 msgstr ""
 
@@ -872,265 +872,269 @@ msgstr ""
 msgid "About BookiE"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:32 crates/app/src/ui/app/shortcuts.rs:175
+#: crates/app/src/ui/app/shortcuts.rs:32 crates/app/src/ui/app/shortcuts.rs:182
 msgid "Quit"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:161 crates/app/src/ui/preferences.rs:40
+#: crates/app/src/ui/app/shortcuts.rs:168 crates/app/src/ui/preferences.rs:40
 msgid "General"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:164
+#: crates/app/src/ui/app/shortcuts.rs:171
 msgid "Open a SQL file in a new editor tab"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:165
+#: crates/app/src/ui/app/shortcuts.rs:172
 msgid "Refresh table"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:166
+#: crates/app/src/ui/app/shortcuts.rs:173
 msgid "Open Preferences"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:167
+#: crates/app/src/ui/app/shortcuts.rs:174
 msgid "Open Query History"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:168
+#: crates/app/src/ui/app/shortcuts.rs:175
 msgid "Open Quickly: favorites and open tabs"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:169
+#: crates/app/src/ui/app/shortcuts.rs:176
 msgid "Save the editor query as a favorite"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:170
+#: crates/app/src/ui/app/shortcuts.rs:177
 msgid "Manage saved queries"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:171
+#: crates/app/src/ui/app/shortcuts.rs:178
 msgid "Save pending changes"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:172
+#: crates/app/src/ui/app/shortcuts.rs:179
 msgid "Undo pending change"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:173
+#: crates/app/src/ui/app/shortcuts.rs:180
 msgid "Redo pending change"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:174
+#: crates/app/src/ui/app/shortcuts.rs:181
 msgid "Show keyboard shortcuts"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:180
+#: crates/app/src/ui/app/shortcuts.rs:187
 msgid "Browse table"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:182
-#: crates/app/src/ui/app/shortcuts.rs:183
+#: crates/app/src/ui/app/shortcuts.rs:189
+#: crates/app/src/ui/app/shortcuts.rs:190
 msgid "Edit focused cell"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:184
+#: crates/app/src/ui/app/shortcuts.rs:191
 msgid "Cancel edit"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:185
+#: crates/app/src/ui/app/shortcuts.rs:192
 msgid "Move to next cell (commits if editing)"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:186
+#: crates/app/src/ui/app/shortcuts.rs:193
 msgid "Move to previous cell (commits if editing)"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:187
+#: crates/app/src/ui/app/shortcuts.rs:194
 msgid "Move to previous cell"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:188
+#: crates/app/src/ui/app/shortcuts.rs:195
 msgid "Move to next cell"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:189
+#: crates/app/src/ui/app/shortcuts.rs:196
 msgid "Toggle boolean cell"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:190
+#: crates/app/src/ui/app/shortcuts.rs:197
 #: crates/app/src/ui/browse_tab/chrome.rs:24
 #: crates/app/src/ui/grid/context_menu.rs:42
-#: crates/app/src/ui/grid/context_menu.rs:375
+#: crates/app/src/ui/grid/context_menu.rs:376
 msgid "Insert row"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:191
+#: crates/app/src/ui/app/shortcuts.rs:198
 msgid "Delete selected row"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:192
+#: crates/app/src/ui/app/shortcuts.rs:199
 msgid "Set focused cell to NULL"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:193
+#: crates/app/src/ui/app/shortcuts.rs:200
 msgid "Filter rows"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:194
+#: crates/app/src/ui/app/shortcuts.rs:201
 msgid "Jump to Column (focused grid)"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:195
-msgid "Select all rows"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:196
-msgid "Extend row selection to clicked row"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:197
-msgid "Toggle clicked row in selection"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:198
-msgid "Clear multi-row selection"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:199
-msgid "Copy selected rows as TSV"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:200
-msgid "Previous page"
-msgstr ""
-
-#: crates/app/src/ui/app/shortcuts.rs:201
-msgid "Next page"
-msgstr ""
-
 #: crates/app/src/ui/app/shortcuts.rs:202
-msgid "Jump to first row of page"
+msgid "Find in loaded rows (focused grid)"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:203
-msgid "Jump to last row of page"
+msgid "Select all rows"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:204
-msgid "Save pending edits"
+msgid "Extend row selection to clicked row"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:205
-msgid "Undo last change"
+msgid "Toggle clicked row in selection"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:206
-msgid "Redo last change"
+msgid "Clear multi-row selection"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:207
+msgid "Copy selected rows as TSV"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:208
+msgid "Previous page"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:209
+msgid "Next page"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:210
+msgid "Jump to first row of page"
 msgstr ""
 
 #: crates/app/src/ui/app/shortcuts.rs:211
+msgid "Jump to last row of page"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:212
+msgid "Save pending edits"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:213
+msgid "Undo last change"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:214
+msgid "Redo last change"
+msgstr ""
+
+#: crates/app/src/ui/app/shortcuts.rs:219
 #: crates/app/src/ui/history_dialog.rs:158 crates/app/src/ui/preferences.rs:199
 msgid "SQL editor"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:213
+#: crates/app/src/ui/app/shortcuts.rs:221
 msgid "Run query"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:214
+#: crates/app/src/ui/app/shortcuts.rs:222
 msgid "Run statement at cursor"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:215
+#: crates/app/src/ui/app/shortcuts.rs:223
 msgid "Save the SQL file"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:216
+#: crates/app/src/ui/app/shortcuts.rs:224
 msgid "Save the SQL file as"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:217
+#: crates/app/src/ui/app/shortcuts.rs:225
 msgid "Cancel running query"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:218
+#: crates/app/src/ui/app/shortcuts.rs:226
 msgid "Toggle line comment"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:219
+#: crates/app/src/ui/app/shortcuts.rs:227
 msgid "New editor tab"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:220
+#: crates/app/src/ui/app/shortcuts.rs:228
 msgid "Close current tab or window"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:221
+#: crates/app/src/ui/app/shortcuts.rs:229
 msgid "Switch to the most recently used tab"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:222
+#: crates/app/src/ui/app/shortcuts.rs:230
 msgid "Previous editor tab"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:223
+#: crates/app/src/ui/app/shortcuts.rs:231
 msgid "Reopen last closed tab"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:224
+#: crates/app/src/ui/app/shortcuts.rs:232
 msgid "Format SQL"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:225
+#: crates/app/src/ui/app/shortcuts.rs:233
 msgid "Jump to the next statement"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:226
+#: crates/app/src/ui/app/shortcuts.rs:234
 msgid "Jump to the previous statement"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:231
+#: crates/app/src/ui/app/shortcuts.rs:239
 #: crates/app/src/ui/history_dialog.rs:159
 msgid "Table structure"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:233
+#: crates/app/src/ui/app/shortcuts.rs:241
 msgid "Save pending DDL"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:234
+#: crates/app/src/ui/app/shortcuts.rs:242
 msgid "Undo DDL change"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:235
+#: crates/app/src/ui/app/shortcuts.rs:243
 msgid "Redo DDL change"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:240
+#: crates/app/src/ui/app/shortcuts.rs:248
 msgid "Dialogs"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:241
+#: crates/app/src/ui/app/shortcuts.rs:249
 msgid "Close dialog"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:263
+#: crates/app/src/ui/app/shortcuts.rs:271
 msgid "Left"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:264
+#: crates/app/src/ui/app/shortcuts.rs:272
 msgid "Right"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:265
+#: crates/app/src/ui/app/shortcuts.rs:273
 msgid "space"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:266
+#: crates/app/src/ui/app/shortcuts.rs:274
 msgid "Shift-click"
 msgstr ""
 
-#: crates/app/src/ui/app/shortcuts.rs:267
+#: crates/app/src/ui/app/shortcuts.rs:275
 msgid "Ctrl-click"
 msgstr ""
 
@@ -2801,15 +2805,19 @@ msgstr ""
 msgid "Columns…"
 msgstr ""
 
-#: crates/app/src/ui/grid/context_menu.rs:376
-msgid "Duplicate row"
+#: crates/app/src/ui/grid/context_menu.rs:374
+msgid "Find in Loaded Rows…"
 msgstr ""
 
 #: crates/app/src/ui/grid/context_menu.rs:377
-msgid "Set to NULL"
+msgid "Duplicate row"
 msgstr ""
 
 #: crates/app/src/ui/grid/context_menu.rs:378
+msgid "Set to NULL"
+msgstr ""
+
+#: crates/app/src/ui/grid/context_menu.rs:379
 msgid "Delete row"
 msgstr ""
 
@@ -2823,6 +2831,28 @@ msgstr ""
 
 #: crates/app/src/ui/grid/display.rs:17
 msgid "(auto)"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:92 crates/app/src/ui/grid/row_find.rs:96
+msgid "Search the loaded rows"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:147
+msgid "No matching rows"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:149
+#, rust-format
+msgid "The first {count} matches"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:151
+#, rust-format
+msgid "{count} matching rows"
+msgstr ""
+
+#: crates/app/src/ui/grid/row_find.rs:190
+msgid "Find in Loaded Rows"
 msgstr ""
 
 #: crates/app/src/ui/grid/value_viewer.rs:64
