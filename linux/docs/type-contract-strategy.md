@@ -785,7 +785,8 @@ mixed-case quoted schema/type names now also survive metadata lookup, keyed edit
 The mixed-case transaction-local enum contract now also verifies rollback: a
 typed update and filter run with the lowercase shadow first in `search_path`,
 then rollback must restore both target rows and the original session path. The
-same contract still checks committed writes and native shadow/type identity.
+same contract still checks committed writes and native shadow/type identity
+([validation comment on PR #127](https://github.com/cozyGarage/BookiE/pull/127#issuecomment-6029039984)).
 
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
