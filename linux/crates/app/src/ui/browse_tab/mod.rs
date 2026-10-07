@@ -170,6 +170,7 @@ pub struct BrowseTab {
     /// the selection model's connect_selection_changed signal so it
     /// stays in sync without polling.
     selection_label: gtk::Label,
+    inspector: crate::ui::row_inspector::RowInspector,
     first_button: gtk::Button,
     prev_button: gtk::Button,
     next_button: gtk::Button,
@@ -628,7 +629,12 @@ impl SimpleComponent for BrowseTab {
         root.add_top_bar(&read_only_banner);
         root.add_top_bar(&no_pk_banner);
         root.add_top_bar(&filter_strip.widget);
-        root.set_content(Some(&inner_stack));
+        let inspector = crate::ui::row_inspector::RowInspector::new(&inner_stack);
+        paginator.inspector_button.connect_toggled({
+            let inspector = inspector.clone();
+            move |button| inspector.set_visible(button.is_active())
+        });
+        root.set_content(Some(inspector.widget()));
 
         let sync_top_bar_slot: std::rc::Rc<dyn Fn()> = {
             let root_for_sync = root.clone();
@@ -898,6 +904,7 @@ impl SimpleComponent for BrowseTab {
             pending_focus_restore: std::cell::RefCell::new(None),
             paginator_label: paginator.paginator_label,
             selection_label: paginator.selection_label,
+            inspector,
             first_button: paginator.first_button,
             prev_button: paginator.prev_button,
             next_button: paginator.next_button,

@@ -4,6 +4,7 @@
 
 ### Added
 
+- Table tabs have a Row inspector pane that shows every column of the selected row with its type and full value.
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.

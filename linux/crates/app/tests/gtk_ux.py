@@ -473,6 +473,26 @@ def scenarios(ui):
         ui.press_x11_key("Down", ("Alt_L", "Shift_L"))
         wait_for_caret(third)
 
+    def row_inspector_lists_every_column_of_the_selected_row(database, base):
+        import sqlite3
+        with sqlite3.connect(database) as connection:
+            connection.executemany("INSERT INTO safety_items(id, note) VALUES (?, ?)", [(1, "alpha"), (2, "beta")])
+        ui.invoke_named_action_within("safety_items", "Open safety_items")
+        ui.wait_for_node(name="alpha", role=pyatspi.ROLE_LABEL)
+        ui.invoke(ui.wait_for_node(name="Row inspector", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="No row selected")
+        click_cell("beta")
+        ui.wait_for_node(name="No row selected", present=False)
+        deadline = time.monotonic() + ui.WAIT_SECONDS
+        while time.monotonic() < deadline:
+            names = {ui.node_name(node) for node in ui.descendants(ui.application_node())}
+            titles = [name for name in names if "\u00b7" in name and name.split(" ")[0] in ("id", "note")]
+            if len(titles) >= 2 and "beta" in names:
+                break
+            time.sleep(ui.POLL_SECONDS)
+        else:
+            raise AssertionError(f"the inspector did not list the row:\n{ui.accessible_snapshot()}")
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -592,6 +612,7 @@ def scenarios(ui):
         ctrl_tab_returns_to_the_most_recently_used_tab,
         interactive_controls_have_accessible_names,
         alt_arrows_jump_between_statements,
+        row_inspector_lists_every_column_of_the_selected_row,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

@@ -39,7 +39,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-8 | ~~Second launch exits silently~~ | DONE | PR #87, verified with D-Bus on the runner | gtk-installed |
 | UI-8b | ~~Second launch logged a GLib "did not unregister" warning~~ | DONE | Second launch runs through `Application::run`; scenario `a_second_launch_raises_the_window_and_exits_cleanly` | gtk-installed |
 | UI-9 | ~~No read-only viewer for long, JSON or binary cell values~~ | DONE | PR #91, `value_viewer` tests | unit + gtk-widget |
-| UI-9b | No row inspector side pane | OPEN | `AdwOverlaySplitView` trailing pane | gtk-widget |
+| UI-9b | ~~No row inspector side pane~~ | DONE | Table tabs have a Row inspector toggle in the footer. It opens a trailing pane listing every column of the one selected row with its type and full value, selectable, NULL dimmed, and a hint when no single row is selected. Tests `row_inspector` (unit and isolated GTK widget test) and AT-SPI scenario `row_inspector_lists_every_column_of_the_selected_row`. Editing from the pane is not offered | unit + gtk-installed |
 | UI-27 | ~~Editable result cells opened two menus on right-click~~ | DONE | Capture-phase gesture; end-to-end scenarios `view_value_*` and `columns_dialog_*` | gtk-installed |
 | UI-28 | ~~The grid cell menu had no standard keyboard shortcut~~ | DONE | Shift+F10 added beside the Menu key | gtk-installed |
 | UI-29 | ~~Editing a connection failed outright when the keyring was unavailable or its unlock was cancelled~~ | DONE | `prefill.rs` `readable` test; scenario `editing_a_saved_connection_*` | unit + gtk-installed |

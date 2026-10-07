@@ -267,9 +267,12 @@ impl BrowseTab {
         // any) drops with the old selection — no leak.
         let selection_label_for_signal = self.selection_label.clone();
         if let Some(sel) = self.current_selection.as_ref() {
+            let inspector = self.inspector.clone();
+            let columns = self.current_columns.clone();
             sel.connect_selection_changed(move |sel, _, _| {
                 let n = sel.selection().size() as u32;
                 update_selection_chrome(&selection_label_for_signal, n);
+                inspector.show_row(inspected_row(sel, &columns));
             });
             // Page rebuild clears MultiSelection's bitset; reset the
             // chrome explicitly so a stale "5 selected" doesn't linger.
@@ -390,4 +393,20 @@ impl BrowseTab {
     pub(super) fn refresh_row(&self, position: u32) {
         self.refresh_row_at(position);
     }
+}
+
+fn inspected_row(
+    selection: &gtk::MultiSelection,
+    columns: &[ColumnInfo],
+) -> Option<Vec<crate::ui::row_inspector::InspectorField>> {
+    let bits = selection.selection();
+    if bits.size() != 1 {
+        return None;
+    }
+    let row = selection
+        .model()?
+        .item(bits.nth(0))?
+        .downcast::<crate::ui::row_object::RowObject>()
+        .ok()?;
+    Some(row.with_cells(|cells| crate::ui::row_inspector::inspector_fields(columns, cells)))
 }
