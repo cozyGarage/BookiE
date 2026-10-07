@@ -25,7 +25,11 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_cross_consumer_server_targets_are_gated_and_documented(self):
         local = (ROOT / "linux/scripts/ci-local.sh").read_text()
-        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+        for package, target in [
+            ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-policy", "session_postgres"),
+            ("tablepro-policy", "session_mssql"),
+        ]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "linux/scripts/isolated-tests.json").read_text())
         self.assertEqual(
@@ -70,7 +74,11 @@ class CiWorkflowTests(unittest.TestCase):
             workflow,
         )
         ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
-        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+        for package, target in [
+            ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-policy", "session_postgres"),
+            ("tablepro-policy", "session_mssql"),
+        ]:
             self.assertIn(f"-p {package} --test {target}", ledger)
         self.assertIn("scripts/run-test-layer.py app-server", ledger)
         self.assertNotIn("tablepro-driver-tests", ledger)

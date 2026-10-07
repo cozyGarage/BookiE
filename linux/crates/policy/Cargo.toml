@@ -34,8 +34,9 @@ tokio-util.workspace = true
 tempfile.workspace = true
 secrecy.workspace = true
 tablepro-driver-postgres = { path = "../drivers/postgres" }
+tablepro-driver-mssql = { path = "../drivers/mssql" }
 testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["postgres"] }
+testcontainers-modules = { workspace = true, features = ["mssql_server", "postgres"] }
 
 [lints]
 workspace = true
