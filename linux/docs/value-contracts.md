@@ -300,8 +300,9 @@ empty-string labels versus SQL NULL, CSV import with an explicit collision-free
 null marker, and Copy as SQL replay against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
 The app's keyed-grid path also edits nullable Enum16 labels against native type
-and signed-code oracles, keeps blank SQL NULL distinct from the literal `NULL`
-label, and proves an undeclared label leaves all rows unchanged
+and signed-code oracles, accepts quoted empty and literal `NULL` labels, keeps
+blank input as SQL NULL, and proves an undeclared label leaves all rows
+unchanged
 ([test](../crates/app/tests/support/clickhouse_enum_contract.rs)).
 Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)`,
 `Array(Nullable(Enum16))`, `Tuple(Enum8, Nullable(Enum8), Enum8)` and

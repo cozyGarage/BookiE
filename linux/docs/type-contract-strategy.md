@@ -56,10 +56,10 @@ and export oracles, and lossy SQL, binding and grid-write refusal in that
 contract. Tuples containing Enum8 and Enum16, with nullable elements and a
 literal `NULL` label, use the same native JSON/export oracle and explicit
 lossy-consumer refusal checks.
-The app grid path also has a native Enum16 keyed-edit contract: a valid label
-survives the parser and update, blank input stores SQL NULL separately from the
-literal `NULL` enum label, the native Int16 code is checked, and an undeclared
-label is refused without changing any row
+The app grid path also has a native Enum16 keyed-edit contract: unquoted labels
+remain convenient, quoted empty and literal `NULL` labels survive parsing,
+blank input stores SQL NULL, the native Int16 code is checked, and an
+undeclared label is refused without changing any row
 ([test](../crates/app/tests/support/clickhouse_enum_contract.rs)).
 
 PostgreSQL `citext` scalar and array values preserve exact label text while

@@ -42,13 +42,13 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
         .execute(
             "CREATE TABLE enum16_grid (
                 id UInt8,
-                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767))
+                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767, '' = 1))
             ) ENGINE = MergeTree ORDER BY id",
         )
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO enum16_grid VALUES (1, 'low'), (2, 'NULL'), (3, NULL), (4, 'high')")
+        .execute("INSERT INTO enum16_grid VALUES (1, 'low'), (2, 'NULL'), (3, NULL), (4, 'high'), (5, 'low')")
         .await
         .unwrap();
 
@@ -85,6 +85,19 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     .unwrap();
     connection.execute_in_transaction(&[update]).await.unwrap();
 
+    let empty_label = parse_input_for_grid_cell("''", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(empty_label, Value::Text(String::new()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "clickhouse",
+        None,
+        "enum16_grid",
+        &columns,
+        &[(state_index, empty_label)],
+        &[Value::Int(5)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+
     let before_refusal = connection
         .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state) FROM enum16_grid ORDER BY id")
         .await
@@ -106,6 +119,7 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
                 Value::Int(32767),
                 Value::Int(0)
             ],
+            vec![Value::Int(5), Value::Text(String::new()), Value::Int(1), Value::Int(0)],
         ]
     );
 
