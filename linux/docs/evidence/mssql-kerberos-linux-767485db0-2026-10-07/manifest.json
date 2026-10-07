@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "docs/b4-21-current-linux-2026-10-07",
+  "source_commit": "767485db0a30e588a1bea6ff32ba5909bd4eaf2f",
+  "source_tree": "50298f3ae00163ca937e9bd24af6550627c037df",
+  "run_commit": "813aebf9d2c58c5788445ea9b6ec9fcb999f9942",
+  "tested_source_sha256": {
+    "crates/driver-tls-tests/tests/mssql_kerberos.rs": "7f0cf6f8e55f2f49d6a3a760af2efc1963f13db04ea9dbedadb00781820bee05",
+    "scripts/test-mssql-kerberos.sh": "93e6d3af9f7b8508f4d47e641868ceff3163e36d06de2298b1056884bb2f542e",
+    "tests/fixtures/mssql-kerberos/docker-compose.yml": "be80e3936fb3324a5070805bef18e0edfbba5282ec1b861005049a164697bfa8",
+    "tests/fixtures/mssql-kerberos/client/Dockerfile": "a2dfc295a5315c897edc833471b9447174ae62ad97bfed315dfafb682a080330",
+    "tests/fixtures/mssql-kerberos/mssql/Dockerfile": "c8f9eaeb72a86fbf027181d3e38e6260b5e42ec35a68331ebb46ccd13385bda1"
+  },
+  "engine": "SQL Server 2022 Developer plus pinned Samba AD DC test domain",
+  "command": "TMPDIR=/tmp CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target bash scripts/test-mssql-kerberos.sh",
+  "result": "2 passed; 0 failed; 0 ignored; process exit 0",
+  "log": {
+    "path": "focused.txt",
+    "sha256": "117b2610168a7604fc3f1bd773ac1ddf97e56440e24a4a75acc16796333bf62e",
+    "normalization": "trailing whitespace removed from Docker output lines"
+  },
+  "assertions": [
+    "Kerberos ticket connects over VerifyFull TLS and executes a query.",
+    "An unregistered SQL Server SPN is refused."
+  ],
+  "remaining": [
+    "Samba AD does not establish Windows Server AD interoperability.",
+    "Frozen-candidate, hosted, and installed acceptance remain separate."
+  ]
+}
