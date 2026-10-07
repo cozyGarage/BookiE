@@ -71,6 +71,7 @@
 
 ### Fixed
 
+- SSH Docker integration fixtures now allow up to 180 seconds for container startup; host-key mismatch assertions remain unchanged.
 - Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 - MongoDB stale grid deletes now compare the document's full top-level field set as well as materialized values, so a field added after the read prevents deleting that changed document.
 
