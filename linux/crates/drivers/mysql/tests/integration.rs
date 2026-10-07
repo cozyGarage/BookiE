@@ -1172,6 +1172,8 @@ mod database_listing;
 
 #[path = "support/enum_sql_mode_contract.rs"]
 mod enum_sql_mode_contract;
+#[path = "support/unsigned_subtraction.rs"]
+mod unsigned_subtraction;
 #[path = "support/wide_decimal_csv.rs"]
 mod wide_decimal_csv;
 
