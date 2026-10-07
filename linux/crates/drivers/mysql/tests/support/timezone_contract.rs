@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use chrono::{TimeZone, Utc};
-use tablepro_core::{ConnectOptions, Connection, OperationControl, Value};
+use tablepro_core::{ConnectOptions, OperationControl, Value};
 
 use crate::{connect, start_mariadb, start_mysql};
 
@@ -52,6 +52,20 @@ async fn assert_non_utc_timestamp_contract(options: ConnectOptions, engine: &str
 
     let expected_instant =
         Utc.with_ymd_and_hms(2024, 1, 1, 21, 19, 5).unwrap() + chrono::Duration::microseconds(123_456);
+    assert_eq!(
+        result.rows.len(),
+        1,
+        "{engine}: exactly one keyed timestamp must be returned"
+    );
+    assert_eq!(
+        result.columns.len(),
+        3,
+        "{engine}: timestamp, local text, and epoch metadata must be present"
+    );
+    assert_eq!(
+        result.columns[0].data_type, "TIMESTAMP",
+        "{engine}: preserve native temporal type metadata"
+    );
     assert_eq!(
         result.rows[0][1],
         Value::Text("2024-01-02 03:04:05.123456".into()),
