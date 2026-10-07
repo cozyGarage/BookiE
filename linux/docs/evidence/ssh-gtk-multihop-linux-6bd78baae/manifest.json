@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "source_commit": "c6f25973ddd661a196a03538ba6d943de94c6d24",
+  "source_tree": "4827663d5f934432a5fb350e290d1ddb07fcf524",
+  "scope": "B4-17 current-Linux release-binary GTK trust flows for a saved two-hop SSH route",
+  "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target TABLEPRO_GTK_BINARY=/tmp/bookie-b4-11/linux/target/installed/usr/bin/tablepro TABLEPRO_GTK_SCENARIO=postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-multihop-linux-6bd78baae/artifacts bash scripts/test-postgres-release.sh",
+  "binary": {
+    "path": "target/installed/usr/bin/tablepro",
+    "sha256": "3403c2a9b69134984c504de5657121ef4157d0953260f446c14d748eb9a274b3",
+    "execution": "release app binary installed into the worktree test path and run under Xvfb/AT-SPI"
+  },
+  "tested_source_sha256": {
+    "crates/app/tests/gtk_ux.py": "531c66c6d28377dbfc6b3294846f360d4a1625c86ceab92791143f7f69334213",
+    "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45",
+    "scripts/test-gtk-safety.sh": "adec0b08de0d0d0d9545a868e858c667259b67eee78417b066f7b33ec0e528d7"
+  },
+  "fixture": "PostgreSQL release Docker fixture with bastion and internal relay; isolated Secret Service, known_hosts, Xvfb, D-Bus and AT-SPI",
+  "result": "passed; the selected three GTK result artifacts report passed and the release test harness exited 0",
+  "scenarios": [
+    {
+      "name": "postgres_ssh_multihop_trusts_both_hops_and_queries",
+      "result": "passed",
+      "artifact": "artifacts/postgres_ssh_multihop_trusts_both_hops_and_queries-result.json",
+      "sha256": "c675bb81e278a638a9bae9244105918a57d32eb5fd7968f10b408054eeb37de0"
+    },
+    {
+      "name": "postgres_ssh_second_hop_decline_does_not_learn_key",
+      "result": "passed",
+      "artifact": "artifacts/postgres_ssh_second_hop_decline_does_not_learn_key-result.json",
+      "sha256": "5cf666034934330d47f58e99b629ce05c16cb06090e135fe0a05d3a4f8045325"
+    },
+    {
+      "name": "postgres_ssh_changed_second_hop_key_is_refused",
+      "result": "passed",
+      "artifact": "artifacts/postgres_ssh_changed_second_hop_key_is_refused-result.json",
+      "sha256": "e155e8aeb324df4ce06bd9d19418fce8297aa62cb8384905a520e7adc93bcadb"
+    }
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "9419d0021bd5de7f101e69ee8ab9f0d1492c167330e7064adf59d633e0a95840",
+    "normalization": "Trailing whitespace from Docker/GTK output removed; scenario results and status lines preserved"
+  },
+  "not_established": [
+    "Frozen-candidate acceptance",
+    "Hosted CI acceptance",
+    "Distribution-package or native Wayland installed acceptance",
+    "Windows OpenSSH interoperability"
+  ]
+}

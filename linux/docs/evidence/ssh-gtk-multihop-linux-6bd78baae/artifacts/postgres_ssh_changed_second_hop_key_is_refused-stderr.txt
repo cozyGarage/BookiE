@@ -1,0 +1,8 @@
+2026-10-07T19:10:09.489528Z  INFO starting tablepro-app drivers=7
+2026-10-07T19:10:09.489577Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T19:10:09.592897Z  INFO registered win.disconnect enabled=false
+2026-10-07T19:10:09.596072Z  INFO main window activated
+2026-10-07T19:10:10.167630Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+2026-10-07T19:10:12.404613Z  WARN candidate connection failed error=ssh host key changed: host key for relay:22 does not match /tmp/tablepro-postgres_ssh_changed_second_hop_key_is_refused-70hg9gf0/config/tablepro/known_hosts: stored fingerprint differs (line 1). If the server was reinstalled, remove the old line; otherwise this may indicate a man-in-the-middle attack. New fingerprint: SHA256:Y2D5ewoO3ongz6/GrHB8rIE8DN1ZgkbqOA2ECkd/SwU
