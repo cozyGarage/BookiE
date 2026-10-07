@@ -2,8 +2,8 @@
 
 The shared technical standard is [ADR 0007](decisions/0007-type-and-value-preservation.md).
 This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
-and acceptance. Updated 2026-10-07; each new case links to its source-fingerprinted
-evidence packet, and this summary is not itself runtime evidence.
+and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
+validation comments, while this summary is not itself runtime evidence.
 
 ## Current evidence and next targets
 
@@ -66,6 +66,21 @@ The same XML array now also survives JSON, CSV, XML, HTML, Markdown, XLSX and
 SQL file exports with its native array text, NULL element, and wire bytes
 preserved on SQL replay (`value_contract_xml_array_file_exports_preserve_native_text`
 in `crates/drivers/postgres/tests/support/array_contract_parts/xml_array_file_exports.rs`).
+
+Custom composite arrays now have a named explicit-refusal contract. The test
+checks the undecodable value against PostgreSQL's native composite type, JSON,
+text and wire output, then verifies literal/bind refusal leaves target and
+sibling rows unchanged (`value_contract_custom_composite_array_refusal_preserves_rows`
+in `crates/drivers/postgres/tests/support/custom_array_contract.rs`). Other
+custom array families and their consumers remain open. The unlisted built-in
+The unlisted built-in `money[]` refusal covers populated values, SQL NULL
+elements, native text/JSON/wire snapshots, literal/bind refusal and
+target/sibling preservation (`value_contract_money_array_refusal_preserves_target_and_sibling_rows`).
+The same explicit-refusal contract now covers `point[]` with native type, text,
+JSON and wire oracles plus target/sibling preservation
+(`value_contract_point_array_refusal_preserves_target_and_sibling_rows`). Both
+tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
+see the [PR validation comments](https://github.com/cozyGarage/BookiE/pull/126).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
