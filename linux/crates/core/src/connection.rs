@@ -205,9 +205,12 @@ pub trait Connection: Send + Sync {
         params: &[Value],
         control: &OperationControl,
     ) -> Result<QueryResultBatch, DriverError> {
-        self.query_params_controlled(sql, params, control)
-            .await
-            .map(QueryResultBatch::single)
+        let result = if params.is_empty() {
+            self.query_controlled(sql, control).await
+        } else {
+            self.query_params_controlled(sql, params, control).await
+        }?;
+        Ok(QueryResultBatch::single(result))
     }
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError>;
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
