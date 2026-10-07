@@ -1144,6 +1144,9 @@ async fn binary_sql_exports_round_trip_null_empty_and_every_byte() {
     );
 }
 
+#[path = "support/mysql_identity_copy_contract.rs"]
+mod mysql_identity_copy_contract;
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn decimal_results_preserve_all_fractional_digits() {

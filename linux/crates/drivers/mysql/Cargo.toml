@@ -26,6 +26,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 secrecy.workspace = true
+tempfile.workspace = true
 testcontainers.workspace = true
 testcontainers-modules = { workspace = true, features = ["mysql"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

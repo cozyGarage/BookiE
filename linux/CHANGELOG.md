@@ -15,6 +15,7 @@
 - PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL's six built-in range array families now share explicit refusal and target/sibling preservation coverage with native type and JSON oracles.
 - Copy-as-INSERT and SQL exports now let PostgreSQL and SQL Server generate fresh identity values; MySQL continues to preserve explicit auto-increment values.
+- Docker-backed MySQL tests now verify SQL-export and Copy-as-INSERT identity preservation, including the next generated value, against the native server.
 - PostgreSQL geometric array families now share explicit refusal, native type/text/JSON/wire oracles, and target/sibling preservation coverage.
 - The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
@@ -168,6 +169,7 @@
 ### Changed
 
 - The built-in SSH client's unknown-host-key error no longer suggests connecting once with the system `ssh` command, which writes to a different `known_hosts` file than the one this client reads.
+- A built-in SSH host-key prompt now waits until its button response is handled before treating a close attempt as a decline, so trusting a host persists the key.
 - The built-in SSH client reports plainly when a server accepts only keyboard-interactive authentication, which it does not support, instead of a generic authentication failure.
 - The built-in SSH client now sends keepalives and can report a tunnel as closed once a bastion stops responding, instead of leaving a dead tunnel looking alive until a database driver's own timeout notices.
 - When a saved password can't be read because no keyring is running, the keyring is locked, or its unlock prompt was cancelled, the connection error now says which one and what to do, instead of showing the raw D-Bus error.

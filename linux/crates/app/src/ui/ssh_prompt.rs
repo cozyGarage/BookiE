@@ -141,16 +141,20 @@ fn connect_prompt_responses(
     });
     let close_attempt_sender = sender.clone();
     dialog.connect_close_attempt(move |_| {
-        if let Some(sender) = close_attempt_sender.borrow_mut().take() {
-            let _ = sender.send(PromptAnswer::Decline);
-        }
+        decline_after_dialog_signal(close_attempt_sender.clone());
     });
-    dialog.connect_closed(move |_| {
+    dialog.connect_closed(move |_| decline_after_dialog_signal(sender.clone()));
+    connect_escape_key(dialog, escape_sender);
+}
+
+fn decline_after_dialog_signal(
+    sender: std::rc::Rc<std::cell::RefCell<Option<tokio::sync::oneshot::Sender<PromptAnswer>>>>,
+) {
+    gtk::glib::idle_add_local_once(move || {
         if let Some(sender) = sender.borrow_mut().take() {
             let _ = sender.send(PromptAnswer::Decline);
         }
     });
-    connect_escape_key(dialog, escape_sender);
 }
 
 fn connect_escape_key(

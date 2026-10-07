@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `c358b9bce` on `linux` (PR #171).
+Current integrated source baseline: `ce44b552` on `linux` (PR #175).
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
 and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
 and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
@@ -26,8 +26,17 @@ merged; PR #170 then preserved the remaining handshake deadline after the
 trust decision. PR #169 implements the U2 default-copy policy: PostgreSQL and
 SQL Server generate fresh identity values, while MySQL preserves explicit
 auto-increment values. PR #171 removes an unused fixture import exposed by the
-first hosted preflight. Local `quick` and `integration` tiers pass on the
-resulting tree; hosted checks for #171 were still running at this checkpoint.
+first hosted preflight. PR #172 reconciles sprint evidence after #171. PR #173
+ends built-in and system-OpenSSH handshakes when the host-key decision is
+declined or the trust dialog is closed; PR #175 adds Escape dismissal. The
+merged #173 Linux run exposed two
+follow-up regressions: GTK signal ordering could send a close-as-decline before
+the explicit trust response, and the installed Debian file chooser lacks the
+AT-SPI `show_location` action. The current follow-up defers close-as-decline to
+the GLib idle loop and uses Ctrl+L for chooser location entry when that action
+is absent. The focused PostgreSQL two-hop trust scenario, all 47 Debian GTK
+safety scenarios, and local quick CI pass with these changes; the fixes remain
+unmerged and do not qualify B3 or the release.
 Case details and evidence belong in the [B3
 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
 index](value-contracts.md), test sources and relevant PR comments. B3 remains
