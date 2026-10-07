@@ -168,16 +168,66 @@ fn build_outcome_widget(
     }
 }
 
+fn clean_identifier(token: &str) -> String {
+    token
+        .trim_matches(|c: char| matches!(c, '(' | ')' | ';' | ',' | '"' | '`' | '[' | ']'))
+        .to_string()
+}
+
+fn token_after(tokens: &[&str], keyword: &str) -> Option<String> {
+    let position = tokens.iter().position(|token| token.eq_ignore_ascii_case(keyword))?;
+    let name = clean_identifier(tokens.get(position + 1)?);
+    (!name.is_empty()).then_some(name)
+}
+
+fn statement_subject(sql: &str) -> Option<String> {
+    let tokens: Vec<&str> = sql.split_whitespace().collect();
+    let verb = tokens.first()?.to_uppercase();
+    let subject = match verb.as_str() {
+        "SELECT" | "DELETE" => token_after(&tokens, "FROM"),
+        "INSERT" | "REPLACE" => token_after(&tokens, "INTO"),
+        "UPDATE" => tokens.get(1).map(|token| clean_identifier(token)),
+        "CREATE" | "DROP" | "ALTER" | "TRUNCATE" => tokens
+            .iter()
+            .skip(1)
+            .filter(|token| {
+                !matches!(
+                    token.to_uppercase().as_str(),
+                    "IF" | "NOT" | "EXISTS" | "OR" | "REPLACE"
+                )
+            })
+            .nth(1)
+            .map(|token| clean_identifier(token)),
+        _ => None,
+    };
+    Some(match subject.filter(|name| !name.is_empty()) {
+        Some(name) => format!("{verb} {name}"),
+        None => verb,
+    })
+}
+
 fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
+    let n = (idx + 1).to_string();
+    let Some(statement) = statement_subject(&o.sql_preview) else {
+        return match &o.kind {
+            StatementOutcomeKind::Rows(qr) => crate::tr!("Result {n} ({rows})")
+                .replace("{n}", &n)
+                .replace("{rows}", &qr.rows.len().to_string()),
+            StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
+            StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
+        };
+    };
     match &o.kind {
-        StatementOutcomeKind::Rows(qr) => {
-            let n_str = qr.rows.len().to_string();
-            crate::tr!("Result {n} ({rows})")
-                .replace("{n}", &(idx + 1).to_string())
-                .replace("{rows}", &n_str)
-        }
-        StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &(idx + 1).to_string()),
-        StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &(idx + 1).to_string()),
+        StatementOutcomeKind::Rows(qr) => crate::tr!("{n} · {statement} ({rows})")
+            .replace("{n}", &n)
+            .replace("{statement}", &statement)
+            .replace("{rows}", &qr.rows.len().to_string()),
+        StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
+            .replace("{n}", &n)
+            .replace("{statement}", &statement),
+        StatementOutcomeKind::NotRun => crate::tr!("{n} · {statement} (skipped)")
+            .replace("{n}", &n)
+            .replace("{statement}", &statement),
     }
 }
 
@@ -280,9 +330,29 @@ pub(crate) fn render_outcomes(
 #[cfg(test)]
 mod tests {
     use super::super::session_mode::StatementTarget;
-    use super::uses_drop_down;
     use super::{BatchErrorPolicy, ScriptRunResult, StatementOutcomeKind, run_statements, sql_preview, summary_label};
+    use super::{statement_subject, uses_drop_down};
     use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    #[test]
+    fn a_statement_is_named_by_its_verb_and_the_table_it_touches() {
+        let name = |sql: &str| statement_subject(sql);
+        assert_eq!(
+            name("select id, name from public.users where id = 1"),
+            Some("SELECT public.users".into())
+        );
+        assert_eq!(name("SELECT 1"), Some("SELECT".into()));
+        assert_eq!(
+            name("insert into \"orders\" (a) values (1)"),
+            Some("INSERT orders".into())
+        );
+        assert_eq!(name("UPDATE items SET a = 1"), Some("UPDATE items".into()));
+        assert_eq!(name("DELETE FROM `logs`;"), Some("DELETE logs".into()));
+        assert_eq!(name("create table if not exists t (id int)"), Some("CREATE t".into()));
+        assert_eq!(name("DROP TABLE IF EXISTS old_t"), Some("DROP old_t".into()));
+        assert_eq!(name("EXPLAIN select 1"), Some("EXPLAIN".into()));
+        assert_eq!(name("   "), None);
+    }
 
     #[test]
     fn a_few_results_keep_their_buttons_and_many_collapse_into_a_drop_down() {

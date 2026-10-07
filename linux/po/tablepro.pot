@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 17:48+0200\n"
+"POT-Creation-Date: 2026-10-07 17:52+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1361,7 +1361,7 @@ msgid "Unsaved changes will be permanently lost if you discard them."
 msgstr ""
 
 #: crates/app/src/ui/app/workspace_tabs.rs:987
-#: crates/app/src/ui/editor/outcomes.rs:243
+#: crates/app/src/ui/editor/outcomes.rs:293
 #: crates/app/src/ui/editor/schema.rs:42
 #: crates/app/src/ui/history_dialog.rs:1021
 msgid "Empty query"
@@ -2358,26 +2358,41 @@ msgstr ""
 msgid "Skipped because an earlier statement failed."
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:175
+#: crates/app/src/ui/editor/outcomes.rs:213
 #, rust-format
 msgid "Result {n} ({rows})"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:179
+#: crates/app/src/ui/editor/outcomes.rs:216
 #, rust-format
 msgid "Result {n} (error)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:180
+#: crates/app/src/ui/editor/outcomes.rs:217
 #, rust-format
 msgid "Result {n} (skipped)"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:217
+#: crates/app/src/ui/editor/outcomes.rs:221
+#, rust-format
+msgid "{n} · {statement} ({rows})"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:225
+#, rust-format
+msgid "{n} · {statement} (error)"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:228
+#, rust-format
+msgid "{n} · {statement} (skipped)"
+msgstr ""
+
+#: crates/app/src/ui/editor/outcomes.rs:267
 msgid "Statement result"
 msgstr ""
 
-#: crates/app/src/ui/editor/outcomes.rs:244
+#: crates/app/src/ui/editor/outcomes.rs:294
 msgid "Type a SQL statement and press Run."
 msgstr ""
 
