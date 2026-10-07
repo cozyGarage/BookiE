@@ -5,6 +5,11 @@ This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
 and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
 validation comments, while this summary is not itself runtime evidence.
 
+MySQL transaction queries already shared the production result collector; the
+Docker suite now also checks the decoded-byte limit, exact retained payloads,
+the `truncated` flag, and continued use of the same transaction
+([test](../crates/drivers/mysql/tests/shared/mysql_atomic.rs)).
+
 ## Current evidence and next targets
 
 PostgreSQL `citext` scalar and array values preserve exact label text while
