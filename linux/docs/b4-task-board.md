@@ -25,22 +25,29 @@ evidence. Fresh audit results are in [the release audit](archive/release-audit-2
 
 ## C6 tunneled TLS local fixture evidence (October 7)
 
-The working tree based on `5f7e80145` adds unpublished TLS-only MySQL and SQL
-Server endpoints behind an SSH bastion restricted to those two services. The
-ignored per-engine cases exercise BookiE's built-in SSH forwarding and preserve
-the original service identity for TLS verification. Local command
-`bash scripts/test-driver-tls.sh` passed the complete driver TLS tier: 43 tests,
-including 11 MySQL and 9 SQL Server cases. Both drivers execute a native query
-through the tunnel with a valid CA and hostname, reject an unrelated CA, reject
-wrong and local-dial identities, and clean up the local forward. MySQL refuses
-plaintext on its TLS-only endpoint; SQL Server's native `encrypt_option` proves
-the server forces encrypted sessions.
+PR #150 merged the TLS-only MySQL and SQL Server fixtures behind an SSH bastion
+restricted to those two services. The ignored per-engine cases exercise
+BookiE's built-in SSH forwarding and preserve the original service identity for
+TLS verification. Local `bash scripts/test-driver-tls.sh` passed all 43 tests
+on merged HEAD `11672cbe6`, including 11 MySQL and 9 SQL Server cases. Both
+drivers execute a native query through the tunnel with a valid CA and hostname,
+reject an unrelated CA, reject wrong and local-dial identities, and clean up the
+local forward. MySQL refuses plaintext on its TLS-only endpoint; SQL Server's
+native `encrypt_option` proves the server forces encrypted sessions.
 
-The implementation is committed as `0ecb5bc4f` on `b4/c6-tunneled-tls`, but
-is not merged or hosted. Re-run it on the frozen candidate SHA. The tests
-exercise BookiE's built-in SSH route; the OpenSSH route and installed acceptance
-remain unproven. The fixture correction also replaces ineffective SQL Server
-TLS environment variables with the documented `mssql-conf` TLS settings.
+The PR #150 hosted Build run did not execute the TLS fixture: preflight failed
+because the ignored-test inventory was stale, and the regression gate correctly
+rejected the dependent skipped jobs. PR #151's hosted harness then found two
+follow-up defects: its new G5 case was misclassified by the inventory generator,
+and `known-issues.md` retained duplicate B4-1 through B4-4 rows. This PR fixes
+both. SonarCloud also reported SSH host keys being generated in the bastion
+image build; this follow-up moves key generation to container startup. Hosted
+C6 acceptance remains pending a green rerun.
+
+The tests exercise BookiE's built-in SSH route; the OpenSSH route and installed
+acceptance remain unproven. The fixture correction also replaces ineffective
+SQL Server TLS environment variables with the documented `mssql-conf` TLS
+settings.
 
 ## Remaining tasks
 
@@ -50,8 +57,6 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Small task and required assertion | Local layers |
 | --- | --- | --- |
-| C6-MySQL | TLS through real SSH socket forwarding: valid identity succeeds; wrong CA/host fails without plaintext fallback. Assert the original service hostname | `tls`, `ssh` |
-| C6-SQLServer | TLS through real SSH TCP forwarding: same positive and negative identities, with usable control connection | `tls`, `ssh` |
 | G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
 | F8-headless | Extend headless acceptance for late cancellation after replacement and journal-failure propagation across cached and replacement generations | `security-policy`, agentd units, `postgres-release` |
 | I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
