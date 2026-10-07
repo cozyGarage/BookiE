@@ -117,6 +117,7 @@ fn ask(
         entry
     });
     let sender = std::rc::Rc::new(std::cell::RefCell::new(Some(sender)));
+    let escape_sender = sender.clone();
     let response_sender = sender.clone();
     dialog.connect_response(None, move |_, response| {
         let answer = match (response, &entry) {
@@ -139,6 +140,22 @@ fn ask(
             let _ = sender.send(PromptAnswer::Decline);
         }
     });
+    let escape_dialog = dialog.downgrade();
+    let key_controller = gtk::EventControllerKey::new();
+    key_controller.connect_key_pressed(move |_, key, _, _| {
+        if key == gtk::gdk::Key::Escape {
+            if let Some(sender) = escape_sender.borrow_mut().take() {
+                let _ = sender.send(PromptAnswer::Decline);
+            }
+            if let Some(dialog) = escape_dialog.upgrade() {
+                dialog.close();
+            }
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    dialog.add_controller(key_controller);
     let parent = gtk::Application::default().active_window();
     dialog.present(parent.as_ref());
 }
