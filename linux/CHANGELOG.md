@@ -5,6 +5,7 @@
 ### Added
 
 - SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
+- SQL Server result contracts now verify row- and byte-budget truncation, first-result-set metadata even when it is empty, later-set draining, and connection reuse.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
@@ -38,6 +39,7 @@
 - SQLite STRICT `ANY` results from `quote()` remain TEXT through CSV restore, preserving numeric, empty, Unicode, escaped-apostrophe, BLOB, formula-shaped and SQL NULL literal forms.
 - SQLite `instr()` results over STRICT `ANY` preserve INTEGER versus SQL NULL and text, Unicode, and byte-oriented BLOB search positions through typed CSV restore.
 - SQLite `length()` results over STRICT `ANY` preserve INTEGER versus SQL NULL through typed CSV restore, including Unicode character counts and BLOB byte counts with embedded NUL.
+- SQLite attached-schema STRICT `ANY` results preserve INTEGER, REAL, TEXT, BLOB and SQL NULL storage classes through app-level typed CSV restore.
 - SQLite JSON aggregates over STRICT `ANY` preserve `json_group_array()` null/empty semantics and `json_group_object()` duplicate-key, NULL-key omission, and NULL-value semantics through typed CSV; JSON export retains exact result strings, and XLSX keeps object aggregates in text cells.
 - ClickHouse nested `Map → Array → Tuple → UInt128` values gain native JSON/CSV oracles, exact XLSX text cells, and explicit type-less write refusals that preserve the stored row.
 - DuckDB `TIME_NS` and `TIMESTAMP_NS` preserve all nine fractional digits on parameterized INSERT and UPDATE, including SQL NULL and untouched sibling values.
