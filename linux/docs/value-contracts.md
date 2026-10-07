@@ -42,6 +42,8 @@ text; SQL replay is checked against native JSON and wire bytes in
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 
+PostgreSQL enum schema and type identifiers at the 63-byte catalog limit, including a multibyte final character, retain metadata and keyed edits; see the [Docker/local validation comment on PR #125](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
+
 ## Run
 
 From `linux/`, use the existing value runner:
