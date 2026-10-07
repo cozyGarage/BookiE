@@ -34,6 +34,9 @@ mod custom_array_contract;
 #[path = "support/range_array_contract.rs"]
 mod range_array_contract;
 
+#[path = "support/unsupported_builtin_array_contract.rs"]
+mod unsupported_builtin_array_contract;
+
 #[path = "support/binary_array_file_export_contract.rs"]
 mod binary_array_file_export_contract;
 
