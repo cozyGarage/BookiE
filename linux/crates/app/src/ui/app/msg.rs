@@ -139,6 +139,7 @@ pub enum AppMsg {
     CloseWorkspaceTabsToRight(Uuid),
     WorkspaceTabsChanged,
     SwitchToRecentTab,
+    EndRecentTabWalk,
     ExecuteBrowseTransaction {
         tab_id: Uuid,
         statements: Vec<(String, Vec<Value>)>,

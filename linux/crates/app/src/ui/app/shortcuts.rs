@@ -68,6 +68,7 @@ pub(super) fn install_window_actions(
         input_action!("refresh-page", AppMsg::RefreshPage),
         input_action!("jump-column", AppMsg::JumpToColumn),
         input_action!("recent-tab", AppMsg::SwitchToRecentTab),
+        input_action!("recent-tab-end", AppMsg::EndRecentTabWalk),
         input_action!("export-csv", AppMsg::ExportCsv),
         input_action!("export-json", AppMsg::ExportJson),
         input_action!("export-all-csv", AppMsg::ExportAllCsv),
@@ -136,6 +137,12 @@ fn install_recent_tab_key(window: &adw::ApplicationWindow) {
         }
         let _ = gtk::prelude::WidgetExt::activate_action(&target, "win.recent-tab", None);
         glib::Propagation::Stop
+    });
+    let target = window.clone();
+    keys.connect_key_released(move |_, key, _, _| {
+        if matches!(key, gtk::gdk::Key::Control_L | gtk::gdk::Key::Control_R) {
+            let _ = gtk::prelude::WidgetExt::activate_action(&target, "win.recent-tab-end", None);
+        }
     });
     window.add_controller(keys);
 }

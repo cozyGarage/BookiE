@@ -472,6 +472,26 @@ def scenarios(ui):
         ui.press_x11_key("Tab", ("Control_L",))
         wait_for_editor_text("-- three")
 
+    def holding_ctrl_while_pressing_tab_walks_deeper_into_the_history(database, base):
+        def wait_for_editor_text(expected):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if editor_text() == expected:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected the {expected!r} tab, the editor shows {editor_text()!r}")
+
+        ui.set_editor_text("-- one")
+        for label in ("-- two", "-- three"):
+            ui.press_x11_key("t", ("Control_L",))
+            time.sleep(0.5)
+            ui.set_editor_text(label)
+        wait_for_editor_text("-- three")
+        ui.press_x11_key("Tab", ("Control_L",), presses=2)
+        wait_for_editor_text("-- one")
+        ui.press_x11_key("Tab", ("Control_L",))
+        wait_for_editor_text("-- three")
+
     def interactive_controls_have_accessible_names(database, base):
         ui.run_sql("SELECT 1 AS alpha")
         ui.wait_for_node(name="alpha")
@@ -909,6 +929,7 @@ def scenarios(ui):
         a_second_launch_raises_the_window_and_exits_cleanly,
         session_transaction_label_and_toggle_off_confirmation,
         ctrl_tab_returns_to_the_most_recently_used_tab,
+        holding_ctrl_while_pressing_tab_walks_deeper_into_the_history,
         interactive_controls_have_accessible_names,
         alt_arrows_jump_between_statements,
         row_inspector_lists_every_column_of_the_selected_row,

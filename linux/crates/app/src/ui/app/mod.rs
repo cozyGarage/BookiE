@@ -135,6 +135,7 @@ pub struct App {
     workspace_root: Option<adw::TabOverview>,
     workspace_tab_view: Option<adw::TabView>,
     recent_pages: std::cell::RefCell<crate::services::recent_tabs::RecentList<adw::TabPage>>,
+    recent_walk: std::cell::RefCell<Option<crate::services::recent_tabs::RecentWalk<adw::TabPage>>>,
     /// Idempotency flag for `ensure_workspace_root`.
     workspace_root_added: std::cell::Cell<bool>,
     /// Per-tab state. Each entry is either a Browse or Editor tab.
@@ -518,6 +519,7 @@ impl SimpleComponent for App {
             workspace_root: None,
             workspace_tab_view: None,
             recent_pages: std::cell::RefCell::default(),
+            recent_walk: std::cell::RefCell::default(),
             workspace_root_added: std::cell::Cell::new(false),
             workspace_tabs: std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::new())),
             dialog: None,
@@ -647,6 +649,7 @@ impl SimpleComponent for App {
             AppMsg::FetchBrowseRowCount(tab_id) => self.fetch_browse_row_count(tab_id, sender),
             AppMsg::WorkspaceTabsChanged => self.on_workspace_tabs_changed(),
             AppMsg::SwitchToRecentTab => self.on_switch_to_recent_tab(),
+            AppMsg::EndRecentTabWalk => self.on_end_recent_tab_walk(),
             AppMsg::WorkspaceSchemaWordsChanged => self.rebuild_schema_buffer(),
             AppMsg::ExecuteBrowseTransaction {
                 tab_id,

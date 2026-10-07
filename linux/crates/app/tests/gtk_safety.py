@@ -302,7 +302,7 @@ def invoke_accessible_action(action_name):
     raise AssertionError(f"no accessible action {action_name!r}:\n{accessible_snapshot()}")
 
 
-def press_x11_key(name, modifiers=()):
+def press_x11_key(name, modifiers=(), presses=1):
     class XWindowAttributes(ctypes.Structure):
         _fields_ = [
             ("x", ctypes.c_int),
@@ -398,8 +398,9 @@ def press_x11_key(name, modifiers=()):
             modifier_codes.append(modifier_code)
         for modifier_code in modifier_codes:
             xtst.XTestFakeKeyEvent(display, modifier_code, 1, 0)
-        xtst.XTestFakeKeyEvent(display, keycode, 1, 0)
-        xtst.XTestFakeKeyEvent(display, keycode, 0, 0)
+        for _ in range(presses):
+            xtst.XTestFakeKeyEvent(display, keycode, 1, 0)
+            xtst.XTestFakeKeyEvent(display, keycode, 0, 0)
         for modifier_code in reversed(modifier_codes):
             xtst.XTestFakeKeyEvent(display, modifier_code, 0, 0)
         x11.XFlush(display)
