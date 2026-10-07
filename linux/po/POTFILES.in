@@ -2,6 +2,7 @@ crates/app/src/config.rs
 crates/app/src/services/connection_service.rs
 crates/app/src/services/query_parameters.rs
 crates/app/src/services/quick_switcher.rs
+crates/app/src/services/sidebar_tree.rs
 crates/app/src/ui/activity_dialog.rs
 crates/app/src/ui/app/browse.rs
 crates/app/src/ui/app/bundle.rs
