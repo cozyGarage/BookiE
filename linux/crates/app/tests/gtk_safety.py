@@ -499,7 +499,7 @@ def show_file_chooser_location(chooser):
         for index in range(actions.nActions):
             if actions.getName(index) == "show_location" and actions.doAction(index):
                 return
-    raise AssertionError(f"file chooser has no working show_location action:\n{accessible_snapshot()}")
+    press_x11_key("l", ("Control_L",))
 
 
 def choose_import_bundle(path):
