@@ -16,7 +16,7 @@ execution and installed acceptance are separate states.
 | F5 | Merged as `4b7814f5e` (#19) | Installed retirement/toggle flow |
 | F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and installed stale-session acceptance |
 | F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter; decline/accept SSH fixtures exist. Native multi-hop, cancellation and installed trust flow remain candidate gates |
-| F8 | GUI generation split merged as `6346a431c` (#24) | Policy and GUI own separate connection uncertainty and shared journal failure. Daemon still shares one state across connections; complete headless parity and installed restart behavior |
+| F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Complete headless race coverage, frozen-candidate and installed restart acceptance remain |
 
 Source integration above was checked locally. No fresh hosted result is inferred
 from a merge. Historical local/hosted reports and original packets are preserved
@@ -36,8 +36,8 @@ wrong and local-dial identities, and clean up the local forward. MySQL refuses
 plaintext on its TLS-only endpoint; SQL Server's native `encrypt_option` proves
 the server forces encrypted sessions.
 
-This is local working-tree evidence, not a merged or hosted result. Both C6
-engine subtasks still need integration and source-pinned evidence. The tests
+The implementation is committed as `0ecb5bc4f` on `b4/c6-tunneled-tls`, but
+is not merged or hosted. Re-run it on the frozen candidate SHA. The tests
 exercise BookiE's built-in SSH route; the OpenSSH route and installed acceptance
 remain unproven. The fixture correction also replaces ineffective SQL Server
 TLS environment variables with the documented `mssql-conf` TLS settings.
@@ -50,10 +50,8 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Small task and required assertion | Local layers |
 | --- | --- | --- |
-| C6-MySQL | TLS through real SSH socket forwarding: valid identity succeeds; wrong CA/host fails without plaintext fallback. Assert the original service hostname | `tls`, `ssh` |
-| C6-SQLServer | TLS through real SSH TCP forwarding: same positive and negative identities, with usable control connection | `tls`, `ssh` |
 | G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
-| F8-headless | Give cached daemon connections separate generations sharing journal failure; A's unknown write blocks A, B still writes, replacement recovers, and late A cannot poison replacement | `security-policy`, agentd units, `postgres-release` |
+| F8-headless | Extend headless acceptance for late cancellation after replacement and journal-failure propagation across cached and replacement generations | `security-policy`, agentd units, `postgres-release` |
 | I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
 | I5 | Record tunnel setup and host-key refusal through the approved audit contract; success/denial/cancel/error each has one safe terminal outcome | `security-policy`, `ssh`, `postgres-release` |
 | F7 | Isolated GTK Session → BEGIN → transaction label → toggle-off confirmation; Cancel retains session, rollback settles before closing; register selector once | `widgets`, `postgres-release`; `ui` if the safety flow changes |
@@ -62,8 +60,14 @@ additional privacy, value and evidence tasks without duplicating this board.
 | B4-MySQL-engine-atomicity | **Narrow contract tested locally:** failed InnoDB DML rolls back InnoDB rows, but an AFTER INSERT trigger's MyISAM write survives; the UI warns that non-transactional writes may remain. Other storage engines and side-effect patterns still need scoped proof | [Native trigger regression and evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); broader candidate acceptance remains |
 | I1 | In the Debian phase, build/install executable `tablepro-askpass` in debhelper rules and make validator reject its absence; inspect the rules-built package | `packaging-contracts`, Debian package build |
 
-Headless panic retirement belongs with G5 and F8-headless; make it a separate
-small patch before their combined acceptance.
+## Completed local slices
+
+| ID | Local evidence | Scope remaining |
+| --- | --- | --- |
+| C6-MySQL / C6-SQLServer | Commit `0ecb5bc4f`; `bash scripts/test-driver-tls.sh` passed all 43 tests on 2026-10-07, including MySQL 11 and SQL Server 9. Both engine fixtures execute queries through built-in SSH forwarding with valid TLS identity and refuse invalid CA/hostname cases without plaintext fallback | Re-run on frozen candidate SHA; hosted results, system OpenSSH route and installed acceptance remain separate |
+
+Headless panic retirement is covered by `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy`;
+include it in the combined G5/F8 candidate acceptance.
 
 The agentd panic-retirement unit test uses a credential-free saved connection
 and carries its tracing subscriber through the async operation. Secret Service

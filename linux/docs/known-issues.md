@@ -18,8 +18,8 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Source snapshot: `origin/linux` after PR #91, 2026-10-06. Items come from the
-archived audits of 2026-09-17 to 2026-10-06 and the
+Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
+2026-10-07. Items come from the archived audits of 2026-09-17 to 2026-10-06 and the
 [sprint](bookie-0.2-sprint.md); the first column says which area owns them.
 
 ## UI (app layer)
@@ -73,8 +73,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
-| B4-1 | C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback | OPEN | `driver-tls` fixture | driver-docker |
-| B4-2 | C6 SQL Server: same, needs a usable control connection | OPEN | | driver-docker |
+| B4-1 | ~~C6 MySQL: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`, wrong/local identity and untrusted authority refusals; `bash scripts/test-driver-tls.sh` (43 tests) | driver-tls |
+| B4-2 | ~~C6 SQL Server: TLS through real SSH forwarding, wrong CA or host fails with no plaintext fallback~~ | DONE | `verify_full_through_ssh_reaches_the_unpublished_server_and_runs_a_query`, wrong/local identity and untrusted authority refusals; native `encrypt_option`; `bash scripts/test-driver-tls.sh` (43 tests) | driver-tls |
 | B4-3 | G5: daemon provider through system OpenSSH; unknown host key declines without learning | OPEN | | driver-docker |
 | B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` proves A is blocked after an interrupted write, B stays writable and a replacement recovers (fails with the old shared state) | sandbox |
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
