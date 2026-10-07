@@ -4,6 +4,7 @@
 
 ### Added
 
+- MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
 - PostgreSQL query results now have Docker coverage for shared byte-budget truncation, row order and payloads, plus pooled connection reuse.
 - SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
 - MongoDB `find` and `aggregate` queries now have Docker regression coverage for 64 MiB result-budget truncation, exact admitted payloads, and a usable connection afterward.
@@ -17,6 +18,7 @@
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.
+- PostgreSQL custom enum arrays preserve three-dimensional shape and the six-dimensional limit, non-default bounds, SQL NULL, empty and escaped labels through result decoding and typed parameter rebinding, with native type, JSON and wire-byte comparisons.
 - PostgreSQL `bit[]` and `varbit[]` query results now preserve bit values through typed parameter and CSV re-import, including empty bit strings, SQL NULL, and non-default array bounds.
 - The result grid's cell menu also opens with Shift+F10, and the editor find fields have accessible names.
 - Result grids have a Columns… menu entry to hide and show columns; the choice is remembered per table and at least one column always stays visible.
@@ -82,6 +84,7 @@
 
 ### Fixed
 
+- SSH Docker integration fixtures now allow up to 180 seconds for container startup; host-key mismatch assertions remain unchanged.
 - GTK installed-flow smoke re-queries rows while AT-SPI makes their named actions available, avoiding a transient accessibility-tree race.
 - Saving an edited cell or deleting a row in a PostgreSQL, MySQL, SQL Server, SQLite or DuckDB table no longer asks for a manual write approval every time; the write is already limited to one row per statement.
 - MongoDB stale grid deletes now compare the document's full top-level field set as well as materialized values, so a field added after the read prevents deleting that changed document.

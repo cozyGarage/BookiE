@@ -5,6 +5,11 @@ This page owns remaining B3 work; [the sprint](bookie-0.2-sprint.md) owns order
 and acceptance. Updated 2026-10-07; new cases link to their source tests and PR
 validation comments, while this summary is not itself runtime evidence.
 
+MySQL transaction queries already shared the production result collector; the
+Docker suite now also checks the decoded-byte limit, exact retained payloads,
+the `truncated` flag, and continued use of the same transaction
+([test](../crates/drivers/mysql/tests/shared/mysql_atomic.rs)).
+
 ## Current evidence and next targets
 
 PostgreSQL `citext` scalar and array values preserve exact label text while
@@ -167,6 +172,10 @@ The enum-array shape family is also checked with a same-named shadow type:
 non-default bounds, empty labels/arrays, and SQL NULL. Untyped shape calls return
 `42804`; empty-array length is NULL while cardinality is zero
 ([evidence](evidence/postgres-enum-array-shape-functions-results-2026-10-05/manifest.json)).
+The driver also round-trips three-dimensional custom enum arrays with non-default
+bounds, SQL NULL, empty and escaped labels, plus a six-dimensional array at
+PostgreSQL's supported limit. Dimensions, JSON values, type metadata and wire
+bytes match native results.
 Quoted enum schema/type identifiers containing embedded quotes also retain the
 target type under a same-named shadowed `search_path`; keyed writes and filters
 match native qualified/unqualified type names, preserve both target and shadow

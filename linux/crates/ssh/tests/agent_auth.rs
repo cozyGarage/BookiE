@@ -327,6 +327,7 @@ async fn an_encrypted_private_key_authenticates_with_its_passphrase() {
 async fn start_named_password_sshd(name: &str, network: &str) -> ContainerAsync<GenericImage> {
     GenericImage::new("alpine", "3.22")
         .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .with_env_var("AUTHORIZED_KEY", "")
         .with_cmd(["sh", "-c", PASSWORD_SSHD_SCRIPT])
         .with_network(network)
@@ -340,6 +341,7 @@ async fn start_first_hop_sshd(name: &str, network: &str) -> (ContainerAsync<Gene
     let container = GenericImage::new("alpine", "3.22")
         .with_exposed_port(2222.tcp())
         .with_wait_for(WaitFor::message_on_stderr("Server listening on"))
+        .with_startup_timeout(std::time::Duration::from_secs(180))
         .with_env_var("AUTHORIZED_KEY", "")
         .with_cmd(["sh", "-c", PASSWORD_SSHD_SCRIPT])
         .with_network(network)
