@@ -112,6 +112,9 @@ pub(super) fn present(parent: &impl IsA<gtk::Widget>, column: &str, value: &Valu
         .content_height(480)
         .child(&toolbar)
         .build();
+    dialog
+        .upcast_ref::<gtk::Widget>()
+        .update_property(&[gtk::accessible::Property::Label(column)]);
     dialog.present(Some(parent));
 }
 

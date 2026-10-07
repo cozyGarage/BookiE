@@ -16,7 +16,7 @@ pub use csv_import::{
     MAX_PREVIEW_ROWS, detect_format, read_csv, read_csv_file, suggest_mapping,
 };
 pub use extended_temporal::duckdb_extended_timestamptz_nanos;
-pub use infer::{INFER_SAMPLE_ROWS, infer_columns, type_name};
+pub use infer::{INFER_SAMPLE_ROWS, infer_columns, supports_table_creation, type_name};
 pub use plan::{
     DEFAULT_IMPORT_BATCH_ROWS, ImportTarget, InsertPlan, MAX_REPORTED_ROW_ERRORS, PlanError, build_insert_plan,
 };

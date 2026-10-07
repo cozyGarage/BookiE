@@ -63,7 +63,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | UI-22 | Code folding, vim, multi-cursor, split panes | OPEN | Vim is a preference; the rest need feasibility slices | manual |
 | UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
-| UI-25 | CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB | OPEN | Per-engine type map | driver-docker |
+| UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
 | UI-26 | Reusable SSH profiles are not editable; client certificates are partial | OPEN | With U5 below | gtk-widget |
 
 ## Transport, sessions, daemon (B4)
@@ -111,7 +111,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
 | PKG-1 | Arch installed pass on native Wayland: install, upgrade, rollback, askpass, GSettings, profile isolation | OPEN | Xvfb does not qualify | gtk-installed |
-| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | Build, unit and widget tiers now pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`scripts/test-distro-floor.sh`, CI job `distro-floor`). Still missing: the installed AT-SPI pass on those distros | gtk-installed |
+| PKG-2 | Debian/GNOME phase UI-D1 to D4 | OPEN | Build, unit and widget tiers pass on Ubuntu 24.04 (GTK 4.14, libadwaita 1.5) and Debian 13 (GTK 4.18, libadwaita 1.7) in containers on the runner (`scripts/test-distro-floor.sh`, CI job `distro-floor`). The installed AT-SPI suite on Ubuntu 24.04 (`DISTRO_FLOOR_INSTALLED=1`) now passes its first 30-odd scenarios and renders correctly (screenshot checked). It found and fixed two older-stack gaps: a Status-role label that GTK 4.14 does not list, and a repeated toolbar content swap. It stops at `view_value_opens_the_whole_cell_with_pretty_json`: the grid cell context menu does not open there. Debian 13 installed run not done | gtk-installed |
 | PKG-3 | B7 soak: frozen SHA, 30 consecutive retry-free GTK attempts over six runs | OPEN | | gtk-installed |
 | PKG-4 | Real Flatpak build and install; Flathub submission; screenshots | OPEN | | manual |
 | PKG-5 | `dpkg-deb` contract skipped in harness; validators tested, installation not | OPEN | Debian runner | sandbox |
@@ -153,7 +153,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 
 | ID | Issue | Status | Next | Layer |
 | --- | --- | --- | --- | --- |
-| DOC-1 | `po/tablepro.pot` is stale | OPEN | Run `update-translations.py` in its own commit | manual |
+| DOC-1 | ~~`po/tablepro.pot` is stale~~ | DONE | Regenerated 2026-10-07 with `scripts/update-translations.py` in its own commit; 24 more source files are now listed in `POTFILES.in` | manual |
 | DOC-2 | ~~Adoption matrix is stale~~ | DONE | Archived; this ledger owns open items | manual |
 | DOC-3 | Accessibility: Orca pass, keyboard-only order, high contrast, accessible names | OPEN | [platforms](platforms.md#accessibility) | gtk-installed |
 | DOC-4 | ~114 inline references to absent cache reports | ACCEPTED | Marked unavailable in the archive | n/a |
