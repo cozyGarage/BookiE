@@ -782,6 +782,15 @@ with the role's default `search_path` aimed at the shadow schema ([shadow-path e
 quoted-identifier CSV import also preserves the target enum under a transaction-local shadowed `search_path`, distinguishes SQL NULL from the literal `NULL`, and leaves the same-named shadow table unchanged ([CSV evidence](evidence/postgres-enum-quoted-csv-shadow-results-2026-10-06/manifest.json));
 mixed-case quoted schema/type names now also survive metadata lookup, keyed edits and structured filtering when lowercase-folded schema/type collisions appear earlier in `search_path`, with native catalog and untouched shadow-row checks ([case-fold collision evidence](evidence/postgres-enum-mixed-case-identifiers-results-2026-10-07/manifest.json)); the same collision survives transaction-local `SET LOCAL search_path`: metadata, keyed update and typed filtering still target the quoted enum; a shadow-only label is refused with native `22P02`, target and shadow rows are checked, and commit restores the original session path ([transaction-local evidence and validation logs on PR #108](https://github.com/cozyGarage/BookiE/pull/108#issuecomment-6027211913)). The transaction-local contract now also passes when the target schema is omitted from `search_path`, reusing metadata fetched beforehand ([validation on PR #112](https://github.com/cozyGarage/BookiE/pull/112#issuecomment-6027345843)). Restricted-role session and login-default paths also omit the target schema: inferred query parameters, keyed updates, and filters stay bound to the qualified target type while shadow-only labels are refused ([validation on PR #114](https://github.com/cozyGarage/BookiE/pull/114#issuecomment-6027426272)). The mixed-case quoted target also stays bound under a restricted `SET ROLE` session when a lowercase folded shadow leads `search_path` and the target schema is absent, with native row/type equality and `22P02` refusal ([latest validation on PR #117](https://github.com/cozyGarage/BookiE/pull/117#issuecomment-6027700412)). Other identifier forms and transaction/session `search_path` permutations remain open.
 
+The PostgreSQL identifier boundary now has a focused regression at the 63-byte
+catalog limit: a maximum-length schema and a maximum-length type ending in a
+two-byte UTF-8 character must survive metadata discovery and a keyed enum edit,
+with the stored catalog identity and sibling value checked natively. The
+contract is `value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve_typed_edits`
+in `crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs`.
+This closes only that identifier boundary; other identifier forms and
+transaction/session `search_path` permutations remain open.
+
 SQLite STRICT `ANY` table and direct query-result CSV now tag INTEGER,
 REAL, TEXT and BLOB cells so a native import can retain their runtime storage
 classes; SQL NULL uses the export's explicit collision-free marker. Untagged
