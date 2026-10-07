@@ -1,0 +1,28 @@
+2026-10-07T12:53:33.135314Z  INFO starting tablepro-app drivers=7
+2026-10-07T12:53:33.137094Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T12:53:33.326383Z  INFO registered win.disconnect enabled=false
+2026-10-07T12:53:33.329553Z  INFO main window activated
+
+(com.tablepro.linux:2770472): Gtk-CRITICAL **: 14:53:33.359: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T12:53:33.825729Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+(com.tablepro.linux:2770472): Gtk-CRITICAL **: 14:53:33.847: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:2770472): Gtk-CRITICAL **: 14:53:33.850: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T12:53:34.343976Z  INFO disconnected
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.158: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.159: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.240: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.257: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.258: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.258: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
+
+(com.tablepro.linux:2770472): GVFS-WARNING **: 14:53:35.264: The peer-to-peer connection failed: Error when getting information for file “/tmp/tablepro-bundle_export_records_sanitized_audit_outcome-8yg2c1tk/runtime/gvfsd”: No such file or directory. Falling back to the session bus. Your application is probably missing --filesystem=xdg-run/gvfsd privileges.
