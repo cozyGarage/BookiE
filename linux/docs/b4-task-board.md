@@ -23,6 +23,25 @@ from a merge. Historical local/hosted reports and original packets are preserved
 in [B4 history](archive/b4-history.md); missing worktree/cache paths remain unavailable
 evidence. Fresh audit results are in [the release audit](archive/release-audit-2026-10-03.md).
 
+## C6 tunneled TLS local fixture evidence (October 7)
+
+The working tree based on `5f7e80145` adds unpublished TLS-only MySQL and SQL
+Server endpoints behind an SSH bastion restricted to those two services. The
+ignored per-engine cases exercise BookiE's built-in SSH forwarding and preserve
+the original service identity for TLS verification. Local command
+`bash scripts/test-driver-tls.sh` passed the complete driver TLS tier: 43 tests,
+including 11 MySQL and 9 SQL Server cases. Both drivers execute a native query
+through the tunnel with a valid CA and hostname, reject an unrelated CA, reject
+wrong and local-dial identities, and clean up the local forward. MySQL refuses
+plaintext on its TLS-only endpoint; SQL Server's native `encrypt_option` proves
+the server forces encrypted sessions.
+
+The implementation is committed as `0ecb5bc4f` on `b4/c6-tunneled-tls`, but
+is not merged or hosted. Re-run it on the frozen candidate SHA. The tests
+exercise BookiE's built-in SSH route; the OpenSSH route and installed acceptance
+remain unproven. The fixture correction also replaces ineffective SQL Server
+TLS environment variables with the documented `mssql-conf` TLS settings.
+
 ## Remaining tasks
 
 Each row is a bounded task; implement engines and route variants separately.
@@ -33,6 +52,8 @@ additional privacy, value and evidence tasks without duplicating this board.
 | --- | --- | --- |
 | C6-MySQL | TLS through real SSH socket forwarding: valid identity succeeds; wrong CA/host fails without plaintext fallback. Assert the original service hostname | `tls`, `ssh` |
 | C6-SQLServer | TLS through real SSH TCP forwarding: same positive and negative identities, with usable control connection | `tls`, `ssh` |
+| G5 | Exercise the actual daemon provider through system OpenSSH: unattended unknown key declines without learning; pretrusted host reaches a guarded query | `ssh`, `postgres-release` |
+| F8-headless | Extend headless acceptance for late cancellation after replacement and journal-failure propagation across cached and replacement generations | `security-policy`, agentd units, `postgres-release` |
 | I2 | Selecting system OpenSSH inside Flatpak refuses explicitly before subprocess/driver dispatch; no backend switch. Add a deterministic sandbox-context regression | `harness`, transport units |
 | I5 | Record tunnel setup and host-key refusal through the approved audit contract; success/denial/cancel/error each has one safe terminal outcome | `security-policy`, `ssh`, `postgres-release` |
 | F7 | Isolated GTK Session → BEGIN → transaction label → toggle-off confirmation; Cancel retains session, rollback settles before closing; register selector once | `widgets`, `postgres-release`; `ui` if the safety flow changes |
@@ -47,6 +68,7 @@ additional privacy, value and evidence tasks without duplicating this board.
 | --- | --- | --- |
 | G5 | `bash scripts/test-postgres-release.sh` on the BookiE `b4/g5-daemon-openssh` worktree, 2026-10-07: actual agentd provider refuses an unattended unknown system OpenSSH key without writing it, then reaches a guarded PostgreSQL query with a pretrusted key. The command also passed the existing PostgreSQL release integration suite | Re-run on the frozen B3+B4 candidate SHA; hosted and installed acceptance remain separate |
 | F8-headless | `agentd::audit_isolation_tests`: connection A uncertainty leaves B writable; replacement recovers; cancellation of an old write after replacement does not poison the new generation; outcome journal failure blocks other sessions and replacement generations | Re-run on the frozen B3+B4 candidate SHA; hosted and installed restart acceptance remain separate |
+| C6-MySQL / C6-SQLServer | Commit `0ecb5bc4f`; `bash scripts/test-driver-tls.sh` passed all 43 tests on 2026-10-07, including MySQL 11 and SQL Server 9. Both engine fixtures execute queries through built-in SSH forwarding with valid TLS identity and refuse invalid CA/hostname cases without plaintext fallback | Re-run on frozen candidate SHA; hosted results, system OpenSSH route and installed acceptance remain separate |
 
 Headless panic retirement is covered by `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy`;
 include it in the combined G5/F8 candidate acceptance.

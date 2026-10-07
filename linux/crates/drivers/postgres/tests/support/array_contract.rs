@@ -815,7 +815,11 @@ async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
         ),
         ("xml[]", "$$[0:1]={\"<root/>\",NULL}$$::xml[]"),
         ("bytea[]", "ARRAY[decode('00ff275c','hex'),decode('','hex'),NULL]"),
-        ("name[]", "ARRAY['alpha','','',NULL]::name[]"),
+        (
+            "name[]",
+            "ARRAY['alpha'::name, ''::name, NULL::name, 'NULL'::name, 'a,b'::name, \
+             'a\"b'::name, E'slash\\\\path'::name, '東京'::name, (repeat('x',61) || 'é')::name]",
+        ),
         ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),
         ("int4[]", "ARRAY[-2147483648,0,2147483647]::int4[]"),
         ("int8[]", "ARRAY[-9223372036854775808,0,9223372036854775807]::int8[]"),

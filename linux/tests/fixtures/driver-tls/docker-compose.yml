@@ -174,6 +174,53 @@ services:
         aliases:
           - mysql.tablepro.test
 
+  mysql-ssh:
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: tablepro
+      MYSQL_DATABASE: tablepro
+      MYSQL_USER: tablepro
+      MYSQL_PASSWORD: tablepro
+    command:
+      - mysqld
+      - --require_secure_transport=ON
+      - --ssl-ca=/certs/ca.crt
+      - --ssl-cert=/certs/server.crt
+      - --ssl-key=/certs/server.key
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - --protocol=socket
+        - -utablepro
+        - -ptablepro
+        - -Dtablepro
+        - -e
+        - "SELECT 1"
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    networks:
+      fixture:
+        aliases:
+          - mysql-ssh.tablepro.test
+
+  ssh-bastion:
+    build:
+      context: .
+      dockerfile: ssh-bastion/Dockerfile
+    ports:
+      - "127.0.0.1:2224:2222"
+    networks:
+      - fixture
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2222"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
   clickhouse:
     build:
       context: .
@@ -256,13 +303,12 @@ services:
     build:
       context: .
       dockerfile: mssql/Dockerfile
+      args:
+        TLS_ENABLED: "1"
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
-      MSSQL_TLS_CERTIFICATE_FILE: /certs/server.crt
-      MSSQL_TLS_KEY_FILE: /certs/server.key
-      MSSQL_FORCE_ENCRYPTION: "1"
     healthcheck:
       test:
         - CMD-SHELL
@@ -276,6 +322,28 @@ services:
       fixture:
         aliases:
           - mssql.tablepro.test
+
+  mssql-ssh:
+    build:
+      context: .
+      dockerfile: mssql/Dockerfile
+      args:
+        TLS_ENABLED: "1"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "TablePro_fixture!2026"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U tablepro -P tablepro -Q "SELECT 1" || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    networks:
+      fixture:
+        aliases:
+          - mssql-ssh.tablepro.test
 
   mssql-plain:
     build:

@@ -9,6 +9,18 @@ if [[ "${1:-}" == "--force" ]]; then
   rm -rf "$MATERIALS"
 fi
 
+if ! command -v ssh-keygen >/dev/null 2>&1; then
+  echo "missing required command: ssh-keygen" >&2
+  exit 1
+fi
+
+mkdir -p "$MATERIALS"
+if [[ ! -f "$MATERIALS/ssh_client" ]]; then
+  ssh-keygen -q -t ed25519 -N '' -C 'tablepro-driver-tls-fixture' -f "$MATERIALS/ssh_client"
+fi
+chmod 600 "$MATERIALS/ssh_client"
+chmod 644 "$MATERIALS/ssh_client.pub"
+
 if [[ -f "$MATERIALS/server.pem" ]]; then
   echo "driver-tls materials already present in $MATERIALS"
   exit 0
@@ -35,7 +47,7 @@ openssl req -x509 -newkey rsa:2048 -sha256 -days 3650 -nodes \
 cat > server.ext <<EXT
 basicConstraints=CA:FALSE
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:${SERVER_HOSTNAME},DNS:mongo.tablepro.test,DNS:redis.tablepro.test,DNS:mysql.tablepro.test,DNS:clickhouse.tablepro.test,DNS:mssql.tablepro.test
+subjectAltName=DNS:${SERVER_HOSTNAME},DNS:mongo.tablepro.test,DNS:redis.tablepro.test,DNS:mysql.tablepro.test,DNS:mysql-ssh.tablepro.test,DNS:clickhouse.tablepro.test,DNS:mssql.tablepro.test,DNS:mssql-ssh.tablepro.test
 EXT
 
 openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr \
