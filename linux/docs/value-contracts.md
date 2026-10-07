@@ -36,6 +36,9 @@ grid writes and typed CSV restore. Native `pg_typeof`, array text and
 `array_send` checks include XML fragments, SQL NULL, and a malformed XML
 assignment refused with SQLSTATE `2200N` without changing either row
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
+JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports now also preserve exact array
+text; SQL replay is checked against native JSON and wire bytes in
+`value_contract_xml_array_file_exports_preserve_native_text`.
 
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 
