@@ -33,6 +33,6 @@ hashes. Fresh hosted validation is required on the final follow-up commit.
 This PR #159 checkpoint predates the later frozen candidate. It did not
 establish installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
 Debian/GNOME Wayland acceptance or B3 completion. The later frozen-candidate
-results are recorded in the [2026-10-08 evidence bundle](../b4-frozen-candidate-2026-10-07/summary.md).
+results are recorded in the [PR #258 evidence comment](https://github.com/cozyGarage/BookiE/pull/258#issuecomment-6048355227).
 Hosted candidate checks and installed acceptance remain open; this historical
 checkpoint does not close B4 or qualify a release.
