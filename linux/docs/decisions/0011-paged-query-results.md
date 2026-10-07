@@ -55,8 +55,7 @@ A cursor needs a read-only transaction on the session. Today a guarded session
 records `BEGIN` as a write batch (`PolicySession::begin`), so a cursor opened
 through it would be audited as a write and could be refused on a read-only
 connection. The guard needs a read-snapshot start first: a read-only `BEGIN`
-audited as a read. The same change unblocks a snapshot export (UI-13b). It is
-a guard and audit decision and lands before any cursor code.
+audited as a read. The same change unblocks the snapshot export required by [ADR 0014](0014-full-table-export-snapshot.md) (UI-13b). It is a guard and audit decision and lands before any cursor code.
 
 ## Open questions
 
