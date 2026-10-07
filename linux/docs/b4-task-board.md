@@ -34,16 +34,24 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-The current `linux` baseline fetched on 2026-10-07 is `e47dbbbc2` (PR #183).
+The current `linux` baseline fetched on 2026-10-07 is `3a3d742fe` (PR #185).
 Recent B4 merges include #159 (SSH audit, rollback and Kerberos), #161/#162
 (PostgreSQL GTK fixture setup), #163/#170/#173/#175 (SSH trust-prompt timeout
 and dismissal), #165 (GTK SSH fixture hardening), and #178 (file-chooser
 accessibility wait). PR #181 records fresh merged-linux plaintext bundle-audit
 GTK runs; #182 adds a fresh encrypted-bundle run and corrects the stale I5 GTK
-coverage row. PR #183 adds B3 UI and MSSQL coverage. The [October 7 candidate
+coverage row. PR #183 adds B3 UI and MSSQL coverage; #184 reconciles the sprint
+baseline. PR #185 fixes bundle chooser interaction and connection-list rebuild
+after its GTK run exposed a fatal-critical regression. The export, plaintext
+import and encrypted retry/credential round-trip GTK scenarios were rerun on
+`3a3d742fe` via `TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome,bundle_import_records_sanitized_audit_outcome,encrypted_bundle_round_trip_restores_credentials bash scripts/test-gtk-safety.sh`;
+all three passed on the local host under isolated D-Bus/Xvfb. The harness sets
+`G_DEBUG=fatal-criticals`. The [PR #185 discussion](https://github.com/cozyGarage/BookiE/pull/185)
+records the original failure and fix. Hosted checks on #185 were still in
+progress at this checkpoint. The [October 7 candidate
 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
-the earlier candidate evidence. These merges do not establish fresh hosted,
-frozen-candidate, or installed acceptance; those gates remain open.
+the earlier candidate evidence. These runs do not establish frozen-candidate
+or installed acceptance; those gates remain open.
 
 ## Remaining tasks
 
@@ -64,7 +72,7 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
-| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. Failed passphrase attempts retain the parsed bundle and reopen the passphrase prompt without requiring another file selection. Focused interrupted-intent recovery, fail-closed and paired-event checks pass; affected crate suite passed (903 passed, 45 ignored). Earlier plaintext and encrypted release-binary Xvfb packets are preserved in the [PR #181 discussion](https://github.com/cozyGarage/BookiE/pull/181#issuecomment-6038419580) and [PR #182 discussion](https://github.com/cozyGarage/BookiE/pull/182#issuecomment-6038507980). Their logs exposed a GTK wrong-parent removal; the fix and fatal-critical harness now pass export, plaintext import and encrypted round-trip locally ([rerun details](https://github.com/cozyGarage/BookiE/pull/185)) | Frozen-candidate and hosted acceptance, plus distribution-package/native Wayland acceptance, remain |
+| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. Failed passphrase attempts retain the parsed bundle and reopen the passphrase prompt without requiring another file selection. Focused interrupted-intent recovery, fail-closed and paired-event checks pass; the affected crate suite passed earlier (903 passed, 45 ignored). Earlier plaintext and encrypted runs are preserved in the [PR #181 discussion](https://github.com/cozyGarage/BookiE/pull/181#issuecomment-6038419580) and [PR #182 discussion](https://github.com/cozyGarage/BookiE/pull/182#issuecomment-6038507980). Those runs exposed a GTK wrong-parent removal. After PR #185, release-binary local Xvfb reruns on `3a3d742fe` passed `bundle_export_records_sanitized_audit_outcome`, `bundle_import_records_sanitized_audit_outcome`, and `encrypted_bundle_round_trip_restores_credentials` with `G_DEBUG=fatal-criticals`; the [PR #185 discussion](https://github.com/cozyGarage/BookiE/pull/185) records the fix. Hosted checks, frozen-candidate, and distribution-package/native Wayland acceptance remain open | `widgets`, GTK safety scenarios, frozen-candidate |
 
 ## Completed local slices
 
