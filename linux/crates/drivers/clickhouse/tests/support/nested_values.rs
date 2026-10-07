@@ -8,6 +8,10 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
     let connection = connect(opts).await;
     let cases = [
         (
+            "CAST(['NULL', 'O''Brien', '東京', 'zero'] AS Array(Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'zero' = 0)))",
+            "Array(Enum8('東京' = -1, 'zero' = 0, 'NULL' = 1, 'O\\'Brien' = 2))",
+        ),
+        (
             "CAST([toUInt128('18446744073709551616'), CAST(NULL AS Nullable(UInt128))] AS Array(Nullable(UInt128)))",
             "Array(Nullable(UInt128))",
         ),
