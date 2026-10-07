@@ -9,79 +9,111 @@ use crate::{connect, start_pg};
 async fn value_contract_range_array_refusal_preserves_target_and_sibling_rows() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
+    connection.execute("SET TIME ZONE 'UTC'").await.unwrap();
+    connection.execute("SET DateStyle TO ISO, YMD").await.unwrap();
     connection
         .execute(
-            "CREATE TABLE range_array_refusal \
-             (id integer PRIMARY KEY, value int4range[], sibling text NOT NULL)",
+            "CREATE TABLE range_array_refusal (
+                id integer PRIMARY KEY,
+                int4_values int4range[], int8_values int8range[], num_values numrange[],
+                date_values daterange[], ts_values tsrange[], tstz_values tstzrange[],
+                sibling text NOT NULL
+            )",
         )
         .await
         .unwrap();
     connection
         .execute(
-            "INSERT INTO range_array_refusal VALUES \
-             (1, ARRAY[int4range(1, 4), int4range(8, NULL, '(]'), 'empty'::int4range, NULL], 'target'), \
-             (2, ARRAY[int4range(20, 25)], 'sibling')",
+            "INSERT INTO range_array_refusal VALUES
+             (1,
+                ARRAY[int4range(1, 4), int4range(8, NULL, '(]'), 'empty'::int4range, NULL],
+                ARRAY[int8range(1, 4000000000), int8range(9, NULL), 'empty'::int8range, NULL],
+                ARRAY[numrange(1.25, 4.5), numrange(9, NULL), 'empty'::numrange, NULL],
+                ARRAY[daterange('2024-01-01', '2024-01-03'), daterange('2024-04-01', NULL, '(]'), 'empty'::daterange, NULL],
+                ARRAY[tsrange('2024-01-01', '2024-01-02'), tsrange('2024-03-01', NULL), 'empty'::tsrange, NULL],
+                ARRAY[tstzrange('2024-01-01 00:00:00+00', '2024-01-02 00:00:00+00'), tstzrange('2024-03-01 00:00:00+00', NULL), 'empty'::tstzrange, NULL],
+                'target'),
+             (2,
+                ARRAY[int4range(20, 25)], ARRAY[int8range(20, 25)],
+                ARRAY[numrange(20, 25)], ARRAY[daterange('2024-05-01', '2024-05-03')],
+                ARRAY[tsrange('2024-05-01', '2024-05-03')],
+                ARRAY[tstzrange('2024-05-01 00:00:00+00', '2024-05-03 00:00:00+00')], 'sibling')",
         )
         .await
         .unwrap();
 
-    let source = connection
-        .query(
-            "SELECT value, pg_typeof(value)::text, value::text, \
-             array_to_json(value)::text, encode(array_send(value), 'hex') \
-             FROM range_array_refusal WHERE id = 1",
-        )
-        .await
-        .unwrap();
-    let refusal = source.rows[0][0].clone();
-    assert!(
-        matches!(&refusal, Value::Undecodable(name) if name.eq_ignore_ascii_case("INT4RANGE[]")),
-        "int4range[] must remain visibly unsupported: {refusal:?}"
-    );
-    assert_eq!(source.rows[0][1], Value::Text("int4range[]".into()));
-    assert_eq!(
-        source.rows[0][3],
-        Value::Text(r#"["[1,4)","[9,)","empty",null]"#.into())
-    );
-    let before = connection
-        .query(
-            "SELECT id, value::text, array_to_json(value)::text, \
-             encode(array_send(value), 'hex'), sibling \
-             FROM range_array_refusal ORDER BY id",
-        )
-        .await
-        .unwrap();
-    assert_eq!(before.rows.len(), 2);
-    assert_eq!(before.rows[0][1], source.rows[0][2]);
-    assert_eq!(before.rows[0][2], source.rows[0][3]);
-    assert_eq!(before.rows[0][3], source.rows[0][4]);
+    let cases = [
+        ("int4_values", "int4range[]", r#"["[1,4)","[9,)","empty",null]"#),
+        (
+            "int8_values",
+            "int8range[]",
+            r#"["[1,4000000000)","[9,)","empty",null]"#,
+        ),
+        ("num_values", "numrange[]", r#"["[1.25,4.5)","[9,)","empty",null]"#),
+        (
+            "date_values",
+            "daterange[]",
+            r#"["[2024-01-01,2024-01-03)","[2024-04-02,)","empty",null]"#,
+        ),
+        (
+            "ts_values",
+            "tsrange[]",
+            r#"["[\"2024-01-01 00:00:00\",\"2024-01-02 00:00:00\")","[\"2024-03-01 00:00:00\",)","empty",null]"#,
+        ),
+        (
+            "tstz_values",
+            "tstzrange[]",
+            r#"["[\"2024-01-01 00:00:00+00\",\"2024-01-02 00:00:00+00\")","[\"2024-03-01 00:00:00+00\",)","empty",null]"#,
+        ),
+    ];
 
-    assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
-    assert!(
-        connection
-            .query_params("SELECT $1", std::slice::from_ref(&refusal))
+    for (column, range_type, expected_json) in cases {
+        let source = connection
+            .query(&format!(
+                "SELECT {column}, pg_typeof({column})::text, array_to_json({column})::text \
+                 FROM range_array_refusal WHERE id = 1"
+            ))
             .await
-            .is_err()
-    );
-    assert!(
-        connection
-            .execute_params("UPDATE range_array_refusal SET value = $1 WHERE id = 1", &[refusal])
-            .await
-            .is_err()
-    );
+            .unwrap();
+        let refusal = source.rows[0][0].clone();
+        assert!(
+            matches!(&refusal, Value::Undecodable(name) if name.eq_ignore_ascii_case(range_type)),
+            "{range_type} must remain visibly unsupported: {refusal:?}"
+        );
+        assert_eq!(source.rows[0][1], Value::Text(range_type.into()));
+        assert_eq!(source.rows[0][2], Value::Text(expected_json.into()), "{range_type}");
 
-    let after = connection
-        .query(
-            "SELECT id, value::text, array_to_json(value)::text, \
-             encode(array_send(value), 'hex'), sibling \
-             FROM range_array_refusal ORDER BY id",
-        )
-        .await
-        .unwrap();
-    assert_eq!(after.rows, before.rows, "refused binding changed stored values");
-    assert_eq!(after.rows[0][1], source.rows[0][2]);
-    assert_eq!(after.rows[0][2], source.rows[0][3]);
-    assert_eq!(after.rows[0][3], source.rows[0][4]);
-    assert_eq!(after.rows[0][4], Value::Text("target".into()));
-    assert_eq!(after.rows[1][4], Value::Text("sibling".into()));
+        let snapshot_sql = format!(
+            "SELECT id, {column}::text, array_to_json({column})::text, \
+             encode(array_send({column}), 'hex'), sibling \
+             FROM range_array_refusal ORDER BY id"
+        );
+        let before = connection.query(&snapshot_sql).await.unwrap();
+        assert_eq!(before.rows.len(), 2, "{range_type}");
+        assert_eq!(before.rows[0][2], source.rows[0][2], "{range_type}");
+        assert_eq!(before.rows[0][4], Value::Text("target".into()));
+        assert_eq!(before.rows[1][4], Value::Text("sibling".into()));
+
+        assert!(tablepro_core::sql_literal::render_sql_literal("postgres", &refusal).is_err());
+        assert!(
+            connection
+                .query_params("SELECT $1", std::slice::from_ref(&refusal))
+                .await
+                .is_err(),
+            "{range_type} parameter must be refused"
+        );
+        assert!(
+            connection
+                .execute_params(
+                    &format!("UPDATE range_array_refusal SET {column} = $1 WHERE id = 1"),
+                    std::slice::from_ref(&refusal),
+                )
+                .await
+                .is_err(),
+            "{range_type} update must be refused"
+        );
+
+        let after = connection.query(&snapshot_sql).await.unwrap();
+        assert_eq!(after.rows, before.rows, "{range_type} refusal changed stored values");
+    }
 }

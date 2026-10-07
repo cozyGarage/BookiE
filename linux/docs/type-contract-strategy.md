@@ -104,8 +104,8 @@ The same explicit-refusal contract now covers `point[]` with native type, text,
 JSON and wire oracles plus target/sibling preservation
 (`value_contract_point_array_refusal_preserves_target_and_sibling_rows`). Both
 tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
-the PostgreSQL built-in `int4range[]` receives the same explicit refusal and
-preservation checks in
+all six built-in range arrays now receive the same explicit refusal, native
+JSON, exact type and post-refusal row/wire preservation checks in
 `crates/drivers/postgres/tests/support/range_array_contract.rs`.
 PostgreSQL `int4multirange[]` remains open: a native projection currently fails
 before value decoding with SQLx's internal `unknown type code 109`. SQLx 0.9's
