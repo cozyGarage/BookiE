@@ -5,6 +5,7 @@
 ### Added
 
 - PostgreSQL query results now have Docker coverage for shared byte-budget truncation, row order and payloads, plus pooled connection reuse.
+- SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
 - MongoDB `find` and `aggregate` queries now have Docker regression coverage for 64 MiB result-budget truncation, exact admitted payloads, and a usable connection afterward.
 - SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
 - Table tabs have a Row inspector pane that shows every column of the selected row with its type and full value.

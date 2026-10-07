@@ -88,6 +88,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::mssql_max_value_contract::value_contract_mssql_max_values_survive_connection_session_and_consumers"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
     ],
     [
