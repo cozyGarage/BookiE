@@ -4,6 +4,7 @@
 
 ### Added
 
+- The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.

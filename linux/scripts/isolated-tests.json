@@ -135,6 +135,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::editor::statement_band::tests::moving_the_cursor_moves_the_band_between_statements"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::app::shortcuts::dialog_tests::the_shortcuts_window_lists_keys_and_describes_mouse_gestures"
     ],
     [

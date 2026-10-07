@@ -71,6 +71,22 @@ pub fn statement_at_cursor(text: &str, driver: &str, byte: usize) -> Option<Stri
     Some(statement.text(text).trim().to_owned())
 }
 
+pub fn statement_range_at(text: &str, driver: &str, byte: usize) -> Option<std::ops::Range<usize>> {
+    let plan = plan_for(text, grammar_for(driver)?);
+    let statement = plan.statement_at(byte)?;
+    let unterminated = plan.diagnostics().iter().any(|diagnostic| {
+        let tablepro_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;
+        statement.range.contains(start)
+    });
+    if unterminated {
+        return None;
+    }
+    let body = statement.text(text);
+    let leading = body.len() - body.trim_start().len();
+    let trimmed = body.trim();
+    (!trimmed.is_empty()).then(|| statement.range.start + leading..statement.range.start + leading + trimmed.len())
+}
+
 pub fn adjacent_statement_start(text: &str, driver: &str, byte: usize, forward: bool) -> Option<usize> {
     let plan = plan_for(text, grammar_for(driver)?);
     let mut starts = plan.statements().iter().filter_map(|statement| {
@@ -106,6 +122,16 @@ SELECT 3";
             Some(second)
         );
         assert_eq!(adjacent_statement_start(sql, "postgres", 0, false), None);
+    }
+
+    #[test]
+    fn the_statement_range_covers_the_trimmed_statement_under_the_cursor() {
+        let sql = "SELECT 1;\n  SELECT '東京' ;\nSELECT 3";
+        let start = sql.find("SELECT '東京'").unwrap();
+        let range = statement_range_at(sql, "postgres", start + 4).unwrap();
+        assert_eq!(&sql[range], "SELECT '東京'");
+        assert_eq!(statement_range_at("SELECT 'open", "postgres", 3), None);
+        assert_eq!(statement_range_at("SELECT 1", "redis", 1), None);
     }
 
     #[test]

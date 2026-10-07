@@ -8,6 +8,7 @@ mod outcomes;
 mod schema;
 mod session_mode;
 mod sql_text;
+mod statement_band;
 mod statement_cursor;
 
 use std::time::SystemTime;
@@ -390,6 +391,11 @@ impl SimpleComponent for SqlEditor {
             buffer.set_text(&initial_text);
             widgets.source_view.set_buffer(Some(&buffer));
         }
+        statement_band::install(
+            widgets.source_view.buffer().upcast_ref(),
+            init.database.clone(),
+            init.connection_id,
+        );
         let find = find_bar::FindBar::new(&widgets.source_view);
         if let Some(find) = &find {
             root.add_top_bar(find.widget());
