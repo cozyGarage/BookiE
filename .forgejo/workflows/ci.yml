@@ -73,4 +73,4 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Ubuntu 24.04 and Debian 13
-        run: cd src/linux && bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
+        run: cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13

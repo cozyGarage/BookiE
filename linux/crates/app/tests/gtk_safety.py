@@ -116,14 +116,29 @@ def wait_within(root, name=None, role=None, present=True, timeout=WAIT_SECONDS):
     )
 
 
-def invoke_named_action_within_node(root, anchor_name, action_name):
-    anchor = wait_within(root, name=anchor_name, role=pyatspi.ROLE_LIST_ITEM)
-    for node in descendants(anchor):
-        if node_name(node) == action_name:
-            invoke(node)
-            return
+def invoke_named_action(anchor_lookup, anchor_name, action_name):
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline:
+        anchor = anchor_lookup()
+        if anchor is not None:
+            for node in descendants(anchor):
+                if node_name(node) == action_name:
+                    try:
+                        invoke(node)
+                        return
+                    except AssertionError:
+                        break
+        time.sleep(POLL_SECONDS)
     raise AssertionError(
         f"no action {action_name!r} within {anchor_name!r}:\n{accessible_snapshot()}"
+    )
+
+
+def invoke_named_action_within_node(root, anchor_name, action_name):
+    invoke_named_action(
+        lambda: find_within(root, name=anchor_name, role=pyatspi.ROLE_LIST_ITEM),
+        anchor_name,
+        action_name,
     )
 
 
@@ -258,14 +273,10 @@ def invoke(node):
 
 
 def invoke_named_action_within(anchor_name, action_name):
-    anchor = wait_for_node(name=anchor_name, role=pyatspi.ROLE_LIST_ITEM)
-    for node in descendants(anchor):
-        if node_name(node) != action_name:
-            continue
-        invoke(node)
-        return
-    raise AssertionError(
-        f"no action {action_name!r} within {anchor_name!r}:\n{accessible_snapshot()}"
+    invoke_named_action(
+        lambda: find_node(name=anchor_name, role=pyatspi.ROLE_LIST_ITEM),
+        anchor_name,
+        action_name,
     )
 
 

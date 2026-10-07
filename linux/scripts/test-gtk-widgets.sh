@@ -3,7 +3,15 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 widget_root="$(mktemp -d)"
-trap 'rm -rf -- "$widget_root"' EXIT
+cleanup_widget_root() {
+  if command -v fusermount3 >/dev/null 2>&1; then
+    for widget_mount in "$widget_root/runtime/doc" "$widget_root/runtime/gvfs"; do
+      fusermount3 -uz -- "$widget_mount" >/dev/null 2>&1 || true
+    done
+  fi
+  rm -rf -- "$widget_root" || true
+}
+trap cleanup_widget_root EXIT
 export XDG_RUNTIME_DIR="$widget_root/runtime"
 export XDG_CONFIG_HOME="$widget_root/config"
 export XDG_DATA_HOME="$widget_root/data"
