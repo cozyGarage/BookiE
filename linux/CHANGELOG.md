@@ -4,6 +4,7 @@
 
 ### Added
 
+- MongoDB `find` and `aggregate` queries now have Docker regression coverage for 64 MiB result-budget truncation, exact admitted payloads, and a usable connection afterward.
 - SQLite transaction queries now share the streaming row and byte budget with ordinary queries; the regression checks truncation and follow-up use in the same transaction.
 - Table tabs have a Row inspector pane that shows every column of the selected row with its type and full value.
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
