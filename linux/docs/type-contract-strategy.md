@@ -104,7 +104,9 @@ The same explicit-refusal contract now covers `point[]` with native type, text,
 JSON and wire oracles plus target/sibling preservation
 (`value_contract_point_array_refusal_preserves_target_and_sibling_rows`). Both
 tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
-see the [PR validation comments](https://github.com/cozyGarage/BookiE/pull/126).
+the PostgreSQL built-in `int4range[]` receives the same explicit refusal and
+preservation checks in
+`crates/drivers/postgres/tests/support/range_array_contract.rs`.
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their

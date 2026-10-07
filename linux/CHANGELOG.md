@@ -9,6 +9,7 @@
 - PostgreSQL oid[] keyed grid edits now preserve zero, the UINT32 maximum and SQL NULL against native type/text/wire oracles while leaving sibling rows unchanged.
 - PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
 - PostgreSQL custom enum-array slicing now checks native lower-bound normalization, multidimensional shape, SQL NULL versus empty arrays, literal NULL/Unicode labels, and typed rebind wire equality.
+- PostgreSQL `int4range[]` now has an explicit unsupported-value contract with native range text/JSON/wire oracles and refused-write target/sibling preservation.
 - The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
 - The scoped core XLSX writer mutation run caught all 41 generated mutants; broader core/package mutation triage remains open.
