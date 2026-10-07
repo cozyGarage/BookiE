@@ -191,6 +191,11 @@ The driver also round-trips three-dimensional custom enum arrays with non-defaul
 bounds, SQL NULL, empty and escaped labels, plus a six-dimensional array at
 PostgreSQL's supported limit. Dimensions, JSON values, type metadata and wire
 bytes match native results.
+Custom enum-array slicing now has a native consumer contract: slicing a
+non-1-based multidimensional array resets the result bounds to `[1:2][1:2]`,
+while preserving empty text, literal `NULL`, SQL NULL, Unicode and exact wire
+bytes through typed rebinding. SQL NULL and an empty array remain distinct
+([test](../crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs)).
 Quoted enum schema/type identifiers containing embedded quotes also retain the
 target type under a same-named shadowed `search_path`; keyed writes and filters
 match native qualified/unqualified type names, preserve both target and shadow
