@@ -20,6 +20,8 @@ mod connect_refusal;
 mod datetimeoffset_csv;
 #[path = "support/disconnection.rs"]
 mod disconnection;
+#[path = "support/result_sets.rs"]
+mod result_sets;
 #[path = "support/server_owned_columns.rs"]
 mod server_owned_columns;
 #[path = "support/temporal_boundaries.rs"]
@@ -518,31 +520,6 @@ async fn empty_result_set_still_reports_columns() {
     let paged = conn.fetch_rows(None, "empty_demo", 0, 50).await.unwrap();
     assert!(paged.rows.is_empty());
     assert_eq!(paged.columns.len(), 2);
-}
-
-#[tokio::test]
-#[ignore = "requires docker"]
-async fn an_error_raised_after_the_first_result_set_is_reported() {
-    let (_c, opts) = start_mssql().await;
-    let conn = connect(opts).await;
-
-    let err = conn
-        .query("SELECT 1 AS a; SELECT 2 AS b; SELECT 1/0 AS c")
-        .await
-        .unwrap_err();
-    assert!(format!("{err}").to_lowercase().contains("divide by zero"), "got: {err}");
-
-    let first = conn.query("SELECT 1 AS a; SELECT 'x' AS b, 'y' AS c").await.unwrap();
-    let names: Vec<&str> = first.columns.iter().map(|c| c.name.as_str()).collect();
-    assert_eq!(names, vec!["a"]);
-    assert_eq!(first.rows, vec![vec![Value::Int(1)]]);
-
-    let after_late_error = conn.query("SELECT 3 AS usable").await.unwrap();
-    assert_eq!(
-        after_late_error.rows,
-        vec![vec![Value::Int(3)]],
-        "draining later result sets leaves the connection usable"
-    );
 }
 
 #[tokio::test]
