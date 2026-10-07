@@ -703,8 +703,9 @@ fn journal_path() -> Result<PathBuf, StorageError> {
 #[async_trait]
 impl AuditSink for AuditJournal {
     async fn record(&self, event: AuditEvent) -> Result<(), AuditError> {
-        let durable =
-            event.phase == AuditRecordPhase::Intent || event.operation_class == AuditOperationClass::TransactionCommit;
+        let durable = event.phase == AuditRecordPhase::Intent
+            || event.operation_class == AuditOperationClass::TransactionCommit
+            || event.administrative_action.is_some();
         self.append_record(event, durable)
             .await
             .map_err(|error| AuditError::Persistence(error.to_string()))
@@ -738,6 +739,7 @@ pub fn sample_event(principal: Principal) -> AuditEvent {
         rows_affected: Some(1),
         duration_ms: Some(1),
         transport_attempt: None,
+        administrative_action: None,
     }
 }
 

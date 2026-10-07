@@ -94,7 +94,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-19 | ~~Hostile-server SCRAM challenges: short or non-ASCII nonces and excessive iterations~~ | DONE | Vendored SQLx rejects a server nonce that does not extend the client nonce, includes a non-printable/non-ASCII byte, or has no server suffix. A local PostgreSQL wire fixture verifies short, non-ASCII, and 100,001-iteration challenges are rejected before the client sends its proof; `cargo test -p tablepro-driver-postgres --lib` passed (54 tests) | unit |
 | B4-20 | ~~Credential rotation during connect: fingerprint and assembly load material separately~~ | DONE | Daemon: `a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest` and `a_material_lookup_failure_*` tests; the GUI reconnect reuses the options captured at connect, so it has no second lookup | sandbox |
 | B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | | driver-docker |
-| B4-22 | Bundle export and import write no audit entries | OPEN | Needs an admin-event class ADR | sandbox |
+| B4-22 | Bundle export and import write no audit entries | IN PROGRESS | ADR 0010; aggregate durable intent/outcome implementation and focused policy/storage/app suites pass locally. GTK bundle-flow plus frozen-candidate and hosted acceptance remain | sandbox |
 
 ## Security
 

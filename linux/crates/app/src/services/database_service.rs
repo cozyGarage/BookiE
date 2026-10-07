@@ -7,7 +7,8 @@ use uuid::Uuid;
 
 use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Environment};
 use tablepro_policy::{
-    AuditState, DenyApprovalSink, GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_from_path,
+    AuditAdministrativeAction, AuditEvent, AuditRecordPhase, AuditState, AuditTerminalStatus, DenyApprovalSink,
+    GuardContext, NullAuditSink, PolicyConfig, PolicyGuard, Principal, load_from_path,
 };
 use tablepro_storage::AuditJournal;
 use tablepro_transport::{OpenSshEnvironment, SshEnvironment, SshRoute, Tunnel};
@@ -252,6 +253,32 @@ impl DatabaseService {
 
     pub fn policy_available(&self) -> bool {
         self.policy_available
+    }
+
+    pub async fn audit_administrative_action(
+        &self,
+        operation_id: Uuid,
+        action: AuditAdministrativeAction,
+        phase: AuditRecordPhase,
+        terminal_status: AuditTerminalStatus,
+        affected_count: usize,
+        duration_ms: Option<u64>,
+    ) -> Result<(), tablepro_policy::AuditError> {
+        let event = AuditEvent::administrative_action(
+            operation_id,
+            action,
+            phase,
+            terminal_status,
+            affected_count,
+            duration_ms,
+        );
+        match self.audit.record(event).await {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.audit_state.disable_after_audit_failure();
+                Err(error)
+            }
+        }
     }
 
     /// Whether a prior governed operation has an unresolved outcome.  The UI
@@ -626,6 +653,80 @@ mod tests {
             .filter(|record| record["event"]["phase"] == "outcome" && record["event"]["terminal_status"] == "succeeded")
             .count();
         assert_eq!(successful_outcomes, 2);
+    }
+
+    #[tokio::test]
+    async fn administrative_bundle_audit_writes_sanitized_intent_and_outcome_pair() {
+        let service = DatabaseService::new_isolated();
+        let operation_id = Uuid::new_v4();
+
+        service
+            .audit_administrative_action(
+                operation_id,
+                AuditAdministrativeAction::ConnectionBundleImport,
+                AuditRecordPhase::Intent,
+                AuditTerminalStatus::Pending,
+                3,
+                None,
+            )
+            .await
+            .expect("durable administrative intent");
+        service
+            .audit_administrative_action(
+                operation_id,
+                AuditAdministrativeAction::ConnectionBundleImport,
+                AuditRecordPhase::Outcome,
+                AuditTerminalStatus::Succeeded,
+                3,
+                Some(12),
+            )
+            .await
+            .expect("durable administrative outcome");
+
+        let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+        let contents = std::fs::read_to_string(journal).expect("audit journal exists");
+        let records: Vec<serde_json::Value> = contents
+            .lines()
+            .map(|line| serde_json::from_str(line).expect("journal record is valid JSON"))
+            .collect();
+        assert_eq!(records.len(), 2);
+        for (record, phase) in records.iter().zip(["intent", "outcome"]) {
+            let event = &record["event"];
+            assert_eq!(event["operation_id"], operation_id.to_string());
+            assert_eq!(event["phase"], phase);
+            assert_eq!(event["operation_class"], "administrative");
+            assert_eq!(event["connection_id"], Uuid::nil().to_string());
+            assert_eq!(event["connection_name"], "local_settings");
+            assert_eq!(event["driver_id"], "bookie");
+            assert_eq!(event["administrative_action"]["action"], "connection_bundle_import");
+            assert_eq!(event["administrative_action"]["affected_count"], 3);
+            assert!(event.get("transport_attempt").is_none_or(serde_json::Value::is_null));
+            let encoded = event.to_string();
+            for forbidden in ["/tmp/private-bundle", "connection-secret", "private-key-material"] {
+                assert!(!encoded.contains(forbidden));
+            }
+        }
+        assert_eq!(records[1]["event"]["terminal_status"], "succeeded");
+    }
+
+    #[tokio::test]
+    async fn administrative_bundle_intent_fails_closed_when_audit_is_unavailable() {
+        let audit_dir = tempfile::tempdir().expect("audit temp dir");
+        let service = DatabaseService::with_audit(AuditRuntime::unavailable(), Some(audit_dir));
+
+        let result = service
+            .audit_administrative_action(
+                Uuid::new_v4(),
+                AuditAdministrativeAction::ConnectionBundleExport,
+                AuditRecordPhase::Intent,
+                AuditTerminalStatus::Pending,
+                1,
+                None,
+            )
+            .await;
+
+        assert!(result.is_err());
+        assert!(service.audit_state.governed_writes_disabled());
     }
 
     #[tokio::test]

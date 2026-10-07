@@ -69,6 +69,12 @@ additional privacy, value and evidence tasks without duplicating this board.
 | B4-MySQL-engine-atomicity | **Narrow contract tested locally:** failed InnoDB DML rolls back InnoDB rows, but an AFTER INSERT trigger's MyISAM write survives; the UI warns that non-transactional writes may remain. Other storage engines and side-effect patterns still need scoped proof | [Native trigger regression and evidence](evidence/mysql-atomic-results-2026-10-03/manifest.json); broader candidate acceptance remains |
 | I1 | In the Debian phase, build/install executable `tablepro-askpass` in debhelper rules and make validator reject its absence; inspect the rules-built package | `packaging-contracts`, Debian package build |
 
+## In-progress local slices
+
+| ID | Current implementation and validation | Remaining |
+| --- | --- | --- |
+| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. The focused interrupted-intent recovery, fail-closed and paired-event checks pass; `cargo test -p tablepro-policy -p tablepro-storage -p tablepro-app --lib` passed (903 passed, 45 ignored) | GTK bundle-flow plus frozen-candidate and hosted acceptance remain |
+
 ## Completed local slices
 
 | ID | Local evidence | Scope remaining |

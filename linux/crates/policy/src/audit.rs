@@ -144,6 +144,28 @@ pub struct AuditTransportMetadata {
     pub outcome: AuditTransportOutcome,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditAdministrativeAction {
+    ConnectionBundleExport,
+    ConnectionBundleImport,
+}
+
+impl AuditAdministrativeAction {
+    fn code(self) -> &'static str {
+        match self {
+            Self::ConnectionBundleExport => "connection_bundle_export",
+            Self::ConnectionBundleImport => "connection_bundle_import",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuditAdministrativeMetadata {
+    pub action: AuditAdministrativeAction,
+    pub affected_count: u64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEvent {
     pub timestamp: DateTime<Utc>,
@@ -173,9 +195,53 @@ pub struct AuditEvent {
     /// remains forward compatible.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transport_attempt: Option<AuditTransportMetadata>,
+    /// Present only for process-wide administrative operations. These use a
+    /// nil `connection_id` and deliberately omit paths, connection names and
+    /// credential material.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub administrative_action: Option<AuditAdministrativeMetadata>,
 }
 
 impl AuditEvent {
+    pub fn administrative_action(
+        operation_id: Uuid,
+        action: AuditAdministrativeAction,
+        phase: AuditRecordPhase,
+        terminal_status: AuditTerminalStatus,
+        affected_count: usize,
+        duration_ms: Option<u64>,
+    ) -> Self {
+        Self {
+            timestamp: chrono::Utc::now(),
+            operation_id,
+            batch_id: None,
+            phase,
+            principal: Principal::human_gui(),
+            connection_id: Uuid::nil(),
+            connection_name: "local_settings".into(),
+            environment: Environment::Local,
+            driver_id: "bookie".into(),
+            operation_class: AuditOperationClass::Administrative,
+            redacted_sql: "[NOT_APPLICABLE]".into(),
+            sql_hash: hex::encode(Sha256::digest(action.code().as_bytes())),
+            targets: Vec::new(),
+            decision_rule: action.code().into(),
+            approval_outcome: AuditApprovalOutcome::NotRequired,
+            preview_state: AuditPreviewState::NotRequested,
+            terminal_status,
+            transaction_outcome: AuditTransactionOutcome::NotApplicable,
+            error_category: None,
+            error: None,
+            rows_affected: None,
+            duration_ms,
+            transport_attempt: None,
+            administrative_action: Some(AuditAdministrativeMetadata {
+                action,
+                affected_count: affected_count.min(u64::MAX as usize) as u64,
+            }),
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn transport_attempt(
         operation_id: Uuid,
@@ -214,6 +280,7 @@ impl AuditEvent {
             rows_affected: None,
             duration_ms: Some(duration_ms),
             transport_attempt: Some(AuditTransportMetadata { client, outcome }),
+            administrative_action: None,
         }
     }
 }
@@ -366,6 +433,36 @@ mod tests {
             .remove("transport_attempt");
         let decoded: AuditEvent = serde_json::from_value(old_record).expect("load old journal record");
         assert!(decoded.transport_attempt.is_none());
+    }
+
+    #[test]
+    fn administrative_audit_metadata_is_aggregate_and_backward_compatible() {
+        let event = AuditEvent::administrative_action(
+            Uuid::new_v4(),
+            AuditAdministrativeAction::ConnectionBundleImport,
+            AuditRecordPhase::Outcome,
+            AuditTerminalStatus::Succeeded,
+            3,
+            Some(12),
+        );
+        assert_eq!(event.connection_id, Uuid::nil());
+        assert_eq!(event.operation_class, AuditOperationClass::Administrative);
+        assert_eq!(event.rows_affected, None);
+        assert_eq!(
+            event.administrative_action,
+            Some(AuditAdministrativeMetadata {
+                action: AuditAdministrativeAction::ConnectionBundleImport,
+                affected_count: 3,
+            })
+        );
+
+        let mut older = serde_json::to_value(event).expect("serialize event");
+        older
+            .as_object_mut()
+            .expect("event object")
+            .remove("administrative_action");
+        let decoded: AuditEvent = serde_json::from_value(older).expect("load record without admin metadata");
+        assert!(decoded.administrative_action.is_none());
     }
 
     #[test]

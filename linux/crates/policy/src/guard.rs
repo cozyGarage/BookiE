@@ -491,6 +491,7 @@ impl PolicyGuard {
                 rows_affected,
                 duration_ms,
                 transport_attempt: None,
+                administrative_action: None,
             })
             .await
     }
