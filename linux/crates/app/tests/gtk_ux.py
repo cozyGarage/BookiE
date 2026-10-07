@@ -272,6 +272,11 @@ def scenarios(ui):
             time.sleep(ui.POLL_SECONDS)
         assert editor_text() == "select b, b from t where b = 1", editor_text()
 
+    def wait_for_dialog(name, present=True):
+        if os.environ.get("TABLEPRO_GTK_OLD_ADW") == "1":
+            return
+        ui.wait_for_node(name=name, role=pyatspi.ROLE_DIALOG, present=present)
+
     def view_value_opens_the_whole_cell_with_pretty_json(database, base):
         ui.run_sql("""SELECT '{"a":1}' AS payload""")
         open_cell_menu('{"a":1}')
