@@ -31,6 +31,8 @@ checked against native `array_send` bytes in
 `value_contract_arrays_preserve_elements_dimensions_and_exports`. Keyed grid
 edits use the qualified built-in cast and preserve the sibling row in
 `value_contract_array_grid_edit_preserves_array_elements`.
+Typed CSV import of `name[]` uses the same value distinctions and checks the
+restored native wire bytes in `value_contract_builtin_array_families_survive_typed_csv_insert`.
 
 The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
 32-bit maximum and SQL NULL, using native type/text/`array_send` equality and

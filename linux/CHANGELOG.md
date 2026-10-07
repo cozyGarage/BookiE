@@ -7,6 +7,7 @@
 - PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
 - PostgreSQL name[] array coverage now checks empty/NULL distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact wire preservation through typed session rebinding and keyed grid edits.
 - PostgreSQL oid[] keyed grid edits now preserve zero, the UINT32 maximum and SQL NULL against native type/text/wire oracles while leaving sibling rows unchanged.
+- PostgreSQL name[] typed CSV import now checks NULL/empty distinctions, escaped and Unicode labels, the 63-byte UTF-8 boundary, and exact native array wire preservation.
 - MySQL transaction query coverage now verifies decoded-byte-budget truncation, exact retained payloads, and follow-up queries within the same transaction.
 - PostgreSQL query results now have Docker coverage for shared byte-budget truncation, row order and payloads, plus pooled connection reuse.
 - SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
