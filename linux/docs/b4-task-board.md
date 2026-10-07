@@ -1,14 +1,12 @@
 # B4 task board: transport and sessions
 
-Base scope: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The active B4
-integration branch is `b4/i5-reconciled`; its tip advances as work lands. Use each
-evidence manifest for the exact source revision and use Git for the current branch tip.
+Base scope: `aeac107a4`, branch `linux`, reviewed 2026-10-03. The active B4 integration branch advances as work lands. Use each evidence
+manifest for the exact source revision and Git for the current branch tip.
 The local source includes MySQL batch/result fixes indexed in the [evidence manifest]
 (evidence/mysql-atomic-results-2026-10-03/manifest.json).
 The [sprint](bookie-0.2-sprint.md) owns release order; [ADR 0008](decisions/0008-connection-and-session-ownership.md)
-owns the decisions. The local integration branch is `b4/i5-reconciled`; use the
-current Git tip for its revision because this board is updated independently of
-source commits. B4 remains open. Implementation, local execution, hosted
+owns the decisions. Use the current Git tip for its revision because this board is updated
+independently of source commits. B4 remains open. Implementation, local execution, hosted
 execution and installed acceptance are separate states.
 
 ## B4 continuation checkpoint (October 3; historical integration snapshot)
@@ -36,10 +34,14 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-PRs #153–#156 have since merged into `fork/linux`; current fetched baseline is
-`3b9909443`. They repair hosted fixture/inventory wiring, add PostgreSQL enum
-and range-array cases, and reconcile the sprint and known-issues status. Those
-merges do not close the remaining B4 candidate, hosted, or installed gates.
+PRs #153–#161 have merged into `fork/linux`; current baseline is
+`b586f6b43`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
+PostgreSQL release check failed because the job lacked GTK development
+libraries; PR #161 adds those build dependencies. Installed GTK safety smoke
+also exposed stale scenario setup, fixed locally and recorded with candidate
+layer evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+Fresh hosted validation of that harness fix and installed acceptance remain
+open.
 
 ## Remaining tasks
 

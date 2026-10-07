@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "commit": "4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4",
+  "working_tree": "",
+  "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "started_utc": "2026-10-07T07:27:34.122049+00:00",
+  "status": "failed",
+  "layers": {
+    "full": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "full"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "full-1.log",
+          "exit_code": 0,
+          "seconds": 173.063
+        }
+      ]
+    },
+    "security-policy": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "test",
+            "--locked",
+            "-p",
+            "tablepro-policy",
+            "-p",
+            "tablepro-mcp",
+            "--lib",
+            "--tests"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "security-policy-1.log",
+          "exit_code": 0,
+          "seconds": 33.117
+        }
+      ]
+    },
+    "drivers": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/ci-local.sh",
+            "integration"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "drivers-1.log",
+          "exit_code": 0,
+          "seconds": 1759.136
+        }
+      ]
+    },
+    "tls": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-driver-tls.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "tls-1.log",
+          "exit_code": 0,
+          "seconds": 87.605
+        }
+      ]
+    },
+    "ssh": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-ssh.sh"
+          ],
+          "timeout_seconds": 2700,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "ssh-1.log",
+          "exit_code": 0,
+          "seconds": 134.041
+        }
+      ]
+    },
+    "postgres-release": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-postgres-release.sh"
+          ],
+          "timeout_seconds": 1200,
+          "evidence": "rust-tests",
+          "status": "passed",
+          "log": "postgres-release-1.log",
+          "exit_code": 0,
+          "seconds": 64.051
+        }
+      ]
+    },
+    "widgets": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-widgets.sh"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "widgets-1.log",
+          "exit_code": 0,
+          "seconds": 28.506
+        }
+      ]
+    },
+    "keyring": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-secret-service.sh"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "keyring-1.log",
+          "exit_code": 0,
+          "seconds": 16.709
+        }
+      ]
+    },
+    "ui": {
+      "status": "failed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-gtk-safety.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "exit",
+          "status": "failed",
+          "log": "ui-1.log",
+          "exit_code": 1,
+          "seconds": 120.369
+        }
+      ]
+    },
+    "app-server": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/run-isolated-tests.py",
+            "app-server"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "app-server-1.log",
+          "exit_code": 0,
+          "seconds": 131.925
+        }
+      ]
+    },
+    "packaging-contracts": {
+      "status": "failed",
+      "steps": [
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_arch_candidate.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "git",
+            "tar"
+          ],
+          "status": "passed",
+          "log": "packaging-contracts-1.log",
+          "exit_code": 0,
+          "seconds": 0.166
+        },
+        {
+          "argv": [
+            "python3",
+            "scripts/tests/test_deb_package.py"
+          ],
+          "timeout_seconds": 180,
+          "evidence": "exit",
+          "required_tools": [
+            "dpkg-deb"
+          ],
+          "status": "blocked",
+          "log": "packaging-contracts-2.log",
+          "reason": "required tools unavailable: dpkg-deb",
+          "seconds": 0.0
+        }
+      ]
+    },
+    "supply-chain": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "cargo",
+            "deny",
+            "check"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "supply-chain-1.log",
+          "exit_code": 0,
+          "seconds": 1.271
+        },
+        {
+          "argv": [
+            "cargo",
+            "audit"
+          ],
+          "timeout_seconds": 900,
+          "evidence": "exit",
+          "status": "passed",
+          "log": "supply-chain-2.log",
+          "exit_code": 0,
+          "seconds": 2.984
+        }
+      ]
+    },
+    "mssql-kerberos": {
+      "status": "passed",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-mssql-kerberos.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "required_tools": [
+            "docker",
+            "cargo",
+            "ktutil",
+            "openssl"
+          ],
+          "status": "passed",
+          "log": "mssql-kerberos-1.log",
+          "exit_code": 0,
+          "seconds": 27.357
+        }
+      ]
+    }
+  },
+  "finished_utc": "2026-10-07T08:10:34.429188+00:00"
+}
