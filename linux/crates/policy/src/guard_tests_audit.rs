@@ -853,12 +853,30 @@ impl<'writer> tracing_subscriber::fmt::MakeWriter<'writer> for CapturedLogs {
 
 #[test]
 fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
+    const CHILD_ENV: &str = "TABLEPRO_PANIC_AUDIT_TEST_CHILD";
+    const TEST_NAME: &str = "guard::guard_tests::audit::a_driver_panic_message_never_reaches_the_logs_or_the_error";
+
+    if std::env::var_os(CHILD_ENV).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test binary path"))
+            .arg("--exact")
+            .arg(TEST_NAME)
+            .env(CHILD_ENV, "1")
+            .output()
+            .expect("run isolated tracing capture test");
+        assert!(
+            output.status.success(),
+            "isolated tracing capture failed:\n{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+
     let logs = CapturedLogs::default();
     let subscriber = tracing_subscriber::fmt()
         .with_writer(logs.clone())
         .with_ansi(false)
         .with_max_level(tracing::Level::TRACE)
-        .with_ansi(false)
         .finish();
     let guard = PolicyGuard::new(
         Arc::new(PanickingConn),
@@ -872,14 +890,13 @@ fn a_driver_panic_message_never_reaches_the_logs_or_the_error() {
         ),
     );
 
-    let error = tracing::subscriber::with_default(subscriber, || {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("test runtime")
-            .block_on(guard.list_tables())
-            .expect_err("a panicking driver must surface as an error")
-    });
+    tracing::subscriber::set_global_default(subscriber).expect("install process subscriber");
+    let error = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("test runtime")
+        .block_on(guard.list_tables())
+        .expect_err("a panicking driver must surface as an error");
 
     let logged = String::from_utf8(logs.0.lock().expect("log lock").clone()).expect("utf-8 logs");
     assert!(
