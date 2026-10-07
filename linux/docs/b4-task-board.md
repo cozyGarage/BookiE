@@ -34,19 +34,16 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-PRs #153–#162 and #164 have merged into `fork/linux`; PR #163 remains open.
-Current baseline is `c2fa01c08`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
-PostgreSQL release check lacked GTK development libraries; PR #161 added them.
-PR #162 merged the first local GTK safety setup fix. Follow-up hosted runs
-exposed Debian GTK role and two-hop test assumptions; this branch fixes those
-and records local rerun evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
-PR #162's first hosted run passed preflight, security, TLS, DuckDB, supply
-chain, Sonar, harness, workflow lint, and Flatpak builds. Fast checks hit a
-Debian mirror-sync package-size mismatch; PostgreSQL release exposed a GTK
-AT-SPI role mismatch and missing second-hop trust handling in PostgreSQL GTK
-tests. Both are fixed locally; all five default PostgreSQL GTK scenarios and
-the tunnel-loss/reconnect scenario pass. Fresh hosted validation and installed
-acceptance remain open; see the [candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+PRs #153–#166 have merged into `linux`; the current baseline is `b33a0f903`.
+PR #159 adds SSH audit, rollback, and Kerberos slices. PRs #161 and #162 fix
+PostgreSQL release GTK dependencies and safety fixture setup. PR #165 hardens
+GTK SSH trust-prompt role detection and two-hop tunnel-loss setup; its local UI
+and PostgreSQL release layers passed, while fresh hosted validation remained
+pending at that checkpoint. PR #163 is open to test audit write denial after
+the editor session starts and to install/declare `xdotool` for bundle chooser
+navigation. Local evidence and correction history are in the [October 7
+candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+Fresh hosted validation and installed acceptance remain open.
 
 ## Remaining tasks
 
