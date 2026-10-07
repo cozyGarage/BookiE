@@ -10,7 +10,7 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 
 | Path | Classification | Disposition |
 | --- | --- | --- |
-| [.github/workflows/daily-repo-status.md](../../../.github/workflows/daily-repo-status.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| `.github/workflows/daily-repo-status.md` (removed after this inventory) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [CLAUDE.md](../../../CLAUDE.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [CODE_OF_CONDUCT.md](../../../CODE_OF_CONDUCT.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [CONTRIBUTING.md](../../../CONTRIBUTING.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
