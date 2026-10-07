@@ -35,7 +35,7 @@ PostgreSQL `xml[]` is covered through result decoding, inferred rebinding, keyed
 grid writes and typed CSV restore. Native `pg_typeof`, array text and
 `array_send` checks include XML fragments, SQL NULL, and a malformed XML
 assignment refused with SQLSTATE `2200N` without changing either row
-([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118)).
+([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
 
 ## Run
 
