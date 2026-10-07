@@ -93,6 +93,7 @@ impl App {
         items.extend(self.open_tab_items());
         items.extend(relation_items(&self.sidebar_tables, &self.sidebar_views));
         items.extend(self.connection_items());
+        items.extend(crate::services::quick_switcher::command_items());
         let sender_for_choice = sender.clone();
         crate::ui::quick_switcher_dialog::present(&self.window, items, move |target| {
             sender_for_choice.input(AppMsg::QuickSwitcherChose(target));
@@ -122,6 +123,9 @@ impl App {
                 name,
                 open_mode: super::OpenMode::SwitchOrAppend,
             }),
+            QuickTarget::Command(action) => {
+                let _ = gtk::prelude::WidgetExt::activate_action(&self.window, &format!("win.{action}"), None);
+            }
             QuickTarget::Connection(id) => {
                 let Some(saved) = self
                     .saved_connections

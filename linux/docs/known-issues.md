@@ -61,15 +61,15 @@ first column says which area owns them.
 | UI-16b | ~~No current-statement band in the editor~~ | DONE | The statement under the cursor gets a soft background in the SQL editor, refreshed on edits and cursor moves, skipped above 200 KB. Tests `statement_cursor`, `statement_band` (unit and an isolated GTK widget test) | unit + gtk-widget |
 | UI-17 | ~~`Ctrl+Tab` is not most-recent-first~~ | DONE | Ctrl+Tab switches to the most recently used tab and back (window-level key capture, the tab view's own Ctrl+Tab is off). Tests `recent_tabs` and AT-SPI scenario `ctrl_tab_returns_to_the_most_recently_used_tab`. Holding Ctrl to walk deeper is UI-17b | unit + gtk-installed |
 | UI-17b | No preview tabs; ~~Ctrl+Tab does not walk deeper into the history while Ctrl is held~~ | OPEN | Walking is done: `RecentWalk` unit tests and AT-SPI scenario `holding_ctrl_while_pressing_tab_walks_deeper_into_the_history` (two Tab presses with Ctrl held reach the third most recent tab; release commits it). Remaining: preview tabs | gtk-widget |
-| UI-18 | History is a dialog; Open Quickly has no scopes or commands; no single action table | OPEN | `shortcuts.rs` action table | gtk-widget |
+| UI-18 | History is a dialog; ~~Open Quickly has no scopes or commands~~; no single action table | OPEN | Open Quickly now lists 19 window commands: type `>` to see only commands, or search by name (`commands_stay_out_of_the_empty_list_and_are_the_only_hits_after_a_prompt_character`, `every_command_names_an_action_the_window_registers`). Remaining: History as a dialog, one action table shared by menus, shortcuts and the palette | gtk-widget |
 | UI-19 | FK picker and navigation, enum and set pickers, paste TSV, estimated counts (the page-size menu exists: the Rows drop-down) | OPEN | B3-hot files; schedule with B3 | gtk-widget |
 | UI-20 | No server output (NOTICE, PRINT) and no timing breakdown | OPEN | Needs a core trait hook | driver-docker |
 | UI-21 | No `CellView` display boundary and no fake connection for the GTK tier | OPEN | Foundation packets in the archived audit | unit |
-| UI-22 | Code folding, vim, multi-cursor, split panes | OPEN | Vim is a preference; the rest need feasibility slices | manual |
+| UI-22 | ~~Code folding, vim, multi-cursor, split panes~~ | ACCEPTED | Accepted for 0.2 on 2026-10-07: nice-to-have editor features, outside the usable-first scope. GtkSourceView already gives multi-line editing. Revisit after 0.2 | manual |
 | UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
 | UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
-| UI-26 | Reusable SSH profiles are not editable | OPEN | Separate connection-editor slice | gtk-widget |
+| UI-26 | ~~Reusable SSH profiles are not editable~~ | ACCEPTED | Accepted for 0.2 on 2026-10-07: there is no profile feature, a saved connection carries its own SSH settings, so there is nothing to edit. Revisit with the chain editor (UI-1b) | gtk-widget |
 
 ## Transport, sessions, daemon (B4)
 
@@ -171,8 +171,8 @@ first column says which area owns them.
 | PERF-8 | Editor results are materialized in one go up to the caps; progressive loading is absent | OPEN | Design bounded query pages through core, drivers and `PolicyGuard`, including session ownership, masking, audit, cancellation and retained-page budget. See the [action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md); reference-client paging is engine-specific | driver-docker |
 | PERF-9 | Hidden columns are still selected and transferred (dbx drops them from the query) | OPEN | Part of UI-14b: remove hidden non-key columns from the browse SELECT | unit + driver-docker |
 | PERF-10 | Long cell values are shipped whole to the grid (dbx sends a preview with the byte count and fetches the full value on demand) | OPEN | Preview plus on-demand full value through View Value, behind the guard | driver-docker |
-| PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | OPEN | Measure on real GPU rendering and with fewer drivers; see baseline below | manual |
-| PERF-6 | Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols); largest crates are `tablepro_app`, `std`, `mongodb`, `sqlparser`, `zbus` | OPEN | Decide on stripping and the MongoDB cost | manual |
+| PERF-5 | ~~The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked)~~ | ACCEPTED | Accepted on 2026-10-07: eight statically linked drivers is the design (see [adding drivers](adding-drivers.md)). Baseline below stays the reference for regressions | manual |
+| PERF-6 | ~~Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols)~~ | ACCEPTED | Accepted on 2026-10-07: packages may strip symbols; the code size follows from compile-time drivers | manual |
 | PERF-3 | MongoDB census cost per browse not measured | OPEN | | driver-docker |
 | PERF-4 | Timing shows elapsed only, never server time | OPEN | With UI-20 | driver-docker |
 
