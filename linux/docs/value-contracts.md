@@ -40,6 +40,13 @@ JSON/CSV/XML/HTML/Markdown/XLSX/SQL file exports now also preserve exact array
 text; SQL replay is checked against native JSON and wire bytes in
 `value_contract_xml_array_file_exports_preserve_native_text`.
 
+Custom composite arrays have a focused unsupported-value contract: native
+PostgreSQL type, text, JSON and wire oracles confirm the value while SQL literal
+and parameter paths refuse it without changing either row. Other custom array
+families remain untested. The unlisted built-in `money[]` refusal covers
+populated and NULL elements, native text/JSON/wire snapshots, literal/bind
+refusal, and target/sibling preservation ([validation comment on PR #126](https://github.com/cozyGarage/BookiE/pull/126#issuecomment-6028961640)).
+
 A PostgreSQL domain whose base type is an array now preserves declared type metadata and non-default lower bounds through keyed edits; NULL, empty values, native JSON/wire bytes, and CHECK refusal are covered by a Docker-backed regression ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)).
 
 PostgreSQL enum schema and type identifiers at the 63-byte catalog limit, including a multibyte final character, retain metadata and keyed edits; see the [Docker/local validation comment on PR #125](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
