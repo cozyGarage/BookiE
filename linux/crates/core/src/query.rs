@@ -180,6 +180,43 @@ pub struct QueryResult {
     pub truncated: bool,
 }
 
+/// Ordered row sets returned by one query execution. The truncation flag and
+/// query budget apply to the whole batch, not independently to each set.
+#[derive(Debug, Clone)]
+pub struct QueryResultBatch {
+    pub result_sets: Vec<QueryResult>,
+    pub truncated: bool,
+}
+
+impl QueryResultBatch {
+    pub fn single(result: QueryResult) -> Self {
+        let truncated = result.truncated;
+        Self {
+            result_sets: vec![result],
+            truncated,
+        }
+    }
+
+    pub fn into_first(self) -> QueryResult {
+        let first = self.result_sets.into_iter().next().unwrap_or(QueryResult {
+            columns: Vec::new(),
+            rows: Vec::new(),
+            truncated: self.truncated,
+        });
+        QueryResult {
+            truncated: self.truncated || first.truncated,
+            ..first
+        }
+    }
+
+    pub fn retained_rows(&self) -> u64 {
+        self.result_sets
+            .iter()
+            .map(|result_set| result_set.rows.len() as u64)
+            .sum()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ExecResult {
     pub rows_affected: u64,

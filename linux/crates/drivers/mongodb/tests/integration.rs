@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+#[path = "support/hostile_scram.rs"]
+mod hostile_scram;
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;
 
@@ -886,6 +888,12 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
 
 #[path = "support/census_cost.rs"]
 mod census_cost;
+
+#[path = "support/census_cancellation.rs"]
+mod census_cancellation;
+
+#[path = "support/nested_filters.rs"]
+mod nested_filters;
 
 #[path = "support/run_find_late_type_contract.rs"]
 mod run_find_late_type_contract;

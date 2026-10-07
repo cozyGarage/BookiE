@@ -302,6 +302,53 @@ impl Connection for PolicyGuard {
         result
     }
 
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let authorization = self.authorize(sql, true, Some(control)).await?;
+        let operation = self.operation(
+            sql,
+            None,
+            &authorization.facts,
+            &authorization.decision,
+            authorization.approval_outcome,
+            authorization.preview_state,
+        );
+        let start = Instant::now();
+        if authorization.facts.writes {
+            self.require_governed_write_available()?;
+            self.handle_intent_failure(self.record_intent(&operation).await)?;
+            let mut pending_write = self.ctx.audit_state.pending_write();
+            let result = self
+                .caught_write(
+                    "a write statement",
+                    self.inner.query_result_sets_controlled(sql, params, control),
+                )
+                .await
+                .map(|batch| self.mask_result_batch_for_sql(sql, batch));
+            let rows = result.as_ref().ok().map(QueryResultBatch::retained_rows);
+            self.audit_write_result(&operation, start, &result, rows).await?;
+            pending_write.disarm();
+            return result;
+        }
+
+        self.prepare_governed_read(&operation).await?;
+        let result = self
+            .caught_read(
+                "QUERY RESULT SETS",
+                self.inner.query_result_sets_controlled(sql, params, control),
+            )
+            .await
+            .map(|batch| self.mask_result_batch_for_sql(sql, batch));
+        let rows = result.as_ref().ok().map(QueryResultBatch::retained_rows);
+        self.audit_controlled_read_result(&operation, start, &result, rows)
+            .await?;
+        result
+    }
+
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError> {
         let authorization = self.authorize(sql, false, None).await?;
         self.execute_write(sql, None, authorization, |inner| inner.execute(sql))

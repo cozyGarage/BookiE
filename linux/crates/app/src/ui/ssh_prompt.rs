@@ -95,10 +95,12 @@ fn ask(
     cancel: tokio_util::sync::CancellationToken,
 ) {
     let dialog = adw::AlertDialog::new(Some(&question.heading), Some(&question.body));
+    let dialog_open = std::rc::Rc::new(std::cell::Cell::new(true));
     let dialog_for_cancel = dialog.clone();
+    let open_for_cancel = dialog_open.clone();
     glib::MainContext::default().spawn_local(async move {
         cancel.cancelled().await;
-        dialog_for_cancel.close();
+        close_dialog_once(&dialog_for_cancel, &open_for_cancel);
     });
     dialog.add_response("cancel", &crate::tr!("Cancel"));
     dialog.add_response("accept", &question.accept);
@@ -117,7 +119,7 @@ fn ask(
         entry
     });
     let sender = std::rc::Rc::new(std::cell::RefCell::new(Some(sender)));
-    connect_prompt_responses(&dialog, sender.clone(), entry);
+    connect_prompt_responses(&dialog, sender.clone(), entry, dialog_open);
     let parent = gtk::Application::default().active_window();
     dialog.present(parent.as_ref());
 }
@@ -126,10 +128,12 @@ fn connect_prompt_responses(
     dialog: &adw::AlertDialog,
     sender: std::rc::Rc<std::cell::RefCell<Option<tokio::sync::oneshot::Sender<PromptAnswer>>>>,
     entry: Option<gtk::PasswordEntry>,
+    dialog_open: std::rc::Rc<std::cell::Cell<bool>>,
 ) {
-    let escape_sender = sender.clone();
     let response_sender = sender.clone();
+    let open_for_response = dialog_open.clone();
     dialog.connect_response(None, move |_, response| {
+        open_for_response.set(false);
         let answer = match (response, &entry) {
             ("accept", Some(entry)) => PromptAnswer::Secret(SecretString::new(entry.text().to_string().into())),
             ("accept", None) => PromptAnswer::Accept,
@@ -140,11 +144,28 @@ fn connect_prompt_responses(
         }
     });
     let close_attempt_sender = sender.clone();
+    let open_for_close_attempt = dialog_open.clone();
     dialog.connect_close_attempt(move |_| {
+        open_for_close_attempt.set(false);
         decline_after_dialog_signal(close_attempt_sender.clone());
     });
-    dialog.connect_closed(move |_| decline_after_dialog_signal(sender.clone()));
-    connect_escape_key(dialog, escape_sender);
+    let open_for_closed = dialog_open.clone();
+    let closed_sender = sender.clone();
+    dialog.connect_closed(move |_| {
+        open_for_closed.set(false);
+        decline_after_dialog_signal(closed_sender.clone());
+    });
+    connect_escape_key(dialog, sender, dialog_open);
+}
+
+fn close_dialog_once(dialog: &adw::AlertDialog, dialog_open: &std::cell::Cell<bool>) {
+    if claim_prompt_close(dialog_open) {
+        dialog.close();
+    }
+}
+
+fn claim_prompt_close(dialog_open: &std::cell::Cell<bool>) -> bool {
+    dialog_open.replace(false)
 }
 
 fn decline_after_dialog_signal(
@@ -160,16 +181,18 @@ fn decline_after_dialog_signal(
 fn connect_escape_key(
     dialog: &adw::AlertDialog,
     sender: std::rc::Rc<std::cell::RefCell<Option<tokio::sync::oneshot::Sender<PromptAnswer>>>>,
+    dialog_open: std::rc::Rc<std::cell::Cell<bool>>,
 ) {
     let escape_dialog = dialog.downgrade();
+    let open_for_escape = dialog_open.clone();
     let key_controller = gtk::EventControllerKey::new();
     key_controller.connect_key_pressed(move |_, key, _, _| {
         if key == gtk::gdk::Key::Escape {
+            if let Some(dialog) = escape_dialog.upgrade() {
+                close_dialog_once(&dialog, &open_for_escape);
+            }
             if let Some(sender) = sender.borrow_mut().take() {
                 let _ = sender.send(PromptAnswer::Decline);
-            }
-            if let Some(dialog) = escape_dialog.upgrade() {
-                dialog.close();
             }
             glib::Propagation::Stop
         } else {
@@ -182,6 +205,14 @@ fn connect_escape_key(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_prompt_close_is_claimed_only_once() {
+        let open = std::cell::Cell::new(true);
+
+        assert!(claim_prompt_close(&open));
+        assert!(!claim_prompt_close(&open));
+    }
 
     #[test]
     fn a_host_key_question_names_the_host_and_fingerprint_and_asks_for_confirmation() {

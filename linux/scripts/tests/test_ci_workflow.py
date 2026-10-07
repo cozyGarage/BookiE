@@ -25,7 +25,11 @@ class CiWorkflowTests(unittest.TestCase):
 
     def test_cross_consumer_server_targets_are_gated_and_documented(self):
         local = (ROOT / "linux/scripts/ci-local.sh").read_text()
-        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+        for package, target in [
+            ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-policy", "session_postgres"),
+            ("tablepro-policy", "session_mssql"),
+        ]:
             self.assertIn(f"-p {package} --test {target} -- --include-ignored --test-threads=1", local)
         registry = json.loads((ROOT / "linux/scripts/isolated-tests.json").read_text())
         self.assertEqual(
@@ -58,7 +62,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
                 "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
                 "value_contract_mssql_max_values_survive_connection_session_and_consumers",
-                "value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server",
+                "value_contract_mssql_server_owned_columns_use_native_defaults_across_consumers",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
@@ -70,7 +74,11 @@ class CiWorkflowTests(unittest.TestCase):
             workflow,
         )
         ledger = subprocess.check_output(["python3", str(ROOT / "linux/scripts/inventory-ignored-tests.py")], text=True)
-        for package, target in [("tablepro-mcp", "mongodb_extended_json"), ("tablepro-policy", "session_postgres")]:
+        for package, target in [
+            ("tablepro-mcp", "mongodb_extended_json"),
+            ("tablepro-policy", "session_postgres"),
+            ("tablepro-policy", "session_mssql"),
+        ]:
             self.assertIn(f"-p {package} --test {target}", ledger)
         self.assertIn("scripts/run-test-layer.py app-server", ledger)
         self.assertNotIn("tablepro-driver-tests", ledger)
@@ -153,6 +161,22 @@ class CiWorkflowTests(unittest.TestCase):
             ledger,
         )
         self.assertIn("scripts/test-postgres-release.sh", ledger)
+
+    def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
+        script = (ROOT / "linux/scripts/test-postgres-release.sh").read_text()
+        default_scenarios = next(
+            line for line in script.splitlines() if 'TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-' in line
+        )
+        for scenario in [
+            "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+            "postgres_ssh_multihop_trusts_both_hops_and_queries",
+            "postgres_ssh_setup_failure_is_durably_audited",
+            "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+            "postgres_ssh_second_hop_decline_does_not_learn_key",
+            "postgres_ssh_changed_second_hop_key_is_refused",
+        ]:
+            with self.subTest(scenario=scenario):
+                self.assertIn(scenario, default_scenarios)
 
 
 if __name__ == "__main__":

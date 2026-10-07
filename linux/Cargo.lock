@@ -6430,6 +6430,7 @@ dependencies = [
  "sha2 0.10.9",
  "sqlparser",
  "tablepro-core",
+ "tablepro-driver-mssql",
  "tablepro-driver-postgres",
  "tempfile",
  "testcontainers",

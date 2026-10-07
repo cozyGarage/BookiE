@@ -59,7 +59,7 @@ pub(crate) async fn run_statements(
         let kind = match target.query(&bound.sql, &bound.values, control).await {
             Ok(qr) => {
                 succeeded(&sql);
-                StatementOutcomeKind::Rows(std::sync::Arc::new(qr))
+                StatementOutcomeKind::Rows(qr.result_sets.into_iter().map(std::sync::Arc::new).collect())
             }
             Err(DriverError::Cancelled) => return ScriptRunResult::Cancelled,
             Err(DriverError::TimedOut) => return ScriptRunResult::TimedOut,
@@ -120,26 +120,38 @@ fn build_outcome_widget(
     database: std::sync::Arc<crate::services::database_service::DatabaseService>,
 ) -> gtk::Widget {
     match &o.kind {
-        StatementOutcomeKind::Rows(result) if !result.columns.is_empty() => {
-            let (column_view, _selection) = build_column_view(
-                result,
-                &result.columns,
-                "",
-                None,
-                Some(grid_sender.clone()),
-                None,
-                None,
-                connection_id,
-                TabGridContext::default(),
-                None,
-                database,
-            );
-            let scrolled = gtk::ScrolledWindow::builder()
-                .child(&column_view)
-                .hexpand(true)
-                .vexpand(true)
-                .build();
-            scrolled.upcast()
+        StatementOutcomeKind::Rows(result_sets) if result_sets.len() > 1 => {
+            let stack = adw::ViewStack::new();
+            let labels = result_sets
+                .iter()
+                .enumerate()
+                .map(|(index, result)| {
+                    crate::tr!("Result set {n} ({rows})")
+                        .replace("{n}", &(index + 1).to_string())
+                        .replace("{rows}", &result.rows.len().to_string())
+                })
+                .collect::<Vec<_>>();
+            for (index, result) in result_sets.iter().enumerate() {
+                let widget = build_result_set_widget(result, grid_sender, connection_id, database.clone());
+                stack.add_titled(&widget, Some(&format!("set{index}")), &labels[index]);
+            }
+            let dropdown = gtk::DropDown::from_strings(&labels.iter().map(String::as_str).collect::<Vec<_>>());
+            dropdown.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Result set"))]);
+            dropdown.connect_selected_notify({
+                let stack = stack.downgrade();
+                move |dropdown| {
+                    if let Some(stack) = stack.upgrade() {
+                        stack.set_visible_child_name(&format!("set{}", dropdown.selected()));
+                    }
+                }
+            });
+            let holder = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            holder.append(&dropdown);
+            holder.append(&stack);
+            holder.upcast()
+        }
+        StatementOutcomeKind::Rows(result_sets) if let Some(result) = result_sets.first() => {
+            build_result_set_widget(result, grid_sender, connection_id, database)
         }
         StatementOutcomeKind::Rows(_) => {
             let ms = o.elapsed_ms.to_string();
@@ -166,6 +178,41 @@ fn build_outcome_widget(
             .build()
             .upcast(),
     }
+}
+
+fn build_result_set_widget(
+    result: &std::sync::Arc<tablepro_core::QueryResult>,
+    grid_sender: &relm4::Sender<GridMsg>,
+    connection_id: Option<uuid::Uuid>,
+    database: std::sync::Arc<crate::services::database_service::DatabaseService>,
+) -> gtk::Widget {
+    if result.columns.is_empty() {
+        return adw::StatusPage::builder()
+            .title(crate::tr!("No rows returned"))
+            .icon_name("emblem-default-symbolic")
+            .vexpand(true)
+            .build()
+            .upcast();
+    }
+    let (column_view, _selection) = build_column_view(
+        result,
+        &result.columns,
+        "",
+        None,
+        Some(grid_sender.clone()),
+        None,
+        None,
+        connection_id,
+        TabGridContext::default(),
+        None,
+        database,
+    );
+    gtk::ScrolledWindow::builder()
+        .child(&column_view)
+        .hexpand(true)
+        .vexpand(true)
+        .build()
+        .upcast()
 }
 
 fn clean_identifier(token: &str) -> String {
@@ -210,18 +257,18 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
     let n = (idx + 1).to_string();
     let Some(statement) = statement_subject(&o.sql_preview) else {
         return match &o.kind {
-            StatementOutcomeKind::Rows(qr) => crate::tr!("Result {n} ({rows})")
+            StatementOutcomeKind::Rows(sets) => crate::tr!("Result {n} ({rows})")
                 .replace("{n}", &n)
-                .replace("{rows}", &qr.rows.len().to_string()),
+                .replace("{rows}", &result_rows(sets).to_string()),
             StatementOutcomeKind::Error(_) => crate::tr!("Result {n} (error)").replace("{n}", &n),
             StatementOutcomeKind::NotRun => crate::tr!("Result {n} (skipped)").replace("{n}", &n),
         };
     };
     match &o.kind {
-        StatementOutcomeKind::Rows(qr) => crate::tr!("{n} · {statement} ({rows})")
+        StatementOutcomeKind::Rows(sets) => crate::tr!("{n} · {statement} ({rows})")
             .replace("{n}", &n)
             .replace("{statement}", &statement)
-            .replace("{rows}", &qr.rows.len().to_string()),
+            .replace("{rows}", &result_rows(sets).to_string()),
         StatementOutcomeKind::Error(_) => crate::tr!("{n} · {statement} (error)")
             .replace("{n}", &n)
             .replace("{statement}", &statement),
@@ -229,6 +276,10 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
             .replace("{n}", &n)
             .replace("{statement}", &statement),
     }
+}
+
+fn result_rows(result_sets: &[std::sync::Arc<tablepro_core::QueryResult>]) -> usize {
+    result_sets.iter().map(|result| result.rows.len()).sum()
 }
 
 const MAX_SWITCHER_BUTTONS: usize = 5;

@@ -6,7 +6,7 @@ use chrono::Utc;
 use sha2::{Digest, Sha256};
 use tablepro_core::{
     ColumnInfo, Connection, DriverError, Environment, ExecResult, ForeignKeyInfo, IndexInfo, OperationControl,
-    QueryResult, TableInfo, Transaction, Value, check_pre_dispatch,
+    QueryResult, QueryResultBatch, TableInfo, Transaction, Value, check_pre_dispatch,
 };
 use uuid::Uuid;
 
@@ -599,6 +599,19 @@ impl PolicyGuard {
         let sensitive_positions =
             sql.and_then(|sql| crate::sensitive_projection::sensitive_projection(sql, &self.ctx.driver_id, &patterns));
         apply_masking(result, &patterns, sensitive_positions.as_deref())
+    }
+
+    fn mask_result_batch_for_sql(&self, sql: &str, batch: QueryResultBatch) -> QueryResultBatch {
+        if !self.should_mask() {
+            return batch;
+        }
+        let truncated = batch.truncated;
+        let result_sets = batch
+            .result_sets
+            .into_iter()
+            .map(|result_set| self.mask_result_for_sql(Some(sql), result_set))
+            .collect();
+        QueryResultBatch { result_sets, truncated }
     }
 
     async fn audit_read_result<T>(

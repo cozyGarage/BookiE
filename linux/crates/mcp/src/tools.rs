@@ -86,11 +86,17 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
                 .ok_or("missing sql")?
                 .to_string();
             let result = bridge.execute_query(token, id, &sql).await?;
+            let first = result.result_sets.first();
             Ok(json!({
-                "columns": result.columns.iter().map(|c| &c.name).collect::<Vec<_>>(),
-                "rows": result.rows.iter().map(|r| {
+                "columns": first.map(|set| set.columns.iter().map(|c| &c.name).collect::<Vec<_>>()).unwrap_or_default(),
+                "rows": first.into_iter().flat_map(|set| &set.rows).map(|r| {
                     r.iter().map(value_to_json).collect::<Vec<_>>()
                 }).collect::<Vec<_>>(),
+                "additional_result_sets": result.result_sets.iter().skip(1).map(|set| json!({
+                    "columns": set.columns.iter().map(|c| &c.name).collect::<Vec<_>>(),
+                    "rows": set.rows.iter().map(|r| r.iter().map(value_to_json).collect::<Vec<_>>()).collect::<Vec<_>>(),
+                    "truncated": set.truncated,
+                })).collect::<Vec<_>>(),
                 "truncated": result.truncated,
             }))
         }
@@ -149,7 +155,13 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
             bridge.ensure_operation_active(&control)?;
             match format {
                 "csv" => {
-                    let null_marker = unique_csv_null_marker(&result.rows);
+                    if result.result_sets.len() > 1 {
+                        return Err("CSV export cannot represent multiple result sets; use JSON".into());
+                    }
+                    let first = result.result_sets.first();
+                    let rows = first.map(|set| set.rows.as_slice()).unwrap_or_default();
+                    let columns = first.map(|set| set.columns.as_slice()).unwrap_or_default();
+                    let null_marker = unique_csv_null_marker(rows);
                     let options = CsvOptions {
                         null_to_empty: false,
                         null_marker: Some(null_marker.clone()),
@@ -157,11 +169,10 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
                         ..CsvOptions::default()
                     };
                     let mut out: Vec<u8> = Vec::new();
-                    write_csv_header_with_options(&mut out, &result.columns, &options)
-                        .map_err(|error| error.to_string())?;
-                    for row in &result.rows {
+                    write_csv_header_with_options(&mut out, columns, &options).map_err(|error| error.to_string())?;
+                    for row in rows {
                         bridge.ensure_operation_active(&control)?;
-                        write_csv_row_with_columns_and_options(&mut out, &result.columns, row, &options)
+                        write_csv_row_with_columns_and_options(&mut out, columns, row, &options)
                             .map_err(|error| error.to_string())?;
                     }
                     bridge.ensure_operation_active(&control)?;
@@ -169,16 +180,25 @@ pub async fn dispatch(bridge: &McpBridge, token: &McpToken, name: &str, args: Js
                     Ok(json!({"format": "csv", "content": content, "null_marker": null_marker}))
                 }
                 _ => {
-                    let mut rows = Vec::with_capacity(result.rows.len());
-                    for row in &result.rows {
+                    let first = result.result_sets.first();
+                    let first_rows = first.map(|set| set.rows.as_slice()).unwrap_or_default();
+                    let first_columns = first.map(|set| set.columns.as_slice()).unwrap_or_default();
+                    let mut rows = Vec::with_capacity(first_rows.len());
+                    for row in first_rows {
                         bridge.ensure_operation_active(&control)?;
                         rows.push(row.iter().map(value_to_json).collect::<Vec<_>>());
                     }
                     bridge.ensure_operation_active(&control)?;
                     Ok(json!({
                         "format": "json",
-                        "columns": result.columns.iter().map(|c| &c.name).collect::<Vec<_>>(),
+                        "columns": first_columns.iter().map(|c| &c.name).collect::<Vec<_>>(),
                         "rows": rows,
+                        "additional_result_sets": result.result_sets.iter().skip(1).map(|set| json!({
+                            "columns": set.columns.iter().map(|c| &c.name).collect::<Vec<_>>(),
+                            "rows": set.rows.iter().map(|r| r.iter().map(value_to_json).collect::<Vec<_>>()).collect::<Vec<_>>(),
+                            "truncated": set.truncated,
+                        })).collect::<Vec<_>>(),
+                        "truncated": result.truncated,
                     }))
                 }
             }
