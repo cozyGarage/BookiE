@@ -7,7 +7,8 @@ use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
 use tablepro_core::{
-    AuthMode, ConnectOptions, DriverMaturity, DriverRegistry, Environment, TlsMode, connection_form_defaults,
+    AuthMode, ConnectOptions, Connection, DriverMaturity, DriverRegistry, Environment, TlsMode,
+    connection_form_defaults,
 };
 use tablepro_storage::{
     SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
@@ -51,6 +52,7 @@ pub struct ConnectDialog {
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
     audit_factory: tablepro_transport::TransportAuditFactory,
+    guard_factory: crate::services::database_service::CandidateGuardFactory,
     applied_driver: Option<u32>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
 }
@@ -97,6 +99,7 @@ pub struct ConnectDialogInit {
     pub prefill: Option<ConnectionPrefill>,
     pub ssh_environment: tablepro_transport::SshEnvironment,
     pub audit_factory: tablepro_transport::TransportAuditFactory,
+    pub guard_factory: crate::services::database_service::CandidateGuardFactory,
 }
 
 #[derive(Debug)]
@@ -384,6 +387,7 @@ impl Component for ConnectDialog {
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
             audit_factory: init.audit_factory,
+            guard_factory: init.guard_factory,
             applied_driver: None,
             connect_cancel: None,
         };
@@ -486,6 +490,7 @@ impl Component for ConnectDialog {
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
                 let audit_factory = self.audit_factory.clone();
+                let guard_factory = self.guard_factory.clone();
 
                 let bound_id = self.bound_connection_id;
                 let cancel = tokio_util::sync::CancellationToken::new();
@@ -502,6 +507,7 @@ impl Component for ConnectDialog {
                                 ssh: ssh_inputs,
                                 ssh_environment,
                                 audit_factory,
+                                guard_factory,
                                 read_only,
                                 environment,
                                 timeout_secs,
@@ -554,7 +560,10 @@ impl Component for ConnectDialog {
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
                 let audit_factory = self.audit_factory.clone();
+                let guard_factory = self.guard_factory.clone();
                 let name = saved_connection_name(self.name.text().as_str(), &entry.id, &opts);
+                let read_only = self.read_only.is_active();
+                let query_timeout_secs = timeout_value(self.query_timeout.value());
                 let bound_id = self.bound_connection_id;
                 let environment = self.selected_environment();
                 let cancellation = tokio_util::sync::CancellationToken::new();
@@ -581,11 +590,20 @@ impl Component for ConnectDialog {
                                     let audit = audit_factory.context(
                                         tablepro_policy::Principal::human_gui(),
                                         id,
-                                        name,
+                                        name.clone(),
                                         environment,
                                         entry.id.clone(),
                                     );
                                     let ssh_environment = ssh_environment.with_audit(audit);
+                                    let metadata = crate::services::database_service::ConnectionMetadata {
+                                        id,
+                                        name: name.clone(),
+                                        driver_id: entry.id.clone(),
+                                        environment,
+                                        read_only,
+                                        server_version: None,
+                                        query_timeout_secs,
+                                    };
                                     match tablepro_transport::establish_with_cancellation(
                                         driver.as_ref(),
                                         opts,
@@ -595,10 +613,18 @@ impl Component for ConnectDialog {
                                     )
                                     .await
                                     {
-                                        Ok((conn, _tunnel)) => match conn.list_tables_controlled(&control).await {
-                                            Ok(tables) => Ok(tables.len()),
-                                            Err(e) => Err(format!("list_tables: {e}")),
-                                        },
+                                        Ok((conn, _tunnel)) => {
+                                            let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
+                                            let guarded = guard_factory.guard(
+                                                conn,
+                                                &metadata,
+                                                tablepro_policy::Principal::human_gui(),
+                                            );
+                                            match guarded.list_tables_controlled(&control).await {
+                                                Ok(tables) => Ok(tables.len()),
+                                                Err(e) => Err(format!("list_tables: {e}")),
+                                            }
+                                        }
                                         Err(e) => Err(e.to_string()),
                                     }
                                 }
@@ -892,6 +918,7 @@ struct ConnectRequest {
     ssh: Option<SshInputs>,
     ssh_environment: tablepro_transport::SshEnvironment,
     audit_factory: tablepro_transport::TransportAuditFactory,
+    guard_factory: crate::services::database_service::CandidateGuardFactory,
     read_only: bool,
     environment: Environment,
     timeout_secs: u32,
@@ -900,11 +927,16 @@ struct ConnectRequest {
 }
 
 struct OpenedCandidate {
-    conn: Box<dyn tablepro_core::Connection>,
+    conn: Arc<dyn tablepro_core::Connection>,
     tunnel: Option<tablepro_transport::Tunnel>,
     server_version: Option<String>,
     tables: Vec<tablepro_core::TableInfo>,
     views: Vec<tablepro_core::TableInfo>,
+}
+
+struct CandidateBootstrap<'a> {
+    guard_factory: &'a crate::services::database_service::CandidateGuardFactory,
+    metadata: &'a crate::services::database_service::ConnectionMetadata,
 }
 
 async fn open_candidate(
@@ -914,18 +946,29 @@ async fn open_candidate(
     ssh_environment: &tablepro_transport::SshEnvironment,
     timeout_secs: u32,
     cancellation: tokio_util::sync::CancellationToken,
+    bootstrap: CandidateBootstrap<'_>,
 ) -> Result<OpenedCandidate, String> {
     let (conn, tunnel) =
         tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
             .await
             .map_err(|error| error.to_string())?;
-    let server_version = conn.server_version().await.ok().flatten();
+    let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
+    let guarded = bootstrap.guard_factory.guard(
+        conn.clone(),
+        bootstrap.metadata,
+        tablepro_policy::Principal::human_gui(),
+    );
+    let server_version = match guarded.server_version().await {
+        Ok(version) => version,
+        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(_) => None,
+    };
     let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = conn
+    let tables = guarded
         .list_tables_controlled(&control)
         .await
         .map_err(|e| format!("list_tables: {e}"))?;
-    let views = conn
+    let views = guarded
         .list_views_controlled(&control)
         .await
         .map_err(|e| format!("list_views: {e}"))?;
@@ -948,6 +991,7 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         ssh,
         ssh_environment,
         audit_factory,
+        guard_factory,
         read_only,
         environment,
         timeout_secs,
@@ -979,6 +1023,15 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         driver_id.clone(),
     ));
 
+    let candidate_metadata = crate::services::database_service::ConnectionMetadata {
+        id,
+        name: label.clone(),
+        driver_id: driver_id.clone(),
+        environment,
+        read_only,
+        server_version: None,
+        query_timeout_secs,
+    };
     let opening = open_candidate(
         driver.as_ref(),
         opts.clone(),
@@ -986,6 +1039,10 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         &ssh_environment,
         timeout_secs,
         cancel.clone(),
+        CandidateBootstrap {
+            guard_factory: &guard_factory,
+            metadata: &candidate_metadata,
+        },
     );
     let opened = match opening.await {
         Ok(opened) => opened,

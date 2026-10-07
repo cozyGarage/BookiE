@@ -6,7 +6,7 @@ use tablepro_transport::TransportError;
 use tablepro_transport::{SshEnvironment, SshRoute, Tunnel};
 use uuid::Uuid;
 
-use super::database_service::{ConnectionMetadata, DatabaseService, ReconnectParams};
+use super::database_service::{CandidateGuardFactory, ConnectionMetadata, DatabaseService, ReconnectParams};
 
 /// A connection that has authenticated and completed its initial metadata
 /// query, but has not replaced the active application connection yet.
@@ -18,7 +18,7 @@ pub struct PreparedConnection {
     pub driver_id: String,
     id: uuid::Uuid,
     metadata: ConnectionMetadata,
-    connection: Box<dyn Connection>,
+    connection: Arc<dyn Connection>,
     tunnel: Option<Tunnel>,
     read_only: bool,
     params: ReconnectParams,
@@ -56,7 +56,7 @@ impl PreparedConnection {
         views: Vec<tablepro_core::TableInfo>,
         driver_id: String,
         metadata: ConnectionMetadata,
-        connection: Box<dyn Connection>,
+        connection: Arc<dyn Connection>,
         tunnel: Option<Tunnel>,
         params: ReconnectParams,
     ) -> Self {
@@ -82,7 +82,7 @@ impl PreparedConnection {
     /// refusal here never needs to be rolled back.
     pub fn activate(self, database: &DatabaseService) -> Option<ActivatedConnection> {
         let id = self.id;
-        let activated = database.activate(
+        let activated = database.activate_shared(
             id,
             self.metadata,
             self.connection,
@@ -108,6 +108,7 @@ pub async fn open_saved(
     timeout_secs: u32,
     ssh_environment: SshEnvironment,
     cancellation: tokio_util::sync::CancellationToken,
+    guard_factory: CandidateGuardFactory,
 ) -> Result<PreparedConnection, String> {
     let driver = registry
         .get(&saved.driver_id)
@@ -129,24 +130,34 @@ pub async fn open_saved(
     )
     .await
     .map_err(message)?;
-    let server_version = conn.server_version().await.ok().flatten();
-    let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = conn
-        .list_tables_controlled(&control)
-        .await
-        .map_err(|e| format!("list_tables: {e}"))?;
-    let views = conn
-        .list_views_controlled(&control)
-        .await
-        .map_err(|e| format!("list_views: {e}"))?;
+    let connection: Arc<dyn Connection> = Arc::from(conn);
     let metadata = ConnectionMetadata {
         id,
         name: saved.name.clone(),
         driver_id: saved.driver_id.clone(),
         environment,
         read_only,
-        server_version,
+        server_version: None,
         query_timeout_secs: saved.query_timeout_secs,
+    };
+    let guarded = guard_factory.guard(connection.clone(), &metadata, tablepro_policy::Principal::human_gui());
+    let server_version = match guarded.server_version().await {
+        Ok(version) => version,
+        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(_) => None,
+    };
+    let control = crate::services::operation_control::bounded(timeout_secs);
+    let tables = guarded
+        .list_tables_controlled(&control)
+        .await
+        .map_err(|e| format!("list_tables: {e}"))?;
+    let views = guarded
+        .list_views_controlled(&control)
+        .await
+        .map_err(|e| format!("list_views: {e}"))?;
+    let metadata = ConnectionMetadata {
+        server_version,
+        ..metadata
     };
     let params = ReconnectParams {
         driver,
@@ -159,7 +170,7 @@ pub async fn open_saved(
         views,
         saved.driver_id,
         metadata,
-        conn,
+        connection,
         tunnel,
         params,
     ))

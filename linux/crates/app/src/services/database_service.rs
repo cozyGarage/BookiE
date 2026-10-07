@@ -71,6 +71,42 @@ pub struct ReconnectParams {
     pub environment: SshEnvironment,
 }
 
+/// Builds the same audited policy wrapper used by active connections for
+/// connection bootstrap reads. A candidate is not registered yet, but its
+/// metadata reads still belong to the durable audit journal.
+#[derive(Clone)]
+pub struct CandidateGuardFactory {
+    policy: Arc<PolicyConfig>,
+    approval: Arc<dyn tablepro_policy::ApprovalSink>,
+    audit: Arc<dyn tablepro_policy::AuditSink>,
+    audit_state: Arc<AuditState>,
+}
+
+impl CandidateGuardFactory {
+    pub fn guard(
+        &self,
+        connection: Arc<dyn Connection>,
+        metadata: &ConnectionMetadata,
+        principal: Principal,
+    ) -> PolicyGuard {
+        PolicyGuard::new(
+            connection,
+            GuardContext {
+                connection_id: metadata.id,
+                connection_name: metadata.name.clone(),
+                driver_id: metadata.driver_id.clone(),
+                environment: metadata.environment,
+                read_only: metadata.read_only,
+                principal,
+                policy: self.policy.clone(),
+                approval: self.approval.clone(),
+                audit: self.audit.clone(),
+                audit_state: Arc::new(self.audit_state.new_connection_generation()),
+            },
+        )
+    }
+}
+
 struct Entry {
     inner: Arc<Mutex<EntryInner>>,
     metadata: ConnectionMetadata,
@@ -264,6 +300,15 @@ impl DatabaseService {
         tablepro_transport::TransportAuditFactory::new(self.audit.clone(), self.audit_state.clone())
     }
 
+    pub fn candidate_guard_factory(&self) -> CandidateGuardFactory {
+        CandidateGuardFactory {
+            policy: self.policy.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            approval: self.approval.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+            audit: self.audit.clone(),
+            audit_state: self.audit_state.clone(),
+        }
+    }
+
     pub fn enable_system_openssh(&self, openssh: OpenSshEnvironment) {
         self.ssh_environment.lock().unwrap_or_else(|e| e.into_inner()).openssh = Some(openssh);
     }
@@ -309,6 +354,7 @@ impl DatabaseService {
     /// Returns `false` without registering anything when `id` is already
     /// active. `connection` and `tunnel` are dropped in that case -- this
     /// consumes them either way, so refusal alone is enough to close them.
+    #[cfg(test)]
     #[must_use]
     pub fn activate(
         &self,
@@ -319,13 +365,25 @@ impl DatabaseService {
         read_only: bool,
         params: ReconnectParams,
     ) -> bool {
+        self.activate_shared(id, metadata, Arc::from(connection), tunnel, read_only, params)
+    }
+
+    pub(crate) fn activate_shared(
+        &self,
+        id: Uuid,
+        metadata: ConnectionMetadata,
+        connection: Arc<dyn Connection>,
+        tunnel: Option<Tunnel>,
+        read_only: bool,
+        params: ReconnectParams,
+    ) -> bool {
         let mut connections = self.connections.lock().unwrap_or_else(|e| e.into_inner());
         if connections.contains_key(&id) {
             return false;
         }
         let fault = Arc::new(Notify::new());
         connection.attach_fault_notify(Arc::clone(&fault));
-        let arc: Arc<dyn Connection> = Arc::from(connection);
+        let arc = connection;
         let environment = metadata.environment;
         let inner = Arc::new(Mutex::new(EntryInner {
             connection: arc,
@@ -516,6 +574,89 @@ mod tests {
         );
         assert!(activated, "the id is freshly generated, so activation must succeed");
         id
+    }
+
+    #[tokio::test]
+    async fn candidate_catalog_reads_use_the_durable_policy_audit_journal() {
+        let service = DatabaseService::new_isolated();
+        let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
+        let connection: Arc<dyn Connection> = Arc::from(
+            driver
+                .connect(ConnectOptions {
+                    database: ":memory:".into(),
+                    ..Default::default()
+                })
+                .await
+                .expect("sqlite connection"),
+        );
+        let metadata = ConnectionMetadata {
+            id: Uuid::new_v4(),
+            name: "candidate".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Prod,
+            read_only: true,
+            server_version: None,
+            query_timeout_secs: None,
+        };
+        let guard = service
+            .candidate_guard_factory()
+            .guard(connection, &metadata, Principal::human_gui());
+
+        guard.list_tables().await.expect("guarded table listing");
+        guard.list_views().await.expect("guarded view listing");
+
+        let journal = service._audit_temp_dir.as_ref().unwrap().path().join("audit.jsonl");
+        let lines = std::fs::read_to_string(journal).expect("audit journal exists");
+        let events: Vec<serde_json::Value> = lines.lines().map(|line| serde_json::from_str(line).unwrap()).collect();
+        let metadata_events: Vec<_> = events
+            .iter()
+            .filter(|record| record["event"]["decision_rule"] == "metadata_read")
+            .collect();
+        assert_eq!(
+            metadata_events.len(),
+            4,
+            "two metadata reads each have intent and outcome"
+        );
+        assert!(metadata_events.iter().all(|record| {
+            record["event"]["connection_id"] == metadata.id.to_string()
+                && record["event"]["connection_name"] == "candidate"
+        }));
+        let successful_outcomes = metadata_events
+            .iter()
+            .filter(|record| record["event"]["phase"] == "outcome" && record["event"]["terminal_status"] == "succeeded")
+            .count();
+        assert_eq!(successful_outcomes, 2);
+    }
+
+    #[tokio::test]
+    async fn candidate_metadata_read_refuses_when_its_audit_intent_cannot_be_written() {
+        let audit_dir = tempfile::tempdir().expect("audit temp dir");
+        let service = DatabaseService::with_audit(AuditRuntime::unavailable(), Some(audit_dir));
+        let driver: Arc<dyn DatabaseDriver> = Arc::new(drivers_sqlite::SqliteDriver);
+        let connection: Arc<dyn Connection> = Arc::from(
+            driver
+                .connect(ConnectOptions {
+                    database: ":memory:".into(),
+                    ..Default::default()
+                })
+                .await
+                .expect("sqlite connection"),
+        );
+        let metadata = ConnectionMetadata {
+            id: Uuid::new_v4(),
+            name: "candidate".into(),
+            driver_id: "sqlite".into(),
+            environment: Environment::Prod,
+            read_only: true,
+            server_version: None,
+            query_timeout_secs: None,
+        };
+        let guard = service
+            .candidate_guard_factory()
+            .guard(connection, &metadata, Principal::human_gui());
+
+        let result = guard.list_tables().await;
+        assert!(matches!(result, Err(tablepro_core::DriverError::PolicyDenied(_))));
     }
 
     #[tokio::test]

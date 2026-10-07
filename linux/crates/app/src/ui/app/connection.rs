@@ -66,6 +66,7 @@ impl App {
                 prefill,
                 ssh_environment: self.database.ssh_environment(),
                 audit_factory: self.database.transport_audit_factory(),
+                guard_factory: self.database.candidate_guard_factory(),
             })
             .forward(sender.input_sender(), |out| match out {
                 ConnectDialogOutput::Prepared(prepared) => AppMsg::ConnectionPrepared(prepared),
@@ -370,13 +371,21 @@ impl App {
         let ssh_environment = self
             .database
             .ssh_environment_for_connection(&saved, tablepro_policy::Principal::human_gui());
+        let guard_factory = self.database.candidate_guard_factory();
         let sender_clone = sender.clone();
         sender.command(move |_, shutdown| {
             shutdown
                 .register(async move {
                     let attempted = saved.clone();
-                    match connection_service::open_saved(registry, saved, timeout_secs, ssh_environment, cancel.clone())
-                        .await
+                    match connection_service::open_saved(
+                        registry,
+                        saved,
+                        timeout_secs,
+                        ssh_environment,
+                        cancel.clone(),
+                        guard_factory,
+                    )
+                    .await
                     {
                         Ok(prepared) => sender_clone.input(AppMsg::ConnectionPrepared(Box::new(prepared))),
                         Err(_) if cancel.is_cancelled() => sender_clone.input(AppMsg::ConnectionCancelled),
