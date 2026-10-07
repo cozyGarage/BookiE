@@ -6,7 +6,7 @@ use crate::{connect, start_pg};
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
+async fn value_contract_enum_parameter_stays_with_target_type_after_role_and_local_search_path() {
     let (_container, options) = start_pg().await;
     let connection = connect(options).await;
     connection.execute("CREATE SCHEMA enum_role_target").await.unwrap();
@@ -188,6 +188,83 @@ async fn value_contract_enum_parameter_stays_with_target_type_after_set_role() {
         "the target enum must reject the shadow-only label with 22P02: {invalid_shadow_label:?}"
     );
     assert_eq!(error_code(&invalid_shadow_label), error_code(&native_invalid_label));
+
+    session.query_params_controlled("BEGIN", &[], &control).await.unwrap();
+    session
+        .query_params_controlled("SET LOCAL search_path TO enum_role_shadow, public", &[], &control)
+        .await
+        .unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled(
+                "SELECT current_user::text, current_setting('search_path')::text",
+                &[],
+                &control,
+            )
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![
+            Value::Text("enum_role_contract".into()),
+            Value::Text("enum_role_shadow, public".into()),
+        ]]
+    );
+    let local_update = session
+        .query_params_controlled(
+            "UPDATE enum_role_target.rows SET state = $1 WHERE id = 2 \
+             RETURNING id, state::text, pg_typeof(state)::text, sibling",
+            &[Value::Text("target-only".into())],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        local_update.rows,
+        vec![vec![
+            Value::Int(2),
+            Value::Text("target-only".into()),
+            Value::Text(target_type.into()),
+            Value::Text("common sibling".into()),
+        ]]
+    );
+    let local_filter = session
+        .query_params_controlled(
+            "SELECT id FROM enum_role_target.rows \
+             WHERE state IS NOT DISTINCT FROM $1 ORDER BY id",
+            &[Value::Text("target-only".into())],
+            &control,
+        )
+        .await
+        .unwrap();
+    assert_eq!(local_filter.rows, vec![vec![Value::Int(1)], vec![Value::Int(2)]]);
+
+    session
+        .query_params_controlled("SAVEPOINT before_local_invalid_label", &[], &control)
+        .await
+        .unwrap();
+    let local_invalid = session
+        .query_params_controlled(
+            "UPDATE enum_role_target.rows SET state = $1 WHERE id = 2",
+            &[Value::Text("shadow-only".into())],
+            &control,
+        )
+        .await
+        .expect_err("a local shadow path must not accept the shadow-only label");
+    assert_eq!(error_code(&local_invalid).as_deref(), Some("22P02"));
+    assert_eq!(error_code(&local_invalid), error_code(&native_invalid_label));
+    session
+        .query_params_controlled("ROLLBACK TO SAVEPOINT before_local_invalid_label", &[], &control)
+        .await
+        .unwrap();
+    session.query_params_controlled("COMMIT", &[], &control).await.unwrap();
+    assert_eq!(
+        session
+            .query_params_controlled("SHOW search_path", &[], &control)
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Text("enum_role_shadow, enum_role_target, public".into())]]
+    );
 
     session
         .query_params_controlled("SET search_path TO enum_role_shadow, public", &[], &control)
