@@ -49,7 +49,8 @@ stored row remains unchanged
 `Array(Enum16)` and `Array(Nullable(Enum16))` now cover their signed endpoints,
 SQL NULL versus the literal `NULL` label where nullable, the same native JSON
 and export oracles, and lossy SQL, binding and grid-write refusal in that
-contract.
+contract. `Tuple(Enum16, Nullable(Enum16), Enum16)` now uses the same native
+JSON/export oracle and explicit lossy-consumer refusal checks.
 The app grid path also has a native Enum16 keyed-edit contract: a valid label
 survives the parser and update, blank input stores SQL NULL separately from the
 literal `NULL` enum label, the native Int16 code is checked, and an undeclared

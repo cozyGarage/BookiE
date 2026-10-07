@@ -303,11 +303,11 @@ The app's keyed-grid path also edits nullable Enum16 labels against native type
 and signed-code oracles, keeps blank SQL NULL distinct from the literal `NULL`
 label, and proves an undeclared label leaves all rows unchanged
 ([test](../crates/app/tests/support/clickhouse_enum_contract.rs)).
-Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)` and
-`Array(Nullable(Enum16))` use native `toJSONString` as the value oracle and
-check JSON/CSV/XLSX export plus refusal by type-less SQL, binding and keyed
-grid writes. The nullable arrays distinguish SQL NULL elements from an enum
-label literally named `NULL`
+Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)`,
+`Array(Nullable(Enum16))` and `Tuple(Enum16, Nullable(Enum16), Enum16)` use
+native `toJSONString` as the value oracle and check JSON/CSV/XLSX export plus
+refusal by type-less SQL, binding and keyed grid writes. The nullable shapes
+distinguish SQL NULL from an enum label literally named `NULL`
 ([test](../crates/drivers/clickhouse/tests/support/nested_values.rs)).
 
 The compound-result and direct table-projection XLSX workbooks both keep `=1+1`
