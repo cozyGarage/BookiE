@@ -65,11 +65,11 @@ first column says which area owns them.
 | UI-19 | FK picker and navigation, enum and set pickers, paste TSV, estimated counts (the page-size menu exists: the Rows drop-down) | OPEN | B3-hot files; schedule with B3 | gtk-widget |
 | UI-20 | No server output (NOTICE, PRINT) and no timing breakdown | OPEN | Needs a core trait hook | driver-docker |
 | UI-21 | No `CellView` display boundary and no fake connection for the GTK tier | OPEN | Foundation packets in the archived audit | unit |
-| UI-22 | ~~Code folding, vim, multi-cursor, split panes~~ | ACCEPTED | Accepted for 0.2 on 2026-10-07: nice-to-have editor features, outside the usable-first scope. GtkSourceView already gives multi-line editing. Revisit after 0.2 | manual |
+| UI-22 | Code folding, vim, multi-cursor, split panes | ACCEPTED | Accepted for 0.2 on 2026-10-07: nice-to-have editor features, outside the usable-first scope. GtkSourceView already gives multi-line editing. Revisit after 0.2 | manual |
 | UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
 | UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
-| UI-26 | ~~Reusable SSH profiles are not editable~~ | ACCEPTED | Accepted for 0.2 on 2026-10-07: there is no profile feature, a saved connection carries its own SSH settings, so there is nothing to edit. Revisit with the chain editor (UI-1b) | gtk-widget |
+| UI-26 | Reusable SSH profiles are not editable | ACCEPTED | Accepted for 0.2 on 2026-10-07: there is no profile feature, a saved connection carries its own SSH settings, so there is nothing to edit. Revisit with the chain editor (UI-1b) | gtk-widget |
 
 ## Transport, sessions, daemon (B4)
 
@@ -171,8 +171,8 @@ first column says which area owns them.
 | PERF-8 | Editor results are materialized in one go up to the caps; progressive loading is absent | OPEN | Design bounded query pages through core, drivers and `PolicyGuard`, including session ownership, masking, audit, cancellation and retained-page budget. See the [action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md); reference-client paging is engine-specific | driver-docker |
 | PERF-9 | Hidden columns are still selected and transferred (dbx drops them from the query) | OPEN | Part of UI-14b: remove hidden non-key columns from the browse SELECT | unit + driver-docker |
 | PERF-10 | Long cell values are shipped whole to the grid (dbx sends a preview with the byte count and fetches the full value on demand) | OPEN | Preview plus on-demand full value through View Value, behind the guard | driver-docker |
-| PERF-5 | ~~The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked)~~ | ACCEPTED | Accepted on 2026-10-07: eight statically linked drivers is the design (see [adding drivers](adding-drivers.md)). Baseline below stays the reference for regressions | manual |
-| PERF-6 | ~~Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols)~~ | ACCEPTED | Accepted on 2026-10-07: packages may strip symbols; the code size follows from compile-time drivers | manual |
+| PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | ACCEPTED | Accepted on 2026-10-07: eight statically linked drivers is the design (see [adding drivers](adding-drivers.md)). Baseline below stays the reference for regressions | manual |
+| PERF-6 | Release binary is 68 MB on disk (34.7 MiB of code; the rest is symbols) | ACCEPTED | Accepted on 2026-10-07: packages may strip symbols; the code size follows from compile-time drivers | manual |
 | PERF-3 | MongoDB census cost per browse not measured | OPEN | | driver-docker |
 | PERF-4 | Timing shows elapsed only, never server time | OPEN | With UI-20 | driver-docker |
 
