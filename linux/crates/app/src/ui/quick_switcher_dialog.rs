@@ -22,7 +22,9 @@ where
         .build();
 
     let search = gtk::SearchEntry::builder()
-        .placeholder_text(tr!("Search favorites, open tabs, and saved connections"))
+        .placeholder_text(tr!(
+            "Search favorites, tabs, connections and tables. Type > for commands"
+        ))
         .hexpand(true)
         .build();
     search.update_property(&[gtk::accessible::Property::Label("Open quickly search")]);
@@ -99,6 +101,7 @@ where
                     QuickTarget::Tab(_) => "tab-new-symbolic",
                     QuickTarget::Connection(_) => "network-server-symbolic",
                     QuickTarget::Relation { .. } => "view-list-symbolic",
+                    QuickTarget::Command(_) => "system-run-symbolic",
                 };
                 row.add_prefix(&gtk::Image::from_icon_name(icon));
                 let open_label = tr!("Open {name}").replace("{name}", &item.title);

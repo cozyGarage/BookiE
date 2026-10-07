@@ -35,6 +35,7 @@
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.
 - A script with more than five statements shows its results in a drop-down instead of a row of buttons that overflows the window.
 - Preferences has an opt-in Vim keys setting for the SQL editor, applied to editors opened afterwards.
+- A table remembers the column order you drag it to, per connection.
 - Find in Loaded Rows (Ctrl+Alt+F or the grid menu) lists the loaded rows that contain a text and selects the one you pick.
 - Holding Ctrl and pressing Tab repeatedly walks deeper through the recently used tabs; releasing Ctrl keeps the chosen tab.
 - Preferences has an Editor font family setting; an empty value keeps the system monospace font.
