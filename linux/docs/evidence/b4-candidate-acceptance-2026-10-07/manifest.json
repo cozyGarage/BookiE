@@ -33,5 +33,34 @@
     "upgrade/rollback",
     "Debian/GNOME Wayland",
     "B3 completion"
-  ]
+  ],
+  "ui_reruns": [
+    {
+      "commit": "301b05926418eddd7cf895781de56dea77c87c77",
+      "report": "ui-pr162-report.json",
+      "log": "ui-pr162.log",
+      "status": "passed",
+      "scenarios": 47,
+      "seconds": 268.396,
+      "report_sha256": "3b79a6d0e1b2f39fe141d1ef3830f34971f6ad2b049d024cbf01c30d03bf2137",
+      "log_sha256": "173e9d36808e46fbbc27c96ea45b8bbdbf07d1eed342d39bceb0485f1e936bc6"
+    }
+  ],
+  "hosted_pr_162_snapshot": {
+    "status": "in_progress_at_2026-10-07T08:38Z",
+    "passed": [
+      "workflow-lint",
+      "harness",
+      "resolve-ref",
+      "security-policy",
+      "supply-chain",
+      "SonarCloud",
+      "Flatpak development build"
+    ],
+    "pending": [
+      "preflight/sandbox layer",
+      "Flatpak default build"
+    ],
+    "note": "GTK safety and PostgreSQL release jobs had not started when recorded."
+  }
 }

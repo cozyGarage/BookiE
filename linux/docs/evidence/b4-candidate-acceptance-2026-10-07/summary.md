@@ -1,29 +1,26 @@
-B4 candidate acceptance checkpoint — 2026-10-07
+# B4 candidate acceptance checkpoint — 2026-10-07
 
-Baseline: fork/linux 4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4 (PR #159 merge).
+The broad candidate layer report records local work based on `fork/linux`
+`4f819f9123fe005db7dbd5f530ad8f3c73e1f0d4` (PR #159). It passed the full,
+security-policy, drivers, TLS, SSH, PostgreSQL release, widgets, keyring,
+app-server, supply-chain and SQL Server Kerberos. The Arch packaging-contract
+test passed; the Debian package-contract step first lacked `dpkg-deb` on this
+host. The UI layer first exposed stale setup in `audit_failure_denies` and a flaky
+bundle-import file chooser. The Debian package validator passed in a disposable Debian testing container.
 
-Initial broad local layer run: full, security-policy, drivers, TLS, SSH,
-PostgreSQL release, widgets, keyring, app-server, packaging contracts,
-supply-chain and SQL Server Kerberos passed. UI initially exposed a stale GTK
-setup in audit_failure_denies and a flaky file chooser interaction in the
-bundle-import scenarios. Host Debian package-contract step was blocked because
-dpkg-deb is absent on this host.
+PR #162 fixes the UI test setup and adds the Xvfb/AT-SPI runtime packages to
+the PostgreSQL release job. PR #161 had already supplied its GTK/GLib build
+dependencies. On PR #162's exact source SHA `301b05926418eddd7cf895781de56dea77c87c77`,
+the full local UI layer passed all 47 scenarios in 268.396 seconds. The raw
+report and log are `ui-pr162-report.json` and `ui-pr162.log`.
 
-Local follow-up fixes: audit_failure_denies now exercises a saved connection
-without opening the editor and verifies denial/audit behavior; bundle import
-uses the AT-SPI location action. The complete UI layer then passed (47 GTK
-scenarios; 238.348 seconds). The Debian package symlink validator passed in a
-disposable debian:testing container (image digest recorded in the manifest).
-Workflow actionlint and the 9-test workflow unit suite passed. Python bytecode
-compilation passed.
+At the 2026-10-07 08:38 UTC hosted snapshot, workflow lint, harness, ref
+resolution, security policy, supply-chain, SonarCloud and the development
+Flatpak build passed. The preflight layer and default Flatpak build were still
+running; GTK safety and PostgreSQL release jobs had not yet started. See the
+manifest for exact report hashes and status details. Do not treat pending
+checks as passes.
 
-Hosted PR #159 at merge: PostgreSQL release job failed before tests because
-GTK/GLib development pkg-config dependencies were missing. Installed GTK
-safety smoke failed because its setup opened the editor before testing the
-expected audit fail-closed path. The PostgreSQL workflow now installs the GTK
-build and AT-SPI runtime dependencies; the GTK test corrections are local.
-These hosted fixes still require a follow-up PR and fresh hosted checks.
-
-Not established here: installed Arch/Omarchy/Hyprland Wayland acceptance,
-upgrade/rollback, Debian/GNOME Wayland acceptance, or B3 completion. This
-checkpoint does not close B4 or qualify a release.
+Installed Arch/Omarchy/Hyprland Wayland acceptance, upgrade/rollback,
+Debian/GNOME Wayland acceptance, B3 completion and frozen-candidate acceptance
+are not established here. This evidence does not close B4 or qualify a release.
