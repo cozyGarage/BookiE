@@ -59,6 +59,13 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
             name: "status".into()
         })
     );
+    assert_eq!(
+        columns[1].domain_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: "status_domain_257".into(),
+        })
+    );
 
     let (update, params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
@@ -69,7 +76,10 @@ async fn value_contract_domain_over_enum_257_levels_preserve_schema_aware_values
         &[Value::Int(1)],
     )
     .unwrap();
-    assert!(update.contains(&format!("\"{schema}\".\"status\"")), "{update}");
+    assert!(
+        update.contains(&format!("\"{schema}\".\"status_domain_257\"")),
+        "{update}"
+    );
     connection.execute_params(&update, &params).await.unwrap();
 
     let raw = connection
@@ -235,6 +245,13 @@ async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values
             name: "status".into(),
         })
     );
+    assert_eq!(
+        columns[1].domain_type,
+        Some(tablepro_core::QualifiedTypeName {
+            schema: schema.into(),
+            name: "status_domain_259".into(),
+        })
+    );
 
     let (update, params) = tablepro_core::sql_dialect::build_keyed_update(
         "postgres",
@@ -245,7 +262,10 @@ async fn value_contract_domain_over_enum_259_levels_preserve_schema_aware_values
         &[Value::Int(1)],
     )
     .unwrap();
-    assert!(update.contains(&format!("\"{schema}\".\"status\"")), "{update}");
+    assert!(
+        update.contains(&format!("\"{schema}\".\"status_domain_259\"")),
+        "{update}"
+    );
     connection.execute_params(&update, &params).await.unwrap();
 
     let filters = FilterSet {
