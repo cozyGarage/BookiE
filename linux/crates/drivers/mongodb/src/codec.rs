@@ -65,6 +65,7 @@ pub(super) fn columns_from_types(mut union: BTreeMap<String, String>) -> Vec<Col
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         });
     }
     for (name, data_type) in union {
@@ -79,6 +80,7 @@ pub(super) fn columns_from_types(mut union: BTreeMap<String, String>) -> Vec<Col
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         });
     }
     columns

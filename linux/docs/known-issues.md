@@ -161,8 +161,8 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | DOC-6 | ~~Too many top-level documents~~ | DONE | 30 dated documents moved to [archive](archive/) | n/a |
 | PERF-1 | PostgreSQL capped result about 12% slower, 58% lower RSS | OPEN | Profile release binaries | manual |
 | PERF-2 | Arbitrary results are materialized up to three caps (1M rows, 10M cells, 64 MiB estimated bytes), not streamed | OPEN | Baseline 2026-10-07 below: the byte cap binds first; GUI memory is about 2.5x the driver result; no streaming yet | driver-docker |
-| PERF-7 | The grid deep-cloned every result row into its own GObject up front, so a 100k-row result held the rows twice | OPEN | Rows are now shared with the result and wrapped only when shown: 100k rows went from 308 MB to 240 MB resident (+150 to +82 MB over idle), 300k capped from 339 to 254 MB, measured on the runner. Remaining: the 61 MB driver result and the browse tab export copy. Target of 50% less not yet met | gtk-widget + profile |
-| PERF-8 | Editor results are materialized in one go up to the caps; dbx pages 100 rows by default and appends more through a server-side cursor session on scroll | OPEN | Cursor-style progressive loading for editor queries: classify and audit once at open, bounded pages, cancel reaches the server. Needs a core design and an ADR note | driver-docker |
+| PERF-7 | Query results remain resident, and loaded-result query export still copies the capped result; the grid also owns draft/replacement rows | OPEN | Shared result rows now use weak `RowObject` caches. Three-run release GTK profiles cut scroll RSS growth from 69.8 to 5.2 MB at 100k rows and from 84.4 to 5.8 MB at the 120,019-row cap. Initial-load and loaded-query export costs remain. See the [profile and action record](archive/grid-memory-and-fetch-action-plan-2026-10-07.md) | gtk-widget + profile |
+| PERF-8 | Editor results are materialized in one go up to the caps; progressive loading is absent | OPEN | Design bounded query pages through core, drivers and `PolicyGuard`, including session ownership, masking, audit, cancellation and retained-page budget. See the [action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md); reference-client paging is engine-specific | driver-docker |
 | PERF-9 | Hidden columns are still selected and transferred (dbx drops them from the query) | OPEN | Part of UI-14b: remove hidden non-key columns from the browse SELECT | unit + driver-docker |
 | PERF-10 | Long cell values are shipped whole to the grid (dbx sends a preview with the byte count and fetches the full value on demand) | OPEN | Preview plus on-demand full value through View Value, behind the guard | driver-docker |
 | PERF-5 | The idle app uses about 158 MB resident (Xvfb software rendering, eight drivers linked) | OPEN | Measure on real GPU rendering and with fewer drivers; see baseline below | manual |
@@ -173,23 +173,31 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 ### What the reference client does differently
 
 Read from dbx at `d9338d1` (a Tauri and Vue app over a Rust core), source only;
-none of it was run. Its speed comes from holding and drawing less:
+none of it was run. These mechanisms can reduce held and drawn data; this is
+not a measured cross-client speed comparison:
 
 - pages of 100 rows by default, a 10,000-row fetch ceiling, and more rows
-  appended through a server-side cursor session as the user scrolls;
+  appended through result sessions on supported paths. A result session does
+  not by itself prove a server-side cursor or bounded driver buffering;
 - result rows marked raw (`markRaw`), so no per-row reactive objects exist;
 - truncated cell previews with the full value fetched on demand, and hidden
   columns left out of the query;
 - a canvas renderer with a fixed row height that paints only visible cells.
 
-Our grid has the same virtualization (`GtkColumnView`), but wraps each row in a
-GObject cloned from the result. PERF-7 to PERF-10 apply the same restraint.
+Our grid uses widget virtualization (`GtkColumnView`) and shares the result.
+`RowStore` weakly caches requested shared rows, preserving object identity while
+consumers hold references and recreating a clean row after those references are
+released. Draft and replacement rows stay strongly owned. Three-run scroll
+profiles reduced retained RSS growth by 80–93%; the query result itself remains
+fully resident. PERF-7 to PERF-10 track the remaining work. See the [October 7
+profile and action record](archive/grid-memory-and-fetch-action-plan-2026-10-07.md).
 
 ### Performance baseline, 2026-10-07
 
-Measured on the Arch runner (10 vCPU, host CPU type) with release builds, from
-`scripts/profile-baseline.sh`. Rows have six columns of mixed integer, real and
-text values (about 0.6 KB each).
+Historical pre-RowStore baseline measured on the Arch runner (10 vCPU, host CPU
+type) with release builds, from the then-current `scripts/profile-baseline.sh`.
+Rows have six columns of mixed integer, real and text values (about 0.6 KB
+each). The current scroll profile is recorded separately in the action plan.
 
 | Level | Rows requested | Rows shown | Time | Memory |
 | --- | ---: | ---: | ---: | ---: |
@@ -206,7 +214,9 @@ text values (about 0.6 KB each).
   row), 59 MB peak heap.
 - The 64 MiB byte budget binds long before 1,000,000 rows for text-heavy rows,
   so memory is bounded, but each shown row costs about 1.5 KB in the app against
-  0.6 KB in the driver result: the grid holds a second copy.
+  0.6 KB in the driver result: at this baseline the grid held a second copy.
+  PERF-7 records the later lazy-row measurements. Neither set was rerun by the
+  October 7 source review on the local workstation.
 - The Xvfb run uses software rendering; resident size on a real GPU session
   will differ and still needs a measurement.
 

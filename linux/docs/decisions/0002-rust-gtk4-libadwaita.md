@@ -25,7 +25,7 @@ from the gtk-rs project. The application supports Linux only.
 
 ## Rationale
 
-`GtkColumnView` provides the virtualized list and column model needed by the result grid. The current `RowStore` creates row GObjects on demand, while the query result itself remains fully resident in memory; database paging is a separate capability and is not implied by widget virtualization. GtkSourceView provides the editor foundation. GTK supplies accessibility, input methods, clipboard integration, drag and drop, and desktop services without embedding a browser runtime.
+`GtkColumnView` provides the virtualized list and column model needed by the result grid. `RowStore` weakly caches row GObjects on demand, preserving each object's identity while consumers hold it; clean shared rows can be recreated after release, while drafts and replacement rows remain model-owned. The query result itself remains fully resident in memory; database paging is a separate capability and is not implied by widget virtualization. GtkSourceView provides the editor foundation. GTK supplies accessibility, input methods, clipboard integration, drag and drop, and desktop services without embedding a browser runtime.
 
 libadwaita provides navigation, tab, toolbar, dialog, and preference widgets that match the selected GNOME platform baseline. GTK remains usable on KDE Plasma without a second UI implementation.
 

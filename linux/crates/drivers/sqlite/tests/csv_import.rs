@@ -237,6 +237,7 @@ async fn a_csv_file_creates_the_table_it_is_loaded_into_and_fills_it() {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         })
         .collect();
     let plan = plan_for("people", &columns, csv);
@@ -489,5 +490,6 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }

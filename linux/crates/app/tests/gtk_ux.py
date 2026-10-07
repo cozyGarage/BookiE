@@ -238,6 +238,11 @@ def scenarios(ui):
 
     def profile_large_result_in_the_grid(database, base):
         rows = int(os.environ["TABLEPRO_PROFILE_ROWS"])
+
+        def rss_sample():
+            resident, high_water = app_memory_kb()
+            return {"rss_mb": round(resident / 1024, 1), "peak_mb": round(high_water / 1024, 1)}
+
         sql = (
             f"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < {rows}) "
             "SELECT x, 'person-' || x, x * 1.5, x % 2, datetime('2026-01-01', '+' || (x % 100000) || ' seconds'), "
@@ -247,12 +252,86 @@ def scenarios(ui):
         started = time.monotonic()
         ui.run_sql(sql)
         ui.wait_for_node_containing("done in", timeout=300)
-        shown = time.monotonic() - started
+        first_result_seconds = time.monotonic() - started
         time.sleep(3)
-        after_rss, peak = app_memory_kb()
+        after_load = rss_sample()
+
+        application = ui.application_node()
+        scrollbars = []
+        for node in ui.descendants(application):
+            if ui.node_role(node) != ui.pyatspi.ROLE_SCROLL_BAR:
+                continue
+            try:
+                bounds = node.queryComponent().getExtents(ui.pyatspi.WINDOW_COORDS)
+                value = node.queryValue()
+                if bounds.height > bounds.width and value.maximumValue > value.minimumValue:
+                    scrollbars.append((bounds.height, bounds.x, bounds.y, value))
+            except Exception:
+                continue
+        assert scrollbars, f"no usable vertical scrollbar in accessibility tree:\n{ui.accessible_snapshot()}"
+
+        def visible_row_range():
+            found = []
+            for node in ui.descendants(application):
+                name = ui.node_name(node)
+                if name.startswith("person-"):
+                    try:
+                        found.append(int(name.removeprefix("person-")))
+                    except ValueError:
+                        pass
+            return [min(found), max(found)] if found else []
+
+        initial_visible = visible_row_range()
+        probes = []
+        for height, x, y, value in scrollbars:
+            value.set_currentValue(value.maximumValue)
+            time.sleep(0.5)
+            observed = visible_row_range()
+            probes.append({"x": x, "y": y, "height": height, "rows": observed})
+            value.set_currentValue(value.minimumValue)
+            time.sleep(0.3)
+        moving = [entry for entry in probes if entry["rows"] and initial_visible and entry["rows"][1] > initial_visible[1]]
+        assert moving, f"no vertical scrollbar moved grid rows: initial={initial_visible}, probes={probes}"
+        chosen = max(moving, key=lambda entry: entry["rows"][1])
+        scrollbar = next(value for _, x, y, value in scrollbars if x == chosen["x"] and y == chosen["y"])
+        lower = scrollbar.minimumValue
+        upper = scrollbar.maximumValue
+
+        def traverse_to(start_fraction, end_fraction, steps):
+            started_scroll = time.monotonic()
+            for step in range(1, steps + 1):
+                fraction = start_fraction + (end_fraction - start_fraction) * step / steps
+                scrollbar.set_currentValue(lower + (upper - lower) * fraction)
+                time.sleep(0.005)
+            time.sleep(2)
+            sample = rss_sample()
+            sample["visible_rows"] = visible_row_range()
+            sample["scrollbar_value"] = round(scrollbar.currentValue, 2)
+            return round(time.monotonic() - started_scroll, 3), sample
+
+        scroll_steps = int(os.environ.get("TABLEPRO_PROFILE_SCROLL_STEPS", str(min(20000, max(1000, rows // 10)))))
+        middle_steps = max(1, scroll_steps // 2)
+        middle_seconds, middle = traverse_to(0.0, 0.5, middle_steps)
+        end_seconds, end = traverse_to(0.5, 1.0, scroll_steps - middle_steps or 1)
+        top_seconds, top = traverse_to(1.0, 0.0, scroll_steps)
+        _, peak = app_memory_kb()
+        result_status = sorted({
+            ui.node_name(node) for node in ui.descendants(application)
+            if any(word in ui.node_name(node).lower() for word in ("done in", "truncat"))
+        })
         line = json.dumps({
-            "rows_requested": rows, "seconds_to_result": round(shown, 2),
-            "rss_before_mb": round(before_rss / 1024, 1), "rss_after_mb": round(after_rss / 1024, 1),
+            "rows_requested": rows,
+            "repetition": int(os.environ.get("TABLEPRO_PROFILE_REPETITION", "1")),
+            "rows_loaded_inferred": end["visible_rows"][1] if end["visible_rows"] else None,
+            "truncated_inferred": bool(end["visible_rows"] and end["visible_rows"][1] < rows),
+            "result_status": result_status,
+            "first_result_seconds": round(first_result_seconds, 2),
+            "rss_before_mb": round(before_rss / 1024, 1),
+            "after_load": after_load, "after_middle": middle,
+            "after_end": end, "after_return_top": top,
+            "scroll_seconds": {"middle": middle_seconds, "end": end_seconds, "top": top_seconds},
+            "visible_person_rows": visible_row_range(),
+            "scrollbar_probes": probes,
             "peak_mb": round(peak / 1024, 1),
         })
         with open(os.environ["TABLEPRO_PROFILE_OUT"], "a") as out:

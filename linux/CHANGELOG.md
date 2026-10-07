@@ -25,6 +25,7 @@
 - Saved connections can be edited from the welcome list, including their password, TLS, timeouts and single-hop SSH settings.
 - PostgreSQL enum results and browse filters preserve the literal label `NULL` separately from SQL NULL across scalar and array projections and typed comparisons.
 - PostgreSQL UUID-domain arrays preserve their values through result decoding, bound writes, and keyed edits.
+- PostgreSQL domains over arrays preserve declared type metadata and non-default bounds through results and keyed edits, with native JSON/wire checks and domain CHECK refusal.
 - PostgreSQL CSV imports cast custom enum labels to their catalog type and refuse ambiguous blank enum cells unless an explicit NULL marker is set.
 - PostgreSQL scalar enum CSV export and typed restore preserve leading and trailing label spaces.
 - PostgreSQL grid edits preserve wide `NUMERIC` values that are stored as exact text.

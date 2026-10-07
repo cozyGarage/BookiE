@@ -22,6 +22,7 @@ fn value_contract_postgres_scalar_named_array_types_stay_text_in_the_grid_parser
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         let parsed = parse_input_for_driver(literal, Some(&column), "postgres")
             .unwrap_or_else(|error| panic!("{data_type}: {error}"));
@@ -677,6 +678,7 @@ fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -689,6 +691,7 @@ fn value_contract_postgres_float8_array_grid_literal_keeps_subnormal_and_signed_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -721,6 +724,7 @@ fn value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_key
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -733,6 +737,7 @@ fn value_contract_postgres_boolean_array_grid_literal_stays_text_through_the_key
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -765,6 +770,7 @@ fn value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -777,6 +783,7 @@ fn value_contract_postgres_bytea_array_grid_literal_keeps_escaped_bytes_through_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -809,6 +816,7 @@ fn value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -821,6 +829,7 @@ fn value_contract_postgres_uuid_array_grid_literal_stays_text_through_the_keyed_
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -853,6 +862,7 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         ColumnInfo {
             name: "value".into(),
@@ -865,6 +875,7 @@ fn value_contract_postgres_timestamptz_array_grid_literal_stays_text_through_the
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
     ];
     let parsed = parse_input_for_driver(literal, Some(&columns[1]), "postgres").unwrap();
@@ -899,6 +910,7 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
             schema: "enum_array_schema".into(),
             name: "label".into(),
         }),
+        domain_type: None,
     };
     let parsed = parse_input_for_driver(literal, Some(&column), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
@@ -922,6 +934,7 @@ fn value_contract_postgres_custom_enum_array_grid_literal_stays_text_with_a_qual
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         column,
     ];
@@ -955,6 +968,7 @@ fn value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain
             schema: "public".into(),
             name: "value_contract_domain_array_label".into(),
         }),
+        domain_type: None,
     };
     let parsed = parse_input_for_driver(literal, Some(&column), "postgres").unwrap();
     assert_eq!(parsed, Value::Text(literal.into()));
@@ -970,6 +984,7 @@ fn value_contract_postgres_domain_enum_array_grid_literal_stays_text_with_domain
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         },
         column,
     ];

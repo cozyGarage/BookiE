@@ -210,6 +210,7 @@ impl Connection for DuckdbConnection {
                         comment: None,
                         collation: None,
                         enum_type: None,
+                        domain_type: None,
                     })
                 })
                 .map_err(map_duck_error)?;
@@ -432,6 +433,7 @@ fn run_query(
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             })
             .collect()
     } else {
@@ -447,6 +449,7 @@ fn run_query(
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             })
             .collect()
     };

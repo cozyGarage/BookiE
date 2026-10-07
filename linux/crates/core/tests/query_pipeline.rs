@@ -26,6 +26,7 @@ fn column(name: &str, data_type: &str, primary_key: bool) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

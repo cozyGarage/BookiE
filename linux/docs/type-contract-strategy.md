@@ -14,7 +14,7 @@ through result decoding, typed parameter binding, keyed grid edits and CSV
 export/import. Native `array_send`, JSON, type and sibling-row checks are the
 oracles; malformed array text and same-named composite types are refused without
 data loss ([evidence](evidence/postgres-citext-array-roundtrip-results-2026-10-06/manifest.json)).
-Other custom PostgreSQL array families remain open.
+Domain-over-array columns now retain their declared PostgreSQL domain metadata in query results and table metadata, so keyed grid edits cast through the qualified domain. The Docker regression checks non-default lower bounds, NULL/empty arrays, JSON and wire bytes, plus CHECK refusal ([test](../crates/drivers/postgres/tests/support/domain_array_type_contract.rs)). Other custom PostgreSQL array families remain open.
 
 PostgreSQL `bit[]` and `varbit[]` now decode from their native array wire
 format. Fixed-width values, varying lengths, empty bit strings, SQL NULL,
