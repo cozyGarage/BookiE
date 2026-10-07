@@ -78,14 +78,14 @@ def _listing_last_fields(package: Path) -> set[str]:
     return {line.split()[-1] for line in listing.splitlines() if line.strip()}
 
 
-def check_rules_build_and_install_the_askpass_helper(source: Path) -> None:
-    rules = (source / "packaging/debian/rules").read_text()
-    assert "--bin tablepro-askpass" in rules, "debian/rules does not build the SSH askpass helper"
-    assert "usr/bin/tablepro-askpass" in rules, "debian/rules does not install the SSH askpass helper"
+def check_builder_builds_and_installs_the_askpass_helper(source: Path) -> None:
+    builder = (source / "scripts/build-deb.sh").read_text()
+    assert "--bin tablepro-askpass" in builder, "build-deb.sh does not build the SSH askpass helper"
+    assert "usr/bin/tablepro-askpass" in builder, "build-deb.sh does not install the SSH askpass helper"
 
 
 def main() -> None:
-    check_rules_build_and_install_the_askpass_helper(Path(__file__).resolve().parents[2])
+    check_builder_builds_and_installs_the_askpass_helper(Path(__file__).resolve().parents[2])
     if shutil.which("dpkg-deb") is None:
         print("Debian package validation skipped: dpkg-deb is unavailable")
         return

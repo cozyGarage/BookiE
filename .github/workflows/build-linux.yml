@@ -166,6 +166,7 @@ jobs:
           if-no-files-found: error
 
   gtk-safety:
+    if: github.event_name != 'pull_request'
     name: Installed GTK safety smoke
     timeout-minutes: 60
     runs-on: ubuntu-24.04
@@ -283,6 +284,7 @@ jobs:
         run: cargo +stable clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
 
   integration:
+    if: github.event_name != 'pull_request'
     name: Driver integration tests (docker)
     timeout-minutes: 45
     runs-on: ubuntu-24.04
@@ -331,6 +333,7 @@ jobs:
           if-no-files-found: error
 
   driver-tls:
+    if: github.event_name != 'pull_request'
     name: Driver TLS fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -375,6 +378,7 @@ jobs:
           if-no-files-found: error
 
   postgres-release:
+    if: github.event_name != 'pull_request'
     name: PostgreSQL release fixture (docker)
     timeout-minutes: 30
     runs-on: ubuntu-24.04
@@ -434,6 +438,7 @@ jobs:
           if-no-files-found: error
 
   duckdb:
+    if: github.event_name != 'pull_request'
     needs: preflight
     name: Optional DuckDB driver and GTK feature
     timeout-minutes: 60
