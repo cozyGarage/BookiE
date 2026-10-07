@@ -2122,8 +2122,8 @@ msgstr ""
 msgid "Cannot ask for parameter values without a window"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:940
-msgid "Waiting for session commit"
+#: crates/app/src/ui/editor/mod.rs:947
+msgid "Waiting for session to finish"
 msgstr ""
 
 #: crates/app/src/ui/editor/mod.rs:947 crates/app/src/ui/editor/mod.rs:952
@@ -2255,6 +2255,10 @@ msgstr ""
 
 #: crates/app/src/ui/editor/session_mode.rs:426
 msgid "Session committed"
+msgstr ""
+
+#: crates/app/src/ui/editor/session_mode.rs:447
+msgid "Session rolled back"
 msgstr ""
 
 #: crates/app/src/ui/editor/session_mode.rs:440

@@ -118,6 +118,28 @@ fn can_start_session_close(
     teardown_active && !close_running && !open_running && !query_running
 }
 
+fn session_end_dialog(button: &gtk::ToggleButton, on_end: impl Fn(bool) + 'static) -> adw::AlertDialog {
+    let dialog = adw::AlertDialog::new(
+        Some(&crate::tr!("End the session with an open transaction?")),
+        Some(&crate::tr!(
+            "Changes made since BEGIN are kept only if you commit them."
+        )),
+    );
+    dialog.add_response("cancel", &crate::tr!("Cancel"));
+    dialog.add_response("rollback", &crate::tr!("Roll Back"));
+    dialog.add_response("commit", &crate::tr!("Commit"));
+    dialog.set_response_appearance("rollback", adw::ResponseAppearance::Destructive);
+    dialog.set_default_response(Some("cancel"));
+    dialog.set_close_response("cancel");
+    let button = button.clone();
+    dialog.connect_response(None, move |_, response| match response {
+        "commit" => on_end(true),
+        "rollback" => on_end(false),
+        _ => button.set_active(true),
+    });
+    dialog
+}
+
 pub(crate) fn session_label(transaction_open: bool) -> String {
     if transaction_open {
         crate::tr!("Session · transaction open")
@@ -336,6 +358,9 @@ impl SqlEditor {
         usable: bool,
         sender: &ComponentSender<Self>,
     ) {
+        if self.ending_session_id == Some(session_id) {
+            return;
+        }
         let Some(session) = self.session.as_mut() else {
             return;
         };
@@ -373,6 +398,58 @@ impl SqlEditor {
         } else if self.session_button.is_active() {
             self.session_button.set_active(false);
         }
+    }
+
+    pub(super) fn rollback_and_end(&mut self, session_id: Uuid, sender: &ComponentSender<Self>) {
+        let Some(session) = self
+            .session
+            .as_ref()
+            .filter(|session| session_callback_matches(session_id, Some(session.id)))
+        else {
+            return;
+        };
+        if self.ending_session_id == Some(session_id) {
+            return;
+        }
+        self.ending_session_id = Some(session_id);
+        self.session_teardown_active = true;
+        self.session_teardown_running = true;
+        self.session_button.set_sensitive(false);
+        self.run_button.set_sensitive(false);
+        self.status.set_label(&crate::tr!("Rolling back and closing session…"));
+        let shared = session.shared.clone();
+        let sender = sender.clone();
+        relm4::spawn(async move {
+            let result = rollback_and_close(&shared)
+                .await
+                .map_err(|error| crate::ui::error_text::driver_message(&error));
+            sender.input(super::SqlEditorInput::SessionRollbackFinished { session_id, result });
+        });
+    }
+
+    pub(super) fn on_session_rollback_finished(&mut self, session_id: Uuid, result: Result<(), String>) {
+        if !commit_callback_matches(
+            session_id,
+            self.session.as_ref().map(|session| session.id),
+            self.ending_session_id,
+        ) {
+            return;
+        }
+        if let Some(session) = self.session.take() {
+            if result.is_err() {
+                self.retired_session_connection_id = Some((session.connection_id, session.id));
+            }
+        }
+        self.ending_session_id = None;
+        self.session_button.set_label(&session_label(false));
+        self.session_button.remove_css_class("warning");
+        if self.session_button.is_active() {
+            self.session_button.set_active(false);
+        }
+        if result.is_ok() {
+            self.status.set_label(&crate::tr!("Session rolled back"));
+        }
+        self.finish_session_teardown(result);
     }
 
     pub(super) fn session_ending(&self) -> bool {
@@ -436,30 +513,10 @@ impl SqlEditor {
         let Some(session_id) = self.session.as_ref().map(|session| session.id) else {
             return;
         };
-        let dialog = adw::AlertDialog::new(
-            Some(&crate::tr!("End the session with an open transaction?")),
-            Some(&crate::tr!(
-                "Changes made since BEGIN are kept only if you commit them."
-            )),
-        );
-        dialog.add_response("cancel", &crate::tr!("Cancel"));
-        dialog.add_response("rollback", &crate::tr!("Roll Back"));
-        dialog.add_response("commit", &crate::tr!("Commit"));
-        dialog.set_response_appearance("rollback", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("cancel"));
-        dialog.set_close_response("cancel");
+        self.session_button.set_active(true);
         let sender = sender.clone();
-        let button = self.session_button.clone();
-        dialog.connect_response(None, move |_, response| match response {
-            "commit" => sender.input(SqlEditorInput::SessionEnd {
-                session_id,
-                commit: true,
-            }),
-            "rollback" => sender.input(SqlEditorInput::SessionEnd {
-                session_id,
-                commit: false,
-            }),
-            _ => button.set_active(true),
+        let dialog = session_end_dialog(&self.session_button, move |commit| {
+            sender.input(SqlEditorInput::SessionEnd { session_id, commit })
         });
         let parent = self.source_view.root().and_downcast::<gtk::Window>();
         dialog.present(parent.as_ref());
@@ -474,6 +531,19 @@ async fn commit_session(shared: &SharedSession) -> Result<(), DriverError> {
     let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
     session.query_params_controlled("COMMIT", &[], &control).await?;
     Ok(())
+}
+
+async fn rollback_and_close(shared: &SharedSession) -> Result<(), DriverError> {
+    let Some(mut session) = shared.lock().await.take() else {
+        return Err(DriverError::Unsupported("the session was closed".into()));
+    };
+    let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
+    let rollback = session.query_params_controlled("ROLLBACK", &[], &control).await;
+    let close = session.close().await;
+    match (rollback, close) {
+        (Err(error), _) => Err(error),
+        (Ok(_), result) => result,
+    }
 }
 
 pub(crate) fn close_detached(shared: SharedSession) {
@@ -497,6 +567,8 @@ fn session_open_message(error: &DriverError) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     #[test]
@@ -523,6 +595,17 @@ mod tests {
         usable: Arc<AtomicBool>,
         queries: Arc<AtomicUsize>,
         fail_query: bool,
+    }
+
+    struct DelayedRollback {
+        rollback_started: Option<tokio::sync::oneshot::Sender<()>>,
+        finish_rollback: Option<tokio::sync::oneshot::Receiver<()>>,
+        close_started: Option<tokio::sync::oneshot::Sender<()>>,
+        finish_close: Option<tokio::sync::oneshot::Receiver<()>>,
+    }
+
+    struct FailingRollback {
+        close_calls: Arc<AtomicUsize>,
     }
 
     #[async_trait::async_trait]
@@ -634,12 +717,138 @@ mod tests {
         }
     }
 
+    #[async_trait::async_trait]
+    impl Session for DelayedRollback {
+        async fn query_params_controlled(
+            &mut self,
+            sql: &str,
+            _: &[Value],
+            _: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            assert_eq!(sql, "ROLLBACK");
+            let _ = self.rollback_started.take().expect("rollback signal").send(());
+            let _ = self.finish_rollback.take().expect("rollback gate").await;
+            Ok(QueryResult {
+                columns: Vec::new(),
+                rows: Vec::new(),
+                truncated: false,
+            })
+        }
+
+        fn is_usable(&self) -> bool {
+            true
+        }
+
+        async fn close(mut self: Box<Self>) -> Result<(), DriverError> {
+            let _ = self.close_started.take().expect("close signal").send(());
+            let _ = self.finish_close.take().expect("close gate").await;
+            Ok(())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Session for FailingRollback {
+        async fn query_params_controlled(
+            &mut self,
+            sql: &str,
+            _: &[Value],
+            _: &OperationControl,
+        ) -> Result<QueryResult, DriverError> {
+            assert_eq!(sql, "ROLLBACK");
+            Err(DriverError::TimedOut)
+        }
+
+        fn is_usable(&self) -> bool {
+            true
+        }
+
+        async fn close(self: Box<Self>) -> Result<(), DriverError> {
+            self.close_calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        }
+    }
+
     #[tokio::test]
     async fn a_failed_commit_leaves_the_session_available_for_retry() {
         let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailFirstCommit(true)))));
         assert!(matches!(commit_session(&shared).await, Err(DriverError::TimedOut)));
         assert!(shared.lock().await.is_some());
         commit_session(&shared).await.expect("retry commit");
+    }
+
+    #[tokio::test]
+    async fn rollback_completes_before_session_close_and_end_reports_only_after_close() {
+        let (rollback_started, started) = tokio::sync::oneshot::channel();
+        let (finish_rollback, rollback_gate) = tokio::sync::oneshot::channel();
+        let (close_started, mut closed) = tokio::sync::oneshot::channel();
+        let (finish_close, close_gate) = tokio::sync::oneshot::channel();
+        let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(DelayedRollback {
+            rollback_started: Some(rollback_started),
+            finish_rollback: Some(rollback_gate),
+            close_started: Some(close_started),
+            finish_close: Some(close_gate),
+        }))));
+        let ending_shared = shared.clone();
+        let ending = tokio::spawn(async move { rollback_and_close(&ending_shared).await });
+
+        started.await.expect("ROLLBACK started");
+        assert!(closed.try_recv().is_err(), "close must wait for ROLLBACK");
+        assert!(!ending.is_finished(), "the editor must wait while ROLLBACK runs");
+        finish_rollback.send(()).expect("finish ROLLBACK");
+        closed.await.expect("close started after ROLLBACK");
+        assert!(!ending.is_finished(), "the editor must wait while close runs");
+        finish_close.send(()).expect("finish close");
+        ending.await.expect("end task").expect("rollback and close succeed");
+    }
+
+    #[tokio::test]
+    async fn rollback_failure_still_closes_and_returns_the_rollback_error() {
+        let close_calls = Arc::new(AtomicUsize::new(0));
+        let shared: SharedSession = Arc::new(tokio::sync::Mutex::new(Some(Box::new(FailingRollback {
+            close_calls: close_calls.clone(),
+        }))));
+
+        assert!(matches!(rollback_and_close(&shared).await, Err(DriverError::TimedOut)));
+        assert!(shared.lock().await.is_none());
+        assert_eq!(close_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn session_end_dialog_keeps_the_toggle_active_until_the_selected_action_finishes() {
+        gtk::init().unwrap();
+        let button = gtk::ToggleButton::new();
+        button.set_active(true);
+        let ended = Rc::new(Cell::new(None));
+        let ended_callback = ended.clone();
+        let dialog = session_end_dialog(&button, move |commit| ended_callback.set(Some(commit)));
+
+        dialog.emit_by_name::<()>("response", &[&"cancel"]);
+
+        assert!(button.is_active());
+        assert_eq!(ended.get(), None);
+        assert_eq!(dialog.default_response().as_deref(), Some("cancel"));
+        assert_eq!(dialog.close_response().as_str(), "cancel");
+
+        let ended = Rc::new(Cell::new(None));
+        let ended_callback = ended.clone();
+        let dialog = session_end_dialog(&button, move |commit| ended_callback.set(Some(commit)));
+        dialog.emit_by_name::<()>("response", &[&"rollback"]);
+        assert_eq!(ended.get(), Some(false));
+        assert!(
+            button.is_active(),
+            "the session stays visible until rollback and close finish"
+        );
+
+        let ended = Rc::new(Cell::new(None));
+        let ended_callback = ended.clone();
+        let dialog = session_end_dialog(&button, move |commit| ended_callback.set(Some(commit)));
+        dialog.emit_by_name::<()>("response", &[&"commit"]);
+        assert_eq!(ended.get(), Some(true));
+        assert!(
+            button.is_active(),
+            "commit selection also leaves completion to the session handler"
+        );
     }
 
     #[tokio::test]

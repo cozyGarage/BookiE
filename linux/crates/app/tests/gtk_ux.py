@@ -149,6 +149,33 @@ def scenarios(ui):
         assert stored_notes(database) == [(1, "gamma"), (2, "beta")], stored_notes(database)
         ui.wait_for_node(name="1 unsaved change", present=False)
 
+    def postgres_session_transaction_confirmation_cancels_or_rolls_back(database, base):
+        ui.open_saved_connection(ui.POSTGRES_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_CONNECTION_NAME} — BookiE")
+        psql("DROP TABLE IF EXISTS public.session_rollback_probe; CREATE TABLE public.session_rollback_probe (id integer PRIMARY KEY)")
+
+        session_toggle = ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.invoke(session_toggle)
+        ui.run_sql("BEGIN")
+        ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO session_rollback_probe(id) VALUES (1)")
+        ui.wait_for_node_containing("done in")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+        ui.invoke(ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON))
+        ui.wait_for_node(name="End the session with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Cancel", role=pyatspi.ROLE_PUSH_BUTTON))
+        toggle = ui.wait_for_node(name="Session · transaction open", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.run_sql("INSERT INTO session_rollback_probe(id) VALUES (2)")
+        ui.wait_for_node_containing("done in")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+
+        ui.invoke(toggle)
+        ui.wait_for_node(name="End the session with an open transaction?")
+        ui.invoke(ui.wait_for_node(name="Roll Back", role=pyatspi.ROLE_PUSH_BUTTON))
+        ui.wait_for_node(name="Session", role=pyatspi.ROLE_TOGGLE_BUTTON)
+        ui.wait_for_node(name="Session rolled back")
+        assert psql("SELECT COUNT(*) FROM public.session_rollback_probe") == "0"
+
     def editing_a_saved_connection_prefills_it_and_saves_the_new_name(database, base):
         before = saved_connections(base)
         ui.invoke(ui.wait_for_node(name="Open saved connection", role=pyatspi.ROLE_TOGGLE_BUTTON))
@@ -619,6 +646,7 @@ def scenarios(ui):
     if os.environ.get("TABLEPRO_GTK_MYSQL_CONTAINER"):
         result.append(mysql_grid_edit_and_delete_commit_to_the_server)
     if os.environ.get("TABLEPRO_GTK_POSTGRES_PORT"):
+        result.append(postgres_session_transaction_confirmation_cancels_or_rolls_back)
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
