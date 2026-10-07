@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "d77884c",
+  "engine": "BookiE GTK app with PostgreSQL 16 and SSH bastion Docker fixtures",
+  "command": "bash scripts/test-postgres-release.sh",
+  "selector": "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+  "result": "passed; release integration suites and both selected GTK PostgreSQL scenarios passed",
+  "assertions": [
+    "Opening the saved SSH connection displays the built-in GTK host-key trust prompt for the fixture bastion.",
+    "Declining the unknown host key writes exactly one durable transport outcome for the saved connection.",
+    "The outcome is phase outcome, terminal status denied, client builtin_ssh, and outcome host_key_refused.",
+    "The declined host key is not added to the isolated known_hosts file."
+  ],
+  "remaining": [
+    "This is local GTK/Xvfb and Docker fixture evidence, not installed-package, hosted CI, or native Wayland acceptance."
+  ]
+}
