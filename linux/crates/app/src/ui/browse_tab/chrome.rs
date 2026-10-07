@@ -508,6 +508,18 @@ pub(super) struct PendingRevealer {
     pub(super) pending_label: gtk::Label,
 }
 
+pub(super) fn bind_inspector(
+    content: &impl IsA<gtk::Widget>,
+    button: &gtk::ToggleButton,
+) -> crate::ui::row_inspector::RowInspector {
+    let inspector = crate::ui::row_inspector::RowInspector::new(content);
+    button.connect_toggled({
+        let inspector = inspector.clone();
+        move |button| inspector.set_visible(button.is_active())
+    });
+    inspector
+}
+
 #[cfg(test)]
 mod tests {
     use super::format_thousands;
@@ -528,16 +540,4 @@ mod tests {
         assert_eq!(format_thousands(1), "1");
         assert_eq!(format_thousands(999), "999");
     }
-}
-
-pub(super) fn bind_inspector(
-    content: &impl IsA<gtk::Widget>,
-    button: &gtk::ToggleButton,
-) -> crate::ui::row_inspector::RowInspector {
-    let inspector = crate::ui::row_inspector::RowInspector::new(content);
-    button.connect_toggled({
-        let inspector = inspector.clone();
-        move |button| inspector.set_visible(button.is_active())
-    });
-    inspector
 }
