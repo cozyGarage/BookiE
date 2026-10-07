@@ -26,6 +26,10 @@ ClickHouse Enum8 now covers its signed endpoints and zero (`-128`, `0`, `127`)
 in the existing native contract. Parameter insertion, result label decoding,
 native Int8 casts, CSV import and SQL-literal replay all preserve the labels;
 an undeclared Enum8 label is refused and leaves all stored rows unchanged.
+Empty-string labels now remain distinct from SQL NULL across Enum8 and Enum16
+parameter writes, reads, CSV import and SQL-literal replay, including nullable
+Enum8. Native enum-code and `isNull` checks distinguish the empty label from
+NULL.
 Enum16 now covers its signed endpoints and zero (`-32768`, `0`, `32767`) with
 the same consumers and native Int16 casts; an undeclared Enum16 label is also
 refused without changing stored rows. Both widths share the same native test

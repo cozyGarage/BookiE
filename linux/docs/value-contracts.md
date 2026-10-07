@@ -296,8 +296,8 @@ re-save ([evidence](evidence/sqlite-xlsx-calc-reimport-results-2026-10-04/manife
 ClickHouse `Enum8` and `Enum16` use label text in result values while retaining
 the native enum type in result and table metadata. A Docker contract checks
 parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
-CSV import with an explicit collision-free null marker, and Copy as SQL replay
-against the native server
+empty-string labels versus SQL NULL, CSV import with an explicit collision-free
+null marker, and Copy as SQL replay against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
 The app's keyed-grid path also edits nullable Enum16 labels against native type
 and signed-code oracles, keeps blank SQL NULL distinct from the literal `NULL`
