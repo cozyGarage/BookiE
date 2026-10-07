@@ -67,8 +67,10 @@ The broad `drivers` layer timed out at 30 minutes; earlier passing driver
 groups do not make that layer green. Arch packaging passed, while Debian
 package validation was blocked because `dpkg-deb` was unavailable. The staged
 binary GTK run used Xvfb/private D-Bus, not a distro install on native Wayland.
-Hosted, installed, upgrade/rollback, and Windows AD acceptance remain open;
-this candidate does not close B4 or qualify 0.2.0.
+PR #258 [Build Linux checks](https://github.com/cozyGarage/BookiE/actions/runs/37697660656) and [Flatpak builds](https://github.com/cozyGarage/BookiE/actions/runs/37697660722) completed successfully: 11 checks passed, including preflight, fast GTK, security, SonarCloud, workflow contracts, regression gate, and both Flatpak builds. The Docker driver integration, TLS, PostgreSQL release,
+and installed GTK safety jobs were skipped on the pull-request event; those
+skips do not establish hosted B4 fixture or installed acceptance. Distro-package installation on native Wayland, upgrade/rollback, and Windows AD acceptance remain open.
+This candidate does not close B4 or qualify 0.2.0.
 
 ## Remaining tasks
 
