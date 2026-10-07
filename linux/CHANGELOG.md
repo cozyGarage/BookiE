@@ -32,6 +32,7 @@
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.
+- A script with more than five statements shows its results in a drop-down instead of a row of buttons that overflows the window.
 - Find in Loaded Rows (Ctrl+Alt+F or the grid menu) lists the loaded rows that contain a text and selects the one you pick.
 - Holding Ctrl and pressing Tab repeatedly walks deeper through the recently used tabs; releasing Ctrl keeps the chosen tab.
 - Preferences has an Editor font family setting; an empty value keeps the system monospace font.
