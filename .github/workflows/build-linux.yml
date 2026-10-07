@@ -396,7 +396,12 @@ jobs:
             build-essential \
             pkg-config \
             libssl-dev \
+            libgtk-4-dev \
+            libadwaita-1-dev \
+            libgtksourceview-5-dev \
+            libsecret-1-dev \
             libkrb5-dev \
+            libsqlite3-dev \
             clang \
             openssh-client \
             dbus-daemon \
