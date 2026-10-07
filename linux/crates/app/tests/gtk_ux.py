@@ -17,7 +17,7 @@ class XWindowAttributes(ctypes.Structure):
     ]
 
 
-ATSPI_WINDOW_Y_OFFSET = 19
+ATSPI_WINDOW_Y_OFFSET = int(os.environ.get("TABLEPRO_GTK_Y_OFFSET", "19"))
 
 
 def x11_click(window_x, window_y, button=3, clicks=1):
