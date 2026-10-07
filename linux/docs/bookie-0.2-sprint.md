@@ -5,7 +5,8 @@ Approved 2026-09-16. Delivery branch: `linux`; source version 0.1.5; target
 
 ## Current continuation plan: 2026-10-08
 
-Integrated baseline: `d1741b8ac` on `linux` (PR #269; PRs #266 and #268 are docs-only).
+Integrated baseline: `236432b92` on `linux` (PR #271; PRs #266, #268 and
+#270 are docs-only).
 Recent B3 merges cover SQL Server server-owned values and mutation batches
 (#224–#225), multiple result sets (#228), MongoDB census cost/cancellation and
 nested filters (#229, #231, #234, #247), ClickHouse enum values (#242),
@@ -16,6 +17,8 @@ enum-array and domain cast coverage (#253, #255), the MongoDB one-million-
 document census profile (#257), and ClickHouse Enum8 signed-endpoint, zero-code,
 and undeclared-label refusal coverage for both widths, plus nullable Enum16
 consumer coverage (#260–#263, #267, #269).
+The nested `Array(Enum8)` result/export and write-refusal case is covered in
+#271.
 PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
 coverage across engines. These are focused cases, not milestone closure.
 
