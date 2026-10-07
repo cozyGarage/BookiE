@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "test/b4-ssh-audit-hosted-coverage",
+  "source_commit": "3a00ecc2687cce1334fc0600d5d3529573ea65d6",
+  "worktree_state": "local SSH prompt fix and expanded default scenario selector; hashes identify tested sources",
+  "scope": "B4-7 SSH terminal audit outcomes, B4-16 stale-session retirement, and B4-17 saved multi-hop trust flow",
+  "engine": "PostgreSQL/OpenSSH Docker fixture with GTK under Xvfb",
+  "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target TABLEPRO_GTK_ARTIFACT_DIR=/tmp/b4-ssh-audit-expanded-artifacts bash scripts/test-postgres-release.sh",
+  "gtk_binary": {
+    "path": "/home/trung/Projects/tablepro/linux/target/debug/tablepro-app",
+    "sha256": "82f5947cd77461beeb2862ee505de960463d98e8831f4bd3be45e11df9387b99"
+  },
+  "tested_source_sha256": {
+    "crates/app/src/ui/ssh_prompt.rs": "8b1cbcc61885ee33af770ff78e62ba0e43a5187cadf73464247306b811c52901",
+    "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45",
+    "scripts/tests/test_ci_workflow.py": "f30e56a34df9648a5a79e09c7ba926d80a1a296e96e096b748f7b33777ea748f"
+  },
+  "result": "passed; script exit status 0; PostgreSQL release fixture and all seven default GTK scenarios passed",
+  "scenarios": [
+    "postgres_saved_mtls_connection_authenticates_and_queries",
+    "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+    "postgres_ssh_setup_failure_is_durably_audited",
+    "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+    "postgres_ssh_multihop_trusts_both_hops_and_queries",
+    "postgres_ssh_second_hop_decline_does_not_learn_key",
+    "postgres_ssh_changed_second_hop_key_is_refused"
+  ],
+  "result_artifacts": "artifacts/*-result.json; all seven report status passed",
+  "log": {
+    "path": "focused.txt",
+    "sha256": "24388bbadf7254d0d4ee74eab157481a91d54f1a26885228c04369cec0515fe7"
+  },
+  "not_established": [
+    "Frozen-candidate acceptance",
+    "Hosted execution of this exact seven-scenario PostgreSQL fixture",
+    "Distribution-package installation and native Wayland acceptance"
+  ]
+}
