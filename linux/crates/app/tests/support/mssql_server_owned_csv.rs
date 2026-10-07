@@ -29,6 +29,16 @@ async fn value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_serv
     assert!(columns[0].is_auto_increment);
     assert!(columns[2].is_generated);
     assert!(columns[3].is_generated);
+    assert!(!crate::ui::grid::cell_allows_inline_edit(&columns[0], &Value::Int(1)));
+    assert!(crate::ui::grid::cell_allows_inline_edit(
+        &columns[1],
+        &Value::Text("editable".into())
+    ));
+    assert!(!crate::ui::grid::cell_allows_inline_edit(&columns[2], &Value::Int(2)));
+    assert!(!crate::ui::grid::cell_allows_inline_edit(
+        &columns[3],
+        &Value::Bytes(vec![0; 8])
+    ));
     let options = tablepro_core::import::CsvImportOptions::default();
     let sheet = tablepro_core::import::read_csv(
         b"id,note,calculated,version\n900,first,ignored,ignored\n901,second,ignored,ignored\n",
