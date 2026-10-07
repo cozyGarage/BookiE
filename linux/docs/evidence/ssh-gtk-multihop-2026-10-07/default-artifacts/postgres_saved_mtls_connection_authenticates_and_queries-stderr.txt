@@ -1,0 +1,19 @@
+2026-10-07T05:39:54.933154Z  INFO starting tablepro-app drivers=7
+2026-10-07T05:39:54.933207Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T05:39:55.124009Z  INFO registered win.disconnect enabled=false
+2026-10-07T05:39:55.127189Z  INFO main window activated
+
+(com.tablepro.linux:1535345): Gtk-CRITICAL **: 07:39:55.166: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T05:39:55.701606Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+
+(com.tablepro.linux:1535345): Gtk-CRITICAL **: 07:39:55.710: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:1535345): Gtk-CRITICAL **: 07:39:55.716: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T05:39:57.349479Z  INFO workspace ready driver=postgres table_count=4 view_count=0
+
+(com.tablepro.linux:1535345): Gtk-CRITICAL **: 07:39:57.362: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+
+(com.tablepro.linux:1535345): Gtk-CRITICAL **: 07:39:57.368: gtk_box_remove: assertion 'gtk_widget_get_parent (child) == (GtkWidget *)box' failed
+2026-10-07T05:39:58.576991Z  INFO script run complete n_ok=1 n_err=0 total_ms=2

@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-07",
+  "scope": "BookiE B4-22 encrypted connection-bundle GTK round trip, credential replacement and passphrase retry",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "worktree_state": "Application and GTK test source have local uncommitted changes; hashes identify the tested source and binary",
+  "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=encrypted_bundle_round_trip_restores_credentials TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/b4-encrypted-bundle-gtk-2026-10-07/retry-artifacts bash scripts/test-gtk-safety.sh",
+  "binary": "target/installed/usr/bin/tablepro (rebuilt release binary)",
+  "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+  "tested_source_sha256": {
+    "crates/app/src/ui/app/bundle.rs": "bc9a006f6b2bd457626dffa47fdbfa1c01b5797746ea5c39084c178a08ab3708",
+    "crates/app/tests/gtk_safety.py": "7086a14b550d53840795c04328346169bea26f24465576796fcd37cb5d5dc47c"
+  },
+  "result": "passed; GTK scenario result artifact reports passed after rebuilding the release binary",
+  "release_binary_run": {
+    "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=encrypted_bundle_round_trip_restores_credentials TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/b4-encrypted-bundle-gtk-2026-10-07/retry-artifacts bash scripts/test-gtk-safety.sh",
+    "binary": "target/installed/usr/bin/tablepro",
+    "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+    "tested_source_sha256": {
+      "crates/app/src/ui/app/bundle.rs": "bc9a006f6b2bd457626dffa47fdbfa1c01b5797746ea5c39084c178a08ab3708",
+      "crates/app/tests/gtk_safety.py": "7086a14b550d53840795c04328346169bea26f24465576796fcd37cb5d5dc47c"
+    },
+    "result": "passed; GTK scenario result artifact reports passed",
+    "log": {
+      "path": "retry-focused.txt",
+      "sha256": "d3cdd8c272e0cd0cf03fc49e3244ac4a01ddd03475dcfc876d28f12c3a7c1277"
+    }
+  },
+  "scenarios": [
+    {
+      "name": "encrypted_bundle_round_trip_restores_credentials",
+      "result": "passed",
+      "assertions": [
+        "Encrypted export file does not contain the fixture credential or passphrase as plaintext",
+        "Wrong passphrase is rejected and does not proceed to the import preview",
+        "After a wrong passphrase, the passphrase dialog reappears for retry without reopening the file chooser",
+        "Correct passphrase opens the import preview",
+        "Confirming with Replace saved passwords enabled restores the credential carried by the encrypted export",
+        "Export and import each write one durable intent/outcome pair; the rejected unlock writes no bundle audit pair",
+        "Audit records omit the file path, database credentials, changed fixture credential and passphrase"
+      ]
+    }
+  ],
+  "log": {
+    "path": "retry-focused.txt",
+    "sha256": "d3cdd8c272e0cd0cf03fc49e3244ac4a01ddd03475dcfc876d28f12c3a7c1277"
+  },
+  "prior_pre_retry_runs": [
+    {
+      "binary": "target/debug/tablepro-app",
+      "binary_sha256": "85688bed133cbc05b1ac17fb11c9836cf5a4c0a4a8e0422efee4c28fe2c10964",
+      "test_source_sha256": "d4642c2074aca859d1456be5d3d91771dc829916cf847a66a3d504cfcd86ac7e",
+      "log": "focused.txt",
+      "result": "passed before wrong-passphrase retry behavior was changed"
+    },
+    {
+      "binary": "target/installed/usr/bin/tablepro",
+      "binary_sha256": "50658f88ef18ccdf206a449cc6ea9df993e5db655156899932cd4fe72604d1db",
+      "test_source_sha256": "d4642c2074aca859d1456be5d3d91771dc829916cf847a66a3d504cfcd86ac7e",
+      "log": "release-focused.txt",
+      "result": "passed before wrong-passphrase retry behavior was changed"
+    }
+  ],
+  "not_established": [
+    "Frozen-candidate acceptance",
+    "Hosted CI",
+    "Distribution-package installed desktop and native Wayland acceptance"
+  ]
+}
