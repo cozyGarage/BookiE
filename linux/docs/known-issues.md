@@ -18,9 +18,9 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `linux` at `002da6fe0` (PRs #256–#258), checked
-2026-10-08. This includes the latest MongoDB census profile and frozen B4
-candidate findings. The
+Reconciled against BookiE `linux` at `2ac063ae2` (PRs #256–#261), checked
+2026-10-08. This includes the latest MongoDB census profile, ClickHouse Enum8
+boundary cases and frozen B4 candidate findings. The
 B4-* rows summarize the [B4 board](b4-task-board.md); when they differ, the board
 and linked PR evidence discussions are authoritative. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
