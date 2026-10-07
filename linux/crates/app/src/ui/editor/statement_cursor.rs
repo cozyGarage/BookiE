@@ -71,9 +71,51 @@ pub fn statement_at_cursor(text: &str, driver: &str, byte: usize) -> Option<Stri
     Some(statement.text(text).trim().to_owned())
 }
 
+pub fn adjacent_statement_start(text: &str, driver: &str, byte: usize, forward: bool) -> Option<usize> {
+    let plan = plan_for(text, grammar_for(driver)?);
+    let mut starts = plan.statements().iter().filter_map(|statement| {
+        let body = statement.text(text);
+        let trimmed = body.trim_start();
+        (!trimmed.trim_end().is_empty()).then(|| statement.range.start + body.len() - trimmed.len())
+    });
+    if forward {
+        starts.find(|start| *start > byte)
+    } else {
+        starts.rfind(|start| *start < byte)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jumping_moves_to_the_start_of_the_next_and_previous_statement() {
+        let sql = "SELECT 1;
+  SELECT 2;
+
+SELECT 3";
+        let second = sql.find("SELECT 2").unwrap();
+        let third = sql.find("SELECT 3").unwrap();
+        assert_eq!(adjacent_statement_start(sql, "postgres", 0, true), Some(second));
+        assert_eq!(adjacent_statement_start(sql, "postgres", second, true), Some(third));
+        assert_eq!(adjacent_statement_start(sql, "postgres", third, true), None);
+        assert_eq!(adjacent_statement_start(sql, "postgres", third, false), Some(second));
+        assert_eq!(
+            adjacent_statement_start(sql, "postgres", second + 3, false),
+            Some(second)
+        );
+        assert_eq!(adjacent_statement_start(sql, "postgres", 0, false), None);
+    }
+
+    #[test]
+    fn jumping_ignores_empty_statements_and_engines_without_a_grammar() {
+        let sql = "SELECT 1;;;
+SELECT 2";
+        let second = sql.find("SELECT 2").unwrap();
+        assert_eq!(adjacent_statement_start(sql, "postgres", 0, true), Some(second));
+        assert_eq!(adjacent_statement_start(sql, "redis", 0, true), None);
+    }
 
     #[test]
     fn dialect_boundaries_and_unicode_cursor_are_preserved() {

@@ -445,6 +445,34 @@ def scenarios(ui):
         ]
         assert not unnamed, "controls without an accessible name:\n" + "\n".join(unnamed)
 
+    def alt_arrows_jump_between_statements(database, base):
+        sql = "select 1;\nselect 2;\nselect 3"
+        editor = ui.set_editor_text(sql)
+
+        def caret():
+            return editor.queryText().caretOffset
+
+        def wait_for_caret(expected):
+            deadline = time.monotonic() + ui.WAIT_SECONDS
+            while time.monotonic() < deadline:
+                if caret() == expected:
+                    return
+                time.sleep(ui.POLL_SECONDS)
+            raise AssertionError(f"expected the caret at {expected}, it is at {caret()}")
+
+        extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
+        x11_click(extents.x + 60, extents.y + 10, button=1)
+        time.sleep(0.3)
+        ui.press_x11_key("End", ("Control_L",))
+        wait_for_caret(len(sql))
+        second, third = sql.index("select 2"), sql.index("select 3")
+        ui.press_x11_key("Up", ("Alt_L", "Shift_L"))
+        wait_for_caret(third)
+        ui.press_x11_key("Up", ("Alt_L", "Shift_L"))
+        wait_for_caret(second)
+        ui.press_x11_key("Down", ("Alt_L", "Shift_L"))
+        wait_for_caret(third)
+
     def ctrl_slash_toggles_a_comment_in_the_editor(database, base):
         editor = ui.set_editor_text("select 1")
         extents = editor.queryComponent().getExtents(pyatspi.WINDOW_COORDS)
@@ -563,6 +591,7 @@ def scenarios(ui):
         session_transaction_label_and_toggle_off_confirmation,
         ctrl_tab_returns_to_the_most_recently_used_tab,
         interactive_controls_have_accessible_names,
+        alt_arrows_jump_between_statements,
     ]
     if os.environ.get("TABLEPRO_PROFILE_ROWS"):
         result.append(profile_large_result_in_the_grid)

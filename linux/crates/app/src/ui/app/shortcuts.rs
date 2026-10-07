@@ -222,6 +222,8 @@ pub(super) fn build_shortcuts_dialog() -> gtk::ShortcutsWindow {
             ("<Primary><Shift>Tab", crate::tr!("Previous editor tab")),
             ("<Primary><Shift>t", crate::tr!("Reopen last closed tab")),
             ("<Primary><Shift>f", crate::tr!("Format SQL")),
+            ("<Alt><Shift>Down", crate::tr!("Jump to the next statement")),
+            ("<Alt><Shift>Up", crate::tr!("Jump to the previous statement")),
         ],
     );
     add_shortcut_group(

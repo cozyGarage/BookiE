@@ -32,7 +32,7 @@ pub use schema::{SQL_KEYWORDS, build_schema_buffer, derive_tab_label, update_sch
 use outcomes::{ScriptRunResult, clear_box, render_outcomes, run_statements, summary_label};
 use schema::{apply_editor_font_size, apply_editor_scheme};
 use sql_text::toggle_line_comment;
-use statement_cursor::{cursor_byte_offset, script_statements, statement_at_cursor};
+use statement_cursor::{adjacent_statement_start, cursor_byte_offset, script_statements, statement_at_cursor};
 
 fn show_cancel_button(running: bool, supports_server_cancellation: bool) -> bool {
     running && supports_server_cancellation
@@ -135,6 +135,9 @@ pub enum SqlEditorInput {
     ReplaceQuery(String),
     Format,
     RunAtCursor,
+    JumpStatement {
+        forward: bool,
+    },
     ToggleLineComment,
     ShowFind,
     Explain,
@@ -507,6 +510,18 @@ impl SimpleComponent for SqlEditor {
         controller.add_shortcut(format_shortcut);
         controller.add_shortcut(run_at_cursor_shortcut);
         controller.add_shortcut(toggle_comment_shortcut);
+        for (trigger, forward) in [("<Alt><Shift>Down", true), ("<Alt><Shift>Up", false)] {
+            let jump_sender = sender.clone();
+            controller.add_shortcut(
+                gtk::Shortcut::builder()
+                    .trigger(&crate::ui::shortcut::parse(trigger))
+                    .action(&gtk::CallbackAction::new(move |_, _| {
+                        jump_sender.input(SqlEditorInput::JumpStatement { forward });
+                        glib::Propagation::Stop
+                    }))
+                    .build(),
+            );
+        }
         widgets.source_view.add_controller(controller);
 
         let drop_target = gtk::DropTarget::new(gtk::gio::File::static_type(), gtk::gdk::DragAction::COPY);
@@ -681,6 +696,21 @@ impl SimpleComponent for SqlEditor {
                         &self.preferences,
                     );
                 }
+            }
+
+            SqlEditorInput::JumpStatement { forward } => {
+                let buffer = self.source_view.buffer();
+                let (start, end) = buffer.bounds();
+                let sql = buffer.text(&start, &end, false).to_string();
+                let cursor_chars = buffer.iter_at_mark(&buffer.get_insert()).offset() as usize;
+                let cursor_byte = cursor_byte_offset(&sql, cursor_chars);
+                let driver_id = self.metadata().map(|metadata| metadata.driver_id).unwrap_or_default();
+                let Some(target) = adjacent_statement_start(&sql, &driver_id, cursor_byte, forward) else {
+                    return;
+                };
+                let target_chars = sql[..target].chars().count() as i32;
+                buffer.place_cursor(&buffer.iter_at_offset(target_chars));
+                self.source_view.scroll_mark_onscreen(&buffer.get_insert());
             }
 
             SqlEditorInput::RunAtCursor => {
