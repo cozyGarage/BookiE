@@ -5,13 +5,9 @@
     { "prefix": "crates/core/tests/", "package": "tablepro-core", "target": "--tests" },
     { "prefix": "crates/app/src/", "package": "tablepro-app", "target": "--lib" },
     { "prefix": "crates/app/tests/", "package": "tablepro-app", "target": "--tests" },
+    { "prefix": "crates/drivers/postgres/tests/", "package": "tablepro-driver-postgres", "target": "--test=integration" },
     { "prefix": "crates/mcp/src/", "package": "tablepro-mcp", "target": "--lib" },
-    {
-      "prefix": "crates/drivers/",
-      "path_contains": "/src/",
-      "package_from_manifest": true,
-      "target": "--lib"
-    }
+    { "prefix": "crates/drivers/", "path_contains": "/src/", "package_from_manifest": true, "target": "--lib" }
   ],
   "exact_tests": {
     "crates/core/src/query.rs": {
@@ -47,9 +43,10 @@
       "target": "--lib",
       "tests": [
         "sql_dialect::tests::value_contract_postgres_text_array_updates_cast_through_text_to_a_builtin_array_type",
-        "sql_dialect::tests::postgres_array_update_casts_allowlist_type_metadata",
-        "sql_dialect::tests::postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type",
-        "sql_dialect::tests::postgres_numeric_cast_does_not_interpolate_untrusted_metadata"
+        "sql_dialect::tests::postgres_array_cast_tests::postgres_array_update_casts_allowlist_type_metadata",
+        "sql_dialect::tests::postgres_domain_cast_tests::postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type",
+        "sql_dialect::tests::postgres_numeric_cast_does_not_interpolate_untrusted_metadata",
+        "sql_dialect::tests::postgres_domain_cast_tests::postgres_domain_text_updates_cast_to_the_qualified_type"
       ]
     },
     "crates/app/src/ui/browse_tab/row_ops.rs": {
