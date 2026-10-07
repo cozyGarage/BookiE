@@ -10,7 +10,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .execute(
             "CREATE TABLE enum_values (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
@@ -48,6 +48,12 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             Value::Text("maximum".into()),
             Value::Text("low".into()),
             Value::Text("present".into()),
+        ],
+        vec![
+            Value::Int(6),
+            Value::Text("zero".into()),
+            Value::Text("high".into()),
+            Value::Null,
         ],
     ];
     for row in &expected {
@@ -96,7 +102,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
             row[6],
             Value::Int(if expected[index][3] == Value::Null { 1 } else { 0 })
         );
-        assert_eq!(row[7], Value::Int([1, 2, -1, -128, 127][index]));
+        assert_eq!(row[7], Value::Int([1, 2, -1, -128, 127, 0][index]));
         assert_eq!(row[8], Value::Int(if index % 2 == 0 { -32768 } else { 32767 }));
     }
 
@@ -133,7 +139,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .execute(
             "CREATE TABLE enum_csv_copy (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
@@ -153,7 +159,7 @@ async fn value_contract_clickhouse_enum8_and_enum16_preserve_labels_null_and_csv
         .execute(
             "CREATE TABLE enum_sql_copy (
                 id UInt8,
-                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127),
+                narrow Enum8('NULL' = 1, 'O''Brien' = 2, '東京' = -1, 'minimum' = -128, 'maximum' = 127, 'zero' = 0),
                 wide Enum16('low' = -32768, 'high' = 32767),
                 optional Nullable(Enum8('NULL' = 1, 'present' = 2))
             ) ENGINE = MergeTree ORDER BY id",
