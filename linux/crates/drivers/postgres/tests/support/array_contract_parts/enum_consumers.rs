@@ -348,6 +348,59 @@ async fn value_contract_custom_enum_array_three_dimensions_round_trip_native_wir
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn value_contract_custom_enum_array_six_dimension_limit_round_trips() {
+    let (_container, options) = crate::start_pg().await;
+    let connection = crate::connect(options).await;
+    connection.execute("CREATE SCHEMA value_contract_enum_6d").await.unwrap();
+    connection
+        .execute("CREATE TYPE value_contract_enum_6d.label AS ENUM ('ready')")
+        .await
+        .unwrap();
+
+    let enum_type = "value_contract_enum_6d.label[]";
+    let expression = r#"'[0:0][1:1][2:2][3:3][4:4][5:5]={{{{{{ready}}}}}}'::value_contract_enum_6d.label[]"#;
+    let result = connection.query(&format!("SELECT {expression} AS value")).await.unwrap();
+    assert_eq!(result.columns[0].data_type, enum_type);
+    let Value::Text(array_text) = &result.rows[0][0] else {
+        panic!("six-dimensional enum array must remain text: {:?}", result.rows[0][0]);
+    };
+
+    let native = connection
+        .query(&format!(
+            "SELECT pg_typeof(value)::text, array_dims(value), array_ndims(value), \
+                    array_to_json(value)::text, encode(array_send(value), 'hex') \
+             FROM (SELECT {expression} AS value) AS source"
+        ))
+        .await
+        .unwrap();
+    assert_eq!(native.rows[0][0], Value::Text(enum_type.into()));
+    assert_eq!(native.rows[0][1], Value::Text("[0:0][1:1][2:2][3:3][4:4][5:5]".into()));
+    assert_eq!(native.rows[0][2], Value::Int(6));
+    let Value::Text(native_json) = &native.rows[0][3] else {
+        panic!("native enum array JSON oracle is not text: {:?}", native.rows[0][3]);
+    };
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(native_json).unwrap(),
+        serde_json::json!([[[[[["ready"]]]]]])
+    );
+
+    let rebound = connection
+        .query_params(
+            &format!(
+                "SELECT pg_typeof($1::text::{enum_type})::text, \
+                        array_dims($1::text::{enum_type}), array_ndims($1::text::{enum_type}), \
+                        array_to_json($1::text::{enum_type})::text, \
+                        encode(array_send($1::text::{enum_type}), 'hex')"
+            ),
+            &[Value::Text(array_text.clone())],
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.rows[0], native.rows[0]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_enum_range_uses_qualified_type_under_shadowed_search_path() {
     let (_container, options) = crate::start_pg().await;
     let connection = crate::connect(options).await;
