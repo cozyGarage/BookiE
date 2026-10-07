@@ -32,6 +32,16 @@ Replace the list with a `GtkListView` over a `GtkTreeListModel`.
 6. Row context menus keep their actions. Group rows offer New Table and Table
    from CSV, which today sit on the schema header.
 
+## Slices
+
+1. The tree model (nodes, collapse state, search visibility), pure and tested.
+   Done in `services/sidebar_tree.rs`.
+2. A `GtkListView` over a `GtkTreeListModel` that renders the model, behind the
+   current sidebar, with the sidebar tests moved to it first.
+3. Selection sync, the context menus and the open messages on the new rows.
+4. Lazy catalog groups through the guarded connection.
+5. Saved collapse state per connection, then removal of the old factory.
+
 ## Consequences
 
 - The factory, filter and selection sync are rewritten. The sidebar tests
