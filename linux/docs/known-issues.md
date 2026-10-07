@@ -66,7 +66,7 @@ first column says which area owns them.
 | UI-20 | No server output (NOTICE, PRINT) and no timing breakdown | OPEN | Needs a core trait hook | driver-docker |
 | UI-21 | No `CellView` display boundary and no fake connection for the GTK tier | OPEN | Foundation packets in the archived audit | unit |
 | UI-22 | Code folding, vim, multi-cursor, split panes | OPEN | Vim is a preference; the rest need feasibility slices | manual |
-| UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
+| UI-23 | ~~PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles~~; typed activity console | OPEN | The catalog is built: the Catalog dialog lists routines, triggers, sequences, extensions, roles, types and grants (`catalog_objects_are_listed_per_kind_and_filtered_by_schema`, run in the driver matrix), and materialized views appear in the table list (`pg_matviews`, `CREATE MATERIALIZED VIEW` in the browse test). Remaining: a typed activity console; the activity dialog shows the driver's activity SQL in a plain result grid | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
 | UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
 | UI-26 | Reusable SSH profiles are not editable | OPEN | Separate connection-editor slice | gtk-widget |
