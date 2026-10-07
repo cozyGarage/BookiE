@@ -42,13 +42,15 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
         .execute(
             "CREATE TABLE enum16_grid (
                 id UInt8,
-                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767, '' = 1))
+                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767, '' = 1, 'O''Brien' = 2))
             ) ENGINE = MergeTree ORDER BY id",
         )
         .await
         .unwrap();
     connection
-        .execute("INSERT INTO enum16_grid VALUES (1, 'low'), (2, 'NULL'), (3, NULL), (4, 'high'), (5, 'low')")
+        .execute(
+            "INSERT INTO enum16_grid VALUES (1, 'low'), (2, 'NULL'), (3, NULL), (4, 'high'), (5, 'low'), (6, 'low')",
+        )
         .await
         .unwrap();
 
@@ -98,6 +100,20 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     .unwrap();
     connection.execute_in_transaction(&[update]).await.unwrap();
 
+    let apostrophe_label =
+        parse_input_for_grid_cell("'O''Brien'", Some(&columns[state_index]), "clickhouse", None).unwrap();
+    assert_eq!(apostrophe_label, Value::Text("O'Brien".into()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "clickhouse",
+        None,
+        "enum16_grid",
+        &columns,
+        &[(state_index, apostrophe_label)],
+        &[Value::Int(6)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+
     let before_refusal = connection
         .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state) FROM enum16_grid ORDER BY id")
         .await
@@ -120,6 +136,12 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
                 Value::Int(0)
             ],
             vec![Value::Int(5), Value::Text(String::new()), Value::Int(1), Value::Int(0)],
+            vec![
+                Value::Int(6),
+                Value::Text("O'Brien".into()),
+                Value::Int(2),
+                Value::Int(0)
+            ],
         ]
     );
 
