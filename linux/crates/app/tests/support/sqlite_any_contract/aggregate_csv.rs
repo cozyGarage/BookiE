@@ -570,6 +570,103 @@ async fn sqlite_any_arithmetic_csv_round_trip_preserves_runtime_storage_classes(
 }
 
 #[tokio::test]
+async fn sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE groups (id INTEGER PRIMARY KEY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute("INSERT INTO groups VALUES (1), (2), (3)")
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE flexible (group_id INTEGER, position INTEGER, value ANY) STRICT")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO flexible VALUES \
+             (1, 1, 42), (1, 2, 1.5), (1, 3, '42'), (1, 4, 'NULL'), \
+             (1, 5, NULL), (1, 6, ''), (1, 7, '=1+1'), (1, 8, '<tag>&amp;'), \
+             (1, 9, '東京'), (2, 1, NULL), (2, 2, NULL)",
+        )
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "CREATE TABLE restored (\
+                 id INTEGER PRIMARY KEY, position INTEGER, result ANY, storage_class TEXT\
+             ) STRICT",
+        )
+        .await
+        .unwrap();
+
+    let result = connection
+        .query(
+            "SELECT groups.id AS position, \
+                    json_group_array(flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL) AS result, \
+                    typeof(json_group_array(flexible.value ORDER BY flexible.position) \
+                        FILTER (WHERE flexible.position IS NOT NULL)) AS storage_class \
+             FROM groups LEFT JOIN flexible ON flexible.group_id = groups.id \
+             GROUP BY groups.id ORDER BY groups.id",
+        )
+        .await
+        .unwrap();
+    assert_eq!(result.columns[1].data_type, "NULL");
+    assert_eq!(
+        result.rows,
+        vec![
+            vec![
+                Value::Int(1),
+                Value::Text(r#"[42,1.5,"42","NULL",null,"","=1+1","<tag>&amp;","東京"]"#.into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(2),
+                Value::Text("[null,null]".into()),
+                Value::Text("text".into()),
+            ],
+            vec![
+                Value::Int(3),
+                Value::Text("[]".into()),
+                Value::Text("text".into()),
+            ],
+        ]
+    );
+
+    sqlite_result_csv_round_trip(
+        connection.as_ref(),
+        &result,
+        "restored",
+        &[None, Some(0), Some(1), Some(2)],
+    )
+    .await;
+
+    let restored = connection
+        .query("SELECT typeof(result), result, storage_class FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        result
+            .rows
+            .iter()
+            .map(|row| vec![Value::Text("text".into()), row[1].clone(), Value::Text("text".into())])
+            .collect::<Vec<_>>()
+    );
+}
+
+#[tokio::test]
 async fn sqlite_json_extract_any_csv_round_trip_preserves_runtime_storage_classes() {
     use tablepro_core::{ConnectOptions, DatabaseDriver};
 

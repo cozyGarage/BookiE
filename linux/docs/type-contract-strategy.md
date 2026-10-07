@@ -380,9 +380,12 @@ passes 33 tests
 
 SQLite STRICT `ANY` computed-result contracts now cover `CASE`, `COALESCE`,
 `NULLIF`, `MIN`/`MAX`, `SUBSTR`, `ABS`, `ROUND`, `hex`, `quote`, `instr`,
-`length` and `CAST(value AS BLOB)`. Typed CSV restore checks native storage
-classes and exact values or bytes; BLOB casts also have JSON and XLSX text-cell
-assertions. Representative evidence: [CASE](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),
+`length`, `CAST(value AS BLOB)` and `json_group_array()`. The JSON aggregate
+case checks numeric and text elements, JSON null versus SQL NULL, an empty
+array, and typed CSV restore against SQLite's native result and `typeof()`.
+Typed CSV restore checks native storage classes and exact values or bytes; BLOB
+casts also have JSON and XLSX text-cell assertions. Representative evidence:
+[CASE](evidence/sqlite-case-any-csv-roundtrip-results-2026-10-04/manifest.json),
 [SUBSTR](evidence/sqlite-substr-any-csv-results-2026-10-05/manifest.json),
 [ABS](evidence/sqlite-abs-any-csv-results-2026-10-06/manifest.json),
 [ROUND](evidence/sqlite-round-any-csv-results-2026-10-06/manifest.json),
