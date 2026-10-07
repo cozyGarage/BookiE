@@ -128,6 +128,12 @@ fn ask(
             let _ = sender.send(answer);
         }
     });
+    let close_attempt_sender = sender.clone();
+    dialog.connect_close_attempt(move |_| {
+        if let Some(sender) = close_attempt_sender.borrow_mut().take() {
+            let _ = sender.send(PromptAnswer::Decline);
+        }
+    });
     dialog.connect_closed(move |_| {
         if let Some(sender) = sender.borrow_mut().take() {
             let _ = sender.send(PromptAnswer::Decline);
