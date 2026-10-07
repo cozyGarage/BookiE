@@ -67,6 +67,7 @@ pub(super) fn install_window_actions(
         input_action!("explain-query", AppMsg::ExplainActiveQuery),
         input_action!("refresh-page", AppMsg::RefreshPage),
         input_action!("jump-column", AppMsg::JumpToColumn),
+        input_action!("recent-tab", AppMsg::SwitchToRecentTab),
         input_action!("export-csv", AppMsg::ExportCsv),
         input_action!("export-json", AppMsg::ExportJson),
         input_action!("export-all-csv", AppMsg::ExportAllCsv),
@@ -120,6 +121,23 @@ pub(super) fn install_window_shortcuts(window: &adw::ApplicationWindow) {
         controller.add_shortcut(make_shortcut(trigger, action));
     }
     window.add_controller(controller);
+    install_recent_tab_key(window);
+}
+
+fn install_recent_tab_key(window: &adw::ApplicationWindow) {
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let target = window.clone();
+    keys.connect_key_pressed(move |_, key, _, state| {
+        let ctrl_only =
+            state.contains(gtk::gdk::ModifierType::CONTROL_MASK) && !state.contains(gtk::gdk::ModifierType::SHIFT_MASK);
+        if key != gtk::gdk::Key::Tab || !ctrl_only {
+            return glib::Propagation::Proceed;
+        }
+        let _ = gtk::prelude::WidgetExt::activate_action(&target, "win.recent-tab", None);
+        glib::Propagation::Stop
+    });
+    window.add_controller(keys);
 }
 
 fn make_shortcut(trigger: &str, action: &str) -> gtk::Shortcut {
@@ -200,10 +218,12 @@ pub(super) fn build_shortcuts_dialog() -> gtk::ShortcutsWindow {
             ("<Primary>slash", crate::tr!("Toggle line comment")),
             ("<Primary>t", crate::tr!("New editor tab")),
             ("<Primary>w", crate::tr!("Close current tab or window")),
-            ("<Primary>Tab", crate::tr!("Next editor tab")),
+            ("<Primary>Tab", crate::tr!("Switch to the most recently used tab")),
             ("<Primary><Shift>Tab", crate::tr!("Previous editor tab")),
             ("<Primary><Shift>t", crate::tr!("Reopen last closed tab")),
             ("<Primary><Shift>f", crate::tr!("Format SQL")),
+            ("<Alt><Shift>Down", crate::tr!("Jump to the next statement")),
+            ("<Alt><Shift>Up", crate::tr!("Jump to the previous statement")),
         ],
     );
     add_shortcut_group(
