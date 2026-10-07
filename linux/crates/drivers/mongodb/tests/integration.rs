@@ -887,6 +887,9 @@ fn xlsx_shared_cell_text(path: &std::path::Path, column: usize, row: u32) -> Res
 #[path = "support/census_cost.rs"]
 mod census_cost;
 
+#[path = "support/nested_filters.rs"]
+mod nested_filters;
+
 #[path = "support/run_find_late_type_contract.rs"]
 mod run_find_late_type_contract;
 

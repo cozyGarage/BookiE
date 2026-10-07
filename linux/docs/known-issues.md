@@ -156,7 +156,7 @@ table in the same commit.
 | TEST-10 | O3: multiple result sets, later sets are discarded | OPEN | ADR 0013 is implemented on `b3/test10-result-sets`: ordered SQL Server rowsets pass through the guard, editor, MCP and JSON export; MCP applies one shared row cap and CSV refuses multi-set output. Local checks pass, including Docker-backed SQL Server ordering, empty-first-set, late-error, truncation and connection-reuse cases. Pending final review and PR checks | driver-docker |
 | TEST-11 | ~~U3: completion conflated same-named tables in different schemas~~ | DONE | `table_key` keeps the schema; an ambiguous bare name offers no columns; three new `completion` tests replace the one that pinned the defect | unit |
 | TEST-12 | U6: MongoDB metadata scan cost, writes to read documents, cancellation | OPEN | | driver-docker |
-| TEST-13 | MongoDB nested filters, binary UUID, MQL; Redis Sentinel and Cluster | OPEN | | driver-docker |
+| TEST-13 | MongoDB nested filters and MQL; Redis Sentinel and Cluster topology | OPEN | MongoDB now has a native Docker test for dotted nested fields and `$elemMatch` through both JSON-filter and `db.collection.find(...)` paths. Existing BSON tests cover UUID subtype `04` through result/export and native grid-edit persistence. Remaining: Redis Sentinel/Cluster topology fixtures and an explicit support boundary for those connection modes | driver-docker |
 | TEST-14 | Keep refusing PK-less delete; no all-column fallback | ACCEPTED | Guard to preserve | unit |
 | TEST-15 | Lost-ack writes: reconnect success must not authorize replay | OPEN | Independent row and audit oracle | driver-docker |
 | TEST-16 | Mongo hostile-server handshake not run end to end | OPEN | | driver-docker |
