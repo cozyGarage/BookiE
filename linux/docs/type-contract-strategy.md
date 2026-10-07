@@ -10,6 +10,13 @@ Docker suite now also checks the decoded-byte limit, exact retained payloads,
 the `truncated` flag, and continued use of the same transaction
 ([test](../crates/drivers/mysql/tests/shared/mysql_atomic.rs)).
 
+SQL Server CSV import now builds and executes its real core import plan against
+a native table with an identity, computed column and rowversion. The CSV maps
+all four fields, including hostile supplied values for the three server-owned
+columns; the plan omits them, and native rows prove SQL Server generated each
+value (`value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server`).
+SEC-3 remains open for grid edits, Copy as SQL and SQL export.
+
 ## Current evidence and next targets
 
 PostgreSQL `citext` scalar and array values preserve exact label text while

@@ -93,6 +93,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::mssql_server_owned_csv::value_contract_mssql_csv_import_leaves_server_owned_columns_to_sql_server"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::mysql_enum_set_contract::value_contract_mysql_enum_set_keyed_edits_preserve_native_values_across_sql_modes"
     ],
     [

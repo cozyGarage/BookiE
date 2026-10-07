@@ -880,6 +880,10 @@ mod mssql_datetimeoffset_contract;
 mod mssql_max_value_contract;
 
 #[cfg(test)]
+#[path = "../../../tests/support/mssql_server_owned_csv.rs"]
+mod mssql_server_owned_csv;
+
+#[cfg(test)]
 #[path = "../../../tests/support/mysql_spatial_contract.rs"]
 mod mysql_spatial_contract;
 
