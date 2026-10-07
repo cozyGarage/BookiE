@@ -34,12 +34,12 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-PRs #153–#161 have merged into `fork/linux`; current baseline is
-`b586f6b43`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
-PostgreSQL release check failed because the job lacked GTK development
-libraries; PR #161 adds those build dependencies. Installed GTK safety smoke
-also exposed stale scenario setup, fixed locally and recorded with candidate
-layer evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
+PRs #153–#164 have merged into `fork/linux`; current baseline is
+`c2fa01c08`. PR #159 adds the SSH audit, rollback, and Kerberos slices. Its
+PostgreSQL release check lacked GTK development libraries; PR #161 added them.
+PR #162 merged the first local GTK safety setup fix. Follow-up hosted runs
+exposed Debian GTK role and two-hop test assumptions; this branch fixes those
+and records local rerun evidence in the [October 7 checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
 PR #162's first hosted run passed preflight, security, TLS, DuckDB, supply
 chain, Sonar, harness, workflow lint, and Flatpak builds. Fast checks hit a
 Debian mirror-sync package-size mismatch; PostgreSQL release exposed a GTK
