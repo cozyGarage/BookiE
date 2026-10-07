@@ -19,9 +19,10 @@ and undeclared-label refusal coverage for both widths, plus nullable Enum16
 consumer coverage (#260–#263, #267, #269).
 Nested `Array(Enum8)` and `Array(Nullable(Enum8))` result/export and
 write-refusal cases are covered in #271 and #273.
-`Array(Nullable(Enum16))` now extends that matrix with the signed endpoints,
-SQL NULL versus the literal `NULL` label, native JSON, JSON/CSV/XLSX consumers,
-and type-less SQL, bind and grid-write refusal.
+`Array(Enum16)` and `Array(Nullable(Enum16))` now extend that matrix with the
+signed endpoints, SQL NULL versus the literal `NULL` label where nullable,
+native JSON, JSON/CSV/XLSX consumers, and type-less SQL, bind and grid-write
+refusal.
 PR #236 reconciles the SQL Server matrix; #248 adds MySQL update/delete effect
 coverage across engines. These are focused cases, not milestone closure.
 

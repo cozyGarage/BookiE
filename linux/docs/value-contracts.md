@@ -299,7 +299,7 @@ parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
 CSV import with an explicit collision-free null marker, and Copy as SQL replay
 against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
-Nested `Array(Enum8)`, `Array(Nullable(Enum8))` and
+Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)` and
 `Array(Nullable(Enum16))` use native `toJSONString` as the value oracle and
 check JSON/CSV/XLSX export plus refusal by type-less SQL, binding and keyed
 grid writes. The nullable arrays distinguish SQL NULL elements from an enum
