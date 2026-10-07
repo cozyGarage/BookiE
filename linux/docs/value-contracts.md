@@ -527,6 +527,18 @@ SQLite grouped `AVG()` over STRICT `ANY` returns REAL for non-NULL groups,
 including near-`i64::MAX` values, while all-NULL groups remain SQL NULL. Typed
 CSV re-import preserves computed values and runtime classes ([evidence](evidence/sqlite-avg-any-results-2026-10-04/manifest.json)).
 
+SQLite `json_group_array()` over STRICT `ANY` preserves numeric and text
+elements, formula-shaped text, Unicode, JSON null, and empty-group output (`[]`)
+as exact JSON text through typed CSV re-import. The native `typeof()` oracle
+checks the restored value remains TEXT; see
+[`sqlite_json_group_array_any_csv_round_trip_preserves_json_null_and_text`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+
+SQLite `json_group_object()` over STRICT `ANY` preserves ordered duplicate keys,
+omits NULL keys, retains NULL values as JSON `null`, and returns `{}` for an
+empty group. Exact JSON text and restored TEXT storage are checked through typed
+CSV; see
+[`sqlite_json_group_object_any_csv_round_trip_preserves_keys_and_nulls`](../crates/app/tests/support/sqlite_any_contract/aggregate_csv.rs).
+
 SQLite arithmetic expressions over STRICT `ANY` verify numeric coercion,
 integer division, overflow promotion to REAL, divide-by-zero NULL and typed CSV
 restoration ([evidence](evidence/sqlite-arithmetic-any-results-2026-10-04/manifest.json)).
