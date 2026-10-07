@@ -8,11 +8,17 @@ on:
 
 env:
   CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
   GITHUB_STEP_SUMMARY: /dev/null
+  PATH: /home/runner/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+  RUSTC_WRAPPER: sccache
+  SCCACHE_DIR: /var/cache/ci/sccache
+  SCCACHE_CACHE_SIZE: 40G
+  CARGO_TARGET_DIR: /var/cache/ci/target/${{ github.job }}
 
 jobs:
-  checks:
-    runs-on: arch
+  guards:
+    runs-on: debian-host
     steps:
       - name: Check out
         env:
@@ -22,16 +28,63 @@ jobs:
           rm -rf src
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
-      - name: Quick layer (guards, formatting, harness, packaging contracts)
-        run: cd src/linux && python3 scripts/run-test-layer.py quick
+      - name: Script harness and guards
+        run: |
+          cd src/linux
+          bash scripts/test-harness.sh
+          bash scripts/check-file-size.sh
+          bash scripts/check-bounded-operations.sh
+          bash scripts/check-panic-sites.sh
+          python3 scripts/check-function-size.py
+          cargo fmt --all -- --check
+
+  clippy:
+    runs-on: debian-host
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
       - name: Clippy
-        run: cd src/linux && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+        run: |
+          cd src/linux && cargo clippy --workspace --exclude tablepro-driver-duckdb --all-targets -- -D warnings
+
+  unit:
+    runs-on: debian-host
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
       - name: Unit tests
-        run: cd src/linux && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
+        run: |
+          cd src/linux && cargo test --workspace --exclude tablepro-driver-duckdb --lib --bins
+
+  sandbox:
+    runs-on: debian-host
+    steps:
+      - name: Check out
+        env:
+          TOKEN: ${{ github.token }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          rm -rf src
+          git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
+          git -C src checkout --quiet "${{ github.sha }}"
+      - name: Sandbox tier
+        run: |
+          cd src/linux && bash scripts/test-sandbox.sh
 
   widgets:
-    runs-on: arch
-    needs: checks
+    runs-on: debian-host
     steps:
       - name: Check out
         env:
@@ -42,12 +95,13 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: GTK widget tests
-        run: cd src/linux && bash scripts/test-gtk-widgets.sh
+        run: |
+          cd src/linux && bash scripts/test-gtk-widgets.sh
 
   gtk:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
-    runs-on: arch
-    needs: widgets
     steps:
       - name: Check out
         env:
@@ -58,12 +112,13 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Installed GTK end-to-end suite
-        run: cd src/linux && bash scripts/test-gtk-safety.sh
+        run: |
+          cd src/linux && bash scripts/test-gtk-safety.sh
 
   servers:
-    if: github.event_name == 'push'
     runs-on: arch
-    needs: gtk
+    needs: [guards, clippy, unit, sandbox, widgets]
+    if: github.event_name == 'push'
     steps:
       - name: Check out
         env:
@@ -74,14 +129,16 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: PostgreSQL end-to-end
-        run: cd src/linux && bash scripts/test-gtk-postgres.sh
+        run: |
+          cd src/linux && bash scripts/test-gtk-postgres.sh
       - name: MySQL end-to-end
-        run: cd src/linux && bash scripts/test-gtk-mysql.sh
+        run: |
+          cd src/linux && bash scripts/test-gtk-mysql.sh
 
   distro-floor:
+    runs-on: debian-host
+    needs: [guards, clippy, unit, sandbox, widgets]
     if: github.event_name == 'push'
-    runs-on: arch
-    needs: gtk
     steps:
       - name: Check out
         env:
@@ -92,6 +149,8 @@ jobs:
           git clone --quiet "http://oauth2:${TOKEN}@${SERVER#http://}/${{ github.repository }}.git" src
           git -C src checkout --quiet "${{ github.sha }}"
       - name: Ubuntu 24.04 and Debian 13
-        run: cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
+        run: |
+          cd src/linux && DISTRO_FLOOR_INSTALLED=1 bash scripts/test-distro-floor.sh ubuntu:24.04 debian:13
       - name: Debian package build, install and purge
-        run: cd src/linux && bash scripts/test-deb-package.sh ubuntu:24.04 debian:13
+        run: |
+          cd src/linux && bash scripts/test-deb-package.sh ubuntu:24.04 debian:13
