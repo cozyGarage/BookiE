@@ -299,9 +299,9 @@ parameter writes, `NULL` label versus SQL NULL, Unicode and quoted labels,
 empty-string labels versus SQL NULL, CSV import with an explicit collision-free
 null marker, and Copy as SQL replay against the native server
 ([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)).
-A Docker-backed app grid contract edits nullable Enum16 labels against native
-type and signed-code oracles. It accepts quoted empty, literal `NULL` and
-apostrophe-bearing labels, keeps blank input as SQL NULL, and proves an
+A Docker-backed app grid contract edits nullable Enum8/Enum16 labels against
+native type and signed-code oracles. It accepts quoted empty, literal `NULL`
+and apostrophe-bearing labels, keeps blank input as SQL NULL, and proves an
 undeclared label leaves all rows unchanged
 ([test](../crates/app/tests/support/clickhouse_enum_contract.rs)).
 Nested `Array(Enum8)`, `Array(Nullable(Enum8))`, `Array(Enum16)`,

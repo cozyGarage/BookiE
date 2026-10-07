@@ -5,7 +5,7 @@ use tablepro_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
-async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses_invalid_values() {
+async fn value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values() {
     use tablepro_core::{ConnectOptions, DatabaseDriver, TlsConfig};
     use testcontainers::core::wait::HttpWaitStrategy;
     use testcontainers::core::{IntoContainerPort, WaitFor};
@@ -42,14 +42,15 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
         .execute(
             "CREATE TABLE enum16_grid (
                 id UInt8,
-                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767, '' = 1, 'O''Brien' = 2))
+                state Nullable(Enum16('low' = -32768, 'NULL' = 0, 'high' = 32767, '' = 1, 'O''Brien' = 2)),
+                state8 Nullable(Enum8('low' = -128, 'NULL' = 0, 'high' = 127, '' = 1))
             ) ENGINE = MergeTree ORDER BY id",
         )
         .await
         .unwrap();
     connection
         .execute(
-            "INSERT INTO enum16_grid VALUES (1, 'low'), (2, 'NULL'), (3, NULL), (4, 'high'), (5, 'low'), (6, 'low')",
+            "INSERT INTO enum16_grid VALUES (1, 'low', 'low'), (2, 'NULL', 'NULL'), (3, NULL, NULL), (4, 'high', 'high'), (5, 'low', 'low'), (6, 'low', 'low')",
         )
         .await
         .unwrap();
@@ -57,9 +58,12 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     let columns = connection.fetch_columns(None, "enum16_grid").await.unwrap();
     let id_index = columns.iter().position(|column| column.name == "id").unwrap();
     let state_index = columns.iter().position(|column| column.name == "state").unwrap();
+    let state8_index = columns.iter().position(|column| column.name == "state8").unwrap();
     assert!(columns[id_index].primary_key, "id is the MergeTree ordering key");
     assert!(columns[state_index].nullable);
     assert!(columns[state_index].data_type.starts_with("Nullable(Enum16("));
+    assert!(columns[state8_index].nullable);
+    assert!(columns[state8_index].data_type.starts_with("Nullable(Enum8("));
 
     let high = parse_input_for_grid_cell("high", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(high, Value::Text("high".into()));
@@ -100,6 +104,19 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     .unwrap();
     connection.execute_in_transaction(&[update]).await.unwrap();
 
+    let empty_enum8 = parse_input_for_grid_cell("''", Some(&columns[state8_index]), "clickhouse", None).unwrap();
+    assert_eq!(empty_enum8, Value::Text(String::new()));
+    let update = tablepro_core::sql_dialect::build_keyed_update(
+        "clickhouse",
+        None,
+        "enum16_grid",
+        &columns,
+        &[(state8_index, empty_enum8)],
+        &[Value::Int(5)],
+    )
+    .unwrap();
+    connection.execute_in_transaction(&[update]).await.unwrap();
+
     let apostrophe_label =
         parse_input_for_grid_cell("'O''Brien'", Some(&columns[state_index]), "clickhouse", None).unwrap();
     assert_eq!(apostrophe_label, Value::Text("O'Brien".into()));
@@ -115,7 +132,7 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     connection.execute_in_transaction(&[update]).await.unwrap();
 
     let before_refusal = connection
-        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state) FROM enum16_grid ORDER BY id")
+        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state), state8, CAST(assumeNotNull(state8) AS Int8), isNull(state8) FROM enum16_grid ORDER BY id")
         .await
         .unwrap();
     assert_eq!(
@@ -125,21 +142,54 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
                 Value::Int(1),
                 Value::Text("high".into()),
                 Value::Int(32767),
+                Value::Int(0),
+                Value::Text("low".into()),
+                Value::Int(-128),
                 Value::Int(0)
             ],
-            vec![Value::Int(2), Value::Null, Value::Int(0), Value::Int(1)],
-            vec![Value::Int(3), Value::Null, Value::Int(0), Value::Int(1)],
+            vec![
+                Value::Int(2),
+                Value::Null,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Text("NULL".into()),
+                Value::Int(0),
+                Value::Int(0)
+            ],
+            vec![
+                Value::Int(3),
+                Value::Null,
+                Value::Int(0),
+                Value::Int(1),
+                Value::Null,
+                Value::Int(0),
+                Value::Int(1)
+            ],
             vec![
                 Value::Int(4),
                 Value::Text("high".into()),
                 Value::Int(32767),
+                Value::Int(0),
+                Value::Text("high".into()),
+                Value::Int(127),
                 Value::Int(0)
             ],
-            vec![Value::Int(5), Value::Text(String::new()), Value::Int(1), Value::Int(0)],
+            vec![
+                Value::Int(5),
+                Value::Text(String::new()),
+                Value::Int(1),
+                Value::Int(0),
+                Value::Text(String::new()),
+                Value::Int(1),
+                Value::Int(0)
+            ],
             vec![
                 Value::Int(6),
                 Value::Text("O'Brien".into()),
                 Value::Int(2),
+                Value::Int(0),
+                Value::Text("low".into()),
+                Value::Int(-128),
                 Value::Int(0)
             ],
         ]
@@ -157,7 +207,7 @@ async fn value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses
     .unwrap();
     assert!(connection.execute_in_transaction(&[update]).await.is_err());
     let after_refusal = connection
-        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state) FROM enum16_grid ORDER BY id")
+        .query("SELECT id, state, CAST(assumeNotNull(state) AS Int16), isNull(state), state8, CAST(assumeNotNull(state8) AS Int8), isNull(state8) FROM enum16_grid ORDER BY id")
         .await
         .unwrap();
     assert_eq!(after_refusal.rows, before_refusal.rows);

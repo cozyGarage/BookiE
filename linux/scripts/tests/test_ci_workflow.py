@@ -43,7 +43,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_postgres_text_array_grid_edit_preserves_escaped_values_and_siblings",
                 "value_contract_postgres_bit_array_grid_edit_preserves_wire_values_and_sibling",
                 "value_contract_postgres_citext_array_grid_edit_preserves_case_nulls_and_sibling",
-                "value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses_invalid_values",
+                "value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values",
                 "value_contract_mysql_unparseable_procedure_uses_human_approval_before_execution",
                 "value_contract_mongodb_int32_grid_edit_preserves_integer_width",
                 "value_contract_mongodb_date_grid_edit_preserves_millisecond_instant",

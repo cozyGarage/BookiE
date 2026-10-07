@@ -3,7 +3,7 @@
     [
       "tablepro-app",
       "--lib",
-      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses_invalid_values"
+      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum8_and_enum16_grid_edits_preserve_labels_and_refuse_invalid_values"
     ],
     [
       "tablepro-app",
