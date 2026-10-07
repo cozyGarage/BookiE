@@ -160,6 +160,14 @@ async fn value_contract_json_array_refusal_preserves_target_and_sibling_rows() {
     assert_eq!(source.rows[0][2], Value::Text("json[]".into()));
     assert_eq!(source.rows[0][3], Value::Text("jsonb[]".into()));
     assert_eq!(
+        source.rows[0][4],
+        Value::Text(r#"{"{\"z\":1,\"a\":\"x,y\"}","null",NULL}"#.into())
+    );
+    assert_eq!(
+        source.rows[0][5],
+        Value::Text(r#"{"{\"a\": \"x,y\", \"z\": 1}","null",NULL}"#.into())
+    );
+    assert_eq!(
         source.rows[0][6],
         Value::Text(r#"[{"z":1,"a":"x,y"},null,null]"#.into())
     );
