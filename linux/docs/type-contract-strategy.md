@@ -811,6 +811,11 @@ then rollback must restore both target rows and the original session path. The
 same contract still checks committed writes and native shadow/type identity
 ([validation comment on PR #127](https://github.com/cozyGarage/BookiE/pull/127#issuecomment-6029039984)).
 
+A restricted role that has schema and table privileges but no `USAGE` on the
+custom enum can still select enum values, bind matching and SQL NULL filters,
+and update the enum column. Native type/value checks and `22P02` invalid-label
+refusal confirm PostgreSQL's value-query privilege semantics.
+
 The PostgreSQL identifier boundary now has a focused regression at the 63-byte
 catalog limit: a maximum-length schema and a maximum-length type ending in a
 two-byte UTF-8 character must survive metadata discovery and a keyed enum edit,
