@@ -100,6 +100,11 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertEqual(checker.assess(results, "push")[0], [name])
         self.assertEqual(set(checker.assess({}, "push")[0]), checker.REQUIRED | {checker.SCHEDULED})
 
+    def test_only_pull_request_runs_are_cancelled_when_a_newer_run_starts(self):
+        workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", workflow)
+        self.assertNotIn("event_name == 'push' }}", workflow.split("concurrency:", 1)[1].split("jobs:", 1)[0])
+
     def test_a_pull_request_may_defer_only_the_merge_tier_jobs(self):
         success = {name: {"result": "success"} for name in checker.REQUIRED | {checker.SCHEDULED}}
         for name in checker.REQUIRED:
