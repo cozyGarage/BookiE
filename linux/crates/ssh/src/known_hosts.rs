@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use russh::keys::known_hosts::{check_known_hosts_path, known_host_keys_path, learn_known_hosts_path};
 use russh::keys::ssh_key::PublicKey;
 
+use crate::HostKeyPromptEvent;
 use crate::UnknownHostKey;
 use crate::openssh::{AskpassPrompt, PromptAnswer, Prompter};
 
@@ -40,6 +41,7 @@ pub(super) async fn verify_or_prompt(
     known_hosts: &Path,
     fingerprint: &str,
     prompter: &dyn Prompter,
+    prompt_events: &tokio::sync::mpsc::UnboundedSender<HostKeyPromptEvent>,
 ) -> HostKeyOutcome {
     match check_known_host(host, port, key, known_hosts, fingerprint) {
         Ok(true) => HostKeyOutcome::Trusted,
@@ -49,7 +51,10 @@ pub(super) async fn verify_or_prompt(
                 algorithm: key.algorithm().to_string(),
                 fingerprint: fingerprint.to_string(),
             };
-            if matches!(prompter.answer(&prompt).await, PromptAnswer::Accept) {
+            let _ = prompt_events.send(HostKeyPromptEvent::WaitingForUser);
+            let answer = prompter.answer(&prompt).await;
+            let _ = prompt_events.send(HostKeyPromptEvent::UserResponded);
+            if matches!(answer, PromptAnswer::Accept) {
                 record_known_host(host, port, key, known_hosts, fingerprint)
             } else {
                 HostKeyOutcome::Unknown {
@@ -175,7 +180,17 @@ mod tests {
         let path = dir.path().join("nested").join("known_hosts");
         let key = parse_key(KEY_A_BASE64);
         let (decliner, prompts) = recording_prompter(false);
-        let declined = verify_or_prompt("bastion.example.com", 2222, &key, &path, "SHA256:abc", &decliner).await;
+        let (prompt_events, _prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let declined = verify_or_prompt(
+            "bastion.example.com",
+            2222,
+            &key,
+            &path,
+            "SHA256:abc",
+            &decliner,
+            &prompt_events,
+        )
+        .await;
         assert!(matches!(declined, HostKeyOutcome::Unknown { .. }));
         assert!(!path.exists(), "decline must not modify known_hosts");
         assert!(matches!(
@@ -185,7 +200,16 @@ mod tests {
         ));
 
         let (acceptor, _) = recording_prompter(true);
-        let accepted = verify_or_prompt("bastion.example.com", 2222, &key, &path, "SHA256:abc", &acceptor).await;
+        let accepted = verify_or_prompt(
+            "bastion.example.com",
+            2222,
+            &key,
+            &path,
+            "SHA256:abc",
+            &acceptor,
+            &prompt_events,
+        )
+        .await;
         assert!(matches!(accepted, HostKeyOutcome::LearnedNew { .. }));
         assert!(path.exists(), "accepted key must be persisted");
     }
@@ -198,7 +222,17 @@ mod tests {
         let changed = parse_key(KEY_B_BASE64);
         let _ = verify_or_learn("bastion.example.com", 22, &first, &path, "first", UnknownHostKey::Learn);
         let (acceptor, prompts) = recording_prompter(true);
-        let outcome = verify_or_prompt("bastion.example.com", 22, &changed, &path, "changed", &acceptor).await;
+        let (prompt_events, _prompt_event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let outcome = verify_or_prompt(
+            "bastion.example.com",
+            22,
+            &changed,
+            &path,
+            "changed",
+            &acceptor,
+            &prompt_events,
+        )
+        .await;
         assert!(matches!(outcome, HostKeyOutcome::Changed { .. }));
         assert!(prompts.lock().unwrap().is_empty());
         assert!(matches!(
