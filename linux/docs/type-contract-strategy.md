@@ -29,8 +29,10 @@ an undeclared Enum8 label is refused and leaves all stored rows unchanged.
 Enum16 now covers its signed endpoints and zero (`-32768`, `0`, `32767`) with
 the same consumers and native Int16 casts; an undeclared Enum16 label is also
 refused without changing stored rows. Both widths share the same native test
-([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)). Other
-ClickHouse type and consumer combinations remain open.
+([test](../crates/drivers/clickhouse/tests/support/enum_values.rs)). A driver
+unit test separately pins Enum16 label text and SQL NULL decoding
+([test](../crates/drivers/clickhouse/src/tests.rs)). Other ClickHouse type and
+consumer combinations remain open.
 
 Nullable Enum16 additionally preserves SQL NULL separately from the literal
 `NULL` label through parameter writes, native casts, CSV import and SQL-literal
