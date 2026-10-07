@@ -44,6 +44,7 @@
 
 ### Changed
 
+- MongoDB B3 coverage pins a BSON String-to-Decimal128 change between `run_find` metadata census and page retrieval; the returned column is `mixed` and preserves canonical Extended JSON.
 - Create table from CSV now explains that ClickHouse, MongoDB and Redis connections cannot do it, and DuckDB gets its own JSON type name.
 - The app builds and runs its tests on Ubuntu 24.04 and Debian 13 (GTK 4.14, libadwaita 1.5 or newer); the shortcuts window uses the standard GTK layout.
 - Large results use about 45% less memory in the grid because rows are built only when they scroll into view.
