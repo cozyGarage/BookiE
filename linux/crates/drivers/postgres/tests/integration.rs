@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::str::FromStr;
+use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
@@ -257,6 +258,80 @@ async fn a_bare_begin_does_not_leave_a_pooled_session_inside_a_transaction() {
         .await
         .unwrap();
     assert_eq!(idle_in_transaction.rows, vec![vec![Value::Int(0)]]);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_batch_reports_rollback_failure_after_postgres_terminates_its_backend() {
+    let (_container, mut options) = start_pg().await;
+    let application_name = format!("bookie_rollback_failure_{}", Uuid::new_v4());
+    options.application_name = Some(application_name.clone());
+    let connection = Arc::new(connect(options.clone()).await);
+    let mut observer_options = options;
+    observer_options.application_name = Some(format!("{application_name}_observer"));
+    let observer = connect(observer_options).await;
+    connection
+        .execute("CREATE TABLE rollback_failure_probe (id integer PRIMARY KEY)")
+        .await
+        .expect("create rollback probe");
+
+    let executing = connection.clone();
+    let batch = vec![
+        ("INSERT INTO rollback_failure_probe(id) VALUES (1)".into(), Vec::new()),
+        ("SELECT pg_sleep(60)".into(), Vec::new()),
+    ];
+    let operation = tokio::spawn(async move { executing.execute_in_transaction(&batch).await });
+    let pid = tokio::time::timeout(std::time::Duration::from_secs(15), async {
+        loop {
+            let activity = observer
+                .query(&format!(
+                    "SELECT pid::bigint FROM pg_stat_activity \
+                     WHERE application_name = '{application_name}' \
+                       AND state = 'active' AND query LIKE '%pg_sleep(60)%' LIMIT 1"
+                ))
+                .await
+                .expect("observe active transaction statement");
+            if let Some(Value::Int(pid)) = activity.rows.first().and_then(|row| row.first()) {
+                break *pid;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .expect("batch reached its blocking PostgreSQL statement");
+
+    let terminated = observer
+        .query(&format!("SELECT pg_terminate_backend({pid})"))
+        .await
+        .expect("terminate the transaction backend");
+    assert_eq!(terminated.rows, vec![vec![Value::Bool(true)]]);
+
+    let error = tokio::time::timeout(std::time::Duration::from_secs(15), operation)
+        .await
+        .expect("batch exits after backend termination")
+        .expect("batch task")
+        .expect_err("the failed statement and rollback must be reported");
+    match error {
+        DriverError::TransactionRollbackFailed {
+            statement_index,
+            source,
+            rollback_error,
+        } => {
+            assert_eq!(statement_index, 1);
+            assert!(matches!(source.as_ref(), DriverError::Disconnected), "{source:?}");
+            assert!(
+                matches!(rollback_error.as_ref(), DriverError::Disconnected),
+                "{rollback_error:?}"
+            );
+        }
+        other => panic!("expected rollback failure with unknown outcome, got {other:?}"),
+    }
+
+    let persisted = connection
+        .query("SELECT count(*)::bigint FROM rollback_failure_probe")
+        .await
+        .expect("query after the terminated connection was discarded");
+    assert_eq!(persisted.rows, vec![vec![Value::Int(0)]]);
 }
 
 #[tokio::test]

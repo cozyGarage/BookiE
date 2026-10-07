@@ -84,7 +84,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
 | B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
 | B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
-| B4-12 | PostgreSQL rollback-failure acceptance | OPEN | Native fixture | driver-docker |
+| B4-12 | PostgreSQL rollback-failure acceptance | OPEN | The native Docker regression now covers backend termination during statement 1, `TransactionRollbackFailed`, and absence of the earlier insert; focused local pass is recorded on the B4 board. Re-run on the frozen candidate and extend side-effect coverage | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
 | B4-14 | U5: no client certificate or key in transport or storage | OPEN | Scope drivers and routes first | driver-docker |
 | B4-15 | O1: connect A, cancel, switch to B, namespace ownership races | OPEN | | gtk-widget |
