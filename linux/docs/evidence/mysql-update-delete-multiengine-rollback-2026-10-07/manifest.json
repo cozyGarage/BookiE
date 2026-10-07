@@ -25,5 +25,12 @@
   "remaining": [
     "Other MySQL engines, effects outside trigger writes, and multi-engine deployment behavior remain untested.",
     "Frozen-candidate and hosted acceptance remain separate."
-  ]
+  ],
+  "atomicity_group_run": {
+    "command": "env CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1",
+    "result": "8 passed, 0 failed, 0 ignored; 63 filtered out",
+    "duration_seconds": 95.93,
+    "log_path": "atomic-group.txt",
+    "log_sha256": "6682f0f12d8e581da7877d85a56ad05eb46b9a9f63d921ade5e4d4dd047e73ff"
+  }
 }
