@@ -47,6 +47,7 @@ Other options and why they were rejected.
 | [0010](0010-administrative-action-audit.md) | Audit confirmed bundle administration | Accepted | Bundle import/export use durable, paired aggregate audit records and fail closed before side effects. |
 | [0011](0011-paged-query-results.md) | Page large editor results through a cursor | Accepted | An optional guarded, audited server cursor returns pages of 5,000 rows; PostgreSQL first, other engines keep the caps |
 | [0012](0012-sidebar-object-tree.md) | Show database objects in a collapsible sidebar tree | Accepted | A `GtkListView` over a `GtkTreeListModel` with real group rows, lazy catalog groups and saved collapse state |
+| [0013](0013-multiple-query-result-sets.md) | Preserve every result set from a query | Accepted | Ordered result batches keep SQL Server's later sets, with one shared budget, guard masking/audit, UI tabs and MCP output |
 
 Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted
 means the architecture choice is recorded; implementation and runtime acceptance

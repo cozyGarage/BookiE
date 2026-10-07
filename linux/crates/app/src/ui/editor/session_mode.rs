@@ -3,7 +3,9 @@ use std::sync::Arc;
 use relm4::ComponentSender;
 use relm4::adw::prelude::*;
 use relm4::{adw, gtk};
-use tablepro_core::{Connection, DriverError, OperationControl, QueryResult, Session, Value};
+#[cfg(test)]
+use tablepro_core::QueryResult;
+use tablepro_core::{Connection, DriverError, OperationControl, QueryResultBatch, Session, Value};
 use uuid::Uuid;
 
 use crate::services::database_service::ConnectionIdentity;
@@ -41,11 +43,14 @@ impl StatementTarget {
         sql: &str,
         params: &[Value],
         control: &OperationControl,
-    ) -> Result<QueryResult, DriverError> {
+    ) -> Result<QueryResultBatch, DriverError> {
         match self {
-            Self::Pool(connection) => connection.query_params_controlled(sql, params, control).await,
+            Self::Pool(connection) => connection.query_result_sets_controlled(sql, params, control).await,
             Self::Session { shared, .. } => match shared.lock().await.as_mut() {
-                Some(session) if session.is_usable() => session.query_params_controlled(sql, params, control).await,
+                Some(session) if session.is_usable() => session
+                    .query_params_controlled(sql, params, control)
+                    .await
+                    .map(QueryResultBatch::single),
                 Some(_) => Err(retired_session_error()),
                 None => Err(DriverError::Unsupported("the session was closed".into())),
             },

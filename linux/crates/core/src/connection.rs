@@ -9,7 +9,9 @@ use tokio::sync::Notify;
 use crate::catalog::{CatalogObject, CatalogObjectKind};
 use crate::error::DriverError;
 use crate::operation::{OperationControl, run_controlled};
-use crate::query::{ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, TableInfo, Value};
+use crate::query::{
+    ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, QueryResult, QueryResultBatch, TableInfo, Value,
+};
 use crate::tls::TlsConfig;
 use crate::transaction::Transaction;
 
@@ -194,6 +196,21 @@ pub trait Connection: Send + Sync {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         run_controlled(self.query_params(sql, params), control).await
+    }
+    /// Run a query and preserve each tabular result set in order, including
+    /// empty sets. Drivers without multi-set results inherit single-result behavior.
+    async fn query_result_sets_controlled(
+        &self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResultBatch, DriverError> {
+        let result = if params.is_empty() {
+            self.query_controlled(sql, control).await
+        } else {
+            self.query_params_controlled(sql, params, control).await
+        }?;
+        Ok(QueryResultBatch::single(result))
     }
     async fn execute(&self, sql: &str) -> Result<ExecResult, DriverError>;
     async fn execute_controlled(&self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {

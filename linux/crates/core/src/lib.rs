@@ -51,7 +51,7 @@ pub use pagination::{KEYSET_OFFSET_THRESHOLD, KeysetError, keyset_order_by, keys
 pub use params::{NamedParameters, ParameterKind, extract_named_parameters, parse_parameter_value};
 pub use query::{
     ColumnInfo, ExecResult, ForeignKeyInfo, IndexInfo, MAX_QUERY_RESULT_BYTES, MAX_QUERY_RESULT_CELLS, MAX_QUERY_ROWS,
-    QualifiedTypeName, QueryResult, QueryResultBudget, TableInfo, Value,
+    QualifiedTypeName, QueryResult, QueryResultBatch, QueryResultBudget, TableInfo, Value,
 };
 pub use registry::DriverRegistry;
 pub use session::Session;
