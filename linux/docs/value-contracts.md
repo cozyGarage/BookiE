@@ -34,6 +34,17 @@ edits use the qualified built-in cast and preserve the sibling row in
 Typed CSV import of `name[]` uses the same value distinctions and checks the
 restored native wire bytes in `value_contract_builtin_array_families_survive_typed_csv_insert`.
 
+Copied INSERTs and SQL-file exports omit PostgreSQL and SQL Server identity
+values so the destination generates a fresh key; MySQL keeps explicit
+auto-increment values. PostgreSQL `GENERATED ALWAYS` and `BY DEFAULT` identities,
+SQL Server `IDENTITY`, generated columns and identity-only tables are checked
+against native rows in
+`value_contract_postgres_copy_insert_regenerates_identity_values` and
+`value_contract_server_owned_columns_and_identity_copy_inserts_use_defaults`.
+The SQL export writer pins the same per-engine output in
+`sql_export_uses_engine_generated_identity_values`. Explicit identity-value
+preservation is not supported by these copy/export paths.
+
 The same PostgreSQL keyed grid contract covers `oid[]` zero, the unsigned
 32-bit maximum and SQL NULL, using native type/text/`array_send` equality and
 sibling preservation in `value_contract_array_grid_edit_preserves_array_elements`.

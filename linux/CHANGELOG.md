@@ -13,6 +13,7 @@
 - PostgreSQL `tsvector[]` and `tsquery[]` now have explicit unsupported-value contracts with native text-search JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL `json[]` and `jsonb[]` now have explicit unsupported-value contracts with native text/JSON/wire oracles and refused-write target/sibling preservation.
 - PostgreSQL's six built-in range array families now share explicit refusal and target/sibling preservation coverage with native type and JSON oracles.
+- Copy-as-INSERT and SQL exports now let PostgreSQL and SQL Server generate fresh identity values; MySQL continues to preserve explicit auto-increment values.
 - PostgreSQL geometric array families now share explicit refusal, native type/text/JSON/wire oracles, and target/sibling preservation coverage.
 - The enum-array slice regression is split into its own test file so the PostgreSQL contract source stays within the file-size guard; the ignored-test inventory points to its new location.
 - B3 mutation triage now records a scoped PostgreSQL array-dimension decoder run: 10 mutants caught, 2 compile-unviable, none missed or timed out.
