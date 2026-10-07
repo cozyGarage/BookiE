@@ -50,6 +50,7 @@
 - Browse results share their in-memory query result; GTK row objects are created when the view requests them. This avoids eager per-row GObject creation but does not page database rows or bound result memory.
 - The B3 board and ignored-test inventory now record completed PostgreSQL `citext[]`, `pg_lsn[]`, `macaddr[]`, `macaddr8[]`, `inet[]` and `cidr[]` result, typed binding, keyed update and CSV round-trip contracts; other array families remain open.
 - PostgreSQL integration contracts now classify supported `xml[]` in the built-in array OID census and assert that domain-over-enum CSV and keyed writes cast through the declared domain.
+- The PostgreSQL B3 summary now matches the source-pinned 301-layer domain-over-enum test and evidence; 301 is a tested point, not a maximum-depth claim.
 - SonarCloud GTK CSS selector findings are recorded with their framework-specific classification and the native widget-node evidence.
 - The documentation link checker skips generated packaged Markdown and keeps checking source documents.
 - The SQLite B3 summary removes duplicate `quote()`/`instr()` evidence links and links both typed-CSV packets directly.
