@@ -392,15 +392,31 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
         .await
         .unwrap();
     conn.execute("INSERT INTO dml_parent VALUES (1), (2)").await.unwrap();
-    conn.execute("CREATE TABLE update_effects (id INT PRIMARY KEY) ENGINE=MyISAM")
-        .await
-        .unwrap();
+    let update_effect_tables = [
+        ("update_myisam_effects", "MyISAM", "id INT PRIMARY KEY"),
+        ("update_memory_effects", "MEMORY", "id INT PRIMARY KEY"),
+        ("update_csv_effects", "CSV", "id INT NOT NULL"),
+        ("update_archive_effects", "ARCHIVE", "id INT NOT NULL"),
+    ];
+    for (table, engine, columns) in update_effect_tables {
+        conn.execute(&format!("CREATE TABLE {table} ({columns}) ENGINE={engine}"))
+            .await
+            .unwrap();
+    }
     conn.execute("CREATE TABLE update_transactional_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
         .await
         .unwrap();
-    conn.execute("CREATE TABLE delete_effects (id INT PRIMARY KEY) ENGINE=MyISAM")
-        .await
-        .unwrap();
+    let delete_effect_tables = [
+        ("delete_myisam_effects", "MyISAM", "id INT PRIMARY KEY"),
+        ("delete_memory_effects", "MEMORY", "id INT PRIMARY KEY"),
+        ("delete_csv_effects", "CSV", "id INT NOT NULL"),
+        ("delete_archive_effects", "ARCHIVE", "id INT NOT NULL"),
+    ];
+    for (table, engine, columns) in delete_effect_tables {
+        conn.execute(&format!("CREATE TABLE {table} ({columns}) ENGINE={engine}"))
+            .await
+            .unwrap();
+    }
     conn.execute("CREATE TABLE delete_transactional_effects (id INT PRIMARY KEY) ENGINE=InnoDB")
         .await
         .unwrap();
@@ -416,23 +432,31 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
         )
         .await
         .unwrap();
-    sqlx::raw_sql(
+    let update_effect_inserts = update_effect_tables
+        .iter()
+        .map(|(table, _, _)| format!("INSERT INTO {table} VALUES (NEW.id); "))
+        .collect::<String>();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
         "CREATE TRIGGER dml_parent_after_update AFTER UPDATE ON dml_parent \
          FOR EACH ROW BEGIN \
-             INSERT INTO update_effects VALUES (NEW.id); \
              INSERT INTO update_transactional_effects VALUES (NEW.id); \
-         END",
-    )
+             {update_effect_inserts} \
+         END"
+    )))
     .execute(&fixture)
     .await
     .unwrap();
-    sqlx::raw_sql(
+    let delete_effect_inserts = delete_effect_tables
+        .iter()
+        .map(|(table, _, _)| format!("INSERT INTO {table} VALUES (OLD.id); "))
+        .collect::<String>();
+    sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
         "CREATE TRIGGER dml_parent_after_delete AFTER DELETE ON dml_parent \
          FOR EACH ROW BEGIN \
-             INSERT INTO delete_effects VALUES (OLD.id); \
              INSERT INTO delete_transactional_effects VALUES (OLD.id); \
-         END",
-    )
+             {delete_effect_inserts} \
+         END"
+    )))
     .execute(&fixture)
     .await
     .unwrap();
@@ -455,14 +479,16 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
         vec![vec![Value::Int(1)], vec![Value::Int(2)]],
         "the InnoDB UPDATE is rolled back"
     );
-    assert_eq!(
-        conn.query("SELECT id FROM update_effects ORDER BY id")
-            .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(3)]],
-        "the MyISAM AFTER UPDATE trigger effect survives rollback"
-    );
+    for (table, engine, _) in update_effect_tables {
+        assert_eq!(
+            conn.query(&format!("SELECT id FROM {table} ORDER BY id"))
+                .await
+                .unwrap()
+                .rows,
+            vec![vec![Value::Int(3)]],
+            "the {engine} AFTER UPDATE trigger effect survives rollback"
+        );
+    }
     assert_eq!(
         conn.query("SELECT id FROM update_transactional_effects ORDER BY id")
             .await
@@ -489,14 +515,16 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
         vec![vec![Value::Int(1)], vec![Value::Int(2)]],
         "the InnoDB DELETE is rolled back"
     );
-    assert_eq!(
-        conn.query("SELECT id FROM delete_effects ORDER BY id")
-            .await
-            .unwrap()
-            .rows,
-        vec![vec![Value::Int(1)]],
-        "the MyISAM AFTER DELETE trigger effect survives rollback"
-    );
+    for (table, engine, _) in delete_effect_tables {
+        assert_eq!(
+            conn.query(&format!("SELECT id FROM {table} ORDER BY id"))
+                .await
+                .unwrap()
+                .rows,
+            vec![vec![Value::Int(1)]],
+            "the {engine} AFTER DELETE trigger effect survives rollback"
+        );
+    }
     assert_eq!(
         conn.query("SELECT id FROM delete_transactional_effects ORDER BY id")
             .await
@@ -504,6 +532,66 @@ async fn mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigg
             .rows,
         Vec::<Vec<Value>>::new(),
         "the InnoDB AFTER DELETE trigger effect is rolled back"
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_batch_rollback_preserves_trigger_session_variable_effects() {
+    let (_container, opts) = start_mysql().await;
+    let conn = connect(opts.clone()).await;
+    conn.execute("CREATE TABLE session_effect_parent (id INT PRIMARY KEY) ENGINE=InnoDB")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO session_effect_parent VALUES (1)")
+        .await
+        .unwrap();
+
+    let fixture = sqlx::mysql::MySqlPoolOptions::new()
+        .connect_with(
+            sqlx::mysql::MySqlConnectOptions::new()
+                .host(&opts.host)
+                .port(opts.port)
+                .username(&opts.username)
+                .password(opts.password.expose_secret())
+                .database(&opts.database),
+        )
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        "CREATE TRIGGER session_effect_parent_after_insert AFTER INSERT ON session_effect_parent \
+         FOR EACH ROW SET @rollback_side_effect_count = COALESCE(@rollback_side_effect_count, 0) + 1",
+    )
+    .execute(&fixture)
+    .await
+    .unwrap();
+    fixture.close().await;
+
+    conn.execute("SET @rollback_side_effect_count = 0").await.unwrap();
+    let batch = vec![
+        ("INSERT INTO session_effect_parent VALUES (2)".into(), vec![]),
+        ("INSERT INTO session_effect_parent VALUES (1)".into(), vec![]),
+    ];
+    let error = conn
+        .execute_in_transaction(&batch)
+        .await
+        .expect_err("duplicate key must fail the batch");
+    assert!(
+        matches!(error, DriverError::Transaction { statement_index: 1, .. }),
+        "got {error:?}"
+    );
+    assert_eq!(
+        conn.query("SELECT id FROM session_effect_parent ORDER BY id")
+            .await
+            .unwrap()
+            .rows,
+        vec![vec![Value::Int(1)]],
+        "the InnoDB row from the failed batch is rolled back"
+    );
+    assert_eq!(
+        conn.query("SELECT @rollback_side_effect_count").await.unwrap().rows,
+        vec![vec![Value::Int(1)]],
+        "the trigger's session variable side effect survives rollback"
     );
 }
 

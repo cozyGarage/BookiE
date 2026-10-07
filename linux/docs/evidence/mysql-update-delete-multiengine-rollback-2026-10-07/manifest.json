@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "BookiE B4-11 MySQL UPDATE and DELETE trigger side effects across nontransactional engines",
+  "branch": "b4/b4-11-multiengine-dml",
+  "source_commit": "d5d1fefa4e2ccae3c4c8f3d81d86bee9ae3ab839",
+  "source_tree": "2a061650613b7aa0dffee4dec6a549e0aafd66a4",
+  "worktree_state": "local regression change; source file and patch hashes identify tested code",
+  "tested_source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "c5f58824837bb1e37c50e4dde96e4f43d78d04c045613ec96767a920c4b279d6"
+  },
+  "patch_sha256": "4f2ad7efb81ea368defe3824c15d0a477a7422c67b33ef7d2f47465c0fc860d9",
+  "engine": "MySQL testcontainers-modules default fixture; InnoDB parent and transactional trigger controls; MyISAM, MEMORY, CSV, and ARCHIVE effect tables",
+  "test": "mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects",
+  "command": "cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects -- --ignored --exact --test-threads=1",
+  "result": "1 passed, 0 failed, 0 ignored; 70 filtered out",
+  "assertions": [
+    "A failed UPDATE batch restores the InnoDB parent and InnoDB AFTER UPDATE trigger rows while INSERT effects written by AFTER UPDATE triggers to MyISAM, MEMORY, CSV, and ARCHIVE survive.",
+    "A failed DELETE batch restores the InnoDB parent and InnoDB AFTER DELETE trigger rows while INSERT effects written by AFTER DELETE triggers to MyISAM, MEMORY, CSV, and ARCHIVE survive."
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "36a39427ab3cbe1f621699997dd90a0585a310ad42dd3691bc1c0d5125f0ada3"
+  },
+  "remaining": [
+    "Other MySQL engines, effects outside trigger writes, and multi-engine deployment behavior remain untested.",
+    "Frozen-candidate and hosted acceptance remain separate."
+  ],
+  "atomicity_group_run": {
+    "command": "env CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic:: -- --ignored --test-threads=1",
+    "result": "8 passed, 0 failed, 0 ignored; 63 filtered out",
+    "duration_seconds": 95.93,
+    "log_path": "atomic-group.txt",
+    "log_sha256": "6682f0f12d8e581da7877d85a56ad05eb46b9a9f63d921ade5e4d4dd047e73ff"
+  }
+}
