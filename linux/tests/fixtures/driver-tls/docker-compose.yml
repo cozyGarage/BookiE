@@ -207,6 +207,78 @@ services:
         aliases:
           - mysql-ssh.tablepro.test
 
+  mysql-mtls:
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: tablepro
+      MYSQL_DATABASE: tablepro
+      MYSQL_USER: tablepro_mtls
+      MYSQL_PASSWORD: tablepro
+    volumes:
+      - ./mysql-mtls/require-client-cert.sql:/docker-entrypoint-initdb.d/10-require-client-cert.sql:ro
+    command:
+      - mysqld
+      - --require_secure_transport=ON
+      - --ssl-ca=/certs/ca.crt
+      - --ssl-cert=/certs/server.crt
+      - --ssl-key=/certs/server.key
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - --protocol=socket
+        - -uroot
+        - -ptablepro
+        - -Dtablepro
+        - -e
+        - "SELECT 1"
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    ports:
+      - "127.0.0.1:3309:3306"
+    networks:
+      fixture:
+        aliases:
+          - mysql-mtls.tablepro.test
+
+  mysql-mtls-ssh:
+    build:
+      context: .
+      dockerfile: mysql/Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: tablepro
+      MYSQL_DATABASE: tablepro
+      MYSQL_USER: tablepro_mtls
+      MYSQL_PASSWORD: tablepro
+    volumes:
+      - ./mysql-mtls/require-client-cert.sql:/docker-entrypoint-initdb.d/10-require-client-cert.sql:ro
+    command:
+      - mysqld
+      - --require_secure_transport=ON
+      - --ssl-ca=/certs/ca.crt
+      - --ssl-cert=/certs/server.crt
+      - --ssl-key=/certs/server.key
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - --protocol=socket
+        - -uroot
+        - -ptablepro
+        - -Dtablepro
+        - -e
+        - "SELECT 1"
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    networks:
+      fixture:
+        aliases:
+          - mysql-mtls-ssh.tablepro.test
+
   ssh-bastion:
     build:
       context: .

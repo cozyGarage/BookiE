@@ -21,6 +21,8 @@ fn saved(name: &str) -> SavedConnection {
         use_tls: true,
         tls_mode: Some(TlsMode::Require),
         tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Password,
         environment: Environment::Dev,
@@ -96,12 +98,29 @@ fn the_exported_record_carries_exactly_the_included_fields() {
         assert!(!record.contains_key(*field), "{field} must not be exported");
     }
     for field in BUNDLE_INCLUDED_FIELDS {
-        let optional = matches!(*field, "socket_dir" | "tls_root_cert" | "ssh");
+        let optional = matches!(
+            *field,
+            "socket_dir" | "tls_root_cert" | "tls_client_cert" | "tls_client_key" | "ssh"
+        );
         assert!(
             optional || record.contains_key(*field),
             "{field} is missing from the exported record"
         );
     }
+}
+
+#[test]
+fn client_tls_paths_round_trip_in_connection_bundles_without_key_bytes() {
+    let mut connection = saved("mTLS");
+    connection.tls_client_cert = Some(PathBuf::from("/etc/bookie/client.crt"));
+    connection.tls_client_key = Some(PathBuf::from("/etc/bookie/client.key"));
+    let bytes = export_plaintext(&export_of(vec![connection.clone()], Vec::new())).expect("export");
+    let record = &plaintext_body(&bytes).connections[0];
+
+    assert_eq!(record.tls_client_cert, connection.tls_client_cert);
+    assert_eq!(record.tls_client_key, connection.tls_client_key);
+    assert!(!String::from_utf8_lossy(&bytes).contains("PRIVATE KEY"));
+    assert_eq!(record.to_saved().tls_client_key, connection.tls_client_key);
 }
 
 #[test]

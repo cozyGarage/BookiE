@@ -108,6 +108,12 @@ impl ConnectDialog {
         if let Some(root_cert) = &saved.tls_root_cert {
             self.tls_root_cert.set_text(&root_cert.to_string_lossy());
         }
+        if let Some(client_cert) = &saved.tls_client_cert {
+            self.tls_client_cert.set_text(&client_cert.to_string_lossy());
+        }
+        if let Some(client_key) = &saved.tls_client_key {
+            self.tls_client_key.set_text(&client_key.to_string_lossy());
+        }
         self.apply_tls_visibility();
         self.read_only.set_active(saved.read_only);
         self.environment.set_selected(environment_row(saved.environment));
@@ -160,6 +166,8 @@ mod tests {
             use_tls: false,
             tls_mode: None,
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: false,
             auth_mode: AuthMode::Password,
             environment: Environment::Local,

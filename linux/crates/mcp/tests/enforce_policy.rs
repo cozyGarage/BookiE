@@ -590,6 +590,8 @@ impl RecordingProvider {
             use_tls: false,
             tls_mode: None,
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: false,
             auth_mode: Default::default(),
             environment: Default::default(),

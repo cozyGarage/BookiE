@@ -81,5 +81,19 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
     eval "$(printf "tablepro-test" | gnome-keyring-daemon --daemonize --unlock --components=secrets)"
     PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo build --locked -p tablepro-ssh --bin tablepro-askpass
     PATH="$TABLEPRO_TARGET_DIR/debug:$PATH" cargo test --locked -p tablepro-agentd --test g5_system_openssh -- --include-ignored --test-threads=1
+    cargo test --locked -p tablepro-agentd --test mtls -- --include-ignored --test-threads=1
     cargo test --locked -p tablepro-release-tests --tests -- --include-ignored --test-threads=1
+    cargo build --locked -p tablepro-app --bin tablepro-app
+    TABLEPRO_GTK_DBUS_ACTIVE=0 \
+      TABLEPRO_GTK_POSTGRES_MTLS_PASSWORD=tablepro \
+      TABLEPRO_GTK_BINARY="$TABLEPRO_TARGET_DIR/debug/tablepro-app" \
+      TABLEPRO_GTK_SCENARIO=postgres_saved_mtls_connection_authenticates_and_queries \
+      TABLEPRO_GTK_POSTGRES_MTLS_PORT=5433 \
+      TABLEPRO_GTK_POSTGRES_MTLS_HOST=localhost \
+      TABLEPRO_GTK_POSTGRES_MTLS_DB=tablepro \
+      TABLEPRO_GTK_POSTGRES_MTLS_USER=tablepro_mtls \
+      TABLEPRO_GTK_POSTGRES_MTLS_CA="$TABLEPRO_FIXTURE_MATERIALS/ca.crt" \
+      TABLEPRO_GTK_POSTGRES_MTLS_CERT="$TABLEPRO_FIXTURE_MATERIALS/client.crt" \
+      TABLEPRO_GTK_POSTGRES_MTLS_KEY="$TABLEPRO_FIXTURE_MATERIALS/client.key" \
+      bash scripts/test-gtk-safety.sh
   '

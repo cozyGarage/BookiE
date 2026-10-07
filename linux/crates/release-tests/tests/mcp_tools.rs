@@ -54,6 +54,8 @@ impl ConnectionProvider for FixtureProvider {
             use_tls: true,
             tls_mode: None,
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: self.read_only,
             auth_mode: Default::default(),
             environment: Environment::Local,

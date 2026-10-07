@@ -26,6 +26,8 @@ MYSQL_CONNECTION_NAME = "Safety MySQL"
 MYSQL_CONNECTION_ID = "c38e2d93-4314-4c18-b192-08f164386e09"
 POSTGRES_CONNECTION_NAME = "Safety PostgreSQL"
 POSTGRES_CONNECTION_ID = "0b6d4a52-3d1a-4f0e-8f6c-5f3f0c2a9e11"
+POSTGRES_MTLS_CONNECTION_NAME = "PostgreSQL mTLS"
+POSTGRES_MTLS_CONNECTION_ID = "02a95df6-b1bb-419d-9a15-8d484ba729c3"
 WAIT_SECONDS = 15
 POLL_SECONDS = 0.05
 FILE_CHOOSER_ROLES = (pyatspi.ROLE_FILE_CHOOSER, pyatspi.ROLE_DIALOG)
@@ -606,6 +608,46 @@ def write_fixture(base, audit_available=True, environment="prod"):
                 "environment": environment,
             }
         )
+    postgres_mtls_port = os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT")
+    if postgres_mtls_port:
+        connections["connections"].append(
+            {
+                "id": POSTGRES_MTLS_CONNECTION_ID,
+                "name": POSTGRES_MTLS_CONNECTION_NAME,
+                "driver_id": "postgres",
+                "host": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_HOST", "localhost"),
+                "port": int(postgres_mtls_port),
+                "database": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_DB", "tablepro"),
+                "username": os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_USER", "tablepro_mtls"),
+                "use_tls": True,
+                "tls_mode": "verify_full",
+                "tls_root_cert": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_CA"],
+                "tls_client_cert": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_CERT"],
+                "tls_client_key": os.environ["TABLEPRO_GTK_POSTGRES_MTLS_KEY"],
+                "read_only": True,
+                "auth_mode": "password",
+                "environment": environment,
+            }
+        )
+        password = os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PASSWORD")
+        if password:
+            subprocess.run(
+                [
+                    "secret-tool",
+                    "store",
+                    "--label=BookiE GTK PostgreSQL mTLS fixture",
+                    "xdg:schema",
+                    "com.tablepro.linux.Password",
+                    "connection-id",
+                    POSTGRES_MTLS_CONNECTION_ID,
+                    "kind",
+                    "db_password",
+                ],
+                input=password,
+                text=True,
+                check=True,
+                capture_output=True,
+            )
     (tablepro_config / "connections.json").write_text(json.dumps(connections), encoding="utf-8")
     (tablepro_config / "preferences.json").write_text(
         json.dumps(

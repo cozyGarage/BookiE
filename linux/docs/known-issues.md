@@ -67,7 +67,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | UI-23 | PostgreSQL catalog: materialized views, routines, triggers, sequences, extensions, roles; typed activity console | OPEN | B6 | driver-docker |
 | UI-24 | Workspace restore proven only partially | UNVERIFIED | Restart with every referenced connection | gtk-installed |
 | UI-25 | ~~CSV create-table uses PostgreSQL-leaning type names on ClickHouse, MongoDB, Redis, DuckDB~~ | DONE | Creating a table from a file is offered only on PostgreSQL, MySQL, SQLite, SQL Server and DuckDB (ClickHouse needs an ENGINE clause, MongoDB and Redis have no tables); DuckDB spells JSON as `JSON`. Tests `import::infer` | unit |
-| UI-26 | Reusable SSH profiles are not editable; client certificates are partial | OPEN | With U5 below | gtk-widget |
+| UI-26 | Reusable SSH profiles are not editable | OPEN | Separate connection-editor slice | gtk-widget |
 
 ## Transport, sessions, daemon (B4)
 
@@ -86,7 +86,7 @@ Source snapshot: BookiE `fork/linux` at `5f7e80145` (PR #123), checked
 | B4-11 | MySQL batch: only InnoDB and the trigger boundary are proven | OPEN | Other engines and side effects | driver-docker |
 | B4-12 | PostgreSQL rollback-failure acceptance | OPEN | The native Docker regression now covers backend termination during statement 1, `TransactionRollbackFailed`, and absence of the earlier insert; focused local pass is recorded on the B4 board. Re-run on the frozen candidate and extend side-effect coverage | driver-docker |
 | B4-13 | ~~U4: reconnect retried every error forever~~ | DONE | `is_permanent_failure` tests; `a_credential_failure_ends_the_retry_loop_and_reports_the_reason`; `ConnectionHealth::Failed` shown in the banner. Raw error text still goes through `error_text` only | unit |
-| B4-14 | U5: no client certificate or key in transport or storage | OPEN | Scope drivers and routes first | driver-docker |
+| B4-14 | ~~U5: saved mTLS transport and consumer support~~ | DONE | PostgreSQL server requiring client cert: direct/SSH shared transport, missing/untrusted/rotated identities, GTK saved-connection query, agentd direct + saved SSH and untrusted-cert refusal. MySQL driver fixture: direct/SSH, missing/untrusted/rotated identities. `scripts/test-postgres-release.sh` and `scripts/test-driver-tls.sh` pass locally; installed/package/hosted acceptance remains separate | driver-docker + gtk-widget |
 | B4-15 | ~~O1: cancel a pending connection attempt, switch to B, and preserve connection ownership~~ | DONE | [GTK evidence](evidence/b4-connection-cancel-switch-2026-10-07/manifest.json): after cancelling a hanging attempt, the original database stays untouched and writes reach saved B; a second-window regression preserves its pending edit during another window's switch | gtk-widget |
 | B4-16 | F4/F9 stale-session invalidation merged but not accepted | UNVERIFIED | Installed acceptance | gtk-installed |
 | B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | | driver-docker |

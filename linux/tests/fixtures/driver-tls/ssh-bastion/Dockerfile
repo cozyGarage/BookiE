@@ -15,7 +15,7 @@ RUN apk add --no-cache openssh-server \
       'PubkeyAuthentication yes' \
       'AllowTcpForwarding local' \
       'AllowStreamLocalForwarding yes' \
-      'PermitOpen mysql-ssh.tablepro.test:3306 mssql-ssh.tablepro.test:1433' \
+      'PermitOpen mysql-ssh.tablepro.test:3306 mysql-mtls-ssh.tablepro.test:3306 mssql-ssh.tablepro.test:1433' \
       'X11Forwarding no' \
       'AllowAgentForwarding no' \
       > /etc/ssh/sshd_config

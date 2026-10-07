@@ -564,6 +564,14 @@ def scenarios(ui):
         ui.press_x11_key("Escape")
         wait_for_adw_dialog("name", present=False)
 
+    def postgres_saved_mtls_connection_authenticates_and_queries(database, base):
+        ui.open_saved_connection(ui.POSTGRES_MTLS_CONNECTION_NAME)
+        ui.wait_for_frame_containing(f"{ui.POSTGRES_MTLS_CONNECTION_NAME} — BookiE")
+        ui.invoke(ui.wait_for_node(name="Open SQL editor"))
+        ui.wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON)
+        ui.run_sql("SELECT count(*) AS row_count FROM release_items")
+        ui.wait_for_node(name="3", role=pyatspi.ROLE_LABEL)
+
     def psql(sql):
         import subprocess
         out = subprocess.run(
@@ -666,6 +674,8 @@ def scenarios(ui):
         result.append(postgres_saved_connection_browses_rows_and_values)
         result.append(postgres_grid_edit_and_delete_commit_to_the_server)
         result.append(postgres_database_switcher_reconnects_to_the_chosen_database)
+    if os.environ.get("TABLEPRO_GTK_POSTGRES_MTLS_PORT"):
+        result.append(postgres_saved_mtls_connection_authenticates_and_queries)
     for scenario in result:
         scenario.environment = "local"
     return result

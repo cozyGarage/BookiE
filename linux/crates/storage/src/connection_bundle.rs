@@ -42,6 +42,8 @@ pub const BUNDLE_INCLUDED_FIELDS: &[&str] = &[
     "username",
     "tls_mode",
     "tls_root_cert",
+    "tls_client_cert",
+    "tls_client_key",
     "read_only",
     "auth_mode",
     "environment",
@@ -102,6 +104,10 @@ pub struct BundleConnection {
     pub tls_mode: TlsMode,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_root_cert: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_client_cert: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tls_client_key: Option<PathBuf>,
     pub read_only: bool,
     pub auth_mode: AuthMode,
     pub environment: Environment,
@@ -122,6 +128,8 @@ impl BundleConnection {
             username: saved.username.clone(),
             tls_mode: saved.effective_tls_mode(),
             tls_root_cert: saved.tls_root_cert.clone(),
+            tls_client_cert: saved.tls_client_cert.clone(),
+            tls_client_key: saved.tls_client_key.clone(),
             read_only: saved.read_only,
             auth_mode: saved.auth_mode,
             environment: saved.environment,
@@ -142,6 +150,8 @@ impl BundleConnection {
             use_tls: self.tls_mode.encrypts(),
             tls_mode: Some(self.tls_mode),
             tls_root_cert: self.tls_root_cert.clone(),
+            tls_client_cert: self.tls_client_cert.clone(),
+            tls_client_key: self.tls_client_key.clone(),
             read_only: self.read_only,
             auth_mode: self.auth_mode,
             environment: self.environment,

@@ -35,6 +35,8 @@ pub struct ConnectDialog {
     auth_combo: adw::ComboRow,
     tls_mode: adw::ComboRow,
     tls_root_cert: adw::EntryRow,
+    tls_client_cert: adw::EntryRow,
+    tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
     connect_timeout: adw::SpinRow,
     query_timeout: adw::SpinRow,
@@ -75,6 +77,12 @@ fn auth_mode_label(mode: AuthMode) -> String {
 
 fn auth_mode_for_row(row: u32) -> AuthMode {
     AUTH_MODE_ROWS.get(row as usize).copied().unwrap_or_default()
+}
+
+fn selected_path(row: &adw::EntryRow) -> Option<std::path::PathBuf> {
+    let value = row.text();
+    let path = value.trim();
+    (!path.is_empty()).then(|| std::path::PathBuf::from(path))
 }
 
 mod browse;
@@ -237,6 +245,10 @@ impl Component for ConnectDialog {
             .title(crate::tr!("Certificate authority"))
             .build();
         browse::attach_certificate_picker(&tls_root_cert);
+        let tls_client_cert = adw::EntryRow::builder().title(crate::tr!("Client certificate")).build();
+        browse::attach_client_certificate_picker(&tls_client_cert);
+        let tls_client_key = adw::EntryRow::builder().title(crate::tr!("Client private key")).build();
+        browse::attach_client_key_picker(&tls_client_key);
         let sender_for_tls = sender.clone();
         tls_mode.connect_selected_notify(move |_| {
             sender_for_tls.input(ConnectDialogInput::TlsModeChanged);
@@ -270,6 +282,10 @@ impl Component for ConnectDialog {
         }
         let s = sender.clone();
         password.connect_changed(move |_| s.input(ConnectDialogInput::InputChanged));
+        for entry in [&tls_client_cert, &tls_client_key] {
+            let s = sender.clone();
+            entry.connect_changed(move |_| s.input(ConnectDialogInput::InputChanged));
+        }
 
         // Semantic preferences groups: Connection / Authentication /
         // Options / SSH. AdwPreferencesPage renders them with the
@@ -306,6 +322,8 @@ impl Component for ConnectDialog {
         let options_group = adw::PreferencesGroup::builder().title(crate::tr!("Options")).build();
         options_group.add(&tls_mode);
         options_group.add(&tls_root_cert);
+        options_group.add(&tls_client_cert);
+        options_group.add(&tls_client_key);
         options_group.add(&read_only);
         let (connect_timeout, query_timeout) = timeout_rows();
         options_group.add(&connect_timeout);
@@ -370,6 +388,8 @@ impl Component for ConnectDialog {
             auth_combo,
             tls_mode,
             tls_root_cert,
+            tls_client_cert,
+            tls_client_key,
             read_only,
             connect_timeout,
             query_timeout,
@@ -687,6 +707,13 @@ impl ConnectDialog {
     }
 
     fn refresh_validity(&self) {
+        let client_cert_set = !self.tls_client_cert.text().trim().is_empty();
+        let client_key_set = !self.tls_client_key.text().trim().is_empty();
+        let invalid_client_tls = client_cert_set != client_key_set
+            || ((client_cert_set || client_key_set)
+                && matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer));
+        toggle_error(&self.tls_client_cert, invalid_client_tls);
+        toggle_error(&self.tls_client_key, invalid_client_tls);
         let database_empty = self.database.text().trim().is_empty();
         toggle_error(&self.database, database_empty);
 
@@ -709,6 +736,13 @@ impl ConnectDialog {
     }
 
     fn is_form_valid(&self) -> bool {
+        let client_cert_set = !self.tls_client_cert.text().trim().is_empty();
+        let client_key_set = !self.tls_client_key.text().trim().is_empty();
+        if client_cert_set != client_key_set
+            || (client_cert_set && matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer))
+        {
+            return false;
+        }
         if self.database.text().trim().is_empty() {
             return false;
         }
@@ -751,6 +785,8 @@ impl ConnectDialog {
         tablepro_core::TlsConfig {
             mode,
             root_cert: self.selected_root_cert(mode),
+            client_cert: selected_path(&self.tls_client_cert),
+            client_key: selected_path(&self.tls_client_key),
             ..Default::default()
         }
     }
@@ -771,6 +807,20 @@ impl ConnectDialog {
         self.tls_root_cert.set_visible(
             !self.form.file_based && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
         );
+        let identity_configured =
+            !self.tls_client_cert.text().trim().is_empty() || !self.tls_client_key.text().trim().is_empty();
+        let client_auth_supported = self
+            .drivers
+            .get(self.driver_combo.selected() as usize)
+            .and_then(|entry| self.registry.get(&entry.id))
+            .is_some_and(|driver| driver.supports_client_tls_auth());
+        let visible = identity_configured
+            || (!self.form.file_based
+                && !self.uses_local_socket()
+                && client_auth_supported
+                && self.selected_tls_mode() != TlsMode::Disabled);
+        self.tls_client_cert.set_visible(visible);
+        self.tls_client_key.set_visible(visible);
     }
 
     fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
@@ -781,9 +831,7 @@ impl ConnectDialog {
             self.endpoint_combo.set_selected(0);
         }
         self.apply_form_state();
-        self.tls_root_cert.set_visible(
-            !driver.is_file_based() && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
-        );
+        self.apply_tls_visibility();
         self.database_file_picker.set_visible(self.form.file_based);
         self.database.set_title(&if self.form.file_based {
             crate::tr!("File path")
@@ -1070,6 +1118,8 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
         tls_root_cert: opts_clone.tls.root_cert.clone(),
+        tls_client_cert: opts_clone.tls.client_cert.clone(),
+        tls_client_key: opts_clone.tls.client_key.clone(),
         auth_mode: opts_clone.auth_mode,
         read_only,
         environment,

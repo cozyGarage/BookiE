@@ -253,6 +253,7 @@ fn driver_metadata() {
     assert_eq!(d.default_port(), 5432);
     assert_eq!(d.default_database(), "postgres");
     assert_eq!(d.default_username(), "postgres");
+    assert!(d.supports_client_tls_auth());
 }
 
 #[test]

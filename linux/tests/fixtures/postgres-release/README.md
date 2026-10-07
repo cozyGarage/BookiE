@@ -6,13 +6,15 @@ Deterministic PostgreSQL environment for the Phase 3 release gate. Run it from t
 ./scripts/test-postgres-release.sh
 ```
 
-The script generates materials, builds and starts the containers, waits for each path, and runs the
-`tablepro-release-tests` suite with `--include-ignored --test-threads=1`. Set
+The script generates materials, builds and starts the containers, waits for each path, and runs
+agentd SSH/mTLS tests, the `tablepro-release-tests` suite, and a GTK saved-mTLS connection scenario.
+The Rust suites run with `--include-ignored --test-threads=1`. Set
 `TABLEPRO_FIXTURE_KEEP_UP=1` to leave the containers running after the suite.
 
 ## Requirements
 
-Docker with Compose v2, `openssl`, and `ssh-keygen`.
+Docker with Compose v2, `openssl`, `ssh-keygen`, `dbus-run-session`,
+`gnome-keyring-daemon`, `secret-tool`, `xvfb-run`, and Python 3 with `pyatspi`.
 
 ## Topology
 
@@ -33,6 +35,9 @@ cut either path and observe reconnect behavior.
 - `server.crt` / `server.key`: server certificate for `CN=db.tablepro.test` with
   `subjectAltName=DNS:db.tablepro.test,DNS:localhost`
 - `other-ca.crt`: unrelated authority for unknown-CA rejection
+- `client.crt` / `client.key`: client identity accepted by the dedicated mTLS role
+- `rotated-client.crt` / `rotated-client.key`: second valid identity for rotation checks
+- `wrong-client.crt` / `wrong-client.key`: client identity signed by the unrelated CA
 - `ssh_host_ed25519_key`: bastion host key
 - `client_ed25519_key`: tunnel user key
 
@@ -49,6 +54,10 @@ trip the SSH host-key mismatch check and the developer's own `known_hosts` is un
 - `VerifyFull` through a socket-forwarded SSH tunnel verifies the original database hostname
 - `VerifyFull` through SSH rejects a service identity the certificate does not name
 - `VerifyFull` over a TCP-forwarded tunnel fails instead of verifying the local dial address
+- A server-enforced client-certificate role accepts valid saved mTLS credentials directly and
+  through SSH, rejects missing or untrusted client identities, and accepts rotated credentials
+- The GTK app opens a saved mTLS connection and queries the fixture database; agentd exercises
+  saved mTLS directly and over its saved SSH route and rejects an untrusted identity
 - Read-only denies a data-changing CTE and an administrative function
 - Batch and interactive rollback leave no rows behind
 - Activity templates run, and the blocking-lock query reports a contended row
@@ -56,3 +65,6 @@ trip the SSH host-key mismatch check and the developer's own `known_hosts` is un
 
 Server-confirmed cancellation and timeout are covered by
 `cargo test -p tablepro-driver-postgres --test integration`.
+
+The separate `scripts/test-driver-tls.sh` fixture verifies MySQL mTLS directly and through SSH,
+including missing/untrusted identities and certificate rotation.

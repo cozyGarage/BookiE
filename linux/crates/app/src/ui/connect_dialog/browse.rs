@@ -11,10 +11,10 @@ fn picker_button(icon: &str, tooltip: &str) -> gtk::Button {
     button
 }
 
-fn certificate_filters() -> gtk::gio::ListStore {
+fn file_filters(name: &str, patterns: &[&str]) -> gtk::gio::ListStore {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&crate::tr!("Certificates")));
-    for pattern in ["*.pem", "*.crt", "*.cer"] {
+    filter.set_name(Some(name));
+    for pattern in patterns {
         filter.add_pattern(pattern);
     }
     let filters = gtk::gio::ListStore::new::<gtk::FileFilter>();
@@ -35,16 +35,47 @@ fn parent_window(button: &gtk::Button) -> Option<gtk::Window> {
 }
 
 pub(super) fn attach_certificate_picker(row: &adw::EntryRow) {
-    let button = picker_button(
-        "document-open-symbolic",
+    attach_path_picker(
+        row,
         &crate::tr!("Browse for certificate authority file"),
+        &crate::tr!("Select certificate authority"),
+        &crate::tr!("Certificates"),
+        &["*.pem", "*.crt", "*.cer"],
     );
+}
+
+pub(super) fn attach_client_certificate_picker(row: &adw::EntryRow) {
+    attach_path_picker(
+        row,
+        &crate::tr!("Browse for client certificate file"),
+        &crate::tr!("Select client certificate"),
+        &crate::tr!("Certificates"),
+        &["*.pem", "*.crt", "*.cer"],
+    );
+}
+
+pub(super) fn attach_client_key_picker(row: &adw::EntryRow) {
+    attach_path_picker(
+        row,
+        &crate::tr!("Browse for client private key file"),
+        &crate::tr!("Select client private key"),
+        &crate::tr!("Private keys"),
+        &["*.pem", "*.key"],
+    );
+}
+
+fn attach_path_picker(row: &adw::EntryRow, tooltip: &str, title: &str, filter_name: &str, patterns: &[&str]) {
+    let button = picker_button("document-open-symbolic", tooltip);
+    let title = title.to_string();
+    let filter_name = filter_name.to_string();
+    let patterns: Vec<String> = patterns.iter().map(|pattern| (*pattern).to_string()).collect();
     let entry = row.clone();
     button.connect_clicked(move |button| {
+        let pattern_refs: Vec<&str> = patterns.iter().map(String::as_str).collect();
         let dialog = gtk::FileDialog::builder()
-            .title(crate::tr!("Select certificate authority"))
+            .title(&title)
             .modal(true)
-            .filters(&certificate_filters())
+            .filters(&file_filters(&filter_name, &pattern_refs))
             .build();
         let entry = entry.clone();
         dialog.open(

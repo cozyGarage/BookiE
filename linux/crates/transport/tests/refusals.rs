@@ -15,6 +15,7 @@ use tablepro_ssh::{SshAuth, SshConfig};
 struct FakeDriver {
     integrated_auth: bool,
     local_socket: bool,
+    client_tls_auth: bool,
 }
 
 impl FakeDriver {
@@ -22,6 +23,7 @@ impl FakeDriver {
         Self {
             integrated_auth: false,
             local_socket: false,
+            client_tls_auth: false,
         }
     }
 
@@ -29,6 +31,15 @@ impl FakeDriver {
         Self {
             integrated_auth: false,
             local_socket: true,
+            client_tls_auth: false,
+        }
+    }
+
+    fn with_client_tls_auth() -> Self {
+        Self {
+            integrated_auth: false,
+            local_socket: false,
+            client_tls_auth: true,
         }
     }
 }
@@ -53,6 +64,10 @@ impl DatabaseDriver for FakeDriver {
 
     fn supports_local_socket(&self) -> bool {
         self.local_socket
+    }
+
+    fn supports_client_tls_auth(&self) -> bool {
+        self.client_tls_auth
     }
 
     async fn connect(&self, _opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
@@ -128,6 +143,78 @@ async fn integrated_authentication_is_refused_by_a_driver_that_cannot_do_it() {
         format!("{error}").contains("Fake"),
         "the message must name the driver: {error}"
     );
+}
+
+#[tokio::test]
+async fn a_partial_client_tls_identity_is_refused_before_driver_dispatch() {
+    let directory = tempfile::tempdir().unwrap();
+    let cert = directory.path().join("client.crt");
+    std::fs::write(&cert, b"certificate").unwrap();
+    let error = refusal(
+        &FakeDriver::with_client_tls_auth(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyFull,
+                client_cert: Some(cert),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "a client certificate without its private key must be refused",
+    )
+    .await;
+    assert!(error.to_string().contains("both a certificate and a private key"));
+}
+
+#[tokio::test]
+async fn client_tls_auth_refuses_modes_that_can_fall_back_to_plaintext() {
+    let directory = tempfile::tempdir().unwrap();
+    let cert = directory.path().join("client.crt");
+    let key = directory.path().join("client.key");
+    std::fs::write(&cert, b"certificate").unwrap();
+    std::fs::write(&key, b"private key").unwrap();
+    let error = refusal(
+        &FakeDriver::with_client_tls_auth(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::Prefer,
+                client_cert: Some(cert),
+                client_key: Some(key),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "mTLS must not use a mode that permits plaintext fallback",
+    )
+    .await;
+    assert!(error.to_string().contains("cannot fall back to plaintext"));
+}
+
+#[tokio::test]
+async fn a_driver_without_client_tls_auth_refuses_configured_identity() {
+    let directory = tempfile::tempdir().unwrap();
+    let cert = directory.path().join("client.crt");
+    let key = directory.path().join("client.key");
+    std::fs::write(&cert, b"certificate").unwrap();
+    std::fs::write(&key, b"private key").unwrap();
+    let error = refusal(
+        &FakeDriver::plain(),
+        ConnectOptions {
+            tls: TlsConfig {
+                mode: TlsMode::VerifyFull,
+                client_cert: Some(cert),
+                client_key: Some(key),
+                ..TlsConfig::disabled()
+            },
+            ..options()
+        },
+        None,
+        "a driver without mTLS support must not silently ignore credentials",
+    )
+    .await;
+    assert!(error.to_string().contains("does not support TLS client authentication"));
 }
 
 #[tokio::test]

@@ -163,6 +163,8 @@ pub async fn connect_options_for(saved: &SavedConnection) -> Result<ConnectOptio
         tls: TlsConfig {
             mode: saved.effective_tls_mode(),
             root_cert: saved.tls_root_cert.clone(),
+            client_cert: saved.tls_client_cert.clone(),
+            client_key: saved.tls_client_key.clone(),
             ..Default::default()
         },
         auth_mode: saved.auth_mode,
@@ -311,6 +313,7 @@ async fn establish_inner(
     cancellation: tokio_util::sync::CancellationToken,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), TransportError> {
     check_auth_mode(opts.auth_mode, driver.supports_integrated_auth(), driver.display_name())?;
+    validate_client_tls_auth(driver, &opts)?;
     validate_local_socket(&opts, driver, ssh.is_some())?;
     opts.forwarded_socket_dir = None;
     let tunnel = match ssh {
@@ -320,6 +323,45 @@ async fn establish_inner(
     let timeout = connect_timeout(&opts);
     let raw = connect_with_timeout(driver, opts, timeout).await?;
     Ok((raw, tunnel))
+}
+
+fn validate_client_tls_auth(driver: &dyn DatabaseDriver, opts: &ConnectOptions) -> Result<(), TransportError> {
+    let (Some(cert), Some(key)) = (&opts.tls.client_cert, &opts.tls.client_key) else {
+        if opts.tls.client_cert.is_none() && opts.tls.client_key.is_none() {
+            return Ok(());
+        }
+        return Err(DriverError::Unsupported(
+            "TLS client authentication requires both a certificate and a private key".into(),
+        )
+        .into());
+    };
+    if !driver.supports_client_tls_auth() {
+        return Err(DriverError::Unsupported(format!(
+            "{} does not support TLS client authentication",
+            driver.display_name()
+        ))
+        .into());
+    }
+    if matches!(opts.tls.mode, TlsMode::Disabled | TlsMode::Prefer) {
+        return Err(DriverError::Unsupported(
+            "TLS client authentication requires a TLS mode that cannot fall back to plaintext".into(),
+        )
+        .into());
+    }
+    for path in [cert, key] {
+        let file = std::fs::File::open(path)
+            .map_err(|_| DriverError::Unsupported("TLS client certificate or key file cannot be opened".into()))?;
+        let metadata = file
+            .metadata()
+            .map_err(|_| DriverError::Unsupported("TLS client certificate or key file cannot be inspected".into()))?;
+        if !metadata.is_file() || metadata.len() > 1024 * 1024 {
+            return Err(DriverError::Unsupported(
+                "TLS client certificate and key must be regular files no larger than 1 MiB".into(),
+            )
+            .into());
+        }
+    }
+    Ok(())
 }
 
 fn connect_timeout(opts: &ConnectOptions) -> Duration {
@@ -620,6 +662,8 @@ mod tests {
             use_tls: false,
             tls_mode: None,
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             auth_mode: AuthMode::Password,
             read_only: false,
             environment: Environment::Local,
