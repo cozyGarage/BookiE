@@ -181,6 +181,56 @@ fn outcome_tab_label(idx: usize, o: &StatementOutcome) -> String {
     }
 }
 
+const MAX_SWITCHER_BUTTONS: usize = 5;
+
+fn uses_drop_down(count: usize) -> bool {
+    count > MAX_SWITCHER_BUTTONS
+}
+
+fn build_result_switcher(stack: &adw::ViewStack, outcomes: &[StatementOutcome]) -> gtk::CenterBox {
+    let holder = gtk::CenterBox::builder()
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(12)
+        .margin_end(12)
+        .build();
+    if uses_drop_down(outcomes.len()) {
+        holder.set_center_widget(Some(&build_result_drop_down(stack, outcomes)));
+    } else {
+        let switcher = adw::ViewSwitcher::builder()
+            .stack(stack)
+            .policy(adw::ViewSwitcherPolicy::Wide)
+            .build();
+        holder.set_center_widget(Some(&switcher));
+    }
+    holder
+}
+
+fn build_result_drop_down(stack: &adw::ViewStack, outcomes: &[StatementOutcome]) -> gtk::DropDown {
+    let labels: Vec<String> = outcomes
+        .iter()
+        .enumerate()
+        .map(|(idx, outcome)| outcome_tab_label(idx, outcome))
+        .collect();
+    let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
+    let drop_down = gtk::DropDown::from_strings(&label_refs);
+    drop_down.update_property(&[gtk::accessible::Property::Label(&crate::tr!("Statement result"))]);
+    let first_error = outcomes
+        .iter()
+        .position(|outcome| matches!(outcome.kind, StatementOutcomeKind::Error(_)))
+        .unwrap_or(0);
+    drop_down.set_selected(first_error as u32);
+    drop_down.connect_selected_notify({
+        let stack = stack.downgrade();
+        move |drop_down| {
+            if let Some(stack) = stack.upgrade() {
+                stack.set_visible_child_name(&format!("r{}", drop_down.selected()));
+            }
+        }
+    });
+    drop_down
+}
+
 pub(crate) fn render_outcomes(
     holder: &gtk::Box,
     outcomes: &[StatementOutcome],
@@ -217,18 +267,7 @@ pub(crate) fn render_outcomes(
             let _ = page;
         }
     }
-    let switcher = adw::ViewSwitcher::builder()
-        .stack(&stack)
-        .policy(adw::ViewSwitcherPolicy::Wide)
-        .build();
-    let switcher_holder = gtk::CenterBox::builder()
-        .margin_top(6)
-        .margin_bottom(6)
-        .margin_start(12)
-        .margin_end(12)
-        .build();
-    switcher_holder.set_center_widget(Some(&switcher));
-    holder.append(&switcher_holder);
+    holder.append(&build_result_switcher(&stack, outcomes));
     holder.append(&stack);
     if let Some(err_idx) = outcomes
         .iter()
@@ -241,8 +280,17 @@ pub(crate) fn render_outcomes(
 #[cfg(test)]
 mod tests {
     use super::super::session_mode::StatementTarget;
+    use super::uses_drop_down;
     use super::{BatchErrorPolicy, ScriptRunResult, StatementOutcomeKind, run_statements, sql_preview, summary_label};
     use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    #[test]
+    fn a_few_results_keep_their_buttons_and_many_collapse_into_a_drop_down() {
+        assert!(!uses_drop_down(2));
+        assert!(!uses_drop_down(5));
+        assert!(uses_drop_down(6));
+        assert!(uses_drop_down(40));
+    }
 
     async fn sqlite_connection() -> std::sync::Arc<dyn tablepro_core::Connection> {
         let driver = drivers_sqlite::SqliteDriver;

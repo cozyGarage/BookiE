@@ -4,6 +4,7 @@
 
 ### Added
 
+- PostgreSQL built-in multirange scalar and array projections now resolve to named `Undecodable` values, with literal and parameter refusal and SQL NULL distinction covered by Docker-backed contracts.
 - MariaDB now has the non-UTC TIMESTAMP refusal contract already used for MySQL, covering dedicated sessions, pooled queries, transaction-local changes, session-local text, and the native UTC epoch.
 - MySQL and MariaDB unsigned subtraction now has Docker-backed `NO_UNSIGNED_SUBTRACTION` session contracts for native underflow/overflow refusal, engine-specific signed result metadata, and negative/positive `BIGINT` boundaries.
 - PostgreSQL `timestamp[]` coverage now restores exported CSV under `ISO, MDY` after exporting under `SQL, DMY`, asserting native type, JSON, wire bytes, and an untouched sibling.
@@ -32,6 +33,7 @@
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.
+- A script with more than five statements shows its results in a drop-down instead of a row of buttons that overflows the window.
 - Find in Loaded Rows (Ctrl+Alt+F or the grid menu) lists the loaded rows that contain a text and selects the one you pick.
 - Holding Ctrl and pressing Tab repeatedly walks deeper through the recently used tabs; releasing Ctrl keeps the chosen tab.
 - Preferences has an Editor font family setting; an empty value keeps the system monospace font.
