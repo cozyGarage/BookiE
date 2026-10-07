@@ -1,0 +1,8 @@
+2026-10-07T19:10:05.636254Z  INFO starting tablepro-app drivers=7
+2026-10-07T19:10:05.636307Z  INFO MCP HTTP server starting host=127.0.0.1 port=17432
+MESA-EGL: warning: DRI3 error: Could not get DRI3 device
+MESA-EGL: warning: Ensure your X server supports DRI3 to get accelerated rendering
+2026-10-07T19:10:05.739861Z  INFO registered win.disconnect enabled=false
+2026-10-07T19:10:05.743305Z  INFO main window activated
+2026-10-07T19:10:06.302105Z  INFO workspace ready driver=sqlite table_count=1 view_count=0
+2026-10-07T19:10:08.810557Z  WARN candidate connection failed error=ssh host-key trust was refused: host key for relay:22 is not in /tmp/tablepro-postgres_ssh_second_hop_decline_does_not_learn_key-1tb4z5o0/config/tablepro/known_hosts, and this connection does not add new keys. Running ssh will not help: it writes to its own known_hosts file, not this one. Connect once from BookiE with a setting that trusts new keys, or add the line to /tmp/tablepro-postgres_ssh_second_hop_decline_does_not_learn_key-1tb4z5o0/config/tablepro/known_hosts yourself. Fingerprint: SHA256:Y2D5ewoO3ongz6/GrHB8rIE8DN1ZgkbqOA2ECkd/SwU
