@@ -15,7 +15,7 @@ execution and installed acceptance are separate states.
 | E1/E2, G3, F1/F2/F3 | Merged in #13–#18 | No reimplementation; native/shared policy, verified cache and close-route acceptance at candidate SHA |
 | F5 | Merged as `4b7814f5e` (#19) | Installed retirement/toggle flow |
 | F4/F9 | Merged as `573435766` (#20) | Monitor consumes tunnel closure and swaps live identity; native reconnect and installed stale-session acceptance |
-| F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter; decline/accept fixtures exist. Native two-hop success and second-hop key-change refusal passed locally on `8d88f48ec` via `bash scripts/test-ssh.sh`; multi-hop cancellation and installed trust flow remain candidate gates. See [SSH multi-hop evidence](evidence/ssh-multihop-2026-10-07/manifest.json) |
+| F6 | Merged as `d1434438e` and follow-up `6e2c5687a` (#22/#23) | GUI defaults to refusal and installs the built-in prompter; decline/accept fixtures exist. Native two-hop success, second-hop key-change refusal, and in-flight cancellation while the second-hop trust prompt is pending passed locally on `f3a1765` via `bash scripts/test-ssh.sh`; installed trust flow remains a candidate gate. See [SSH multi-hop evidence](evidence/ssh-multihop-2026-10-07/manifest.json) |
 | F8 | GUI generation split merged as `6346a431c` (#24); daemon generations merged as `09c5351a3` | Policy, GUI and daemon scope uncertainty per connection generation while sharing journal failure. Agentd regressions cover isolation, replacement, late cancellation and shared journal failure; frozen-candidate and installed restart acceptance remain |
 
 Source integration above was checked locally. No fresh hosted result is inferred
