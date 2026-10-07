@@ -70,6 +70,9 @@ fn matches_endpoint(saved: &SavedConnection, identity: &ConnectionIdentity<'_>) 
     if saved.driver_id != identity.driver_id || saved.database != opts.database {
         return false;
     }
+    if saved.tls_client_cert != opts.tls.client_cert || saved.tls_client_key != opts.tls.client_key {
+        return false;
+    }
     if identity.file_based {
         return true;
     }
@@ -126,6 +129,8 @@ mod tests {
             use_tls: false,
             tls_mode: Some(TlsMode::Disabled),
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             auth_mode,
             read_only: false,
             environment: Environment::Local,
@@ -163,6 +168,40 @@ mod tests {
         assert!(matches_existing(&entry, &identity("mssql", &same, false)));
         assert!(!matches_existing(&entry, &identity("mssql", &other_user, false)));
         assert!(!matches_existing(&entry, &identity("mssql", &kerberos, false)));
+    }
+
+    #[test]
+    fn network_entries_distinguish_tls_client_identities() {
+        let mut entry = saved("postgres", "reader", AuthMode::Password);
+        entry.tls_client_cert = Some(std::path::PathBuf::from("/certs/old.crt"));
+        entry.tls_client_key = Some(std::path::PathBuf::from("/certs/old.key"));
+
+        let same_identity = ConnectOptions {
+            tls: tablepro_core::TlsConfig {
+                client_cert: entry.tls_client_cert.clone(),
+                client_key: entry.tls_client_key.clone(),
+                ..Default::default()
+            },
+            ..opts("reader", AuthMode::Password)
+        };
+        let rotated_identity = ConnectOptions {
+            tls: tablepro_core::TlsConfig {
+                client_cert: Some(std::path::PathBuf::from("/certs/new.crt")),
+                client_key: Some(std::path::PathBuf::from("/certs/new.key")),
+                ..Default::default()
+            },
+            ..opts("reader", AuthMode::Password)
+        };
+
+        assert!(matches_existing(&entry, &identity("postgres", &same_identity, false)));
+        assert!(!matches_existing(
+            &entry,
+            &identity("postgres", &opts("reader", AuthMode::Password), false)
+        ));
+        assert!(!matches_existing(
+            &entry,
+            &identity("postgres", &rotated_identity, false)
+        ));
     }
 
     #[test]

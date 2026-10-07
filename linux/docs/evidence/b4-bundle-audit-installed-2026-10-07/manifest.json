@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-07",
+  "scope": "BookiE B4-22 release-binary GTK acceptance for confirmed connection-bundle export and import",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "worktree_state": "GTK test source has local uncommitted changes; source hash identifies the tested scenarios",
+  "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=bundle_export_records_sanitized_audit_outcome,bundle_import_records_sanitized_audit_outcome bash scripts/test-gtk-safety.sh",
+  "binary_build": "scripts/test-gtk-safety.sh built cargo build --release --locked -p tablepro-app --bin tablepro-app and installed it at target/installed/usr/bin/tablepro",
+  "binary_sha256": "50658f88ef18ccdf206a449cc6ea9df993e5db655156899932cd4fe72604d1db",
+  "tested_source_sha256": {
+    "crates/app/tests/gtk_safety.py": "1e53841d5cb20c8c6c8ff617e9205750e078186f93fcc6c6d6a4d5c4b9bef4d6"
+  },
+  "result": "passed; script exit status 0",
+  "scenarios": [
+    {
+      "name": "bundle_export_records_sanitized_audit_outcome",
+      "result": "passed",
+      "assertions": [
+        "export action creates selected bundle file",
+        "audit journal contains exactly one durable intent and one outcome with a shared operation ID",
+        "audit records contain only the aggregate affected count and omit destination path"
+      ]
+    },
+    {
+      "name": "bundle_import_records_sanitized_audit_outcome",
+      "result": "passed",
+      "assertions": [
+        "preview appears before a connection is saved",
+        "confirmation saves the selected connection and preserves unmentioned connections",
+        "audit journal contains exactly one durable intent and one outcome with a shared operation ID",
+        "audit records contain only the aggregate affected count and omit bundle path and connection name"
+      ]
+    }
+  ],
+  "log": {
+    "path": "focused.txt",
+    "sha256": "3a0523fb2ce1245b84cbffe4d2c3239deba35492625513ca2d6bd3b46ada36bf"
+  },
+  "not_established": [
+    "encrypted bundle unlock and credential replacement in the GTK flow",
+    "frozen-candidate acceptance",
+    "hosted CI",
+    "distribution-package installed desktop acceptance"
+  ]
+}

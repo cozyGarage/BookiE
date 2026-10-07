@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "source_sha256": {
+    "crates/drivers/mysql/tests/shared/mysql_atomic.rs": "5d5c6a8d96a730618d819bd615407f843cf16c1bd00fdea933cfb5305648face"
+  },
+  "engine": "MySQL 8.1 container from testcontainers-modules 0.15.0",
+  "case": "Failed InnoDB DML rolls back parent and transactional trigger rows; MyISAM, MEMORY and CSV trigger writes survive; AUTO_INCREMENT allocation remains consumed after rollback.",
+  "test": "mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects",
+  "contract": [
+    "A successful InnoDB insert seeds the parent and trigger-effect rows at ID 1.",
+    "The batch inserts ID 2, then fails on duplicate ID 1; both the parent row and its InnoDB trigger write for ID 2 roll back.",
+    "The AFTER INSERT effects for IDs 1 and 2 remain in MyISAM, MEMORY and CSV tables.",
+    "A separate failing InnoDB batch removes its inserted row but does not restore the AUTO_INCREMENT counter; the next successful insert receives ID 3.",
+    "This establishes only the named MySQL engine and side-effect cases; it does not establish rollback behavior for all engines or side effects."
+  ],
+  "validation": {
+    "format": {
+      "command": "rtk cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    "focused_test": {
+      "command": "rtk proxy cargo test --locked -p tablepro-driver-mysql --test integration mysql_atomic::mysql_batch_rollback_does_not_claim_to_reverse_nontransactional_engine_effects -- --ignored --exact --test-threads=1",
+      "result": "1 passed, 0 failed, 0 ignored; 63 filtered out",
+      "log": "focused.txt"
+    }
+  },
+  "remaining": [
+    "Other storage engines and side-effect patterns remain untested.",
+    "Frozen B3+B4 candidate and hosted acceptance remain."
+  ],
+  "log_sha256": {
+    "focused.txt": "d3fd4c24864590b727008a23e37d4e52258c3ce2d9471642c045a86e7d0a88e3"
+  }
+}

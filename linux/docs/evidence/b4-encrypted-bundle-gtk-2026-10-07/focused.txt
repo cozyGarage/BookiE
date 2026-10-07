@@ -1,0 +1,67 @@
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.a11y.Bus' requested by ':1.1' (uid=1000 pid=1492034 comm="gdbus call --session --dest org.a11y.Bus --object-")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[1492045]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=1000 pid=1492057 comm="python3 /home/trung/Projects/tablepro/linux/crates")
+dbus-daemon[1492045]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.gtk.vfs.Daemon' requested by ':1.7' (uid=1000 pid=1492058 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.gtk.vfs.Daemon'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.freedesktop.portal.Desktop' requested by ':1.7' (uid=1000 pid=1492058 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.10' (uid=1000 pid=1492128 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.freedesktop.portal.Documents' requested by ':1.10' (uid=1000 pid=1492128 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.freedesktop.portal.Documents'
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.599: Choosing gtk.portal for org.freedesktop.impl.portal.Lockdown via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.599: The preferred method to match portal implementations to desktop environments is to use the portals.conf(5) configuration file
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.freedesktop.impl.portal.desktop.gtk' requested by ':1.10' (uid=1000 pid=1492128 comm="/usr/lib/xdg-desktop-portal")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.freedesktop.impl.portal.desktop.gtk'
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.649: Choosing gtk.portal for org.freedesktop.impl.portal.Access via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.656: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.656: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.656: Failed to load RealtimeKit property: GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name is not activatable
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.656: Choosing gtk.portal for org.freedesktop.impl.portal.Settings via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.657: Choosing gtk.portal for org.freedesktop.impl.portal.FileChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.658: Choosing gtk.portal for org.freedesktop.impl.portal.AppChooser via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.658: Choosing gtk.portal for org.freedesktop.impl.portal.Print via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.659: Choosing gtk.portal for org.freedesktop.impl.portal.Notification via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.660: Choosing gtk.portal for org.freedesktop.impl.portal.Inhibit via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.662: Failed to connect to PipeWire: Couldn't connect to PipeWire
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.662: Choosing gtk.portal for org.freedesktop.impl.portal.Account via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.663: Choosing gtk.portal for org.freedesktop.impl.portal.Email via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.664: Choosing gnome-keyring.portal for org.freedesktop.impl.portal.Secret via the deprecated UseIn key
+
+(/usr/lib/xdg-desktop-portal:1492128): xdg-desktop-portal-WARNING **: 07:27:14.664: Choosing gtk.portal for org.freedesktop.impl.portal.DynamicLauncher via the deprecated UseIn key
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.freedesktop.portal.Desktop'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.gtk.vfs.UDisks2VolumeMonitor' requested by ':1.7' (uid=1000 pid=1492058 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.gtk.vfs.UDisks2VolumeMonitor'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.gtk.vfs.MTPVolumeMonitor' requested by ':1.7' (uid=1000 pid=1492058 comm="/home/trung/Projects/tablepro/linux/target/debug/t")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.gtk.vfs.MTPVolumeMonitor'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='org.gtk.vfs.Metadata' requested by ':1.14' (uid=1000 pid=1492150 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'org.gtk.vfs.Metadata'
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Activating service name='ca.desrt.dconf' requested by ':1.14' (uid=1000 pid=1492150 comm="/usr/lib/xdg-desktop-portal-gtk")
+dbus-daemon[1491779]: [session uid=1000 pid=1491779 pidfd=5] Successfully activated service 'ca.desrt.dconf'
+
+(xdg-desktop-portal-gtk:1492150): Gtk-CRITICAL **: 07:27:22.288: gtk_widget_event: assertion 'WIDGET_REALIZED_FOR_EVENT (widget, event)' failed
+
+(xdg-desktop-portal-gtk:1492150): Gtk-CRITICAL **: 07:27:22.293: gtk_widget_event: assertion 'WIDGET_REALIZED_FOR_EVENT (widget, event)' failed
+
+(xdg-desktop-portal-gtk:1492150): Gtk-CRITICAL **: 07:27:29.527: gtk_widget_event: assertion 'WIDGET_REALIZED_FOR_EVENT (widget, event)' failed
+passed: encrypted_bundle_round_trip_restores_credentials
+A connection to the bus can't be made
+A connection to the bus can't be made
+A connection to the bus can't be made

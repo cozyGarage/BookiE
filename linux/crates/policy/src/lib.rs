@@ -17,8 +17,9 @@ mod transaction_control;
 
 pub use approval::{ApprovalOutcome, ApprovalRequest, ApprovalSink, AutoApproveSink, DenyApprovalSink};
 pub use audit::{
-    AuditApprovalOutcome, AuditError, AuditErrorCategory, AuditEvent, AuditOperationClass, AuditPreviewState,
-    AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus, AuditTransactionOutcome, NullAuditSink,
+    AuditAdministrativeAction, AuditAdministrativeMetadata, AuditApprovalOutcome, AuditError, AuditErrorCategory,
+    AuditEvent, AuditOperationClass, AuditPreviewState, AuditRecordPhase, AuditSink, AuditState, AuditTerminalStatus,
+    AuditTransactionOutcome, AuditTransportClient, AuditTransportMetadata, AuditTransportOutcome, NullAuditSink,
 };
 pub use blast_radius::{BlastRadiusResult, BlastRadiusRewrite, count_sql_for_mutation};
 pub use classify::{StatementClass, StatementFacts, classify, statement_requires_write_capability};

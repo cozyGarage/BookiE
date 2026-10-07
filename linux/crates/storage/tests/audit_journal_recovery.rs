@@ -2,7 +2,10 @@
 use std::os::unix::fs::PermissionsExt;
 
 use sha2::{Digest, Sha256};
-use tablepro_policy::{AuditOperationClass, AuditRecordPhase, AuditTerminalStatus, AuditTransactionOutcome, Principal};
+use tablepro_policy::{
+    AuditAdministrativeAction, AuditEvent, AuditOperationClass, AuditRecordPhase, AuditSink, AuditTerminalStatus,
+    AuditTransactionOutcome, Principal,
+};
 use tablepro_storage::{AuditJournal, sample_event};
 use uuid::Uuid;
 
@@ -152,6 +155,38 @@ async fn unresolved_recovery_remains_durable_without_duplicate_outcomes() {
         })
         .count();
     assert_eq!(unknown_outcomes, 1);
+}
+
+#[tokio::test]
+async fn interrupted_administrative_bundle_audit_recovers_as_unknown_write() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("audit.jsonl");
+    let journal = AuditJournal::open_validated(path.clone()).unwrap();
+    let operation_id = Uuid::from_u128(0xB422);
+    journal
+        .record(AuditEvent::administrative_action(
+            operation_id,
+            AuditAdministrativeAction::ConnectionBundleImport,
+            AuditRecordPhase::Intent,
+            AuditTerminalStatus::Pending,
+            2,
+            None,
+        ))
+        .await
+        .unwrap();
+    drop(journal);
+
+    let recovered = AuditJournal::open_validated(path).unwrap();
+
+    assert!(recovered.recovery().has_unresolved_writes());
+    assert_eq!(recovered.recovery().recovered_operation_ids(), &[operation_id]);
+    let records = recovered.recent(10).await.unwrap();
+    let unknown = records
+        .iter()
+        .find(|event| event.operation_id == operation_id && event.phase == AuditRecordPhase::Outcome)
+        .expect("recovery records an unknown outcome");
+    assert_eq!(unknown.terminal_status, AuditTerminalStatus::Unknown);
+    assert_eq!(unknown.administrative_action.unwrap().affected_count, 2);
 }
 
 #[tokio::test]

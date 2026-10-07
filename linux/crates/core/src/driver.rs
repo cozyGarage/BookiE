@@ -119,6 +119,13 @@ pub trait DatabaseDriver: Send + Sync {
         false
     }
 
+    /// Whether this driver can authenticate TLS connections with a client
+    /// certificate and private key. Transport refuses configured identities
+    /// for drivers that do not explicitly opt in.
+    fn supports_client_tls_auth(&self) -> bool {
+        false
+    }
+
     /// File name a forwarded Unix socket must use for this driver to
     /// dial it while verifying TLS against the original service
     /// hostname. `None` means the driver has no socket transport and an

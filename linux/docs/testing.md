@@ -110,6 +110,12 @@ and SQL Server fixtures also expose TLS-only servers behind the built-in SSH
 tunnel, so the same tier checks service identity through forwarding and refuses
 invalid certificates without plaintext fallback.
 
+SQL Server Kerberos is an opt-in local fixture because its Samba AD domain
+controller needs privileged Docker execution. Run
+`bash scripts/test-mssql-kerberos.sh` to verify a real Kerberos ticket, SQL
+Server service keytab, SPN refusal, and `VerifyFull` TLS through the BookiE
+driver. The fixture uses Samba AD DC and does not replace a Windows AD lab.
+
 ## Real-driver integration tests
 
 Run all configured Docker suites with:

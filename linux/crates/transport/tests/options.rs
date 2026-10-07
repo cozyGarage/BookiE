@@ -20,6 +20,8 @@ fn saved(tls_mode: Option<TlsMode>, use_tls: bool) -> SavedConnection {
         use_tls,
         tls_mode,
         tls_root_cert: None,
+        tls_client_cert: None,
+        tls_client_key: None,
         read_only: false,
         auth_mode: AuthMode::Kerberos,
         environment: Environment::Prod,
@@ -76,6 +78,18 @@ async fn file_connections_do_not_require_secret_service() {
     let opts = connect_options_for(&connection).await.expect("build file options");
 
     assert_eq!(opts.database, "/tmp/tablepro.db");
+}
+
+#[tokio::test]
+async fn saved_client_certificate_and_key_reach_the_driver_options() {
+    let mut connection = saved(Some(TlsMode::VerifyFull), false);
+    connection.tls_client_cert = Some(PathBuf::from("/etc/bookie/client.crt"));
+    connection.tls_client_key = Some(PathBuf::from("/etc/bookie/client.key"));
+
+    let opts = connect_options_for(&connection).await.expect("build mTLS options");
+
+    assert_eq!(opts.tls.client_cert, connection.tls_client_cert);
+    assert_eq!(opts.tls.client_key, connection.tls_client_key);
 }
 
 #[tokio::test]

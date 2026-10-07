@@ -44,7 +44,7 @@ the [ledger](known-issues.md). Use the
 to locate a dated record, and the current boards and evidence manifests for
 active decisions and case proof. Useful starting points:
 
-- [Release audit, October 3](archive/release-audit-2026-10-03.md): the latest broad source audit, pinned to its baseline.
+- [Release audit, October 3](archive/release-audit-2026-10-03.md): a dated broad source audit pinned to its then-current baseline; use the live ledger and boards for current status.
 - [Architecture review](archive/architecture-consistency-review-2026-10-03.md): source risks and unavailable raw proof.
 - [App layer audit](archive/app-layer-external-audit-2026-10-06.md): GUI gaps and the TablePro and dbx UI comparison.
 - [Grid memory and fetch action plan](archive/grid-memory-and-fetch-action-plan-2026-10-07.md): scroll profile, weak-cache implementation and measured results; keep query paging and ODBC scoped separately.

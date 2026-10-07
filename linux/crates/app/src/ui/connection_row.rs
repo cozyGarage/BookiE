@@ -287,6 +287,8 @@ mod tests {
             use_tls: true,
             tls_mode: Some(TlsMode::VerifyFull),
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             auth_mode,
             read_only: false,
             environment: Environment::Prod,

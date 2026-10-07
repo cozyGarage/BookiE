@@ -36,6 +36,8 @@ pub(crate) const KNOWN_CONNECTION_FIELDS: &[&str] = &[
     "use_tls",
     "tls_mode",
     "tls_root_cert",
+    "tls_client_cert",
+    "tls_client_key",
     "read_only",
     "auth_mode",
     "environment",
@@ -68,6 +70,12 @@ pub struct SavedConnection {
     /// certificate is not issued by a CA in the system trust store.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_root_cert: Option<PathBuf>,
+    /// Client certificate and key paths for engines with explicit mTLS support.
+    /// The private key material itself is never copied into the saved record.
+    #[serde(default)]
+    pub tls_client_cert: Option<PathBuf>,
+    #[serde(default)]
+    pub tls_client_key: Option<PathBuf>,
     #[serde(default)]
     pub read_only: bool,
     #[serde(default)]
@@ -354,6 +362,11 @@ fn validate_connections(connections: &[SavedConnection]) -> Result<(), StorageEr
 }
 
 fn validate_connection(connection: &SavedConnection) -> Result<(), StorageError> {
+    if connection.tls_client_cert.is_some() != connection.tls_client_key.is_some() {
+        return Err(StorageError::Schema(
+            "TLS client authentication requires both a certificate and a private key".into(),
+        ));
+    }
     for value in [
         connection.name.as_str(),
         connection.driver_id.as_str(),
@@ -363,9 +376,14 @@ fn validate_connection(connection: &SavedConnection) -> Result<(), StorageError>
     ] {
         validate_value_size(value.len())?;
     }
-    for path in [connection.socket_dir.as_deref(), connection.tls_root_cert.as_deref()]
-        .into_iter()
-        .flatten()
+    for path in [
+        connection.socket_dir.as_deref(),
+        connection.tls_root_cert.as_deref(),
+        connection.tls_client_cert.as_deref(),
+        connection.tls_client_key.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
     {
         validate_value_size(path.as_os_str().as_encoded_bytes().len())?;
     }
@@ -462,6 +480,8 @@ mod tests {
             use_tls: false,
             tls_mode: Some(TlsMode::Disabled),
             tls_root_cert: None,
+            tls_client_cert: None,
+            tls_client_key: None,
             read_only: false,
             auth_mode: AuthMode::Password,
             environment: Environment::Local,
@@ -862,6 +882,34 @@ mod tests {
         save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
         let loaded = load_from(&path).await.unwrap();
         assert_eq!(loaded[0].tls_root_cert, connection.tls_root_cert);
+    }
+
+    #[tokio::test]
+    async fn client_tls_identity_paths_round_trip_without_storing_key_material() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut connection = sample_connection();
+        connection.tls_mode = Some(TlsMode::VerifyFull);
+        connection.tls_client_cert = Some(PathBuf::from("/etc/bookie/client.crt"));
+        connection.tls_client_key = Some(PathBuf::from("/etc/bookie/client.key"));
+
+        save_to(&path, std::slice::from_ref(&connection)).await.unwrap();
+
+        let stored = std::fs::read_to_string(&path).unwrap();
+        assert!(!stored.contains("PRIVATE KEY"));
+        assert_eq!(load_from(&path).await.unwrap(), vec![connection]);
+    }
+
+    #[tokio::test]
+    async fn a_client_certificate_without_its_key_is_rejected_from_storage() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut connection = sample_connection();
+        connection.tls_client_cert = Some(PathBuf::from("/etc/bookie/client.crt"));
+
+        let error = save_to(&path, &[connection]).await.unwrap_err();
+
+        assert!(matches!(error, StorageError::Schema(_)));
     }
 
     #[test]

@@ -85,11 +85,15 @@ for path in sorted((root / "crates").rglob("*.rs")):
         relative = path.relative_to(root).as_posix()
         if "subprocess" in name or not match.group(1):
             tier, enable = "Helper", "Run parent unit/sandbox test; do not enable globally"
+        elif "mssql_kerberos.rs" in relative:
+            tier, enable = "MSSQL Kerberos", "scripts/test-mssql-kerberos.sh"
         elif "driver-tls-tests" in relative:
             tier, enable = "TLS", "scripts/test-driver-tls.sh"
         elif "release-tests" in relative:
             tier, enable = "Release", "scripts/test-postgres-release.sh"
         elif "postgres release fixture" in reason.lower():
+            tier, enable = "Release", "scripts/test-postgres-release.sh"
+        elif relative == "crates/agentd/tests/mtls.rs":
             tier, enable = "Release", "scripts/test-postgres-release.sh"
         elif "socket" in relative:
             tier, enable = "Socket", "scripts/test-postgres-socket.sh"

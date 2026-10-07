@@ -7,7 +7,8 @@ use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
 
 use tablepro_core::{
-    AuthMode, ConnectOptions, DriverMaturity, DriverRegistry, Environment, TlsMode, connection_form_defaults,
+    AuthMode, ConnectOptions, Connection, DriverMaturity, DriverRegistry, Environment, TlsMode,
+    connection_form_defaults,
 };
 use tablepro_storage::{
     SavedConnection, delete_password, save_connections, store_password, store_ssh_passphrase, store_ssh_password,
@@ -34,6 +35,8 @@ pub struct ConnectDialog {
     auth_combo: adw::ComboRow,
     tls_mode: adw::ComboRow,
     tls_root_cert: adw::EntryRow,
+    tls_client_cert: adw::EntryRow,
+    tls_client_key: adw::EntryRow,
     read_only: adw::SwitchRow,
     connect_timeout: adw::SpinRow,
     query_timeout: adw::SpinRow,
@@ -50,6 +53,8 @@ pub struct ConnectDialog {
     preferences: crate::services::preferences::PreferencesStore,
     bound_connection_id: Option<Uuid>,
     ssh_environment: tablepro_transport::SshEnvironment,
+    audit_factory: tablepro_transport::TransportAuditFactory,
+    guard_factory: crate::services::database_service::CandidateGuardFactory,
     applied_driver: Option<u32>,
     connect_cancel: Option<tokio_util::sync::CancellationToken>,
 }
@@ -74,6 +79,12 @@ fn auth_mode_for_row(row: u32) -> AuthMode {
     AUTH_MODE_ROWS.get(row as usize).copied().unwrap_or_default()
 }
 
+fn selected_path(row: &adw::EntryRow) -> Option<std::path::PathBuf> {
+    let value = row.text();
+    let path = value.trim();
+    (!path.is_empty()).then(|| std::path::PathBuf::from(path))
+}
+
 mod browse;
 mod form;
 mod identity;
@@ -95,6 +106,8 @@ pub struct ConnectDialogInit {
     pub bound_connection_id: Option<Uuid>,
     pub prefill: Option<ConnectionPrefill>,
     pub ssh_environment: tablepro_transport::SshEnvironment,
+    pub audit_factory: tablepro_transport::TransportAuditFactory,
+    pub guard_factory: crate::services::database_service::CandidateGuardFactory,
 }
 
 #[derive(Debug)]
@@ -232,6 +245,10 @@ impl Component for ConnectDialog {
             .title(crate::tr!("Certificate authority"))
             .build();
         browse::attach_certificate_picker(&tls_root_cert);
+        let tls_client_cert = adw::EntryRow::builder().title(crate::tr!("Client certificate")).build();
+        browse::attach_client_certificate_picker(&tls_client_cert);
+        let tls_client_key = adw::EntryRow::builder().title(crate::tr!("Client private key")).build();
+        browse::attach_client_key_picker(&tls_client_key);
         let sender_for_tls = sender.clone();
         tls_mode.connect_selected_notify(move |_| {
             sender_for_tls.input(ConnectDialogInput::TlsModeChanged);
@@ -265,6 +282,10 @@ impl Component for ConnectDialog {
         }
         let s = sender.clone();
         password.connect_changed(move |_| s.input(ConnectDialogInput::InputChanged));
+        for entry in [&tls_client_cert, &tls_client_key] {
+            let s = sender.clone();
+            entry.connect_changed(move |_| s.input(ConnectDialogInput::InputChanged));
+        }
 
         // Semantic preferences groups: Connection / Authentication /
         // Options / SSH. AdwPreferencesPage renders them with the
@@ -301,6 +322,8 @@ impl Component for ConnectDialog {
         let options_group = adw::PreferencesGroup::builder().title(crate::tr!("Options")).build();
         options_group.add(&tls_mode);
         options_group.add(&tls_root_cert);
+        options_group.add(&tls_client_cert);
+        options_group.add(&tls_client_key);
         options_group.add(&read_only);
         let (connect_timeout, query_timeout) = timeout_rows();
         options_group.add(&connect_timeout);
@@ -365,6 +388,8 @@ impl Component for ConnectDialog {
             auth_combo,
             tls_mode,
             tls_root_cert,
+            tls_client_cert,
+            tls_client_key,
             read_only,
             connect_timeout,
             query_timeout,
@@ -381,6 +406,8 @@ impl Component for ConnectDialog {
             preferences: init.preferences,
             bound_connection_id: init.bound_connection_id,
             ssh_environment: init.ssh_environment,
+            audit_factory: init.audit_factory,
+            guard_factory: init.guard_factory,
             applied_driver: None,
             connect_cancel: None,
         };
@@ -482,6 +509,8 @@ impl Component for ConnectDialog {
                 let timeout_secs = query_timeout_secs
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
+                let audit_factory = self.audit_factory.clone();
+                let guard_factory = self.guard_factory.clone();
 
                 let bound_id = self.bound_connection_id;
                 let cancel = tokio_util::sync::CancellationToken::new();
@@ -497,6 +526,8 @@ impl Component for ConnectDialog {
                                 opts,
                                 ssh: ssh_inputs,
                                 ssh_environment,
+                                audit_factory,
+                                guard_factory,
                                 read_only,
                                 environment,
                                 timeout_secs,
@@ -532,8 +563,8 @@ impl Component for ConnectDialog {
                 };
                 let opts = self.collect_options(driver.as_ref());
                 let ssh_inputs = if self.ssh.is_enabled() {
-                    match self.ssh.collect().and_then(|inputs| inputs.route()) {
-                        Ok(route) => Some(route),
+                    match self.ssh.collect() {
+                        Ok(inputs) => Some(inputs),
                         Err(e) => {
                             self.set_busy(BusyKind::None);
                             self.show_toast(&e);
@@ -548,23 +579,75 @@ impl Component for ConnectDialog {
                 let timeout_secs = query_timeout_secs
                     .unwrap_or_else(|| crate::services::operation_control::configured_timeout_secs(&self.preferences));
                 let ssh_environment = self.ssh_environment.clone();
+                let audit_factory = self.audit_factory.clone();
+                let guard_factory = self.guard_factory.clone();
+                let name = saved_connection_name(self.name.text().as_str(), &entry.id, &opts);
+                let read_only = self.read_only.is_active();
+                let query_timeout_secs = timeout_value(self.query_timeout.value());
+                let bound_id = self.bound_connection_id;
+                let environment = self.selected_environment();
+                let cancellation = tokio_util::sync::CancellationToken::new();
+                self.connect_cancel = Some(cancellation.clone());
                 sender.command(move |out, shutdown| {
                     shutdown
                         .register(async move {
                             let control = crate::services::operation_control::bounded(timeout_secs);
-                            let result = match connection_service::establish(
-                                driver.as_ref(),
-                                opts,
-                                ssh_inputs,
-                                &ssh_environment,
-                            )
-                            .await
-                            {
-                                Ok((conn, _tunnel)) => match conn.list_tables_controlled(&control).await {
-                                    Ok(tables) => Ok(tables.len()),
-                                    Err(e) => Err(format!("list_tables: {e}")),
-                                },
-                                Err(e) => Err(e),
+                            let ssh = ssh_inputs.as_ref().map(SshInputs::route).transpose();
+                            let result = match ssh {
+                                Err(error) => Err(error),
+                                Ok(ssh) => {
+                                    let identity = ConnectionIdentity {
+                                        bound_id,
+                                        driver_id: &entry.id,
+                                        opts: &opts,
+                                        file_based: driver.is_file_based(),
+                                        ssh: ssh_inputs.as_ref(),
+                                    };
+                                    let existing = find_existing(&identity).await;
+                                    let id = existing
+                                        .as_ref()
+                                        .map_or_else(|| bound_id.unwrap_or_else(Uuid::new_v4), |saved| saved.id);
+                                    let audit = audit_factory.context(
+                                        tablepro_policy::Principal::human_gui(),
+                                        id,
+                                        name.clone(),
+                                        environment,
+                                        entry.id.clone(),
+                                    );
+                                    let ssh_environment = ssh_environment.with_audit(audit);
+                                    let metadata = crate::services::database_service::ConnectionMetadata {
+                                        id,
+                                        name: name.clone(),
+                                        driver_id: entry.id.clone(),
+                                        environment,
+                                        read_only,
+                                        server_version: None,
+                                        query_timeout_secs,
+                                    };
+                                    match tablepro_transport::establish_with_cancellation(
+                                        driver.as_ref(),
+                                        opts,
+                                        ssh,
+                                        &ssh_environment,
+                                        cancellation,
+                                    )
+                                    .await
+                                    {
+                                        Ok((conn, _tunnel)) => {
+                                            let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
+                                            let guarded = guard_factory.guard(
+                                                conn,
+                                                &metadata,
+                                                tablepro_policy::Principal::human_gui(),
+                                            );
+                                            match guarded.list_tables_controlled(&control).await {
+                                                Ok(tables) => Ok(tables.len()),
+                                                Err(e) => Err(format!("list_tables: {e}")),
+                                            }
+                                        }
+                                        Err(e) => Err(e.to_string()),
+                                    }
+                                }
                             };
                             out.send(ConnectDialogCmd::TestResult(result)).ok();
                         })
@@ -573,6 +656,9 @@ impl Component for ConnectDialog {
             }
 
             ConnectDialogInput::Closed => {
+                if let Some(cancel) = self.connect_cancel.take() {
+                    cancel.cancel();
+                }
                 let _ = sender.output(ConnectDialogOutput::Closed);
             }
         }
@@ -621,6 +707,13 @@ impl ConnectDialog {
     }
 
     fn refresh_validity(&self) {
+        let client_cert_set = !self.tls_client_cert.text().trim().is_empty();
+        let client_key_set = !self.tls_client_key.text().trim().is_empty();
+        let invalid_client_tls = client_cert_set != client_key_set
+            || ((client_cert_set || client_key_set)
+                && matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer));
+        toggle_error(&self.tls_client_cert, invalid_client_tls);
+        toggle_error(&self.tls_client_key, invalid_client_tls);
         let database_empty = self.database.text().trim().is_empty();
         toggle_error(&self.database, database_empty);
 
@@ -643,6 +736,13 @@ impl ConnectDialog {
     }
 
     fn is_form_valid(&self) -> bool {
+        let client_cert_set = !self.tls_client_cert.text().trim().is_empty();
+        let client_key_set = !self.tls_client_key.text().trim().is_empty();
+        if client_cert_set != client_key_set
+            || (client_cert_set && matches!(self.selected_tls_mode(), TlsMode::Disabled | TlsMode::Prefer))
+        {
+            return false;
+        }
         if self.database.text().trim().is_empty() {
             return false;
         }
@@ -685,6 +785,8 @@ impl ConnectDialog {
         tablepro_core::TlsConfig {
             mode,
             root_cert: self.selected_root_cert(mode),
+            client_cert: selected_path(&self.tls_client_cert),
+            client_key: selected_path(&self.tls_client_key),
             ..Default::default()
         }
     }
@@ -705,6 +807,20 @@ impl ConnectDialog {
         self.tls_root_cert.set_visible(
             !self.form.file_based && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
         );
+        let identity_configured =
+            !self.tls_client_cert.text().trim().is_empty() || !self.tls_client_key.text().trim().is_empty();
+        let client_auth_supported = self
+            .drivers
+            .get(self.driver_combo.selected() as usize)
+            .and_then(|entry| self.registry.get(&entry.id))
+            .is_some_and(|driver| driver.supports_client_tls_auth());
+        let visible = identity_configured
+            || (!self.form.file_based
+                && !self.uses_local_socket()
+                && client_auth_supported
+                && self.selected_tls_mode() != TlsMode::Disabled);
+        self.tls_client_cert.set_visible(visible);
+        self.tls_client_key.set_visible(visible);
     }
 
     fn apply_driver_form_visibility(&mut self, driver: &dyn tablepro_core::DatabaseDriver) {
@@ -715,9 +831,7 @@ impl ConnectDialog {
             self.endpoint_combo.set_selected(0);
         }
         self.apply_form_state();
-        self.tls_root_cert.set_visible(
-            !driver.is_file_based() && !self.uses_local_socket() && self.selected_tls_mode().verifies_cert(),
-        );
+        self.apply_tls_visibility();
         self.database_file_picker.set_visible(self.form.file_based);
         self.database.set_title(&if self.form.file_based {
             crate::tr!("File path")
@@ -851,6 +965,8 @@ struct ConnectRequest {
     opts: ConnectOptions,
     ssh: Option<SshInputs>,
     ssh_environment: tablepro_transport::SshEnvironment,
+    audit_factory: tablepro_transport::TransportAuditFactory,
+    guard_factory: crate::services::database_service::CandidateGuardFactory,
     read_only: bool,
     environment: Environment,
     timeout_secs: u32,
@@ -859,11 +975,16 @@ struct ConnectRequest {
 }
 
 struct OpenedCandidate {
-    conn: Box<dyn tablepro_core::Connection>,
+    conn: Arc<dyn tablepro_core::Connection>,
     tunnel: Option<tablepro_transport::Tunnel>,
     server_version: Option<String>,
     tables: Vec<tablepro_core::TableInfo>,
     views: Vec<tablepro_core::TableInfo>,
+}
+
+struct CandidateBootstrap<'a> {
+    guard_factory: &'a crate::services::database_service::CandidateGuardFactory,
+    metadata: &'a crate::services::database_service::ConnectionMetadata,
 }
 
 async fn open_candidate(
@@ -872,15 +993,30 @@ async fn open_candidate(
     ssh: Option<tablepro_transport::SshRoute>,
     ssh_environment: &tablepro_transport::SshEnvironment,
     timeout_secs: u32,
+    cancellation: tokio_util::sync::CancellationToken,
+    bootstrap: CandidateBootstrap<'_>,
 ) -> Result<OpenedCandidate, String> {
-    let (conn, tunnel) = connection_service::establish(driver, opts, ssh, ssh_environment).await?;
-    let server_version = conn.server_version().await.ok().flatten();
+    let (conn, tunnel) =
+        tablepro_transport::establish_with_cancellation(driver, opts, ssh, ssh_environment, cancellation)
+            .await
+            .map_err(|error| error.to_string())?;
+    let conn: Arc<dyn tablepro_core::Connection> = Arc::from(conn);
+    let guarded = bootstrap.guard_factory.guard(
+        conn.clone(),
+        bootstrap.metadata,
+        tablepro_policy::Principal::human_gui(),
+    );
+    let server_version = match guarded.server_version().await {
+        Ok(version) => version,
+        Err(tablepro_core::DriverError::PolicyDenied(message)) => return Err(message),
+        Err(_) => None,
+    };
     let control = crate::services::operation_control::bounded(timeout_secs);
-    let tables = conn
+    let tables = guarded
         .list_tables_controlled(&control)
         .await
         .map_err(|e| format!("list_tables: {e}"))?;
-    let views = conn
+    let views = guarded
         .list_views_controlled(&control)
         .await
         .map_err(|e| format!("list_views: {e}"))?;
@@ -902,6 +1038,8 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         opts,
         ssh,
         ssh_environment,
+        audit_factory,
+        guard_factory,
         read_only,
         environment,
         timeout_secs,
@@ -911,24 +1049,6 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
     let stored_password: SecretString = opts.password.clone();
     let ssh_for_establish = ssh.as_ref().map(SshInputs::route).transpose()?;
     let opts_clone = opts.clone();
-
-    let opening = open_candidate(
-        driver.as_ref(),
-        opts.clone(),
-        ssh_for_establish.clone(),
-        &ssh_environment,
-        timeout_secs,
-    );
-    let Some(opened) = connection_service::until_cancelled(&cancel, opening).await else {
-        return Ok(None);
-    };
-    let OpenedCandidate {
-        conn,
-        tunnel,
-        server_version,
-        tables,
-        views,
-    } = opened?;
 
     let identity = ConnectionIdentity {
         bound_id,
@@ -943,6 +1063,47 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         .map(|connection| connection.id)
         .or(bound_id)
         .unwrap_or_else(Uuid::new_v4);
+    let ssh_environment = ssh_environment.with_audit(audit_factory.context(
+        tablepro_policy::Principal::human_gui(),
+        id,
+        label.clone(),
+        environment,
+        driver_id.clone(),
+    ));
+
+    let candidate_metadata = crate::services::database_service::ConnectionMetadata {
+        id,
+        name: label.clone(),
+        driver_id: driver_id.clone(),
+        environment,
+        read_only,
+        server_version: None,
+        query_timeout_secs,
+    };
+    let opening = open_candidate(
+        driver.as_ref(),
+        opts.clone(),
+        ssh_for_establish.clone(),
+        &ssh_environment,
+        timeout_secs,
+        cancel.clone(),
+        CandidateBootstrap {
+            guard_factory: &guard_factory,
+            metadata: &candidate_metadata,
+        },
+    );
+    let opened = match opening.await {
+        Ok(opened) => opened,
+        Err(_) if cancel.is_cancelled() => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let OpenedCandidate {
+        conn,
+        tunnel,
+        server_version,
+        tables,
+        views,
+    } = opened;
 
     let tls_mode = opts_clone.tls.mode;
     let saved = SavedConnection {
@@ -957,6 +1118,8 @@ async fn run_connect(request: ConnectRequest) -> Result<Option<connection_servic
         use_tls: tls_mode.encrypts(),
         tls_mode: Some(tls_mode),
         tls_root_cert: opts_clone.tls.root_cert.clone(),
+        tls_client_cert: opts_clone.tls.client_cert.clone(),
+        tls_client_key: opts_clone.tls.client_key.clone(),
         auth_mode: opts_clone.auth_mode,
         read_only,
         environment,

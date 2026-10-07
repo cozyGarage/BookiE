@@ -1,0 +1,2 @@
+IF SUSER_ID(N'DOMAIN1\bookiekerb') IS NULL
+    CREATE LOGIN [DOMAIN1\bookiekerb] FROM WINDOWS;

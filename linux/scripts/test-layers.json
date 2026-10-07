@@ -134,6 +134,27 @@
         }
       ]
     },
+    "mssql-kerberos": {
+      "purpose": "SQL Server integrated authentication, SPN refusal and verified TLS against an isolated AD test domain",
+      "prerequisites": "Rust 1.98; Docker Compose with privileged-container support; ktutil; OpenSSL",
+      "hosted_gate": "Opt-in local fixture; privileged AD DC is not part of hosted CI",
+      "steps": [
+        {
+          "argv": [
+            "bash",
+            "scripts/test-mssql-kerberos.sh"
+          ],
+          "timeout_seconds": 1800,
+          "evidence": "rust-tests",
+          "required_tools": [
+            "docker",
+            "cargo",
+            "ktutil",
+            "openssl"
+          ]
+        }
+      ]
+    },
     "ssh": {
       "purpose": "Agent authentication and OpenSSH sessions",
       "prerequisites": "Rust 1.98; Docker; ssh, ssh-agent, ssh-add, ssh-keygen",

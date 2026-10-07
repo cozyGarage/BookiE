@@ -123,7 +123,7 @@ async fn reconnect_loop(
             _ = tokio::time::sleep(delay) => {}
         }
 
-        match try_reconnect(params).await {
+        match try_reconnect(params, cancel).await {
             Err(failure) if failure.permanent => {
                 tracing::warn!(error = %failure.message, attempt, "reconnect cannot succeed; giving up");
                 set_health(
@@ -156,12 +156,14 @@ fn next_delay(prev: Duration) -> Duration {
 
 async fn try_reconnect(
     params: &ReconnectParams,
+    cancel: &CancellationToken,
 ) -> Result<(Box<dyn Connection>, Option<Tunnel>), connection_service::EstablishFailure> {
-    connection_service::establish_classified(
+    connection_service::establish_classified_with_cancellation(
         params.driver.as_ref(),
         params.opts.clone(),
         params.ssh.clone(),
         &params.environment,
+        cancel.clone(),
     )
     .await
 }

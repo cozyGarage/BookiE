@@ -81,6 +81,10 @@ impl DatabaseDriver for PgDriver {
         true
     }
 
+    fn supports_client_tls_auth(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         use tablepro_core::TlsMode;
         let mut pg_opts = match opts.transport() {
@@ -108,6 +112,12 @@ impl DatabaseDriver for PgDriver {
             });
         if let Some(path) = &opts.tls.root_cert {
             pg_opts = pg_opts.ssl_root_cert(path);
+        }
+        if let Some(path) = &opts.tls.client_cert {
+            pg_opts = pg_opts.ssl_client_cert(path);
+        }
+        if let Some(path) = &opts.tls.client_key {
+            pg_opts = pg_opts.ssl_client_key(path);
         }
         if let Some(name) = &opts.application_name {
             pg_opts = pg_opts.application_name(name);

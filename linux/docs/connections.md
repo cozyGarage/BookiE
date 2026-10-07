@@ -1,6 +1,6 @@
 # Connection handling
 
-Source checked at `aeac107a4` on 2026-10-03. [ADR 0008](decisions/0008-connection-and-session-ownership.md)
+Source checked in the B4 Linux working tree on 2026-10-07. [ADR 0008](decisions/0008-connection-and-session-ownership.md)
 owns identity and trust, [ADR 0005](decisions/0005-server-side-cancellation.md)
 cancellation, and [the B4 board](b4-task-board.md) remaining acceptance.
 The [September connection audit](archive/connections-history.md) retains older source
@@ -34,13 +34,23 @@ over TCP or refuse. Local PostgreSQL sockets reject SSH and TLS; forwarded
 sockets retain the remote identity.
 
 PostgreSQL's release fixture covers TLS through SSH. Driver TLS fixtures cover
-direct CA/hostname/encryption and no-fallback cases, including SQL Server. MySQL
-and SQL Server TLS through a real SSH route remain B4 C6; a direct TLS pass or
-SSH authentication pass does not close them. See [testing](testing.md) for
-commands and [the release audit](archive/release-audit-2026-10-03.md) for fresh results.
+direct CA/hostname/encryption and no-fallback cases, including SQL Server; B4-1
+and B4-2 also cover MySQL and SQL Server TLS through real SSH routes. See
+[testing](testing.md) for commands and [the release audit](archive/release-audit-2026-10-03.md)
+for historical results.
 
-Saved custom CA assembly exists. Configured client certificate/key integration
-is U5; internal `TlsConfig` fields do not establish saved-connection mTLS support.
+Saved custom CA and client certificate/key paths are assembled through saved
+connections, bundles, GUI setup, and agentd transport. PostgreSQL and MySQL
+drivers opt in; other drivers refuse configured client identities. TLS modes
+that can fall back to plaintext are rejected, and missing, partial, non-file,
+or oversized identity material fails closed. Local PostgreSQL fixtures prove
+required-client-cert authentication through direct and SSH saved routes, reject
+missing/untrusted identities, and accept a rotated identity. MySQL's driver TLS
+fixture proves the same direct/SSH, missing/untrusted, and rotation cases. GTK
+opens and queries a saved PostgreSQL mTLS connection; agentd proves saved mTLS
+directly and through its saved SSH route, and rejects an untrusted identity.
+These are local source/test results; installed-package and hosted acceptance
+remain separate.
 Do not promise certificate pinning or Kerberos qualification without their
 specific native evidence. Typed keyring failure propagates instead of becoming
 a missing password; see [storage](storage.md#secrets).
@@ -64,15 +74,19 @@ Saved passwords/passphrases answer only a matching destination/key prompt.
 Jump routing comes from `~/.ssh/config`/`ProxyJump`; saved per-hop chains are
 refused for this backend. Built-in SSH supports saved chains and ssh-agent.
 
-The executable `tablepro-askpass` helper must be installed beside the app or on
-PATH. Current discovery checks executable availability; explicit Flatpak route
-refusal needs I2's sandbox regression. The Debian standalone builder includes
-the helper, but debhelper rules and package validation need I1. An unavailable
-selected route must fail without switching backend or weakening authentication.
+Inside Flatpak, selecting system OpenSSH fails with an explicit message before
+resolving saved SSH credentials or dispatching the database driver. The client
+does not switch to built-in SSH; select that backend explicitly if it is wanted.
+Native system OpenSSH remains available outside Flatpak. The executable
+`tablepro-askpass` helper must be installed beside the app or on PATH. The Debian
+standalone builder includes the helper, but debhelper rules and package
+validation need I1. Flatpak package/runtime behavior remains a separate
+acceptance check.
 
 ## Remaining evidence
 
 Use B4 task IDs for TLS, trust, audit, cache and installed route work. U4 owns
-permanent-error retry classification and U5 saved mTLS assembly. Native engine
-oracles, Xvfb automation, installed Wayland and package rollback are separate
-proof. Preserve safe refusal for combinations without exact support.
+permanent-error retry classification. U5's source-level and local route/consumer
+acceptance is recorded in B4-14; installed-package, hosted CI, native engine
+oracles, Wayland, and package rollback remain separate proof. Preserve safe
+refusal for combinations without exact support.

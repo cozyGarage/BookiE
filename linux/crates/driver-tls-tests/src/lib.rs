@@ -62,6 +62,7 @@ pub struct DriverTlsFixture {
     pub redis_plaintext_port: u16,
     pub mysql_port: u16,
     pub mysql_plaintext_port: u16,
+    pub mysql_mtls_port: u16,
     pub clickhouse_port: u16,
     pub clickhouse_plaintext_port: u16,
     pub mssql_port: u16,
@@ -74,6 +75,12 @@ pub struct DriverTlsFixture {
     pub password: String,
     pub ca_cert: PathBuf,
     pub other_ca_cert: PathBuf,
+    pub client_cert: PathBuf,
+    pub client_key: PathBuf,
+    pub rotated_client_cert: PathBuf,
+    pub rotated_client_key: PathBuf,
+    pub wrong_client_cert: PathBuf,
+    pub wrong_client_key: PathBuf,
 }
 
 impl DriverTlsFixture {
@@ -95,6 +102,7 @@ impl DriverTlsFixture {
             redis_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_REDIS_PLAINTEXT_PORT", 6381),
             mysql_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PORT", 3307),
             mysql_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_PLAINTEXT_PORT", 3308),
+            mysql_mtls_port: env_port("TABLEPRO_DRIVER_TLS_MYSQL_MTLS_PORT", 3309),
             clickhouse_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PORT", 8444),
             clickhouse_plaintext_port: env_port("TABLEPRO_DRIVER_TLS_CLICKHOUSE_PLAINTEXT_PORT", 8445),
             mssql_port: env_port("TABLEPRO_DRIVER_TLS_MSSQL_PORT", 1434),
@@ -107,6 +115,12 @@ impl DriverTlsFixture {
             password: env_or("TABLEPRO_DRIVER_TLS_PASSWORD", "tablepro"),
             ca_cert: materials.join("ca.crt"),
             other_ca_cert: materials.join("other-ca.crt"),
+            client_cert: materials.join("client.crt"),
+            client_key: materials.join("client.key"),
+            rotated_client_cert: materials.join("rotated-client.crt"),
+            rotated_client_key: materials.join("rotated-client.key"),
+            wrong_client_cert: materials.join("wrong-client.crt"),
+            wrong_client_key: materials.join("wrong-client.key"),
         }
     }
 
@@ -154,6 +168,42 @@ impl DriverTlsFixture {
         self.options(self.mysql_port, mode, root_cert)
     }
 
+    pub fn mysql_mtls(
+        &self,
+        mode: TlsMode,
+        client_cert: Option<PathBuf>,
+        client_key: Option<PathBuf>,
+    ) -> ConnectOptions {
+        let mut options = self.options(self.mysql_mtls_port, mode, Some(self.ca_cert.clone()));
+        options.username = "tablepro_mtls".into();
+        options.tls.client_cert = client_cert;
+        options.tls.client_key = client_key;
+        options
+    }
+
+    pub fn mysql_mtls_ssh(
+        &self,
+        identity_host: &str,
+        tunnel: &SshTunnel,
+        mode: TlsMode,
+        client_cert: Option<PathBuf>,
+        client_key: Option<PathBuf>,
+    ) -> ConnectOptions {
+        let mut options = self.options(3306, mode, Some(self.ca_cert.clone()));
+        options.username = "tablepro_mtls".into();
+        options.host = identity_host.to_string();
+        options.service_endpoint = Some((identity_host.to_string(), 3306));
+        options.forwarded_socket_dir = Some(
+            tunnel
+                .socket_dir()
+                .expect("the MySQL mTLS tunnel uses a Unix socket")
+                .to_path_buf(),
+        );
+        options.tls.client_cert = client_cert;
+        options.tls.client_key = client_key;
+        options
+    }
+
     pub async fn open_mysql_ssh_tunnel(&self) -> SshTunnel {
         SshTunnel::open_chain_socket(
             &[self.ssh_config()],
@@ -164,6 +214,18 @@ impl DriverTlsFixture {
         )
         .await
         .expect("open SSH socket forward to the unpublished MySQL fixture")
+    }
+
+    pub async fn open_mysql_mtls_ssh_tunnel(&self) -> SshTunnel {
+        SshTunnel::open_chain_socket(
+            &[self.ssh_config()],
+            "mysql-mtls-ssh.tablepro.test".into(),
+            3306,
+            "mysqld.sock",
+            UnknownHostKey::Learn,
+        )
+        .await
+        .expect("open SSH socket forward to the unpublished mTLS MySQL fixture")
     }
 
     pub async fn open_mssql_ssh_tunnel(&self) -> SshTunnel {

@@ -10,6 +10,15 @@ publish = false
 name = "tablepro_driver_tls_tests"
 path = "src/lib.rs"
 
+[features]
+default = []
+mssql-kerberos = ["tablepro-driver-mssql/kerberos"]
+
+[[test]]
+name = "mssql_kerberos"
+path = "tests/mssql_kerberos.rs"
+required-features = ["mssql-kerberos"]
+
 [dependencies]
 tablepro-core = { path = "../core" }
 tablepro-ssh = { path = "../ssh" }

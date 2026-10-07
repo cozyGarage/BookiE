@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "branch": "b4/i5-ssh-audit",
+  "source_commit": "83df8dc7f58a921bc30aff66aba1301235427966",
+  "worktree_state": "fixture and GTK test sources are local uncommitted changes; hashes below identify the tested sources",
+  "scope": "B4-17 release-binary GTK acceptance of a saved two-hop SSH route",
+  "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=postgres_ssh_multihop_trusts_both_hops_and_queries TABLEPRO_GTK_BINARY=target/installed/usr/bin/tablepro TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-multihop-2026-10-07/artifacts bash scripts/test-postgres-release.sh",
+  "binary": "target/installed/usr/bin/tablepro",
+  "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+  "tested_source_sha256": {
+    "tests/fixtures/postgres-release/docker-compose.yml": "a78ce1e163c46329cad505f11fdab0ab1e241acdf3d732827bea0db65c5dad9e",
+    "tests/fixtures/postgres-release/generate-materials.sh": "613d4c6ca9c836c4996d6291cc1b4e882a1fbe9919ea36aa338ef19bbaf6589f",
+    "tests/fixtures/postgres-release/relay/Dockerfile": "ef533b7d1e9ce32ae760a2f998a7c6ff0e1563c5ee9947ecf41dfb585d0e532f",
+    "crates/app/tests/gtk_safety.py": "6afe63f409ef50adc67dd0d761e73d1aa133f7169312b645d14df79bba256cbe",
+    "crates/app/tests/gtk_ux.py": "ebd17e26a50f8b89d74cba3d63a8cb00a9331948ffa313f1581b9bbbea8d560f",
+    "scripts/test-postgres-release.sh": "a09b16a21f3ba2c83e96e29f50ce94d05256c5103e3322df72cce27f901162e7"
+  },
+  "native_release_harness": "PostgreSQL release test harness completed its Docker-backed SSH, mTLS, release integration and app build phases successfully before the selected GTK scenario",
+  "result": "passed; selected GTK scenario result artifact reports passed",
+  "scenario": {
+    "name": "postgres_ssh_multihop_trusts_both_hops_and_queries",
+    "result": "passed",
+    "assertions": [
+      "Saved connection uses the fixture bastion followed by an internal relay host",
+      "GTK trust prompt identifies and accepts the first bastion host key",
+      "GTK trust prompt identifies and accepts the second relay host key",
+      "Both accepted host keys are persisted in the isolated known_hosts file",
+      "The release binary establishes the database connection through the two-hop chain and queries PostgreSQL",
+      "The complete SSH attempt produces exactly one successful transport audit outcome"
+    ]
+  },
+  "log": {
+    "path": "focused.txt",
+    "sha256": "f86e248571844a01f959bdc2a021f8cdf706e3f929233411dc3d127f55d99097"
+  },
+  "gtk_result_artifact": "artifacts/postgres_ssh_multihop_trusts_both_hops_and_queries-result.json",
+  "combined_default_run": {
+    "command": "rtk proxy env TABLEPRO_GTK_BINARY=target/installed/usr/bin/tablepro TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-multihop-2026-10-07/default-artifacts bash scripts/test-postgres-release.sh",
+    "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+    "tested_source_sha256": {
+      "crates/app/tests/gtk_ux.py": "88dc81dc5b3235b92849a8026dc170c8f55c13f438f6acd663dbeafc32c65738",
+      "scripts/test-postgres-release.sh": "1c067e429e64e0c143999a35cafeefa8ad3fec3a158e451963582448574144af"
+    },
+    "result": "passed; all five default GTK scenarios and PostgreSQL release harness suites passed",
+    "scenarios": [
+      "postgres_saved_mtls_connection_authenticates_and_queries",
+      "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+      "postgres_ssh_multihop_trusts_both_hops_and_queries",
+      "postgres_ssh_second_hop_decline_does_not_learn_key",
+      "postgres_ssh_changed_second_hop_key_is_refused"
+    ],
+    "log": {
+      "path": "default-focused.txt",
+      "sha256": "c59bf0f5f23ffe443fa0ec9c1905ccbed36b136b0e7c308aee6605fd1bbec25c"
+    }
+  },
+  "second_hop_decline_run": {
+    "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=postgres_ssh_second_hop_decline_does_not_learn_key TABLEPRO_GTK_BINARY=target/installed/usr/bin/tablepro TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-multihop-2026-10-07/decline-artifacts bash scripts/test-postgres-release.sh",
+    "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+    "tested_source_sha256": {
+      "crates/app/tests/gtk_ux.py": "122be9bbfd5b2597340a42430c99f139c0cf0fb2d54197159629859aee012c23",
+      "scripts/test-postgres-release.sh": "342ea8bb17d0c5867f4b4124d684b7f088aab3291762c76128f8da7f9e16811f"
+    },
+    "result": "passed; GTK scenario result artifact reports passed",
+    "assertions": [
+      "Accepting the first jump host and declining the relay trust prompt fails the connection",
+      "The isolated known_hosts file contains only the first accepted hop and no second-hop entry",
+      "The refusal records exactly one denied host_key_refused transport outcome"
+    ],
+    "log": {
+      "path": "decline-focused.txt",
+      "sha256": "cbc3cab0cbba3e1409fc2a57a8ab6aeef02325de26579c34305771090a54d4fd"
+    },
+    "gtk_result_artifact": "decline-artifacts/postgres_ssh_second_hop_decline_does_not_learn_key-result.json"
+  },
+  "changed_second_hop_run": {
+    "command": "rtk proxy env TABLEPRO_GTK_SCENARIO=postgres_ssh_changed_second_hop_key_is_refused TABLEPRO_GTK_BINARY=target/installed/usr/bin/tablepro TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-gtk-multihop-2026-10-07/changed-key-artifacts bash scripts/test-postgres-release.sh",
+    "binary_sha256": "d423bf5e26eb6d53f82900f450f8a07b845104e078c48dd96e116d9b5e521601",
+    "tested_source_sha256": {
+      "crates/app/tests/gtk_ux.py": "4fbc83cd4bff8ad60b53850ff65c44261707f0080405f4c41c3d63698c6967a5",
+      "scripts/test-postgres-release.sh": "1c067e429e64e0c143999a35cafeefa8ad3fec3a158e451963582448574144af"
+    },
+    "result": "passed; GTK scenario result artifact reports passed",
+    "assertions": [
+      "The isolated known_hosts starts with an intentionally wrong key for relay:22",
+      "The first hop prompts and can be explicitly trusted before the route reaches the changed relay key",
+      "BookiE refuses the changed relay key without offering a trust override",
+      "The wrong relay record is not overwritten and the newly accepted first-hop record remains",
+      "Exactly one denied host_key_changed transport outcome is audited"
+    ],
+    "log": {
+      "path": "changed-key-focused.txt",
+      "sha256": "4731e2e3e68a3ca21870ddb49372d6a56d2d5ea6d4ae3cfe11c3555e3995528c"
+    },
+    "gtk_result_artifact": "changed-key-artifacts/postgres_ssh_changed_second_hop_key_is_refused-result.json"
+  },
+  "not_established": [
+    "Distribution-package installation and native Wayland acceptance",
+    "Frozen-candidate acceptance",
+    "Hosted CI",
+    "Windows OpenSSH interoperability"
+  ]
+}

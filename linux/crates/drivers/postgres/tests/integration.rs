@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 use std::str::FromStr;
+use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use rust_decimal::Decimal;
@@ -95,6 +96,9 @@ mod enum_file_export_contract;
 
 #[path = "support/disconnection.rs"]
 mod disconnection;
+
+#[path = "support/rollback_failure.rs"]
+mod rollback_failure;
 
 #[path = "../../shared/server_restart.rs"]
 mod server_restart;

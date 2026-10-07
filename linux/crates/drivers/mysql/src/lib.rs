@@ -67,6 +67,10 @@ impl DatabaseDriver for MysqlDriver {
         Some(FORWARDED_SOCKET_NAME.to_string())
     }
 
+    fn supports_client_tls_auth(&self) -> bool {
+        true
+    }
+
     async fn connect(&self, opts: ConnectOptions) -> Result<Box<dyn Connection>, DriverError> {
         let mysql_opts = mysql_connect_options(&opts);
         let cancellation_options = mysql_opts.clone();
@@ -837,6 +841,12 @@ fn mysql_connect_options(opts: &ConnectOptions) -> MySqlConnectOptions {
     if let Some(path) = &opts.tls.root_cert {
         mysql_opts = mysql_opts.ssl_ca(path);
     }
+    if let Some(path) = &opts.tls.client_cert {
+        mysql_opts = mysql_opts.ssl_client_cert(path);
+    }
+    if let Some(path) = &opts.tls.client_key {
+        mysql_opts = mysql_opts.ssl_client_key(path);
+    }
     mysql_opts
 }
 
@@ -1054,6 +1064,7 @@ mod tests {
         assert_eq!(d.default_port(), 3306);
         assert_eq!(d.default_database(), "mysql");
         assert_eq!(d.default_username(), "root");
+        assert!(d.supports_client_tls_auth());
     }
 
     #[test]

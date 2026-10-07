@@ -91,6 +91,11 @@ pub(crate) async fn authenticate(
         }
     };
 
+    let client_nonce = nonce.strip_prefix("r=").ok_or_else(|| {
+        err_protocol!("invalid client SCRAM nonce")
+    })?;
+    validate_server_nonce(client_nonce, &cont.nonce)?;
+
     // Normalize(password):
     let password = options.password.as_deref().unwrap_or_default();
     let password = match saslprep(password) {
@@ -169,6 +174,22 @@ pub(crate) async fn authenticate(
     // authentication is only considered valid if this verification passes
     mac.verify_slice(&data.verifier).map_err(Error::protocol)?;
 
+    Ok(())
+}
+
+fn validate_server_nonce(client_nonce: &str, server_nonce: &str) -> Result<(), Error> {
+    let suffix = server_nonce.strip_prefix(client_nonce);
+    let Some(suffix) = suffix else {
+        return Err(err_protocol!("server SCRAM nonce does not extend the client nonce"));
+    };
+    if suffix.is_empty()
+        || !server_nonce
+            .as_bytes()
+            .iter()
+            .all(|byte| (0x21..=0x7e).contains(byte) && *byte != b',')
+    {
+        return Err(err_protocol!("server SCRAM nonce is invalid"));
+    }
     Ok(())
 }
 

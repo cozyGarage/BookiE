@@ -164,6 +164,10 @@ pub enum SqlEditorInput {
         session_id: Uuid,
         result: Result<(), String>,
     },
+    SessionRollbackFinished {
+        session_id: Uuid,
+        result: Result<(), String>,
+    },
     PrepareForTeardown(tokio::sync::oneshot::Sender<Result<(), String>>),
     SessionTeardownFinished(Result<(), String>),
 }
@@ -651,11 +655,14 @@ impl SimpleComponent for SqlEditor {
             }
             SqlEditorInput::SessionEnd { session_id, .. } => {
                 if session_mode::session_callback_matches(session_id, self.session.as_ref().map(|session| session.id)) {
-                    self.end_session(&sender);
+                    self.rollback_and_end(session_id, &sender);
                 }
             }
             SqlEditorInput::SessionCommitFinished { session_id, result } => {
                 self.on_session_commit_finished(session_id, result, &sender);
+            }
+            SqlEditorInput::SessionRollbackFinished { session_id, result } => {
+                self.on_session_rollback_finished(session_id, result);
             }
             SqlEditorInput::PrepareForTeardown(reply) => self.prepare_for_teardown(reply, &sender),
             SqlEditorInput::SessionTeardownFinished(result) => self.finish_session_teardown(result),
@@ -973,7 +980,7 @@ impl SqlEditor {
             return;
         }
         if self.session_ending() {
-            self.status.set_label(&crate::tr!("Waiting for session commit"));
+            self.status.set_label(&crate::tr!("Waiting for session to finish"));
             return;
         }
         let origin = crate::services::catalog::CatalogOrigin::capture(self.connection_id, &self.database);

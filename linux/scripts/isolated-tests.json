@@ -206,6 +206,11 @@
       "tablepro-app",
       "--lib",
       "ui::grid::export::tests::clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
+      "ui::editor::session_mode::tests::session_end_dialog_keeps_the_toggle_active_until_the_selected_action_finishes"
     ]
   ],
   "keyring": [
