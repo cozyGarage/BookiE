@@ -23,14 +23,31 @@ for base in "${images[@]}"; do
     mkdir -p ~/.config/tablepro ~/.local/share/tablepro
     echo keep > ~/.config/tablepro/connections.json
     echo keep > ~/.local/share/tablepro/history.db
-    apt-get install -y -qq "$deb" >/dev/null
+    older=$deb
+    dpkg-deb -R "$older" /work/repack
+    sed -i "s/^Version: .*/Version: 0.1.5-2/" /work/repack/DEBIAN/control
+    newer=/work/out/tablepro_0.1.5-2_amd64.deb
+    dpkg-deb --root-owner-group --build /work/repack "$newer" >/dev/null
+    installed_version() { dpkg-query -W -f="\${Version}" tablepro; }
+    keeps_user_data() {
+      test "$(cat ~/.config/tablepro/connections.json)" = keep
+      test "$(cat ~/.local/share/tablepro/history.db)" = keep
+    }
+    apt-get install -y -qq "$older" >/dev/null
     bash /src/scripts/check-installed-deb.sh
-    apt-get install -y -qq --reinstall "$deb" >/dev/null
+    apt-get install -y -qq --reinstall "$older" >/dev/null
     bash /src/scripts/check-installed-deb.sh
+    apt-get install -y -qq "$newer" >/dev/null
+    test "$(installed_version)" = 0.1.5-2
+    bash /src/scripts/check-installed-deb.sh
+    keeps_user_data
+    apt-get install -y -qq --allow-downgrades "$older" >/dev/null
+    test "$(installed_version)" = 0.1.5-1
+    bash /src/scripts/check-installed-deb.sh
+    keeps_user_data
     apt-get purge -y -qq tablepro >/dev/null
     test ! -e /usr/bin/bookie
-    test "$(cat ~/.config/tablepro/connections.json)" = keep
-    test "$(cat ~/.local/share/tablepro/history.db)" = keep
-    echo "install, reinstall and purge keep the user data under the tablepro paths"
+    keeps_user_data
+    echo "install, reinstall, upgrade, downgrade and purge keep the user data under the tablepro paths"
   '
 done
