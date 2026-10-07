@@ -1,0 +1,3 @@
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+passed: bundle_export_records_sanitized_audit_outcome
+passed: bundle_import_records_sanitized_audit_outcome
