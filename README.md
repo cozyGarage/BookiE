@@ -31,7 +31,7 @@ Database support is provided by static Rust crates compiled into the app:
 | MongoDB | Experimental |
 | DuckDB | Optional build feature |
 
-See [`linux/docs/driver-maturity.md`](linux/docs/driver-maturity.md) for current limits.
+See [`linux/docs/adding-drivers.md`](linux/docs/adding-drivers.md#driver-maturity) for current limits.
 
 See the [bug and consistency audit](linux/docs/archive/bug-consistency-2026-09.md) for its dated test results and the [macOS 0.72 gap review](linux/docs/archive/upstream-adoption.md) for follow-up features.
 

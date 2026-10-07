@@ -44,8 +44,8 @@ A screened row is not exhaustive semantic certification or a runtime pass.
 | [linux/docs/decisions/0006-driver-panic-containment.md](../decisions/0006-driver-panic-containment.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/decisions/README.md](../decisions/README.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/disconnection-contracts.md](../disconnection-contracts.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |
-| [linux/docs/driver-maturity.md](../driver-maturity.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
-| [linux/docs/driver-priority.md](../driver-maturity.md#order-the-engines-were-added) | reference/guide | Screened; retain stated scope, no exhaustive claim |
+| [linux/docs/adding-drivers.md#driver-maturity](../adding-drivers.md#driver-maturity) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
+| [linux/docs/driver-priority.md](../adding-drivers.md#order-the-engines-were-added) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/error-handling.md](../error-handling.md) | current guide or mixed historical ledger | Corrected authority, source drift or evidence qualification |
 | [linux/docs/flathub.md](../platforms.md#flathub) | reference/guide | Screened; retain stated scope, no exhaustive claim |
 | [linux/docs/ignored-tests.md](../ignored-tests.md) | reference/guide | Screened; retain stated scope, no exhaustive claim |

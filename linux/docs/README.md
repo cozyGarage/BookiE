@@ -30,7 +30,7 @@ on historical statements such as “next”, “current” or “pending”.
 | Type/consumer proof lookup | [Value evidence index](value-contracts.md) | Link to the case; detailed logs/counts belong in history/evidence |
 | Supported distros, Rust toolchain, Arch package, Flathub, accessibility | [Platforms](platforms.md) | Keep one section per concern; the build floor is stated here |
 | Commands, execution ownership, handoff format | [Validation playbook](validation-playbook.md) | Reuse existing layers; distinguish local/hosted/installed |
-| SonarCloud findings | [SonarCloud triage](sonarcloud-triage.md) | Confirm framework-specific findings against the native platform before changing source |
+| SonarCloud findings | [SonarCloud triage](validation-playbook.md#sonarcloud-triage) | Confirm framework-specific findings against the native platform before changing source |
 | Crate/source structure | [Architecture](../ARCHITECTURE.md) | Match actual manifests and owning wrappers |
 | Active milestone / short status | [Sprint](bookie-0.2-sprint.md) / [ROADMAP](../ROADMAP.md) | Sprint owns acceptance; roadmap links to current boards |
 

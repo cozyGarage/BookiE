@@ -42,7 +42,7 @@ These are the dependencies used by the current drivers:
 | MongoDB | `mongodb`, including the workspace's vendored patch |
 | DuckDB | `duckdb`, behind the optional `duckdb` feature |
 
-Review engine/library proposals against [driver maturity](driver-maturity.md#order-the-engines-were-added),
+Review engine/library proposals against [driver maturity](adding-drivers.md#order-the-engines-were-added),
 dependency policy and license requirements. Upstream macOS plugins are behavior
 references; they do not introduce a Linux runtime plugin ABI.
 
@@ -102,3 +102,33 @@ separate from default-workspace success.
 Return an exact SHA, commands, report paths, retained sanitized evidence and
 unrun gates. Driver maturity, a fixture pass, package qualification and release
 approval are separate claims.
+
+## Driver maturity
+
+Every registered driver reports a `DriverMaturity` (`Stable` or
+`Experimental`). The Connect dialog shows Experimental as a subtitle so
+users are not surprised by missing write or transaction paths. These are driver declarations, not release approval; see [current acceptance](bookie-0.2-sprint.md).
+
+| Driver | Maturity | Connect | Browse | Query | Writes | Params | `begin` / MCP preview | Notes |
+|---|---|---|---|---|---|---|---|---|
+| PostgreSQL | Stable | yes | yes | SQL | yes | yes | yes | all five TLS modes, release-verified |
+| MySQL | Stable | yes | yes | SQL | yes | yes | yes | DDL not transactional; TLS release-verified |
+| SQLite | Stable | yes | yes | SQL | yes | yes | yes | File-based |
+| SQL Server | Stable | yes | yes | SQL | yes | yes | no interactive begin | Tiberius; custom CA implemented; Verify Ca and Verify Full are identical; server cancellation unsupported |
+| ClickHouse | Stable | yes | yes | SQL | yes | yes | no | Async mutations; no row counts; TLS release-verified |
+| Redis | Experimental | yes | DBs / SCAN | Redis CLI | via query | no | no | TLS release-verified; Verify Ca behaves as Verify Full |
+| MongoDB | Experimental | yes | collections | find / aggregate | insertOne / deleteMany / drop | no | no | TLS release-verified; Verify Ca behaves as Verify Full; CI integration coverage for browse, find, aggregate, delete and drop |
+| DuckDB | Experimental | yes | yes | SQL | yes | yes | no | Cargo feature `duckdb`; CSV/TSV/JSON/Parquet files; bundled JSON/Parquet; explicit optional CI |
+
+### Maturity rules
+
+1. Default maturity is `Stable`. Override only when a path users expect is missing or dialect-limited.
+2. Do not register a driver that always fails at connect.
+3. DuckDB stays behind `--features duckdb` for compile size, not maturity.
+4. Raising a driver to Stable means browse, the engine's query dialect, common writes, and CI integration coverage are in place.
+
+Transport and TLS behaviour per driver is tracked in [connections.md](connections.md).
+
+### Order the engines were added
+
+ClickHouse (Stable), Redis (Experimental), DuckDB (Experimental, `--features duckdb`), MongoDB (Experimental). SSH jump-host chains belong in `crates/ssh` as sequential tunnels, not in drivers.
