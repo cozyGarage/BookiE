@@ -1,0 +1,1 @@
+{"scenario": "postgres_ssh_unknown_host_key_decline_is_durably_audited", "status": "passed", "error": null}

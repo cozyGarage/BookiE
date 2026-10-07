@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "source_commit": "3a00ecc2687cce1334fc0600d5d3529573ea65d6",
+  "workflow_run": "37656652820",
+  "job": "Build Linux / Installed GTK safety smoke",
+  "environment": "Hosted Debian GTK/Xvfb installed-release smoke",
+  "command": "bash scripts/test-gtk-safety.sh",
+  "result": "passed; 50 GTK safety scenarios passed in 619.043 seconds",
+  "scenarios": [
+    {
+      "name": "bundle_export_records_sanitized_audit_outcome",
+      "status": "passed",
+      "artifact": "bundle_export_records_sanitized_audit_outcome-result.json",
+      "sha256": "07172c5439634d9377b1094c188c182e4f420f24fb947ad459f7fdefdde7c971"
+    },
+    {
+      "name": "bundle_import_records_sanitized_audit_outcome",
+      "status": "passed",
+      "artifact": "bundle_import_records_sanitized_audit_outcome-result.json",
+      "sha256": "44b8f7c94fd7af1a3bfa054129cfcc6abcd91db99c9d40acc6b0fa20ea998926"
+    },
+    {
+      "name": "encrypted_bundle_round_trip_restores_credentials",
+      "status": "passed",
+      "artifact": "encrypted_bundle_round_trip_restores_credentials-result.json",
+      "sha256": "0bfb6ecf9ccc3438c76126f782a5f1b38eedc3877a61a1f99656838040d282c7"
+    }
+  ],
+  "report": {
+    "path": "report.json",
+    "sha256": "2e14c68a7e24aaa92e12460b356a24eb5ad0a1afe9305bc6b67f910eaa3f8402"
+  },
+  "not_established": [
+    "Frozen B3+B4 candidate acceptance",
+    "Distribution-package installation and native Wayland acceptance",
+    "The full B4-22 acceptance matrix beyond these three bundle GTK scenarios"
+  ]
+}

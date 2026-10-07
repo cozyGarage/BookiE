@@ -162,6 +162,22 @@ class CiWorkflowTests(unittest.TestCase):
         )
         self.assertIn("scripts/test-postgres-release.sh", ledger)
 
+    def test_postgres_release_default_covers_b4_ssh_audit_and_reconnect_scenarios(self):
+        script = (ROOT / "linux/scripts/test-postgres-release.sh").read_text()
+        default_scenarios = next(
+            line for line in script.splitlines() if 'TABLEPRO_GTK_SCENARIO="${TABLEPRO_GTK_SCENARIO:-' in line
+        )
+        for scenario in [
+            "postgres_ssh_unknown_host_key_decline_is_durably_audited",
+            "postgres_ssh_multihop_trusts_both_hops_and_queries",
+            "postgres_ssh_setup_failure_is_durably_audited",
+            "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+            "postgres_ssh_second_hop_decline_does_not_learn_key",
+            "postgres_ssh_changed_second_hop_key_is_refused",
+        ]:
+            with self.subTest(scenario=scenario):
+                self.assertIn(scenario, default_scenarios)
+
 
 if __name__ == "__main__":
     unittest.main()
