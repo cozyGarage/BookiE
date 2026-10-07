@@ -3,6 +3,11 @@
     [
       "tablepro-app",
       "--lib",
+      "ui::browse_tab::value_parse::clickhouse_enum_contract::value_contract_clickhouse_enum16_grid_edit_preserves_labels_and_refuses_invalid_values"
+    ],
+    [
+      "tablepro-app",
+      "--lib",
       "ui::browse_tab::value_parse::tests::postgres_numeric_csv::postgres_numeric_parser_outputs_round_trip_through_server"
     ],
     [
