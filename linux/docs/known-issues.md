@@ -24,6 +24,20 @@ and its evidence folders win. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
 first column says which area owns them.
 
+## Owners and handoff
+
+Every open row has one owner. `scripts/check-known-issues.py` fails when an
+`OPEN` or `UNVERIFIED` row has no owner here, when a row is listed twice, or when
+a listed id is not in the ledger. When you move work between agents, change this
+table in the same commit.
+
+| Owner | Open rows | Next |
+| --- | --- | --- |
+| B3 (types, values, drivers, result paths) | UI-19, UI-20, SEC-3, SEC-4, TEST-2, TEST-5, TEST-10, TEST-12, TEST-13, TEST-16, TEST-25, PERF-1, PERF-3, PERF-4, PERF-7, PERF-9, PERF-10 | TEST-25: skip the case below the SQLite version that fixed `json_group_object`, or bundle SQLite. PERF-7, PERF-9, PERF-10 and UI-19 touch the grid files the UX lane also edits (`RowStore`, row inspector, find in rows): rebase on `linux` first |
+| B4 (transport, guard, audit, SSH, rollback) | B4-7, B4-9, B4-11, B4-12, B4-16, B4-17, B4-21, B4-22, UI-1b, UI-13b, TEST-15, PERF-2, PERF-8 | A guard read-snapshot session start (read-only `BEGIN`, audited as a read) unblocks UI-13b and the cursor paging in ADR 0011 (PERF-8, PERF-2). Frozen-candidate, hosted and installed runs for the B4 rows. UI-1b needs a secrets-per-hop design. TEST-15 needs an independent row and audit oracle |
+| UX lane (app layer, packaging, lab) | UI-10, UI-11, UI-14b, UI-15b, UI-17b, UI-18, UI-21, UI-23, UI-24, PKG-2, PKG-3, PKG-4, PKG-6, TEST-7 | UI-11 collapsible sidebar tree, UI-18 one action table, UI-23 typed activity console, PKG-6 upgrade and rollback, TEST-7 two-profile installed run, PKG-3 and PKG-4 on the lab guests |
+| The maintainer (needs a person or a decision) | PKG-1, DOC-3, DOC-5, TEST-6 | PKG-1: run the Wayland recipe in the row on a real desktop. DOC-3: Orca and high contrast. TEST-6: the manual checklist. DOC-5: compare clients on lab VMs |
+
 ## UI (app layer)
 
 | ID | Issue | Status | Evidence / next | Layer |

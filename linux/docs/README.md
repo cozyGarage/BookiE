@@ -23,7 +23,7 @@ on historical statements such as “next”, “current” or “pending”.
 | Type/value semantics and proof standard | [ADR 0007](decisions/0007-type-and-value-preservation.md) | Change a decision explicitly; link it from plans |
 | Connection/session/trust semantics | [ADR 0008](decisions/0008-connection-and-session-ownership.md) | B4 task IDs track implementation, not competing rules |
 | Durable identity and migration semantics | [ADR 0009](decisions/0009-persistence-and-identity-compatibility.md) | Operational procedures stay in storage/state guides |
-| Every known open issue outside B3, with its status and evidence | [Known issues ledger](known-issues.md) | Cross out a row only with the commit or test that closed it; `scripts/check-known-issues.py` enforces the format |
+| Every known open issue outside B3, with its status, evidence and owner | [Known issues ledger](known-issues.md) (owners in [Owners and handoff](known-issues.md#owners-and-handoff)) | Cross out a row only with the commit or test that closed it; `scripts/check-known-issues.py` enforces the format |
 | Milestones, order and acceptance | [Active sprint](bookie-0.2-sprint.md) | Keep current instructions compact; archive dated progress |
 | B3 remaining work | [Type/consumer board](type-contract-strategy.md) | One bounded case, outcome, evidence pointer and next action |
 | B4 implementation packets | [B4 board](b4-task-board.md) | Update the owning task and integrated status |
