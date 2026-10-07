@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running tests/integration.rs (/home/trung/Projects/tablepro/linux/target/debug/deps/integration-f0961337c4162ed9)
+
+running 1 test
+test mysql_atomic::mysql_batch_rollback_preserves_nontransactional_update_and_delete_trigger_effects ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 70 filtered out; finished in 9.57s
+
