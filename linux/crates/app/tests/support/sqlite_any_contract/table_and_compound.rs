@@ -308,6 +308,97 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
 }
 
 #[tokio::test]
+async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() {
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
+
+    let connection = drivers_sqlite::SqliteDriver
+        .connect(ConnectOptions {
+            database: ":memory:".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    connection
+        .execute("CREATE TABLE restored (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    let target_columns = connection.fetch_columns(None, "restored").await.unwrap();
+
+    let mut transaction = connection.begin().await.unwrap();
+    transaction.execute("ATTACH DATABASE ':memory:' AS aux").await.unwrap();
+    transaction
+        .execute("CREATE TABLE aux.flexible (id INTEGER PRIMARY KEY, value ANY) STRICT")
+        .await
+        .unwrap();
+    transaction
+        .execute(
+            "INSERT INTO aux.flexible VALUES \
+             (1, 42), (2, 1.5), (3, 'NULL'), (4, ''), (5, NULL), \
+             (6, X'00FF80'), (7, '=SUM(1)')",
+        )
+        .await
+        .unwrap();
+
+    let source = transaction
+        .query("SELECT id, value FROM aux.flexible ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(source.columns[1].data_type, "ANY");
+    transaction.commit().await.unwrap();
+
+    use tablepro_core::{
+        export::{CsvOptions, render_csv, unique_csv_null_marker},
+        import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv},
+    };
+    let null_marker = unique_csv_null_marker(&source.rows);
+    let csv_options = CsvOptions {
+        null_to_empty: false,
+        null_marker: Some(null_marker.clone()),
+        preserve_sqlite_result_types: true,
+        ..Default::default()
+    };
+    let csv = render_csv(&source.columns, &source.rows, &csv_options);
+    let import_options = CsvImportOptions {
+        has_header: true,
+        null_marker,
+        ..Default::default()
+    };
+    let sheet = read_csv(csv.as_bytes(), &import_options, None).unwrap();
+    let plan = build_insert_plan(
+        &ImportTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "restored",
+            columns: &target_columns,
+            mapping: &[Some(0), Some(1)],
+        },
+        &sheet,
+        &import_options,
+    )
+    .unwrap();
+    for row in &plan.rows {
+        connection.execute_params(&plan.statement, row).await.unwrap();
+    }
+
+    let restored = connection
+        .query("SELECT id, typeof(value), value, hex(value) FROM restored ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(
+        restored.rows,
+        vec![
+            vec![Value::Int(1), Value::Text("integer".into()), Value::Int(42), Value::Text("3432".into())],
+            vec![Value::Int(2), Value::Text("real".into()), Value::Float(1.5), Value::Text("312E35".into())],
+            vec![Value::Int(3), Value::Text("text".into()), Value::Text("NULL".into()), Value::Text("4E554C4C".into())],
+            vec![Value::Int(4), Value::Text("text".into()), Value::Text(String::new()), Value::Text(String::new())],
+            vec![Value::Int(5), Value::Text("null".into()), Value::Null, Value::Text(String::new())],
+            vec![Value::Int(6), Value::Text("blob".into()), Value::Bytes(vec![0, 255, 128]), Value::Text("00FF80".into())],
+            vec![Value::Int(7), Value::Text("text".into()), Value::Text("=SUM(1)".into()), Value::Text("3D53554D283129".into())],
+        ]
+    );
+}
+
+#[tokio::test]
 async fn sqlite_compound_any_result_exports_csv_text_and_xlsx_cell_kinds() {
     use tablepro_core::{
         ConnectOptions, DatabaseDriver,
