@@ -2,7 +2,7 @@
   "schema_version": 1,
   "date": "2026-10-07",
   "branch": "b4/b4-11-multiengine-dml",
-  "source_commit": "56c17fd16da2c44e00871d5172bcc4f3390a7ab1",
+  "source_commit": "b5422f6b907b099cfcf449340eeffe298aadea22",
   "source_file": "crates/drivers/mysql/tests/shared/mysql_atomic.rs",
   "source_sha256": "4a2d66cd79acad8e61c948d52378726a88d536da4eb3d9253384ccaf22a01314",
   "source_patch_sha256": "38c4f55316f5127a7cf7ec8e8ad50b8216e28d45838c15ce0bf3c78a9bc90282",
