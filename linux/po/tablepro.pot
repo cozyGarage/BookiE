@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-"POT-Creation-Date: 2026-10-07 17:24+0200\n"
+"POT-Creation-Date: 2026-10-07 17:47+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -76,7 +76,7 @@ msgid "Connection closed."
 msgstr ""
 
 #: crates/app/src/ui/activity_dialog.rs:111
-#: crates/app/src/ui/editor/mod.rs:1013
+#: crates/app/src/ui/editor/mod.rs:1009
 msgid "Running…"
 msgstr ""
 
@@ -1897,7 +1897,7 @@ msgid "0 uses the default of 30 seconds"
 msgstr ""
 
 #: crates/app/src/ui/connect_dialog/mod.rs:1231
-#: crates/app/src/ui/preferences.rs:216
+#: crates/app/src/ui/preferences.rs:223
 msgid "Query timeout (seconds)"
 msgstr ""
 
@@ -2158,57 +2158,57 @@ msgstr ""
 msgid "Run query (Ctrl+Return)"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:679
+#: crates/app/src/ui/editor/mod.rs:675
 msgid "empty query"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:741
+#: crates/app/src/ui/editor/mod.rs:737
 msgid "No statement at cursor"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:815 crates/app/src/ui/history_dialog.rs:1034
+#: crates/app/src/ui/editor/mod.rs:811 crates/app/src/ui/history_dialog.rs:1034
 msgid "cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:818
+#: crates/app/src/ui/editor/mod.rs:814
 msgid "Query cancelled"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:819
+#: crates/app/src/ui/editor/mod.rs:815
 msgid "The running query was stopped."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:836
+#: crates/app/src/ui/editor/mod.rs:832
 #, rust-format
 msgid "Query exceeded the {n}s timeout configured in Preferences."
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:842
+#: crates/app/src/ui/editor/mod.rs:838
 msgid "timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:845
+#: crates/app/src/ui/editor/mod.rs:841
 msgid "Query timed out"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:894
+#: crates/app/src/ui/editor/mod.rs:890
 msgid "Formatting is unavailable for this connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:960
+#: crates/app/src/ui/editor/mod.rs:956
 msgid "Cannot ask for parameter values without a window"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:987
+#: crates/app/src/ui/editor/mod.rs:983
 msgid "Waiting for session to finish"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:994 crates/app/src/ui/editor/mod.rs:999
+#: crates/app/src/ui/editor/mod.rs:990 crates/app/src/ui/editor/mod.rs:995
 #: crates/app/src/ui/editor/session_mode.rs:206
 msgid "no active connection"
 msgstr ""
 
-#: crates/app/src/ui/editor/mod.rs:1152 crates/app/src/ui/editor/mod.rs:1165
+#: crates/app/src/ui/editor/mod.rs:1148 crates/app/src/ui/editor/mod.rs:1161
 msgid "query-results"
 msgstr ""
 
@@ -3319,7 +3319,15 @@ msgstr ""
 msgid "Editor font family"
 msgstr ""
 
-#: crates/app/src/ui/preferences.rs:218
+#: crates/app/src/ui/preferences.rs:213
+msgid "Vim keys in the SQL editor"
+msgstr ""
+
+#: crates/app/src/ui/preferences.rs:214
+msgid "Applies to editors opened after the change."
+msgstr ""
+
+#: crates/app/src/ui/preferences.rs:225
 msgid "Cancel long-running queries automatically. Set to 0 to disable."
 msgstr ""
 

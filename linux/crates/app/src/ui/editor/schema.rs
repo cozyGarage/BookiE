@@ -73,7 +73,28 @@ fn editor_font_css(font_size: u32, family: &str) -> String {
     format!(".{EDITOR_FONT_CSS_CLASS}, .{EDITOR_FONT_CSS_CLASS} text {{ font-size: {font_size}pt;{family} }}")
 }
 
-pub(crate) fn apply_editor_font(view: &sourceview5::View, font_size: u32, family: &str) {
+fn apply_vim_mode(view: &sourceview5::View, enabled: bool) {
+    if !enabled {
+        return;
+    }
+    let context = sourceview5::VimIMContext::new();
+    context.set_client_widget(Some(view));
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    keys.set_im_context(Some(&context));
+    view.add_controller(keys);
+    view.connect_destroy(move |_| context.set_client_widget(gtk::Widget::NONE));
+}
+
+pub(crate) fn apply_editor_preferences(
+    view: &sourceview5::View,
+    preferences: &crate::services::preferences::Preferences,
+) {
+    apply_editor_font(view, preferences.editor_font_size, &preferences.editor_font_family);
+    apply_vim_mode(view, preferences.editor_vim_mode);
+}
+
+fn apply_editor_font(view: &sourceview5::View, font_size: u32, family: &str) {
     view.add_css_class(EDITOR_FONT_CSS_CLASS);
     thread_local! {
         static EDITOR_FONT_PROVIDER: std::cell::RefCell<Option<gtk::CssProvider>> =
@@ -116,5 +137,30 @@ mod font_tests {
         for hostile in ["x\"; } * { color: red", "a{b}", "a;b", "\\9"] {
             assert!(!editor_font_css(12, hostile).contains("font-family"), "{hostile}");
         }
+    }
+}
+
+#[cfg(test)]
+mod vim_tests {
+    use super::*;
+
+    fn controllers(view: &sourceview5::View) -> u32 {
+        view.observe_controllers().n_items()
+    }
+
+    #[test]
+    #[ignore = "requires an isolated GTK display"]
+    fn vim_keys_are_attached_only_when_enabled() {
+        gtk::init().unwrap();
+        let plain = sourceview5::View::new();
+        let before = controllers(&plain);
+        apply_vim_mode(&plain, false);
+        assert_eq!(controllers(&plain), before);
+
+        let vim = sourceview5::View::new();
+        let before = controllers(&vim);
+        apply_vim_mode(&vim, true);
+        assert!(controllers(&vim) > before);
+        std::mem::forget(vim);
     }
 }
