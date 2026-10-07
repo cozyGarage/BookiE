@@ -8,6 +8,7 @@ use crate::map_sqlx_error;
 use crate::query::{statement_columns, statement_type_infos};
 
 const PG_LSN_OID: u32 = 3220;
+const XML_OID: u32 = 142;
 const MACADDR8_OID: u32 = 774;
 const MACADDR_OID: u32 = 829;
 const CIDR_OID: u32 = 650;
@@ -98,7 +99,10 @@ fn is_inferred_text_element(type_info: &PgTypeInfo, domain_depth: usize) -> Resu
             }
             Ok(true)
         }
-        PgTypeKind::Simple if type_info.name().eq_ignore_ascii_case("citext") => {
+        PgTypeKind::Simple
+            if type_info.name().eq_ignore_ascii_case("citext")
+                || type_info.oid().is_some_and(|oid| oid.0 == XML_OID) =>
+        {
             if domain_depth >= 64 {
                 return Err(DriverError::Unsupported(
                     "PostgreSQL array element domain hierarchy exceeds the driver's resolvable depth".into(),

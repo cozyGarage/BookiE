@@ -25,6 +25,14 @@ pub async fn assert_array_contract(connection: &dyn Connection) {
             "ARRAY[NULL,'NULL','null','','{}','a,b',' leading ', '漢字 😀', $$a\"b$$, $$a\\b$$, E'line\nnext', $$x'); DROP TABLE t; --$$]",
         ),
         ("text[]", "ARRAY[['a',NULL],['','NULL']]"),
+        (
+            "xml[]",
+            "ARRAY[XMLPARSE(CONTENT '<a>one,two</a>'), \
+             XMLPARSE(CONTENT '<b attr=\"quoted\">東京 &amp; 😀</b>'), NULL]::xml[]",
+        ),
+        ("xml[]", "NULL::xml[]"),
+        ("xml[]", "ARRAY[]::xml[]"),
+        ("xml[]", "$$[0:1]={\"<root/>\",NULL}$$::xml[]"),
         ("varchar[]", "ARRAY['x','',NULL]::varchar[]"),
         ("bpchar[]", "ARRAY['x',' y']::char(3)[]"),
         (
@@ -191,6 +199,101 @@ pub async fn assert_array_grid_edit(connection: &dyn Connection) {
                 Value::Text("quote \" slash \\, comma".into()),
             ],
         ]
+    );
+
+    const XML_ARRAY: &str = r#"{"<a>one,two</a>","<b attr=\"quoted\">東京 &amp; 😀</b>",NULL}"#;
+    connection
+        .execute("CREATE TABLE xml_array_grid_edit (id integer PRIMARY KEY, value xml[], sibling text NOT NULL)")
+        .await
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO xml_array_grid_edit VALUES \
+             (1, ARRAY[XMLPARSE(CONTENT '<old/>')], 'target sibling'), \
+             (2, ARRAY[XMLPARSE(CONTENT '<keep/>')], 'sibling row')",
+        )
+        .await
+        .unwrap();
+    let mut xml_rows = connection
+        .query("SELECT * FROM xml_array_grid_edit ORDER BY id")
+        .await
+        .unwrap();
+    let id_index = xml_rows.columns.iter().position(|column| column.name == "id").unwrap();
+    let value_index = xml_rows
+        .columns
+        .iter()
+        .position(|column| column.name == "value")
+        .unwrap();
+    xml_rows.columns[id_index].primary_key = true;
+    let sibling_wire_before = connection
+        .query("SELECT encode(array_send(value), 'hex') FROM xml_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap()
+        .rows[0][0]
+        .clone();
+    let (update_sql, update_params) = tablepro_core::sql_dialect::build_keyed_update(
+        "postgres",
+        None,
+        "xml_array_grid_edit",
+        &xml_rows.columns,
+        &[(value_index, Value::Text(XML_ARRAY.into()))],
+        &[Value::Int(1)],
+    )
+    .unwrap();
+    assert!(update_sql.contains("$1::text::pg_catalog.xml[]"), "{update_sql}");
+    assert_eq!(
+        connection
+            .execute_in_transaction(&[(update_sql.clone(), update_params)])
+            .await
+            .unwrap(),
+        vec![1]
+    );
+    let native = connection
+        .query(
+            "SELECT pg_typeof(value)::text, value::text, encode(array_send(value), 'hex'), sibling \
+             FROM xml_array_grid_edit WHERE id = 1",
+        )
+        .await
+        .unwrap();
+    let oracle = connection
+        .query(
+            "SELECT pg_typeof(expected)::text, expected::text, encode(array_send(expected), 'hex'), 'target sibling' \
+             FROM (SELECT ARRAY[XMLPARSE(CONTENT '<a>one,two</a>'), \
+                               XMLPARSE(CONTENT '<b attr=\"quoted\">東京 &amp; 😀</b>'), NULL]::xml[] AS expected) source",
+        )
+        .await
+        .unwrap();
+    assert_eq!(native.rows, oracle.rows);
+    assert_eq!(native.rows[0][0], Value::Text("xml[]".into()));
+    let sibling = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM xml_array_grid_edit WHERE id = 2")
+        .await
+        .unwrap();
+    assert_eq!(sibling.rows[0][1], Value::Text("sibling row".into()));
+    assert_eq!(sibling.rows[0][0], sibling_wire_before);
+
+    let invalid_xml = connection
+        .query_params(
+            "UPDATE xml_array_grid_edit SET value = $1 WHERE id = 1",
+            &[Value::Text(r#"{"<broken>"}"#.into())],
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&invalid_xml, tablepro_core::DriverError::Query { sqlstate: Some(code), .. } if code == "2200N"),
+        "expected native XML parse refusal, got {invalid_xml:?}"
+    );
+    let after_refusal = connection
+        .query("SELECT encode(array_send(value), 'hex'), sibling FROM xml_array_grid_edit WHERE id = 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        after_refusal.rows,
+        native
+            .rows
+            .iter()
+            .map(|row| vec![row[2].clone(), row[3].clone()])
+            .collect::<Vec<_>>()
     );
 
     assert_bool_array_grid_edit(connection).await;
@@ -561,6 +664,12 @@ async fn assert_float8_array_csv_round_trip(
 async fn assert_array_csv_insert_contract(connection: &dyn Connection) {
     let cases = [
         ("bool[]", "ARRAY[true,false,NULL]::bool[]"),
+        (
+            "xml[]",
+            "ARRAY[XMLPARSE(CONTENT '<a>one,two</a>'), \
+             XMLPARSE(CONTENT '<b attr=\"quoted\">東京 &amp; 😀</b>'), NULL]::xml[]",
+        ),
+        ("xml[]", "$$[0:1]={\"<root/>\",NULL}$$::xml[]"),
         ("bytea[]", "ARRAY[decode('00ff275c','hex'),decode('','hex'),NULL]"),
         ("name[]", "ARRAY['alpha','','',NULL]::name[]"),
         ("int2[]", "ARRAY[-32768,0,32767]::int2[]"),
@@ -774,6 +883,7 @@ fn assert_array_value(kind: &str, result: &QueryResult) {
     let expected_type = match kind {
         "bpchar[]" => "CHAR[]".into(),
         "pg_lsn[]" => "pg_lsn[]".into(),
+        "xml[]" => "xml[]".into(),
         _ => kind.to_ascii_uppercase(),
     };
     assert_eq!(result.columns[0].data_type, expected_type);

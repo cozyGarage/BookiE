@@ -14,6 +14,7 @@ const MACADDR_OID: u32 = 829;
 const INET_OID: u32 = 869;
 const CIDR_OID: u32 = 650;
 const PG_LSN_OID: u32 = 3220;
+const XML_OID: u32 = 142;
 
 pub(crate) fn decode(raw: &PgValueRef<'_>) -> Option<Value> {
     let info = raw.type_info();
@@ -44,7 +45,10 @@ pub(super) fn is_text_element(info: &PgTypeInfo) -> bool {
             PgTypeKind::Domain(base) => current = base,
             // ponytail: PgTypeInfo omits custom namespaces; if unrelated
             // simple types named citext are used, verify extension membership by OID.
-            PgTypeKind::Simple => return current.name().eq_ignore_ascii_case("citext"),
+            PgTypeKind::Simple => {
+                return current.name().eq_ignore_ascii_case("citext")
+                    || current.oid().is_some_and(|oid| oid.0 == XML_OID);
+            }
             _ => return false,
         }
     }
@@ -238,6 +242,7 @@ fn supported(oid: u32) -> bool {
             | 1184
             | 1186
             | 1266
+            | XML_OID
             | BIT_OID
             | VARBIT_OID
             | 1700
