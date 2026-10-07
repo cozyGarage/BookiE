@@ -8,11 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: BookiE 0.1.5\n"
 "Report-Msgid-Bugs-To: https://github.com/cozyGarage/TablePro/issues\n"
-<<<<<<< HEAD
 "POT-Creation-Date: 2026-10-07 17:28+0200\n"
-=======
-"POT-Creation-Date: 2026-10-07 17:24+0200\n"
->>>>>>> origin/linux
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
