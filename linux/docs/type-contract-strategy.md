@@ -119,6 +119,10 @@ bindings leave target and sibling rows unchanged
 The same explicit-refusal and preservation contract now covers built-in
 `json[]` and `jsonb[]`, with native array text, JSON, and wire snapshots in the
 same test file.
+PostgreSQL geometric arrays `point[]`, `line[]`, `lseg[]`, `box[]`, `path[]`,
+`polygon[]`, and `circle[]` now share an explicit-refusal contract. It checks
+native type/text/JSON/wire oracles, SQL-literal and parameter refusal, and
+unchanged target and sibling rows (`value_contract_geometric_array_refusals_preserve_target_and_sibling_rows`).
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
