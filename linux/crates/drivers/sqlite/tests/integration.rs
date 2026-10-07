@@ -166,6 +166,34 @@ async fn direct_query_columns_recover_declared_strict_any_metadata() {
 }
 
 #[tokio::test]
+async fn transaction_query_obeys_result_budget_and_remains_usable() {
+    let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
+    let mut transaction = connection.begin().await.unwrap();
+    let payload = format!("{:>4096}", "x");
+    let result = transaction
+        .query(
+            "WITH RECURSIVE rows(id) AS (\
+                 SELECT 1 UNION ALL SELECT id + 1 FROM rows WHERE id < 20000\
+             ) SELECT id, printf('%4096s', 'x') AS payload FROM rows ORDER BY id",
+        )
+        .await
+        .unwrap();
+
+    assert!(result.truncated, "omitted rows must be reported");
+    assert!(!result.rows.is_empty());
+    assert!(result.rows.len() < 20_000);
+    assert!(result.rows.len() * payload.len() <= tablepro_core::MAX_QUERY_RESULT_BYTES);
+    assert!(result.rows.iter().enumerate().all(|(index, row)| {
+        row.first() == Some(&Value::Int(index as i64 + 1))
+            && matches!(row.get(1), Some(Value::Text(value)) if value == &payload)
+    }));
+
+    let next = transaction.query("SELECT 42 AS usable").await.unwrap();
+    assert_eq!(next.rows, vec![vec![Value::Int(42)]]);
+    transaction.rollback().await.unwrap();
+}
+
+#[tokio::test]
 async fn computed_coalesce_over_strict_any_keeps_fallback_metadata_and_storage_classes() {
     let connection = SqliteDriver.connect(options_for(":memory:")).await.unwrap();
     connection
