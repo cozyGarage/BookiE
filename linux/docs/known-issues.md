@@ -18,10 +18,10 @@ Rules:
   engine/type/consumer/configuration matrix, mutation triage, installed grid
   acceptance.
 
-Reconciled against BookiE `linux` at `236432b92` (PRs #256–#271), checked
+Reconciled against BookiE `linux` at `4e145e1f0` (PRs #256–#273), checked
 2026-10-08. This includes the latest MongoDB census profile, ClickHouse Enum8
 and Enum16 boundary/refusal cases, nullable Enum16 consumers, nested Enum8
-array exports/refusal, and frozen B4 candidate findings. The
+and nullable Enum8 array exports/refusal, and frozen B4 candidate findings. The
 B4-* rows summarize the [B4 board](b4-task-board.md); when they differ, the board
 and linked PR evidence discussions are authoritative. Items come from the archived
 audits of 2026-09-17 to 2026-10-06 and the [sprint](bookie-0.2-sprint.md); the
