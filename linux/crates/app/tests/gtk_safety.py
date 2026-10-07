@@ -951,6 +951,46 @@ def audit_failure_denies(database, _base):
 audit_failure_denies.audit_available = False
 
 
+def bundle_export_records_sanitized_audit_outcome(_database, base):
+    export_path = base / "home" / "review-only.bundle"
+    invoke_accessible_action("win.disconnect")
+    invoke_accessible_action("welcome.export-bundle")
+    invoke(wait_for_node(name="Choose File…", role=pyatspi.ROLE_PUSH_BUTTON))
+    chooser = wait_for_node(name="Export connections", role=FILE_CHOOSER_ROLES)
+    set_visible_editable_within("Export connections", FILE_CHOOSER_ROLES, str(export_path))
+    invoke(wait_within(chooser, name="Save", role=pyatspi.ROLE_PUSH_BUTTON))
+
+    deadline = time.monotonic() + WAIT_SECONDS
+    while time.monotonic() < deadline and not export_path.exists():
+        time.sleep(POLL_SECONDS)
+    assert export_path.exists(), "connection bundle export was not created"
+
+    journal_path = base / "data" / storage_dir_name() / "audit.jsonl"
+    deadline = time.monotonic() + WAIT_SECONDS
+    events = []
+    while time.monotonic() < deadline:
+        if journal_path.exists():
+            records = [json.loads(line) for line in journal_path.read_text(encoding="utf-8").splitlines()]
+            events = [
+                record["event"] for record in records
+                if record["event"].get("decision_rule") == "connection_bundle_export"
+            ]
+            if len(events) == 2:
+                break
+        time.sleep(POLL_SECONDS)
+
+    assert len(events) == 2, f"expected one export intent and outcome, got {events!r}"
+    assert [event["phase"] for event in events] == ["intent", "outcome"]
+    assert events[0]["operation_id"] == events[1]["operation_id"]
+    assert [event["terminal_status"] for event in events] == ["pending", "succeeded"]
+    assert all(event["administrative_action"]["affected_count"] == 3 for event in events)
+    assert all(event["connection_id"] == "00000000-0000-0000-0000-000000000000" for event in events)
+    assert all(event["connection_name"] == "local_settings" for event in events)
+    assert all(str(export_path) not in json.dumps(event) for event in events), (
+        "the audit record must not contain the exported file path"
+    )
+
+
 def choose_export_format(label, keys):
     invoke_accessible_action("win.export-csv")
     combo = wait_for_node(name="Format", role=pyatspi.ROLE_COMBO_BOX)
@@ -1500,6 +1540,7 @@ def main():
         dismissed_approval_denies,
         approve_once_prompts_again,
         audit_failure_denies,
+        bundle_export_records_sanitized_audit_outcome,
         named_parameter_binds_a_value,
         favorite_round_trips_through_open_quickly,
         successful_switch_keeps_database_ownership,

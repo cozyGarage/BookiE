@@ -73,7 +73,7 @@ additional privacy, value and evidence tasks without duplicating this board.
 
 | ID | Current implementation and validation | Remaining |
 | --- | --- | --- |
-| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. The focused interrupted-intent recovery, fail-closed and paired-event checks pass; `cargo test -p tablepro-policy -p tablepro-storage -p tablepro-app --lib` passed (903 passed, 45 ignored) | GTK bundle-flow plus frozen-candidate and hosted acceptance remain |
+| B4-22 | ADR [0010](decisions/0010-administrative-action-audit.md) defines privacy-bounded administrative audit events; code records durable intent/outcome around confirmed bundle export/import and gates side effects on intent durability. Focused interrupted-intent recovery, fail-closed and paired-event checks pass; affected crate suite passed (903 passed, 45 ignored). [GTK export evidence](evidence/b4-bundle-export-audit-2026-10-07/manifest.json) verifies the export UI and sanitized durable pair | GTK import, frozen-candidate and hosted acceptance remain |
 
 ## Completed local slices
 
