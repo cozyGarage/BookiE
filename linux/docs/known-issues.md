@@ -79,7 +79,7 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-4 | ~~F8 headless: agentd shared one `AuditState` across every connection~~ | DONE | Each cached session owns an audit generation; `audit_isolation_tests` proves A is blocked after an interrupted write, B stays writable and a replacement recovers (fails with the old shared state) | sandbox |
 | B4-5 | ~~Retire the daemon handle after a driver panic or disconnect even when ping succeeds~~ | DONE | `SessionFaultSink` marks the cached session retired through the guard; `a_session_whose_driver_panicked_is_not_reused_even_though_its_ping_is_healthy` (fails without the change) | sandbox |
 | B4-6 | ~~I2: Flatpak plus system OpenSSH must refuse explicitly before dispatch~~ | DONE | `TransportError::SystemSshUnavailableInSandbox` raised in `build_openssh_config` before any process; `sandbox_tests` | sandbox |
-| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | | sandbox |
+| B4-7 | I5: tunnel setup and host-key refusal audited with one terminal outcome each | OPEN | Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
 | B4-8 | ~~F7: isolated GTK Session, BEGIN, label, toggle-off confirm~~ | DONE | AT-SPI scenario `session_transaction_label_and_toggle_off_confirmation` (SQLite): Session on, BEGIN shows the transaction label, toggling off asks, Cancel keeps the session and the label, Roll Back returns the plain label. Runs in the installed suite on Arch, Ubuntu 24.04 and Debian 13 | gtk-installed |
 | B4-9 | I3: reconcile route, auth and TLS evidence after C6, G5, I2 | OPEN | Docs | manual |
 | B4-10 | ~~I1: `packaging/debian/rules` has no askpass build or install~~ | DONE | `packaging/debian/rules` builds and installs `tablepro-askpass`; the validator and `test_deb_package.py` reject a package without it | sandbox |
@@ -90,11 +90,11 @@ archived audits of 2026-09-17 to 2026-10-06 and the
 | B4-15 | O1: connect A, cancel, switch to B, namespace ownership races | OPEN | | gtk-widget |
 | B4-16 | F4/F9 stale-session invalidation merged but not accepted | UNVERIFIED | Installed acceptance | gtk-installed |
 | B4-17 | F6: native multi-hop, cancellation, installed trust flow | OPEN | | driver-docker |
-| B4-18 | Connect and Test Connection read tables on a raw connection before hand-out, with no audit record | OPEN | A decision for ADR 0008, not a bypass | sandbox |
+| B4-18 | Connect and Test Connection read tables on a raw connection before hand-out, with no audit record | OPEN | A decision for ADR 0008, not a bypass. Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
 | B4-19 | Hostile-server fixtures: real short or non-ASCII SCRAM nonces and excessive iterations | OPEN | Source-string tests only today | driver-docker |
 | B4-20 | ~~Credential rotation during connect: fingerprint and assembly load material separately~~ | DONE | Daemon: `a_key_material_rotation_during_connect_is_not_cached_under_the_stale_digest` and `a_material_lookup_failure_*` tests; the GUI reconnect reuses the options captured at connect, so it has no second lookup | sandbox |
 | B4-21 | SQL Server Kerberos and TLS need a deterministic KDC and certificate fixture | OPEN | | driver-docker |
-| B4-22 | Bundle export and import write no audit entries | OPEN | Needs an admin-event class ADR | sandbox |
+| B4-22 | Bundle export and import write no audit entries | OPEN | Design proposed in [ADR 0010](decisions/0010-administrative-audit-events.md), awaiting acceptance | sandbox |
 
 ## Security
 
