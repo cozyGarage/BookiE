@@ -309,7 +309,7 @@ async fn sqlite_strict_any_csv_round_trip_preserves_runtime_storage_classes() {
 
 #[tokio::test]
 async fn sqlite_attached_any_csv_round_trip_preserves_runtime_storage_classes() {
-    use tablepro_core::{ConnectOptions, Connection, DatabaseDriver, Transaction};
+    use tablepro_core::{ConnectOptions, DatabaseDriver};
 
     let connection = drivers_sqlite::SqliteDriver
         .connect(ConnectOptions {
