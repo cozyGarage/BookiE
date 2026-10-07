@@ -8,8 +8,8 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `b43af2030` (PR #154) on `linux`, pushed to
-`origin/linux`. Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
+Current integrated source baseline: `3b9909443` (PR #156) on `fork/linux`.
+Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
 headless audit-generation regressions. Earlier merges #138–#145 cover result
@@ -24,7 +24,9 @@ ledger rows, and moves SSH host-key generation to container startup. PR #154
 added a PostgreSQL enum-array slice consumer case. Its hosted quick gate exposed
 the PostgreSQL contract source exceeding the file-size limit; the regression is
 now split into its own included file and the ignored-test inventory updated in
-PR #156. Local quick checks pass; the PR's hosted checks remain pending. The
+PR #156, which also adds range-array refusal contracts. At the 2026-10-07 check,
+PR #156 preflight, security, package, TLS, PostgreSQL release, and SonarCloud
+checks passed; driver integration, GTK, and DuckDB checks were still running. The
 scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
 coverage remains open. These changes do not qualify the release.
 
