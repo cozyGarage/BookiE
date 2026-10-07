@@ -14,6 +14,7 @@ fn loaded(default: Option<&str>) -> DraftColumn {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     })
 }
 

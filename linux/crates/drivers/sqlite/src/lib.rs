@@ -196,6 +196,7 @@ impl Connection for SqliteConnection {
                     comment: None,
                     collation: None,
                     enum_type: None,
+                    domain_type: None,
                 }
             })
             .collect())
@@ -548,6 +549,7 @@ async fn result_columns(
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         })
         .collect();
     resolve_result_column_types(connection, source_columns, &mut columns, sql).await;

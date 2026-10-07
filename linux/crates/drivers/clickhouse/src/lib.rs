@@ -484,6 +484,7 @@ fn response_columns(names: Vec<String>, types: Vec<String>) -> Result<Vec<Column
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         })
         .collect())
 }
@@ -562,6 +563,7 @@ fn catalog_row_to_column_info(r: CatalogColumnRow) -> ColumnInfo {
         comment,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

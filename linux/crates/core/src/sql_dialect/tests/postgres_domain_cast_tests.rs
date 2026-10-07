@@ -1,0 +1,43 @@
+use super::*;
+
+#[test]
+fn postgres_wide_numeric_inserts_cast_text_to_the_builtin_numeric_type() {
+    let mut columns = [col("amount", false)];
+    columns[0].data_type = "numeric(65, 0)".into();
+    let wide = "1234567890123456789012345678901234567890";
+    let (sql, params) =
+        build_insert_from_draft("postgres", None, "ledger", &columns, &[Value::Text(wide.into())]).unwrap();
+
+    assert_eq!(
+        sql,
+        r#"INSERT INTO "ledger" ("amount") VALUES ($1::text::pg_catalog.numeric)"#
+    );
+    assert_eq!(params, vec![Value::Text(wide.into())]);
+}
+
+#[test]
+fn postgres_wide_numeric_updates_cast_text_to_the_builtin_numeric_type() {
+    let mut columns = [col("id", true), col("amount", false)];
+    columns[1].data_type = "numeric(80, 40)".into();
+    let (sql, params) = build_keyed_update(
+        "postgres",
+        None,
+        "ledger",
+        &columns,
+        &[(1, Value::Text("1234567890123456789012345678901234567890.1".into()))],
+        &[Value::Int(7)],
+    )
+    .unwrap();
+
+    assert_eq!(
+        sql,
+        r#"UPDATE "ledger" SET "amount" = $1::text::pg_catalog.numeric WHERE "id" = $2"#
+    );
+    assert_eq!(
+        params,
+        vec![
+            Value::Text("1234567890123456789012345678901234567890.1".into()),
+            Value::Int(7)
+        ]
+    );
+}

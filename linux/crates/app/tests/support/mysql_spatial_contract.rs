@@ -13,6 +13,7 @@ fn col(data_type: &str, nullable: bool) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

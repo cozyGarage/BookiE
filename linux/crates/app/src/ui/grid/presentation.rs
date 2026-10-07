@@ -38,6 +38,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         for value in [Value::Bytes(vec![1]), Value::Text("true".into()), Value::Int(2)] {
             assert!(!cell_allows_inline_edit(&column, &value));
@@ -62,6 +63,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         assert!(cell_allows_inline_edit(&column, &Value::Null));
         assert!(!cell_allows_inline_edit(&column, &Value::Undecodable("NUMERIC".into())));
@@ -80,6 +82,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         assert!(!cell_allows_inline_edit(&column, &Value::Text("same text".into())));
         assert!(!column_is_editable(&column));
@@ -98,6 +101,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         assert!(column_is_editable(&column));
         assert!(cell_allows_inline_edit(&column, &Value::Text("editable".into())));
@@ -116,6 +120,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         assert!(cell_allows_inline_edit(&bit1, &Value::Int(0)));
         assert!(cell_allows_inline_edit(&bit1, &Value::Int(1)));
@@ -152,6 +157,7 @@ mod tests {
             default_value: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         };
         for value in [
             Value::Null,

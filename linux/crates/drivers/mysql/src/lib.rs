@@ -552,6 +552,7 @@ fn statement_columns(columns: &[sqlx::mysql::MySqlColumn]) -> Vec<ColumnInfo> {
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         })
         .collect()
 }
@@ -932,6 +933,7 @@ fn row_to_column_info(r: &MySqlRow) -> ColumnInfo {
             .unwrap_or(None)
             .filter(|c| !c.is_empty()),
         enum_type: None,
+        domain_type: None,
     }
 }
 

@@ -76,6 +76,9 @@ pub struct ColumnInfo {
     /// qualified enum/domain element type for an array of custom values.
     #[serde(skip)]
     pub enum_type: Option<QualifiedTypeName>,
+    /// The declared PostgreSQL domain type when a column is a domain.
+    #[serde(skip)]
+    pub domain_type: Option<QualifiedTypeName>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -202,6 +205,7 @@ mod tests {
                 schema: "app".into(),
                 name: "status_type".into(),
             }),
+            domain_type: None,
         };
 
         let wire = serde_json::to_value(&column).unwrap();

@@ -526,6 +526,7 @@ fn column(name: &str) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 

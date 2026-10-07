@@ -703,6 +703,7 @@ fn build_rule_row(
             comment: None,
             collation: None,
             enum_type: None,
+            domain_type: None,
         });
     let ops = operators_for(&col.data_type);
     let op_labels: Vec<&str> = ops.iter().map(|e| e.label).collect();
@@ -740,6 +741,7 @@ fn build_rule_row(
                 comment: None,
                 collation: None,
                 enum_type: None,
+                domain_type: None,
             });
         let ops = operators_for(&col.data_type);
         if let Some(entry) = ops.get(new_idx) {

@@ -186,6 +186,7 @@ fn col(name: &str, data_type: &str) -> ColumnInfo {
         comment: None,
         collation: None,
         enum_type: None,
+        domain_type: None,
     }
 }
 
