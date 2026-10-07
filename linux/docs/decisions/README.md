@@ -45,6 +45,7 @@ Other options and why they were rejected.
 | [0008](0008-connection-and-session-ownership.md) | Connection/session ownership and trust | Accepted | Distinct live identities, no pool/replay/security fallback, and scoped uncertainty with durable audit obligations. |
 | [0009](0009-persistence-and-identity-compatibility.md) | Durable identity and recoverable state | Accepted | Stable identifiers, compatible adapters, recoverable migrations and distinct persistence writer contracts. |
 | [0010](0010-administrative-action-audit.md) | Audit confirmed bundle administration | Accepted | Bundle import/export use durable, paired aggregate audit records and fail closed before side effects. |
+| [0011](0011-paged-query-results.md) | Page large editor results through a cursor | Proposed | An optional guarded, audited server cursor returns pages of 5,000 rows; PostgreSQL first, other engines keep the caps |
 
 Decisions 0007–0009 extract existing approved sprint/task-board rules. Accepted
 means the architecture choice is recorded; implementation and runtime acceptance
