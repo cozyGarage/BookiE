@@ -63,6 +63,13 @@ NULL are checked against `pg_typeof` and `array_send`; malformed XML retains the
 native `2200N` refusal, with the target and sibling rows unchanged
 ([validation on PR #118](https://github.com/cozyGarage/BookiE/pull/118#issuecomment-6027920545)).
 
+Custom composite arrays now have a named explicit-refusal contract. The test
+checks the undecodable value against PostgreSQL's native composite type, JSON,
+text and wire output, then verifies literal/bind refusal leaves target and
+sibling rows unchanged (`value_contract_custom_composite_array_refusal_preserves_rows`
+in `crates/drivers/postgres/tests/support/custom_array_contract.rs`). Other
+custom array families and their consumers remain open.
+
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
 source/SHA attribution; this summary does not certify the current tree.
