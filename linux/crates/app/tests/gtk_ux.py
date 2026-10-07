@@ -374,10 +374,11 @@ def scenarios(ui):
         open_cell_menu("1")
         choose_menu_item(6)
         wait_for_adw_dialog("Columns")
+        switch_roles = {getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON), pyatspi.ROLE_CHECK_BOX}
         switches = [
             node for node in ui.descendants(ui.application_node())
             if ui.node_name(node) in ("alpha", "beta")
-            and ui.node_role(node) == getattr(pyatspi, "ROLE_SWITCH", pyatspi.ROLE_TOGGLE_BUTTON)
+            and ui.node_role(node) in switch_roles
             and node.queryAction().nActions > 0
         ]
         assert len(switches) == 2, ui.accessible_snapshot()
