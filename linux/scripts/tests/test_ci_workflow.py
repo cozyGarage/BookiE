@@ -56,6 +56,7 @@ class CiWorkflowTests(unittest.TestCase):
                 "value_contract_mongodb_collection_wide_mixed_metadata_refuses_edit",
                 "value_contract_mssql_legacy_datetime_text_grid_edit_preserves_wire_value_and_siblings",
                 "value_contract_mssql_datetimeoffset_grid_edit_preserves_local_time_offset_and_siblings",
+                "value_contract_mssql_max_values_survive_connection_session_and_consumers",
             },
         )
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()

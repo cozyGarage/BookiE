@@ -4,6 +4,7 @@
 
 ### Added
 
+- SQL Server `nvarchar(max)`, `varchar(max)` and `varbinary(max)` now have Docker-backed 64 KiB boundary and 1 MiB contracts across regular and dedicated sessions; CSV round-trips large values, while XLSX is verified to refuse cells beyond its format limit instead of truncating. CSV import keeps a 2 MiB per-field bound so 1 MiB hex-escaped binary values remain importable.
 - Table tabs can export every row of the table, or of the filtered and sorted view, to CSV or JSON in a background job with progress and cancel.
 - PostgreSQL `bit[]` and `varbit[]` preserve values through results, typed parameters, CSV import, and keyed grid edits, including empty bit strings, SQL NULL, non-default bounds, and refusal of invalid edits without changing sibling rows.
 - PostgreSQL `citext[]` preserves exact elements, SQL NULL, empty arrays, multidimensional shape, zero lower bounds and case-insensitive comparisons through results, typed parameters, keyed grid edits and CSV round-trips; malformed values are refused without changing target or sibling rows.

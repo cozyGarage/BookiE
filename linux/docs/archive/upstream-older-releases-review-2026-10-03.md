@@ -80,6 +80,14 @@ Compare exact native `DATALENGTH`, server hash and stored kind against driver,
 grid, CSV/JSON/XLSX and re-import results. Add configuration only if a native
 failure proves it necessary, and ensure it cannot change audit/transaction state.
 
+The Docker contract now covers the size/NULL/empty, ordinary/dedicated-session,
+grid display, CSV and JSON paths. CSV re-import accepts 1 MiB binary values using
+a bounded 2 MiB plus prefix field ceiling. XLSX is verified at its per-cell
+length boundary and explicitly rejects larger values; it does not promise to
+round-trip SQL Server MAX-sized cells. No `TEXTSIZE` change was needed. See
+`value_contract_mssql_max_values_survive_connection_session_and_consumers` and
+the B3 board for this contract's status.
+
 ### O3: result limits and multiple result sets
 
 Origins: 0.17.0, [0.55.0](https://github.com/TableProApp/TablePro/releases/tag/v0.55.0),
