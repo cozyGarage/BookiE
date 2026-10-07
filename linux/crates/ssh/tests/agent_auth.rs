@@ -106,6 +106,24 @@ struct AnswerHostKeys {
     calls: AtomicUsize,
 }
 
+struct AcceptFirstAndWaitOnSecondHostKey {
+    calls: AtomicUsize,
+    second_prompt: tokio::sync::Notify,
+}
+
+#[async_trait::async_trait]
+impl Prompter for AcceptFirstAndWaitOnSecondHostKey {
+    async fn answer(&self, prompt: &AskpassPrompt) -> PromptAnswer {
+        assert!(matches!(prompt, AskpassPrompt::HostKeyConfirmation { .. }));
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            PromptAnswer::Accept
+        } else {
+            self.second_prompt.notify_one();
+            std::future::pending().await
+        }
+    }
+}
+
 #[async_trait::async_trait]
 impl Prompter for AnswerHostKeys {
     async fn answer(&self, prompt: &AskpassPrompt) -> PromptAnswer {
@@ -448,6 +466,63 @@ async fn a_two_hop_chain_reaches_the_final_host() {
     );
 
     drop(hop1);
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn cancelling_while_trusting_the_second_hop_does_not_learn_its_host_key() {
+    let temp = tempfile::tempdir().unwrap();
+    isolate_known_hosts(temp.path());
+    let unique = unique_suffix();
+    let network = format!("tablepro-ssh-chain-cancel-{unique}");
+    let hop0_name = format!("tablepro-ssh-hop0-cancel-{unique}");
+    let hop1_name = format!("tablepro-ssh-hop1-cancel-{unique}");
+
+    let (_hop0, hop0_host, hop0_port) = start_first_hop_sshd(&hop0_name, &network).await;
+    let _hop1 = start_named_password_sshd(&hop1_name, &network).await;
+    let hops = vec![
+        password_config(&hop0_host, hop0_port, "s3cret"),
+        password_config(&hop1_name, 2222, "s3cret"),
+    ];
+    let prompter = Arc::new(AcceptFirstAndWaitOnSecondHostKey {
+        calls: AtomicUsize::new(0),
+        second_prompt: tokio::sync::Notify::new(),
+    });
+    let second_prompt = prompter.second_prompt.notified();
+    tokio::pin!(second_prompt);
+    let prompt_wait = tokio::time::timeout(std::time::Duration::from_secs(10), second_prompt.as_mut());
+    let task_prompter = prompter.clone();
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let task_cancellation = cancellation.clone();
+    let attempt = tokio::spawn(async move {
+        tokio::select! {
+            () = task_cancellation.cancelled() => false,
+            result = SshTunnel::open_chain_prompted(
+                &hops,
+                "127.0.0.1".into(),
+                2222,
+                UnknownHostKey::Refuse,
+                task_prompter,
+            ) => result.is_ok(),
+        }
+    });
+
+    prompt_wait.await.unwrap();
+    cancellation.cancel();
+    assert!(!attempt.await.unwrap(), "the cancelled chain must not connect");
+
+    let known_hosts = tablepro_ssh::default_known_hosts_path().unwrap();
+    let learned = std::fs::read_to_string(known_hosts).unwrap();
+    assert_eq!(
+        learned.lines().filter(|line| !line.trim().is_empty()).count(),
+        1,
+        "only the explicitly accepted first hop is trusted: {learned}"
+    );
+    assert!(learned.contains(&format!("[{hop0_host}]:{hop0_port}")));
+    assert!(
+        !learned.contains(&hop1_name),
+        "cancelling the prompt must not trust hop two"
+    );
 }
 
 #[tokio::test]
