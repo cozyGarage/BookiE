@@ -33,6 +33,7 @@
 - The SQL editor shades the statement under the cursor so you can see what Run Statement at Cursor will send.
 - The SQL editor jumps to the next or previous statement with Alt+Shift+Down and Alt+Shift+Up.
 - Preferences has an Appearance setting to follow the system or always use the light or dark style.
+- Result tabs of a script are named after the statement and table, such as 2 · SELECT users (12), instead of Result 2.
 - A script with more than five statements shows its results in a drop-down instead of a row of buttons that overflows the window.
 - Preferences has an opt-in Vim keys setting for the SQL editor, applied to editors opened afterwards.
 - A table remembers the column order you drag it to, per connection.
