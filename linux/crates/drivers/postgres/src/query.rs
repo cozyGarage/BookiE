@@ -294,30 +294,11 @@ where
             break;
         }
         if rows.is_empty() {
-            type_infos = statement_type_infos(row.columns());
-            column_origins = statement_column_origins(row.columns());
-            type_names = row
-                .columns()
-                .iter()
-                .map(|column| column.type_info().name().to_ascii_uppercase())
-                .collect::<Vec<_>>();
-            columns = row
-                .columns()
-                .iter()
-                .map(|column| ColumnInfo {
-                    name: column.name().to_string(),
-                    data_type: column.type_info().name().to_string(),
-                    nullable: true,
-                    primary_key: false,
-                    is_auto_increment: false,
-                    default_value: None,
-                    is_generated: false,
-                    comment: None,
-                    collation: None,
-                    enum_type: None,
-                    domain_type: None,
-                })
-                .collect();
+            let metadata = stream_column_metadata(row.columns());
+            columns = metadata.columns;
+            type_infos = metadata.type_infos;
+            column_origins = metadata.column_origins;
+            type_names = metadata.type_names;
         }
         // Decode while streaming so the wire rows and the final Value matrix
         // do not both occupy memory for the entire result.
@@ -341,6 +322,44 @@ where
         type_infos,
         column_origins,
     ))
+}
+
+struct PgColumnMetadata {
+    columns: Vec<ColumnInfo>,
+    type_infos: Vec<PgTypeInfo>,
+    column_origins: Vec<Option<(i64, i16)>>,
+    type_names: Vec<String>,
+}
+
+fn stream_column_metadata(pg_columns: &[sqlx::postgres::PgColumn]) -> PgColumnMetadata {
+    let type_infos = statement_type_infos(pg_columns);
+    let column_origins = statement_column_origins(pg_columns);
+    let type_names = pg_columns
+        .iter()
+        .map(|column| column.type_info().name().to_ascii_uppercase())
+        .collect();
+    let columns = pg_columns
+        .iter()
+        .map(|column| ColumnInfo {
+            name: column.name().to_string(),
+            data_type: column.type_info().name().to_string(),
+            nullable: true,
+            primary_key: false,
+            is_auto_increment: false,
+            default_value: None,
+            is_generated: false,
+            comment: None,
+            collation: None,
+            enum_type: None,
+            domain_type: None,
+        })
+        .collect();
+    PgColumnMetadata {
+        columns,
+        type_infos,
+        column_origins,
+        type_names,
+    }
 }
 
 fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, DriverError> {
