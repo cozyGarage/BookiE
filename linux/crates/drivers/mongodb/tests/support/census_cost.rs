@@ -13,7 +13,7 @@ async fn value_contract_mongodb_census_scan_cost_profile() {
     let database = client.database("appdb");
     let connection = MongodbDriver.connect(super::opts(&host, port, "appdb")).await.unwrap();
 
-    for size in [1_000_i32, 10_000_i32, 100_000_i32] {
+    for size in [1_000_i32, 10_000_i32, 100_000_i32, 1_000_000_i32] {
         let collection_name = format!("census_cost_{size}");
         let collection = database.collection::<Document>(&collection_name);
         let documents = (0..size)
