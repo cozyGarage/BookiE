@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "B4-16 current-Linux release-binary GTK rerun for SSH tunnel loss, stale-session retirement, and recovery",
+  "source_commit": "c3bb7f02fbd4f8dd926b14ab5951f5a982c4c5ce",
+  "source_tree": "92517ad998b2ccea507eb9f2b3da25cbc858e055",
+  "tested_source_sha256": {
+    "crates/app/tests/gtk_safety.py": "3f54c08e9964a9cf447c7f1ee21a0dc19cadacb4c5d0de17bdae1b1b5cab46f9",
+    "crates/app/tests/gtk_ux.py": "531c66c6d28377dbfc6b3294846f360d4a1625c86ceab92791143f7f69334213",
+    "scripts/test-postgres-release.sh": "f1b865d96403ec596514e0edb2480ad0be3b906e4ab1523289e32621abd30b45"
+  },
+  "command": "CARGO_TARGET_DIR=/home/trung/Projects/tablepro/linux/target TABLEPRO_GTK_SCENARIO=postgres_ssh_tunnel_loss_retires_session_and_reconnects TABLEPRO_GTK_BINARY=/home/trung/Projects/tablepro/linux/target/release/tablepro-app TABLEPRO_GTK_ARTIFACT_DIR=docs/evidence/ssh-reconnect-session-gtk-fb82ea1-2026-10-07/artifacts bash scripts/test-postgres-release.sh",
+  "binary": {
+    "path": "target/release/tablepro-app",
+    "sha256": "3403c2a9b69134984c504de5657121ef4157d0953260f446c14d748eb9a274b3",
+    "execution": "release app binary under isolated D-Bus, Xvfb, and AT-SPI"
+  },
+  "fixture": "PostgreSQL 16 release Docker fixture with Toxiproxy and SSH bastion",
+  "scenario": "postgres_ssh_tunnel_loss_retires_session_and_reconnects",
+  "assertions": [
+    "GTK opens an editor session through the SSH bastion and reads an uncommitted insert only inside that session.",
+    "Toxiproxy cuts the live route; a stale-session write is refused and the row remains absent.",
+    "After the route is restored, a new Session reconnects and successfully runs SELECT 42."
+  ],
+  "result": "scenario passed; release harness exited 0",
+  "log": {
+    "path": "focused.txt",
+    "sha256": "53319797bdcb26349051c2cd15229840f52160562897a3d39adc60757d99ac27"
+  },
+  "result_artifact": {
+    "path": "artifacts/postgres_ssh_tunnel_loss_retires_session_and_reconnects-result.json",
+    "sha256": "d553f36438e54c95cf1f15eb11ac6f6a67e5d11187a6dcb4e0116ecbd37f3a9f"
+  },
+  "not_established": [
+    "Frozen B3+B4 candidate acceptance",
+    "Hosted acceptance",
+    "Distribution-package installed desktop or native Wayland acceptance"
+  ]
+}
