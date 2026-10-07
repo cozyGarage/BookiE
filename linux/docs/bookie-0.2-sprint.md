@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `377cef3c9` (PR #153) on `linux`, pushed to
+Current integrated source baseline: `b43af2030` (PR #154) on `linux`, pushed to
 `origin/linux`. Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding,
 grid edits and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures
 for MySQL and SQL Server; #151 adds the daemon system-OpenSSH trust flow and
@@ -21,10 +21,12 @@ engine/type/consumer/configuration matrix, mutation triage and installed grid
 acceptance still need work. PR #153 reconciles the hosted preflight and harness
 findings from #150/#151, corrects the ignored-test inventory and duplicate B4
 ledger rows, and moves SSH host-key generation to container startup. PR #154
-adds a PostgreSQL enum-array slice consumer case; local checks and SonarCloud
-pass, while other hosted checks are pending. The scoped XLSX writer mutation
-run caught 41/41 mutants; broad core/package coverage remains open. These
-changes do not qualify the release.
+added a PostgreSQL enum-array slice consumer case. Its hosted quick gate exposed
+the PostgreSQL contract source exceeding the file-size limit; the regression is
+now split into its own included file and the ignored-test inventory updated in
+PR #156. Local quick checks pass; the PR's hosted checks remain pending. The
+scoped XLSX writer mutation run caught 41/41 mutants; broad core/package
+coverage remains open. These changes do not qualify the release.
 
 Order: **B3 → B4 → installed Arch/Omarchy/Hyprland Wayland → Debian/GNOME
 Wayland → B7 qualification**. Review/preparation may overlap with reserved

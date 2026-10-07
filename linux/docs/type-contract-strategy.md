@@ -104,7 +104,9 @@ The same explicit-refusal contract now covers `point[]` with native type, text,
 JSON and wire oracles plus target/sibling preservation
 (`value_contract_point_array_refusal_preserves_target_and_sibling_rows`). Both
 tests are in `crates/drivers/postgres/tests/support/custom_array_contract.rs`;
-see the [PR validation comments](https://github.com/cozyGarage/BookiE/pull/126).
+the PostgreSQL built-in `int4range[]` receives the same explicit refusal and
+preservation checks in
+`crates/drivers/postgres/tests/support/range_array_contract.rs`.
 
 Detailed native cases and old counts are in [type-contract history](archive/type-contract-history.md)
 and [the value evidence index](value-contracts.md). Those records keep their
@@ -195,7 +197,7 @@ Custom enum-array slicing now has a native consumer contract: slicing a
 non-1-based multidimensional array resets the result bounds to `[1:2][1:2]`,
 while preserving empty text, literal `NULL`, SQL NULL, Unicode and exact wire
 bytes through typed rebinding. SQL NULL and an empty array remain distinct
-([test](../crates/drivers/postgres/tests/support/array_contract_parts/enum_consumers.rs)).
+([test](../crates/drivers/postgres/tests/support/array_contract_parts/enum_array_slices.rs)).
 Quoted enum schema/type identifiers containing embedded quotes also retain the
 target type under a same-named shadowed `search_path`; keyed writes and filters
 match native qualified/unqualified type names, preserve both target and shadow

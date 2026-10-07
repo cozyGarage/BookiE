@@ -134,6 +134,7 @@ include!("array_contract_parts/citext_array_consumers.rs");
 include!("array_contract_parts/bit_array_consumers.rs");
 
 include!("array_contract_parts/enum_consumers.rs");
+include!("array_contract_parts/enum_array_slices.rs");
 
 include!("array_contract_parts/enum_catalog_changes.rs");
 
