@@ -788,6 +788,7 @@ two-byte UTF-8 character must survive metadata discovery and a keyed enum edit,
 with the stored catalog identity and sibling value checked natively. The
 contract is `value_contract_postgres_enum_identifiers_at_catalog_byte_limit_preserve_typed_edits`
 in `crates/drivers/postgres/tests/support/quoted_enum_identifier_contract.rs`.
+Its Docker and local CI results are recorded in the [PR validation comment](https://github.com/cozyGarage/BookiE/pull/125#issuecomment-6028822115).
 This closes only that identifier boundary; other identifier forms and
 transaction/session `search_path` permutations remain open.
 
