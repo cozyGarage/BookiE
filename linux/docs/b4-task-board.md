@@ -34,17 +34,16 @@ unavailable evidence. The broad release audit is dated
 | C6 | PR #150, merge commit `8f2df09ee` | MySQL and SQL Server tunneled TLS focused suite passed locally (43 tests) | Preflight, regression gate and SonarCloud failed; integration tests were skipped; Flatpak and supply-chain checks were queued or in progress |
 | G5 | PR #151, merge commit `11672cbe6` | Actual system OpenSSH trust flow and PostgreSQL release suite passed locally; `audit_isolation_tests` passed separately (4 tests) | SonarCloud and resolve-ref passed; other checks were queued |
 
-PRs #153–#171 have merged into `linux`; the current baseline is `c358b9bce`.
-PR #159 adds SSH audit, rollback, and Kerberos slices. PRs #161 and #162 fix
-PostgreSQL release GTK dependencies and safety fixture setup. PR #165 hardens
-GTK trust-prompt role detection, two-hop tunnel-loss setup, and audit-journal
-failure coverage. PR #163 fixes the SSH handshake timeout while a trust prompt
-waits; PR #170 preserves the remaining handshake deadline after the decision.
-The `xdotool` chooser change was not needed by the passing local GTK run. Local
-evidence and correction history are in the [October 7
-candidate checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json).
-Fresh hosted validation, privacy/headless ownership acceptance, and installed
-acceptance remain open.
+The current `linux` baseline fetched on 2026-10-07 is `e47dbbbc2` (PR #183).
+Recent B4 merges include #159 (SSH audit, rollback and Kerberos), #161/#162
+(PostgreSQL GTK fixture setup), #163/#170/#173/#175 (SSH trust-prompt timeout
+and dismissal), #165 (GTK SSH fixture hardening), and #178 (file-chooser
+accessibility wait). PR #181 records fresh merged-linux plaintext bundle-audit
+GTK runs; #182 adds a fresh encrypted-bundle run and corrects the stale I5 GTK
+coverage row. PR #183 adds B3 UI and MSSQL coverage. The [October 7 candidate
+checkpoint](evidence/b4-candidate-acceptance-2026-10-07/manifest.json) retains
+the earlier candidate evidence. These merges do not establish fresh hosted,
+frozen-candidate, or installed acceptance; those gates remain open.
 
 ## Remaining tasks
 

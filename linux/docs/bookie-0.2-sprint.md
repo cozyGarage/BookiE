@@ -8,7 +8,7 @@ they are preserved in this checkout. The history files retain the earlier `0cf70
 
 ## Current continuation plan: 2026-10-07
 
-Current integrated source baseline: `0a57d281` on `linux` (PR #176).
+Current integrated source baseline: `e47dbbbc2` on `linux` (PR #183).
 Merges #146–#149 add PostgreSQL `name[]` decoding, typed rebinding, grid edits
 and escaped/boundary CSV round trips; #150 adds tunneled TLS fixtures for MySQL
 and SQL Server; #151 adds the daemon system-OpenSSH trust flow and headless
@@ -39,6 +39,13 @@ complete Debian testing floor run (app library, GTK widgets and installed GTK
 safety suite) pass on the integrated source. The Debian run uses Xvfb; it does
 not replace GNOME/Wayland acceptance. These fixes close the #173 regressions but
 do not qualify B3 or the release. See PR #176 for command-level evidence.
+Since #176, #177 adds font preference, keyboard history navigation and a
+two-profile bundle test; #178 hardens the GTK file-chooser accessibility wait;
+#179 reconciles sprint status; #180 splits PR and merge CI tiers; #181 and #182
+refresh B4 bundle-audit evidence and correct the B4 SSH-audit coverage record;
+#183 adds loaded-row search and MSSQL maximum-value/restart coverage. The exact
+local bundle flows are linked from the [B4 board](b4-task-board.md); hosted,
+installed and frozen-candidate evidence remains distinct from those local runs.
 Case details and evidence belong in the [B3
 board](type-contract-strategy.md), [B4 board](b4-task-board.md), [value evidence
 index](value-contracts.md), test sources and relevant PR comments. B3 remains
